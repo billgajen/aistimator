@@ -1,0 +1,295 @@
+/**
+ * API request/response types for the Estimator platform
+ */
+
+import type { QuoteStatus, DocumentType, QuotePricing, QuoteContent, CrossServicePricing, SignalRecommendation } from './database.types'
+
+// ============================================================================
+// Common Types
+// ============================================================================
+
+export interface ApiError {
+  code: string
+  message: string
+  details?: unknown[]
+}
+
+export interface ApiErrorResponse {
+  error: ApiError
+}
+
+// ============================================================================
+// Auth API Types
+// ============================================================================
+
+export interface MeResponse {
+  userId: string
+  tenantId: string
+  role: string
+  email: string
+  displayName: string | null
+}
+
+export interface SetupTenantRequest {
+  businessName: string
+}
+
+export interface SetupTenantResponse {
+  tenantId: string
+  tenantName: string
+}
+
+// ============================================================================
+// Public Quote API Types
+// ============================================================================
+
+export interface CustomerInput {
+  name: string
+  email: string
+  phone?: string
+}
+
+export interface JobInput {
+  address?: string
+  postcodeOrZip?: string
+  answers?: Array<{ fieldId: string; value: string | number | boolean | string[] }>
+}
+
+export interface SourceInput {
+  type: 'widget' | 'whatsapp' | 'api'
+  pageUrl?: string
+  userAgent?: string
+}
+
+export interface CreateQuoteRequest {
+  tenantKey: string
+  serviceId: string
+  customer: CustomerInput
+  job?: JobInput
+  assetIds?: string[]
+  source?: SourceInput
+}
+
+export interface CreateQuoteResponse {
+  quoteId: string
+  status: QuoteStatus
+  quoteViewUrl: string
+  tokenExpiresAt: string
+}
+
+// ============================================================================
+// Public Quote View API Types
+// ============================================================================
+
+export interface QuoteViewBusiness {
+  name: string
+  logoUrl?: string
+}
+
+export interface QuoteViewCustomer {
+  name: string
+}
+
+export interface QuoteViewAsset {
+  assetId: string
+  type: 'image' | 'document'
+  viewUrl: string
+}
+
+export interface QuoteViewActions {
+  acceptUrl: string
+  payUrl?: string
+  pdfUrl?: string
+}
+
+export interface QuoteViewResponse {
+  quoteId: string
+  status: QuoteStatus
+  documentType: DocumentType
+  business: QuoteViewBusiness
+  customer: QuoteViewCustomer
+  pricing: QuotePricing
+  breakdown: Array<{ label: string; amount: number }>
+  notes: QuoteContent
+  validUntil?: string
+  assets: QuoteViewAsset[]
+  actions: QuoteViewActions
+  /** Pricing for additional services mentioned by the customer */
+  crossServicePricing?: CrossServicePricing[]
+  /** AI-recommended additional work based on unused signals */
+  signalRecommendations?: SignalRecommendation[]
+}
+
+export interface AcceptQuoteRequest {
+  token: string
+}
+
+export interface AcceptQuoteResponse {
+  status: 'accepted'
+  acceptedAt: string
+}
+
+// ============================================================================
+// Upload API Types
+// ============================================================================
+
+export interface FileInput {
+  fileName: string
+  contentType: string
+  sizeBytes: number
+}
+
+export interface InitUploadsRequest {
+  tenantKey: string
+  files: FileInput[]
+}
+
+export interface UploadIntent {
+  assetId: string
+  uploadUrl: string
+  method: 'PUT'
+}
+
+export interface InitUploadsResponse {
+  uploads: UploadIntent[]
+  errors?: Array<{ fileName: string; error: string }>
+}
+
+// ============================================================================
+// Dashboard API Types
+// ============================================================================
+
+export interface TenantSettingsResponse {
+  tenantId: string
+  name: string
+  currency: string
+  tax: {
+    enabled: boolean
+    label?: string
+    rate?: number
+  }
+  serviceArea: {
+    mode: 'none' | 'postcode_allowlist' | 'county_state'
+    values: string[]
+  }
+}
+
+export interface UpdateTenantRequest {
+  name?: string
+  currency?: string
+  tax?: {
+    enabled: boolean
+    label?: string
+    rate?: number
+  }
+  serviceArea?: {
+    mode: 'none' | 'postcode_allowlist' | 'county_state'
+    values: string[]
+  }
+}
+
+export interface ServiceResponse {
+  serviceId: string
+  name: string
+  active: boolean
+  documentTypeDefault: DocumentType
+}
+
+export interface QuoteListItem {
+  quoteId: string
+  serviceName: string
+  customerName: string
+  customerEmail: string
+  status: QuoteStatus
+  createdAt: string
+  sentAt: string | null
+  viewedAt: string | null
+  acceptedAt: string | null
+  paidAt: string | null
+  total: number
+  currency: string
+}
+
+export interface QuotesListResponse {
+  items: QuoteListItem[]
+  nextCursor: string | null
+}
+
+// ============================================================================
+// Analytics API Types
+// ============================================================================
+
+export interface AnalyticsMetrics {
+  totalQuotes: number
+  quotesViewed: number
+  quotesAccepted: number
+  quotesPaid: number
+  conversionRate: number // percentage (0-100)
+}
+
+export interface UsageData {
+  periodYYYYMM: string
+  estimatesCreated: number
+  estimatesSent: number
+  planLimit: number
+  planName: string
+}
+
+export interface AnalyticsResponse {
+  metrics: AnalyticsMetrics
+  usage: UsageData
+}
+
+// ============================================================================
+// Billing API Types
+// ============================================================================
+
+export interface PlanInfo {
+  id: string
+  name: string
+  monthlyEstimateLimit: number
+  priceCents: number
+  currency: string
+  features: {
+    pdfGeneration: boolean
+    emailNotifications: boolean
+    customBranding: boolean
+    prioritySupport: boolean
+    apiAccess: boolean
+  }
+  stripePriceId?: string
+}
+
+export interface SubscriptionInfo {
+  status: 'active' | 'past_due' | 'canceled' | 'trialing' | 'none'
+  plan: PlanInfo | null
+  currentPeriodEnd: string | null
+  cancelAtPeriodEnd: boolean
+  stripeCustomerId: string | null
+}
+
+export interface BillingUsage {
+  estimatesCreated: number
+  estimatesSent: number
+  planLimit: number
+  periodStart: string
+  periodEnd: string
+}
+
+export interface BillingResponse {
+  subscription: SubscriptionInfo
+  usage: BillingUsage
+  availablePlans: PlanInfo[]
+}
+
+export interface CreateCheckoutRequest {
+  planId: string
+}
+
+export interface CreateCheckoutResponse {
+  checkoutUrl: string
+}
+
+export interface CreatePortalResponse {
+  portalUrl: string
+}

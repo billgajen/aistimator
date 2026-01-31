@@ -1,0 +1,47 @@
+name = "estimator-worker"
+main = "src/index.ts"
+compatibility_date = "2024-06-01"
+
+# Queue producer binding (for HTTP trigger endpoint)
+[[queues.producers]]
+queue = "quote-jobs"
+binding = "QUOTE_JOBS"
+
+# Queue consumer binding
+[[queues.consumers]]
+queue = "quote-jobs"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "quote-jobs-dlq"
+
+# R2 bucket binding (for asset access)
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "aistimator-assets"
+
+# Development environment variables
+[vars]
+ENVIRONMENT = "development"
+
+# Production secrets (set via wrangler secret put):
+# - SUPABASE_URL
+# - SUPABASE_SERVICE_KEY
+# - UPSTASH_REDIS_URL
+# - UPSTASH_REDIS_TOKEN
+# - GEMINI_API_KEY
+# - POSTMARK_API_TOKEN
+# - POSTMARK_FROM_EMAIL
+# - APP_URL (e.g., https://yourdomain.com)
+#
+# Optional rate limit overrides:
+# - RATE_LIMIT_GLOBAL (default: 100)
+# - RATE_LIMIT_TENANT (default: 10)
+
+# Production environment
+[env.production]
+vars = { ENVIRONMENT = "production" }
+
+# Staging environment
+[env.staging]
+vars = { ENVIRONMENT = "staging" }

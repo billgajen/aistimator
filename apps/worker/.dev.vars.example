@@ -1,0 +1,20 @@
+# Worker Environment Variables
+# Copy to .dev.vars for local development with wrangler
+
+# Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=your-service-role-key
+
+# Upstash Redis
+UPSTASH_REDIS_URL=https://your-redis.upstash.io
+UPSTASH_REDIS_TOKEN=your-redis-token
+
+# Gemini AI
+GEMINI_API_KEY=your-gemini-api-key
+
+# Environment
+ENVIRONMENT=development
+
+# Rate limit overrides (optional)
+# RATE_LIMIT_GLOBAL=100
+# RATE_LIMIT_TENANT=10
