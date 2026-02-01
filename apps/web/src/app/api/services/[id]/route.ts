@@ -44,10 +44,15 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    // Fetch service
+    // Fetch service with pricing rules
     const { data: service, error: serviceError } = await supabase
       .from('services')
-      .select('*')
+      .select(`
+        *,
+        service_pricing_rules (
+          rules_json
+        )
+      `)
       .eq('id', id)
       .eq('tenant_id', profile.tenant_id)
       .single()
@@ -59,7 +64,17 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    return NextResponse.json({ service })
+    // Transform to include pricing_rules at top level for frontend compatibility
+    const pricingRule = Array.isArray(service.service_pricing_rules)
+      ? service.service_pricing_rules[0]
+      : service.service_pricing_rules
+    const serviceWithPricing = {
+      ...service,
+      pricing_rules: pricingRule?.rules_json || null,
+      service_pricing_rules: undefined,
+    }
+
+    return NextResponse.json({ service: serviceWithPricing })
   } catch (error) {
     console.error('Service GET error:', error)
     return NextResponse.json(
@@ -120,6 +135,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       workSteps,
       expectedSignals,
       draftConfig,
+      pricingRules,  // BUG-003 FIX: Extract pricingRules from request body
     } = body as {
       name?: string
       description?: string | null
@@ -132,6 +148,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       workSteps?: WorkStepConfig[]
       expectedSignals?: ExpectedSignalConfig[]
       draftConfig?: ServiceDraftConfig | null
+      // BUG-003 FIX: Type for pricingRules
+      pricingRules?: {
+        baseFee?: number
+        minimumCharge?: number
+        addons?: Array<{
+          id: string
+          label: string
+          price: number
+          description?: string
+        }>
+        multipliers?: Array<{
+          id: string
+          label: string
+          conditions: Array<{ signalKey: string; operator: string; value: string | number | boolean }>
+          multiplier: number
+        }>
+        workSteps?: WorkStepConfig[]
+      }
     }
 
     // Build update object
@@ -211,7 +245,35 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       )
     }
 
-    return NextResponse.json({ service })
+    // BUG-003 FIX: Update pricing rules if provided
+    if (pricingRules) {
+      const { error: pricingError } = await supabase
+        .from('service_pricing_rules')
+        .upsert({
+          tenant_id: profile.tenant_id,
+          service_id: id,
+          rules_json: {
+            baseFee: pricingRules.baseFee ?? 0,
+            minimumCharge: pricingRules.minimumCharge ?? 0,
+            addons: pricingRules.addons || [],
+            multipliers: pricingRules.multipliers || [],
+            workSteps: pricingRules.workSteps || workSteps || [],
+          },
+        }, { onConflict: 'service_id' })
+
+      if (pricingError) {
+        console.error('[API] Failed to update pricing rules:', pricingError)
+        // Don't fail the request - service was updated successfully
+      }
+    }
+
+    // Return service with pricing rules included
+    const serviceWithPricing = {
+      ...service,
+      pricing_rules: pricingRules || null,
+    }
+
+    return NextResponse.json({ service: serviceWithPricing })
   } catch (error) {
     console.error('Service PATCH error:', error)
     return NextResponse.json(

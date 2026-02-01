@@ -15,6 +15,305 @@
 
 ## Issues & Resolutions
 
+### 2026-02-01: Quote Generation Quality Fixes v4
+
+**Context:** Deep analysis of a boiler service quote test revealed multiple issues with quote generation quality. Four fixes were implemented based on severity.
+
+---
+
+#### FIX-1: Remove AI Prices from Potential Additional Work (CRITICAL)
+
+**Symptom:** "Potential Additional Work" section showed AI-invented prices like £180, £125, £150 that were not from business configuration.
+
+**Root Cause:** `signal-recommendations.ts` asked AI to generate `estimatedCost` values.
+
+**Resolution (AD-001 Compliance):**
+- File: `packages/shared/src/database.types.ts`
+  - Made `estimatedCost` optional and deprecated
+  - Updated `costBreakdown` to contain work description without prices
+- File: `apps/worker/src/ai/signal-recommendations.ts`
+  - Prompt now asks for `whatItInvolves` (work description) not costs
+  - Added `stripPricesFromText()` to defensively remove any price patterns
+  - Recommendations now describe WHAT might be needed, not how much it costs
+
+**Lesson:** Extends AD-001 - AI can suggest work but cannot set or estimate prices.
+
+---
+
+#### FIX-2: Addon vs Exclusion Conflict Check (CRITICAL)
+
+**Symptom:** "Powerflush" addon was auto-recommended even though "Powerflush" was in `scope_excludes`.
+
+**Root Cause:** No check to prevent recommending addons that conflict with explicit exclusions.
+
+**Resolution:**
+- File: `apps/worker/src/quote-processor.ts`
+  - Added `isAddonConflictingWithExcludes()` function
+  - Checks addon label/ID against `scope_excludes` words
+  - Applied to both description-based and image-based addon detection
+  - Logs when addon is skipped due to conflict
+
+**Lesson:** Exclusions should prevent not just scope promises but also addon recommendations.
+
+---
+
+#### FIX-3: Vision Severity Calibration (HIGH)
+
+**Symptom:** Severe corrosion with water staining rated as "fair" instead of "poor".
+
+**Root Cause:** Vision prompt lacked calibration guidance for condition ratings.
+
+**Resolution:**
+- File: `apps/worker/src/ai/signals.ts`
+  - Added "CONDITION RATING CALIBRATION" section to prompt
+  - Clear definitions for excellent/good/fair/poor
+  - Explicit examples: "Rust on pipe joints + water staining = poor"
+  - Instruction to err on the side of rating WORSE when damage is visible
+
+**Lesson:** AI vision needs explicit calibration examples for severity assessment.
+
+---
+
+#### FIX-6: Error Code Integration (HIGH)
+
+**Symptom:** Customer-reported error codes (e.g., boiler "EA" code) captured but not used in quote wording.
+
+**Root Cause:** Error codes extracted as signals but not passed to wording context.
+
+**Resolution:**
+- File: `apps/worker/src/ai/wording.ts`
+  - Added `errorCode?: string` to `WordingContext`
+  - Added prompt section for error code with instruction to explain if recognized
+- File: `apps/worker/src/quote-processor.ts`
+  - Extracts error code from structured signals (keys: error_code, boiler_error_code, fault_code, display_code)
+  - Passes to wording context
+
+**Lesson:** Captured signals should flow through to customer-facing content.
+
+---
+
+**Note:** FIX-4 (unused signal fallback) and FIX-5 (work step triggers) from the analysis were deprioritized. FIX-5 is a configuration issue, not code.
+
+---
+
+### 2026-01-31: AI Scope Constraint & No-Hardcode Rule
+
+**Context:** Customer asked "if possible, a service at the same time" and AI responded with "A boiler service is included" in the scope summary. The business never configured boiler servicing as part of this service.
+
+**Impact:**
+- If business doesn't offer it → loses trust when they can't deliver
+- If business offers it at extra cost → loses money because AI said it's "included"
+
+**Root Cause:**
+- `scope_includes` was passed to AI as informational context, not a hard constraint
+- The prompt said "reference what's included if provided" (optional)
+- No explicit instruction telling AI it CANNOT mention services outside `scope_includes`
+- AI read customer's "if possible, a service" as intent and included it
+
+**Resolution:**
+
+1. **File: `/CLAUDE.md`**
+   - Added "Anti-hardcoding principle" section to Code conventions
+   - Prevents future hardcoded fixes like "add 'boiler servicing' to excludes"
+   - All business values must come from database configuration
+
+2. **File: `apps/worker/src/ai/wording.ts`**
+   - Added "CRITICAL - SCOPE BOUNDARIES ARE ABSOLUTE" section to WORDING_PROMPT
+   - Explicit rules: MUST NOT mention services outside scope_includes
+   - Customer requests outside scope acknowledged in notes, not promised
+   - Examples showing correct vs wrong behavior
+
+**Lesson:** This extends AD-001 (AI must not set prices) to "AI must not expand scope". The business configuration is the absolute boundary for what can be offered.
+
+**See:** AD-013 for the architectural decision.
+
+---
+
+### 2026-01-31: Intelligent Signal Key Unification
+
+**Context:** The BUG-001 fix used a hardcoded synonym map to match form signals to AI signals. This approach was not scalable (adding "paper_count" requires code changes) and brittle (substring matching, order-dependent). The system already had infrastructure for proper signal mapping (`mapsToSignal`, `expected_signals`) but it wasn't being used intelligently.
+
+**Root Cause:** Form fields and AI extraction used DIFFERENT signal keys:
+- Form field: `fieldId: "number_of_leaks"` (human-created)
+- AI signal: `key: "leak_count"` (AI-invented)
+
+Then the system tried to reconcile them with a brittle synonym map.
+
+**Solution: Canonical Signal Key Derivation (AD-012)**
+
+Instead of post-hoc matching, make form and AI use the SAME key from the start:
+1. When a user creates a question like "How many papers?", the system auto-derives `paper_count`
+2. This becomes the `mapsToSignal` on the field AND the signal key in `expectedSignals`
+3. AI is constrained to use ONLY these expected signal keys
+
+**Changes Made:**
+
+1. **File: `apps/web/src/app/(dashboard)/app/services/page.tsx`**
+   - Added `deriveSignalKey(label, fieldType)` function that intelligently derives canonical keys:
+     - "How many papers?" (number) → `paper_count`
+     - "Number of Leaks" (number) → `leak_count`
+     - "Approximate Age of Roof" (number) → `roof_age`
+     - "Is the leak causing interior damage?" (boolean) → `has_interior_damage`
+     - "Type of Roofing Material" (dropdown) → `roofing_material_type`
+   - Removes common filler words (how many, number of, please enter, etc.)
+   - Singularizes plurals (papers → paper)
+   - Adds appropriate suffix based on field type (_count, _type, has_, etc.)
+   - Updated `fieldToSignal()` to use `deriveSignalKey()`
+
+2. **File: `apps/worker/src/ai/signals.ts`**
+   - Rewrote `buildExpectedSignalsPromptSection()` with STRICT instructions
+   - AI is now explicitly told to use ONLY the provided signal keys
+   - Prohibits AI from inventing new keys like "item_count" when "paper_count" is expected
+   - Clear examples showing correct key usage
+
+3. **File: `apps/worker/src/quote-processor.ts`**
+   - Simplified `findSemanticSignalMatch()` to prioritize explicit `mapsToSignal`
+   - Removed the hardcoded synonym map (no longer needed)
+   - Matching order: direct mapsToSignal → exact fieldId → normalized → singular/plural
+   - Added `mapsToSignal` parameter to the function
+
+**Benefits:**
+- No hardcoded synonyms - works for ANY field type automatically
+- Deterministic - same derivation logic everywhere
+- Self-documenting - `expected_signals` explicitly lists what matters
+- AI-constrained - AI uses the keys we define, not invented ones
+- Scalable - add new question types without code changes
+
+**Lesson:** Signal matching should happen at configuration time, not processing time. By ensuring form and AI use identical canonical keys, we eliminate the need for fuzzy post-hoc matching.
+
+---
+
+### 2026-01-31: Quote Quality Fixes v3 (Comprehensive Review)
+
+**Context:** Continued testing after v1.5.0 revealed 2 additional critical bugs. Cross-service recommendations were matching wrong services (gutter request → Window Cleaning), and multipliers were not being applied due to type comparison failures.
+
+---
+
+#### BUG-004: Cross-Service Recommending Wrong Service - CRITICAL
+
+**Symptom:** Customer requested "gutter cleaning" but "Residential Window Cleaning" was recommended instead. The matched phrase verification (AD-008) passed because the phrase existed, but the SERVICE was wrong.
+
+**Root Cause:**
+- AD-008 verification only checked if `matchedPhrase` exists in source text
+- It did NOT verify that the recommended SERVICE matches the customer's REQUEST
+- Customer said "gutter cleaning" → AI matched to "Window Cleaning" because:
+  - Either no "Gutter Cleaning" service exists
+  - Or AI made a wrong semantic connection between "gutter" and "window"
+
+**Resolution:**
+- File: `apps/worker/src/ai/service-detection.ts`
+- Added AD-010: Service-request relevance validation after phrase verification
+- Extracts key object words from the matched phrase (e.g., "gutter" from "gutter cleaning")
+- Verifies the recommended service name contains the key object word
+- Handles singular/plural variations (gutters → gutter)
+- Rejects recommendations where service name doesn't match request keywords
+
+**Lesson:** Phrase verification alone isn't enough. The recommended SERVICE must semantically match what the customer REQUESTED.
+
+---
+
+#### BUG-005: Multipliers Not Being Applied - CRITICAL
+
+**Symptom:** User configured multipliers (e.g., "When roof age ≥ 10 → +5%", "When interior damage = Yes → +10%") but `multiplierAdjustment: 0` in pricing trace. Conditions were met but multipliers not applied.
+
+**Root Cause:**
+- File: `apps/worker/src/pricing/rules-engine.ts` line 649
+- `case 'equals': return answer.value === compareValue` used STRICT equality
+- Form checkbox submits `interior_damage: true` (boolean)
+- Multiplier config has `equals: "Yes"` (string)
+- `true === "Yes"` evaluates to `false` due to type mismatch
+- Same issue with number values: `10` (number) vs `"10"` (string)
+
+**Resolution:**
+- File: `apps/worker/src/pricing/rules-engine.ts`
+- Replaced strict equality with type-aware comparison in `shouldApplyMultiplier()`
+- Boolean handling: `true` matches "Yes", "yes", "true", "1", 1
+- Number handling: Compares as numbers if both can be parsed
+- String handling: Case-insensitive comparison
+- Fallback to strict equality for other types
+
+**Lesson:** Form data types and config value types may differ. Comparison logic must normalize types before checking equality.
+
+---
+
+### 2026-01-31: Quote Quality Fixes v2 (Deep Investigation)
+
+**Context:** Deep investigation of the v1.4.0 fixes revealed 3 critical bugs that were missed. These bugs caused form data to not properly override AI signals, false cross-service recommendations, and pricing configuration loss.
+
+---
+
+#### BUG-001: Signal Key Semantic Mismatch - CRITICAL
+
+**Symptom:** Customer submitted "Number of Leaks: 2" via form, but signals_json showed BOTH `number_of_leaks=2` (form) AND `leak_count=1` (AI). The AI signal was sometimes used in pricing instead of the form signal.
+
+**Root Cause:**
+- Form used field ID `number_of_leaks` but AI extracted signal key `leak_count`
+- Different keys = no override happened, both signals coexisted
+- The form signal merge code only did exact key matching
+
+**Resolution:**
+- File: `apps/worker/src/quote-processor.ts`
+- Added `findSemanticSignalMatch()` function that normalizes keys and matches synonyms
+- Normalization: removes `number_of_`, `_count`, `_quantity` suffixes
+- Synonym groups: `['leak', 'leaks', 'leakcount']`, `['room', 'rooms']`, etc.
+- Form signal now finds and overrides the AI signal even with different keys
+
+**Lesson:** Form->AI signal matching needs semantic awareness, not just exact string matching.
+
+---
+
+#### BUG-002: Keyword Fallback Bypassed Phrase Verification - CRITICAL
+
+**Symptom:** "Residential Window Cleaning" recommended for roof leak quote. Customer said "gutters overflow on that side sometimes" but quote showed "The customer explicitly requests gutter cleaning with the phrase 'I might need some gutter cleaning as well.'" - a hallucinated phrase.
+
+**Root Cause:**
+- AI detection (AD-008) had phrase verification to prevent hallucination
+- Keyword fallback `detectCrossServiceMentionsKeywords()` had NO verification
+- Window Cleaning had keyword "gutter" → matched "gutters overflow" → false positive
+- The "reason" text was fabricated, not from actual customer input
+
+**Resolution:**
+- File: `apps/worker/src/quote-processor.ts`
+- Added `extractPhraseContext()` to get actual text around keyword match
+- Added `isGenuineServiceRequest()` to verify intent patterns
+- Request patterns: "need", "want", "require", "looking for", "also", "as well"
+- Non-request patterns: "overflow", "sometimes", "because of", "near"
+- Keyword matches must pass verification to be recommended
+
+**Lesson:** ALL detection paths need the same validation rigor. Fallbacks can't be lower quality.
+
+---
+
+#### BUG-003: Add-ons and Multipliers Not Saved - CRITICAL
+
+**Symptom:** User configured add-ons and multipliers in service wizard, but after saving and reloading, they were gone. Only default empty values shown.
+
+**Root Cause:**
+- POST handler destructured request body but `pricingRules` was NOT included
+- PATCH handler same issue - `pricingRules` not extracted
+- POST inserted hardcoded defaults: `{ baseFee: 0, addons: [], multipliers: [] }`
+- Frontend sent `pricingRules` but API ignored it completely
+
+**Resolution:**
+- File: `apps/web/src/app/api/services/route.ts` (POST)
+  - Added `pricingRules` to request body destructuring
+  - Use `pricingRules.baseFee`, `.addons`, `.multipliers` in insert
+  - Return `pricing_rules` in response for frontend state update
+- File: `apps/web/src/app/api/services/[id]/route.ts` (PATCH)
+  - Added `pricingRules` to request body destructuring
+  - Added upsert to `service_pricing_rules` when `pricingRules` provided
+  - Return `pricing_rules` in response
+- File: `apps/web/src/app/api/services/route.ts` (GET)
+  - Added join with `service_pricing_rules` table
+  - Transform response to include `pricing_rules` at top level
+- File: `apps/web/src/app/api/services/[id]/route.ts` (GET)
+  - Added join with `service_pricing_rules` table
+  - Transform response to include `pricing_rules` at top level
+
+**Lesson:** When adding new fields to a wizard, ensure the API handler extracts and persists them, AND returns them when fetching.
+
+---
+
 ### 2026-01-31: Quote Quality Fixes (Roof Leak Test)
 
 **Context:** Testing a roof leak quote submission revealed 6 quality issues that made quotes look unprofessional.
@@ -387,6 +686,130 @@ if (pricingResult.estimatedTotal <= 0) {
 
 ---
 
+### AD-010: Cross-Service Name-Request Relevance
+
+**Decision:** Cross-service recommendations are rejected if the SERVICE NAME doesn't contain keywords from the customer's REQUEST.
+
+**Rationale:**
+- AD-008 phrase verification prevents hallucinated phrases but doesn't verify service match
+- "Gutter cleaning" request should NOT recommend "Window Cleaning" service
+- Customer mentions "gutter" → only "Gutter Cleaning" service is relevant
+- Recommending wrong service is worse than recommending nothing
+
+**Implementation:**
+1. Extract key object words from matched phrase (excluding common verbs/fillers)
+2. Check if any key word appears in the service name
+3. Handle singular/plural variations (gutters → gutter)
+4. Reject if no match found
+
+**Examples:**
+- Phrase: "gutter cleaning" → Key words: ["gutter"] → Matches "Gutter Cleaning" ✓
+- Phrase: "gutter cleaning" → Key words: ["gutter"] → Rejects "Window Cleaning" ✗
+- Phrase: "paint the walls" → Key words: ["paint", "walls"] → Matches "Painting" ✓
+
+**Implications:**
+- More restrictive than AD-008 alone
+- May reduce some edge-case valid recommendations
+- Significantly reduces false positives
+- Works in conjunction with AD-008 (phrase verification)
+
+---
+
+### AD-011: Type-Aware Multiplier Comparison
+
+**Decision:** Multiplier condition matching handles type differences between form values and config values.
+
+**Rationale:**
+- Form checkboxes submit `true`/`false` (boolean)
+- Config values may be "Yes"/"No" (string) or 1/0 (number)
+- Strict equality fails across types: `true === "Yes"` → false
+- Businesses shouldn't need to match exact types in config
+
+**Type Normalization:**
+| Form Value | Matches Config Values |
+|------------|----------------------|
+| `true` (bool) | `true`, "true", "True", "Yes", "yes", "1", 1 |
+| `false` (bool) | `false`, "false", "False", "No", "no", "0", 0 |
+| `10` (number) | 10, "10" |
+| "Large" (string) | "large", "LARGE", "Large" (case-insensitive) |
+
+**Implications:**
+- Config values are more forgiving
+- Boolean checkboxes work with string "Yes"/"No" conditions
+- Number fields work with string number conditions
+- String comparisons are case-insensitive
+
+---
+
+### AD-012: Canonical Signal Key Derivation
+
+**Decision:** Form fields and AI extraction MUST use identical signal keys, derived automatically from question labels using `deriveSignalKey()`.
+
+**Rationale:**
+- BUG-001 fix used hardcoded synonym map - not scalable or maintainable
+- Different keys (form: `number_of_leaks`, AI: `leak_count`) caused override failures
+- Signal matching should happen at configuration time, not processing time
+- Canonical keys eliminate the need for fuzzy post-hoc matching
+
+**Implementation:**
+
+| Question Label | Field Type | Derived Key |
+|----------------|------------|-------------|
+| "How many papers?" | number | `paper_count` |
+| "Number of Leaks" | number | `leak_count` |
+| "Approximate Age of Roof" | number | `roof_age` |
+| "Is the leak causing damage?" | boolean | `has_leak_damage` |
+| "Type of Roofing Material" | dropdown | `roofing_material_type` |
+
+**Derivation Rules:**
+1. Remove filler words: "how many", "number of", "please enter", etc.
+2. Singularize plurals: "papers" → "paper"
+3. Add suffix based on type:
+   - number → `_count` (default), `_age`, `_area` (if label contains those)
+   - dropdown/radio → `_type`, `_material`, `_condition` (based on label)
+   - boolean/checkbox → `has_` or `is_` prefix
+
+**AI Constraint:**
+- Expected signals prompt explicitly tells AI to use ONLY provided keys
+- AI cannot invent new keys like `item_count` when `paper_count` is expected
+- Violations result in unmatched signals (acceptable over wrong matches)
+
+**Migration:**
+- Existing services continue to work with normalized matching fallback
+- New services automatically use canonical keys
+- No code changes needed for new question types
+
+---
+
+### AD-013: AI Wording Constrained to Configured Scope
+
+**Decision:** AI-generated wording MUST NOT promise services outside the business's configured `scope_includes`.
+
+**Rationale:**
+- `scope_includes` is the source of truth for what the business offers
+- AI accepting customer requests for unconfigured services causes:
+  - Lost trust (can't deliver what was promised)
+  - Lost money (gave away service for free)
+- This extends AD-001 "AI must not set prices" to "AI must not expand scope"
+
+**Implementation:**
+- Prompt constraint is primary defense (explicit instruction in WORDING_PROMPT)
+- Business configuration is respected as absolute boundary
+- Customer requests outside scope are acknowledged but not promised
+- Notes suggest: "Additional services like [X] can be quoted separately upon request."
+
+**Implications:**
+- AI cannot say a service is "included" unless it appears in scope_includes
+- Customer requests for unlisted services are handled gracefully
+- When in doubt, AI mentions LESS not MORE
+- Business controls what they offer; AI describes it, never expands it
+
+**Related:**
+- AD-001: Deterministic Pricing from Business Configuration
+- AD-007: Unconditional Form Signal Override
+
+---
+
 ### AD-006: Consolidated Pricing with Auto-Linking and Strict Validation
 
 **Decision:** All pricing configuration consolidated in Service wizard with auto-linking, smart defaults, and strict validation that blocks publish.
@@ -580,6 +1003,11 @@ if (pricingResult.estimatedTotal <= 0) {
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-01 | 1.9.0 | Quote Quality Fixes v4: AD-001 compliance for recommendations (no AI prices), addon/exclusion conflict check, vision severity calibration, error code integration |
+| 2026-01-31 | 1.8.0 | AI Scope Constraint & No-Hardcode Rule (AD-013): AI cannot promise services outside scope_includes, added anti-hardcoding principle to CLAUDE.md |
+| 2026-01-31 | 1.7.0 | Intelligent Signal Key Unification (AD-012): Canonical signal key derivation, AI constrained to expected keys, removed hardcoded synonym map |
+| 2026-01-31 | 1.6.0 | Quote Quality Fixes v3 (BUG-004, BUG-005): Cross-service relevance validation (AD-010), multiplier type coercion (AD-011) |
+| 2026-01-31 | 1.5.0 | Quote Quality Fixes v2 (BUG-001, BUG-002, BUG-003): Semantic signal matching, keyword phrase verification, pricing rules save fix |
 | 2026-01-31 | 1.4.0 | Quote Quality Fixes (AD-007, AD-008, AD-009): Unconditional form signal merge, cross-service phrase verification, potential work limits |
 | 2026-01-31 | 1.3.0 | Consolidated Pricing (AD-006): Auto-linking, smart defaults, strict validation, hidden advanced mode, standalone pricing page removed |
 | 2026-01-31 | 1.2.0 | Explicit Quantity Sources (AD-005): Added quantitySource to WorkStepConfig, reordered wizard (Questions before Pricing), added Test step with Quote Simulator |
@@ -607,4 +1035,4 @@ if (pricingResult.estimatedTotal <= 0) {
 
 ---
 
-*Last Updated: 2026-01-31 (v1.4.0)*
+*Last Updated: 2026-02-01 (v1.9.0)*

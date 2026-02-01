@@ -444,6 +444,39 @@ IMPORTANT:
 - For assessedCondition: Give your honest assessment based ONLY on what you see
 - For countedItems: Only include if the service prices per item/unit (when instructed above)
 
+===== CONDITION RATING CALIBRATION =====
+Use these guidelines to rate condition accurately:
+
+"excellent" - New or like-new condition
+- No visible wear, corrosion, or damage
+- Components appear recently installed or maintained
+
+"good" - Minor wear, functioning normally
+- Light surface wear or dust
+- No significant damage or deterioration
+- Normal aging signs only
+
+"fair" - Moderate wear, some issues
+- Visible wear patterns
+- Minor surface damage or discoloration
+- May need maintenance soon
+
+"poor" - Significant damage, needs attention urgently
+- Visible rust, corrosion, or water damage
+- Obvious deterioration or decay
+- Staining indicating ongoing issues
+- Components appear worn out or failing
+
+CALIBRATION EXAMPLES:
+- Rust on pipe joints + water staining on floor = "poor" (NOT "fair")
+- Heavy corrosion visible on metal components = "poor"
+- Multiple cracks or structural damage visible = "poor"
+- Minor dust and light surface wear = "good"
+- Some discoloration but no damage = "fair"
+
+Err on the side of rating WORSE when there are clear signs of damage.
+It's better to flag issues than to understate problems.
+
 Respond with ONLY the JSON object, no other text.`
 
   return prompt
@@ -488,49 +521,66 @@ export async function extractSignals(
 
 /**
  * Build prompt section for expected signals extraction
+ *
+ * CRITICAL: This prompt CONSTRAINS the AI to use ONLY the provided signal keys.
+ * This is key to the canonical signal key system - form fields and AI must use
+ * identical keys so no fuzzy matching is needed.
  */
 function buildExpectedSignalsPromptSection(expectedSignals: ExpectedSignalConfig[]): string {
   if (!expectedSignals || expectedSignals.length === 0) {
     return ''
   }
 
-  let section = `\n\n**EXPECTED SIGNALS TO EXTRACT**:
-For this service, you MUST extract the following specific signals. Each signal should have a confidence score.
-`
-
-  for (const signal of expectedSignals) {
-    section += `\n- "${signal.signalKey}" (${signal.type}): ${signal.description}`
+  // Build the signal list with clear formatting
+  const signalList = expectedSignals.map(signal => {
+    let line = `  - "${signal.signalKey}" (${signal.type}): ${signal.description}`
     if (signal.type === 'enum' && signal.possibleValues?.length) {
-      section += ` [Values: ${signal.possibleValues.join(', ')}]`
+      line += `\n    Allowed values: [${signal.possibleValues.join(', ')}]`
     }
-  }
+    return line
+  }).join('\n')
 
-  section += `
+  return `
 
-**SIGNAL EXTRACTION - USE BOTH SOURCES**:
-Use BOTH photos AND customer notes together to extract the most accurate signals:
-- Photos: Best for visual signals (dimensions, condition, what you can see)
-- Customer notes: Best for context, requirements, and details not visible in photos (e.g., "dead zones upstairs", "8 rooms", "router is 5 years old")
-- Combine evidence from both sources when available
-- Set source: "vision" if from photos, "inferred" if from customer notes, or combine both in evidence
-- Examples: customer says "dead zones" → mesh_required: true, customer says "old router" → router_age: "old"
-- Don't return "Cannot determine" if either source provides relevant clues
+**STRICT SIGNAL EXTRACTION - CRITICAL INSTRUCTIONS**
 
-Include these in your response under a "signals" array with this structure:
+You MUST extract signals using EXACTLY these keys. Do NOT invent new signal names.
+
+REQUIRED SIGNALS (use these EXACT keys):
+${signalList}
+
+RULES - FOLLOW EXACTLY:
+1. Use the EXACT signal key names listed above - spelling must match exactly
+2. Do NOT create new signal keys that aren't in the list above
+3. If you cannot determine a value for a signal, OMIT it from the response
+4. Do NOT add signals like "item_count", "leak_count" if they're not in the list
+5. The keys are canonical - "paper_count" not "number_of_papers", "leak_count" not "leaks"
+
+SIGNAL EXTRACTION SOURCES:
+- Photos: Visual evidence (dimensions, condition, counts)
+- Customer notes: Context and details (quantities, requirements, preferences)
+- Use BOTH sources together when available
+- Set source: "vision" for photos, "inferred" for customer notes
+
+RESPONSE FORMAT:
+Include a "signals" array with ONLY the keys from the list above:
 {
   "signals": [
     {
-      "key": "signal_key_from_above",
+      "key": "exact_key_from_list_above",
       "value": <extracted_value>,
       "confidence": 0.0-1.0,
       "source": "vision|form|nlp|inferred",
-      "evidence": "brief explanation, photo reference, or quote from customer notes"
+      "evidence": "brief explanation"
     }
   ]
 }
-`
 
-  return section
+EXAMPLES:
+- If list has "paper_count" → use "paper_count", NOT "number_of_papers" or "papers"
+- If list has "leak_count" → use "leak_count", NOT "leaks" or "number_of_leaks"
+- If list has "roof_age" → use "roof_age", NOT "age_of_roof" or "roof_years"
+`
 }
 
 /**

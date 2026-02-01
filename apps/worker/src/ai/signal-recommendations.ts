@@ -55,9 +55,12 @@ export interface RecommendationContext {
  * Prompt template for generating signal recommendations
  *
  * IMPORTANT: All recommendations must use SOFT/CONDITIONAL phrasing because
- * these are AI-estimated suggestions, not confirmed requirements.
+ * these are AI suggestions, not confirmed requirements.
+ *
+ * AD-001 COMPLIANCE: AI does NOT set prices. Recommendations describe WHAT
+ * might be needed, but actual pricing comes from business configuration.
  */
-const SIGNAL_RECOMMENDATIONS_PROMPT = `You are a pricing assistant helping estimate costs for POTENTIAL additional work.
+const SIGNAL_RECOMMENDATIONS_PROMPT = `You are an assistant helping identify POTENTIAL additional work that may be needed.
 
 Service: {{SERVICE_NAME}}
 {{SERVICE_DESCRIPTION}}
@@ -65,23 +68,22 @@ Service: {{SERVICE_NAME}}
 The customer's quote has been processed, but some signals extracted from their description/photos
 weren't used in pricing because no work step is configured for them. These MAY indicate additional work needed.
 
-Existing configured work steps (for reference on typical pricing):
+Existing configured work steps (for reference):
 {{WORK_STEPS}}
 
 Unused signals that may need additional work:
 {{UNUSED_SIGNALS}}
 
-For each signal that genuinely implies additional work MIGHT be needed, provide a cost estimate.
-Consider typical industry rates and the existing pricing patterns shown above.
+For each signal that genuinely implies additional work MIGHT be needed, describe what might be required.
+Do NOT include any prices or cost estimates - the business will provide pricing separately.
 
 Return JSON only, no explanation:
 {
   "recommendations": [
     {
       "signalKey": "the signal key",
-      "workDescription": "Brief, customer-friendly description (e.g., 'Potential Insulation Removal')",
-      "estimatedCost": number,
-      "costBreakdown": "How you calculated this (e.g., 'Labor and disposal if removal needed: £150')",
+      "workDescription": "Brief description (e.g., 'Potential Insulation Removal')",
+      "whatItInvolves": "Brief description of work involved (NO PRICES)",
       "reason": "MUST use conditional/soft language - see guidelines below"
     }
   ]
@@ -91,7 +93,7 @@ Return JSON only, no explanation:
 1. Return MAXIMUM 3 recommendations (pick most relevant to customer's stated problem)
 2. workDescription: 3-5 words ONLY (e.g., "Potential Tile Replacement")
 3. reason: ONE sentence, max 20 words
-4. costBreakdown: SHORT phrase (e.g., "5 tiles × £20 + labor")
+4. whatItInvolves: SHORT phrase describing the work (NO £ amounts or prices)
 
 PRIORITIZATION (if more than 3 signals apply):
 1. Items directly addressing customer's stated problem
@@ -102,6 +104,7 @@ DO NOT include:
 - Speculative items only tangentially related
 - Items the customer didn't ask about
 - Upsells disguised as recommendations
+- ANY prices, costs, or £/$ amounts
 
 ===== PHRASING GUIDELINES =====
 - ALL recommendations MUST use SOFT, CONDITIONAL language
@@ -114,15 +117,19 @@ GOOD examples for "reason" field:
 - "May need additional labor for access."
 - "Could require extra material."
 
+GOOD examples for "whatItInvolves" field:
+- "Removal and disposal if present"
+- "Component inspection and potential replacement"
+- "Surface preparation before treatment"
+
 BAD examples (DO NOT USE):
-- "The insulation needs to be removed." (too assertive)
-- "Requires additional material." (too definitive)
-- "The larger area will need more work." (too certain)
+- "£150 for parts" (no prices!)
+- "Approximately £200" (no prices!)
+- "Labor costs around £80/hour" (no prices!)
 
 Other guidelines:
 - Only include signals that genuinely imply additional work MIGHT be needed
 - Skip purely informational signals
-- Estimates should be realistic and conservative
 - workDescription should be short (3-5 words) and start with "Potential" or similar
 - If a signal has low confidence (shown in %), be extra cautious in wording
 - Return empty recommendations array if no signals warrant recommendations`
@@ -174,6 +181,9 @@ export async function generateSignalRecommendations(
 
 /**
  * Parse AI response into typed recommendations
+ *
+ * AD-001 COMPLIANCE: No prices are extracted - costBreakdown contains
+ * description of work involved, not cost estimates.
  */
 function parseRecommendations(
   response: string,
@@ -196,8 +206,9 @@ function parseRecommendations(
       recommendations?: Array<{
         signalKey: string
         workDescription: string
-        estimatedCost: number
-        costBreakdown: string
+        whatItInvolves?: string  // New field (no prices)
+        costBreakdown?: string   // Legacy field (may contain prices from old responses)
+        estimatedCost?: number   // Legacy field (ignored)
         reason: string
       }>
     }
@@ -210,15 +221,21 @@ function parseRecommendations(
     const signalMap = new Map(unusedSignals.map(s => [s.key, s]))
 
     let recommendations = parsed.recommendations
-      .filter(rec => rec.signalKey && rec.workDescription && typeof rec.estimatedCost === 'number')
+      .filter(rec => rec.signalKey && rec.workDescription)
       .map(rec => {
         const originalSignal = signalMap.get(rec.signalKey)
+
+        // Use whatItInvolves (new, price-free) or fall back to costBreakdown (legacy)
+        // Strip any prices from costBreakdown if present (defensive)
+        let workInvolved = rec.whatItInvolves || rec.costBreakdown || ''
+        workInvolved = stripPricesFromText(workInvolved)
+
         return {
           signalKey: rec.signalKey,
           signalValue: originalSignal?.value ?? true,
           workDescription: rec.workDescription,
-          estimatedCost: Math.max(0, rec.estimatedCost),
-          costBreakdown: rec.costBreakdown || '',
+          // estimatedCost intentionally omitted (AD-001)
+          costBreakdown: workInvolved,
           confidence: originalSignal?.confidence ?? 0.5,
           evidence: rec.reason || originalSignal?.evidence || '',
           isEstimate: true,
@@ -239,6 +256,23 @@ function parseRecommendations(
     console.error('[SignalRecommendations] Failed to parse response:', error)
     return []
   }
+}
+
+/**
+ * Strip any price/cost mentions from text (defensive measure)
+ * Removes patterns like "£150", "$200", "~£80", "around £100"
+ */
+function stripPricesFromText(text: string): string {
+  // Remove currency patterns: £123, $456, €789, with optional ~ or "around"
+  let cleaned = text.replace(/~?\s*[£$€]\s*\d+(?:[.,]\d+)?/g, '')
+  // Remove "around/approximately/about £X" patterns
+  cleaned = cleaned.replace(/(?:around|approximately|about|~)\s*[£$€]\s*\d+(?:[.,]\d+)?/gi, '')
+  // Remove "X pounds/dollars" patterns
+  cleaned = cleaned.replace(/\d+(?:[.,]\d+)?\s*(?:pounds?|dollars?|euros?)/gi, '')
+  // Clean up leftover artifacts
+  cleaned = cleaned.replace(/\s*:\s*$/g, '') // trailing colons
+  cleaned = cleaned.replace(/\s{2,}/g, ' ') // multiple spaces
+  return cleaned.trim()
 }
 
 /**

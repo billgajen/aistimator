@@ -292,11 +292,8 @@ export default function QuotePage({ params }: QuotePageProps) {
                   key={index}
                   className="mb-3 last:mb-0 pb-3 last:pb-0 border-b last:border-b-0 border-amber-100"
                 >
-                  <div className="flex justify-between items-start mb-1">
+                  <div className="mb-1">
                     <span className="font-medium text-amber-900">{rec.workDescription}</span>
-                    <span className="text-amber-900 font-semibold">
-                      ~{formatCurrency(rec.estimatedCost, pricing.currency)}
-                    </span>
                   </div>
                   <p className="text-xs text-amber-700">{rec.evidence}</p>
                   {rec.costBreakdown && (
@@ -305,7 +302,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                 </div>
               ))}
               <p className="text-xs text-amber-500 mt-3 pt-3 border-t border-amber-100">
-                These are AI-estimated costs based on your description. Final pricing confirmed on-site.
+                Contact us for pricing on additional work. Final scope confirmed on-site.
               </p>
             </div>
           )}

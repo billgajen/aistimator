@@ -213,6 +213,55 @@ Respond with ONLY the JSON array, no other text.`
         return false
       }
 
+      // AD-010: Verify service name is relevant to the matched phrase
+      // Prevents "Window Cleaning" from matching "gutter cleaning" request
+      const serviceNameLower = r.serviceName.toLowerCase()
+
+      // Extract words from the phrase (excluding common service verbs and filler words)
+      const commonWords = new Set([
+        'cleaning', 'repair', 'installation', 'removal', 'painting', 'fixing', 'service',
+        'also', 'need', 'want', 'some', 'the', 'a', 'an', 'my', 'our', 'your',
+        'might', 'could', 'would', 'should', 'please', 'can', 'you', 'me', 'as', 'well', 'too',
+        'i', 'we', 'they', 'it', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+        'have', 'has', 'had', 'do', 'does', 'did', 'will', 'shall', 'may',
+        'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'up', 'about',
+        'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between'
+      ])
+
+      const phraseWords = phraseLower
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !commonWords.has(w))
+
+      // Find the key object words (nouns that identify what the customer wants)
+      // These are words that aren't in the common list and could identify a service type
+      const keyObjectWords = phraseWords.filter(word => {
+        // Check if this word is a potential service identifier
+        // It should NOT be a generic action word
+        return word.length > 3
+      })
+
+      if (keyObjectWords.length > 0) {
+        // Check if any key object word appears in the service name
+        const serviceMatchesRequest = keyObjectWords.some(objectWord => {
+          // Direct match: "gutter" in "Gutter Cleaning"
+          if (serviceNameLower.includes(objectWord)) {
+            return true
+          }
+          // Singular/plural handling: "gutters" matches "Gutter Cleaning"
+          const singular = objectWord.replace(/s$/, '')
+          const plural = objectWord + 's'
+          if (serviceNameLower.includes(singular) || serviceNameLower.includes(plural)) {
+            return true
+          }
+          return false
+        })
+
+        if (!serviceMatchesRequest) {
+          console.log(`[ServiceDetection] REJECTING mismatched service: "${r.serviceName}" doesn't match request keywords [${keyObjectWords.join(', ')}] from phrase "${r.matchedPhrase}"`)
+          return false
+        }
+      }
+
       return true
     })
 

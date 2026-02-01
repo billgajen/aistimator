@@ -43,10 +43,15 @@ export async function GET() {
       )
     }
 
-    // Fetch services
+    // Fetch services with pricing rules
     const { data: services, error: servicesError } = await supabase
       .from('services')
-      .select('*')
+      .select(`
+        *,
+        service_pricing_rules (
+          rules_json
+        )
+      `)
       .eq('tenant_id', profile.tenant_id)
       .order('created_at', { ascending: false })
 
@@ -58,7 +63,19 @@ export async function GET() {
       )
     }
 
-    return NextResponse.json({ services: services || [] })
+    // Transform to include pricing_rules at top level for frontend compatibility
+    const servicesWithPricing = (services || []).map((service) => {
+      const pricingRule = Array.isArray(service.service_pricing_rules)
+        ? service.service_pricing_rules[0]
+        : service.service_pricing_rules
+      return {
+        ...service,
+        pricing_rules: pricingRule?.rules_json || null,
+        service_pricing_rules: undefined, // Remove nested object
+      }
+    })
+
+    return NextResponse.json({ services: servicesWithPricing })
   } catch (error) {
     console.error('Services GET error:', error)
     return NextResponse.json(
@@ -118,6 +135,7 @@ export async function POST(request: NextRequest) {
       expectedSignals,
       draftConfig,
       suggestedFields,
+      pricingRules,  // BUG-003 FIX: Extract pricingRules from request body
     } = body as {
       name: string
       description?: string | null
@@ -138,6 +156,24 @@ export async function POST(request: NextRequest) {
         helpText?: string
         criticalForPricing?: boolean
       }>
+      // BUG-003 FIX: Type for pricingRules
+      pricingRules?: {
+        baseFee?: number
+        minimumCharge?: number
+        addons?: Array<{
+          id: string
+          label: string
+          price: number
+          description?: string
+        }>
+        multipliers?: Array<{
+          id: string
+          label: string
+          conditions: Array<{ signalKey: string; operator: string; value: string | number | boolean }>
+          multiplier: number
+        }>
+        workSteps?: WorkStepConfig[]
+      }
     }
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -178,15 +214,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create default pricing rules for the service
+    // BUG-003 FIX: Create pricing rules with actual values from request (not hardcoded zeros)
     const { error: pricingError } = await supabase.from('service_pricing_rules').insert({
       tenant_id: profile.tenant_id,
       service_id: service.id,
       rules_json: {
-        baseFee: 0,
-        minimumCharge: 0,
-        addons: [],
-        multipliers: [],
+        baseFee: pricingRules?.baseFee || 0,
+        minimumCharge: pricingRules?.minimumCharge || 0,
+        addons: pricingRules?.addons || [],
+        multipliers: pricingRules?.multipliers || [],
+        workSteps: pricingRules?.workSteps || workSteps || [],
       },
     })
 
@@ -229,7 +266,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ service }, { status: 201 })
+    // Return service with pricing rules included
+    const serviceWithPricing = {
+      ...service,
+      pricing_rules: pricingRules || {
+        baseFee: 0,
+        minimumCharge: 0,
+        addons: [],
+        multipliers: [],
+        workSteps: workSteps || [],
+      },
+    }
+
+    return NextResponse.json({ service: serviceWithPricing }, { status: 201 })
   } catch (error) {
     console.error('Services POST error:', error)
     return NextResponse.json(

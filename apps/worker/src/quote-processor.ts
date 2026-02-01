@@ -404,7 +404,24 @@ export async function processQuote(
 
       // Determine the signal key: use explicit mapsToSignal or derive from fieldId
       const field = widgetFields.find(f => f.fieldId === answer.fieldId)
-      const signalKey = field?.mapsToSignal || answer.fieldId
+      let signalKey = field?.mapsToSignal || answer.fieldId
+
+      // Canonical signal key matching
+      // With deriveSignalKey(), form fields and AI should use identical keys
+      // This matching handles legacy services or minor variations
+      const existingIndex = structuredSignals.signals.findIndex(s => s.key === signalKey)
+      if (existingIndex < 0) {
+        // No exact match - try matching with mapsToSignal
+        const matchedKey = findSemanticSignalMatch(
+          answer.fieldId,
+          structuredSignals.signals.map(s => s.key),
+          field?.mapsToSignal
+        )
+        if (matchedKey) {
+          console.log(`[Processor] Signal match: form "${answer.fieldId}" -> AI signal "${matchedKey}"`)
+          signalKey = matchedKey
+        }
+      }
 
       // Determine the signal type: check expected_signals config or infer from value
       let signalType: string = 'string'
@@ -553,6 +570,16 @@ export async function processQuote(
 
       // Add detected addons as form answers so they get applied by pricing engine
       for (const detected of detectedAddons) {
+        // Get the addon config to access label
+        const addonConfig = rules.addons.find(a => a.id === detected.addonId)
+        const addonLabel = addonConfig?.label || detected.addonId
+
+        // FIX-2: Skip if addon conflicts with scope_excludes
+        if (isAddonConflictingWithExcludes(detected.addonId, addonLabel, service.scope_excludes)) {
+          console.log(`[Processor] Skipping addon ${detected.addonId} - conflicts with scope_excludes`)
+          continue
+        }
+
         // Skip if addon functionality is already part of the core service
         if (isAddonCoveredByService(detected.addonId, service.name, service.scope_includes)) {
           console.log(`[Processor] Skipping addon ${detected.addonId} - already part of core service "${service.name}"`)
@@ -602,6 +629,16 @@ export async function processQuote(
 
       // Add detected addons as form answers so they get applied by pricing engine
       for (const detected of detectedAddons) {
+        // Get the addon config to access label
+        const addonConfig = rules.addons.find(a => a.id === detected.addonId)
+        const addonLabel = addonConfig?.label || detected.addonId
+
+        // FIX-2: Skip if addon conflicts with scope_excludes
+        if (isAddonConflictingWithExcludes(detected.addonId, addonLabel, service.scope_excludes)) {
+          console.log(`[Processor] Skipping addon ${detected.addonId} from image - conflicts with scope_excludes`)
+          continue
+        }
+
         // Skip if addon functionality is already part of the core service
         if (isAddonCoveredByService(detected.addonId, service.name, service.scope_includes)) {
           console.log(`[Processor] Skipping addon ${detected.addonId} from image - already part of core service "${service.name}"`)
@@ -726,6 +763,23 @@ export async function processQuote(
     quoteData.widgetFields || []
   )
 
+  // FIX-6: Extract error code from structured signals if present
+  // Common error code signal keys: error_code, boiler_error_code, fault_code, display_code
+  let errorCode: string | undefined
+  if (structuredSignals?.signals) {
+    const errorCodeSignal = structuredSignals.signals.find(s =>
+      s.key === 'error_code' ||
+      s.key === 'boiler_error_code' ||
+      s.key === 'fault_code' ||
+      s.key === 'display_code' ||
+      s.key.includes('error') && typeof s.value === 'string'
+    )
+    if (errorCodeSignal && typeof errorCodeSignal.value === 'string') {
+      errorCode = errorCodeSignal.value
+      console.log(`[Processor] Error code detected: ${errorCode}`)
+    }
+  }
+
   // Build wording context with service profile data
   const wordingContext = {
     businessName: tenant.name,
@@ -741,6 +795,7 @@ export async function processQuote(
     formAnswers: formAnswersForWording,
     projectDescription, // Customer's detailed project description
     documentType: quoteData.quote.document_type as 'instant_estimate' | 'formal_quote' | 'proposal' | 'sow',
+    errorCode, // FIX-6: Pass error code to wording for contextual notes
   }
 
   if (gemini) {
@@ -1669,6 +1724,8 @@ async function detectCrossServiceMentionsWithAI(
 
 /**
  * Keyword-based service detection (fallback)
+ * BUG-002 FIX: Now includes phrase verification to prevent false positives
+ * Keyword matches must be genuine service requests, not incidental mentions
  */
 function detectCrossServiceMentionsKeywords(
   projectDescription: string,
@@ -1685,12 +1742,18 @@ function detectCrossServiceMentionsKeywords(
     // Check service name first
     const serviceNameLower = service.name.toLowerCase()
     if (textLower.includes(serviceNameLower)) {
-      recommendations.push({
-        serviceId: service.id,
-        serviceName: service.name,
-        reason: `You mentioned "${service.name}" in your description`,
-        matchedKeyword: service.name,
-      })
+      // BUG-002: Verify this is a genuine request, not just a mention
+      const phraseContext = extractPhraseContext(projectDescription, service.name)
+      if (isGenuineServiceRequest(phraseContext)) {
+        recommendations.push({
+          serviceId: service.id,
+          serviceName: service.name,
+          reason: `You mentioned "${service.name}" in your description`,
+          matchedKeyword: service.name,
+        })
+      } else {
+        console.log(`[CrossService] Skipping "${service.name}" - not a genuine request: "${phraseContext}"`)
+      }
       continue
     }
 
@@ -1703,11 +1766,21 @@ function detectCrossServiceMentionsKeywords(
 
         // Use word boundary matching
         const regex = new RegExp(`\\b${escapeRegExp(keywordLower)}\\b`, 'i')
-        if (regex.test(textLower)) {
+        const match = regex.exec(projectDescription.toLowerCase())
+
+        if (match) {
+          // BUG-002 FIX: Extract actual phrase context and verify it's a genuine request
+          const phraseContext = extractPhraseContext(projectDescription, keyword)
+
+          if (!isGenuineServiceRequest(phraseContext)) {
+            console.log(`[CrossService] Skipping keyword "${keyword}" for "${service.name}" - not a request: "${phraseContext}"`)
+            continue
+          }
+
           recommendations.push({
             serviceId: service.id,
             serviceName: service.name,
-            reason: `Based on "${keyword}" in your description`,
+            reason: `Based on: "${phraseContext}"`,
             matchedKeyword: keyword,
           })
           matched = true
@@ -1717,7 +1790,7 @@ function detectCrossServiceMentionsKeywords(
 
       if (!matched) {
         // Log when keywords exist but didn't match
-        console.log(`[CrossService] Keywords for "${service.name}" didn't match: [${service.detection_keywords.join(', ')}]`)
+        console.log(`[CrossService] Keywords for "${service.name}" didn't match or weren't requests: [${service.detection_keywords.join(', ')}]`)
       }
     } else {
       // Log when no keywords configured
@@ -1726,6 +1799,79 @@ function detectCrossServiceMentionsKeywords(
   }
 
   return recommendations
+}
+
+/**
+ * BUG-002 FIX: Extract context around a matched keyword/phrase
+ * Returns ~60 chars of context centered on the match
+ */
+function extractPhraseContext(text: string, keyword: string): string {
+  const textLower = text.toLowerCase()
+  const keywordLower = keyword.toLowerCase()
+  const index = textLower.indexOf(keywordLower)
+
+  if (index < 0) return keyword
+
+  const contextRadius = 30
+  const start = Math.max(0, index - contextRadius)
+  const end = Math.min(text.length, index + keyword.length + contextRadius)
+
+  let context = text.substring(start, end).trim()
+
+  // Add ellipsis if truncated
+  if (start > 0) context = '...' + context
+  if (end < text.length) context = context + '...'
+
+  return context
+}
+
+/**
+ * BUG-002 FIX: Verify that a phrase context indicates a genuine service request
+ * Returns true if the customer is actively requesting/needing the service
+ * Returns false if it's just an incidental mention or description
+ */
+function isGenuineServiceRequest(phraseContext: string): boolean {
+  const contextLower = phraseContext.toLowerCase()
+
+  // Patterns that indicate a genuine request
+  const requestPatterns = [
+    /\b(need|needs|needed)\b/i,
+    /\b(want|wants|wanted)\b/i,
+    /\b(require|requires|required)\b/i,
+    /\b(looking for|looking to)\b/i,
+    /\b(interested in)\b/i,
+    /\b(please|could you|can you|would you)\b/i,
+    /\b(also|as well|too|additionally)\b/i,
+    /\b(might need|may need|probably need)\b/i,
+    /\b(should|must|have to)\b/i,
+    /\b(quote for|estimate for|price for)\b/i,
+    /\b(help with|assist with)\b/i,
+    /\b(clean|cleaning|repair|fix|install|replace|service)\b/i,  // Action verbs
+  ]
+
+  // Patterns that indicate it's NOT a request (just describing a problem or situation)
+  const nonRequestPatterns = [
+    /\b(overflow|overflows|overflowing)\b/i,  // "gutters overflow" ≠ "need gutter cleaning"
+    /\b(sometimes|occasionally)\b/i,  // Describing occasional issues
+    /\b(used to|in the past)\b/i,  // Historical context
+    /\b(because of|due to|caused by)\b/i,  // Explaining root cause
+    /\b(near|next to|beside|by the)\b/i,  // Describing location
+  ]
+
+  // Check for non-request patterns first (more specific)
+  for (const pattern of nonRequestPatterns) {
+    if (pattern.test(contextLower)) {
+      // This looks like a situational description, not a request
+      // But check if there's also a request pattern (e.g., "gutters overflow, need cleaning")
+      const hasRequestPattern = requestPatterns.some(p => p.test(contextLower))
+      if (!hasRequestPattern) {
+        return false
+      }
+    }
+  }
+
+  // Check for request patterns
+  return requestPatterns.some(p => p.test(contextLower))
 }
 
 /**
@@ -1762,6 +1908,57 @@ function isAddonCoveredByService(
 
   // Check if the addon's core functionality is already in the service name or scope
   return serviceNameLower.includes(addonKeyword) || scopeText.includes(addonKeyword)
+}
+
+/**
+ * Check if an addon conflicts with scope_excludes
+ * FIX-2: Prevents recommending addons (like "Powerflush") that are explicitly excluded
+ *
+ * Returns true if the addon should be filtered out (conflicts with exclusion)
+ */
+function isAddonConflictingWithExcludes(
+  addonId: string,
+  addonLabel: string,
+  scopeExcludes: string[] = []
+): boolean {
+  if (!scopeExcludes || scopeExcludes.length === 0) return false
+
+  const addonIdLower = addonId.toLowerCase()
+  const addonLabelLower = addonLabel.toLowerCase()
+
+  // Extract key words from addon label (e.g., "Powerflush Treatment" → ["powerflush", "treatment"])
+  const addonLabelWords = addonLabelLower
+    .split(/[\s_-]+/)
+    .filter(word => word.length > 2) // Skip short words like "a", "of"
+
+  for (const exclude of scopeExcludes) {
+    const excludeLower = exclude.toLowerCase()
+
+    // Check 1: Direct label match (addon label contains exclusion or vice versa)
+    if (addonLabelLower.includes(excludeLower) || excludeLower.includes(addonLabelLower)) {
+      console.log(`[Processor] Addon "${addonLabel}" conflicts with exclusion "${exclude}" (direct match)`)
+      return true
+    }
+
+    // Check 2: Word-level matching (any significant word from addon label appears in exclusion)
+    for (const word of addonLabelWords) {
+      if (excludeLower.includes(word)) {
+        console.log(`[Processor] Addon "${addonLabel}" conflicts with exclusion "${exclude}" (word: "${word}")`)
+        return true
+      }
+    }
+
+    // Check 3: ID-based matching (addon ID contains exclusion keyword)
+    const excludeWords = excludeLower.split(/[\s_-]+/).filter(w => w.length > 2)
+    for (const excludeWord of excludeWords) {
+      if (addonIdLower.includes(excludeWord)) {
+        console.log(`[Processor] Addon "${addonLabel}" (id: ${addonId}) conflicts with exclusion "${exclude}" (id match: "${excludeWord}")`)
+        return true
+      }
+    }
+  }
+
+  return false
 }
 
 /**
@@ -1832,6 +2029,88 @@ export function findMatchingFormAnswer(
     }
   }
 
+  return undefined
+}
+
+/**
+ * Find signal match between form field ID and AI signal keys
+ *
+ * With the canonical signal key system (deriveSignalKey), form fields
+ * and AI signals should use identical keys. This function handles:
+ * 1. Direct match via mapsToSignal (primary mechanism)
+ * 2. Exact fieldId match (fallback)
+ * 3. Simple normalized match for minor variations (legacy support)
+ *
+ * NO hardcoded synonym maps - the canonical key system eliminates the need.
+ *
+ * @param formFieldId - The field ID from the form (e.g., "paper_count")
+ * @param aiSignalKeys - Array of signal keys extracted by AI
+ * @param mapsToSignal - Optional explicit signal mapping from widget config
+ * @returns The matching AI signal key, or undefined if no match
+ */
+function findSemanticSignalMatch(
+  formFieldId: string,
+  aiSignalKeys: string[],
+  mapsToSignal?: string
+): string | undefined {
+  if (aiSignalKeys.length === 0) return undefined
+
+  // 1. Primary: If explicit mapsToSignal exists and matches an AI key, use it
+  if (mapsToSignal && aiSignalKeys.includes(mapsToSignal)) {
+    console.log(`[Processor] Direct mapsToSignal match: ${mapsToSignal}`)
+    return mapsToSignal
+  }
+
+  // 2. Check if fieldId directly matches an AI signal key
+  if (aiSignalKeys.includes(formFieldId)) {
+    return formFieldId
+  }
+
+  // 3. Simple normalized matching for minor variations (backward compatibility)
+  // This handles cases like underscores vs spaces, case differences
+  const normalizeKey = (key: string): string => {
+    return key
+      .toLowerCase()
+      .replace(/[_\s-]/g, '')  // Remove separators
+  }
+
+  const normalizedFieldId = normalizeKey(formFieldId)
+  const normalizedMapsTo = mapsToSignal ? normalizeKey(mapsToSignal) : null
+
+  for (const aiKey of aiSignalKeys) {
+    const normalizedAi = normalizeKey(aiKey)
+
+    // Check normalized match against fieldId
+    if (normalizedAi === normalizedFieldId) {
+      console.log(`[Processor] Normalized match: "${formFieldId}" -> "${aiKey}"`)
+      return aiKey
+    }
+
+    // Check normalized match against mapsToSignal
+    if (normalizedMapsTo && normalizedAi === normalizedMapsTo) {
+      console.log(`[Processor] Normalized mapsToSignal match: "${mapsToSignal}" -> "${aiKey}"`)
+      return aiKey
+    }
+  }
+
+  // 4. Handle singular/plural variations
+  const singularize = (s: string): string => {
+    if (s.endsWith('ies')) return s.slice(0, -3) + 'y'
+    if (s.endsWith('es') && !s.endsWith('ss')) return s.slice(0, -2)
+    if (s.endsWith('s') && !s.endsWith('ss')) return s.slice(0, -1)
+    return s
+  }
+
+  const singularFieldId = singularize(normalizedFieldId)
+  for (const aiKey of aiSignalKeys) {
+    const singularAi = singularize(normalizeKey(aiKey))
+    if (singularAi === singularFieldId) {
+      console.log(`[Processor] Singular match: "${formFieldId}" -> "${aiKey}"`)
+      return aiKey
+    }
+  }
+
+  // No match found - this is fine, form field creates a new signal
   return undefined
 }
 

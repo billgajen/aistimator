@@ -75,17 +75,158 @@ function generateAddonId(): string {
 }
 
 /**
+ * Derive a canonical signal key from a field label and type
+ *
+ * This ensures form fields and AI use the SAME signal keys - no matching needed.
+ *
+ * Examples:
+ * - "How many papers?" (number) → paper_count
+ * - "Number of Leaks" (number) → leak_count
+ * - "Approximate Age of Roof" (number) → roof_age
+ * - "Is the leak causing interior damage?" (boolean) → has_interior_damage
+ * - "Type of Roofing Material" (dropdown) → roofing_material_type
+ * - "Number of Papers" (number) → paper_count
+ */
+function deriveSignalKey(label: string, fieldType: string): string {
+  // Normalize label: lowercase, remove punctuation
+  let normalized = label.toLowerCase()
+    .replace(/[?!.,'"]/g, '')
+    .trim()
+
+  // Remove common question prefixes/fillers
+  const prefixPatterns = [
+    /^how many\s+/i,
+    /^number of\s+/i,
+    /^what is the\s+/i,
+    /^what is your\s+/i,
+    /^what are the\s+/i,
+    /^what\s+/i,
+    /^how\s+/i,
+    /^is the\s+/i,
+    /^is there\s+/i,
+    /^do you have\s+/i,
+    /^does the\s+/i,
+    /^are there\s+/i,
+    /^please enter\s+/i,
+    /^please provide\s+/i,
+    /^approximate\s+/i,
+    /^estimated\s+/i,
+    /^total\s+/i,
+  ]
+
+  for (const pattern of prefixPatterns) {
+    normalized = normalized.replace(pattern, '')
+  }
+
+  // Split into words and filter stop words
+  const words = normalized.split(/\s+/)
+  const stopWords = new Set([
+    'the', 'a', 'an', 'of', 'is', 'are', 'your', 'do', 'you', 'have',
+    'need', 'needed', 'required', 'for', 'to', 'in', 'on', 'at', 'by',
+    'this', 'that', 'these', 'those', 'any', 'some'
+  ])
+
+  const meaningfulWords = words
+    .filter(w => !stopWords.has(w) && w.length > 1)
+    .slice(0, 3) // Take up to 3 meaningful words
+
+  if (meaningfulWords.length === 0) {
+    // Fallback: just use the first word
+    const firstWord = words[0] || 'field'
+    return firstWord.replace(/s$/, '') // singularize
+  }
+
+  // Singularize common plurals in the core concept
+  const singularize = (word: string): string => {
+    if (word.endsWith('ies')) return word.slice(0, -3) + 'y'
+    if (word.endsWith('es') && !word.endsWith('ss')) return word.slice(0, -2)
+    if (word.endsWith('s') && !word.endsWith('ss')) return word.slice(0, -1)
+    return word
+  }
+
+  // Build the core concept (first 2 words usually)
+  const coreWords = meaningfulWords.slice(0, 2).map(singularize)
+  const core = coreWords.join('_')
+
+  // Add appropriate suffix based on field type
+  switch (fieldType) {
+    case 'number': {
+      // Check if it already has a numeric suffix
+      const numericSuffixes = ['count', 'quantity', 'number', 'total', 'amount', 'age', 'area', 'sqft', 'size']
+      const hasNumericSuffix = numericSuffixes.some(s => core.endsWith(s) || core.includes(`_${s}`))
+
+      // Check for specific patterns
+      if (core.includes('age') || normalized.includes('age')) {
+        return core.includes('age') ? core : `${core}_age`
+      }
+      if (core.includes('area') || core.includes('sqft') || normalized.includes('sqft') || normalized.includes('square')) {
+        return core.includes('area') ? core : `${core}_area`
+      }
+
+      // Default: add _count for numbers
+      return hasNumericSuffix ? core : `${core}_count`
+    }
+
+    case 'dropdown':
+    case 'radio': {
+      // Check if it already has a type-like suffix
+      const typeSuffixes = ['type', 'kind', 'style', 'category', 'material', 'condition', 'status']
+      const hasTypeSuffix = typeSuffixes.some(s => core.endsWith(s) || core.includes(`_${s}`))
+
+      // Check for specific patterns
+      if (normalized.includes('condition')) {
+        return core.includes('condition') ? core : `${core}_condition`
+      }
+      if (normalized.includes('material')) {
+        return core.includes('material') ? core : `${core}_material`
+      }
+
+      // Default: add _type for dropdowns
+      return hasTypeSuffix ? core : `${core}_type`
+    }
+
+    case 'checkbox': {
+      // For checkboxes, check what makes sense
+      const boolPrefixes = ['is', 'has', 'can', 'does', 'will', 'should']
+      const startsWithBool = boolPrefixes.some(p => core.startsWith(p) || core.startsWith(`${p}_`))
+
+      return startsWithBool ? core : `has_${core}`
+    }
+
+    case 'boolean': {
+      // For yes/no toggles
+      const boolPrefixes = ['is', 'has', 'can', 'does', 'will', 'should']
+      const startsWithBool = boolPrefixes.some(p => core.startsWith(p) || core.startsWith(`${p}_`))
+
+      // Check for specific patterns
+      if (normalized.includes('damage') || normalized.includes('damaged')) {
+        return core.includes('has_') ? core : `has_${core.replace('damage', 'damage')}`
+      }
+      if (normalized.includes('required') || normalized.includes('needed')) {
+        return `${core.replace('_required', '').replace('_needed', '')}_required`
+      }
+
+      return startsWithBool ? core : `has_${core}`
+    }
+
+    case 'text':
+    case 'textarea':
+    default:
+      // For text fields, just use the core concept
+      return core.endsWith('description') ? core : (core.length > 0 ? core : 'description')
+  }
+}
+
+/**
  * Convert a form field to an expected signal
  * This auto-generates signal configuration from customer questions
+ *
+ * Uses deriveSignalKey() to ensure canonical, consistent signal keys
+ * that both form and AI will use - eliminating the need for synonym matching.
  */
 function fieldToSignal(field: SuggestedField): ExpectedSignalConfig {
-  // Use fieldId if available, otherwise derive from label
-  const signalKey = field.fieldId || field.label
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, '_')
-    .replace(/^(how_many_|what_is_the_|do_you_have_|what_|how_|is_there_)/, '')
-    .replace(/_$/, '')
+  // Derive canonical signal key from label and type
+  const signalKey = deriveSignalKey(field.label, field.type)
 
   // Map field type to signal type
   const typeMap: Record<SuggestedField['type'], ExpectedSignalConfig['type']> = {

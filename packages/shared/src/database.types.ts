@@ -316,24 +316,34 @@ export interface CrossServicePricing {
 /**
  * AI-generated recommendation for unused signals
  * When AI extracts signals that aren't used by any pricing work step,
- * this captures the AI's estimate for potential additional work
+ * this captures the AI's recommendation for potential additional work
+ *
+ * NOTE (AD-001 Compliance): Prices are NOT included in recommendations.
+ * AI cannot set prices - all pricing must come from business configuration.
+ * Recommendations only suggest WHAT might be needed, not how much it costs.
  */
 export interface SignalRecommendation {
   /** The signal key that triggered this recommendation */
   signalKey: string
   /** The value of the signal (e.g., true, "poor", 5) */
   signalValue: string | number | boolean
-  /** AI-generated description of recommended work */
+  /** AI-generated description of recommended work (3-5 words) */
   workDescription: string
-  /** AI-estimated cost for this work */
-  estimatedCost: number
-  /** How AI calculated the estimate (e.g., "Mesh system + installation: £150") */
+  /**
+   * @deprecated No longer used - violates AD-001 (AI cannot set prices).
+   * Kept for backward compatibility with existing stored quotes.
+   */
+  estimatedCost?: number
+  /**
+   * Brief description of what the work entails (no prices).
+   * E.g., "May require component replacement" instead of "£150 for parts"
+   */
   costBreakdown: string
   /** Confidence from the original signal extraction (0-1) */
   confidence: number
   /** Evidence from original signal (why AI thinks this is needed) */
   evidence: string
-  /** Always true - these are AI estimates, not configured pricing */
+  /** Always true - these are AI suggestions, not configured pricing */
   isEstimate: boolean
 }
 

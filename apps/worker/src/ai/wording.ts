@@ -58,6 +58,8 @@ export interface WordingContext {
   projectDescription?: string
   /** Document type for tone selection */
   documentType?: DocumentTone
+  /** Error code reported by customer (e.g., boiler error code "EA", "F1") */
+  errorCode?: string
 }
 
 /**
@@ -137,6 +139,11 @@ Customer's project description:
 {{PROJECT_DESCRIPTION}}
 {{/if}}
 
+{{#if ERROR_CODE}}
+Error code reported: {{ERROR_CODE}}
+(If you recognize this error code, briefly mention what it typically indicates in the notes section)
+{{/if}}
+
 {{#if SCOPE_INCLUDES}}
 What this service typically includes:
 {{SCOPE_INCLUDES}}
@@ -204,6 +211,25 @@ If the pricing only covers Phase 1 (inspection) but customer wants repair:
 - Clearly state in scopeSummary: "This quote covers inspection and diagnosis. A detailed repair quote will follow once we assess the extent of work required."
 - Do NOT imply the quote covers repair when it only covers inspection
 
+===== CRITICAL - SCOPE BOUNDARIES ARE ABSOLUTE =====
+The scope_includes list (if provided) defines the ONLY services this quote can offer.
+
+RULES:
+1. You MUST NOT mention, promise, or include ANY service not listed in scope_includes
+2. If customer requests something outside scope_includes, acknowledge it in notes with:
+   "Additional services like [X] can be quoted separately upon request."
+3. NEVER say a service is "included" unless it appears in scope_includes
+4. When in doubt, mention LESS not MORE - only describe what's explicitly configured
+
+EXAMPLES:
+- scope_includes: ["Leak inspection", "Pressure testing"]
+- Customer asks: "can you also service the boiler?"
+- WRONG: "This quote includes boiler servicing"
+- RIGHT: Scope mentions only leak inspection and pressure testing
+         Notes: "Boiler servicing can be quoted separately if needed."
+
+The business configured what they offer. AI must not expand this.
+
 Respond with ONLY the JSON object, no other text.`
 
 /**
@@ -241,6 +267,14 @@ export async function generateWording(
     prompt = prompt.replace('{{PROJECT_DESCRIPTION}}', context.projectDescription)
   } else {
     prompt = prompt.replace(/{{#if PROJECT_DESCRIPTION}}[\s\S]*?{{\/if}}/g, '')
+  }
+
+  // FIX-6: Error code from customer (e.g., boiler error codes)
+  if (context.errorCode) {
+    prompt = prompt.replace(/{{#if ERROR_CODE}}([\s\S]*?){{\/if}}/g, '$1')
+    prompt = prompt.replace('{{ERROR_CODE}}', context.errorCode)
+  } else {
+    prompt = prompt.replace(/{{#if ERROR_CODE}}[\s\S]*?{{\/if}}/g, '')
   }
 
   // Scope includes

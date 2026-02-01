@@ -646,6 +646,41 @@ function shouldApplyMultiplier(
 
   switch (operator) {
     case 'equals':
+      // Type-aware comparison to handle form data types vs config value types
+      // E.g., checkbox submits true (boolean) but config may have "Yes" (string)
+
+      // Handle boolean answer value → string compareValue
+      if (typeof answer.value === 'boolean') {
+        // Normalize compareValue to boolean for comparison
+        const compareAsBool =
+          compareValue === true ||
+          compareValue === 'true' ||
+          compareValue === 'True' ||
+          compareValue === 'TRUE' ||
+          compareValue === 'Yes' ||
+          compareValue === 'yes' ||
+          compareValue === 'YES' ||
+          compareValue === '1' ||
+          compareValue === 1
+        return answer.value === compareAsBool
+      }
+
+      // Handle number answer value → string compareValue (or vice versa)
+      if (typeof answer.value === 'number' || typeof compareValue === 'number') {
+        const answerNum = Number(answer.value)
+        const compareNum = Number(compareValue)
+        // Only compare as numbers if both can be parsed as numbers
+        if (!isNaN(answerNum) && !isNaN(compareNum)) {
+          return answerNum === compareNum
+        }
+      }
+
+      // Handle string comparisons case-insensitively
+      if (typeof answer.value === 'string' && typeof compareValue === 'string') {
+        return answer.value.toLowerCase() === compareValue.toLowerCase()
+      }
+
+      // Fallback to strict equality
       return answer.value === compareValue
     case 'contains':
       if (typeof answer.value === 'string' && typeof compareValue === 'string') {

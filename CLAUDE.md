@@ -37,6 +37,13 @@ You are building a SaaS platform that lets businesses embed an estimate widget o
 - No hardcoded secrets. Use env vars and `.env.example`.
 - Do not introduce a heavy dependency if a small utility can do.
 
+## Anti-hardcoding principle
+- NEVER hardcode business-specific values in the codebase (service names, keywords, prices, scope items)
+- All business-configurable values must come from database configuration
+- If a fix requires adding specific text like "boiler servicing" or "window cleaning", it's the wrong approach
+- The correct approach: make the system respect existing configuration (scope_includes, scope_excludes, etc.)
+- AI behavior should be constrained by business configuration, not by hardcoded rules in prompts
+
 ## Quality gates
 For each ticket:
 - Add or update unit tests where practical.
