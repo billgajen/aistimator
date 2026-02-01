@@ -92,7 +92,62 @@
 
 ---
 
-**Note:** FIX-4 (unused signal fallback) and FIX-5 (work step triggers) from the analysis were deprioritized. FIX-5 is a configuration issue, not code.
+**Note:** FIX-5 (work step triggers) is a configuration issue, not code.
+
+---
+
+### 2026-02-01: Quote Generation Quality Fixes v4 - Remaining Fixes
+
+Additional fixes from the v4 analysis, implementing FIX-4, FIX-7, and FIX-8.
+
+---
+
+#### FIX-4: Ignore Unused Signals in Fallback Calculation (HIGH)
+
+**Symptom:** `linear_distance` triggered fallback mode (`"Low confidence for: linear_distance"`) for boiler service even though no work step uses that signal.
+
+**Root Cause:** All low-confidence signals triggered fallback, regardless of whether they're actually used in pricing.
+
+**Resolution:**
+- File: `apps/worker/src/quote-processor.ts`
+  - Added `getUsedSignalKeys()` function to extract signal keys referenced by work steps
+  - Modified `evaluateFallback()` to only include signals that are actually used
+  - Logs when ignoring unused low-confidence signals
+
+**Lesson:** Fallback should only trigger for signals that affect pricing, not all extracted signals.
+
+---
+
+#### FIX-7: Smarter Addon Keyword Matching (MEDIUM)
+
+**Symptom:** "radiators go lukewarm" triggered Powerflush recommendation - symptom words matching addon names.
+
+**Root Cause:** AI addon detection didn't distinguish between symptoms and explicit requests.
+
+**Resolution:**
+- File: `apps/worker/src/ai/signals.ts`
+  - Updated `detectAddonsFromDescription` prompt with "SYMPTOM vs SOLUTION DISTINCTION" section
+  - Clear examples of symptoms (don't match) vs requests (do match)
+  - AI now only recommends addons when customer explicitly requests or mentions them
+
+**Lesson:** Natural language understanding must distinguish between describing problems and requesting solutions.
+
+---
+
+#### FIX-8: Form Data Overrides Vision for Access (MEDIUM)
+
+**Symptom:** Customer said "Access is easy" but AI detected "moderate" from cabinet photos, causing "Cabinet modification" to be recommended.
+
+**Root Cause:** Customer's explicit statement about access wasn't overriding AI vision assessment.
+
+**Resolution:**
+- File: `apps/worker/src/quote-processor.ts`
+  - Added `detectAccessOverrideFromDescription()` function
+  - Checks project description for explicit access statements
+  - Overrides `access_difficulty` signal with confidence 1.0 when found
+  - Patterns: "access is easy", "easy access", "readily accessible", etc.
+
+**Lesson:** Explicit customer statements should override AI inference (extends AD-002).
 
 ---
 
@@ -1003,6 +1058,7 @@ if (pricingResult.estimatedTotal <= 0) {
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-01 | 1.9.1 | Quote Quality Fixes v4 (remaining): Ignore unused signals in fallback (FIX-4), smarter addon keyword matching (FIX-7), form overrides vision for access (FIX-8) |
 | 2026-02-01 | 1.9.0 | Quote Quality Fixes v4: AD-001 compliance for recommendations (no AI prices), addon/exclusion conflict check, vision severity calibration, error code integration |
 | 2026-01-31 | 1.8.0 | AI Scope Constraint & No-Hardcode Rule (AD-013): AI cannot promise services outside scope_includes, added anti-hardcoding principle to CLAUDE.md |
 | 2026-01-31 | 1.7.0 | Intelligent Signal Key Unification (AD-012): Canonical signal key derivation, AI constrained to expected keys, removed hardcoded synonym map |
@@ -1035,4 +1091,4 @@ if (pricingResult.estimatedTotal <= 0) {
 
 ---
 
-*Last Updated: 2026-02-01 (v1.9.0)*
+*Last Updated: 2026-02-01 (v1.9.1)*

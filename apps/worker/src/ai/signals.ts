@@ -965,6 +965,26 @@ Be intelligent about matching - the customer may not use exact terms. For exampl
 - "looks dirty" or "green stuff" → moss/algae treatment
 - "seal it after" or "protect the surface" → sealing
 
+IMPORTANT - SYMPTOM vs SOLUTION DISTINCTION (FIX-7):
+Do NOT recommend an add-on just because the customer described a SYMPTOM that the add-on might address.
+Symptoms are descriptions of problems, NOT requests for specific solutions.
+
+Examples of SYMPTOMS (do NOT match to add-ons):
+- "radiators go lukewarm" → symptom of heating issue, NOT a request for powerflush
+- "heating sometimes cuts out" → symptom, NOT a request for specific repair
+- "pressure drops" → symptom, NOT a request for specific service
+- "water goes cold" → symptom, NOT a request for specific fix
+
+Examples of REQUESTS (DO match to add-ons):
+- "need a powerflush" → explicit request for powerflush
+- "want the system flushed" → request for flush service
+- "please include a gas safety certificate" → request for certificate
+
+Only recommend add-ons when the customer:
+1. Explicitly mentions the add-on by name or close synonym
+2. Explicitly requests the specific service
+3. Describes a condition that ONLY that add-on can address
+
 Return a JSON array of matched add-ons. Only include add-ons that are clearly relevant to what the customer described.
 If no add-ons match, return an empty array.
 

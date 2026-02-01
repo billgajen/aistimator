@@ -37,7 +37,7 @@ import type {
   ServiceForMatching,
   SignalExtractionContext,
 } from './ai'
-import type { MatchedItem, ExtractedSignalsV2, PricingTrace, ExpectedSignalConfig, LowConfidenceMode, SignalRecommendation } from '@estimator/shared'
+import type { MatchedItem, ExtractedSignalsV2, PricingTrace, ExpectedSignalConfig, LowConfidenceMode, SignalRecommendation, WorkStepConfig } from '@estimator/shared'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@estimator/shared'
@@ -178,6 +178,34 @@ interface FallbackResult {
 }
 
 /**
+ * Get set of signal keys that are actually used by work steps
+ * FIX-4: Only signals referenced by work steps should trigger fallback
+ */
+function getUsedSignalKeys(workSteps: WorkStepConfig[] | undefined): Set<string> {
+  const usedKeys = new Set<string>()
+
+  if (!workSteps) return usedKeys
+
+  for (const step of workSteps) {
+    // Check triggerSignal
+    if (step.triggerSignal) {
+      usedKeys.add(step.triggerSignal)
+    }
+    // Check quantitySource.signalKey
+    if (step.quantitySource?.type === 'ai_signal' && step.quantitySource.signalKey) {
+      usedKeys.add(step.quantitySource.signalKey)
+    }
+  }
+
+  // Also include common signals that affect pricing globally
+  usedKeys.add('condition_rating')
+  usedKeys.add('complexity_level')
+  usedKeys.add('access_difficulty')
+
+  return usedKeys
+}
+
+/**
  * Evaluate whether fallback mode should be triggered
  */
 function evaluateFallback(
@@ -190,6 +218,9 @@ function evaluateFallback(
   const confidenceThreshold = service.confidence_threshold || 0.7
   const highValueThreshold = service.high_value_threshold
 
+  // FIX-4: Get signals actually used by work steps
+  const usedSignalKeys = getUsedSignalKeys(service.work_steps)
+
   const lowConfidenceSignals: string[] = []
   let overallConfidence = 1.0
 
@@ -198,13 +229,19 @@ function evaluateFallback(
     overallConfidence = structuredSignals.overallConfidence
     for (const signal of structuredSignals.signals) {
       if (signal.confidence < confidenceThreshold) {
-        lowConfidenceSignals.push(signal.key)
+        // FIX-4: Only include if signal is actually used by a work step
+        if (usedSignalKeys.has(signal.key)) {
+          lowConfidenceSignals.push(signal.key)
+        } else {
+          console.log(`[Processor] Ignoring low-confidence signal "${signal.key}" - not used by any work step`)
+        }
       }
     }
-    // Also include any marked as low confidence
+    // Also include any marked as low confidence (if used)
     if (structuredSignals.lowConfidenceSignals) {
       for (const key of structuredSignals.lowConfidenceSignals) {
-        if (!lowConfidenceSignals.includes(key)) {
+        // FIX-4: Only include if signal is actually used
+        if (usedSignalKeys.has(key) && !lowConfidenceSignals.includes(key)) {
           lowConfidenceSignals.push(key)
         }
       }
@@ -484,6 +521,39 @@ export async function processQuote(
       .filter(s => s.confidence < confidenceThreshold)
       .map(s => s.key)
     console.log(`[Processor] Regenerated lowConfidenceSignals after form merge: [${structuredSignals.lowConfidenceSignals.join(', ')}]`)
+  }
+
+  // FIX-8: Form/description overrides vision for access difficulty
+  // If customer explicitly states access is easy, override AI vision assessment
+  if (structuredSignals && customerNotes) {
+    const accessOverride = detectAccessOverrideFromDescription(customerNotes)
+    if (accessOverride) {
+      const existingSignal = structuredSignals.signals.find(s => s.key === 'access_difficulty')
+      const accessSignal = {
+        key: 'access_difficulty',
+        value: accessOverride.value,
+        confidence: 1.0,
+        source: 'inferred' as const,
+        evidence: `Customer stated: "${accessOverride.matchedPhrase}"`
+      }
+
+      if (existingSignal) {
+        if (existingSignal.value !== accessOverride.value) {
+          console.log(`[Processor] FIX-8: Access override from description: "${accessOverride.value}" (was: "${existingSignal.value}" from ${existingSignal.source})`)
+          // Replace the existing signal
+          const index = structuredSignals.signals.indexOf(existingSignal)
+          structuredSignals.signals[index] = accessSignal
+        }
+      } else {
+        structuredSignals.signals.push(accessSignal)
+        console.log(`[Processor] FIX-8: Access set from description: "${accessOverride.value}"`)
+      }
+
+      // Also update legacy signals
+      if (signals) {
+        signals.access = { difficulty: accessOverride.value as 'easy' | 'moderate' | 'difficult' | 'unknown' }
+      }
+    }
   }
 
   // 2.5 Extract inventory items if catalog is configured (works for any industry)
@@ -1879,6 +1949,53 @@ function isGenuineServiceRequest(phraseContext: string): boolean {
  */
 function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * FIX-8: Detect if customer explicitly mentioned access difficulty in their description
+ * Returns override value if found, null otherwise
+ */
+function detectAccessOverrideFromDescription(description: string): { value: string; matchedPhrase: string } | null {
+  // Easy access patterns
+  const easyPatterns = [
+    /access\s+is\s+easy/i,
+    /easy\s+access/i,
+    /readily\s+accessible/i,
+    /good\s+access/i,
+    /easy\s+to\s+access/i,
+    /easily\s+accessible/i,
+    /no\s+access\s+issues/i,
+    /accessible\s+from/i,
+  ]
+
+  // Difficult access patterns
+  const difficultPatterns = [
+    /access\s+is\s+difficult/i,
+    /difficult\s+access/i,
+    /hard\s+to\s+access/i,
+    /limited\s+access/i,
+    /restricted\s+access/i,
+    /tight\s+space/i,
+    /confined\s+space/i,
+  ]
+
+  // Check easy patterns first
+  for (const pattern of easyPatterns) {
+    const match = pattern.exec(description)
+    if (match) {
+      return { value: 'easy', matchedPhrase: match[0] }
+    }
+  }
+
+  // Check difficult patterns
+  for (const pattern of difficultPatterns) {
+    const match = pattern.exec(description)
+    if (match) {
+      return { value: 'difficult', matchedPhrase: match[0] }
+    }
+  }
+
+  return null
 }
 
 /**
