@@ -331,9 +331,13 @@ export function calculatePricing(
   subtotal = Math.round(subtotal * 100) / 100
 
   // 6. Calculate tax
+  // ISSUE-8 FIX: Use proper rounding to avoid penny discrepancies
+  // First calculate actual tax amount (rate is stored as percentage, e.g., 20 for 20%)
+  // Then round to 2 decimal places
   let taxAmount = 0
   if (taxConfig.enabled && taxConfig.rate) {
-    taxAmount = Math.round(subtotal * taxConfig.rate) / 100
+    const rawTax = subtotal * (taxConfig.rate / 100)
+    taxAmount = Math.round(rawTax * 100) / 100
   }
 
   // 7. Calculate total
@@ -427,6 +431,10 @@ function buildSearchableText(context?: AddonDetectionContext): string {
 /**
  * Check if text contains any of the trigger keywords
  * Returns the matched keyword if found
+ *
+ * IMPORTANT: This function now checks for negation context.
+ * If a keyword appears after negation words (e.g., "no polish", "don't want extras"),
+ * it will be skipped and not returned as a match.
  */
 function findMatchingKeyword(text: string, keywords: string[]): string | null {
   const textLower = text.toLowerCase()
@@ -439,6 +447,11 @@ function findMatchingKeyword(text: string, keywords: string[]): string | null {
     // e.g., "oil" shouldn't match "boiling"
     const regex = new RegExp(`\\b${escapeRegExp(keywordLower)}\\b`, 'i')
     if (regex.test(textLower)) {
+      // Check if keyword is negated (e.g., "no polish", "don't want staining")
+      if (isKeywordNegated(text, keyword)) {
+        console.log(`[Pricing] Keyword "${keyword}" found but negated in context, skipping`)
+        continue  // Skip this keyword, try next one
+      }
       return keyword
     }
   }
@@ -451,6 +464,57 @@ function findMatchingKeyword(text: string, keywords: string[]): string | null {
  */
 function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// ============================================================================
+// KEYWORD NEGATION DETECTION
+// ============================================================================
+
+/**
+ * Global phrases that suppress ALL addon recommendations
+ * These indicate the customer explicitly doesn't want extras
+ */
+const GLOBAL_ADDON_SUPPRESSORS = [
+  /\b(no extras?)\b/i,
+  /\b(please no extras?)\b/i,
+  /\b(don'?t (want|need|add) (any )?extras?)\b/i,
+  /\b(budget (only|focused|conscious))\b/i,
+  /\b(keep it (simple|basic|minimal))\b/i,
+  /\b(nothing extra)\b/i,
+  /\b(just the basics?)\b/i,
+  /\b(no add[- ]?ons?)\b/i,
+  /\b(no additional)\b/i,
+]
+
+/**
+ * Check if text contains global addon suppressor phrases
+ * When detected, ALL keyword-triggered addons should be suppressed
+ */
+function hasGlobalAddonSuppressor(text: string): boolean {
+  return GLOBAL_ADDON_SUPPRESSORS.some(pattern => pattern.test(text))
+}
+
+/**
+ * Check if a keyword appears in a negation context
+ * e.g., "no polish" or "don't want staining" should return true
+ *
+ * Checks if a negation word appears within 3 words before the keyword
+ */
+function isKeywordNegated(text: string, keyword: string): boolean {
+  const textLower = text.toLowerCase()
+  const keywordLower = keyword.toLowerCase()
+
+  // Negation words to check for
+  const negationWords = ['no', "don't", 'dont', "won't", 'wont', 'not', 'without', 'skip', 'avoid', 'exclude', 'never']
+
+  // Build pattern: negation word, then 0-2 words, then the keyword
+  // e.g., "no concrete", "don't want polish", "without the spur"
+  const negationPattern = new RegExp(
+    `\\b(${negationWords.join('|')})\\s+(\\w+\\s+){0,2}${escapeRegExp(keywordLower)}\\b`,
+    'i'
+  )
+
+  return negationPattern.test(textLower)
 }
 
 /**
@@ -511,6 +575,13 @@ function shouldApplyAddon(
 
   // 2. Check keyword triggers in project description
   if (addon.triggerKeywords && addon.triggerKeywords.length > 0 && searchableText) {
+    // Check for global addon suppressor phrases first (e.g., "no extras", "budget only")
+    // If customer explicitly says they don't want extras, skip all keyword-based addons
+    if (hasGlobalAddonSuppressor(searchableText)) {
+      console.log(`[Pricing] Addon "${addon.id}" skipped - global suppressor phrase detected in: "${searchableText.substring(0, 100)}..."`)
+      return { apply: false }
+    }
+
     const matchedKeyword = findMatchingKeyword(searchableText, addon.triggerKeywords)
     if (matchedKeyword) {
       // Filter out if addon is already covered by the core service
@@ -649,6 +720,19 @@ function shouldApplyMultiplier(
       // Type-aware comparison to handle form data types vs config value types
       // E.g., checkbox submits true (boolean) but config may have "Yes" (string)
 
+      // ISSUE-7 FIX: Handle array fields - check if array CONTAINS the compare value
+      // This allows multipliers to work with multi-select form fields
+      if (Array.isArray(answer.value) && typeof compareValue === 'string') {
+        const compareValueLower = compareValue.toLowerCase()
+        const hasMatch = answer.value.some(v =>
+          typeof v === 'string' && v.toLowerCase() === compareValueLower
+        )
+        if (hasMatch) {
+          console.log(`[Pricing] Multiplier array match: field "${mult.when.fieldId}" contains "${compareValue}"`)
+        }
+        return hasMatch
+      }
+
       // Handle boolean answer value → string compareValue
       if (typeof answer.value === 'boolean') {
         // Normalize compareValue to boolean for comparison
@@ -665,6 +749,20 @@ function shouldApplyMultiplier(
         return answer.value === compareAsBool
       }
 
+      // Handle string answer value that represents a boolean → boolean compareValue
+      // E.g., form sends "true" string but config has boolean true
+      if (typeof answer.value === 'string' && typeof compareValue === 'boolean') {
+        const answerAsBool =
+          answer.value === 'true' ||
+          answer.value === 'True' ||
+          answer.value === 'TRUE' ||
+          answer.value === 'Yes' ||
+          answer.value === 'yes' ||
+          answer.value === 'YES' ||
+          answer.value === '1'
+        return answerAsBool === compareValue
+      }
+
       // Handle number answer value → string compareValue (or vice versa)
       if (typeof answer.value === 'number' || typeof compareValue === 'number') {
         const answerNum = Number(answer.value)
@@ -675,9 +773,30 @@ function shouldApplyMultiplier(
         }
       }
 
-      // Handle string comparisons case-insensitively
+      // FIX-3: Handle string comparisons with format normalization
       if (typeof answer.value === 'string' && typeof compareValue === 'string') {
-        return answer.value.toLowerCase() === compareValue.toLowerCase()
+        // First try case-insensitive exact match
+        if (answer.value.toLowerCase() === compareValue.toLowerCase()) {
+          return true
+        }
+
+        // FIX-3: Normalize common format variations (underscores, parentheses, spaces)
+        const normalize = (s: string): string => s
+          .toLowerCase()
+          .replace(/_/g, ' ')           // underscores to spaces
+          .replace(/[()<>]/g, '')       // remove brackets and comparison symbols
+          .replace(/\s+/g, ' ')         // multiple spaces to single
+          .trim()
+
+        const normalizedAnswer = normalize(answer.value)
+        const normalizedCompare = normalize(compareValue)
+
+        if (normalizedAnswer === normalizedCompare) {
+          console.log(`[Pricing] Multiplier match via normalization: "${answer.value}" ≈ "${compareValue}"`)
+          return true
+        }
+
+        return false
       }
 
       // Fallback to strict equality
@@ -686,21 +805,65 @@ function shouldApplyMultiplier(
       if (typeof answer.value === 'string' && typeof compareValue === 'string') {
         return answer.value.toLowerCase().includes(compareValue.toLowerCase())
       }
+      // ISSUE-4 FIX: Array contains with case-insensitive matching
       if (Array.isArray(answer.value) && typeof compareValue === 'string') {
-        return answer.value.includes(compareValue)
+        const compareValueLower = compareValue.toLowerCase()
+        return answer.value.some(v =>
+          typeof v === 'string' && v.toLowerCase() === compareValueLower
+        )
       }
       return false
-    case 'gt':
-      return typeof answer.value === 'number' && typeof compareValue === 'number' && answer.value > compareValue
-    case 'lt':
-      return typeof answer.value === 'number' && typeof compareValue === 'number' && answer.value < compareValue
-    case 'gte':
-      return typeof answer.value === 'number' && typeof compareValue === 'number' && answer.value >= compareValue
-    case 'lte':
-      return typeof answer.value === 'number' && typeof compareValue === 'number' && answer.value <= compareValue
+    // ISSUE-1 FIX: Numeric comparison operators now handle string values
+    // Form inputs often come as strings (e.g., "30" instead of 30)
+    case 'gt': {
+      const answerNum = coerceToNumber(answer.value)
+      const compareNum = coerceToNumber(compareValue)
+      if (answerNum === null || compareNum === null) return false
+      return answerNum > compareNum
+    }
+    case 'lt': {
+      const answerNum = coerceToNumber(answer.value)
+      const compareNum = coerceToNumber(compareValue)
+      if (answerNum === null || compareNum === null) return false
+      return answerNum < compareNum
+    }
+    case 'gte': {
+      const answerNum = coerceToNumber(answer.value)
+      const compareNum = coerceToNumber(compareValue)
+      if (answerNum === null || compareNum === null) return false
+      return answerNum >= compareNum
+    }
+    case 'lte': {
+      const answerNum = coerceToNumber(answer.value)
+      const compareNum = coerceToNumber(compareValue)
+      if (answerNum === null || compareNum === null) return false
+      return answerNum <= compareNum
+    }
     default:
       return false
   }
+}
+
+/**
+ * ISSUE-1 & ISSUE-2 FIX: Coerce a value to number with comma handling
+ * Handles:
+ * - Numbers (passthrough)
+ * - String numbers ("30" → 30)
+ * - Comma-formatted numbers ("2,400" → 2400)
+ * - Empty/null/undefined → null
+ */
+function coerceToNumber(value: unknown): number | null {
+  if (typeof value === 'number' && !isNaN(value)) {
+    return value
+  }
+  if (typeof value === 'string') {
+    // ISSUE-2 FIX: Strip commas from formatted numbers (e.g., "2,400" → "2400")
+    const cleaned = value.replace(/,/g, '').trim()
+    if (!cleaned) return null
+    const parsed = parseFloat(cleaned)
+    return isNaN(parsed) ? null : parsed
+  }
+  return null
 }
 
 /**
@@ -1026,9 +1189,9 @@ function calculateWorkStepCost(
               quantityTrusted = true  // Form = 100% trusted
               signalsUsed.push({ key: step.quantitySource.fieldId || 'form_field', value: quantity })
             } else if (formAnswer?.value != null && typeof formAnswer.value === 'string') {
-              // Try to parse string as number
-              const parsed = parseFloat(formAnswer.value)
-              if (!isNaN(parsed) && parsed > 0) {
+              // ISSUE-2 FIX: Use coerceToNumber to handle comma-separated numbers (e.g., "2,400" → 2400)
+              const parsed = coerceToNumber(formAnswer.value)
+              if (parsed !== null && parsed > 0) {
                 quantity = parsed
                 quantitySource = 'form_field'
                 quantityTrusted = true
@@ -1251,6 +1414,13 @@ export function calculatePricingWithTrace(
 
       const stepResult = calculateWorkStepCost(step, signalsArray, signals, answers)
 
+      // ISSUE-3 FIX: Skip zero-cost line items (e.g., "0 sockets × £25 = £0")
+      // This prevents unprofessional-looking quotes with $0 line items
+      if (stepResult.cost === 0) {
+        console.log(`[Pricing] Skipping work step "${step.name}" - zero cost`)
+        continue
+      }
+
       // Add trigger signal to signalsUsed if different
       if (step.triggerSignal && signalValue !== undefined && !stepResult.signalsUsed.find(s => s.key === step.triggerSignal)) {
         stepResult.signalsUsed.unshift({ key: step.triggerSignal, value: signalValue })
@@ -1458,9 +1628,11 @@ export function calculatePricingWithTrace(
   }
 
   // 8. Tax
+  // ISSUE-8 FIX: Use proper rounding to avoid penny discrepancies
   let taxAmount = 0
   if (taxConfig.enabled && taxConfig.rate) {
-    taxAmount = Math.round(subtotal * taxConfig.rate) / 100
+    const rawTax = subtotal * (taxConfig.rate / 100)
+    taxAmount = Math.round(rawTax * 100) / 100
 
     traceSteps.push({
       type: 'tax',
@@ -1476,7 +1648,10 @@ export function calculatePricingWithTrace(
   const total = Math.round((subtotal + taxAmount) * 100) / 100
 
   // 10. Confidence and range
-  const confidence = signals.confidence
+  // FIX-1: Use structuredSignals.overallConfidence when available
+  // This reflects accurate confidence after form signals are merged (1.0 for form data)
+  // Legacy signals.confidence defaults to 0.5 when no images, which incorrectly triggers range mode
+  const confidence = structuredSignals?.overallConfidence ?? signals.confidence
   let range: PricingResult['range'] | undefined
 
   if (confidence < 0.7) {
@@ -1603,10 +1778,11 @@ export function calculateCrossServicePricing(
   // Round subtotal
   subtotal = Math.round(subtotal * 100) / 100
 
-  // Calculate tax
+  // Calculate tax (ISSUE-8 FIX: proper rounding)
   let taxAmount = 0
   if (taxConfig.enabled && taxConfig.rate) {
-    taxAmount = Math.round(subtotal * taxConfig.rate) / 100
+    const rawTax = subtotal * (taxConfig.rate / 100)
+    taxAmount = Math.round(rawTax * 100) / 100
     if (taxAmount > 0) {
       breakdown.push(`${taxConfig.label || 'Tax'} (${taxConfig.rate}%): ${formatCurrency(taxAmount, currency)}`)
     }

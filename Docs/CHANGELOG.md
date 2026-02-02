@@ -15,6 +15,402 @@
 
 ## Issues & Resolutions
 
+### 2026-02-02: Keyword Negation in Addon Detection (FIX-NEGATION-1)
+
+**Issue:** The pricing engine was recommending addons based on keyword matches even when customers explicitly said they didn't want extras. For example, "wobbly post" would trigger a `concrete_spur` addon recommendation even if the customer said "please no extras" in the same description.
+
+**Root Cause:** The `findMatchingKeyword()` function in `rules-engine.ts` used simple word-boundary regex matching without any context awareness. It would match keywords regardless of surrounding negation phrases.
+
+**Resolution:** Implemented two-layer negation detection:
+
+1. **Global Addon Suppressors** - Phrases like "no extras", "budget only", "keep it simple" that suppress ALL keyword-triggered addons:
+   ```typescript
+   const GLOBAL_ADDON_SUPPRESSORS = [
+     /\b(no extras?)\b/i,
+     /\b(budget (only|focused|conscious))\b/i,
+     /\b(keep it (simple|basic|minimal))\b/i,
+     // ... etc.
+   ]
+   ```
+
+2. **Contextual Keyword Negation** - Checks if a specific keyword appears after negation words within 3 words:
+   ```typescript
+   // Pattern: negation word + 0-2 words + keyword
+   // e.g., "don't want fridge", "no extra polish"
+   ```
+
+**Files Modified:**
+- `apps/worker/src/pricing/rules-engine.ts` - Added negation detection functions and integrated into addon matching
+- `apps/worker/src/pricing/rules-engine.test.ts` - Added TEST-13 with 6 test cases for negation detection
+
+**Test Coverage (TEST-13):**
+- "no extras" suppresses all addons
+- Negated keyword ("don't clean fridge") is skipped
+- Non-negated keyword still matches correctly
+- "budget only" acts as global suppressor
+- "keep it simple" acts as global suppressor
+- Negation with intervening words ("don't want the fridge")
+
+**Verification:**
+- All 28 rules-engine tests pass
+- All 43 fence-scenario tests pass
+- PRICE-SENSITIVE scenario now correctly has no addon recommendations
+
+**Related to:** Fence Service E2E Stress Test diagnostic report (HIGH priority issue)
+
+---
+
+### 2026-02-01: E2E Quote Processing Integration Tests
+
+**Context:** Implemented comprehensive E2E integration tests for the quote processing pipeline. These tests verify the complete flow from quote request submission through pricing calculation, with mocked AI signals to ensure deterministic test results.
+
+#### TEST SUITE: E2E Quote Processing Tests
+
+**Files:**
+- `apps/worker/src/__tests__/quote-processing.test.ts` - Main integration test file (22 tests)
+- `apps/worker/src/__tests__/fixtures/test-services.ts` - Test service configurations
+- `apps/worker/src/__tests__/mocks/ai-signals.ts` - Mock AI signal responses
+
+**Coverage (22 tests across 6 scenarios):**
+- TEST-E2E-1: Basic Quote Processing - Verifies pricing breakdown, tax, trace summary
+- TEST-E2E-2: Addon Keyword Detection - Verifies auto-recommended addons from description keywords
+- TEST-E2E-3: Cross-Service Detection - Verifies pricing unaffected by cross-service mentions
+- TEST-E2E-4: Signal Recommendations - Verifies processing continues with unused AI signals
+- TEST-E2E-5: Low Confidence Fallback - Verifies price range shown for low confidence scenarios
+- TEST-E2E-6: Form Override - Verifies form values override AI signals (AD-007 compliance)
+
+**Key Outputs Verified:**
+- `pricing_json`: subtotal, taxAmount, total, breakdown (with autoRecommended flags), recommendedAddons, notes
+- `pricing_trace_json`: trace steps, summary (baseFee, workStepsTotal, addonsTotal, multiplierAdjustment, taxAmount, total)
+- `signals_json`: confidence, signals array
+
+**Test Architecture:**
+- Mock AI signal extraction for deterministic results
+- Test the full pricing pipeline directly
+- Verify all output fields match expected calculations
+
+**Run Tests:**
+```bash
+pnpm --filter @estimator/worker test
+```
+
+---
+
+### 2026-02-01: Pricing Accuracy Test Suite & Bug Fix
+
+**Context:** Implemented comprehensive pricing accuracy test suite with 22 tests covering all pricing components (work steps, addons, multipliers, tax, minimum charge). Tests verify mathematical correctness of the deterministic pricing engine.
+
+---
+
+#### ISSUE-9: String Boolean Values Not Compared to Boolean Config (MEDIUM)
+
+**Symptom:** Multiplier with `equals: true` for `heavy_soiling` not applied when form submitted `"true"` (string).
+
+**Root Cause:**
+- File: `apps/worker/src/pricing/rules-engine.ts`
+- The code handled boolean answer values compared to string config values (e.g., `true` vs `"Yes"`)
+- But it didn't handle the reverse: string answer values compared to boolean config values (e.g., `"true"` vs `true`)
+
+**Resolution:**
+- Added new case in `shouldApplyMultiplier()` for string answer → boolean compareValue:
+```typescript
+// Handle string answer value that represents a boolean → boolean compareValue
+if (typeof answer.value === 'string' && typeof compareValue === 'boolean') {
+  const answerAsBool =
+    answer.value === 'true' ||
+    answer.value === 'True' ||
+    answer.value === 'TRUE' ||
+    answer.value === 'Yes' ||
+    answer.value === 'yes' ||
+    answer.value === 'YES' ||
+    answer.value === '1'
+  return answerAsBool === compareValue
+}
+```
+
+**Lesson:** Form data can arrive as either booleans or strings depending on the form framework. Handle both directions of comparison.
+
+---
+
+#### TEST SUITE: Pricing Accuracy Tests
+
+**File:** `apps/worker/src/pricing/rules-engine.test.ts`
+
+**Coverage (22 tests):**
+- TEST-1: Basic quote calculation (4 rooms, 2 bathrooms)
+- TEST-2: Full service with all optional work steps and addons
+- TEST-3: Minimum charge NOT triggered (above minimum)
+- TEST-4: Minimum charge TRIGGERED (below minimum)
+- TEST-5: String number parsing from form inputs
+- TEST-6: Boolean string values ("true", "Yes")
+- TEST-7: Array field multipliers (multi-select)
+- TEST-8: Numeric comparison operators (gt, lt, lte, gte)
+- TEST-9: Zero quantities don't create $0 lines
+- TEST-10: Tax rounding precision (no floating-point errors)
+- TEST-11: Multiplier stacking order (multiplicative)
+- TEST-12: Addon keyword case sensitivity
+- Additional edge cases (empty forms, disabled tax, large numbers)
+
+**Test Service:** "Complete Home Cleaning" with comprehensive configuration:
+- Base fee: £25, Minimum charge: £75
+- Work steps: Room cleaning (per-unit), Bathroom (per-unit), Kitchen (fixed), Oven (optional), Carpet (optional), Windows (optional)
+- Addons: Fridge, Laundry, Pet treatment (keyword-triggered)
+- Multipliers: Property size, Urgency, Heavy soiling, New customer, Loyalty
+
+**Run Tests:**
+```bash
+pnpm --filter @estimator/worker test
+```
+
+---
+
+### 2026-02-01: Quote Generation Quality Fixes v6 (Stress Testing)
+
+**Context:** Designed 20 ultra-realistic test scenarios across 7 service categories and identified 8 bugs/issues affecting real-world quote generation.
+
+---
+
+#### ISSUE-1: Numeric Comparison Operators Fail with String Form Values (HIGH)
+
+**Symptom:** Multiplier with `gte: 25` for `roof_age_years` not applied when form submitted `"30"` (string).
+
+**Root Cause:**
+- File: `apps/worker/src/pricing/rules-engine.ts`
+- Operators `gt`, `lt`, `gte`, `lte` required BOTH values to be `typeof number`
+- Form inputs often come as strings, so `typeof "30" === 'string'` caused silent failure
+
+**Resolution:**
+- Added `coerceToNumber()` helper function with comma handling
+- Updated all numeric operators to use coercion:
+```typescript
+case 'gte': {
+  const answerNum = coerceToNumber(answer.value)
+  const compareNum = coerceToNumber(compareValue)
+  if (answerNum === null || compareNum === null) return false
+  return answerNum >= compareNum
+}
+```
+
+**Lesson:** Form data types are unpredictable. Numeric comparisons must coerce before comparing.
+
+---
+
+#### ISSUE-2: Comma-Separated Numbers Not Parsed (MEDIUM)
+
+**Symptom:** Floor area "2,400" parsed as 2 instead of 2400, causing massive undercharge.
+
+**Root Cause:**
+- `parseFloat("2,400")` stops at first non-numeric character → returns 2
+- Common UK/US formatting uses commas for thousands
+
+**Resolution:**
+- `coerceToNumber()` strips commas: `value.replace(/,/g, '')`
+- Updated `calculateWorkStepCost()` to use `coerceToNumber()` for form field parsing
+- Updated type inference in `quote-processor.ts` to detect comma-formatted numbers
+
+**Lesson:** Always normalize number formats before parsing.
+
+---
+
+#### ISSUE-3: Zero Quantity Creates $0 Line Items (LOW)
+
+**Symptom:** Quote shows "0 sockets × £25 = £0" instead of omitting the line.
+
+**Root Cause:** No check to skip zero-cost line items in work step processing.
+
+**Resolution:**
+- Added check after `calculateWorkStepCost()`:
+```typescript
+if (stepResult.cost === 0) {
+  console.log(`[Pricing] Skipping work step "${step.name}" - zero cost`)
+  continue
+}
+```
+
+**Lesson:** Zero-value line items are unprofessional. Skip them.
+
+---
+
+#### ISSUE-4: Array Contains Doesn't Match Case-Insensitively (MEDIUM)
+
+**Symptom:** Multi-select `["network", "endpoints", "cloud_m365"]` didn't match multiplier `contains: "Cloud_M365"`.
+
+**Root Cause:** Array `includes()` uses strict equality, case-sensitive.
+
+**Resolution:**
+- Updated `contains` operator for arrays:
+```typescript
+if (Array.isArray(answer.value) && typeof compareValue === 'string') {
+  const compareValueLower = compareValue.toLowerCase()
+  return answer.value.some(v =>
+    typeof v === 'string' && v.toLowerCase() === compareValueLower
+  )
+}
+```
+
+**Lesson:** Multi-select values need case-insensitive matching.
+
+---
+
+#### ISSUE-5: Explicit Negation Not Detected in Cross-Service (HIGH)
+
+**Symptom:** Customer wrote "thinking of getting an awning but not for this quote" but awning service was still recommended.
+
+**Root Cause:** `isGenuineServiceRequest()` didn't detect explicit negation phrases.
+
+**Resolution:**
+- Added negation patterns to `nonRequestPatterns`:
+```typescript
+/\b(not for this|not for now|not this time)\b/i,
+/\b(don'?t need|won'?t need|no need)\b/i,
+/\b(not needed|not required|not necessary)\b/i,
+/\b(don'?t want|won'?t want)\b/i,
+/\b(just mentioning|for context|for reference)\b/i,
+/\b(thinking of|considering|might|maybe)\b.*\b(but not|but later|another time)\b/i,
+/\b(separate|different|another)\s+(quote|job|project)\b/i,
+```
+
+**Lesson:** Explicit customer negations must be respected.
+
+---
+
+#### ISSUE-6: Ambiguous Values Not Handled (MEDIUM)
+
+**Symptom:** `levelling_required: "possibly"` treated as truthy, included in firm price.
+
+**Root Cause:** No detection of ambiguous/uncertain values like "possibly", "maybe", "quote_option".
+
+**Resolution:**
+- Added `detectAmbiguousValue()` function
+- `convertFormValueToSignal()` returns `null` for ambiguous values
+- Ambiguous values are logged and skipped from firm pricing
+
+**Lesson:** Uncertain customer inputs shouldn't be included in firm quotes.
+
+---
+
+#### ISSUE-7: Multi-Value Fields (Arrays) in Multipliers `equals` (MEDIUM)
+
+**Symptom:** Array field `audit_scope: ["network", "endpoints", "cloud_m365"]` didn't trigger multiplier `equals: "network"`.
+
+**Root Cause:** `equals` operator for arrays only checked strict equality, not contains.
+
+**Resolution:**
+- Added array handling to `equals` operator:
+```typescript
+if (Array.isArray(answer.value) && typeof compareValue === 'string') {
+  const compareValueLower = compareValue.toLowerCase()
+  const hasMatch = answer.value.some(v =>
+    typeof v === 'string' && v.toLowerCase() === compareValueLower
+  )
+  return hasMatch
+}
+```
+
+**Lesson:** Multipliers with `equals` should match any value in multi-select arrays.
+
+---
+
+#### ISSUE-8: Tax Calculation Rounding (LOW)
+
+**Symptom:** Potential penny discrepancies with fractional tax rates.
+
+**Root Cause:** Formula `Math.round(subtotal * rate) / 100` assumed rate is percentage integer.
+
+**Resolution:**
+- Changed to explicit percentage calculation:
+```typescript
+const rawTax = subtotal * (taxConfig.rate / 100)
+taxAmount = Math.round(rawTax * 100) / 100
+```
+- Updated all 3 tax calculation locations
+
+**Lesson:** Tax calculations should be explicit about percentage conversion.
+
+---
+
+### Files Modified
+
+| File | Issues Fixed |
+|------|-------------|
+| `apps/worker/src/pricing/rules-engine.ts` | ISSUE-1, 2, 3, 4, 7, 8 |
+| `apps/worker/src/quote-processor.ts` | ISSUE-2, 5, 6 |
+
+---
+
+### 2026-02-01: Quote Generation Quality Fixes v5
+
+**Context:** Testing cybersecurity service quote revealed four issues. All fixes are future-proof with no hardcoded values.
+
+---
+
+#### FIX-1: Use structuredSignals.overallConfidence (CRITICAL)
+
+**Symptom:** "Price shown as range due to limited information" appeared incorrectly for form-only submissions.
+
+**Root Cause:** `calculatePricingWithTrace()` used legacy `signals.confidence` (defaults to 0.5 without images) instead of `structuredSignals.overallConfidence` (1.0 after form signals merged).
+
+**Resolution:**
+- File: `apps/worker/src/pricing/rules-engine.ts`
+  - Changed: `const confidence = structuredSignals?.overallConfidence ?? signals.confidence`
+  - Falls back to legacy confidence only when structuredSignals unavailable
+
+**Lesson:** After form signal merging, `structuredSignals.overallConfidence` reflects true confidence (1.0 for form data).
+
+---
+
+#### FIX-2: No Warnings for Photo-Optional Services (HIGH)
+
+**Symptom:** Three warnings appeared ("No images provided", "Site visit recommended") for services where `minPhotos = 0`.
+
+**Root Cause:** No distinction between photo-required vs photo-optional services when no images uploaded.
+
+**Resolution:**
+- File: `apps/worker/src/ai/signals.ts`
+  - Added `getSignalsWithoutImagesPhotoOptional()` - returns confidence 0.8, no warnings, no site visit
+  - Added `getSignalsWithoutImagesV2PhotoOptional()` - matching V2 version
+- File: `apps/worker/src/ai/index.ts`
+  - Exported new functions
+- File: `apps/worker/src/quote-processor.ts`
+  - Checks `service.media_config?.minPhotos ?? 1`
+  - Uses photo-optional functions when `minPhotos === 0`
+
+**Lesson:** Business configuration (`minPhotos`) should control whether missing photos trigger warnings.
+
+---
+
+#### FIX-3: Enhanced String Matching for Multipliers (MEDIUM)
+
+**Symptom:** Timeline multiplier not applied. `"urgent_(<7_days)"` didn't match `"Urgent (<7 days)"`.
+
+**Root Cause:** Case-insensitive comparison insufficient when format differs (underscores vs spaces, brackets).
+
+**Resolution:**
+- File: `apps/worker/src/pricing/rules-engine.ts`
+  - Enhanced `shouldApplyMultiplier()` for `equals` operator
+  - Added `normalize()` function: converts to lowercase, underscores→spaces, removes brackets
+  - `"urgent_(<7_days)"` → `"urgent 7 days"` matches `"Urgent (<7 days)"` → `"urgent 7 days"`
+
+**Lesson:** Form option values may have format variations. Normalize before comparing.
+
+---
+
+#### FIX-4: Intent-Aware Addon Detection (MEDIUM)
+
+**Symptom:** Phishing Simulation addon not recommended despite customer saying "want to tighten our controls".
+
+**Root Cause:** FIX-7 (symptom vs solution) was too conservative - blocked intent signals.
+
+**Resolution:**
+- File: `apps/worker/src/ai/signals.ts`
+  - Enhanced `detectAddonsFromDescription()` prompt
+  - Added "INTENT SIGNALS" category: recognizes goal keywords ("want to", "need to", "improve", "prevent", "strengthen", "tighten", "ensure", "enhance")
+  - Added "CONTEXT COMBINATION" rule: symptom + intent = recommend
+
+**Lesson:** Distinguish between passive symptoms (no action) vs expressed intent (has goal).
+
+---
+
 ### 2026-02-01: Quote Generation Quality Fixes v4
 
 **Context:** Deep analysis of a boiler service quote test revealed multiple issues with quote generation quality. Four fixes were implemented based on severity.
@@ -1058,6 +1454,7 @@ if (pricingResult.estimatedTotal <= 0) {
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-01 | 1.10.0 | Quote Quality Fixes v6 (Stress Testing): 8 issues fixed - numeric operator type coercion (ISSUE-1), comma-separated numbers (ISSUE-2), zero line items (ISSUE-3), array case-insensitive (ISSUE-4), explicit negation (ISSUE-5), ambiguous values (ISSUE-6), array equals matching (ISSUE-7), tax rounding (ISSUE-8) |
 | 2026-02-01 | 1.9.1 | Quote Quality Fixes v4 (remaining): Ignore unused signals in fallback (FIX-4), smarter addon keyword matching (FIX-7), form overrides vision for access (FIX-8) |
 | 2026-02-01 | 1.9.0 | Quote Quality Fixes v4: AD-001 compliance for recommendations (no AI prices), addon/exclusion conflict check, vision severity calibration, error code integration |
 | 2026-01-31 | 1.8.0 | AI Scope Constraint & No-Hardcode Rule (AD-013): AI cannot promise services outside scope_includes, added anti-hardcoding principle to CLAUDE.md |
@@ -1091,4 +1488,4 @@ if (pricingResult.estimatedTotal <= 0) {
 
 ---
 
-*Last Updated: 2026-02-01 (v1.9.1)*
+*Last Updated: 2026-02-01 (v1.10.0)*
