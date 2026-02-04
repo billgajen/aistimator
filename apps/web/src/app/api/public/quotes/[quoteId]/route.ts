@@ -162,6 +162,9 @@ export async function GET(
         total: pricing.total || 0,
         breakdown: pricing.breakdown || [],
         notes: pricing.notes || [],
+        ...(pricing.availableAddons && pricing.availableAddons.length > 0 && {
+          availableAddons: pricing.availableAddons,
+        }),
       },
       breakdown: pricing.breakdown || [],
       notes: {

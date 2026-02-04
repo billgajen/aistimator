@@ -15,6 +15,29 @@
 
 ## Issues & Resolutions
 
+### 2026-02-04: Quote Quality Fixes v5
+
+**Context:** Five quality fixes and one cleanup task to improve signal accuracy, quote completeness, and data hygiene.
+
+**Changes:**
+
+| Fix | File(s) | Description |
+|-----|---------|-------------|
+| FIX-1 | `apps/worker/src/quote-processor.ts` | `mapsToSignal` fallback: widget fields → `draft_config.suggestedFields` → `expected_signals` matching. Added `draft_config` to service query. |
+| FIX-2 | `apps/worker/src/ai/signals.ts`, `packages/shared/src/database.types.ts` | Room-based services: added `'room'` to dimensions type union and mapped it to `item_count` signal instead of `linear_distance`. |
+| FIX-3 | `apps/worker/src/quote-processor.ts`, `packages/shared/src/database.types.ts`, `apps/web/src/app/api/public/quotes/[quoteId]/route.ts`, `apps/web/src/app/q/[quoteId]/page.tsx` | Available addons upsell: untriggered addons surfaced as "Optional Extras" section on quote page (green styling). Added `availableAddons` to `QuotePricing` type. |
+| FIX-4 | `apps/worker/src/ai/wording.ts` | Notes deduplication: AI prompt now instructs not to repeat pricing notes verbatim in content notes. |
+| FIX-5 | `scripts/fix-5-update-line-set-label.sql` | Data update script to fix form label from "Estimated line set length per unit" to "Number of line sets (indoor units)". |
+| CLEANUP | `supabase/migrations/001_initial_schema.sql.bak` | Deleted legacy backup migration file. |
+
+**Architectural Decisions:**
+- FIX-1: Signal mapping uses a 3-tier fallback (widget config → draft_config → expected_signals) to handle cases where `mapsToSignal` is present in `draft_config.suggestedFields` but stripped when saved to `config_json.fields`.
+- FIX-3: Available addons are stored in `pricing_json.availableAddons` alongside the pricing data. They exclude addons that conflict with `scope_excludes` or are covered by the core service.
+
+**Verification:** `pnpm typecheck`, `pnpm lint`, `pnpm test` (93/93 tests pass).
+
+---
+
 ### 2026-02-03: AD-014 Location Context Conflict Detection
 
 **Context:** Cross-service recommendations incorrectly suggested "Roof Leak Repair" for a customer describing a bathroom leak. The existing AD-008 (phrase verification) and AD-010 (keyword matching) validations passed because the phrase mentioned "leak" and the service name contained "Leak".

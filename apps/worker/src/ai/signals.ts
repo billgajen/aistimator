@@ -173,7 +173,7 @@ export interface ExtractedSignals {
 
   /** Estimated dimensions or area */
   dimensions?: {
-    type: 'area' | 'linear' | 'count'
+    type: 'area' | 'linear' | 'count' | 'room'
     value: number
     unit: string
     isEstimate: boolean
@@ -667,7 +667,7 @@ function convertToSignalsV2(
     // Add dimension signal
     if (legacy.dimensions) {
       const dimSignal: ExtractedSignal = {
-        key: legacy.dimensions.type === 'count' ? 'item_count' : legacy.dimensions.type === 'area' ? 'surface_area' : 'linear_distance',
+        key: legacy.dimensions.type === 'count' || legacy.dimensions.type === 'room' ? 'item_count' : legacy.dimensions.type === 'area' ? 'surface_area' : 'linear_distance',
         value: legacy.dimensions.value,
         confidence: legacy.dimensions.isEstimate ? 0.6 : 0.8,
         source: 'vision',

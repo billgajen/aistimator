@@ -3,10 +3,10 @@
 
 -- Create quote_validation_logs table
 CREATE TABLE IF NOT EXISTS quote_validation_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  quote_id UUID NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  service_id UUID NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT generate_prefixed_id('vld'),
+  quote_id TEXT NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  service_id TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
   -- Input snapshot for debugging and learning

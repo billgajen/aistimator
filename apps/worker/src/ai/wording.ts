@@ -327,6 +327,11 @@ export async function generateWording(
     : '- Standard pricing applied'
   prompt = prompt.replace('{{PRICING_NOTES}}', pricingNotes)
 
+  // FIX-4: Instruct AI not to repeat pricing notes verbatim in content notes
+  if (context.pricing.notes.length > 0) {
+    prompt += `\n\nIMPORTANT: The pricing notes above are already shown separately on the quote. Do NOT repeat them verbatim in the "notes" field. Instead, synthesize any relevant information into a cohesive customer-facing note, or leave "notes" as an empty string if there's nothing additional to say.`
+  }
+
   const response = await client.generateText(prompt, getSystemPrompt(context.documentType))
 
   try {

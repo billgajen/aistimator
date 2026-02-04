@@ -227,6 +227,26 @@ export default function QuotePage({ params }: QuotePageProps) {
             </div>
           </div>
 
+          {/* Optional Extras (available addons not triggered) */}
+          {pricing.availableAddons && pricing.availableAddons.length > 0 && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+              <h3 className="text-sm font-medium text-green-800 mb-3">Optional Extras</h3>
+              <div className="space-y-2">
+                {pricing.availableAddons.map((addon) => (
+                  <div key={addon.id} className="flex justify-between items-center text-sm">
+                    <span className="text-green-900">{addon.label}</span>
+                    <span className="text-green-800 font-medium">
+                      +{formatCurrency(addon.price, pricing.currency)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-green-600 mt-3 pt-3 border-t border-green-200">
+                Ask us to add any of these to your quote.
+              </p>
+            </div>
+          )}
+
           {/* Cross-Service Pricing */}
           {crossServicePricing && crossServicePricing.length > 0 && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">

@@ -486,6 +486,8 @@ export interface QuotePricing {
   }>
   /** Pricing notes - warnings, site visit recommendations, etc. */
   notes?: string[]
+  /** Available addons that weren't triggered — shown as optional extras */
+  availableAddons?: Array<{ id: string; label: string; price: number }>
 }
 
 export interface QuoteContent {
@@ -528,7 +530,7 @@ export interface ExtractedSignalsV2 {
 
   /** Legacy fields for backwards compatibility */
   dimensions?: {
-    type: 'area' | 'linear' | 'count'
+    type: 'area' | 'linear' | 'count' | 'room'
     value: number
     unit: string
     isEstimate: boolean

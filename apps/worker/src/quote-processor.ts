@@ -46,7 +46,7 @@ import type {
   ServiceConfigForValidation,
   GeneratedQuoteForValidation,
 } from './ai'
-import type { MatchedItem, ExtractedSignalsV2, PricingTrace, ExpectedSignalConfig, LowConfidenceMode, SignalRecommendation, WorkStepConfig, ValidationSettings, ValidationResult, ValidationOutcome } from '@estimator/shared'
+import type { MatchedItem, ExtractedSignalsV2, PricingTrace, ExpectedSignalConfig, LowConfidenceMode, SignalRecommendation, WorkStepConfig, ValidationSettings, ValidationResult, ValidationOutcome, ServiceDraftConfig } from '@estimator/shared'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@estimator/shared'
@@ -136,6 +136,8 @@ interface QuoteData {
     confidence_threshold?: number
     /** High value threshold for triggering fallback */
     high_value_threshold?: number | null
+    /** AI-generated draft configuration with suggestedFields containing mapsToSignal */
+    draft_config?: ServiceDraftConfig | null
   }
   /** Other services from this tenant (for cross-service detection) */
   otherServices?: Array<{
@@ -446,11 +448,41 @@ export async function processQuote(
     console.log(`[Processor] Form fieldIds: ${formAnswers.map(a => a.fieldId).join(', ')}`)
 
     // Build explicit mapping from fieldId -> signalKey using widget config
+    // FIX-1: Fall back to draft_config.suggestedFields and expected_signals
+    // when widget config_json doesn't include mapsToSignal
     const fieldToSignalMap = new Map<string, string>()
     for (const field of widgetFields) {
       if (field.mapsToSignal) {
         fieldToSignalMap.set(field.fieldId, field.mapsToSignal)
         console.log(`[Processor] Explicit mapping: ${field.fieldId} -> ${field.mapsToSignal}`)
+      }
+    }
+
+    // Fallback 1: draft_config.suggestedFields (has mapsToSignal from AI generation)
+    if (service.draft_config?.suggestedFields) {
+      for (const suggested of service.draft_config.suggestedFields) {
+        if (suggested.mapsToSignal && !fieldToSignalMap.has(suggested.fieldId)) {
+          fieldToSignalMap.set(suggested.fieldId, suggested.mapsToSignal)
+          console.log(`[Processor] Draft config mapping: ${suggested.fieldId} -> ${suggested.mapsToSignal}`)
+        }
+      }
+    }
+
+    // Fallback 2: expected_signals matched by fieldId similarity
+    if (service.expected_signals && service.expected_signals.length > 0) {
+      for (const answer of formAnswers) {
+        if (answer.fieldId.startsWith('_')) continue
+        if (fieldToSignalMap.has(answer.fieldId)) continue
+        // Try to match fieldId to an expected signal key
+        const normalizedFieldId = answer.fieldId.toLowerCase().replace(/[_\s-]/g, '')
+        for (const es of service.expected_signals) {
+          const normalizedSignalKey = es.signalKey.toLowerCase().replace(/[_\s-]/g, '')
+          if (normalizedFieldId === normalizedSignalKey) {
+            fieldToSignalMap.set(answer.fieldId, es.signalKey)
+            console.log(`[Processor] Expected signal mapping: ${answer.fieldId} -> ${es.signalKey}`)
+            break
+          }
+        }
       }
     }
 
@@ -460,9 +492,9 @@ export async function processQuote(
       if (answer.fieldId.startsWith('_')) continue
       if (answer.value === undefined || answer.value === null || answer.value === '') continue
 
-      // Determine the signal key: use explicit mapsToSignal or derive from fieldId
+      // Determine the signal key: use explicit mapsToSignal, fieldToSignalMap fallback, or derive from fieldId
       const field = widgetFields.find(f => f.fieldId === answer.fieldId)
-      let signalKey = field?.mapsToSignal || answer.fieldId
+      let signalKey = field?.mapsToSignal || fieldToSignalMap.get(answer.fieldId) || answer.fieldId
 
       // Canonical signal key matching
       // With deriveSignalKey(), form fields and AI should use identical keys
@@ -1149,6 +1181,25 @@ export async function processQuote(
     }
   }
 
+  // 4.8 Collect available (untriggered) addons for upsell display
+  const availableAddons: Array<{ id: string; label: string; price: number }> = []
+  if (rules.addons && rules.addons.length > 0) {
+    const triggeredAddonIds = new Set(
+      formAnswers.filter(a => a.value === true).map(a => a.fieldId)
+    )
+    for (const addon of rules.addons) {
+      if (!triggeredAddonIds.has(addon.id)) {
+        // Skip addons that conflict with scope_excludes or are covered by core service
+        if (isAddonConflictingWithExcludes(addon.id, addon.label, service.scope_excludes)) continue
+        if (isAddonCoveredByService(addon.id, service.name, service.scope_includes)) continue
+        availableAddons.push({ id: addon.id, label: addon.label, price: addon.price })
+      }
+    }
+    if (availableAddons.length > 0) {
+      console.log(`[Processor] ${availableAddons.length} available addons for upsell: ${availableAddons.map(a => a.label).join(', ')}`)
+    }
+  }
+
   // 5. Update quote record with signals and pricing trace
   const { error: updateError } = await supabase
     .from('quotes')
@@ -1168,6 +1219,10 @@ export async function processQuote(
         // Include recommended addons info
         ...(pricing.recommendedAddons && {
           recommendedAddons: pricing.recommendedAddons,
+        }),
+        // Include available addons for upsell
+        ...(availableAddons.length > 0 && {
+          availableAddons,
         }),
         // Include fallback info if triggered
         ...(fallbackResult.triggered && {
@@ -1344,7 +1399,8 @@ async function loadQuoteData(
         work_steps,
         low_confidence_mode,
         confidence_threshold,
-        high_value_threshold
+        high_value_threshold,
+        draft_config
       )
     `)
     .eq('id', quoteId)
