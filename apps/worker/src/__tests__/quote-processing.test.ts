@@ -20,6 +20,7 @@ import {
   type AddonDetectionContext,
   type PricingResult,
 } from '../pricing/rules-engine'
+import { resolveSignalType } from '../quote-processor'
 import type { ExtractedSignalsV2, PricingTrace } from '@estimator/shared'
 import type { ExtractedSignals } from '../ai/signals'
 
@@ -772,5 +773,363 @@ describe('Test Results Summary', () => {
     console.table(testScenarios)
 
     expect(testScenarios.length).toBe(6)
+  })
+})
+
+// =============================================================================
+// SIGNAL TYPE RESOLUTION TESTS (v6 ISSUE-1)
+// =============================================================================
+
+describe('resolveSignalType', () => {
+  const addressExpectedSignals = [
+    { signalKey: 'property_address', type: 'string' },
+    { signalKey: 'gutter_length_estimate', type: 'number' },
+    { signalKey: 'downpipe_issues', type: 'boolean' },
+    { signalKey: 'gutter_condition', type: 'enum' },
+  ]
+
+  // Priority 1: expected_signals
+  describe('Priority 1: expected_signals config', () => {
+    it('should resolve address with leading number as string via expected_signals', () => {
+      const result = resolveSignalType(
+        'property_address',
+        'property_address',
+        '27 Maple Close, Maidstone, Kent, ME15 7QJ',
+        addressExpectedSignals,
+        null,
+        null,
+      )
+      expect(result.type).toBe('string')
+      expect(result.source).toBe('expected_signals')
+    })
+
+    it('should resolve numeric field as number via expected_signals', () => {
+      const result = resolveSignalType(
+        'gutter_length_estimate',
+        'gutter_length_estimate',
+        '120',
+        addressExpectedSignals,
+        null,
+        null,
+      )
+      expect(result.type).toBe('number')
+      expect(result.source).toBe('expected_signals')
+    })
+
+    it('should resolve comma-formatted number as number via expected_signals', () => {
+      const result = resolveSignalType(
+        'gutter_length_estimate',
+        'gutter_length_estimate',
+        '2,400',
+        addressExpectedSignals,
+        null,
+        null,
+      )
+      expect(result.type).toBe('number')
+      expect(result.source).toBe('expected_signals')
+    })
+
+    it('should resolve boolean field via expected_signals', () => {
+      const result = resolveSignalType(
+        'downpipe_issues',
+        'downpipe_issues',
+        true,
+        addressExpectedSignals,
+        null,
+        null,
+      )
+      expect(result.type).toBe('boolean')
+      expect(result.source).toBe('expected_signals')
+    })
+
+    it('should resolve enum field via expected_signals', () => {
+      const result = resolveSignalType(
+        'gutter_condition',
+        'gutter_condition',
+        'heavy_buildup',
+        addressExpectedSignals,
+        null,
+        null,
+      )
+      expect(result.type).toBe('enum')
+      expect(result.source).toBe('expected_signals')
+    })
+  })
+
+  // Priority 2: Widget field type
+  describe('Priority 2: widget field type', () => {
+    it('should resolve text widget field as string', () => {
+      const result = resolveSignalType(
+        'customer_notes',
+        'customer_notes',
+        'some text here',
+        [],
+        { type: 'text' },
+        null,
+      )
+      expect(result.type).toBe('string')
+      expect(result.source).toBe('widget_field')
+    })
+
+    it('should resolve textarea widget field as string', () => {
+      const result = resolveSignalType(
+        'description',
+        'description',
+        'long description text',
+        [],
+        { type: 'textarea' },
+        null,
+      )
+      expect(result.type).toBe('string')
+      expect(result.source).toBe('widget_field')
+    })
+
+    it('should resolve number widget field as number', () => {
+      const result = resolveSignalType(
+        'room_count',
+        'room_count',
+        '150',
+        [],
+        { type: 'number' },
+        null,
+      )
+      expect(result.type).toBe('number')
+      expect(result.source).toBe('widget_field')
+    })
+
+    it('should resolve select widget field as enum', () => {
+      const result = resolveSignalType(
+        'property_type',
+        'property_type',
+        'semi_detached',
+        [],
+        { type: 'select' },
+        null,
+      )
+      expect(result.type).toBe('enum')
+      expect(result.source).toBe('widget_field')
+    })
+
+    it('should resolve checkbox widget field as boolean', () => {
+      const result = resolveSignalType(
+        'has_access',
+        'has_access',
+        'true',
+        [],
+        { type: 'checkbox' },
+        null,
+      )
+      expect(result.type).toBe('boolean')
+      expect(result.source).toBe('widget_field')
+    })
+  })
+
+  // Priority 3: draft_config.suggestedFields
+  describe('Priority 3: draft_config.suggestedFields', () => {
+    it('should resolve via suggestedFields when no expected_signals or widget field', () => {
+      const result = resolveSignalType(
+        'property_address',
+        'property_address',
+        '27 Maple Close, Maidstone',
+        [],
+        null,
+        { suggestedFields: [{ fieldId: 'property_address', type: 'text' }] },
+      )
+      expect(result.type).toBe('string')
+      expect(result.source).toBe('draft_config')
+    })
+
+    it('should resolve number suggestedField as number', () => {
+      const result = resolveSignalType(
+        'length_metres',
+        'length_metres',
+        '50',
+        [],
+        null,
+        { suggestedFields: [{ fieldId: 'length_metres', type: 'number' }] },
+      )
+      expect(result.type).toBe('number')
+      expect(result.source).toBe('draft_config')
+    })
+
+    it('should resolve dropdown suggestedField as enum', () => {
+      const result = resolveSignalType(
+        'gutter_condition',
+        'gutter_condition',
+        'heavy_buildup',
+        [],
+        null,
+        { suggestedFields: [{ fieldId: 'gutter_condition', type: 'dropdown' }] },
+      )
+      expect(result.type).toBe('enum')
+      expect(result.source).toBe('draft_config')
+    })
+  })
+
+  // Priority 4: Strict inference
+  describe('Priority 4: strict inference (no metadata)', () => {
+    it('should infer pure number string as number', () => {
+      const result = resolveSignalType(
+        'unknown_field',
+        'unknown_field',
+        '150',
+        [],
+        null,
+        null,
+      )
+      expect(result.type).toBe('number')
+      expect(result.source).toBe('inference')
+    })
+
+    it('should infer comma-formatted number as number', () => {
+      const result = resolveSignalType(
+        'unknown_field',
+        'unknown_field',
+        '2,400',
+        [],
+        null,
+        null,
+      )
+      expect(result.type).toBe('number')
+      expect(result.source).toBe('inference')
+    })
+
+    it('should infer negative number as number', () => {
+      const result = resolveSignalType(
+        'unknown_field',
+        'unknown_field',
+        '-5.5',
+        [],
+        null,
+        null,
+      )
+      expect(result.type).toBe('number')
+      expect(result.source).toBe('inference')
+    })
+
+    it('should infer native number as number', () => {
+      const result = resolveSignalType(
+        'unknown_field',
+        'unknown_field',
+        42,
+        [],
+        null,
+        null,
+      )
+      expect(result.type).toBe('number')
+      expect(result.source).toBe('inference')
+    })
+
+    it('should infer native boolean as boolean', () => {
+      const result = resolveSignalType(
+        'unknown_field',
+        'unknown_field',
+        true,
+        [],
+        null,
+        null,
+      )
+      expect(result.type).toBe('boolean')
+      expect(result.source).toBe('inference')
+    })
+  })
+
+  // Priority 5: Default
+  describe('Priority 5: default to string', () => {
+    it('should default address-like string to string (not number)', () => {
+      const result = resolveSignalType(
+        'unknown_field',
+        'unknown_field',
+        '27 Maple Close, Maidstone, Kent, ME15 7QJ',
+        [],
+        null,
+        null,
+      )
+      expect(result.type).toBe('string')
+      expect(result.source).toBe('default')
+    })
+
+    it('should default "3 bedroom house" to string (not number)', () => {
+      const result = resolveSignalType(
+        'unknown_field',
+        'unknown_field',
+        '3 bedroom house',
+        [],
+        null,
+        null,
+      )
+      expect(result.type).toBe('string')
+      expect(result.source).toBe('default')
+    })
+
+    it('should default postcode to string', () => {
+      const result = resolveSignalType(
+        'unknown_field',
+        'unknown_field',
+        'ME15 7QJ',
+        [],
+        null,
+        null,
+      )
+      expect(result.type).toBe('string')
+      expect(result.source).toBe('default')
+    })
+
+    it('should default plain text to string', () => {
+      const result = resolveSignalType(
+        'unknown_field',
+        'unknown_field',
+        'some text value',
+        [],
+        null,
+        null,
+      )
+      expect(result.type).toBe('string')
+      expect(result.source).toBe('default')
+    })
+  })
+
+  // Priority cascade: higher priority wins
+  describe('Priority cascade', () => {
+    it('expected_signals should take priority over widget field', () => {
+      // expected_signals says string, widget says number - expected_signals wins
+      const result = resolveSignalType(
+        'property_address',
+        'property_address',
+        '27 Maple Close',
+        [{ signalKey: 'property_address', type: 'string' }],
+        { type: 'number' },
+        null,
+      )
+      expect(result.type).toBe('string')
+      expect(result.source).toBe('expected_signals')
+    })
+
+    it('widget field should take priority over draft_config', () => {
+      const result = resolveSignalType(
+        'some_field',
+        'some_field',
+        '123',
+        [],
+        { type: 'text' },
+        { suggestedFields: [{ fieldId: 'some_field', type: 'number' }] },
+      )
+      expect(result.type).toBe('string')
+      expect(result.source).toBe('widget_field')
+    })
+
+    it('metadata should skip inference entirely', () => {
+      // Widget says text, value looks like a number — widget wins, no inference
+      const result = resolveSignalType(
+        'ref_number',
+        'ref_number',
+        '12345',
+        [],
+        { type: 'text' },
+        null,
+      )
+      expect(result.type).toBe('string')
+      expect(result.source).toBe('widget_field')
+    })
   })
 })

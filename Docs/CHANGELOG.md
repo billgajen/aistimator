@@ -15,6 +15,35 @@
 
 ## Issues & Resolutions
 
+### 2026-02-04: Quote Quality Fixes v6
+
+**Context:** Five quality fixes addressing signal type resolution, hardcoded keywords, aggressive conflict detection, note duplication, and stale widget configs.
+
+**Changes:**
+
+| Fix | File(s) | Description |
+|-----|---------|-------------|
+| ISSUE-1 | `apps/worker/src/quote-processor.ts` | **Signal type resolution bug.** Address "27 Maple Close, Maidstone, Kent, ME15 7QJ" was parsed as number `27` because `parseFloat()` inference overrode the config-declared `type: 'string'`. Replaced 17-line inline type resolution with `resolveSignalType()` function using metadata-first priority cascade: (1) `expected_signals` config, (2) widget field type, (3) `draft_config.suggestedFields` type, (4) strict regex inference (only if ENTIRE string matches `/^-?\d+(\.\d+)?$/`), (5) default string. Added unit tests. |
+| FIX-2 | `apps/worker/src/quote-processor.ts` | Deleted hardcoded `getAddonKeyword()` (car-service-only keywords). Rewrote `isAddonCoveredByService()` to use generic word-overlap via `extractSignificantWords()`. Added shared `ADDON_STOP_WORDS` and `extractSignificantWords()` utilities. |
+| FIX-3 | `apps/worker/src/quote-processor.ts` | Replaced aggressive single-word conflict matching in `isAddonConflictingWithExcludes()` with minimum-overlap approach: requires 2+ significant word overlap OR Jaccard >0.4. Fixes false positives (e.g., "Wi-Fi smart controller" blocked by "Smart home integration setup"). |
+| FIX-4 | `apps/worker/src/quote-processor.ts` | Added `deduplicateNotes()`: exact dedup via Set, semantic dedup (>50% word overlap keeps longer note), max 3 notes with priority ranking. Called before saving `pricing_json.notes`. |
+| FIX-5a | `apps/web/src/app/api/services/route.ts` | POST handler: added `mapsToSignal` to widget field mapping (was stripped during `.map()` transformation). |
+| FIX-5b | `apps/web/src/app/api/services/[id]/route.ts` | PATCH handler: syncs `widget_configs` when `draftConfig.suggestedFields` is provided. Checks for existing config (update preserving files settings) or inserts new. |
+
+**Architectural Decisions:**
+- ISSUE-1: `resolveSignalType()` consults 3 metadata sources (expected_signals, widget field type, draft_config.suggestedFields) before any value inference. If ANY metadata source declares a type, inference is skipped entirely. The old `parseFloat()` inference was the root cause — it can't distinguish "27 Maple Close" from "27". The new strict regex `/^-?\d+(\.\d+)?$/` only matches when the ENTIRE cleaned string is numeric.
+- FIX-2: `extractSignificantWords()` shared across FIX-2/FIX-3/FIX-4 — extracts words >3 chars excluding stop words. Generic approach works for any service type.
+- FIX-3: Jaccard similarity threshold of 0.4 chosen to block "Full exterior paint" vs "Exterior paint not included" (high overlap) while allowing "Wi-Fi smart controller" vs "Smart home integration setup" (low overlap).
+- FIX-5: v5 FIX-1 runtime fallback (draft_config → expected_signals) kept as safety net for services created before this root-cause fix.
+
+**Known Constraints:**
+- ISSUE-1: `inferSignalTypeFromValue()` returns `null` (not `'string'`) when uncertain, forcing the cascade to fall through to the default. This is intentional — returning `'string'` from inference would prevent the default from ever being reached.
+- FIX-3: Direct substring match (Check 1) still catches cases like "Powerflush Treatment" vs "Powerflush" exclusion, even when word-level overlap is only 1 word. This is intentional — substring containment is a strong signal.
+
+**Verification:** `pnpm typecheck`, `pnpm lint`, `pnpm test`.
+
+---
+
 ### 2026-02-04: Quote Quality Fixes v5
 
 **Context:** Five quality fixes and one cleanup task to improve signal accuracy, quote completeness, and data hygiene.

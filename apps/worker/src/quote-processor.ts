@@ -79,6 +79,13 @@ interface WidgetField {
   criticalForPricing?: boolean
 }
 
+type SignalTypeSource = 'expected_signals' | 'widget_field' | 'draft_config' | 'inference' | 'default'
+
+interface ResolvedSignalType {
+  type: 'string' | 'number' | 'boolean' | 'enum'
+  source: SignalTypeSource
+}
+
 interface QuoteData {
   quote: {
     id: string
@@ -513,24 +520,16 @@ export async function processQuote(
         }
       }
 
-      // Determine the signal type: check expected_signals config or infer from value
-      let signalType: string = 'string'
-      if (service.expected_signals && service.expected_signals.length > 0) {
-        const expectedSignal = service.expected_signals.find(s => s.signalKey === signalKey)
-        if (expectedSignal) {
-          signalType = expectedSignal.type
-        }
-      }
-      // Infer type if not found in expected_signals
-      if (signalType === 'string') {
-        if (typeof answer.value === 'number') signalType = 'number'
-        else if (typeof answer.value === 'boolean') signalType = 'boolean'
-        // ISSUE-2 FIX: Detect numeric strings including comma-formatted numbers (e.g., "2,400")
-        else if (typeof answer.value === 'string') {
-          const cleaned = answer.value.replace(/,/g, '').trim()
-          if (cleaned && !isNaN(parseFloat(cleaned))) signalType = 'number'
-        }
-      }
+      // Resolve signal type using metadata-first priority cascade (v6 ISSUE-1 fix)
+      const resolved = resolveSignalType(
+        signalKey,
+        answer.fieldId,
+        answer.value,
+        service.expected_signals,
+        field,
+        service.draft_config
+      )
+      const signalType = resolved.type
 
       // Convert to appropriate type with support for comma-separated values
       const value = convertFormValueToSignal(answer.value, signalType)
@@ -708,7 +707,7 @@ export async function processQuote(
         }
 
         // Skip if addon functionality is already part of the core service
-        if (isAddonCoveredByService(detected.addonId, service.name, service.scope_includes)) {
+        if (isAddonCoveredByService(detected.addonId, service.name, service.scope_includes, addonLabel)) {
           console.log(`[Processor] Skipping addon ${detected.addonId} - already part of core service "${service.name}"`)
           continue
         }
@@ -767,7 +766,7 @@ export async function processQuote(
         }
 
         // Skip if addon functionality is already part of the core service
-        if (isAddonCoveredByService(detected.addonId, service.name, service.scope_includes)) {
+        if (isAddonCoveredByService(detected.addonId, service.name, service.scope_includes, addonLabel)) {
           console.log(`[Processor] Skipping addon ${detected.addonId} from image - already part of core service "${service.name}"`)
           continue
         }
@@ -1191,7 +1190,7 @@ export async function processQuote(
       if (!triggeredAddonIds.has(addon.id)) {
         // Skip addons that conflict with scope_excludes or are covered by core service
         if (isAddonConflictingWithExcludes(addon.id, addon.label, service.scope_excludes)) continue
-        if (isAddonCoveredByService(addon.id, service.name, service.scope_includes)) continue
+        if (isAddonCoveredByService(addon.id, service.name, service.scope_includes, addon.label)) continue
         availableAddons.push({ id: addon.id, label: addon.label, price: addon.price })
       }
     }
@@ -1212,9 +1211,9 @@ export async function processQuote(
         taxAmount: pricing.taxAmount,
         total: pricing.total,
         breakdown: pricing.breakdown,
-        // Include pricing notes (warnings, site visit recommendations)
+        // Include pricing notes (warnings, site visit recommendations) — deduplicated
         ...(pricing.notes && pricing.notes.length > 0 && {
-          notes: pricing.notes,
+          notes: deduplicateNotes(pricing.notes),
         }),
         // Include recommended addons info
         ...(pricing.recommendedAddons && {
@@ -2358,83 +2357,161 @@ function detectAccessOverrideFromDescription(description: string): { value: stri
 }
 
 /**
- * Extract main keyword from addon ID for scope matching
- * e.g., "paint_blending" → "paint", "deep_scratch_repair" → "scratch"
+ * Stop words to exclude when extracting significant words from addon/service text.
+ * Used by isAddonCoveredByService() and isAddonConflictingWithExcludes().
  */
-function getAddonKeyword(addonId: string): string {
-  const keywords = ['paint', 'scratch', 'dent', 'rust', 'polish', 'wax', 'seal', 'buff', 'clear', 'coat']
-  const idLower = addonId.toLowerCase()
-  return keywords.find(kw => idLower.includes(kw)) || ''
+const ADDON_STOP_WORDS = new Set([
+  'and', 'the', 'for', 'with', 'from', 'into', 'onto', 'upon',
+  'unit', 'setup', 'service', 'new', 'old', 'per', 'each', 'all',
+  'any', 'our', 'your', 'this', 'that', 'will', 'can', 'may',
+])
+
+/**
+ * Extract significant words (>3 chars, excluding stop words) from text.
+ * Used for generic word-overlap matching between addons, services, and scope items.
+ */
+function extractSignificantWords(text: string): string[] {
+  return text.toLowerCase()
+    .split(/[\s_\-/&,()]+/)
+    .filter(word => word.length > 3 && !ADDON_STOP_WORDS.has(word))
 }
 
 /**
- * Check if an addon's functionality is already part of the core service
- * Returns true if the addon should be filtered out (not recommended)
+ * Check if an addon's functionality is already part of the core service.
+ * Uses generic word-overlap matching — no hardcoded keywords.
+ * Returns true if the addon should be filtered out (not recommended).
  */
 function isAddonCoveredByService(
-  addonId: string,
+  _addonId: string,
   serviceName: string,
-  scopeIncludes: string[] = []
+  scopeIncludes: string[] = [],
+  addonLabel: string = ''
 ): boolean {
-  const addonKeyword = getAddonKeyword(addonId)
-  if (!addonKeyword) return false
+  if (!addonLabel) return false
 
-  const serviceNameLower = serviceName.toLowerCase()
-  const scopeText = scopeIncludes.join(' ').toLowerCase()
+  const addonWords = extractSignificantWords(addonLabel)
+  if (addonWords.length === 0) return false
 
-  // Check if the addon's core functionality is already in the service name or scope
-  return serviceNameLower.includes(addonKeyword) || scopeText.includes(addonKeyword)
+  const serviceText = [serviceName, ...scopeIncludes].join(' ').toLowerCase()
+
+  // Check if any significant word from the addon label appears in the service text
+  return addonWords.some(word => serviceText.includes(word))
 }
 
 /**
- * Check if an addon conflicts with scope_excludes
- * FIX-2: Prevents recommending addons (like "Powerflush") that are explicitly excluded
+ * Check if an addon conflicts with scope_excludes.
+ * Uses minimum-overlap approach to avoid false positives from single-word matches.
  *
- * Returns true if the addon should be filtered out (conflicts with exclusion)
+ * Matching rules:
+ * 1. Direct substring match (addon label contains exclusion or vice versa) → blocked
+ * 2. Significant word overlap: ≥2 words overlap OR Jaccard similarity >0.4 → blocked
+ *
+ * Returns true if the addon should be filtered out (conflicts with exclusion).
  */
 function isAddonConflictingWithExcludes(
-  addonId: string,
+  _addonId: string,
   addonLabel: string,
   scopeExcludes: string[] = []
 ): boolean {
   if (!scopeExcludes || scopeExcludes.length === 0) return false
 
-  const addonIdLower = addonId.toLowerCase()
   const addonLabelLower = addonLabel.toLowerCase()
-
-  // Extract key words from addon label (e.g., "Powerflush Treatment" → ["powerflush", "treatment"])
-  const addonLabelWords = addonLabelLower
-    .split(/[\s_-]+/)
-    .filter(word => word.length > 2) // Skip short words like "a", "of"
+  const addonWords = extractSignificantWords(addonLabel)
 
   for (const exclude of scopeExcludes) {
     const excludeLower = exclude.toLowerCase()
 
-    // Check 1: Direct label match (addon label contains exclusion or vice versa)
+    // Check 1: Direct substring match (addon label contains exclusion or vice versa)
     if (addonLabelLower.includes(excludeLower) || excludeLower.includes(addonLabelLower)) {
       console.log(`[Processor] Addon "${addonLabel}" conflicts with exclusion "${exclude}" (direct match)`)
       return true
     }
 
-    // Check 2: Word-level matching (any significant word from addon label appears in exclusion)
-    for (const word of addonLabelWords) {
-      if (excludeLower.includes(word)) {
-        console.log(`[Processor] Addon "${addonLabel}" conflicts with exclusion "${exclude}" (word: "${word}")`)
-        return true
-      }
+    // Check 2: Minimum-overlap approach using significant words
+    const excludeWords = extractSignificantWords(exclude)
+    if (addonWords.length === 0 || excludeWords.length === 0) continue
+
+    const overlap = addonWords.filter(w => excludeWords.includes(w))
+    const overlapCount = overlap.length
+
+    // Require ≥2 overlapping words OR Jaccard similarity >0.4
+    if (overlapCount >= 2) {
+      console.log(`[Processor] Addon "${addonLabel}" conflicts with exclusion "${exclude}" (${overlapCount} word overlap: ${overlap.join(', ')})`)
+      return true
     }
 
-    // Check 3: ID-based matching (addon ID contains exclusion keyword)
-    const excludeWords = excludeLower.split(/[\s_-]+/).filter(w => w.length > 2)
-    for (const excludeWord of excludeWords) {
-      if (addonIdLower.includes(excludeWord)) {
-        console.log(`[Processor] Addon "${addonLabel}" (id: ${addonId}) conflicts with exclusion "${exclude}" (id match: "${excludeWord}")`)
-        return true
-      }
+    const union = new Set([...addonWords, ...excludeWords])
+    const jaccard = overlapCount / union.size
+    if (jaccard > 0.4) {
+      console.log(`[Processor] Addon "${addonLabel}" conflicts with exclusion "${exclude}" (Jaccard: ${jaccard.toFixed(2)})`)
+      return true
     }
   }
 
   return false
+}
+
+/**
+ * Categorize a pricing note by priority for deduplication.
+ * Higher priority notes are kept when deduplicating.
+ */
+function getNotePriority(note: string): number {
+  const lower = note.toLowerCase()
+  if (lower.includes('validation') || lower.includes('corrected') || lower.includes('adjusted')) return 4
+  if (lower.includes('discrepanc') || lower.includes('conflict') || lower.includes('mismatch')) return 3
+  if (lower.includes('recommend') || lower.includes('suggest') || lower.includes('note:')) return 2
+  return 1 // informational / fallback
+}
+
+/**
+ * Deduplicate pricing notes using 3 strategies:
+ * 1. Exact dedup (Set)
+ * 2. Semantic dedup: >50% significant word overlap → keep longer/more specific note
+ * 3. Limit to max 3, keeping highest priority
+ */
+function deduplicateNotes(notes: string[]): string[] {
+  if (!notes || notes.length <= 1) return notes
+
+  // Step 1: Exact dedup
+  const unique = [...new Set(notes)]
+  if (unique.length <= 1) return unique
+
+  // Step 2: Semantic dedup — remove notes with >50% word overlap (keep longer)
+  const deduped: string[] = []
+  for (const note of unique) {
+    const noteWords = extractSignificantWords(note)
+    let isDuplicate = false
+
+    for (let i = 0; i < deduped.length; i++) {
+      const existing = deduped[i]!
+      const existingWords = extractSignificantWords(existing)
+      if (noteWords.length === 0 || existingWords.length === 0) continue
+
+      const overlap = noteWords.filter(w => existingWords.includes(w)).length
+      const smallerLen = Math.min(noteWords.length, existingWords.length)
+      const overlapRatio = overlap / smallerLen
+
+      if (overlapRatio > 0.5) {
+        // Keep the longer/more specific note
+        if (note.length > existing.length) {
+          deduped[i] = note
+        }
+        isDuplicate = true
+        break
+      }
+    }
+
+    if (!isDuplicate) {
+      deduped.push(note)
+    }
+  }
+
+  if (deduped.length <= 3) return deduped
+
+  // Step 3: Limit to 3, keeping highest priority
+  return deduped
+    .sort((a, b) => getNotePriority(b) - getNotePriority(a))
+    .slice(0, 3)
 }
 
 /**
@@ -2621,6 +2698,114 @@ function detectAmbiguousValue(value: string | number | boolean | string[]): 'may
   }
 
   return null
+}
+
+// ============================================================================
+// SIGNAL TYPE RESOLUTION
+// ============================================================================
+
+/**
+ * Map widget/suggestedField type to signal type.
+ * text/textarea → string, number → number, boolean/checkbox → boolean, select/radio/dropdown → enum
+ */
+function mapFieldTypeToSignalType(fieldType: string): ResolvedSignalType['type'] | null {
+  switch (fieldType) {
+    case 'text':
+    case 'textarea':
+      return 'string'
+    case 'number':
+      return 'number'
+    case 'boolean':
+    case 'checkbox':
+      return 'boolean'
+    case 'select':
+    case 'radio':
+    case 'dropdown':
+      return 'enum'
+    default:
+      return null
+  }
+}
+
+/**
+ * Strict last-resort type inference from value alone.
+ * Only returns 'number' if the ENTIRE cleaned string matches a numeric pattern.
+ * Returns null (not 'string') when uncertain — null means "I don't know", falls to default.
+ */
+function inferSignalTypeFromValue(value: string | number | boolean | string[]): ResolvedSignalType['type'] | null {
+  if (typeof value === 'number') return 'number'
+  if (typeof value === 'boolean') return 'boolean'
+  if (Array.isArray(value)) return null
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/,/g, '').trim()
+    // Only treat as number if the ENTIRE string is a valid number
+    if (cleaned && /^-?\d+(\.\d+)?$/.test(cleaned)) return 'number'
+  }
+  return null
+}
+
+/**
+ * Resolve signal type using metadata-first priority cascade.
+ * Consults all metadata sources before falling back to value inference.
+ *
+ * Priority:
+ * 1. expected_signals config (authoritative, explicitly configured)
+ * 2. Widget field type (text/textarea → string, number → number, etc.)
+ * 3. draft_config.suggestedFields type (same mapping as widget field)
+ * 4. Strict inference (last resort, only if ENTIRE string matches numeric regex)
+ * 5. Default → string
+ *
+ * Key rule: If ANY metadata source declares a type, inference is skipped entirely.
+ */
+export function resolveSignalType(
+  signalKey: string,
+  fieldId: string,
+  value: string | number | boolean | string[],
+  expectedSignals?: Array<{ signalKey: string; type: string }>,
+  widgetField?: { type: string } | null,
+  draftConfig?: { suggestedFields?: Array<{ fieldId: string; type: string }> } | null,
+): ResolvedSignalType {
+  // Priority 1: expected_signals config
+  if (expectedSignals && expectedSignals.length > 0) {
+    const expectedSignal = expectedSignals.find(s => s.signalKey === signalKey)
+    if (expectedSignal) {
+      const type = expectedSignal.type as ResolvedSignalType['type']
+      console.log(`[Processor] Signal type resolved: ${signalKey} = ${type} (source: expected_signals)`)
+      return { type, source: 'expected_signals' }
+    }
+  }
+
+  // Priority 2: Widget field type
+  if (widgetField) {
+    const mapped = mapFieldTypeToSignalType(widgetField.type)
+    if (mapped) {
+      console.log(`[Processor] Signal type resolved: ${signalKey} = ${mapped} (source: widget_field, fieldType: ${widgetField.type})`)
+      return { type: mapped, source: 'widget_field' }
+    }
+  }
+
+  // Priority 3: draft_config.suggestedFields type
+  if (draftConfig?.suggestedFields) {
+    const suggested = draftConfig.suggestedFields.find(f => f.fieldId === fieldId)
+    if (suggested) {
+      const mapped = mapFieldTypeToSignalType(suggested.type)
+      if (mapped) {
+        console.log(`[Processor] Signal type resolved: ${signalKey} = ${mapped} (source: draft_config, fieldType: ${suggested.type})`)
+        return { type: mapped, source: 'draft_config' }
+      }
+    }
+  }
+
+  // Priority 4: Strict inference (no metadata found)
+  const inferred = inferSignalTypeFromValue(value)
+  if (inferred) {
+    console.log(`[Processor] Signal type resolved: ${signalKey} = ${inferred} (source: inference)`)
+    return { type: inferred, source: 'inference' }
+  }
+
+  // Priority 5: Default
+  console.log(`[Processor] Signal type resolved: ${signalKey} = string (source: default)`)
+  return { type: 'string', source: 'default' }
 }
 
 /**
