@@ -736,6 +736,255 @@ export interface WhatsAppConversation {
 }
 
 // ============================================================================
+// QUOTE VALIDATION TYPES
+// ============================================================================
+
+/**
+ * Issue category for validation
+ */
+export type ValidationIssueCategory =
+  | 'pricing'
+  | 'scope'
+  | 'potential_work'
+  | 'cross_service'
+  | 'addons'
+  | 'notes'
+  | 'discounts'
+  | 'logic'
+
+/**
+ * Severity level for validation issues
+ */
+export type ValidationIssueSeverity = 'critical' | 'high' | 'medium' | 'low'
+
+/**
+ * Auto-fix action types
+ */
+export type AutoFixAction =
+  | 'add_work_step'
+  | 'remove_scope_text'
+  | 'add_scope_exclusion'
+  | 'remove_potential_work'
+  | 'remove_cross_service'
+  | 'remove_addon'
+  | 'remove_note'
+  | 'add_note'
+  | 'flag_only'
+
+/**
+ * Auto-fix details for different action types
+ */
+export interface AutoFixDetails {
+  action: AutoFixAction
+  details: {
+    // For add_work_step
+    workStepId?: string
+    quantity?: number
+    // For remove_scope_text
+    pattern?: string
+    replacement?: string
+    // For add_scope_exclusion
+    text?: string
+    // For remove_potential_work
+    itemIndex?: number
+    // For remove_cross_service
+    serviceId?: string
+    // For remove_addon
+    addonId?: string
+    // For remove_note / add_note
+    noteIndex?: number
+    noteText?: string
+    position?: 'start' | 'end'
+    // For flag_only
+    reason?: string
+  }
+}
+
+/**
+ * Individual validation issue found during quote validation
+ */
+export interface ValidationIssue {
+  /** Unique identifier for the issue */
+  id: string
+  /** Category of the issue */
+  category: ValidationIssueCategory
+  /** Severity level */
+  severity: ValidationIssueSeverity
+  /** Which check detected this issue (e.g., CHECK_1a, CHECK_2b) */
+  check: string
+  /** Human-readable description of the issue */
+  description: string
+  /** What was found in the quote */
+  found: string
+  /** What was expected based on config/request */
+  expected: string
+  /** Whether this issue can be auto-fixed */
+  autoFixable: boolean
+  /** Auto-fix details if fixable */
+  autoFix?: AutoFixDetails
+  /** Suggested config fix if this is a configuration issue */
+  suggestedConfigFix?: string
+}
+
+/**
+ * Summary of validation issues by severity
+ */
+export interface ValidationSummary {
+  criticalCount: number
+  highCount: number
+  mediumCount: number
+  lowCount: number
+  autoFixableCount: number
+  configIssueCount: number
+}
+
+/**
+ * Overall validation status
+ */
+export type ValidationStatus = 'PASS' | 'FAIL' | 'REVIEW_NEEDED'
+
+/**
+ * Complete validation result
+ */
+export interface ValidationResult {
+  /** Overall status */
+  overallStatus: ValidationStatus
+  /** Confidence score (0-1) */
+  confidenceScore: number
+  /** List of issues found */
+  issues: ValidationIssue[]
+  /** Summary counts */
+  summary: ValidationSummary
+  /** Expected total based on configuration */
+  calculatedExpectedTotal: number
+  /** Actual total from the quote */
+  actualTotal: number
+  /** Percentage gap between expected and actual */
+  pricingGapPercent: number
+}
+
+/**
+ * Configuration suggestion for business learning
+ */
+export interface ConfigSuggestion {
+  /** Type of suggestion */
+  type: 'add_trigger' | 'add_work_step' | 'update_scope' | 'add_exclusion'
+  /** Target of the suggestion (e.g., work_step:tile_installation) */
+  target: string
+  /** Human-readable suggestion */
+  suggestion: string
+  /** How many similar issues this would prevent */
+  wouldPrevent: number
+}
+
+/**
+ * Input snapshot for validation logging
+ */
+export interface ValidationInputSnapshot {
+  formAnswers: Record<string, unknown>
+  customerDescription: string
+  photoCount: number
+  serviceConfigVersion: string
+}
+
+/**
+ * Original quote snapshot before corrections
+ */
+export interface ValidationQuoteSnapshot {
+  total: number
+  breakdown: Array<{ label: string; amount: number }>
+  scopeSummary: string
+  assumptions: string[]
+  exclusions: string[]
+  notes: string[]
+  potentialWork?: SignalRecommendation[]
+  crossServices?: CrossServicePricing[]
+  recommendedAddons?: Array<{ id: string; label: string; price: number }>
+}
+
+/**
+ * Corrections that were applied to the quote
+ */
+export interface ValidationCorrections {
+  appliedFixes: string[]
+  correctedQuote?: Partial<ValidationQuoteSnapshot>
+}
+
+/**
+ * Validation outcome types
+ */
+export type ValidationOutcome = 'auto_corrected' | 'sent_for_review' | 'passed' | 'blocked'
+
+/**
+ * Review outcome types
+ */
+export type ReviewOutcome = 'approved' | 'modified' | 'rejected'
+
+/**
+ * Complete validation log entry
+ */
+export interface QuoteValidationLog {
+  id: string
+  quoteId: string
+  tenantId: string
+  serviceId: string
+  createdAt: string
+  inputSnapshot: ValidationInputSnapshot
+  originalQuoteSnapshot: ValidationQuoteSnapshot
+  validationResult: ValidationResult
+  correctionsApplied?: ValidationCorrections
+  outcome: ValidationOutcome
+  reviewedBy?: string
+  reviewOutcome?: ReviewOutcome
+  reviewNotes?: string
+  reviewedAt?: string
+  configSuggestions?: ConfigSuggestion[]
+}
+
+/**
+ * Validation action when issues are found
+ */
+export type ValidationAction = 'auto_correct' | 'flag_for_review' | 'block' | 'pass_with_warning' | 'ignore'
+
+/**
+ * Enabled checks configuration
+ */
+export interface ValidationEnabledChecks {
+  pricingCompleteness: boolean
+  scopeValidation: boolean
+  potentialWorkValidation: boolean
+  crossServiceValidation: boolean
+  addonValidation: boolean
+  notesValidation: boolean
+  discountValidation: boolean
+  logicValidation: boolean
+}
+
+/**
+ * Tenant-level validation settings
+ */
+export interface ValidationSettings {
+  /** Whether validation is enabled */
+  enabled: boolean
+  /** Action to take on critical issues */
+  onCriticalIssue: ValidationAction
+  /** Action to take on high severity issues */
+  onHighIssue: ValidationAction
+  /** Action to take on medium severity issues */
+  onMediumIssue: ValidationAction
+  /** Action to take on low severity issues */
+  onLowIssue: ValidationAction
+  /** Flag if actual total is below expected by this percentage */
+  pricingGapThresholdPercent: number
+  /** Require manual review for quotes above this amount */
+  requireManualReviewAbove: number
+  /** Which checks are enabled */
+  enabledChecks: ValidationEnabledChecks
+  /** Email addresses to notify on flagged quotes */
+  notifyOnFlaggedQuote?: string[]
+}
+
+// ============================================================================
 // INSERT TYPES (for creating new records)
 // ============================================================================
 

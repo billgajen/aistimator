@@ -17,6 +17,8 @@ import {
   extractStructuredSignals,
   getSignalsWithoutImages,
   getSignalsWithoutImagesV2,
+  getSignalsWithoutImagesPhotoOptional,
+  getSignalsWithoutImagesV2PhotoOptional,
   generateWording,
   generateWordingFallback,
   detectAddonsFromDescription,
@@ -27,6 +29,10 @@ import {
   autoGeneratePromptContext,
   generateSignalRecommendations,
   findUnusedSignals,
+  validateQuote,
+  applyAutoCorrections,
+  determineValidationOutcome,
+  getDefaultValidationSettings,
 } from './ai'
 import type {
   ExtractedSignals,
@@ -36,8 +42,11 @@ import type {
   CrossServiceEstimate,
   ServiceForMatching,
   SignalExtractionContext,
+  CustomerRequestContext,
+  ServiceConfigForValidation,
+  GeneratedQuoteForValidation,
 } from './ai'
-import type { MatchedItem, ExtractedSignalsV2, PricingTrace, ExpectedSignalConfig, LowConfidenceMode, SignalRecommendation, WorkStepConfig } from '@estimator/shared'
+import type { MatchedItem, ExtractedSignalsV2, PricingTrace, ExpectedSignalConfig, LowConfidenceMode, SignalRecommendation, WorkStepConfig, ValidationSettings, ValidationResult, ValidationOutcome } from '@estimator/shared'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@estimator/shared'
@@ -406,9 +415,21 @@ export async function processQuote(
     structuredSignals = getSignalsWithoutImagesV2()
     signals.warnings.push('AI image analysis not available')
   } else {
-    console.log('[Processor] No images provided, using form data only')
-    signals = getSignalsWithoutImages()
-    structuredSignals = getSignalsWithoutImagesV2()
+    // FIX-2: Check if photos are optional for this service
+    const minPhotos = service.media_config?.minPhotos ?? 1
+    const isPhotoOptional = minPhotos === 0
+
+    console.log(`[Processor] No images provided (photo-optional: ${isPhotoOptional})`)
+
+    if (isPhotoOptional) {
+      // Photos are optional - no warnings needed
+      signals = getSignalsWithoutImagesPhotoOptional()
+      structuredSignals = getSignalsWithoutImagesV2PhotoOptional()
+    } else {
+      // Photos expected but not provided - add appropriate warnings
+      signals = getSignalsWithoutImages()
+      structuredSignals = getSignalsWithoutImagesV2()
+    }
   }
 
   console.log(`[Processor] Signals extracted, confidence: ${signals.confidence}`)
@@ -472,7 +493,11 @@ export async function processQuote(
       if (signalType === 'string') {
         if (typeof answer.value === 'number') signalType = 'number'
         else if (typeof answer.value === 'boolean') signalType = 'boolean'
-        else if (typeof answer.value === 'string' && !isNaN(parseFloat(answer.value))) signalType = 'number'
+        // ISSUE-2 FIX: Detect numeric strings including comma-formatted numbers (e.g., "2,400")
+        else if (typeof answer.value === 'string') {
+          const cleaned = answer.value.replace(/,/g, '').trim()
+          if (cleaned && !isNaN(parseFloat(cleaned))) signalType = 'number'
+        }
       }
 
       // Convert to appropriate type with support for comma-separated values
@@ -789,6 +814,23 @@ export async function processQuote(
     console.log(`[Processor] Condition discrepancy detected: ${conditionDiscrepancy.note}`)
   }
 
+  // 3.5.1 ISSUE-1 FIX: Detect form vs description conflicts
+  // When form says "Urgent" but description says "3-4 weeks", flag it for business review
+  // Note: Form value is still used (AD-007) but we surface the conflict
+  if (structuredSignals) {
+    const formDescriptionConflicts = detectFormDescriptionConflicts(
+      quoteRequest.job_answers || [],
+      structuredSignals.signals,
+      quoteData.widgetFields || []
+    )
+    if (formDescriptionConflicts.length > 0) {
+      for (const conflict of formDescriptionConflicts) {
+        pricing.notes.push(conflict.warning)
+        console.log(`[Processor] Form/description conflict detected: ${conflict.fieldId} - form="${conflict.formValue}", description="${conflict.inferredValue}"`)
+      }
+    }
+  }
+
   // 3.6 Detect unused signals and generate AI recommendations
   let signalRecommendations: SignalRecommendation[] = []
   if (structuredSignals && structuredSignals.signals.length > 0 && gemini) {
@@ -981,11 +1023,130 @@ export async function processQuote(
     pricing.notes.push(...fallbackResult.additionalNotes)
   }
 
-  // Determine final status based on fallback
-  const finalStatus = fallbackResult.statusOverride || 'sent'
+  // Determine initial status based on fallback
+  let finalStatus: 'pending_review' | 'sent' = fallbackResult.statusOverride || 'sent'
 
   if (fallbackResult.triggered) {
     console.log(`[Processor] Fallback mode: ${fallbackResult.mode}, status: ${finalStatus}`)
+  }
+
+  // 4.7 Validate quote and apply corrections
+  let validationResult: ValidationResult | undefined
+  let validationOutcome: ValidationOutcome = 'passed'
+  let validationAppliedFixes: string[] = []
+
+  // Get validation settings from tenant (or use defaults)
+  const validationSettings: ValidationSettings = (tenant as unknown as { validation_settings?: ValidationSettings }).validation_settings
+    || getDefaultValidationSettings()
+
+  if (gemini && validationSettings.enabled) {
+    console.log('[Processor] Running quote validation')
+
+    try {
+      // Build customer request context
+      const customerRequestContext: CustomerRequestContext = {
+        formAnswers: quoteRequest.job_answers || [],
+        customerDescription: projectDescription,
+        photoCount: quoteData.assets.filter(a => a.type === 'image').length,
+      }
+
+      // Build service config for validation
+      const serviceConfigForValidation: ServiceConfigForValidation = {
+        serviceName: service.name,
+        serviceDescription: service.description,
+        scopeIncludes: service.scope_includes,
+        scopeExcludes: service.scope_excludes,
+        defaultAssumptions: service.default_assumptions,
+        workSteps: service.work_steps,
+        addons: rules.addons,
+        multipliers: rules.multipliers,
+      }
+
+      // Build quote data for validation
+      const quoteForValidation: GeneratedQuoteForValidation = {
+        pricing,
+        content,
+        signalRecommendations,
+        crossServicePricing,
+        structuredSignals: structuredSignals || undefined,
+      }
+
+      // Run validation
+      validationResult = await validateQuote(
+        gemini,
+        quoteForValidation,
+        customerRequestContext,
+        serviceConfigForValidation,
+        quoteData.widgetFields
+      )
+
+      console.log(`[Processor] Validation result: ${validationResult.overallStatus}, ${validationResult.issues.length} issues found`)
+
+      if (validationResult.issues.length > 0) {
+        console.log(`[Processor] Validation issues: ${validationResult.summary.criticalCount} critical, ${validationResult.summary.highCount} high, ${validationResult.summary.mediumCount} medium, ${validationResult.summary.lowCount} low`)
+
+        // Determine outcome based on settings
+        const outcomeDecision = determineValidationOutcome(validationResult, validationSettings, pricing.total)
+        validationOutcome = outcomeDecision.outcome
+
+        // Override status if validation requires review
+        if (outcomeDecision.statusOverride) {
+          finalStatus = outcomeDecision.statusOverride
+          console.log(`[Processor] Status overridden by validation: ${finalStatus}`)
+        }
+
+        // Apply auto-corrections if outcome allows
+        if (validationOutcome === 'auto_corrected' && validationResult.summary.autoFixableCount > 0) {
+          const corrections = applyAutoCorrections(quoteForValidation, validationResult.issues, serviceConfigForValidation)
+          validationAppliedFixes = corrections.appliedFixes
+
+          // Update pricing and content with corrections
+          Object.assign(pricing, corrections.correctedPricing)
+          Object.assign(content, corrections.correctedContent)
+
+          if (corrections.correctedRecommendations) {
+            signalRecommendations = corrections.correctedRecommendations
+          }
+          if (corrections.correctedCrossServices) {
+            crossServicePricing.length = 0
+            crossServicePricing.push(...corrections.correctedCrossServices)
+          }
+
+          console.log(`[Processor] Applied ${validationAppliedFixes.length} auto-corrections: ${validationAppliedFixes.join(', ')}`)
+        }
+      }
+
+      // Log validation to database (async, don't block)
+      logValidationResult(supabase, {
+        quoteId,
+        tenantId: quoteData.quote.tenant_id,
+        serviceId: quoteData.quote.service_id,
+        inputSnapshot: {
+          formAnswers: Object.fromEntries((quoteRequest.job_answers || []).map(a => [a.fieldId, a.value])),
+          customerDescription: projectDescription || '',
+          photoCount: quoteData.assets.filter(a => a.type === 'image').length,
+          serviceConfigVersion: 'v1',
+        },
+        originalQuoteSnapshot: {
+          total: pricing.total,
+          breakdown: pricing.breakdown,
+          scopeSummary: content.scopeSummary || '',
+          assumptions: content.assumptions || [],
+          exclusions: content.exclusions || [],
+          notes: pricing.notes || [],
+          potentialWork: signalRecommendations,
+          crossServices: crossServicePricing,
+        },
+        validationResult,
+        correctionsApplied: validationAppliedFixes.length > 0 ? { appliedFixes: validationAppliedFixes } : undefined,
+        outcome: validationOutcome,
+      }).catch(err => {
+        console.error('[Processor] Failed to log validation result:', err)
+      })
+    } catch (error) {
+      console.error('[Processor] Quote validation failed:', error)
+      // Continue without validation - don't block the quote
+    }
   }
 
   // 5. Update quote record with signals and pricing trace
@@ -1714,6 +1875,139 @@ function detectConditionDiscrepancy(
 }
 
 /**
+ * ISSUE-1 FIX: Detect conflicts between form inputs and AI-inferred signals from description
+ *
+ * When the customer selects a value on the form but their description suggests otherwise,
+ * this function flags the conflict so the business can follow up. The form value is still
+ * used for pricing (AD-007 compliance), but a warning note is added.
+ *
+ * Example: Form says "Urgent (<7 Days)" but description says "ideally in 3-4 weeks"
+ */
+interface FormDescriptionConflict {
+  fieldId: string
+  formValue: string
+  inferredValue: string
+  confidence: number
+  warning: string
+}
+
+function detectFormDescriptionConflicts(
+  formAnswers: Array<{ fieldId: string; value: string | number | boolean | string[] }>,
+  signals: Array<{ key: string; value: string | number | boolean | null; confidence: number; source: string }>,
+  widgetFields: WidgetField[]
+): FormDescriptionConflict[] {
+  const conflicts: FormDescriptionConflict[] = []
+
+  // Define semantic mappings for conflict detection
+  const conflictChecks = [
+    {
+      category: 'timeline',
+      formFieldPatterns: ['timeline', 'urgency', 'when', 'schedule'],
+      signalKeys: ['work_timeline', 'work_timeline_type', 'urgency', 'timeline'],
+      // Values that indicate urgency
+      urgentValues: ['urgent', 'asap', 'emergency', '<7', 'within 3', 'immediate', 'rush'],
+      // Values that indicate flexibility
+      flexibleValues: ['flexible', '2-4 weeks', '3-4 weeks', 'no rush', 'next month', 'standard', 'whenever'],
+    },
+    {
+      category: 'condition',
+      formFieldPatterns: ['condition', 'prep', 'state', 'quality'],
+      signalKeys: ['condition_prep', 'condition_rating', 'condition_prep_level', 'condition'],
+      // Good condition values
+      goodValues: ['good', 'excellent', 'new', 'perfect', 'great'],
+      // Poor condition values
+      poorValues: ['poor', 'bad', 'damaged', 'average', 'fair', 'needs work', 'worn'],
+    },
+  ]
+
+  for (const check of conflictChecks) {
+    // Find form answer matching this category
+    const formAnswer = formAnswers.find(a => {
+      const fieldIdLower = a.fieldId.toLowerCase()
+      return check.formFieldPatterns.some(p => fieldIdLower.includes(p))
+    })
+
+    if (!formAnswer) continue
+
+    // Find AI signal with high confidence (from description/vision, not form)
+    const aiSignal = signals.find(s =>
+      check.signalKeys.some(k => s.key.toLowerCase().includes(k.toLowerCase())) &&
+      s.source !== 'form' &&
+      s.confidence >= 0.8
+    )
+
+    if (!aiSignal) continue
+
+    const formValueStr = String(formAnswer.value).toLowerCase()
+    const aiValueStr = String(aiSignal.value).toLowerCase()
+
+    // Get the widget field for better labeling
+    const widgetField = widgetFields.find(f => f.fieldId === formAnswer.fieldId)
+    const fieldLabel = widgetField?.label || formAnswer.fieldId
+
+    // Check for timeline conflicts
+    if (check.category === 'timeline') {
+      const formIsUrgent = check.urgentValues?.some(v => formValueStr.includes(v)) ?? false
+      const aiIsFlexible = check.flexibleValues?.some(v => aiValueStr.includes(v)) ?? false
+
+      if (formIsUrgent && aiIsFlexible) {
+        conflicts.push({
+          fieldId: formAnswer.fieldId,
+          formValue: String(formAnswer.value),
+          inferredValue: String(aiSignal.value),
+          confidence: aiSignal.confidence,
+          warning: `Note: Form selected "${formAnswer.value}" for ${fieldLabel}, but description mentions "${aiSignal.value}". Quote uses form selection. Please confirm timeline with customer.`,
+        })
+      }
+
+      const formIsFlexible = check.flexibleValues?.some(v => formValueStr.includes(v)) ?? false
+      const aiIsUrgent = check.urgentValues?.some(v => aiValueStr.includes(v)) ?? false
+
+      if (formIsFlexible && aiIsUrgent) {
+        conflicts.push({
+          fieldId: formAnswer.fieldId,
+          formValue: String(formAnswer.value),
+          inferredValue: String(aiSignal.value),
+          confidence: aiSignal.confidence,
+          warning: `Note: Form selected "${formAnswer.value}" for ${fieldLabel}, but description suggests urgency ("${aiSignal.value}"). Quote uses form selection.`,
+        })
+      }
+    }
+
+    // Check for condition conflicts
+    if (check.category === 'condition') {
+      const formIsGood = check.goodValues?.some(v => formValueStr.includes(v)) ?? false
+      const aiIsPoor = check.poorValues?.some(v => aiValueStr.includes(v)) ?? false
+
+      if (formIsGood && aiIsPoor) {
+        conflicts.push({
+          fieldId: formAnswer.fieldId,
+          formValue: String(formAnswer.value),
+          inferredValue: String(aiSignal.value),
+          confidence: aiSignal.confidence,
+          warning: `Note: Form indicated "${formAnswer.value}" for ${fieldLabel}, but description suggests "${aiSignal.value}". Quote uses form selection - additional work may be needed.`,
+        })
+      }
+
+      const formIsPoor = check.poorValues?.some(v => formValueStr.includes(v)) ?? false
+      const aiIsGood = check.goodValues?.some(v => aiValueStr.includes(v)) ?? false
+
+      if (formIsPoor && aiIsGood) {
+        conflicts.push({
+          fieldId: formAnswer.fieldId,
+          formValue: String(formAnswer.value),
+          inferredValue: String(aiSignal.value),
+          confidence: aiSignal.confidence,
+          warning: `Note: Form indicated "${formAnswer.value}" for ${fieldLabel}, but description suggests better condition ("${aiSignal.value}"). Quote uses form selection.`,
+        })
+      }
+    }
+  }
+
+  return conflicts
+}
+
+/**
  * Detect mentions of other services using hybrid AI + keyword approach
  *
  * This first tries AI detection (more intelligent), then falls back to
@@ -1920,12 +2214,21 @@ function isGenuineServiceRequest(phraseContext: string): boolean {
   ]
 
   // Patterns that indicate it's NOT a request (just describing a problem or situation)
+  // ISSUE-5 FIX: Added explicit negation patterns to prevent false positives
   const nonRequestPatterns = [
     /\b(overflow|overflows|overflowing)\b/i,  // "gutters overflow" ≠ "need gutter cleaning"
     /\b(sometimes|occasionally)\b/i,  // Describing occasional issues
     /\b(used to|in the past)\b/i,  // Historical context
     /\b(because of|due to|caused by)\b/i,  // Explaining root cause
     /\b(near|next to|beside|by the)\b/i,  // Describing location
+    // ISSUE-5: Explicit negation patterns - customer explicitly declined this service
+    /\b(not for this|not for now|not this time)\b/i,  // "not for this quote"
+    /\b(don'?t need|won'?t need|no need)\b/i,  // "don't need", "won't need"
+    /\b(not needed|not required|not necessary)\b/i,  // "not needed"
+    /\b(don'?t want|won'?t want)\b/i,  // "don't want"
+    /\b(just mentioning|for context|for reference)\b/i,  // "just mentioning for context"
+    /\b(thinking of|considering|might|maybe)\b.*\b(but not|but later|another time)\b/i,  // "thinking of X but not for this"
+    /\b(separate|different|another)\s+(quote|job|project)\b/i,  // "separate quote"
   ]
 
   // Check for non-request patterns first (more specific)
@@ -2232,13 +2535,53 @@ function findSemanticSignalMatch(
 }
 
 /**
+ * ISSUE-6 FIX: Detect ambiguous values that shouldn't be included in firm pricing
+ * Returns the ambiguity type or null if the value is definitive
+ */
+function detectAmbiguousValue(value: string | number | boolean | string[]): 'maybe' | 'quote_option' | null {
+  if (typeof value !== 'string') return null
+
+  const valueLower = value.toLowerCase().trim()
+
+  // Values that indicate uncertainty
+  const maybePatterns = [
+    'possibly', 'possible', 'maybe', 'perhaps', 'might',
+    'not sure', 'unsure', 'uncertain', 'depends',
+    'tbd', 'to be determined', 'to be decided',
+  ]
+
+  // Values that indicate the customer wants it as an option/add-on
+  const quoteOptionPatterns = [
+    'quote_option', 'quote option', 'optional', 'as option',
+    'if possible', 'if available', 'if needed',
+  ]
+
+  if (maybePatterns.some(p => valueLower === p || valueLower.includes(p))) {
+    return 'maybe'
+  }
+
+  if (quoteOptionPatterns.some(p => valueLower === p || valueLower.includes(p))) {
+    return 'quote_option'
+  }
+
+  return null
+}
+
+/**
  * Convert form value to signal type
  * Handles comma-separated numeric values by summing them (e.g., "130,120,95,80" → 425)
+ * ISSUE-6 FIX: Returns null for ambiguous values (e.g., "possibly", "maybe")
  */
 function convertFormValueToSignal(
   value: string | number | boolean | string[],
   expectedType: string
 ): string | number | boolean | null {
+  // ISSUE-6 FIX: Skip ambiguous values - they shouldn't affect firm pricing
+  const ambiguity = detectAmbiguousValue(value)
+  if (ambiguity) {
+    console.log(`[Processor] Skipping ambiguous value "${value}" (type: ${ambiguity}) - not included in firm pricing`)
+    return null
+  }
   if (expectedType === 'number') {
     // Handle array of values (sum them)
     if (Array.isArray(value)) {
@@ -2281,4 +2624,79 @@ function convertFormValueToSignal(
     return value.join(', ')
   }
   return String(value)
+}
+
+// ============================================================================
+// VALIDATION LOGGING
+// ============================================================================
+
+import type {
+  ValidationInputSnapshot,
+  ValidationQuoteSnapshot,
+  ValidationCorrections,
+} from '@estimator/shared'
+
+/**
+ * Log parameters for validation result
+ */
+interface LogValidationParams {
+  quoteId: string
+  tenantId: string
+  serviceId: string
+  inputSnapshot: ValidationInputSnapshot
+  originalQuoteSnapshot: ValidationQuoteSnapshot
+  validationResult: ValidationResult
+  correctionsApplied?: ValidationCorrections
+  outcome: ValidationOutcome
+}
+
+/**
+ * Log validation result to database for learning and analytics
+ * This is called asynchronously to not block the quote processing
+ */
+async function logValidationResult(
+  supabase: SupabaseClient,
+  params: LogValidationParams
+): Promise<void> {
+  const {
+    quoteId,
+    tenantId,
+    serviceId,
+    inputSnapshot,
+    originalQuoteSnapshot,
+    validationResult,
+    correctionsApplied,
+    outcome,
+  } = params
+
+  // Extract config suggestions from issues
+  const configSuggestions = validationResult.issues
+    .filter(issue => issue.suggestedConfigFix)
+    .map(issue => ({
+      type: 'update_config' as const,
+      target: issue.category,
+      suggestion: issue.suggestedConfigFix!,
+      wouldPrevent: 1,
+    }))
+
+  const { error } = await supabase
+    .from('quote_validation_logs')
+    .insert({
+      quote_id: quoteId,
+      tenant_id: tenantId,
+      service_id: serviceId,
+      input_snapshot: inputSnapshot,
+      original_quote_snapshot: originalQuoteSnapshot,
+      validation_result: validationResult,
+      corrections_applied: correctionsApplied || null,
+      outcome,
+      config_suggestions: configSuggestions.length > 0 ? configSuggestions : null,
+    })
+
+  if (error) {
+    console.error('[Processor] Failed to log validation result:', error)
+    // Don't throw - this is non-critical
+  } else {
+    console.log(`[Processor] Validation logged for quote ${quoteId}: outcome=${outcome}, issues=${validationResult.issues.length}`)
+  }
 }

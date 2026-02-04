@@ -787,6 +787,36 @@ export function getSignalsWithoutImagesV2(): ExtractedSignalsV2 {
 }
 
 /**
+ * Get signals for photo-OPTIONAL services (minPhotos = 0)
+ * FIX-2: No warnings - photos are optional by business config
+ */
+export function getSignalsWithoutImagesPhotoOptional(): ExtractedSignals {
+  return {
+    confidence: 0.8,  // Higher base - form data is sufficient
+    siteVisitRecommended: false,  // Don't recommend site visit
+    materials: [],
+    complexity: { level: 'unknown', factors: [] },
+    observations: [],
+    warnings: [],  // NO warnings
+  }
+}
+
+/**
+ * Get V2 signals for photo-OPTIONAL services
+ * FIX-2: No site visit recommendation or warnings
+ */
+export function getSignalsWithoutImagesV2PhotoOptional(): ExtractedSignalsV2 {
+  return {
+    extractedAt: new Date().toISOString(),
+    overallConfidence: 0.8,  // Higher confidence
+    signals: [],
+    complexity: { level: 'unknown', factors: [] },
+    siteVisitRecommended: false,
+    lowConfidenceSignals: [],
+  }
+}
+
+/**
  * Valid detectable conditions
  */
 const VALID_CONDITIONS: DetectableCondition[] = [
@@ -965,25 +995,37 @@ Be intelligent about matching - the customer may not use exact terms. For exampl
 - "looks dirty" or "green stuff" → moss/algae treatment
 - "seal it after" or "protect the surface" → sealing
 
-IMPORTANT - SYMPTOM vs SOLUTION DISTINCTION (FIX-7):
-Do NOT recommend an add-on just because the customer described a SYMPTOM that the add-on might address.
-Symptoms are descriptions of problems, NOT requests for specific solutions.
+IMPORTANT - SYMPTOM vs SOLUTION vs INTENT DISTINCTION (FIX-7 enhanced):
 
-Examples of SYMPTOMS (do NOT match to add-ons):
-- "radiators go lukewarm" → symptom of heating issue, NOT a request for powerflush
-- "heating sometimes cuts out" → symptom, NOT a request for specific repair
-- "pressure drops" → symptom, NOT a request for specific service
-- "water goes cold" → symptom, NOT a request for specific fix
+1. SYMPTOMS ONLY (do NOT match):
+   - Problem descriptions WITHOUT expressed desire to fix
+   - Examples: "radiators go lukewarm", "had a breach", "system is slow"
+   - NO intent expressed = don't recommend
 
-Examples of REQUESTS (DO match to add-ons):
-- "need a powerflush" → explicit request for powerflush
-- "want the system flushed" → request for flush service
-- "please include a gas safety certificate" → request for certificate
+2. EXPLICIT REQUESTS (DO match):
+   - Customer asks for the service by name
+   - Examples: "need a powerflush", "want phishing training", "include a gas certificate"
+
+3. INTENT SIGNALS (DO match) - FIX-4:
+   - Customer expresses a GOAL that the add-on addresses
+   - Intent keywords: "want to", "need to", "improve", "prevent", "strengthen", "tighten", "ensure", "enhance"
+   - Examples:
+     - "want to tighten security controls" → security add-ons relevant
+     - "need to improve staff awareness" → training add-on relevant
+     - "prevent future incidents" → prevention add-on relevant
+
+4. CONTEXT COMBINATION (DO match):
+   - SYMPTOM + INTENT = Recommend
+   - Example: "Had a phishing incident and want to tighten controls"
+     → Incident is context, "want to tighten" is intent → RECOMMEND phishing add-on
+
+RULE: Look for intent keywords. If customer expresses a goal/desire, the add-on that addresses that goal IS relevant.
 
 Only recommend add-ons when the customer:
 1. Explicitly mentions the add-on by name or close synonym
 2. Explicitly requests the specific service
 3. Describes a condition that ONLY that add-on can address
+4. Expresses intent/goal that the add-on addresses (FIX-4)
 
 Return a JSON array of matched add-ons. Only include add-ons that are clearly relevant to what the customer described.
 If no add-ons match, return an empty array.

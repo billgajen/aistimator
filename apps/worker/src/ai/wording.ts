@@ -363,8 +363,25 @@ function validateContent(content: Partial<QuoteContent>, context: WordingContext
     notes = getDefaultNotes(context)
   }
 
+  // ISSUE-5 FIX: Validate that scope doesn't promise unpaid work
+  // Check if scope text mentions work that isn't in the pricing breakdown
+  const scopeSummary = content.scopeSummary || getDefaultScopeSummary(context)
+  const scopeValidation = validateScopeAgainstPricing(
+    scopeSummary,
+    context.pricing.breakdown,
+    context.scopeIncludes
+  )
+  if (!scopeValidation.valid) {
+    // Log warnings for visibility (these don't block the quote but help diagnose issues)
+    for (const warning of scopeValidation.warnings) {
+      console.warn(`[Wording] Scope validation warning: ${warning}`)
+    }
+    // Note: We don't add these warnings to customer-facing notes
+    // They're for business/developer awareness during debugging
+  }
+
   return {
-    scopeSummary: content.scopeSummary || getDefaultScopeSummary(context),
+    scopeSummary,
     assumptions,
     exclusions: Array.isArray(content.exclusions) && content.exclusions.length > 0
       ? content.exclusions.slice(0, 5)
@@ -628,4 +645,67 @@ export function generateWordingFallback(context: WordingContext): QuoteContent {
     notes,
     validityDays: 30,
   }
+}
+
+/**
+ * ISSUE-5 FIX: Validate that scope text doesn't promise work not included in pricing
+ *
+ * Checks for keywords in scope text that imply work items, then verifies
+ * those items exist in the pricing breakdown. Returns warnings for mismatches.
+ *
+ * Example: Scope says "re-sealing around the shower" but no sealing line item exists
+ */
+interface ScopeValidationResult {
+  valid: boolean
+  warnings: string[]
+}
+
+export function validateScopeAgainstPricing(
+  scopeText: string,
+  pricingBreakdown: Array<{ label: string }>,
+  scopeIncludes?: string[]
+): ScopeValidationResult {
+  const warnings: string[] = []
+
+  // Keywords that imply work items - must be matched in pricing OR scopeIncludes
+  const workKeywordChecks = [
+    { pattern: /\bre-?seal/i, expectedLabels: ['seal', 'silicone', 'sealant'] },
+    { pattern: /\bgrout/i, expectedLabels: ['grout'] },
+    { pattern: /\bclean/i, expectedLabels: ['clean', 'cleaning'] },
+    { pattern: /\brepair/i, expectedLabels: ['repair', 'fix'] },
+    { pattern: /\btil(e|ing)/i, expectedLabels: ['tile', 'tiling'] },
+    { pattern: /\bpaint/i, expectedLabels: ['paint', 'painting'] },
+    { pattern: /\bremov(e|al|ing)/i, expectedLabels: ['remov', 'disposal', 'strip'] },
+    { pattern: /\binstall/i, expectedLabels: ['install', 'installation', 'fitting'] },
+    { pattern: /\breplace/i, expectedLabels: ['replace', 'replacement'] },
+    { pattern: /\bplumb/i, expectedLabels: ['plumb', 'pipe', 'tap'] },
+    { pattern: /\belectr/i, expectedLabels: ['electr', 'wiring', 'socket'] },
+  ]
+
+  // Build lowercase versions for searching
+  const breakdownLabelsLower = pricingBreakdown.map(b => b.label.toLowerCase())
+  const scopeIncludesLower = (scopeIncludes || []).map(s => s.toLowerCase())
+
+  for (const { pattern, expectedLabels } of workKeywordChecks) {
+    if (pattern.test(scopeText)) {
+      // Check if any expected label appears in breakdown OR scopeIncludes
+      const hasMatchingLine = expectedLabels.some(label =>
+        breakdownLabelsLower.some(bl => bl.includes(label))
+      )
+      const hasMatchingScope = expectedLabels.some(label =>
+        scopeIncludesLower.some(si => si.includes(label))
+      )
+
+      if (!hasMatchingLine && !hasMatchingScope) {
+        // Extract the matched word from scope text for clearer warning
+        const match = scopeText.match(pattern)
+        const matchedWord = match ? match[0] : pattern.source
+        warnings.push(
+          `Scope mentions "${matchedWord}" but no matching line item in pricing. Consider adding to exclusions or pricing.`
+        )
+      }
+    }
+  }
+
+  return { valid: warnings.length === 0, warnings }
 }

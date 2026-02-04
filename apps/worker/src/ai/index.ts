@@ -14,6 +14,8 @@ export {
   getDefaultSignalsV2,
   getSignalsWithoutImages,
   getSignalsWithoutImagesV2,
+  getSignalsWithoutImagesPhotoOptional,
+  getSignalsWithoutImagesV2PhotoOptional,
   detectAddonsFromDescription,
   extractInventoryItems,
   matchItemsToCatalog,
@@ -39,3 +41,16 @@ export type { ServiceDraftRequest } from './service-draft'
 
 export { generateSignalRecommendations, findUnusedSignals } from './signal-recommendations'
 export type { UnusedSignal, RecommendationContext, FormAnswerForFiltering, WidgetFieldForFiltering } from './signal-recommendations'
+
+export {
+  validateQuote,
+  applyAutoCorrections,
+  determineValidationOutcome,
+  getDefaultValidationSettings,
+} from './quote-validator'
+export type {
+  CustomerRequestContext,
+  ServiceConfigForValidation,
+  GeneratedQuoteForValidation,
+  AutoCorrectionResult,
+} from './quote-validator'

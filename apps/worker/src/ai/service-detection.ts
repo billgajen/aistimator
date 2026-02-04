@@ -6,9 +6,102 @@
  * - "paint the walls" → Painting service
  * - "also need the fence fixed" → Fence Repair
  * - "clean the gutters too" → Gutter Cleaning
+ *
+ * Validation layers:
+ * - AD-008: Phrase verification (matchedPhrase must exist in source)
+ * - AD-010: Service name must contain request keywords
+ * - AD-014: Location context must not conflict (e.g., bathroom vs roof)
  */
 
 import { GeminiClient } from './gemini'
+
+// ============================================================================
+// AD-014: LOCATION CONTEXT CONFLICT DETECTION
+// ============================================================================
+
+/**
+ * Location context categories for conflict detection.
+ * Each category groups semantically equivalent location/context words.
+ * This is a generic mapping that applies universally - not hardcoded to specific services.
+ */
+const LOCATION_CONTEXTS: Record<string, string[]> = {
+  // Indoor room types
+  bathroom: ['bathroom', 'shower', 'bath', 'tub', 'toilet', 'sink', 'vanity', 'en-suite', 'ensuite', 'wetroom', 'wet room'],
+  kitchen: ['kitchen', 'cooker', 'oven', 'dishwasher', 'fridge', 'hob', 'extractor', 'splashback'],
+  bedroom: ['bedroom', 'wardrobe', 'closet'],
+  living: ['living room', 'lounge', 'sitting room', 'den'],
+
+  // Structural locations
+  roof: ['roof', 'rooftop', 'attic', 'loft', 'chimney', 'gutter', 'fascia', 'soffit', 'tiles', 'slates', 'flashing'],
+  basement: ['basement', 'cellar', 'foundation'],
+  garage: ['garage', 'carport', 'driveway'],
+
+  // Outdoor
+  garden: ['garden', 'yard', 'lawn', 'patio', 'deck', 'fence', 'shed', 'greenhouse', 'landscaping'],
+  exterior: ['exterior', 'outside', 'outdoor', 'external', 'facade', 'render', 'cladding'],
+
+  // Systems
+  plumbing: ['plumbing', 'pipe', 'drain', 'seal', 'tap', 'faucet', 'water heater', 'boiler', 'cistern', 'overflow', 'waste'],
+  electrical: ['electrical', 'wiring', 'socket', 'switch', 'fuse', 'circuit', 'lighting'],
+  heating: ['heating', 'radiator', 'thermostat', 'hvac', 'air conditioning', 'ductwork'],
+
+  // Vehicle
+  vehicle: ['car', 'vehicle', 'automotive', 'garage door', 'carport'],
+
+  // Commercial
+  commercial: ['office', 'commercial', 'industrial', 'warehouse', 'retail', 'shop'],
+}
+
+/**
+ * Detect if there's a location context conflict between the customer's phrase
+ * and the suggested service name.
+ *
+ * For example:
+ * - Phrase: "leak around the shower or bath seal" → contexts: bathroom, plumbing
+ * - Service: "Roof Leak Repair" → contexts: roof
+ * - Result: CONFLICT (bathroom/plumbing doesn't overlap with roof)
+ *
+ * This prevents recommending "Roof Leak Repair" when the customer is clearly
+ * talking about a bathroom leak.
+ */
+function detectLocationContextConflict(
+  matchedPhrase: string,
+  serviceName: string
+): { hasConflict: boolean; phraseContext?: string; serviceContext?: string } {
+  const phraseLower = matchedPhrase.toLowerCase()
+  const serviceNameLower = serviceName.toLowerCase()
+
+  // Find which context(s) the phrase matches
+  const phraseContexts: string[] = []
+  for (const [context, keywords] of Object.entries(LOCATION_CONTEXTS)) {
+    if (keywords.some(kw => phraseLower.includes(kw))) {
+      phraseContexts.push(context)
+    }
+  }
+
+  // Find which context(s) the service name matches
+  const serviceContexts: string[] = []
+  for (const [context, keywords] of Object.entries(LOCATION_CONTEXTS)) {
+    if (keywords.some(kw => serviceNameLower.includes(kw))) {
+      serviceContexts.push(context)
+    }
+  }
+
+  // If both have specific contexts and they don't overlap → conflict
+  // We need BOTH to have at least one context for this check to apply
+  if (phraseContexts.length > 0 && serviceContexts.length > 0) {
+    const overlaps = phraseContexts.some(pc => serviceContexts.includes(pc))
+    if (!overlaps) {
+      return {
+        hasConflict: true,
+        phraseContext: phraseContexts[0],
+        serviceContext: serviceContexts[0],
+      }
+    }
+  }
+
+  return { hasConflict: false }
+}
 
 /**
  * Service available for matching
@@ -260,6 +353,14 @@ Respond with ONLY the JSON array, no other text.`
           console.log(`[ServiceDetection] REJECTING mismatched service: "${r.serviceName}" doesn't match request keywords [${keyObjectWords.join(', ')}] from phrase "${r.matchedPhrase}"`)
           return false
         }
+      }
+
+      // AD-014: Location context conflict detection
+      // Prevents recommending "Roof Leak Repair" when customer mentions "bathroom leak"
+      const contextConflict = detectLocationContextConflict(r.matchedPhrase, r.serviceName)
+      if (contextConflict.hasConflict) {
+        console.log(`[ServiceDetection] REJECTING context conflict (AD-014): phrase context "${contextConflict.phraseContext}" vs service context "${contextConflict.serviceContext}" for ${r.serviceId} ("${r.serviceName}")`)
+        return false
       }
 
       return true

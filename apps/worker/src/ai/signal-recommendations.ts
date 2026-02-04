@@ -285,6 +285,121 @@ const NUMERIC_SIGNAL_KEYWORDS = [
 ]
 
 /**
+ * Semantic key mappings for conflict detection between AI signals and form answers
+ * Maps categories of signals to their related form field patterns
+ */
+const SIGNAL_TO_FORM_MAPPINGS: Record<string, { signalPatterns: string[]; formPatterns: string[] }> = {
+  'tiling_coverage': {
+    signalPatterns: ['tiling_coverage', 'tile_coverage', 'coverage_type'],
+    formPatterns: ['tiling_coverage', 'tile_coverage', 'coverage'],
+  },
+  'condition': {
+    signalPatterns: ['condition', 'condition_prep', 'condition_level', 'condition_rating', 'prep_level'],
+    formPatterns: ['condition', 'state', 'prep'],
+  },
+  'waste': {
+    signalPatterns: ['waste', 'waste_removal', 'want_waste', 'has_want_waste'],
+    formPatterns: ['waste', 'removal', 'want_waste'],
+  },
+  'timeline': {
+    signalPatterns: ['timeline', 'work_timeline', 'urgency', 'work_timeline_type'],
+    formPatterns: ['timeline', 'urgency', 'when', 'schedule'],
+  },
+}
+
+/**
+ * Check if an AI signal contradicts a form answer
+ * Returns true if the signal should be EXCLUDED from recommendations
+ *
+ * For example:
+ * - Form says "tiling_coverage: Splash zones only" but AI inferred "full_height"
+ * - Form says "condition_prep: Good" but AI inferred "average" or "poor"
+ * - Form says "want_waste: No" but AI inferred waste removal
+ */
+function signalContradictsFormAnswer(
+  signal: { key: string; value: string | number | boolean | null; confidence: number },
+  formAnswers: FormAnswerForFiltering[],
+  widgetFields: WidgetFieldForFiltering[]
+): boolean {
+  if (!formAnswers || formAnswers.length === 0) {
+    return false
+  }
+
+  const signalKeyLower = signal.key.toLowerCase()
+  const signalValueStr = String(signal.value).toLowerCase()
+
+  // Find which category this signal belongs to
+  for (const [category, mapping] of Object.entries(SIGNAL_TO_FORM_MAPPINGS)) {
+    const matchesSignalPattern = mapping.signalPatterns.some(
+      p => signalKeyLower.includes(p.toLowerCase())
+    )
+    if (!matchesSignalPattern) continue
+
+    // Find related form answer
+    const relatedFormAnswer = formAnswers.find(a => {
+      const fieldIdLower = a.fieldId.toLowerCase()
+      return mapping.formPatterns.some(p => fieldIdLower.includes(p.toLowerCase()))
+    })
+
+    // Also check widget field labels and mapsToSignal
+    const relatedWidgetField = widgetFields.find(f => {
+      const fieldIdLower = f.fieldId.toLowerCase()
+      const labelLower = f.label.toLowerCase()
+      const mapsToLower = (f.mapsToSignal || '').toLowerCase()
+      return mapping.formPatterns.some(p => {
+        const pLower = p.toLowerCase()
+        return fieldIdLower.includes(pLower) || labelLower.includes(pLower) || mapsToLower.includes(pLower)
+      })
+    })
+
+    const formAnswer = relatedFormAnswer ||
+      (relatedWidgetField && formAnswers.find(a => a.fieldId === relatedWidgetField.fieldId))
+
+    if (!formAnswer) continue
+
+    const formValueStr = String(formAnswer.value).toLowerCase()
+
+    // Check for specific contradictions based on category
+    switch (category) {
+      case 'tiling_coverage': {
+        // Form says "splash" but AI inferred "full height"
+        if (formValueStr.includes('splash') && (signalValueStr.includes('full') || signalValueStr.includes('height'))) {
+          console.log(`[SignalRecommendations] Contradiction: Form=${formValueStr}, AI signal ${signal.key}=${signalValueStr}`)
+          return true
+        }
+        break
+      }
+      case 'condition': {
+        // Form says "good" or "excellent" but AI inferred "poor" or "average"
+        const formIsGood = formValueStr.includes('good') || formValueStr.includes('excellent') || formValueStr.includes('new')
+        const signalIsPoor = signalValueStr.includes('poor') || signalValueStr.includes('bad') ||
+          signalValueStr.includes('average') || signalValueStr.includes('fair')
+        if (formIsGood && signalIsPoor) {
+          console.log(`[SignalRecommendations] Contradiction: Form=${formValueStr} (good), AI signal ${signal.key}=${signalValueStr} (poor)`)
+          return true
+        }
+        break
+      }
+      case 'waste': {
+        // Form says "no" or "false" to waste removal
+        if (formValueStr === 'false' || formValueStr === 'no' || formValueStr === '0') {
+          console.log(`[SignalRecommendations] Contradiction: Form said no waste removal, AI signal ${signal.key}=${signalValueStr}`)
+          return true
+        }
+        break
+      }
+      case 'timeline': {
+        // Note: Timeline contradictions are handled separately in quote-processor.ts
+        // because we want to flag them as warnings, not filter recommendations
+        break
+      }
+    }
+  }
+
+  return false
+}
+
+/**
  * Semantic patterns to match form fields to signal keys
  * Used to detect if customer already provided input for a numeric signal
  */
@@ -413,6 +528,15 @@ export function findUnusedSignals(
   return extractedSignals
     .filter(s => !usedKeys.has(s.key))
     .filter(s => s.source === 'inferred' || s.source === 'vision')  // Not form-provided
+    .filter(s => {
+      // ISSUE-4 FIX: Skip signals that contradict form answers
+      // e.g., AI says "full_height_tiling" but form says "splash_zones_only"
+      if (signalContradictsFormAnswer(s, formAnswers || [], widgetFields || [])) {
+        console.log(`[SignalRecommendations] Skipping ${s.key} - contradicts form answer`)
+        return false
+      }
+      return true
+    })
     .filter(s => {
       // RULE: For NUMERIC signals, check if customer already provided input
       if (isNumericSignal(s.key)) {

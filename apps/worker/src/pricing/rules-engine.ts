@@ -1088,53 +1088,121 @@ function getSignalValue(
 function shouldTriggerWorkStep(
   step: WorkStepConfig,
   structuredSignals: ExtractedSignal[] | undefined,
-  legacySignals: ExtractedSignals
+  legacySignals: ExtractedSignals,
+  formAnswers?: FormAnswer[]
 ): { trigger: boolean; signalValue?: string | number | boolean } {
   // Non-optional steps always trigger
   if (!step.optional) {
     return { trigger: true }
   }
 
-  // Optional steps need a trigger signal
-  if (!step.triggerSignal) {
-    return { trigger: false }
+  // If explicit trigger signal is configured, use that
+  if (step.triggerSignal) {
+    const { value } = getSignalValue(step.triggerSignal, structuredSignals, legacySignals)
+
+    if (value === undefined) {
+      return { trigger: false }
+    }
+
+    // If no condition specified, trigger if signal exists and is truthy
+    if (!step.triggerCondition) {
+      return {
+        trigger: Boolean(value),
+        signalValue: value
+      }
+    }
+
+    const { operator, value: conditionValue } = step.triggerCondition
+    const conditionResult = evaluateTriggerCondition(operator, value, conditionValue)
+    return { trigger: conditionResult, signalValue: value }
   }
 
-  const { value } = getSignalValue(step.triggerSignal, structuredSignals, legacySignals)
-
-  if (value === undefined) {
-    return { trigger: false }
-  }
-
-  // If no condition specified, trigger if signal exists and is truthy
-  if (!step.triggerCondition) {
-    return {
-      trigger: Boolean(value),
-      signalValue: value
+  // SMART DEFAULT: If no triggerSignal but has quantitySource, trigger when quantity > 0
+  // This handles the common case where business configures "Tile Installation uses bathroom_size"
+  // but forgets to set a trigger - we infer they want it when bathroom_size is provided
+  if (step.quantitySource) {
+    const quantity = getQuantityFromSource(step.quantitySource, structuredSignals, legacySignals, formAnswers)
+    if (quantity > 0) {
+      console.log(`[Pricing] Work step "${step.name}": no triggerSignal but quantitySource has value ${quantity} - triggering`)
+      return { trigger: true, signalValue: quantity }
     }
   }
 
-  const { operator, value: conditionValue } = step.triggerCondition
+  // No trigger signal and no valid quantity source - don't trigger
+  console.log(`[Pricing] Work step "${step.name}": optional with no trigger configuration - skipping`)
+  return { trigger: false }
+}
 
+/**
+ * Evaluate a trigger condition
+ */
+function evaluateTriggerCondition(
+  operator: string | undefined,
+  value: string | number | boolean,
+  conditionValue: string | number | boolean | undefined
+): boolean {
   switch (operator) {
     case 'exists':
-      return { trigger: value !== undefined && value !== null, signalValue: value }
+      return value !== undefined && value !== null
     case 'not_exists':
-      return { trigger: value === undefined || value === null, signalValue: value }
+      return value === undefined || value === null
     case 'equals':
-      return { trigger: value === conditionValue, signalValue: value }
+      return value === conditionValue
+    case 'not_equals':
+      return value !== conditionValue
     case 'gt':
-      return { trigger: typeof value === 'number' && typeof conditionValue === 'number' && value > conditionValue, signalValue: value }
+      return typeof value === 'number' && typeof conditionValue === 'number' && value > conditionValue
     case 'gte':
-      return { trigger: typeof value === 'number' && typeof conditionValue === 'number' && value >= conditionValue, signalValue: value }
+      return typeof value === 'number' && typeof conditionValue === 'number' && value >= conditionValue
     case 'lt':
-      return { trigger: typeof value === 'number' && typeof conditionValue === 'number' && value < conditionValue, signalValue: value }
+      return typeof value === 'number' && typeof conditionValue === 'number' && value < conditionValue
     case 'lte':
-      return { trigger: typeof value === 'number' && typeof conditionValue === 'number' && value <= conditionValue, signalValue: value }
+      return typeof value === 'number' && typeof conditionValue === 'number' && value <= conditionValue
+    case 'contains':
+      return typeof value === 'string' && typeof conditionValue === 'string' && value.toLowerCase().includes(conditionValue.toLowerCase())
     default:
-      return { trigger: false }
+      return Boolean(value)
   }
 }
+
+/**
+ * Get quantity from a configured source
+ */
+function getQuantityFromSource(
+  source: WorkStepConfig['quantitySource'],
+  structuredSignals: ExtractedSignal[] | undefined,
+  legacySignals: ExtractedSignals,
+  formAnswers?: FormAnswer[]
+): number {
+  if (!source) return 0
+
+  switch (source.type) {
+    case 'constant':
+      return source.value || 1
+
+    case 'form_field': {
+      // Try form answers first (most trusted)
+      if (formAnswers && source.fieldId) {
+        const answer = formAnswers.find(a => a.fieldId === source.fieldId)
+        if (answer && typeof answer.value === 'number') {
+          return answer.value
+        }
+      }
+      // Fall back to signals
+      const { value } = getSignalValue(source.fieldId || '', structuredSignals, legacySignals)
+      return typeof value === 'number' ? value : 0
+    }
+
+    case 'ai_signal': {
+      const { value } = getSignalValue(source.signalKey || '', structuredSignals, legacySignals)
+      return typeof value === 'number' ? value : 0
+    }
+
+    default:
+      return 0
+  }
+}
+
 
 /**
  * Result of work step cost calculation with explicit source tracking
@@ -1406,9 +1474,12 @@ export function calculatePricingWithTrace(
     const signalsArray = structuredSignals?.signals
 
     for (const step of rules.workSteps) {
-      const { trigger, signalValue } = shouldTriggerWorkStep(step, signalsArray, signals)
+      const { trigger, signalValue } = shouldTriggerWorkStep(step, signalsArray, signals, answers)
+
+      console.log(`[Pricing] Work step "${step.name}": optional=${step.optional}, triggerSignal=${step.triggerSignal}, trigger=${trigger}, signalValue=${signalValue}`)
 
       if (!trigger) {
+        console.log(`[Pricing] Skipping work step "${step.name}" - trigger not satisfied`)
         continue
       }
 
@@ -1700,6 +1771,42 @@ export function calculatePricingWithTrace(
     range,
     notes,
     recommendedAddons: recommendedAddons.length > 0 ? recommendedAddons : undefined,
+  }
+
+  // ISSUE-2 FIX: Detect form fields that were provided but not used in pricing
+  // This helps identify service configuration issues (e.g., bathroom_size provided but no per-sqft work steps)
+  if (rules.workSteps && rules.workSteps.length > 0) {
+    const usedFormFields = new Set(
+      rules.workSteps
+        .filter(s => s.quantitySource?.type === 'form_field' && s.quantitySource.fieldId)
+        .map(s => s.quantitySource!.fieldId!)
+    )
+
+    // Also track fields used in multipliers
+    for (const mult of rules.multipliers) {
+      usedFormFields.add(mult.when.fieldId)
+    }
+
+    // Find numeric form fields that were provided but not used
+    const unusedNumericFields = answers.filter(a => {
+      // Only check numeric fields
+      const value = typeof a.value === 'number' ? a.value :
+        (typeof a.value === 'string' ? coerceToNumber(a.value) : null)
+
+      if (value === null || value <= 0) return false
+
+      // Skip internal fields
+      if (a.fieldId.startsWith('_')) return false
+
+      // Check if field is used
+      return !usedFormFields.has(a.fieldId)
+    })
+
+    if (unusedNumericFields.length > 0) {
+      const unusedFieldList = unusedNumericFields.map(f => `${f.fieldId}=${f.value}`).join(', ')
+      console.warn(`[Pricing] Numeric form fields provided but unused in pricing: ${unusedFieldList}`)
+      // Note: We log but don't add to customer-facing notes as this is a configuration issue for business owners
+    }
   }
 
   // Build the trace

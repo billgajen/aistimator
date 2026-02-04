@@ -15,6 +15,231 @@
 
 ## Issues & Resolutions
 
+### 2026-02-03: AD-014 Location Context Conflict Detection
+
+**Context:** Cross-service recommendations incorrectly suggested "Roof Leak Repair" for a customer describing a bathroom leak. The existing AD-008 (phrase verification) and AD-010 (keyword matching) validations passed because the phrase mentioned "leak" and the service name contained "Leak".
+
+**Problem Analysis:**
+- Customer: "minor leak around the shower or bath seal... ceiling below... bathroom above"
+- Incorrect Recommendation: "Roof Leak Repair & Inspection"
+- Why AD-010 failed: "leak" appears in both phrase and service name ✓
+- Missing check: Context (bathroom) vs Context (roof) mismatch
+
+**Resolution:**
+- File: `apps/worker/src/ai/service-detection.ts`
+- Added `LOCATION_CONTEXTS` map with 12 context categories:
+  - Indoor: bathroom, kitchen, bedroom, living
+  - Structural: roof, basement, garage
+  - Outdoor: garden, exterior
+  - Systems: plumbing, electrical, heating
+  - Other: vehicle, commercial
+- Added `detectLocationContextConflict()` function that:
+  - Extracts location contexts from customer phrase
+  - Extracts location contexts from service name
+  - Rejects recommendation if contexts don't overlap (e.g., bathroom vs roof)
+
+**Example (Now Fixed):**
+```
+Phrase: "leak around the shower or bath seal"
+  → Contexts: bathroom (shower, bath), plumbing (seal)
+Service: "Roof Leak Repair"
+  → Contexts: roof
+Overlap check: bathroom/plumbing vs roof → NO OVERLAP → REJECTED
+```
+
+**Non-hardcoding Compliance:**
+- `LOCATION_CONTEXTS` is a generic mapping, not tied to specific service names
+- Groups semantically equivalent words that apply universally
+- Can be extended without code changes (future: config-driven)
+
+**Verification:**
+- TypeScript type checking passes
+- ESLint passes
+- Bathroom leak customer will NOT get "Roof Leak Repair" recommendation
+
+**Related to:** AD-008, AD-010, Cross-Service Quality
+
+---
+
+### 2026-02-03: Comprehensive Quote Validation Architecture
+
+**Context:** Implemented a comprehensive quote validation system to catch ALL quote quality issues before quotes reach customers. The system validates pricing completeness, scope text, potential additional work, cross-service recommendations, addons, notes, and logical consistency.
+
+**Files Created/Modified:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `supabase/migrations/00000000000012_quote_validation_logs.sql` | Created | Database table for validation logs + tenant settings |
+| `packages/shared/src/database.types.ts` | Modified | Added 20+ validation-related types |
+| `apps/worker/src/ai/quote-validator.ts` | Created | Core validator with 8 check categories |
+| `apps/worker/src/ai/index.ts` | Modified | Export validator functions |
+| `apps/worker/src/quote-processor.ts` | Modified | Integrated validator into pipeline |
+
+**Validation Check Categories:**
+1. **Pricing Completeness** - Form fields used, work steps triggered, expected total
+2. **Scope Validation** - Promises match paid work, matches customer intent
+3. **Potential Work** - No contradictions with form, no AI prices (AD-001)
+4. **Cross-Service** - Service/request match, context match, negation respected
+5. **Addons** - Negation respected, no conflicts with excludes
+6. **Notes** - Relevance, error codes included
+7. **Discounts** - No unauthorized changes
+8. **Logic** - Form/description consistency
+
+**Key Features:**
+- **Auto-correction**: Automatically fixes auto-fixable issues (remove bad scope text, remove invalid recommendations)
+- **Validation Logging**: All validation results logged to `quote_validation_logs` table for learning
+- **Config Suggestions**: Issues flag suggested configuration fixes for business improvement
+- **Tenant Settings**: Each tenant can configure validation behavior via `validation_settings` JSON column
+- **Severity Levels**: Issues categorized as critical/high/medium/low with configurable actions per level
+
+**Default Validation Settings:**
+```json
+{
+  "enabled": true,
+  "onCriticalIssue": "auto_correct",
+  "onHighIssue": "auto_correct",
+  "onMediumIssue": "auto_correct",
+  "onLowIssue": "pass_with_warning",
+  "pricingGapThresholdPercent": 20,
+  "requireManualReviewAbove": 5000
+}
+```
+
+**Architectural Decision:** Single comprehensive validator with structured checks (rather than multiple agents) for efficiency, shared context, and easier debugging.
+
+**Verification:**
+- All 93 worker tests pass
+- TypeScript type checking passes
+- ESLint passes
+
+**Related to:** AD-001, AD-007, AD-009, AD-013, FIX-BATHROOM-1 through FIX-BATHROOM-5
+
+---
+
+### 2026-02-03: Bathroom Quote Quality Fixes (FIX-BATHROOM-1 to FIX-BATHROOM-4)
+
+**Context:** A bathroom refresh quote test revealed multiple systemic issues where the quote didn't match customer expectations. Four code fixes were implemented; two issues (bathroom_size not used, missing refresh work steps) are service configuration issues requiring business dashboard changes.
+
+---
+
+#### FIX-BATHROOM-1: Form vs Description Conflict Detection (HIGH)
+
+**Symptom:** Customer charged £184 rush surcharge despite description saying "ideally in the next 3 to 4 weeks". Form said "Urgent (<7 Days)" but AI correctly inferred "Flexible (2-4 weeks)" with 0.9 confidence.
+
+**Root Cause:** `quote-processor.ts` always trusts form values (AD-007 principle), but had no mechanism to detect and flag conflicts between form input and AI inference from description.
+
+**Resolution:**
+- File: `apps/worker/src/quote-processor.ts`
+- Added `detectFormDescriptionConflicts()` function that:
+  - Compares AI-inferred signals (confidence ≥ 0.8) against form values
+  - Detects timeline conflicts (form=urgent, description=flexible and vice versa)
+  - Detects condition conflicts (form=good, description=poor and vice versa)
+  - Adds warning notes to pricing without changing pricing (form still wins per AD-007)
+
+**Example Warning Added:**
+```
+Note: Form selected "Urgent (<7 Days)" for Timeline, but description mentions "Flexible (2-4 weeks)". Quote uses form selection. Please confirm timeline with customer.
+```
+
+**Lesson:** Surface conflicts between form and description so businesses can follow up with customers before confirming work.
+
+---
+
+#### FIX-BATHROOM-4: Potential Additional Work Contradicts Form (MEDIUM)
+
+**Symptom:** "Potential Additional Work" section suggested "Full height tiling" when form said "Splash zones only", and "Average condition prep" when form said "Good condition".
+
+**Root Cause:** `findUnusedSignals()` in `signal-recommendations.ts` filtered by signal source but didn't do semantic matching to detect when AI signals contradict form answers.
+
+**Resolution:**
+- File: `apps/worker/src/ai/signal-recommendations.ts`
+- Added `signalContradictsFormAnswer()` function with semantic mappings for:
+  - `tiling_coverage`: Detects form="splash zones" vs AI="full height"
+  - `condition`: Detects form="good" vs AI="poor/average"
+  - `waste`: Detects form="no" vs AI suggesting waste removal
+- Added filter to `findUnusedSignals()` to skip contradicting signals
+
+**Example Filtered:**
+- Form says "Splash zones only" → AI signal "tiling_coverage=full_height" is EXCLUDED from recommendations
+
+**Lesson:** Recommendations must not contradict what the customer explicitly selected on the form.
+
+---
+
+#### FIX-BATHROOM-5: Scope Text Promises Unpaid Work (MEDIUM)
+
+**Symptom:** Scope text mentioned "re-sealing around the shower area, addressing minor issues like loose grout" but these weren't line items in pricing.
+
+**Root Cause:** AI wording generator created scope text from service description and customer keywords without validating that promised items have corresponding price lines.
+
+**Resolution:**
+- File: `apps/worker/src/ai/wording.ts`
+- Added `validateScopeAgainstPricing()` function that:
+  - Checks scope text for work keywords (reseal, grout, clean, repair, tile, etc.)
+  - Verifies each keyword has matching line item in pricing breakdown or scopeIncludes
+  - Logs warnings for scope/pricing mismatches (for business/developer visibility)
+
+**Example Warning Logged:**
+```
+[Wording] Scope validation warning: Scope mentions "reseal" but no matching line item in pricing. Consider adding to exclusions or pricing.
+```
+
+**Lesson:** Scope text should describe paid work. Unpaid promises create customer expectation mismatches.
+
+---
+
+#### FIX-BATHROOM-2: Unused Form Field Warning (MEDIUM)
+
+**Symptom:** Customer provided `bathroom_size: 200` sqft but it wasn't reflected in pricing. The service had no per-sqft work steps configured.
+
+**Root Cause:** Service configuration issue - work steps used `bathroom_count` (count-based) but no steps were configured for `bathroom_size` (area-based).
+
+**Resolution:**
+- File: `apps/worker/src/pricing/rules-engine.ts`
+- Added unused form field detection at end of `calculatePricingWithTrace()`:
+  - Tracks which form fields are used by work steps and multipliers
+  - Identifies numeric form fields that were provided but unused
+  - Logs warning for developer/business visibility
+
+**Example Warning Logged:**
+```
+[Pricing] Numeric form fields provided but unused in pricing: bathroom_size=200
+```
+
+**Note:** This is a diagnostic warning. The fix requires the business to add work steps that use `bathroom_size` as a quantity source (service configuration task).
+
+---
+
+### Out of Scope (Business Configuration Tasks)
+
+These issues require dashboard/database changes, not code:
+
+1. **Issue 2: bathroom_size not used** - Business needs to add work steps with `quantitySource: { type: 'form_field', fieldId: 'bathroom_size' }`
+
+2. **Issue 3: Missing refresh work steps** - Business needs to add refresh-specific work steps:
+   - `bathroom_deep_clean` (£75/bathroom)
+   - `silicone_reseal` (£85 fixed)
+   - `grout_refresh` (£3/sqft)
+   - `minor_repairs` (£50 fixed)
+
+---
+
+**Files Modified:**
+| File | Changes |
+|------|---------|
+| `apps/worker/src/quote-processor.ts` | Added `detectFormDescriptionConflicts()`, integrated into pipeline |
+| `apps/worker/src/ai/signal-recommendations.ts` | Added `signalContradictsFormAnswer()`, integrated into `findUnusedSignals()` |
+| `apps/worker/src/ai/wording.ts` | Added `validateScopeAgainstPricing()`, integrated into `validateContent()` |
+| `apps/worker/src/pricing/rules-engine.ts` | Added unused form field detection in `calculatePricingWithTrace()` |
+
+**Verification:**
+- All 93 worker tests pass
+- TypeScript type checking passes
+- ESLint passes
+
+**Related to:** AD-007 (Form signals override AI), AD-009 (Potential work limits), AD-013 (AI scope constraints)
+
+---
+
 ### 2026-02-02: Keyword Negation in Addon Detection (FIX-NEGATION-1)
 
 **Issue:** The pricing engine was recommending addons based on keyword matches even when customers explicitly said they didn't want extras. For example, "wobbly post" would trigger a `concrete_spur` addon recommendation even if the customer said "please no extras" in the same description.
@@ -1454,6 +1679,9 @@ if (pricingResult.estimatedTotal <= 0) {
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-03 | 1.12.0 | Comprehensive Quote Validation Architecture: 8 validation categories, auto-correction, validation logging, config suggestions, tenant settings |
+| 2026-02-03 | 1.11.0 | Bathroom Quote Quality Fixes: Form/description conflict detection (FIX-BATHROOM-1), contradicting signal filter (FIX-BATHROOM-4), scope/pricing validation (FIX-BATHROOM-5), unused form field warning (FIX-BATHROOM-2) |
+| 2026-02-02 | 1.10.1 | Keyword negation in addon detection (FIX-NEGATION-1): Global addon suppressors, contextual keyword negation |
 | 2026-02-01 | 1.10.0 | Quote Quality Fixes v6 (Stress Testing): 8 issues fixed - numeric operator type coercion (ISSUE-1), comma-separated numbers (ISSUE-2), zero line items (ISSUE-3), array case-insensitive (ISSUE-4), explicit negation (ISSUE-5), ambiguous values (ISSUE-6), array equals matching (ISSUE-7), tax rounding (ISSUE-8) |
 | 2026-02-01 | 1.9.1 | Quote Quality Fixes v4 (remaining): Ignore unused signals in fallback (FIX-4), smarter addon keyword matching (FIX-7), form overrides vision for access (FIX-8) |
 | 2026-02-01 | 1.9.0 | Quote Quality Fixes v4: AD-001 compliance for recommendations (no AI prices), addon/exclusion conflict check, vision severity calibration, error code integration |
@@ -1488,4 +1716,4 @@ if (pricingResult.estimatedTotal <= 0) {
 
 ---
 
-*Last Updated: 2026-02-01 (v1.10.0)*
+*Last Updated: 2026-02-03 (v1.12.0)*
