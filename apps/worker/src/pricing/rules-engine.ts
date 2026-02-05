@@ -877,9 +877,14 @@ function generateMultiplierLabel(
   const { fieldId, equals, value } = mult.when
   const matchedValue = equals ?? value
 
-  // Format the field ID into a readable label
-  // e.g., "dent_size" → "Dent size", "paint_damage" → "Paint damage"
-  const fieldLabel = fieldId
+  // Strip common UI suffixes from fieldId for cleaner display
+  // e.g., "pest_type_input" → "pest_type", "room_select" → "room"
+  const cleanedFieldId = fieldId
+    .replace(/_(input|select|field|type|dropdown|choice)$/i, '')
+
+  // Format the cleaned field ID into a readable label
+  // e.g., "pest_type" → "Pest Type", "dent_size" → "Dent Size"
+  const fieldLabel = cleanedFieldId
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase())
 
@@ -888,15 +893,9 @@ function generateMultiplierLabel(
     ? matchedValue.charAt(0).toUpperCase() + matchedValue.slice(1).replace(/_/g, ' ')
     : String(matchedValue)
 
-  // Determine if this is an increase or decrease
-  const isIncrease = mult.multiplier > 1
-
-  // Generate descriptive label
-  if (isIncrease) {
-    return `${valueLabel} ${fieldLabel.toLowerCase()}`
-  } else {
-    return `${valueLabel} ${fieldLabel.toLowerCase()} discount`
-  }
+  // Use "Field: Value" format for professional labels
+  // e.g., "Pest Type: Mice", "Dent Size: Large"
+  return `${fieldLabel}: ${valueLabel}`
 }
 
 /**
@@ -1213,6 +1212,10 @@ interface WorkStepCostResult {
   signalsUsed: Array<{ key: string; value: string | number | boolean }>
   quantitySource: 'form_field' | 'constant' | 'ai_signal' | 'legacy_fallback'
   quantityTrusted: boolean
+  /** The resolved quantity (for per_unit) or hours (for per_hour). undefined for fixed cost. */
+  quantity?: number
+  /** The unit label (e.g., "Rooms", "Hrs") for display in breakdown. */
+  unitLabel?: string
 }
 
 /**
@@ -1339,12 +1342,16 @@ function calculateWorkStepCost(
       }
 
       const cost = quantity * step.defaultCost
+      // Capitalize unitLabel for display (e.g., "rooms" → "Rooms")
+      const displayUnitLabel = unitLabel.charAt(0).toUpperCase() + unitLabel.slice(1)
       return {
         cost,
         calculation: `${quantity} ${unitLabel} × ${step.defaultCost}/${unitLabel.replace(/s$/, '')} = ${cost}`,
         signalsUsed,
         quantitySource,
         quantityTrusted,
+        quantity,
+        unitLabel: displayUnitLabel,
       }
     }
 
@@ -1411,6 +1418,8 @@ function calculateWorkStepCost(
         signalsUsed,
         quantitySource,
         quantityTrusted,
+        quantity: hours,
+        unitLabel: 'Hrs',
       }
     }
 
@@ -1500,10 +1509,17 @@ export function calculatePricingWithTrace(
       runningTotal += stepResult.cost
       workStepsTotal += stepResult.cost
 
+      // Build descriptive label showing unit math for per_unit/per_hour steps
+      let stepLabel = step.name
+      if (stepResult.quantity !== undefined && stepResult.quantity > 1 && stepResult.unitLabel) {
+        const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency
+        stepLabel = `${step.name}  ${currencySymbol}${step.defaultCost} x ${stepResult.quantity}(${stepResult.unitLabel})`
+      }
+
       traceSteps.push({
         type: 'work_step',
         id: step.id,
-        description: step.name,
+        description: stepLabel,
         signalsUsed: stepResult.signalsUsed,
         calculation: stepResult.calculation,
         amount: stepResult.cost,

@@ -139,8 +139,8 @@ describe('E2E Quote Processing Tests', () => {
       // Verify breakdown contains expected items
       const labels = result.breakdown.map((b) => b.label)
       expect(labels).toContain('Base service fee')
-      expect(labels).toContain('Room Cleaning')
-      expect(labels).toContain('Bathroom Deep Clean')
+      expect(labels).toContain('Room Cleaning  £35 x 4(Rooms)')
+      expect(labels).toContain('Bathroom Deep Clean  £45 x 2(Bathrooms)')
       expect(labels).toContain('Kitchen Deep Clean')
 
       // Verify no $0 line items
@@ -337,7 +337,7 @@ describe('E2E Quote Processing Tests', () => {
 
       // Verify core pricing is not affected by cross-service mention
       const labels = result.breakdown.map((b) => b.label)
-      expect(labels).toContain('Room Cleaning')
+      expect(labels).toContain('Room Cleaning  £35 x 3(Rooms)')
       expect(labels).toContain('Kitchen Deep Clean')
     })
 
@@ -482,7 +482,7 @@ describe('E2E Quote Processing Tests', () => {
       // Form says 5 rooms, AI detected 3 - form should win
       // Room Cleaning: 5 × £35 = £175
 
-      const roomStep = result.breakdown.find((b) => b.label === 'Room Cleaning')
+      const roomStep = result.breakdown.find((b) => b.label.startsWith('Room Cleaning'))
       expect(roomStep).toBeDefined()
       expect(roomStep?.amount).toBe(175) // 5 rooms × £35
 
@@ -531,9 +531,9 @@ describe('E2E Quote Processing Tests', () => {
 
       const labels = result.breakdown.map((b) => b.label)
       expect(labels).toContain('Oven Cleaning')
-      expect(labels).toContain('Carpet Steam Cleaning')
+      expect(labels).toContain('Carpet Steam Cleaning  £25 x 2(Areas)')
 
-      const carpetStep = result.breakdown.find((b) => b.label === 'Carpet Steam Cleaning')
+      const carpetStep = result.breakdown.find((b) => b.label.startsWith('Carpet Steam Cleaning'))
       expect(carpetStep?.amount).toBe(50) // 2 areas × £25
     })
   })

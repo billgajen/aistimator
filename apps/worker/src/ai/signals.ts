@@ -444,6 +444,11 @@ IMPORTANT:
 - For assessedCondition: Give your honest assessment based ONLY on what you see
 - For countedItems: Only include if the service prices per item/unit (when instructed above)
 
+CONDITION DETECTION GUIDELINES:
+- water_damage: ONLY report if you see active water stains, puddles, watermarks, or moisture damage on surfaces. The presence of plumbing pipes alone is NOT water damage.
+- pest_damage: Chewed materials, droppings, nesting materials, gnaw marks. Do NOT also report water_damage just because you see staining near pest activity — staining from pests is pest_damage, not water_damage.
+- Be conservative: if you are unsure whether damage is water-caused or pest-caused, attribute it to the more likely source based on context, do not report both.
+
 ===== CONDITION RATING CALIBRATION =====
 Use these guidelines to rate condition accurately:
 
@@ -593,7 +598,7 @@ export async function extractStructuredSignals(
   client: GeminiClient,
   images: Array<{ mimeType: string; base64: string }>,
   context: SignalExtractionContext
-): Promise<ExtractedSignalsV2> {
+): Promise<{ legacy: ExtractedSignals; structured: ExtractedSignalsV2 }> {
   // Build dynamic prompt with expected signals section
   let prompt = buildDynamicPrompt(context)
 
@@ -617,14 +622,15 @@ export async function extractStructuredSignals(
     const rawSignals = GeminiClient.parseJSON<ExtractedSignals & { signals?: ExtractedSignal[] }>(response)
     const legacySignals = validateSignals(rawSignals)
 
-    // Convert to V2 format
-    return convertToSignalsV2(legacySignals, rawSignals.signals, context.expectedSignals)
+    // Convert to V2 format — return both legacy and structured from a single Gemini call
+    const structured = convertToSignalsV2(legacySignals, rawSignals.signals, context.expectedSignals)
+    return { legacy: legacySignals, structured }
   } catch (error) {
     console.error('[Signals] Failed to parse Gemini response:', error)
     console.error('[Signals] Raw response:', response)
 
     // Return a default low-confidence result
-    return getDefaultSignalsV2('Failed to parse AI response')
+    return { legacy: getSignalsWithoutImages(), structured: getDefaultSignalsV2('Failed to parse AI response') }
   }
 }
 

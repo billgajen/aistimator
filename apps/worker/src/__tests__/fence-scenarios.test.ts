@@ -287,10 +287,10 @@ describe('Fence Installation & Repair - E2E Stress Tests', () => {
 
     it('should apply repair section labor (not full install)', () => {
       const labels = quote.result.breakdown.map(b => b.label)
-      expect(labels).toContain('Section Repair Labour')
+      expect(labels.some(l => l.startsWith('Section Repair Labour'))).toBe(true)
       // Repair jobs should NOT include full installation steps
-      expect(labels).not.toContain('Fence Installation - New')
-      expect(labels).not.toContain('Fence Installation - Full Replacement')
+      expect(labels.some(l => l.startsWith('Fence Installation - New'))).toBe(false)
+      expect(labels.some(l => l.startsWith('Fence Installation - Full Replacement'))).toBe(false)
     })
 
     it('should include site assessment fee', () => {
@@ -339,28 +339,28 @@ describe('Fence Installation & Repair - E2E Stress Tests', () => {
     })
 
     it('should include demolition for full replacement', () => {
-      const demolition = quote.result.breakdown.find(b => b.label === 'Old Fence Removal')
+      const demolition = quote.result.breakdown.find(b => b.label.startsWith('Old Fence Removal'))
       expect(demolition).toBeDefined()
       // 80ft * £8 = £640
       expect(demolition?.amount).toBe(640)
     })
 
     it('should include wood staining', () => {
-      const staining = quote.result.breakdown.find(b => b.label === 'Wood Staining/Sealing')
+      const staining = quote.result.breakdown.find(b => b.label.startsWith('Wood Staining/Sealing'))
       expect(staining).toBeDefined()
       // 80ft * £6 = £480
       expect(staining?.amount).toBe(480)
     })
 
     it('should include 2 gates', () => {
-      const gates = quote.result.breakdown.find(b => b.label === 'Gate Installation')
+      const gates = quote.result.breakdown.find(b => b.label.startsWith('Gate Installation'))
       expect(gates).toBeDefined()
       // 2 gates * £150 = £300
       expect(gates?.amount).toBe(300)
     })
 
     it('should include fence installation for full replacement', () => {
-      const install = quote.result.breakdown.find(b => b.label === 'Fence Installation - Full Replacement')
+      const install = quote.result.breakdown.find(b => b.label.startsWith('Fence Installation - Full Replacement'))
       expect(install).toBeDefined()
       // 80ft * £55 = £4,400
       expect(install?.amount).toBe(4400)
@@ -414,21 +414,21 @@ describe('Fence Installation & Repair - E2E Stress Tests', () => {
 
     it('should apply repair labor not full install', () => {
       const labels = quote.result.breakdown.map(b => b.label)
-      expect(labels).toContain('Section Repair Labour')
+      expect(labels.some(l => l.startsWith('Section Repair Labour'))).toBe(true)
       // Repair jobs should NOT include full installation steps
-      expect(labels).not.toContain('Fence Installation - New')
-      expect(labels).not.toContain('Fence Installation - Full Replacement')
+      expect(labels.some(l => l.startsWith('Fence Installation - New'))).toBe(false)
+      expect(labels.some(l => l.startsWith('Fence Installation - Full Replacement'))).toBe(false)
     })
 
     it('should include wood staining for pine', () => {
-      const staining = quote.result.breakdown.find(b => b.label === 'Wood Staining/Sealing')
+      const staining = quote.result.breakdown.find(b => b.label.startsWith('Wood Staining/Sealing'))
       expect(staining).toBeDefined()
       // 24ft * £6 = £144
       expect(staining?.amount).toBe(144)
     })
 
     it('should NOT include gate installation (gate_count = 0)', () => {
-      const gates = quote.result.breakdown.find(b => b.label === 'Gate Installation')
+      const gates = quote.result.breakdown.find(b => b.label.startsWith('Gate Installation'))
       expect(gates).toBeUndefined()
     })
 
@@ -475,7 +475,7 @@ describe('Fence Installation & Repair - E2E Stress Tests', () => {
     })
 
     it('should apply 8ft height surcharge', () => {
-      const heightSurcharge = quote.result.breakdown.find(b => b.label === 'Tall Fence Surcharge (8ft)')
+      const heightSurcharge = quote.result.breakdown.find(b => b.label.startsWith('Tall Fence Surcharge (8ft)'))
       expect(heightSurcharge).toBeDefined()
       // 40ft * £15 = £600
       expect(heightSurcharge?.amount).toBe(600)
@@ -487,14 +487,14 @@ describe('Fence Installation & Repair - E2E Stress Tests', () => {
     })
 
     it('should detect "secure" keyword and recommend gate lock addon', () => {
-      const lockAddon = quote.result.breakdown.find(b => b.label === 'Heavy-Duty Gate Lock')
+      const lockAddon = quote.result.breakdown.find(b => b.label.startsWith('Heavy-Duty Gate Lock'))
       expect(lockAddon).toBeDefined()
       expect(lockAddon?.amount).toBe(45)
       expect(lockAddon?.autoRecommended).toBe(true)
     })
 
     it('should include demolition for full replacement', () => {
-      const demolition = quote.result.breakdown.find(b => b.label === 'Old Fence Removal')
+      const demolition = quote.result.breakdown.find(b => b.label.startsWith('Old Fence Removal'))
       expect(demolition).toBeDefined()
     })
 
@@ -521,7 +521,7 @@ describe('Fence Installation & Repair - E2E Stress Tests', () => {
 
     it('should use form values (55ft) not description uncertainty', () => {
       // Form says 55ft, description says "50-60ft maybe"
-      const fenceInstall = quote.result.breakdown.find(b => b.label === 'Fence Installation - Full Replacement')
+      const fenceInstall = quote.result.breakdown.find(b => b.label.startsWith('Fence Installation - Full Replacement'))
       expect(fenceInstall).toBeDefined()
       // 55ft * £55 = £3,025
       expect(fenceInstall?.amount).toBe(3025)
@@ -538,18 +538,18 @@ describe('Fence Installation & Repair - E2E Stress Tests', () => {
     })
 
     it('should detect "decorative post caps" keyword', () => {
-      const capsAddon = quote.result.breakdown.find(b => b.label === 'Decorative Post Caps')
+      const capsAddon = quote.result.breakdown.find(b => b.label.startsWith('Decorative Post Caps'))
       expect(capsAddon).toBeDefined()
       expect(capsAddon?.autoRecommended).toBe(true)
     })
 
     it('should NOT include wood staining (vinyl not wood)', () => {
-      const staining = quote.result.breakdown.find(b => b.label === 'Wood Staining/Sealing')
+      const staining = quote.result.breakdown.find(b => b.label.startsWith('Wood Staining/Sealing'))
       expect(staining).toBeUndefined()
     })
 
     it('should include 3 gates', () => {
-      const gates = quote.result.breakdown.find(b => b.label === 'Gate Installation')
+      const gates = quote.result.breakdown.find(b => b.label.startsWith('Gate Installation'))
       expect(gates).toBeDefined()
       // 3 gates * £150 = £450
       expect(gates?.amount).toBe(450)

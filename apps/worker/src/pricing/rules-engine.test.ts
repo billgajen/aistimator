@@ -286,8 +286,8 @@ describe('Pricing Accuracy Tests', () => {
       // Verify breakdown contains expected items
       const labels = result.breakdown.map((b) => b.label)
       expect(labels).toContain('Base service fee')
-      expect(labels).toContain('Room Cleaning')
-      expect(labels).toContain('Bathroom Deep Clean')
+      expect(labels).toContain('Room Cleaning  £35 x 4(Rooms)')
+      expect(labels).toContain('Bathroom Deep Clean  £45 x 2(Bathrooms)')
       expect(labels).toContain('Kitchen Deep Clean')
       expect(labels).toContain('New customer discount')
 
@@ -369,8 +369,8 @@ describe('Pricing Accuracy Tests', () => {
       // Verify optional work steps triggered
       const labels = result.breakdown.map((b) => b.label)
       expect(labels).toContain('Oven Cleaning')
-      expect(labels).toContain('Carpet Steam Cleaning')
-      expect(labels).toContain('Interior Window Cleaning')
+      expect(labels).toContain('Carpet Steam Cleaning  £25 x 4(Areas)')
+      expect(labels).toContain('Interior Window Cleaning  £8 x 12(Windows)')
 
       // Verify addons triggered
       expect(labels).toContain('Fridge Interior Cleaning')
@@ -570,7 +570,7 @@ describe('Pricing Accuracy Tests', () => {
 
       // Verify the comma-formatted number was parsed correctly
       const roomCleaningStep = result.breakdown.find(
-        (b) => b.label === 'Room Cleaning'
+        (b) => b.label.startsWith('Room Cleaning')
       )
       expect(roomCleaningStep?.amount).toBe(35000)
     })

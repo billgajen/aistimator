@@ -15,6 +15,51 @@
 
 ## Issues & Resolutions
 
+### 2026-02-04: Quote Label & Signal Quality Fixes (3 fixes)
+
+**Context:** Three quality improvements: breakdown labels showing unit math, cleaner multiplier labels, and reducing water damage false positives from AI.
+
+**Changes:**
+
+| Fix | File(s) | Description |
+|-----|---------|-------------|
+| FIX-LABELS | `apps/worker/src/pricing/rules-engine.ts` | **Breakdown labels now show unit math.** For per_unit and per_hour work steps with quantity > 1, label changes from `"Pest Treatment"` to `"Pest Treatment  £50 x 2(Rooms)"`. Added `quantity` and `unitLabel` to `WorkStepCostResult` return type. Fixed cost steps and quantity=1 steps keep plain name. |
+| FIX-MULT | `apps/worker/src/pricing/rules-engine.ts` | **Cleaner multiplier fallback labels.** `generateMultiplierLabel()` now strips UI suffixes (`_input`, `_select`, `_field`, `_type`, `_dropdown`, `_choice`) from fieldId and uses `"Field: Value"` format instead of `"Value field_id"`. E.g., `"Pest Type: Mice"` instead of `"Mice pest type input"`. Only affects multipliers without explicit `label` property. |
+| FIX-WATER | `apps/worker/src/ai/signals.ts` | **Reduced water_damage false positives.** Added CONDITION DETECTION GUIDELINES to signal extraction prompt: pipes alone are not water damage, pest-caused staining is pest_damage not water_damage, be conservative when unsure. |
+
+**Architectural Decisions:**
+- FIX-LABELS: Label format only changes when quantity > 1. Single-quantity and fixed-cost steps keep plain name for clean display.
+- FIX-MULT: Explicit `label` on multiplier config always takes priority over `generateMultiplierLabel()`. The fallback function is only used when businesses don't configure a label.
+- FIX-WATER: Prompt-based fix, no structural code change. Conservative approach — tells AI to attribute ambiguous damage to the more likely source.
+
+**Test Updates:**
+- Updated label assertions in `rules-engine.test.ts`, `quote-processing.test.ts`, and `fence-scenarios.test.ts` to match new breakdown label format.
+- Used `startsWith()` matching in fence tests for per_unit work step labels.
+
+**Verification:** `pnpm typecheck`, `pnpm test`, `pnpm build` — all pass (118/118 tests).
+
+---
+
+### 2026-02-04: Platform Reliability Fixes (4 issues)
+
+**Context:** Full platform review uncovered critical reliability gaps: missing images despite upload, silent quote loss on queue failure, duplicate Gemini API calls doubling cost, and a comma-parsing bug corrupting numeric values.
+
+**Changes:**
+
+| Fix | File(s) | Description |
+|-----|---------|-------------|
+| FIX-IMG | `apps/worker/src/quote-processor.ts` | **"No images provided" when images WERE uploaded.** Root cause: asset linking (`UPDATE assets SET quote_request_id`) could silently fail, so `loadQuoteData` found 0 assets. Fix: added fallback — if no assets found via `quote_request_id`, load by `asset_ids` stored on `quote_requests` record. Also repairs the broken link for future retries. |
+| FIX-IMG-2 | `apps/web/src/app/api/public/quotes/route.ts` | Asset linking error was unchecked (`await supabase.update(...)` with no error check). Now logs the error. `asset_ids` on `quote_requests` serves as a safety net. |
+| FIX-QUEUE | `apps/web/src/lib/queue.ts`, `apps/web/src/app/api/public/quotes/route.ts` | **Silent quote loss.** `enqueueQuoteJob()` caught errors but never re-threw — API returned success while quote was stuck at `queued` forever. Fix: re-throw queue errors. Quotes route now catches queue failures, marks quote as `failed`, and returns a warning to the customer. |
+| FIX-GEMINI | `apps/worker/src/ai/signals.ts`, `apps/worker/src/quote-processor.ts` | **Double Gemini API call.** When `expected_signals` configured, both `extractStructuredSignals()` AND `extractSignals()` were called — same images sent to Gemini twice. Fix: `extractStructuredSignals()` now returns both legacy and structured formats from a single call. Halves API cost for structured-signal services. |
+| FIX-COMMA | `apps/worker/src/quote-processor.ts` | **"1,500" parsed as 501.** `convertFormValueToSignal()` split on commas and summed parts. Fix: detect thousands-separator pattern (`/^\d{1,3}(,\d{3})+(\.\d+)?$/`) first — "1,500" → 1500. Only sum when genuinely comma-separated measurements ("130,120,95" → 345). |
+
+**Fix Dependencies:**
+- FIX-IMG depends on `asset_ids` being stored on `quote_requests` (existing behavior at line 376 of quotes route)
+- FIX-GEMINI changes the return type of `extractStructuredSignals()` — any other callers must destructure `{ legacy, structured }`
+
+---
+
 ### 2026-02-04: Quote Quality Fixes v6
 
 **Context:** Five quality fixes addressing signal type resolution, hardcoded keywords, aggressive conflict detection, note duplication, and stale widget configs.
