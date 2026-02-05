@@ -155,6 +155,7 @@ export async function POST(request: NextRequest) {
         options?: string[]
         helpText?: string
         criticalForPricing?: boolean
+        mapsToSignal?: string
       }>
       // BUG-003 FIX: Type for pricingRules
       pricingRules?: {
@@ -245,6 +246,7 @@ export async function POST(request: NextRequest) {
         placeholder: f.helpText || undefined,
         helpText: f.helpText || undefined,
         criticalForPricing: f.criticalForPricing || false,
+        mapsToSignal: f.mapsToSignal || undefined,
         // Convert string[] options to {value, label} format
         ...(f.options && f.options.length > 0 && {
           options: f.options.map((opt) => ({ value: opt.toLowerCase().replace(/\s+/g, '_'), label: opt })),
