@@ -267,6 +267,63 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
 
+    // Sync widget_configs when draftConfig has suggestedFields
+    if (draftConfig?.suggestedFields && draftConfig.suggestedFields.length > 0) {
+      const widgetFields = draftConfig.suggestedFields.map((f) => ({
+        fieldId: f.fieldId,
+        label: f.label,
+        type: f.type === 'dropdown' ? 'select' : f.type === 'boolean' ? 'boolean' : f.type,
+        required: f.required || f.criticalForPricing || false,
+        placeholder: f.helpText || undefined,
+        helpText: f.helpText || undefined,
+        criticalForPricing: f.criticalForPricing || false,
+        mapsToSignal: f.mapsToSignal || undefined,
+        ...(f.options && f.options.length > 0 && {
+          options: f.options.map((opt: string) => ({ value: opt.toLowerCase().replace(/\s+/g, '_'), label: opt })),
+        }),
+      }))
+
+      // Check if widget config already exists for this service
+      const { data: existingConfig } = await supabase
+        .from('widget_configs')
+        .select('id, config_json')
+        .eq('service_id', id)
+        .eq('tenant_id', profile.tenant_id)
+        .single()
+
+      if (existingConfig) {
+        // Update existing config, preserving files settings
+        const existingJson = existingConfig.config_json as Record<string, unknown> | null
+        const { error: widgetError } = await supabase
+          .from('widget_configs')
+          .update({
+            config_json: {
+              fields: widgetFields,
+              files: (existingJson as { files?: unknown })?.files || { minPhotos: 1, maxPhotos: 8, maxDocs: 3 },
+            },
+          })
+          .eq('id', existingConfig.id)
+
+        if (widgetError) {
+          console.error('[API] Failed to update widget config:', widgetError)
+        }
+      } else {
+        // Insert new widget config
+        const { error: widgetError } = await supabase.from('widget_configs').insert({
+          tenant_id: profile.tenant_id,
+          service_id: id,
+          config_json: {
+            fields: widgetFields,
+            files: mediaConfig || { minPhotos: 1, maxPhotos: 8, maxDocs: 3 },
+          },
+        })
+
+        if (widgetError) {
+          console.error('[API] Failed to create widget config:', widgetError)
+        }
+      }
+    }
+
     // Return service with pricing rules included
     const serviceWithPricing = {
       ...service,
