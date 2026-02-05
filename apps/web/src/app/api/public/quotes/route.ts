@@ -443,24 +443,40 @@ export async function POST(request: Request) {
 
     // 11. Update assets to link to this quote request
     if (body.assetIds && body.assetIds.length > 0) {
-      await supabase
+      const { error: linkError } = await supabase
         .from('assets')
         .update({ quote_request_id: quoteRequest.id })
         .in('id', body.assetIds)
+
+      if (linkError) {
+        console.error(`[Quotes] Failed to link assets to quote request ${quoteRequest.id}:`, linkError)
+        // Don't fail the request — asset_ids are also stored on quote_request as a fallback
+      }
     }
 
     // 12. Increment usage counter for estimates_created
     await incrementUsageCounter(supabase, tenantId, 'estimates_created')
 
     // 13. Enqueue job for processing (skip for general inquiries - they need manual review)
+    let queueFailed = false
     if (!isGeneralInquiry) {
-      await enqueueQuoteJob({
-        quoteId: quote.id,
-        quoteRequestId: quoteRequest.id,
-        tenantId: tenantId,
-        timestamp: Date.now(),
-        quoteToken: token, // Pass token for email links
-      })
+      try {
+        await enqueueQuoteJob({
+          quoteId: quote.id,
+          quoteRequestId: quoteRequest.id,
+          tenantId: tenantId,
+          timestamp: Date.now(),
+          quoteToken: token, // Pass token for email links
+        })
+      } catch (queueError) {
+        console.error(`[Quotes] Failed to enqueue quote ${quote.id}:`, queueError)
+        queueFailed = true
+        // Mark quote as failed so it's visible in dashboard and can be retried
+        await supabase
+          .from('quotes')
+          .update({ status: 'failed', error_message: 'Queue dispatch failed — will retry' })
+          .eq('id', quote.id)
+      }
     } else {
       // For general inquiries, mark as ready (no AI processing needed)
       await supabase
@@ -475,10 +491,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       quoteId: quote.id,
-      status: isGeneralInquiry ? 'sent' : 'queued',
+      status: isGeneralInquiry ? 'sent' : queueFailed ? 'failed' : 'queued',
       isGeneralInquiry,
       quoteViewUrl,
       tokenExpiresAt: tokenExpiry.toISOString(),
+      ...(queueFailed && { warning: 'Quote created but processing delayed. We will retry shortly.' }),
     })
   } catch (error) {
     console.error('Quote request error:', error)
