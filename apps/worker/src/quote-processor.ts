@@ -108,6 +108,7 @@ interface QuoteData {
     job_postcode?: string
     job_quantity?: number
     job_answers: Array<{ fieldId: string; value: string | number | boolean | string[] }>
+    asset_ids?: string[]
   }
   tenant: {
     id: string
@@ -1417,11 +1418,33 @@ async function loadQuoteData(
     .eq('service_id', quote.service_id)
     .single()
 
-  // Load assets for quote request
-  const { data: assets } = await supabase
+  // Load assets for quote request (primary: by quote_request_id foreign key)
+  let { data: assets } = await supabase
     .from('assets')
     .select('id, type, content_type, r2_key')
     .eq('quote_request_id', quote.quote_request_id)
+
+  // Fallback: if no assets found via foreign key, try using asset_ids stored on quote_request
+  // This handles the case where the asset linking step (UPDATE assets SET quote_request_id) failed
+  const quoteReq = quote.quote_requests as { asset_ids?: string[] } | null
+  if ((!assets || assets.length === 0) && quoteReq?.asset_ids && quoteReq.asset_ids.length > 0) {
+    console.warn(`[Processor] No assets found via quote_request_id, falling back to asset_ids: ${quoteReq.asset_ids.join(', ')}`)
+    const { data: fallbackAssets } = await supabase
+      .from('assets')
+      .select('id, type, content_type, r2_key')
+      .in('id', quoteReq.asset_ids)
+
+    if (fallbackAssets && fallbackAssets.length > 0) {
+      assets = fallbackAssets
+      console.log(`[Processor] Recovered ${fallbackAssets.length} assets via asset_ids fallback`)
+
+      // Fix the broken link so future retries work via the primary path
+      await supabase
+        .from('assets')
+        .update({ quote_request_id: quote.quote_request_id })
+        .in('id', quoteReq.asset_ids)
+    }
+  }
 
   // Load business owner email (first user for the tenant)
   const { data: ownerProfile } = await supabase
@@ -1550,14 +1573,12 @@ async function extractSignalsFromAssets(
   // Try to extract signals with Gemini using rich context
   try {
     // Use structured extraction when expected signals are configured
+    // Single Gemini call returns both legacy and structured formats
     if (signalContext.expectedSignals && signalContext.expectedSignals.length > 0) {
       console.log(`[Processor] Using structured signal extraction with ${signalContext.expectedSignals.length} expected signals`)
-      const structuredSignals = await extractStructuredSignals(gemini, images, signalContext)
+      const result = await extractStructuredSignals(gemini, images, signalContext)
 
-      // Also extract legacy signals for backward compatibility
-      const signals = await extractSignals(gemini, images, signalContext)
-
-      return { signals, structuredSignals }
+      return { signals: result.legacy, structuredSignals: result.structured }
     }
 
     // Default: extract legacy signals and convert to structured format
@@ -2830,10 +2851,20 @@ function convertFormValueToSignal(
       return nums.length > 0 ? nums.reduce((sum, n) => sum + n, 0) : null
     }
 
-    // Handle comma-separated values (sum them)
+    // Handle comma-containing values
     if (typeof value === 'string') {
-      // Check if it contains commas (comma-separated numbers)
       if (value.includes(',')) {
+        // Detect thousands-separator pattern (e.g., "1,500" or "12,000")
+        // Thousands separators: digits then comma then exactly 3 digits (possibly repeated)
+        const thousandsSepPattern = /^\d{1,3}(,\d{3})+(\.\d+)?$/
+        if (thousandsSepPattern.test(value.trim())) {
+          // Remove commas — "1,500" → 1500, "1,200,000" → 1200000
+          const parsed = parseFloat(value.replace(/,/g, ''))
+          console.log(`[Processor] Parsed thousands-separated value "${value}" → ${parsed}`)
+          return isNaN(parsed) ? null : parsed
+        }
+
+        // Otherwise treat as comma-separated measurements (e.g., "130,120,95" → sum)
         const parts = value.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n))
         if (parts.length > 0) {
           const total = parts.reduce((sum, n) => sum + n, 0)
