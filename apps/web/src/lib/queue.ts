@@ -76,9 +76,10 @@ export async function enqueueQuoteJob(job: QuoteJobMessage): Promise<void> {
     const result = await response.json()
     console.log(`[Queue] Job ${useDirectProcessing ? 'processed' : 'enqueued'} successfully:`, result)
   } catch (error) {
-    console.error('[Queue] Error processing job:', error)
-    // Don't throw - we don't want to fail the quote request if queueing fails
-    // The quote is already created with 'queued' status and can be retried
+    console.error('[Queue] Error dispatching job:', error)
+    // Re-throw so the caller knows the queue dispatch failed
+    // Without this, the API returns success but the quote is stuck at 'queued' forever
+    throw error
   }
 }
 
