@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 /**
  * Main Dashboard Page
  *
- * Shows overview of quotes and quick actions.
+ * Shows overview of quotes, setup progress, and quick actions.
  */
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -29,18 +29,22 @@ export default async function DashboardPage() {
     .single()
 
   // Safety net: if user somehow has no profile, redirect to signup
-  // This shouldn't happen with the trigger, but handles edge cases
   if (!profile?.tenant_id) {
     redirect('/signup?error=account_incomplete')
   }
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('name')
+    .select('name, branding_json')
     .eq('id', profile.tenant_id)
     .single()
 
-  // Get quote stats (placeholder - will be real data in T-020)
+  // Fetch real quote stats
+  const { data: quoteStats } = await supabase
+    .from('quotes')
+    .select('status, pricing_json')
+    .eq('tenant_id', profile.tenant_id)
+
   const stats = {
     sent: 0,
     viewed: 0,
@@ -48,12 +52,131 @@ export default async function DashboardPage() {
     revenue: 0,
   }
 
+  if (quoteStats) {
+    for (const quote of quoteStats) {
+      // Quotes Sent: status in sent, viewed, accepted, paid
+      if (['sent', 'viewed', 'accepted', 'paid'].includes(quote.status)) {
+        stats.sent++
+      }
+      // Quotes Viewed: status in viewed, accepted, paid
+      if (['viewed', 'accepted', 'paid'].includes(quote.status)) {
+        stats.viewed++
+      }
+      // Quotes Accepted: status in accepted, paid
+      if (['accepted', 'paid'].includes(quote.status)) {
+        stats.accepted++
+        // Revenue: sum of total from accepted/paid quotes
+        const total = (quote.pricing_json as { total?: number } | null)?.total
+        if (typeof total === 'number') {
+          stats.revenue += total
+        }
+      }
+    }
+  }
+
+  // Fetch setup completion status
+  const [servicesResult, widgetResult, sitesResult] = await Promise.all([
+    // Check if tenant has at least one active service
+    supabase
+      .from('services')
+      .select('id')
+      .eq('tenant_id', profile.tenant_id)
+      .eq('active', true)
+      .limit(1),
+    // Check if tenant has widget config with form fields
+    supabase
+      .from('widget_configs')
+      .select('config_json')
+      .eq('tenant_id', profile.tenant_id)
+      .limit(1),
+    // Check if tenant has active site configured
+    supabase
+      .from('tenant_sites')
+      .select('id')
+      .eq('tenant_id', profile.tenant_id)
+      .eq('is_active', true)
+      .limit(1),
+  ])
+
+  const hasService = (servicesResult.data?.length ?? 0) > 0
+  const hasWidgetConfig = (() => {
+    const firstConfig = widgetResult.data?.[0]
+    if (!firstConfig) return false
+    const config = firstConfig.config_json as { fields?: unknown[] } | null
+    return Array.isArray(config?.fields) && config.fields.length > 0
+  })()
+  const hasBranding = (() => {
+    if (!tenant?.branding_json) return false
+    const branding = tenant.branding_json as { logoAssetId?: string | null; primaryColor?: string }
+    // Check if logo is set OR primary color is different from default (#2563eb)
+    return branding.logoAssetId !== null || (branding.primaryColor && branding.primaryColor !== '#2563eb')
+  })()
+  const hasVerifiedSite = (sitesResult.data?.length ?? 0) > 0
+
+  const setupSteps = [
+    { id: 'service', label: 'Add a service', completed: hasService, href: '/app/services' },
+    { id: 'widget', label: 'Configure widget', completed: hasWidgetConfig, href: '/app/widget' },
+    { id: 'branding', label: 'Customize branding', completed: hasBranding, href: '/app/branding' },
+    { id: 'embed', label: 'Embed on website', completed: hasVerifiedSite, href: '/app/widget' },
+  ]
+
+  const completedCount = setupSteps.filter((s) => s.completed).length
+  const allComplete = completedCount === setupSteps.length
+
   return (
     <div>
       <PageHeader
-        title={`Welcome back${profile?.display_name ? `, ${profile.display_name}` : ''}`}
-        description={tenant?.name || 'Your Business'}
+        title={tenant?.name || 'Dashboard'}
+        description="Overview of your quotes and activity"
       />
+
+      {/* Setup Progress - only show if not all complete */}
+      {!allComplete && (
+        <div className="mb-8 rounded-xl border border-border bg-background p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display text-lg font-bold text-text-primary">Complete your setup</h2>
+            <span className="text-sm font-medium text-text-secondary">{completedCount} of {setupSteps.length} done</span>
+          </div>
+
+          {/* Progress bar */}
+          <div className="h-2 w-full rounded-full bg-surface mb-5">
+            <div
+              className="h-2 rounded-full bg-secondary transition-all"
+              style={{ width: `${(completedCount / setupSteps.length) * 100}%` }}
+            />
+          </div>
+
+          {/* Steps grid */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {setupSteps.map((step) => (
+              <Link
+                key={step.id}
+                href={step.href}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                  step.completed
+                    ? 'bg-secondary-light text-secondary'
+                    : 'bg-surface text-text-secondary hover:bg-surface hover:text-text-primary'
+                }`}
+              >
+                {step.completed ? (
+                  <svg className="h-4 w-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fillRule="evenodd"
+                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                ) : (
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full border border-current text-[10px] font-medium flex-shrink-0">
+                    {setupSteps.indexOf(step) + 1}
+                  </span>
+                )}
+                <span className="font-medium truncate">{step.label}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Stats grid */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -65,8 +188,8 @@ export default async function DashboardPage() {
 
       {/* Quick actions */}
       <div className="mb-8">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">Quick Actions</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <h2 className="mb-4 font-display text-xl font-bold text-text-primary">Quick Actions</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <QuickAction
             href="/app/services"
             icon={
@@ -97,40 +220,6 @@ export default async function DashboardPage() {
             title="View Quotes"
             description="See all customer quotes"
           />
-          <QuickAction
-            href="/app/onboarding"
-            icon={
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
-            }
-            title="Setup Checklist"
-            description="Complete your account setup"
-          />
-        </div>
-      </div>
-
-      {/* Setup reminder */}
-      <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
-        <div className="flex items-start gap-3">
-          <svg className="h-5 w-5 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <div>
-            <h3 className="font-medium text-yellow-800">Complete Your Setup</h3>
-            <p className="mt-1 text-sm text-yellow-700">
-              Configure your services, pricing rules, and embed the widget on your website to start receiving quotes.
-            </p>
-            <Link
-              href="/app/onboarding"
-              className="mt-2 inline-flex items-center text-sm font-medium text-yellow-800 hover:underline"
-            >
-              View setup checklist
-              <svg className="ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-          </div>
         </div>
       </div>
     </div>
@@ -139,9 +228,9 @@ export default async function DashboardPage() {
 
 function StatCard({ title, value }: { title: string; value: string }) {
   return (
-    <div className="rounded-lg bg-white p-6 shadow-sm">
-      <p className="text-sm font-medium text-gray-500">{title}</p>
-      <p className="mt-2 text-3xl font-bold text-gray-900">{value}</p>
+    <div className="rounded-xl border border-border bg-background p-6">
+      <p className="text-sm font-medium text-text-muted">{title}</p>
+      <p className="mt-2 font-display text-4xl font-extrabold tracking-tight text-text-primary">{value}</p>
     </div>
   )
 }
@@ -160,12 +249,12 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="flex items-start gap-4 rounded-lg bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+      className="flex items-start gap-4 rounded-xl border border-border bg-background p-5 transition-all hover:border-border-strong"
     >
-      <div className="rounded-lg bg-blue-50 p-2 text-blue-600">{icon}</div>
+      <div className="rounded-lg bg-surface p-2.5 text-text-primary">{icon}</div>
       <div>
-        <h3 className="font-medium text-gray-900">{title}</h3>
-        <p className="text-sm text-gray-500">{description}</p>
+        <h3 className="font-semibold text-text-primary">{title}</h3>
+        <p className="mt-0.5 text-sm text-text-secondary">{description}</p>
       </div>
     </Link>
   )

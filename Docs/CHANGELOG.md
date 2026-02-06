@@ -15,6 +15,109 @@
 
 ## Issues & Resolutions
 
+### 2026-02-06: Dashboard Setup Checks & Stats Bug Fixes
+
+**Context:** Three bugs in the dashboard prevented setup completion checks and quote stats from working correctly due to incorrect column names and wrong table references.
+
+**Bugs Fixed:**
+
+| Bug | Root Cause | Fix |
+|-----|------------|-----|
+| "Add a service" not completing | Using `is_active` column that doesn't exist | Changed to `active` (correct column name in `services` table) |
+| "Embed on website" never completing | Using `is_verified` column that doesn't exist | Changed to `is_active` (correct column name in `tenant_sites` table) |
+| Quote stats showing all zeros | Querying `quote_requests` table | Changed to `quotes` table (which has `status` and `pricing_json` columns) |
+
+**Schema Reference:**
+- `services` table: has `active BOOLEAN` (not `is_active`)
+- `tenant_sites` table: has `is_active BOOLEAN` (no `is_verified` column exists)
+- `quotes` table: has `status` and `pricing_json` columns
+- `quote_requests` table: does NOT have `status` or `pricing_json` columns
+
+**File Modified:** `apps/web/src/app/(dashboard)/app/page.tsx` (lines 44, 84, 97)
+
+**Verification:** `pnpm typecheck && pnpm lint` — pass.
+
+---
+
+### 2026-02-06: Dashboard & Menu Reorganization
+
+**Context:** Streamlined the dashboard by removing redundant menu items, fixing broken stat cards, moving the setup checklist inline, and improving the welcome message.
+
+**Changes:**
+
+| Change | Description |
+|--------|-------------|
+| Menu Reorganization | Reduced from 9 to 7 menu items. Removed "Setup Checklist" (moved inline) and "Pricing Rules" (deprecated redirect). Renamed "Getting Started" to "Overview" and "Configuration" to "Configure". |
+| Welcome Message | Changed from "Welcome back, [name]" to business name as heading (e.g., "Acme Plumbing"). |
+| Dashboard Stats | Stats now fetch real data from `quote_requests` table. Queries count quotes by status for Sent/Viewed/Accepted, and sum `pricing_json.total` for Revenue. |
+| Inline Setup Progress | Setup checklist is now a compact card at top of dashboard. Shows 4 steps with progress bar. Auto-hides when all steps complete. |
+| Quick Actions | Reduced from 4 to 3 actions. Removed "Setup Checklist" link. |
+| Deleted Pages | Removed `/app/onboarding` (moved inline) and `/app/pricing` (deprecated redirect). |
+
+**Setup Completion Checks:**
+1. Add a service → `services` table has active service for tenant
+2. Configure widget → `widget_configs` has config with form fields
+3. Customize branding → `branding_json.logoAssetId` is set OR `primaryColor` differs from default `#2563eb`
+4. Embed on website → `tenant_sites` has at least 1 verified site
+
+**Files Modified:**
+- `apps/web/src/app/(dashboard)/layout.tsx` - Removed 2 menu items, renamed sections, removed unused icon functions
+- `apps/web/src/app/(dashboard)/app/page.tsx` - New welcome, real stats, inline setup progress, updated quick actions
+
+**Files Deleted:**
+- `apps/web/src/app/(dashboard)/app/onboarding/page.tsx`
+- `apps/web/src/app/(dashboard)/app/pricing/page.tsx`
+
+**Verification:** `pnpm typecheck`, `pnpm lint`, `pnpm build` — all pass.
+
+---
+
+### 2026-02-05: UI Redesign — "Editorial Black" Bold Minimalist Design
+
+**Context:** Complete visual redesign of the platform. Initially implemented "Warm & Approachable" (terracotta/cream), but user rejected it as looking bad. First B&W iteration with Manrope font was also rejected (text too thin/small, dull). Final "Editorial Black" iteration uses bold, modern, minimalist B&W aesthetic with Sora font.
+
+**Design System:**
+- **Font:** Sora (geometric sans-serif — display + body), JetBrains Mono (code) via `next/font/google`
+- **Colors:** Pure white background (#FFFFFF), zinc-50 surface (#F4F4F5), near-black primary (#09090B), green secondary (#16A34A) for positive indicators only, zinc grays for text hierarchy
+- **Shadows:** Border-based (`0 0 0 1px`) for editorial flat look, blur only on hover
+- **Corners:** Tighter radius (`rounded-lg`, `rounded-xl`) — no oversized rounding
+- **Typography:** Extrabold headings (text-3xl+), semibold nav items (text-[15px]), generous sizing throughout
+- **Animation:** `fade-in-up` 0.25s with staggered delays
+
+**Changes (5 phases, 30+ files):**
+
+| Phase | Files | Description |
+|-------|-------|-------------|
+| Foundation | `tailwind.config.ts`, `globals.css`, `layout.tsx`, `cn.ts` | CSS variables, theme tokens, font loading, utility |
+| Components | 7 new files in `components/ui/` + `EmptyState.tsx` update | Button, Input, Textarea, Select, Card, Badge, PageHeader |
+| Layouts | Dashboard, auth, admin, landing layouts | Warm cream bg, warm sidebar, Fraunces headings |
+| Pages | All 22 routes updated | Systematic class replacement (gray→semantic, blue→primary, etc.) |
+| Polish | Verification pass | typecheck, lint, build all pass |
+
+**Files Created:**
+- `apps/web/src/lib/cn.ts`
+- `apps/web/src/components/ui/Button.tsx`
+- `apps/web/src/components/ui/Input.tsx`
+- `apps/web/src/components/ui/Textarea.tsx`
+- `apps/web/src/components/ui/Select.tsx`
+- `apps/web/src/components/ui/Card.tsx`
+- `apps/web/src/components/ui/Badge.tsx`
+- `apps/web/src/components/ui/PageHeader.tsx`
+
+**Architectural Decisions:**
+- CSS variables for all design tokens — enables future runtime theming
+- Embed widget gets minimal treatment (subtle input/button changes only) since it renders on customer sites
+- `cn()` utility is dependency-free (no clsx/tailwind-merge) — just filters falsy values and joins
+- Component library uses forwardRef for Input/Textarea/Select for form library compatibility
+- Kept some raw Tailwind colors where they serve functional purposes (spinners, progress bars, error overlays) rather than semantic ones
+
+**Known Issue Fixed During Implementation:**
+- `replace_all` for `bg-green-50` also matched inside `bg-green-500`, producing corrupted `bg-secondary-light0`. Caught by verification grep and corrected. Same pattern checked across all files.
+
+**Verification:** `pnpm typecheck`, `pnpm lint`, `pnpm build` — all pass. No new errors introduced.
+
+---
+
 ### 2026-02-04: Quote Label & Signal Quality Fixes (3 fixes)
 
 **Context:** Three quality improvements: breakdown labels showing unit math, cleaner multiplier labels, and reducing water damage false positives from AI.
@@ -1776,6 +1879,7 @@ if (pricingResult.estimatedTotal <= 0) {
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-06 | 1.13.0 | Dashboard & Menu Reorganization: Reduced menu from 9 to 7 items, inline setup progress, real quote stats, improved welcome message, deleted redundant pages |
 | 2026-02-03 | 1.12.0 | Comprehensive Quote Validation Architecture: 8 validation categories, auto-correction, validation logging, config suggestions, tenant settings |
 | 2026-02-03 | 1.11.0 | Bathroom Quote Quality Fixes: Form/description conflict detection (FIX-BATHROOM-1), contradicting signal filter (FIX-BATHROOM-4), scope/pricing validation (FIX-BATHROOM-5), unused form field warning (FIX-BATHROOM-2) |
 | 2026-02-02 | 1.10.1 | Keyword negation in addon detection (FIX-NEGATION-1): Global addon suppressors, contextual keyword negation |
@@ -1813,4 +1917,4 @@ if (pricingResult.estimatedTotal <= 0) {
 
 ---
 
-*Last Updated: 2026-02-03 (v1.12.0)*
+*Last Updated: 2026-02-06 (v1.13.0)*
