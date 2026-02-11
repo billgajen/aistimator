@@ -214,7 +214,7 @@ export default function SettingsPage() {
 
       {/* Success message */}
       {success && (
-        <div className="mb-4 rounded-md bg-green-50 p-4">
+        <div className="mb-4 rounded-warm-lg bg-secondary-light p-4">
           <div className="flex">
             <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
               <path
@@ -223,14 +223,14 @@ export default function SettingsPage() {
                 clipRule="evenodd"
               />
             </svg>
-            <p className="ml-3 text-sm text-green-700">Settings saved successfully</p>
+            <p className="ml-3 text-sm text-secondary">Settings saved successfully</p>
           </div>
         </div>
       )}
 
       {/* Error message */}
       {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-4">
+        <div className="mb-4 rounded-warm-lg bg-danger-light p-4">
           <div className="flex">
             <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
               <path
@@ -239,10 +239,10 @@ export default function SettingsPage() {
                 clipRule="evenodd"
               />
             </svg>
-            <p className="ml-3 text-sm text-red-700">{error}</p>
+            <p className="ml-3 text-sm text-danger">{error}</p>
             <button
               onClick={() => setError(null)}
-              className="ml-auto text-red-400 hover:text-red-600"
+              className="ml-auto text-red-400 hover:text-danger"
             >
               <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path
@@ -258,36 +258,36 @@ export default function SettingsPage() {
 
       <div className="space-y-6">
         {/* Business Info */}
-        <div className="rounded-lg bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-medium text-gray-900">Business Information</h2>
-          <p className="mt-1 text-sm text-gray-500">Basic information about your business</p>
+        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+          <h2 className="text-lg font-medium text-text-primary">Business Information</h2>
+          <p className="mt-1 text-sm text-text-muted">Basic information about your business</p>
 
           <div className="mt-6 grid gap-6 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Business Name</label>
+              <label className="block text-sm font-medium text-text-secondary">Business Name</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Contact Email</label>
+              <label className="block text-sm font-medium text-text-secondary">Contact Email</label>
               <input
                 type="email"
                 value={userEmail}
-                className="mt-1 w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-gray-500"
+                className="mt-1 w-full rounded-warm-lg border border-border bg-background px-3 py-2 text-text-muted"
                 disabled
               />
-              <p className="mt-1 text-xs text-gray-500">Email is managed through your account</p>
+              <p className="mt-1 text-xs text-text-muted">Email is managed through your account</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Currency</label>
+              <label className="block text-sm font-medium text-text-secondary">Currency</label>
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
                 {CURRENCIES.map((c) => (
                   <option key={c.code} value={c.code}>
@@ -302,7 +302,7 @@ export default function SettingsPage() {
             <button
               onClick={() => handleSave('business')}
               disabled={saving}
-              className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex items-center rounded-warm-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
             >
               {saving ? 'Saving...' : 'Save Business Info'}
             </button>
@@ -310,9 +310,9 @@ export default function SettingsPage() {
         </div>
 
         {/* Tax Settings */}
-        <div className="rounded-lg bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-medium text-gray-900">Tax Settings</h2>
-          <p className="mt-1 text-sm text-gray-500">Configure how taxes are calculated on quotes</p>
+        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+          <h2 className="text-lg font-medium text-text-primary">Tax Settings</h2>
+          <p className="mt-1 text-sm text-text-muted">Configure how taxes are calculated on quotes</p>
 
           <div className="mt-6">
             <label className="flex items-center gap-3">
@@ -320,29 +320,29 @@ export default function SettingsPage() {
                 type="checkbox"
                 checked={taxEnabled}
                 onChange={(e) => setTaxEnabled(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
               />
-              <span className="text-sm font-medium text-gray-700">Enable tax on quotes</span>
+              <span className="text-sm font-medium text-text-secondary">Enable tax on quotes</span>
             </label>
           </div>
 
           {taxEnabled && (
             <div className="mt-6 grid gap-6 sm:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Tax Label</label>
+                <label className="block text-sm font-medium text-text-secondary">Tax Label</label>
                 <input
                   type="text"
                   value={taxLabel}
                   onChange={(e) => setTaxLabel(e.target.value)}
                   placeholder="e.g., VAT, GST, Sales Tax"
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-text-muted">
                   This label appears on quotes (e.g., VAT, GST, Sales Tax)
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Tax Rate (%)</label>
+                <label className="block text-sm font-medium text-text-secondary">Tax Rate (%)</label>
                 <input
                   type="number"
                   min="0"
@@ -350,9 +350,9 @@ export default function SettingsPage() {
                   step="0.01"
                   value={taxRatePercent}
                   onChange={(e) => setTaxRatePercent(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
-                <p className="mt-1 text-xs text-gray-500">Enter as percentage (e.g., 20 for 20%)</p>
+                <p className="mt-1 text-xs text-text-muted">Enter as percentage (e.g., 20 for 20%)</p>
               </div>
             </div>
           )}
@@ -361,7 +361,7 @@ export default function SettingsPage() {
             <button
               onClick={() => handleSave('tax')}
               disabled={saving}
-              className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex items-center rounded-warm-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
             >
               {saving ? 'Saving...' : 'Save Tax Settings'}
             </button>
@@ -369,9 +369,9 @@ export default function SettingsPage() {
         </div>
 
         {/* Service Area */}
-        <div className="rounded-lg bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-medium text-gray-900">Service Area</h2>
-          <p className="mt-1 text-sm text-gray-500">Define where you provide services</p>
+        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+          <h2 className="text-lg font-medium text-text-primary">Service Area</h2>
+          <p className="mt-1 text-sm text-text-muted">Define where you provide services</p>
 
           <div className="mt-6 space-y-4">
             {SERVICE_AREA_MODES.map((mode) => (
@@ -382,11 +382,11 @@ export default function SettingsPage() {
                   value={mode.value}
                   checked={serviceAreaMode === mode.value}
                   onChange={(e) => setServiceAreaMode(e.target.value as ServiceAreaMode)}
-                  className="mt-1 h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="mt-1 h-4 w-4 border-border text-primary focus:ring-primary/30"
                 />
                 <div>
-                  <span className="text-sm font-medium text-gray-700">{mode.label}</span>
-                  <p className="text-xs text-gray-500">{mode.description}</p>
+                  <span className="text-sm font-medium text-text-secondary">{mode.label}</span>
+                  <p className="text-xs text-text-muted">{mode.description}</p>
                 </div>
               </label>
             ))}
@@ -394,7 +394,7 @@ export default function SettingsPage() {
 
           {serviceAreaMode !== 'none' && (
             <div className="mt-6">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-text-secondary">
                 {serviceAreaMode === 'postcode_allowlist'
                   ? 'Allowed Postcodes/ZIP Codes'
                   : 'Allowed Counties/States'}
@@ -408,9 +408,9 @@ export default function SettingsPage() {
                     : 'Enter counties or states separated by commas or one per line\ne.g., California, Texas, New York'
                 }
                 rows={4}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-text-muted">
                 Separate multiple values with commas or put each on a new line
               </p>
             </div>
@@ -420,7 +420,7 @@ export default function SettingsPage() {
             <button
               onClick={() => handleSave('serviceArea')}
               disabled={saving}
-              className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex items-center rounded-warm-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
             >
               {saving ? 'Saving...' : 'Save Service Area'}
             </button>
@@ -428,9 +428,9 @@ export default function SettingsPage() {
         </div>
 
         {/* Quote Template Settings */}
-        <div className="rounded-lg bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-medium text-gray-900">Quote Template</h2>
-          <p className="mt-1 text-sm text-gray-500">
+        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+          <h2 className="text-lg font-medium text-text-primary">Quote Template</h2>
+          <p className="mt-1 text-sm text-text-muted">
             Configure the default appearance and content of your quotes
           </p>
 
@@ -440,11 +440,11 @@ export default function SettingsPage() {
                 type="checkbox"
                 checked={showLineItems}
                 onChange={(e) => setShowLineItems(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
               />
               <div>
-                <span className="text-sm font-medium text-gray-700">Show line items</span>
-                <p className="text-xs text-gray-500">Display itemized pricing breakdown on quotes</p>
+                <span className="text-sm font-medium text-text-secondary">Show line items</span>
+                <p className="text-xs text-text-muted">Display itemized pricing breakdown on quotes</p>
               </div>
             </label>
 
@@ -453,11 +453,11 @@ export default function SettingsPage() {
                 type="checkbox"
                 checked={includeAssumptions}
                 onChange={(e) => setIncludeAssumptions(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
               />
               <div>
-                <span className="text-sm font-medium text-gray-700">Include assumptions</span>
-                <p className="text-xs text-gray-500">
+                <span className="text-sm font-medium text-text-secondary">Include assumptions</span>
+                <p className="text-xs text-text-muted">
                   Show assumptions section on quotes (e.g., &quot;Clear access to work area&quot;)
                 </p>
               </div>
@@ -468,11 +468,11 @@ export default function SettingsPage() {
                 type="checkbox"
                 checked={includeExclusions}
                 onChange={(e) => setIncludeExclusions(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
               />
               <div>
-                <span className="text-sm font-medium text-gray-700">Include exclusions</span>
-                <p className="text-xs text-gray-500">
+                <span className="text-sm font-medium text-text-secondary">Include exclusions</span>
+                <p className="text-xs text-text-muted">
                   Show exclusions section on quotes (e.g., &quot;Materials not included&quot;)
                 </p>
               </div>
@@ -481,7 +481,7 @@ export default function SettingsPage() {
 
           <div className="mt-6 grid gap-6 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-text-secondary">
                 Quote Validity (days)
               </label>
               <input
@@ -490,16 +490,16 @@ export default function SettingsPage() {
                 max="365"
                 value={validityDays}
                 onChange={(e) => setValidityDays(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-text-muted">
                 How long quotes remain valid before expiring
               </p>
             </div>
           </div>
 
           <div className="mt-6">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-text-secondary">
               Default Terms & Conditions
             </label>
             <textarea
@@ -507,9 +507,9 @@ export default function SettingsPage() {
               onChange={(e) => setDefaultTermsText(e.target.value)}
               placeholder="Enter your default terms and conditions text that will appear on all quotes..."
               rows={4}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-text-muted">
               This text will appear at the bottom of all quotes
             </p>
           </div>
@@ -518,7 +518,7 @@ export default function SettingsPage() {
             <button
               onClick={() => handleSave('quoteTemplate')}
               disabled={saving}
-              className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex items-center rounded-warm-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
             >
               {saving ? 'Saving...' : 'Save Quote Template'}
             </button>
@@ -526,12 +526,12 @@ export default function SettingsPage() {
         </div>
 
         {/* Notifications */}
-        <div className="rounded-lg bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-medium text-gray-900">Notifications</h2>
-          <p className="mt-1 text-sm text-gray-500">Configure how you receive quote notifications</p>
+        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+          <h2 className="text-lg font-medium text-text-primary">Notifications</h2>
+          <p className="mt-1 text-sm text-text-muted">Configure how you receive quote notifications</p>
 
           <div className="mt-6">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-text-secondary">
               Notification Email (Override)
             </label>
             <input
@@ -539,9 +539,9 @@ export default function SettingsPage() {
               value={notificationEmail}
               onChange={(e) => setNotificationEmail(e.target.value)}
               placeholder={userEmail || 'Leave empty to use account email'}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-text-muted">
               Quote notifications will be sent to this email instead of your account email. Leave
               empty to use your account email ({userEmail}).
             </p>
@@ -551,7 +551,7 @@ export default function SettingsPage() {
             <button
               onClick={() => handleSave('notifications')}
               disabled={saving}
-              className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex items-center rounded-warm-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
             >
               {saving ? 'Saving...' : 'Save Notifications'}
             </button>
@@ -559,11 +559,11 @@ export default function SettingsPage() {
         </div>
 
         {/* Account Info (read-only) */}
-        <div className="rounded-lg bg-gray-50 p-6">
-          <h2 className="text-lg font-medium text-gray-900">Account Information</h2>
-          <p className="mt-1 text-sm text-gray-500">Your account details</p>
+        <div className="rounded-warm-lg bg-background p-6">
+          <h2 className="text-lg font-medium text-text-primary">Account Information</h2>
+          <p className="mt-1 text-sm text-text-muted">Your account details</p>
 
-          <div className="mt-4 text-sm text-gray-600">
+          <div className="mt-4 text-sm text-text-secondary">
             <p>
               <span className="font-medium">Tenant ID:</span> {settings?.id}
             </p>
@@ -571,18 +571,18 @@ export default function SettingsPage() {
         </div>
 
         {/* Danger Zone */}
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6">
-          <h2 className="text-lg font-medium text-red-800">Danger Zone</h2>
-          <p className="mt-1 text-sm text-red-600">Irreversible actions that affect your account</p>
+        <div className="rounded-warm-lg border border-danger/20 bg-danger-light p-6">
+          <h2 className="text-lg font-medium text-danger">Danger Zone</h2>
+          <p className="mt-1 text-sm text-danger">Irreversible actions that affect your account</p>
 
           <div className="mt-6">
             <button
-              className="rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+              className="rounded-warm-lg border border-red-300 bg-surface px-4 py-2 text-sm font-medium text-danger hover:bg-danger-light"
               disabled
             >
               Delete Account
             </button>
-            <p className="mt-2 text-xs text-red-600">
+            <p className="mt-2 text-xs text-danger">
               Account deletion is not available during beta. Contact support if needed.
             </p>
           </div>

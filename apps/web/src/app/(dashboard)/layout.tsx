@@ -12,29 +12,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-white shadow-lg transition-transform duration-200 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 transform border-r border-border bg-background transition-transform duration-200 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-16 items-center justify-between border-b px-4">
-            <Link href="/app" className="text-xl font-bold text-gray-900">
+          <div className="flex h-20 items-center justify-between px-6">
+            <Link href="/app" className="font-display text-2xl font-extrabold tracking-tight text-text-primary">
               Estimator
             </Link>
             <button
-              className="lg:hidden"
+              className="lg:hidden text-text-secondary"
               onClick={() => setSidebarOpen(false)}
               aria-label="Close sidebar"
             >
@@ -45,15 +45,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto p-4">
-            <NavSection title="Getting Started">
+          <nav className="flex-1 overflow-y-auto px-4 pt-2">
+            <NavSection title="Overview">
               <NavItem href="/app" icon={HomeIcon} label="Dashboard" exact />
-              <NavItem href="/app/onboarding" icon={ChecklistIcon} label="Setup Checklist" />
             </NavSection>
 
-            <NavSection title="Configuration">
+            <NavSection title="Configure">
               <NavItem href="/app/services" icon={ServicesIcon} label="Services" />
-              <NavItem href="/app/pricing" icon={PricingIcon} label="Pricing Rules" />
               <NavItem href="/app/widget" icon={WidgetIcon} label="Widget & Embed" />
               <NavItem href="/app/branding" icon={BrandingIcon} label="Branding" />
             </NavSection>
@@ -70,11 +68,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </nav>
 
           {/* User section */}
-          <div className="border-t p-4">
+          <div className="border-t border-border px-4 py-4">
             <form action="/api/auth/signout" method="POST">
               <button
                 type="submit"
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-100"
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-text-secondary hover:bg-surface transition-colors"
               >
                 <SignOutIcon className="h-5 w-5" />
                 Sign out
@@ -85,23 +83,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className="lg:pl-72">
         {/* Top bar for mobile */}
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-white px-4 lg:hidden">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border bg-background px-4 lg:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
             aria-label="Open sidebar"
-            className="text-gray-600"
+            className="text-text-primary"
           >
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <span className="text-lg font-semibold">Estimator</span>
+          <span className="font-display text-xl font-extrabold tracking-tight text-text-primary">Estimator</span>
         </header>
 
         {/* Page content */}
-        <main className="p-4 sm:p-6 lg:p-8">{children}</main>
+        <main className="animate-fade-in-up p-5 sm:p-8 lg:p-10">{children}</main>
       </div>
     </div>
   )
@@ -111,10 +109,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 function NavSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-6">
-      <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+      <h3 className="mb-3 px-3 text-[11px] font-bold uppercase tracking-widest text-text-muted">
         {title}
       </h3>
-      <div className="space-y-1">{children}</div>
+      <div className="space-y-0.5">{children}</div>
     </div>
   )
 }
@@ -136,13 +134,13 @@ function NavItem({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] transition-colors ${
         isActive
-          ? 'bg-blue-50 text-blue-700 font-medium'
-          : 'text-gray-700 hover:bg-gray-100'
+          ? 'bg-primary-light text-text-primary font-semibold'
+          : 'text-text-secondary font-medium hover:bg-surface hover:text-text-primary'
       }`}
     >
-      <Icon className={`h-5 w-5 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
+      <Icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-text-primary' : 'text-text-muted'}`} />
       {label}
     </Link>
   )
@@ -157,26 +155,10 @@ function HomeIcon({ className }: { className?: string }) {
   )
 }
 
-function ChecklistIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-    </svg>
-  )
-}
-
 function ServicesIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-    </svg>
-  )
-}
-
-function PricingIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   )
 }

@@ -94,15 +94,15 @@ export function ExpectedSignalEditor({
   return (
     <div className="space-y-3">
       {signals.length === 0 ? (
-        <div className="rounded-lg border-2 border-dashed border-gray-300 p-4 text-center">
-          <p className="text-sm text-gray-500">No signals defined</p>
-          <p className="mb-2 text-xs text-gray-400">
+        <div className="rounded-warm-lg border-2 border-dashed border-border p-4 text-center">
+          <p className="text-sm text-text-muted">No signals defined</p>
+          <p className="mb-2 text-xs text-text-muted">
             Signals define what AI should extract from photos and forms
           </p>
           <button
             type="button"
             onClick={addSignal}
-            className="text-sm font-medium text-blue-600 hover:text-blue-700"
+            className="text-sm font-medium text-primary hover:text-primary"
           >
             Add your first signal
           </button>
@@ -112,7 +112,7 @@ export function ExpectedSignalEditor({
           {signals.map((signal, index) => (
             <div
               key={index}
-              className="rounded-lg border border-gray-200 bg-white"
+              className="rounded-warm-lg border border-border bg-surface"
             >
               {/* Signal Header */}
               <div
@@ -122,13 +122,13 @@ export function ExpectedSignalEditor({
                 }
               >
                 <div>
-                  <p className="font-medium text-gray-900">
-                    {signal.signalKey || <span className="italic text-gray-400">Unnamed Signal</span>}
+                  <p className="font-medium text-text-primary">
+                    {signal.signalKey || <span className="italic text-text-muted">Unnamed Signal</span>}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-text-muted">
                     {SIGNAL_TYPES.find((t) => t.value === signal.type)?.label || signal.type}
                     {signal.type === 'enum' && signal.possibleValues && (
-                      <span className="ml-1 text-gray-400">
+                      <span className="ml-1 text-text-muted">
                         ({signal.possibleValues.join(', ')})
                       </span>
                     )}
@@ -141,7 +141,7 @@ export function ExpectedSignalEditor({
                       e.stopPropagation()
                       removeSignal(index)
                     }}
-                    className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                    className="rounded p-1 text-text-muted hover:bg-danger-light hover:text-danger"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
@@ -153,7 +153,7 @@ export function ExpectedSignalEditor({
                     </svg>
                   </button>
                   <svg
-                    className={`h-5 w-5 text-gray-400 transition-transform ${
+                    className={`h-5 w-5 text-text-muted transition-transform ${
                       expandedSignal === String(index) ? 'rotate-180' : ''
                     }`}
                     fill="none"
@@ -167,10 +167,10 @@ export function ExpectedSignalEditor({
 
               {/* Signal Details (Expanded) */}
               {expandedSignal === String(index) && (
-                <div className="space-y-4 border-t border-gray-100 px-4 py-4">
+                <div className="space-y-4 border-t border-border px-4 py-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                      <label className="mb-1 block text-sm font-medium text-text-secondary">
                         Signal Key *
                       </label>
                       <input
@@ -181,14 +181,14 @@ export function ExpectedSignalEditor({
                           updateSignal(index, { signalKey: key })
                         }}
                         placeholder="e.g., item_count"
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                       />
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-text-muted">
                         Unique identifier (auto-formatted)
                       </p>
                     </div>
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                      <label className="mb-1 block text-sm font-medium text-text-secondary">
                         Type
                       </label>
                       <select
@@ -199,7 +199,7 @@ export function ExpectedSignalEditor({
                             possibleValues: e.target.value === 'enum' ? [] : undefined,
                           })
                         }
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                       >
                         {SIGNAL_TYPES.map((type) => (
                           <option key={type.value} value={type.value}>
@@ -211,7 +211,7 @@ export function ExpectedSignalEditor({
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label className="mb-1 block text-sm font-medium text-text-secondary">
                       Description
                     </label>
                     <input
@@ -219,28 +219,28 @@ export function ExpectedSignalEditor({
                       value={signal.description}
                       onChange={(e) => updateSignal(index, { description: e.target.value })}
                       placeholder="What does this signal represent?"
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                   </div>
 
                   {/* Enum Values */}
                   {signal.type === 'enum' && (
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                      <label className="mb-1 block text-sm font-medium text-text-secondary">
                         Possible Values
                       </label>
-                      <div className="min-h-[60px] rounded-md border border-gray-300 p-2">
+                      <div className="min-h-[60px] rounded-warm-lg border border-border p-2">
                         <div className="flex flex-wrap gap-2">
                           {signal.possibleValues?.map((value, valueIndex) => (
                             <span
                               key={valueIndex}
-                              className="inline-flex items-center gap-1 rounded-md bg-blue-100 px-2 py-1 text-sm text-blue-800"
+                              className="inline-flex items-center gap-1 rounded-warm-lg bg-primary-light px-2 py-1 text-sm text-primary"
                             >
                               {value}
                               <button
                                 type="button"
                                 onClick={() => removeEnumValue(index, valueIndex)}
-                                className="text-blue-600 hover:text-blue-800"
+                                className="text-primary hover:text-primary"
                               >
                                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -267,7 +267,7 @@ export function ExpectedSignalEditor({
                           />
                         </div>
                       </div>
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-text-muted">
                         Press Enter to add each value
                       </p>
                     </div>
@@ -284,7 +284,7 @@ export function ExpectedSignalEditor({
         <button
           type="button"
           onClick={addSignal}
-          className="inline-flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-gray-400 hover:text-gray-700"
+          className="inline-flex w-full items-center justify-center gap-1 rounded-warm-lg border border-dashed border-border px-3 py-2 text-sm text-text-secondary hover:border-border-strong hover:text-text-primary"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

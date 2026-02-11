@@ -283,18 +283,18 @@ function TagInput({
   }
 
   return (
-    <div className="min-h-[80px] rounded-lg border border-gray-300 p-2 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
+    <div className="min-h-[80px] rounded-lg border border-border p-2 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
       <div className="flex flex-wrap gap-2">
         {tags.map((tag, index) => (
           <span
             key={index}
-            className="inline-flex items-center gap-1 rounded-md bg-blue-100 px-2 py-1 text-sm text-blue-800"
+            className="inline-flex items-center gap-1 rounded-lg bg-primary-light px-2 py-1 text-sm text-primary"
           >
             {tag}
             <button
               type="button"
               onClick={() => removeTag(index)}
-              className="text-blue-600 hover:text-blue-800"
+              className="text-primary hover:text-primary"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -851,7 +851,7 @@ export default function ServicesPage() {
         actions={
           <button
             onClick={openCreateModal}
-            className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="inline-flex items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
           >
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -868,7 +868,7 @@ export default function ServicesPage() {
 
       {/* Error message */}
       {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-4">
+        <div className="mb-4 rounded-lg bg-danger-light p-4">
           <div className="flex">
             <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
               <path
@@ -878,9 +878,9 @@ export default function ServicesPage() {
               />
             </svg>
             <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-sm text-danger">{error}</p>
             </div>
-            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
+            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-danger">
               <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fillRule="evenodd"
@@ -896,98 +896,100 @@ export default function ServicesPage() {
       {/* Loading state */}
       {loading ? (
         <div className="flex min-h-[400px] items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
       ) : services.length === 0 ? (
         /* Empty state */
-        <div className="flex min-h-[400px] flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white p-12 text-center">
-          <svg
-            className="mb-4 h-12 w-12 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-            />
-          </svg>
-          <h3 className="text-lg font-medium text-gray-900">No services yet</h3>
-          <p className="mt-2 max-w-md text-sm text-gray-500">
+        <div className="flex min-h-[400px] flex-col items-center justify-center rounded-xl border border-dashed border-border-strong bg-background p-12 text-center">
+          <div className="mb-5 rounded-xl border border-border bg-surface p-4">
+            <svg
+              className="h-8 w-8 text-text-muted"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+              />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-text-primary">No services yet</h3>
+          <p className="mt-2 max-w-md text-sm text-text-secondary">
             Add your first service to start configuring pricing and receiving quotes.
           </p>
           <button
             onClick={openCreateModal}
-            className="mt-6 inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="mt-6 inline-flex items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
           >
             Add your first service
           </button>
         </div>
       ) : (
         /* Services list */
-        <div className="overflow-hidden rounded-lg bg-white shadow">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+        <div className="overflow-hidden rounded-xl border border-border bg-background">
+          <table className="min-w-full">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-widest text-text-muted">
                   Service
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-widest text-text-muted">
                   Document Type
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-widest text-text-muted">
                   Status
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-6 py-4 text-right text-[11px] font-bold uppercase tracking-widest text-text-muted">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
+            <tbody className="divide-y divide-border">
               {services.map((service) => (
-                <tr key={service.id} className={!service.active ? 'bg-gray-50' : ''}>
-                  <td className="whitespace-nowrap px-6 py-4">
+                <tr key={service.id} className={`transition-colors hover:bg-surface ${!service.active ? 'opacity-60' : ''}`}>
+                  <td className="whitespace-nowrap px-6 py-5">
                     <div className="flex items-center gap-2">
-                      <div className="font-medium text-gray-900">{service.name}</div>
+                      <div className="font-semibold text-text-primary">{service.name}</div>
                       {service.draft_config && <AIDraftBadge compact />}
                     </div>
                     {service.description && (
-                      <div className="max-w-xs truncate text-sm text-gray-500">{service.description}</div>
+                      <div className="mt-0.5 max-w-xs truncate text-sm text-text-muted">{service.description}</div>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                  <td className="whitespace-nowrap px-6 py-5 text-sm text-text-secondary">
                     {DOCUMENT_TYPES.find((d) => d.value === service.document_type_default)?.label ||
                       service.document_type_default}
                   </td>
-                  <td className="whitespace-nowrap px-6 py-4">
+                  <td className="whitespace-nowrap px-6 py-5">
                     <span
-                      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
                         service.active
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
+                          ? 'bg-secondary-light text-secondary'
+                          : 'border border-border text-text-muted'
                       }`}
                     >
                       {service.active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
+                  <td className="whitespace-nowrap px-6 py-5 text-right">
                     <button
                       onClick={() => openEditModal(service)}
-                      className="mr-3 text-blue-600 hover:text-blue-900"
+                      className="mr-4 text-sm font-medium text-text-primary underline-offset-4 hover:underline"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => toggleActive(service)}
-                      className="mr-3 text-gray-600 hover:text-gray-900"
+                      className="mr-4 text-sm font-medium text-text-secondary underline-offset-4 hover:text-text-primary hover:underline"
                     >
                       {service.active ? 'Disable' : 'Enable'}
                     </button>
                     <button
                       onClick={() => deleteService(service)}
-                      className="text-red-600 hover:text-red-900"
+                      className="text-sm font-medium text-danger underline-offset-4 hover:underline"
                     >
                       Delete
                     </button>
@@ -1001,22 +1003,21 @@ export default function ServicesPage() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-background shadow-2xl">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b px-6 py-4">
-              <h2 className="text-lg font-semibold text-gray-900">
+            <div className="flex items-center justify-between border-b border-border px-6 py-5">
+              <h2 className="font-display text-xl font-bold text-text-primary">
                 {editingService ? 'Edit Service' : 'Add Service'}
               </h2>
               <button
                 onClick={closeModal}
-                className="text-gray-400 hover:text-gray-600"
+                className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-surface hover:text-text-primary"
               >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
                     d="M6 18L18 6M6 6l12 12"
                   />
                 </svg>
@@ -1024,22 +1025,22 @@ export default function ServicesPage() {
             </div>
 
             {/* Step Indicators */}
-            <div className="border-b px-6 py-4">
+            <div className="border-b border-border bg-surface/50 px-6 py-4">
               <nav className="flex items-center justify-between">
                 {steps.map((step, index) => (
                   <div key={step.id} className="flex items-center">
                     <div className="flex items-center">
                       <span
-                        className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
+                        className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
                           activeStep === step.id
-                            ? 'bg-blue-600 text-white'
+                            ? 'bg-primary text-white'
                             : WIZARD_STEPS.indexOf(activeStep) > index
-                            ? 'bg-green-500 text-white'
-                            : 'bg-gray-200 text-gray-600'
+                            ? 'bg-secondary text-white'
+                            : 'border-2 border-border bg-background text-text-muted'
                         }`}
                       >
                         {WIZARD_STEPS.indexOf(activeStep) > index ? (
-                          <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                             <path
                               fillRule="evenodd"
                               d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -1051,8 +1052,8 @@ export default function ServicesPage() {
                         )}
                       </span>
                       <span
-                        className={`ml-2 text-sm font-medium ${
-                          activeStep === step.id ? 'text-blue-600' : 'text-gray-500'
+                        className={`ml-2.5 text-sm font-semibold ${
+                          activeStep === step.id ? 'text-text-primary' : 'text-text-muted'
                         }`}
                       >
                         {step.label}
@@ -1060,8 +1061,8 @@ export default function ServicesPage() {
                     </div>
                     {index < steps.length - 1 && (
                       <div
-                        className={`mx-4 h-0.5 w-8 ${
-                          WIZARD_STEPS.indexOf(activeStep) > index ? 'bg-green-500' : 'bg-gray-200'
+                        className={`mx-4 h-0.5 w-8 rounded-full transition-colors ${
+                          WIZARD_STEPS.indexOf(activeStep) > index ? 'bg-secondary' : 'bg-border'
                         }`}
                       />
                     )}
@@ -1076,7 +1077,7 @@ export default function ServicesPage() {
                 {activeStep === 'basic' && (
                   <div className="space-y-4">
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                      <label className="mb-1 block text-sm font-medium text-text-secondary">
                         Service Name *
                       </label>
                       <input
@@ -1089,21 +1090,21 @@ export default function ServicesPage() {
                           }
                         }}
                         placeholder="e.g., Kitchen Renovation"
-                        className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-1 ${
+                        className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
                           nameError
                             ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
-                            : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+                            : 'border-border focus:border-primary focus:ring-primary/30'
                         }`}
                         required
                         autoFocus
                       />
                       {nameError && (
-                        <p className="mt-1 text-sm text-red-600">{nameError}</p>
+                        <p className="mt-1 text-sm text-danger">{nameError}</p>
                       )}
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                      <label className="mb-1 block text-sm font-medium text-text-secondary">
                         Description
                       </label>
                       <textarea
@@ -1111,15 +1112,15 @@ export default function ServicesPage() {
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         placeholder="Describe what this service includes. AI will use this to generate sensible defaults for scope, pricing, and form fields."
                         rows={4}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                       />
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-text-muted">
                         A good description helps AI generate better defaults for the next steps
                       </p>
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                      <label className="mb-1 block text-sm font-medium text-text-secondary">
                         Default Document Type
                       </label>
                       <select
@@ -1130,7 +1131,7 @@ export default function ServicesPage() {
                             documentTypeDefault: e.target.value as DocumentType,
                           })
                         }
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                       >
                         {DOCUMENT_TYPES.map((type) => (
                           <option key={type.value} value={type.value}>
@@ -1142,15 +1143,15 @@ export default function ServicesPage() {
 
                     {/* AI Draft Generation Indicator */}
                     {draftError && (
-                      <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+                      <div className="rounded-lg border border-danger/30 bg-danger-light p-3 text-sm text-danger">
                         {draftError}
                       </div>
                     )}
 
                     {generatingDraft && (
-                      <div className="flex items-center gap-2 rounded-md bg-purple-50 p-3">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-purple-600 border-t-transparent" />
-                        <span className="text-sm text-purple-700">
+                      <div className="flex items-center gap-2 rounded-lg border border-tertiary/30 bg-tertiary-light p-3">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-tertiary border-t-transparent" />
+                        <span className="text-sm text-tertiary">
                           Generating AI draft configuration...
                         </span>
                       </div>
@@ -1163,10 +1164,10 @@ export default function ServicesPage() {
                   <div className="space-y-6">
                     {/* AI Draft Badge for Scope section */}
                     {aiDraft && (
-                      <div className="flex items-center justify-between rounded-md bg-purple-50 p-3">
+                      <div className="flex items-center justify-between rounded-lg border border-tertiary/30 bg-tertiary-light p-3">
                         <div className="flex items-center gap-2">
                           <AIDraftBadge compact />
-                          <span className="text-sm text-purple-700">
+                          <span className="text-sm text-tertiary">
                             Pre-filled from AI draft. You can edit any field.
                           </span>
                         </div>
@@ -1175,14 +1176,14 @@ export default function ServicesPage() {
                             type="button"
                             onClick={generateAIDraft}
                             disabled={generatingDraft}
-                            className="text-sm text-purple-700 hover:text-purple-900"
+                            className="text-sm text-tertiary hover:text-purple-900"
                           >
                             Regenerate
                           </button>
                           <button
                             type="button"
                             onClick={clearAIDraft}
-                            className="text-sm text-gray-600 hover:text-gray-900"
+                            className="text-sm text-text-secondary hover:text-text-primary"
                           >
                             Clear
                           </button>
@@ -1191,7 +1192,7 @@ export default function ServicesPage() {
                     )}
 
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                      <label className="mb-1 block text-sm font-medium text-text-secondary">
                         What&apos;s Typically Included
                       </label>
                       <TagInput
@@ -1202,7 +1203,7 @@ export default function ServicesPage() {
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                      <label className="mb-1 block text-sm font-medium text-text-secondary">
                         What&apos;s Typically Excluded
                       </label>
                       <TagInput
@@ -1213,7 +1214,7 @@ export default function ServicesPage() {
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                      <label className="mb-1 block text-sm font-medium text-text-secondary">
                         Standard Assumptions
                       </label>
                       <TagInput
@@ -1225,11 +1226,11 @@ export default function ServicesPage() {
 
                     <hr className="my-4" />
 
-                    <h3 className="text-base font-medium text-gray-900">Photo Requirements</h3>
+                    <h3 className="text-base font-medium text-text-primary">Photo Requirements</h3>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                        <label className="mb-1 block text-sm font-medium text-text-secondary">
                           Minimum Photos Required
                         </label>
                         <input
@@ -1247,12 +1248,12 @@ export default function ServicesPage() {
                             })
                           }
                           onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                         />
                       </div>
 
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                        <label className="mb-1 block text-sm font-medium text-text-secondary">
                           Maximum Photos Allowed
                         </label>
                         <input
@@ -1270,13 +1271,13 @@ export default function ServicesPage() {
                             })
                           }
                           onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                      <label className="mb-1 block text-sm font-medium text-text-secondary">
                         Photo Guidance for Customers
                       </label>
                       <textarea
@@ -1292,7 +1293,7 @@ export default function ServicesPage() {
                         }
                         placeholder="e.g., Please include photos of the area from multiple angles, any damage or problem areas, and any obstacles."
                         rows={3}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                       />
                     </div>
                   </div>
@@ -1303,10 +1304,10 @@ export default function ServicesPage() {
                   <div className="space-y-6">
                     {/* AI Draft Badge */}
                     {aiDraft && (
-                      <div className="flex items-center justify-between rounded-md bg-purple-50 p-3">
+                      <div className="flex items-center justify-between rounded-lg border border-tertiary/30 bg-tertiary-light p-3">
                         <div className="flex items-center gap-2">
                           <AIDraftBadge compact />
-                          <span className="text-sm text-purple-700">
+                          <span className="text-sm text-tertiary">
                             Pre-filled from AI draft. You can edit any item.
                           </span>
                         </div>
@@ -1314,46 +1315,46 @@ export default function ServicesPage() {
                     )}
 
                     {/* Base Pricing */}
-                    <div className="rounded-lg border border-gray-200 p-4">
-                      <h3 className="mb-3 text-base font-medium text-gray-900">Base Pricing</h3>
+                    <div className="rounded-lg border border-border p-4">
+                      <h3 className="mb-3 text-base font-medium text-text-primary">Base Pricing</h3>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                          <label className="mb-1 block text-sm text-gray-600">Base Fee</label>
+                          <label className="mb-1 block text-sm text-text-secondary">Base Fee</label>
                           <div className="relative">
-                            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
+                            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-text-muted">$</span>
                             <input
                               type="number"
                               min="0"
                               step="0.01"
                               value={formData.baseFee}
                               onChange={(e) => setFormData({ ...formData, baseFee: parseFloat(e.target.value) || 0 })}
-                              className="w-full rounded-md border border-gray-300 py-2 pl-7 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="w-full rounded-lg border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                             />
                           </div>
-                          <p className="mt-1 text-xs text-gray-500">Starting price for all quotes</p>
+                          <p className="mt-1 text-xs text-text-muted">Starting price for all quotes</p>
                         </div>
                         <div>
-                          <label className="mb-1 block text-sm text-gray-600">Minimum Charge</label>
+                          <label className="mb-1 block text-sm text-text-secondary">Minimum Charge</label>
                           <div className="relative">
-                            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
+                            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-text-muted">$</span>
                             <input
                               type="number"
                               min="0"
                               step="0.01"
                               value={formData.minimumCharge}
                               onChange={(e) => setFormData({ ...formData, minimumCharge: parseFloat(e.target.value) || 0 })}
-                              className="w-full rounded-md border border-gray-300 py-2 pl-7 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="w-full rounded-lg border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                             />
                           </div>
-                          <p className="mt-1 text-xs text-gray-500">Minimum quote amount</p>
+                          <p className="mt-1 text-xs text-text-muted">Minimum quote amount</p>
                         </div>
                       </div>
                     </div>
 
                     {/* Price Breakdown (Work Steps) */}
                     <div>
-                      <h3 className="text-base font-medium text-gray-900">Price Breakdown</h3>
-                      <p className="mb-3 text-sm text-gray-500">
+                      <h3 className="text-base font-medium text-text-primary">Price Breakdown</h3>
+                      <p className="mb-3 text-sm text-text-muted">
                         Define how you charge for this service. Each item appears as a line on the quote.
                       </p>
                       <WorkStepEditor
@@ -1365,11 +1366,11 @@ export default function ServicesPage() {
                     </div>
 
                     {/* Adjustments (Multipliers) */}
-                    <div className="rounded-lg border border-gray-200 p-4">
+                    <div className="rounded-lg border border-border p-4">
                       <div className="mb-3 flex items-center justify-between">
                         <div>
-                          <h3 className="text-base font-medium text-gray-900">Adjustments</h3>
-                          <p className="text-sm text-gray-500">Increase or decrease price based on customer answers</p>
+                          <h3 className="text-base font-medium text-text-primary">Adjustments</h3>
+                          <p className="text-sm text-text-muted">Increase or decrease price based on customer answers</p>
                         </div>
                         <button
                           type="button"
@@ -1377,7 +1378,7 @@ export default function ServicesPage() {
                             ...formData,
                             multipliers: [...formData.multipliers, { when: { fieldId: '', equals: '' }, multiplier: 1 }]
                           })}
-                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          className="inline-flex items-center rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-background"
                         >
                           <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1387,7 +1388,7 @@ export default function ServicesPage() {
                       </div>
 
                       {formData.multipliers.length === 0 ? (
-                        <p className="py-4 text-center text-sm text-gray-500">
+                        <p className="py-4 text-center text-sm text-text-muted">
                           No adjustments configured. Example: &quot;When frequency is weekly, reduce by 15%&quot;
                         </p>
                       ) : (
@@ -1398,7 +1399,7 @@ export default function ServicesPage() {
 
                             return (
                               <div key={index} className="flex flex-wrap items-center gap-2 text-sm">
-                                <span className="text-gray-500">When</span>
+                                <span className="text-text-muted">When</span>
                                 <select
                                   value={mult.when.fieldId}
                                   onChange={(e) => {
@@ -1406,14 +1407,14 @@ export default function ServicesPage() {
                                     newMultipliers[index] = { ...mult, when: { ...mult.when, fieldId: e.target.value } }
                                     setFormData({ ...formData, multipliers: newMultipliers })
                                   }}
-                                  className="w-40 rounded-md border border-gray-300 px-2 py-1.5 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  className="w-40 rounded-lg border border-border px-2 py-1.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                                 >
                                   <option value="">Select question...</option>
                                   {formData.suggestedFields.map((field) => (
                                     <option key={field.fieldId} value={field.fieldId}>{field.label}</option>
                                   ))}
                                 </select>
-                                <span className="text-gray-500">=</span>
+                                <span className="text-text-muted">=</span>
                                 {fieldOptions.length > 0 ? (
                                   <select
                                     value={String(mult.when.equals || '')}
@@ -1422,7 +1423,7 @@ export default function ServicesPage() {
                                       newMultipliers[index] = { ...mult, when: { ...mult.when, equals: e.target.value } }
                                       setFormData({ ...formData, multipliers: newMultipliers })
                                     }}
-                                    className="w-40 rounded-md border border-gray-300 px-2 py-1.5 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="w-40 rounded-lg border border-border px-2 py-1.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                                   >
                                     <option value="">Select value...</option>
                                     {fieldOptions.map((opt) => (
@@ -1439,10 +1440,10 @@ export default function ServicesPage() {
                                       setFormData({ ...formData, multipliers: newMultipliers })
                                     }}
                                     placeholder="value"
-                                    className="w-32 rounded-md border border-gray-300 px-2 py-1.5 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="w-32 rounded-lg border border-border px-2 py-1.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                                   />
                                 )}
-                                <span className="text-gray-500">→</span>
+                                <span className="text-text-muted">→</span>
                                 <select
                                   value={mult.multiplier >= 1 ? 'increase' : 'decrease'}
                                   onChange={(e) => {
@@ -1452,12 +1453,12 @@ export default function ServicesPage() {
                                     newMultipliers[index] = { ...mult, multiplier: newMult }
                                     setFormData({ ...formData, multipliers: newMultipliers })
                                   }}
-                                  className="w-28 rounded-md border border-gray-300 px-2 py-1.5 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  className="w-28 rounded-lg border border-border px-2 py-1.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                                 >
                                   <option value="increase">Increase</option>
                                   <option value="decrease">Reduce</option>
                                 </select>
-                                <span className="text-gray-500">by</span>
+                                <span className="text-text-muted">by</span>
                                 <input
                                   type="number"
                                   min="0"
@@ -1470,13 +1471,13 @@ export default function ServicesPage() {
                                     newMultipliers[index] = { ...mult, multiplier: newMult }
                                     setFormData({ ...formData, multipliers: newMultipliers })
                                   }}
-                                  className="w-16 rounded-md border border-gray-300 px-2 py-1.5 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  className="w-16 rounded-lg border border-border px-2 py-1.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                                 />
-                                <span className="text-gray-500">%</span>
+                                <span className="text-text-muted">%</span>
                                 <button
                                   type="button"
                                   onClick={() => setFormData({ ...formData, multipliers: formData.multipliers.filter((_, i) => i !== index) })}
-                                  className="text-gray-400 hover:text-red-600"
+                                  className="text-text-muted hover:text-danger"
                                 >
                                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1490,11 +1491,11 @@ export default function ServicesPage() {
                     </div>
 
                     {/* Add-ons */}
-                    <div className="rounded-lg border border-gray-200 p-4">
+                    <div className="rounded-lg border border-border p-4">
                       <div className="mb-3 flex items-center justify-between">
                         <div>
-                          <h3 className="text-base font-medium text-gray-900">Add-ons</h3>
-                          <p className="text-sm text-gray-500">Optional extras that AI will suggest based on customer needs</p>
+                          <h3 className="text-base font-medium text-text-primary">Add-ons</h3>
+                          <p className="text-sm text-text-muted">Optional extras that AI will suggest based on customer needs</p>
                         </div>
                         <button
                           type="button"
@@ -1502,7 +1503,7 @@ export default function ServicesPage() {
                             ...formData,
                             addons: [...formData.addons, { id: generateAddonId(), label: '', price: 0 }]
                           })}
-                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          className="inline-flex items-center rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-background"
                         >
                           <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1512,7 +1513,7 @@ export default function ServicesPage() {
                       </div>
 
                       {formData.addons.length === 0 ? (
-                        <p className="py-4 text-center text-sm text-gray-500">
+                        <p className="py-4 text-center text-sm text-text-muted">
                           No add-ons configured. Name them clearly (e.g., &quot;Deep Carpet Cleaning&quot;) and AI will suggest them when relevant.
                         </p>
                       ) : (
@@ -1528,10 +1529,10 @@ export default function ServicesPage() {
                                   setFormData({ ...formData, addons: newAddons })
                                 }}
                                 placeholder="Add-on name (e.g., Deep Carpet Cleaning)"
-                                className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                               />
                               <div className="relative w-28">
-                                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
+                                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-text-muted">$</span>
                                 <input
                                   type="number"
                                   min="0"
@@ -1542,13 +1543,13 @@ export default function ServicesPage() {
                                     newAddons[index] = { ...addon, price: parseFloat(e.target.value) || 0 }
                                     setFormData({ ...formData, addons: newAddons })
                                   }}
-                                  className="w-full rounded-md border border-gray-300 py-2 pl-7 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  className="w-full rounded-lg border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                                 />
                               </div>
                               <button
                                 type="button"
                                 onClick={() => setFormData({ ...formData, addons: formData.addons.filter((_, i) => i !== index) })}
-                                className="text-gray-400 hover:text-red-600"
+                                className="text-text-muted hover:text-danger"
                               >
                                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1567,10 +1568,10 @@ export default function ServicesPage() {
                   <div className="space-y-6">
                     {/* AI Draft Badge */}
                     {aiDraft && (
-                      <div className="flex items-center justify-between rounded-md bg-purple-50 p-3">
+                      <div className="flex items-center justify-between rounded-lg border border-tertiary/30 bg-tertiary-light p-3">
                         <div className="flex items-center gap-2">
                           <AIDraftBadge compact />
-                          <span className="text-sm text-purple-700">
+                          <span className="text-sm text-tertiary">
                             Pre-filled from AI draft. You can edit any field.
                           </span>
                         </div>
@@ -1578,8 +1579,8 @@ export default function ServicesPage() {
                     )}
 
                     <div>
-                      <h3 className="text-base font-medium text-gray-900">Customer Questions</h3>
-                      <p className="mb-3 text-sm text-gray-500">
+                      <h3 className="text-base font-medium text-text-primary">Customer Questions</h3>
+                      <p className="mb-3 text-sm text-text-muted">
                         What information do you need from customers to give an accurate quote?
                       </p>
                       <SuggestedFieldEditor
@@ -1611,19 +1612,19 @@ export default function ServicesPage() {
                 {activeStep === 'test' && (
                   <div className="space-y-6">
                     <div>
-                      <h3 className="text-base font-medium text-gray-900">Test Your Pricing</h3>
-                      <p className="mb-3 text-sm text-gray-500">
+                      <h3 className="text-base font-medium text-text-primary">Test Your Pricing</h3>
+                      <p className="mb-3 text-sm text-text-muted">
                         Enter sample values to see how your pricing works before publishing.
                       </p>
                     </div>
 
                     {/* Sample Input Section */}
-                    <div className="rounded-lg border border-gray-200 p-4">
-                      <h4 className="mb-3 text-sm font-medium text-gray-900">Sample Values</h4>
+                    <div className="rounded-lg border border-border p-4">
+                      <h4 className="mb-3 text-sm font-medium text-text-primary">Sample Values</h4>
                       <div className="grid gap-4 sm:grid-cols-2">
                         {formData.suggestedFields.filter(f => f.type === 'number').map((field) => (
                           <div key={field.fieldId}>
-                            <label className="mb-1 block text-sm text-gray-600">
+                            <label className="mb-1 block text-sm text-text-secondary">
                               {field.label}
                             </label>
                             <input
@@ -1638,13 +1639,13 @@ export default function ServicesPage() {
                                 setSimulatorResult(null)
                               }}
                               placeholder="0"
-                              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                             />
                           </div>
                         ))}
                         {formData.suggestedFields.filter(f => f.type === 'dropdown' || f.type === 'radio').map((field) => (
                           <div key={field.fieldId}>
-                            <label className="mb-1 block text-sm text-gray-600">
+                            <label className="mb-1 block text-sm text-text-secondary">
                               {field.label}
                             </label>
                             <select
@@ -1656,7 +1657,7 @@ export default function ServicesPage() {
                                 }))
                                 setSimulatorResult(null)
                               }}
-                              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                             >
                               <option value="">Select...</option>
                               {field.options?.map((opt) => (
@@ -1678,22 +1679,22 @@ export default function ServicesPage() {
                                   }))
                                   setSimulatorResult(null)
                                 }}
-                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
                               />
-                              <span className="text-sm text-gray-700">{field.label}</span>
+                              <span className="text-sm text-text-secondary">{field.label}</span>
                             </label>
                           </div>
                         ))}
                       </div>
                       {formData.suggestedFields.length === 0 && (
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-text-muted">
                           No customer questions defined. Go back to add questions that affect pricing.
                         </p>
                       )}
                       <button
                         type="button"
                         onClick={runSimulator}
-                        className="mt-4 inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                        className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
                       >
                         Calculate Preview
                       </button>
@@ -1701,50 +1702,50 @@ export default function ServicesPage() {
 
                     {/* Preview Results */}
                     {simulatorResult && (
-                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                        <h4 className="mb-3 text-sm font-medium text-gray-900">Preview Breakdown</h4>
+                      <div className="rounded-lg border border-border bg-background p-4">
+                        <h4 className="mb-3 text-sm font-medium text-text-primary">Preview Breakdown</h4>
                         <div className="space-y-2">
                           {simulatorResult.lineItems.map((item, index) => (
                             <div key={index} className="flex items-center justify-between text-sm">
                               <div className="flex items-center gap-2">
-                                <span className="text-gray-900">{item.name}</span>
+                                <span className="text-text-primary">{item.name}</span>
                                 {item.quantitySource === 'form_field' && (
-                                  <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">form</span>
+                                  <span className="rounded bg-primary-light px-1.5 py-0.5 text-xs text-primary">form</span>
                                 )}
                                 {item.quantitySource === 'constant' && (
-                                  <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">fixed</span>
+                                  <span className="rounded bg-secondary-light px-1.5 py-0.5 text-xs text-secondary">fixed</span>
                                 )}
                                 {item.quantitySource === 'ai_signal' && (
-                                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">AI</span>
+                                  <span className="rounded bg-tertiary-light px-1.5 py-0.5 text-xs font-semibold text-tertiary">AI</span>
                                 )}
                                 {item.quantitySource === 'missing' && (
-                                  <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">no source</span>
+                                  <span className="rounded bg-danger-light px-1.5 py-0.5 text-xs text-danger">no source</span>
                                 )}
                               </div>
                               <div className="text-right">
-                                <span className="font-medium text-gray-900">${item.amount.toFixed(2)}</span>
-                                <span className="ml-2 text-gray-500">({item.calculation})</span>
+                                <span className="font-medium text-text-primary">${item.amount.toFixed(2)}</span>
+                                <span className="ml-2 text-text-muted">({item.calculation})</span>
                               </div>
                             </div>
                           ))}
                           {simulatorResult.lineItems.length === 0 && (
-                            <p className="text-sm text-gray-500">No pricing items configured.</p>
+                            <p className="text-sm text-text-muted">No pricing items configured.</p>
                           )}
-                          <div className="mt-2 border-t border-gray-300 pt-2">
+                          <div className="mt-2 border-t border-border pt-2">
                             <div className="flex items-center justify-between font-medium">
-                              <span className="text-gray-900">Total</span>
-                              <span className="text-lg text-gray-900">${simulatorResult.subtotal.toFixed(2)}</span>
+                              <span className="text-text-primary">Total</span>
+                              <span className="text-lg text-text-primary">${simulatorResult.subtotal.toFixed(2)}</span>
                             </div>
                           </div>
                         </div>
 
                         {/* Warnings */}
                         {simulatorResult.warnings.length > 0 && (
-                          <div className="mt-4 rounded-md bg-amber-50 p-3">
-                            <h5 className="mb-1 text-sm font-medium text-amber-800">Warnings</h5>
+                          <div className="mt-4 rounded-lg bg-tertiary-light p-3">
+                            <h5 className="mb-1 text-sm font-medium text-tertiary">Warnings</h5>
                             <ul className="space-y-1">
                               {simulatorResult.warnings.map((warning, index) => (
-                                <li key={index} className="text-sm text-amber-700">• {warning}</li>
+                                <li key={index} className="text-sm text-tertiary">• {warning}</li>
                               ))}
                             </ul>
                           </div>
@@ -1753,8 +1754,8 @@ export default function ServicesPage() {
                     )}
 
                     {/* Validation Summary */}
-                    <div className={`rounded-lg border p-4 ${validationErrors.length > 0 ? 'border-red-200 bg-red-50' : 'border-gray-200'}`}>
-                      <h4 className="mb-3 text-sm font-medium text-gray-900">
+                    <div className={`rounded-lg border p-4 ${validationErrors.length > 0 ? 'border-danger/20 bg-danger-light' : 'border-border'}`}>
+                      <h4 className="mb-3 text-sm font-medium text-text-primary">
                         {validationErrors.length > 0 ? 'Fix Before Publishing' : 'Ready to Publish'}
                       </h4>
 
@@ -1762,14 +1763,14 @@ export default function ServicesPage() {
                       {validationErrors.length > 0 && (
                         <div className="mb-4 space-y-2">
                           {validationErrors.map((err, index) => (
-                            <div key={index} className="flex items-start gap-2 text-sm text-red-700">
+                            <div key={index} className="flex items-start gap-2 text-sm text-danger">
                               <svg className="mt-0.5 h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                               </svg>
                               {err}
                             </div>
                           ))}
-                          <p className="mt-2 text-xs text-red-600">
+                          <p className="mt-2 text-xs text-danger">
                             Go back to Pricing Setup to fix these issues.
                           </p>
                         </div>
@@ -1779,7 +1780,7 @@ export default function ServicesPage() {
                       {validationWarnings.length > 0 && (
                         <div className="mb-4 space-y-2">
                           {validationWarnings.map((warn, index) => (
-                            <div key={index} className="flex items-start gap-2 text-sm text-amber-700">
+                            <div key={index} className="flex items-start gap-2 text-sm text-tertiary">
                               <svg className="mt-0.5 h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                               </svg>
@@ -1792,7 +1793,7 @@ export default function ServicesPage() {
                       {/* Success checks */}
                       {validationErrors.length === 0 && (
                         <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-sm text-green-700">
+                          <div className="flex items-center gap-2 text-sm text-secondary">
                             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
@@ -1800,7 +1801,7 @@ export default function ServicesPage() {
                           </div>
 
                           {formData.suggestedFields.filter(f => f.type === 'number').length > 0 && (
-                            <div className="flex items-center gap-2 text-sm text-green-700">
+                            <div className="flex items-center gap-2 text-sm text-secondary">
                               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
@@ -1809,7 +1810,7 @@ export default function ServicesPage() {
                           )}
 
                           {simulatorResult && (
-                            <div className="flex items-center gap-2 text-sm text-green-700">
+                            <div className="flex items-center gap-2 text-sm text-secondary">
                               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
@@ -1821,7 +1822,7 @@ export default function ServicesPage() {
 
                       {/* Test reminder if not run */}
                       {!simulatorResult && validationErrors.length === 0 && (
-                        <div className="mt-3 flex items-center gap-2 text-sm text-gray-500">
+                        <div className="mt-3 flex items-center gap-2 text-sm text-text-muted">
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
@@ -1834,13 +1835,13 @@ export default function ServicesPage() {
               </div>
 
               {/* Modal Footer - Wizard Navigation */}
-              <div className="flex justify-between border-t bg-gray-50 px-6 py-4">
+              <div className="flex justify-between border-t border-border bg-surface/50 px-6 py-4">
                 <div>
                   {isFirstStep ? (
                     <button
                       type="button"
                       onClick={closeModal}
-                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      className="rounded-lg border border-border bg-background px-5 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
                     >
                       Cancel
                     </button>
@@ -1848,7 +1849,7 @@ export default function ServicesPage() {
                     <button
                       type="button"
                       onClick={goToPreviousStep}
-                      className="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      className="inline-flex items-center rounded-lg border border-border bg-background px-5 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
                     >
                       <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -1863,7 +1864,7 @@ export default function ServicesPage() {
                       type="submit"
                       disabled={saving || !formData.name.trim() || !canPublish}
                       onClick={() => { submitIntentRef.current = true }}
-                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
                       title={!canPublish ? 'Fix validation errors before publishing' : undefined}
                     >
                       {saving ? 'Saving...' : editingService ? 'Save Changes' : 'Create Service'}
@@ -1873,7 +1874,7 @@ export default function ServicesPage() {
                       type="button"
                       onClick={goToNextStep}
                       disabled={generatingDraft}
-                      className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                      className="inline-flex items-center rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
                     >
                       {generatingDraft ? (
                         <>

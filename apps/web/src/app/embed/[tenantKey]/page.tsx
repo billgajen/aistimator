@@ -435,10 +435,10 @@ function ProgressIndicator({ steps, currentStep }: { steps: string[]; currentSte
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
                     isCompleted
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-primary text-white'
                       : isActive
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 text-gray-500'
+                        ? 'bg-primary text-white'
+                        : 'bg-gray-200 text-text-muted'
                   }`}
                 >
                   {isCompleted ? (
@@ -455,7 +455,7 @@ function ProgressIndicator({ steps, currentStep }: { steps: string[]; currentSte
                 </div>
                 <span
                   className={`text-xs mt-1 ${
-                    isActive || isCompleted ? 'text-blue-600 font-medium' : 'text-gray-500'
+                    isActive || isCompleted ? 'text-primary font-medium' : 'text-text-muted'
                   }`}
                 >
                   {label}
@@ -466,7 +466,7 @@ function ProgressIndicator({ steps, currentStep }: { steps: string[]; currentSte
               {index < steps.length - 1 && (
                 <div
                   className={`flex-1 h-0.5 mx-2 ${
-                    index < currentStep ? 'bg-blue-600' : 'bg-gray-200'
+                    index < currentStep ? 'bg-primary' : 'bg-gray-200'
                   }`}
                 />
               )}
@@ -482,7 +482,7 @@ function LoadingState() {
   return (
     <div className="flex flex-col items-center justify-center py-12">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-      <p className="text-gray-500 text-sm">Loading...</p>
+      <p className="text-text-muted text-sm">Loading...</p>
     </div>
   )
 }
@@ -501,13 +501,13 @@ function ErrorState({
   return (
     <div className="text-center py-12 px-4">
       <div className="text-4xl mb-4">⚠️</div>
-      <p className="text-gray-600 mb-4">{message || 'Something went wrong'}</p>
+      <p className="text-text-secondary mb-4">{message || 'Something went wrong'}</p>
 
       {suggestedService && onSelectSuggested && (
         <div className="mb-4">
           <button
             onClick={onSelectSuggested}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover"
           >
             Switch to &quot;{suggestedService.name}&quot; and Submit
           </button>
@@ -516,7 +516,7 @@ function ErrorState({
 
       <button
         onClick={onRetry}
-        className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+        className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-gray-50"
       >
         Start Over
       </button>
@@ -535,14 +535,14 @@ function ServiceStep({
 }) {
   return (
     <div className="p-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-1">{tenantName}</h2>
-      <p className="text-sm text-gray-500 mb-4">Select a service to get started</p>
+      <h2 className="text-lg font-semibold text-text-primary mb-1">{tenantName}</h2>
+      <p className="text-sm text-text-muted mb-4">Select a service to get started</p>
       <div className="space-y-2">
         {services.map((service) => (
           <button
             key={service.id}
             onClick={() => onSelect(service.id)}
-            className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+            className="w-full text-left px-4 py-3 border border-border rounded-lg hover:border-blue-500 hover:bg-primary-light transition-colors"
           >
             {service.name}
           </button>
@@ -629,15 +629,15 @@ function DetailsStep({
   }
 
   const inputErrorClass = 'border-red-300 focus:ring-red-500 focus:border-red-500'
-  const inputNormalClass = 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+  const inputNormalClass = 'border-border focus:ring-primary/30 focus:border-primary'
 
   return (
     <div className="p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Job Details</h3>
+      <h3 className="text-lg font-semibold text-text-primary mb-4">Job Details</h3>
 
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+          <label className="block text-sm font-medium text-text-secondary mb-1">Address</label>
           <input
             type="text"
             value={jobAddress}
@@ -648,7 +648,7 @@ function DetailsStep({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Postcode / ZIP</label>
+          <label className="block text-sm font-medium text-text-secondary mb-1">Postcode / ZIP</label>
           <input
             type="text"
             value={jobPostcode}
@@ -661,7 +661,7 @@ function DetailsStep({
         {/* Quantity field - shown when measurement model asks for customer quantity */}
         {measurementModel?.type === 'per_unit' && measurementModel.askCustomerForQuantity && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-text-secondary mb-1">
               {measurementModel.unitLabel || getUnitLabel(measurementModel.unit)}
             </label>
             <input
@@ -673,14 +673,14 @@ function DetailsStep({
               placeholder={`Enter ${measurementModel.unit || 'quantity'}`}
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 ${inputNormalClass}`}
             />
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-text-muted">
               This helps us provide a more accurate estimate
             </p>
           </div>
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-text-secondary mb-1">
             Project Description <span className="text-red-500">*</span>
           </label>
           <textarea
@@ -690,7 +690,7 @@ function DetailsStep({
             rows={4}
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 ${inputNormalClass}`}
           />
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-text-muted">
             The more detail you provide, the more accurate your quote will be.
           </p>
         </div>
@@ -701,7 +701,7 @@ function DetailsStep({
 
           return (
             <div key={field.fieldId}>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-text-secondary mb-1">
                 {field.label}
                 {field.required && <span className="text-red-500 ml-1">*</span>}
               </label>
@@ -770,9 +770,9 @@ function DetailsStep({
                         value={opt.value}
                         checked={(answers[field.fieldId] as string) === opt.value}
                         onChange={(e) => onFieldChange(field.fieldId, e.target.value)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                        className="w-4 h-4 text-primary border-border focus:ring-primary/30"
                       />
-                      <span className="text-sm text-gray-700">{opt.label}</span>
+                      <span className="text-sm text-text-secondary">{opt.label}</span>
                     </label>
                   ))}
                 </div>
@@ -789,9 +789,9 @@ function DetailsStep({
                           type="checkbox"
                           checked={currentValues.includes(opt.value)}
                           onChange={(e) => handleCheckboxChange(field.fieldId, opt.value, e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="w-4 h-4 rounded border-border text-primary focus:ring-primary/30"
                         />
-                        <span className="text-sm text-gray-700">{opt.label}</span>
+                        <span className="text-sm text-text-secondary">{opt.label}</span>
                       </label>
                     )
                   })}
@@ -805,20 +805,20 @@ function DetailsStep({
                     type="checkbox"
                     checked={(answers[field.fieldId] as boolean) || false}
                     onChange={(e) => onFieldChange(field.fieldId, e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary/30"
                   />
-                  <span className="text-sm text-gray-600">{field.helpText || 'Yes'}</span>
+                  <span className="text-sm text-text-secondary">{field.helpText || 'Yes'}</span>
                 </label>
               )}
 
               {/* Help text */}
               {field.helpText && field.type !== 'boolean' && (
-                <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>
+                <p className="text-xs text-text-muted mt-1">{field.helpText}</p>
               )}
 
               {/* Error message */}
               {hasError && (
-                <p className="text-xs text-red-600 mt-1">{errors[field.fieldId]}</p>
+                <p className="text-xs text-danger mt-1">{errors[field.fieldId]}</p>
               )}
             </div>
           )
@@ -829,14 +829,14 @@ function DetailsStep({
         {onBack && (
           <button
             onClick={onBack}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-gray-50"
           >
             Back
           </button>
         )}
         <button
           onClick={handleContinue}
-          className="flex-1 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="flex-1 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover"
         >
           Continue
         </button>
@@ -987,8 +987,8 @@ function FileUploadStep({
 
   return (
     <div className="p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">Photos & Documents</h3>
-      <p className="text-sm text-gray-600 mb-2">
+      <h3 className="text-lg font-semibold text-text-primary mb-2">Photos & Documents</h3>
+      <p className="text-sm text-text-secondary mb-2">
         {minPhotos > 0
           ? `Add at least ${minPhotos} photo${minPhotos > 1 ? 's' : ''} of the job`
           : 'Add photos or documents (optional)'}
@@ -996,7 +996,7 @@ function FileUploadStep({
 
       {/* Photo guidance from service configuration */}
       {photoGuidance && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mb-4 p-3 bg-primary-light border border-primary/20 rounded-lg">
           <p className="text-sm text-blue-800">{photoGuidance}</p>
         </div>
       )}
@@ -1018,7 +1018,7 @@ function FileUploadStep({
               <div className="w-full h-full flex items-center justify-center">
                 <div className="text-center">
                   <span className="text-2xl">📄</span>
-                  <p className="text-xs text-gray-500 mt-1 px-1 truncate">{file.file.name}</p>
+                  <p className="text-xs text-text-muted mt-1 px-1 truncate">{file.file.name}</p>
                 </div>
               </div>
             )}
@@ -1050,7 +1050,7 @@ function FileUploadStep({
 
         {/* Add button */}
         {(canAddPhotos || canAddDocs) && (
-          <label className="aspect-square bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:bg-gray-50">
+          <label className="aspect-square bg-gray-100 rounded-lg border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-gray-50">
             <input
               ref={fileInputRef}
               type="file"
@@ -1063,15 +1063,15 @@ function FileUploadStep({
               className="hidden"
             />
             <div className="text-center">
-              <span className="text-2xl text-gray-400">+</span>
-              <p className="text-xs text-gray-400 mt-1">Add</p>
+              <span className="text-2xl text-text-muted">+</span>
+              <p className="text-xs text-text-muted mt-1">Add</p>
             </div>
           </label>
         )}
       </div>
 
       {/* Status text */}
-      <p className="text-xs text-gray-500 mb-4">
+      <p className="text-xs text-text-muted mb-4">
         {photoCount} of {maxPhotos} photos
         {maxDocs > 0 && ` | ${docCount} of ${maxDocs} documents`}
       </p>
@@ -1086,14 +1086,14 @@ function FileUploadStep({
       <div className="flex gap-3 mt-6">
         <button
           onClick={onBack}
-          className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+          className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-gray-50"
         >
           Back
         </button>
         <button
           onClick={onNext}
           disabled={!canContinue}
-          className="flex-1 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Continue
         </button>
@@ -1125,11 +1125,11 @@ function ContactStep({
 
   return (
     <div className="p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Contact Details</h3>
+      <h3 className="text-lg font-semibold text-text-primary mb-4">Your Contact Details</h3>
 
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-text-secondary mb-1">
             Name <span className="text-red-500">*</span>
           </label>
           <input
@@ -1137,12 +1137,12 @@ function ContactStep({
             value={name}
             onChange={(e) => onNameChange(e.target.value)}
             placeholder="John Smith"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-text-secondary mb-1">
             Email <span className="text-red-500">*</span>
           </label>
           <input
@@ -1150,18 +1150,18 @@ function ContactStep({
             value={email}
             onChange={(e) => onEmailChange(e.target.value)}
             placeholder="john@example.com"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
+          <label className="block text-sm font-medium text-text-secondary mb-1">Phone (optional)</label>
           <input
             type="tel"
             value={phone}
             onChange={(e) => onPhoneChange(e.target.value)}
             placeholder="+44 7700 900000"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary"
           />
         </div>
       </div>
@@ -1169,14 +1169,14 @@ function ContactStep({
       <div className="flex gap-3 mt-6">
         <button
           onClick={onBack}
-          className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+          className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-gray-50"
         >
           Back
         </button>
         <button
           onClick={onSubmit}
           disabled={!isValid}
-          className="flex-1 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Get Quote
         </button>
@@ -1189,7 +1189,7 @@ function SubmittingState() {
   return (
     <div className="flex flex-col items-center justify-center py-12">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-      <p className="text-gray-500 text-sm">Submitting your request...</p>
+      <p className="text-text-muted text-sm">Submitting your request...</p>
     </div>
   )
 }
@@ -1198,17 +1198,17 @@ function SuccessState({ quoteUrl }: { quoteUrl: string }) {
   return (
     <div className="text-center py-12 px-6">
       <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-        <span className="text-green-600 text-2xl">✓</span>
+        <span className="text-secondary text-2xl">✓</span>
       </div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">Request Submitted!</h3>
-      <p className="text-sm text-gray-600 mb-6">
+      <h3 className="text-lg font-semibold text-text-primary mb-2">Request Submitted!</h3>
+      <p className="text-sm text-text-secondary mb-6">
         We&apos;re preparing your quote. You&apos;ll receive it shortly.
       </p>
       <a
         href={quoteUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        className="inline-block px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover"
       >
         View Your Quote
       </a>

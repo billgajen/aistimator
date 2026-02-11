@@ -48,14 +48,14 @@ export default function AdminActivityPage() {
 
   const getActionBadge = (action: string) => {
     const styles: Record<string, string> = {
-      view: 'bg-blue-100 text-blue-800',
-      retry: 'bg-yellow-100 text-yellow-800',
-      update: 'bg-green-100 text-green-800',
-      delete: 'bg-red-100 text-red-800',
+      view: 'bg-primary-light text-primary',
+      retry: 'bg-tertiary-light text-tertiary',
+      update: 'bg-secondary-light text-secondary',
+      delete: 'bg-danger-light text-danger',
     }
     return (
       <span
-        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${styles[action] || 'bg-gray-100 text-gray-800'}`}
+        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${styles[action] || 'bg-background text-text-primary'}`}
       >
         {action}
       </span>
@@ -64,14 +64,14 @@ export default function AdminActivityPage() {
 
   const getResourceBadge = (type: string) => {
     const styles: Record<string, string> = {
-      quote: 'bg-purple-100 text-purple-800',
+      quote: 'bg-primary-light text-primary',
       tenant: 'bg-cyan-100 text-cyan-800',
-      user: 'bg-orange-100 text-orange-800',
+      user: 'bg-tertiary-light text-tertiary',
       subscription: 'bg-teal-100 text-teal-800',
     }
     return (
       <span
-        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${styles[type] || 'bg-gray-100 text-gray-800'}`}
+        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${styles[type] || 'bg-background text-text-primary'}`}
       >
         {type}
       </span>
@@ -80,8 +80,8 @@ export default function AdminActivityPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">Activity Log</h1>
-      <p className="mt-2 text-gray-600">Audit trail of admin actions.</p>
+      <h1 className="text-2xl font-bold text-text-primary">Activity Log</h1>
+      <p className="mt-2 text-text-secondary">Audit trail of admin actions.</p>
 
       {/* Filters */}
       <div className="mt-6 flex gap-4">
@@ -91,7 +91,7 @@ export default function AdminActivityPage() {
             setResourceFilter(e.target.value)
             setActivities([])
           }}
-          className="rounded-md border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="rounded-warm-lg border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
         >
           <option value="">All resources</option>
           <option value="quote">Quotes</option>
@@ -102,48 +102,48 @@ export default function AdminActivityPage() {
       </div>
 
       {/* Error State */}
-      {error && <div className="mt-4 rounded-lg bg-red-50 p-4 text-red-600">{error}</div>}
+      {error && <div className="mt-4 rounded-warm-lg bg-danger-light p-4 text-danger">{error}</div>}
 
       {/* Results Table */}
-      <div className="mt-6 overflow-hidden rounded-lg bg-white shadow">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="mt-6 overflow-hidden rounded-warm-lg bg-surface shadow">
+        <table className="min-w-full divide-y divide-border">
+          <thead className="bg-background">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-text-muted">
                 Timestamp
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-text-muted">
                 Admin
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-text-muted">
                 Action
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-text-muted">
                 Resource
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-text-muted">
                 Resource ID
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-text-muted">
                 Details
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-border">
             {activities.map((activity) => (
-              <tr key={activity.id} className="hover:bg-gray-50">
-                <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+              <tr key={activity.id} className="hover:bg-background">
+                <td className="whitespace-nowrap px-4 py-3 text-sm text-text-muted">
                   {new Date(activity.created_at).toLocaleString()}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3">
-                  <code className="text-xs text-gray-600">{activity.admin_user_id.slice(0, 8)}...</code>
+                  <code className="text-xs text-text-secondary">{activity.admin_user_id.slice(0, 8)}...</code>
                 </td>
                 <td className="px-4 py-3">{getActionBadge(activity.action)}</td>
                 <td className="px-4 py-3">{getResourceBadge(activity.resource_type)}</td>
                 <td className="whitespace-nowrap px-4 py-3">
-                  <code className="text-sm text-gray-600">{activity.resource_id}</code>
+                  <code className="text-sm text-text-secondary">{activity.resource_id}</code>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
+                <td className="px-4 py-3 text-sm text-text-muted">
                   {Object.keys(activity.details_json || {}).length > 0
                     ? JSON.stringify(activity.details_json)
                     : '-'}
@@ -153,7 +153,7 @@ export default function AdminActivityPage() {
 
             {activities.length === 0 && !loading && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={6} className="px-4 py-8 text-center text-text-muted">
                   No activity logged yet
                 </td>
               </tr>
@@ -164,7 +164,7 @@ export default function AdminActivityPage() {
         {/* Loading */}
         {loading && (
           <div className="flex items-center justify-center py-8">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           </div>
         )}
 
@@ -173,7 +173,7 @@ export default function AdminActivityPage() {
           <div className="border-t p-4 text-center">
             <button
               onClick={() => fetchActivities(nextCursor, true)}
-              className="text-blue-600 hover:underline"
+              className="text-primary hover:underline"
             >
               Load more
             </button>

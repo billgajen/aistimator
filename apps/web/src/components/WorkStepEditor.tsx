@@ -226,15 +226,15 @@ export function WorkStepEditor({
   return (
     <div className="space-y-3">
       {workSteps.length === 0 ? (
-        <div className="rounded-lg border-2 border-dashed border-gray-300 p-4 text-center">
-          <p className="text-sm text-gray-500">No pricing items defined yet</p>
-          <p className="mb-2 text-xs text-gray-400">
+        <div className="rounded-warm-lg border-2 border-dashed border-border p-4 text-center">
+          <p className="text-sm text-text-muted">No pricing items defined yet</p>
+          <p className="mb-2 text-xs text-text-muted">
             Add items that will appear as lines on your quote
           </p>
           <button
             type="button"
             onClick={addStep}
-            className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+            className="mt-2 text-sm font-medium text-primary hover:text-primary"
           >
             Add your first line item
           </button>
@@ -248,7 +248,7 @@ export function WorkStepEditor({
             return (
               <div
                 key={step.id}
-                className={`rounded-lg border bg-white ${hasQuantityIssue ? 'border-amber-300' : 'border-gray-200'}`}
+                className={`rounded-warm-lg border bg-surface ${hasQuantityIssue ? 'border-amber-300' : 'border-border'}`}
               >
                 {/* Step Header */}
                 <div
@@ -266,7 +266,7 @@ export function WorkStepEditor({
                           moveStep(index, 'up')
                         }}
                         disabled={index === 0}
-                        className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                        className="text-text-muted hover:text-text-secondary disabled:opacity-30"
                       >
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -279,7 +279,7 @@ export function WorkStepEditor({
                           moveStep(index, 'down')
                         }}
                         disabled={index === workSteps.length - 1}
-                        className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                        className="text-text-muted hover:text-text-secondary disabled:opacity-30"
                       >
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -287,20 +287,20 @@ export function WorkStepEditor({
                       </button>
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">
-                        {step.name || <span className="italic text-gray-400">Unnamed Item</span>}
+                      <p className="font-medium text-text-primary">
+                        {step.name || <span className="italic text-text-muted">Unnamed Item</span>}
                       </p>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-text-muted">
                         {step.costType === 'fixed' && `$${step.defaultCost.toFixed(2)}`}
                         {step.costType === 'per_unit' && (
                           <>
                             ${step.defaultCost.toFixed(2)} × {' '}
                             {step.quantitySource?.type === 'form_field' && step.quantitySource.fieldId ? (
-                              <span className="text-blue-600">
+                              <span className="text-primary">
                                 {suggestedFields.find(f => f.fieldId === step.quantitySource?.fieldId)?.label || 'question'}
                               </span>
                             ) : step.quantitySource?.type === 'constant' ? (
-                              <span className="text-green-600">{step.quantitySource.value}</span>
+                              <span className="text-secondary">{step.quantitySource.value}</span>
                             ) : step.quantitySource?.type === 'ai_signal' ? (
                               <span className="text-amber-600">AI (legacy)</span>
                             ) : (
@@ -312,17 +312,17 @@ export function WorkStepEditor({
                           <>
                             ${step.defaultCost.toFixed(2)}/hr × {' '}
                             {step.quantitySource?.type === 'form_field' && step.quantitySource.fieldId ? (
-                              <span className="text-blue-600">
+                              <span className="text-primary">
                                 {suggestedFields.find(f => f.fieldId === step.quantitySource?.fieldId)?.label || 'hours'}
                               </span>
                             ) : step.quantitySource?.type === 'constant' ? (
-                              <span className="text-green-600">{step.quantitySource.value}h</span>
+                              <span className="text-secondary">{step.quantitySource.value}h</span>
                             ) : (
-                              <span className="text-gray-400">1h default</span>
+                              <span className="text-text-muted">1h default</span>
                             )}
                           </>
                         )}
-                        {step.optional && <span className="text-gray-400"> (optional)</span>}
+                        {step.optional && <span className="text-text-muted"> (optional)</span>}
                       </p>
                     </div>
                   </div>
@@ -338,7 +338,7 @@ export function WorkStepEditor({
                         e.stopPropagation()
                         removeStep(step.id)
                       }}
-                      className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                      className="rounded p-1 text-text-muted hover:bg-danger-light hover:text-danger"
                     >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path
@@ -350,7 +350,7 @@ export function WorkStepEditor({
                       </svg>
                     </button>
                     <svg
-                      className={`h-5 w-5 text-gray-400 transition-transform ${
+                      className={`h-5 w-5 text-text-muted transition-transform ${
                         expandedStep === step.id ? 'rotate-180' : ''
                       }`}
                       fill="none"
@@ -364,13 +364,13 @@ export function WorkStepEditor({
 
                 {/* Auto-link Suggestion Banner */}
                 {suggestion && expandedStep !== step.id && (
-                  <div className="border-t border-blue-100 bg-blue-50 px-4 py-2">
+                  <div className="border-t border-primary/20 bg-primary-light px-4 py-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <svg className="h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        <span className="text-sm text-blue-700">
+                        <span className="text-sm text-primary">
                           Link to &quot;{suggestion.label}&quot;?
                         </span>
                       </div>
@@ -381,7 +381,7 @@ export function WorkStepEditor({
                             e.stopPropagation()
                             acceptAutoLink(step.id, suggestion)
                           }}
-                          className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700"
+                          className="rounded bg-primary px-2 py-1 text-xs font-medium text-white hover:bg-primary-hover"
                         >
                           Yes, link it
                         </button>
@@ -391,7 +391,7 @@ export function WorkStepEditor({
                             e.stopPropagation()
                             setAutoLinkSuggestions(prev => ({ ...prev, [step.id]: null }))
                           }}
-                          className="rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-100"
+                          className="rounded px-2 py-1 text-xs text-primary hover:bg-primary-light"
                         >
                           No
                         </button>
@@ -402,18 +402,18 @@ export function WorkStepEditor({
 
                 {/* Step Details (Expanded) */}
                 {expandedStep === step.id && (
-                  <div className="space-y-4 border-t border-gray-100 px-4 py-4">
+                  <div className="space-y-4 border-t border-border px-4 py-4">
                     {/* Auto-link Suggestion (when expanded) */}
                     {suggestion && (
-                      <div className="rounded-md bg-blue-50 p-3">
+                      <div className="rounded-warm-lg bg-primary-light p-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <svg className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
                             <div>
-                              <p className="text-sm font-medium text-blue-800">We found a matching question!</p>
-                              <p className="text-sm text-blue-600">
+                              <p className="text-sm font-medium text-primary">We found a matching question!</p>
+                              <p className="text-sm text-primary">
                                 Link &quot;{step.name}&quot; to &quot;{suggestion.label}&quot;?
                               </p>
                             </div>
@@ -422,14 +422,14 @@ export function WorkStepEditor({
                             <button
                               type="button"
                               onClick={() => acceptAutoLink(step.id, suggestion)}
-                              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                              className="rounded-warm-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
                             >
                               Yes, link it
                             </button>
                             <button
                               type="button"
                               onClick={() => setAutoLinkSuggestions(prev => ({ ...prev, [step.id]: null }))}
-                              className="rounded-md px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-100"
+                              className="rounded-warm-lg px-3 py-1.5 text-sm text-primary hover:bg-primary-light"
                             >
                               No thanks
                             </button>
@@ -440,7 +440,7 @@ export function WorkStepEditor({
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                        <label className="mb-1 block text-sm font-medium text-text-secondary">
                           Item Name *
                         </label>
                         <input
@@ -448,11 +448,11 @@ export function WorkStepEditor({
                           value={step.name}
                           onChange={(e) => updateStep(step.id, { name: e.target.value })}
                           placeholder="e.g., Bedroom Cleaning"
-                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                        <label className="mb-1 block text-sm font-medium text-text-secondary">
                           Pricing Type
                         </label>
                         <select
@@ -475,7 +475,7 @@ export function WorkStepEditor({
 
                             updateStep(step.id, updates)
                           }}
-                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         >
                           {COST_TYPES.map((type) => (
                             <option key={type.value} value={type.value}>
@@ -483,7 +483,7 @@ export function WorkStepEditor({
                             </option>
                           ))}
                         </select>
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-text-muted">
                           {COST_TYPES.find(t => t.value === step.costType)?.description}
                         </p>
                       </div>
@@ -491,11 +491,11 @@ export function WorkStepEditor({
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                        <label className="mb-1 block text-sm font-medium text-text-secondary">
                           {step.costType === 'fixed' ? 'Amount' : step.costType === 'per_hour' ? 'Hourly Rate' : 'Price Per Unit'}
                         </label>
                         <div className="relative">
-                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
+                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-text-muted">$</span>
                           <input
                             type="number"
                             min={0}
@@ -506,7 +506,7 @@ export function WorkStepEditor({
                                 defaultCost: parseFloat(e.target.value) || 0,
                               })
                             }
-                            className="w-full rounded-md border border-gray-300 py-2 pl-7 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full rounded-warm-lg border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                           />
                         </div>
                       </div>
@@ -514,14 +514,14 @@ export function WorkStepEditor({
                       {/* Multiply By - Only for per_unit and per_hour */}
                       {(step.costType === 'per_unit' || step.costType === 'per_hour') && (
                         <div>
-                          <label className="mb-1 block text-sm font-medium text-gray-700">
+                          <label className="mb-1 block text-sm font-medium text-text-secondary">
                             Multiply by
                           </label>
                           <select
                             value={getMultiplyByValue(step)}
                             onChange={(e) => handleMultiplyByChange(step.id, e.target.value)}
-                            className={`w-full rounded-md border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                              !step.quantitySource ? 'border-amber-300 bg-amber-50' : 'border-gray-300'
+                            className={`w-full rounded-warm-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 ${
+                              !step.quantitySource ? 'border-amber-300 bg-amber-50' : 'border-border'
                             }`}
                           >
                             <option value="">Select what to multiply by...</option>
@@ -565,7 +565,7 @@ export function WorkStepEditor({
                           )}
 
                           {numberQuestions.length === 0 && !step.quantitySource && (
-                            <p className="mt-1 text-xs text-gray-500">
+                            <p className="mt-1 text-xs text-text-muted">
                               Tip: Add a number question in Customer Questions to link here
                             </p>
                           )}
@@ -576,7 +576,7 @@ export function WorkStepEditor({
                     {/* Unit Label - Only for per_unit */}
                     {step.costType === 'per_unit' && step.quantitySource && (
                       <div className="max-w-xs">
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                        <label className="mb-1 block text-sm font-medium text-text-secondary">
                           Unit Label (optional)
                         </label>
                         <input
@@ -584,9 +584,9 @@ export function WorkStepEditor({
                           value={step.unitLabel || ''}
                           onChange={(e) => updateStep(step.id, { unitLabel: e.target.value || undefined })}
                           placeholder="e.g., bedrooms, sq ft, items"
-                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         />
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-text-muted">
                           Shown on the quote (e.g., &quot;3 bedrooms × $25&quot;)
                         </p>
                       </div>
@@ -601,21 +601,21 @@ export function WorkStepEditor({
                           onChange={(e) =>
                             updateStep(step.id, { optional: e.target.checked })
                           }
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
                         />
-                        <span className="text-sm text-gray-700">Only include when condition is met</span>
+                        <span className="text-sm text-text-secondary">Only include when condition is met</span>
                       </label>
                     </div>
 
                     {/* Optional Step Trigger */}
                     {step.optional && (
-                      <div className="rounded-md bg-gray-50 p-3">
-                        <p className="mb-2 text-sm font-medium text-gray-700">
+                      <div className="rounded-warm-lg bg-background p-3">
+                        <p className="mb-2 text-sm font-medium text-text-secondary">
                           When to include this item
                         </p>
                         <div className="grid grid-cols-3 gap-3">
                           <div>
-                            <label className="mb-1 block text-xs text-gray-600">
+                            <label className="mb-1 block text-xs text-text-secondary">
                               Question
                             </label>
                             <select
@@ -625,7 +625,7 @@ export function WorkStepEditor({
                                   triggerSignal: e.target.value || undefined,
                                 })
                               }
-                              className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="w-full rounded-warm-lg border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                             >
                               <option value="">Select question...</option>
                               {expectedSignals.map((sig) => (
@@ -636,7 +636,7 @@ export function WorkStepEditor({
                             </select>
                           </div>
                           <div>
-                            <label className="mb-1 block text-xs text-gray-600">
+                            <label className="mb-1 block text-xs text-text-secondary">
                               Condition
                             </label>
                             <select
@@ -649,7 +649,7 @@ export function WorkStepEditor({
                                   },
                                 })
                               }
-                              className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="w-full rounded-warm-lg border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                             >
                               {OPERATORS.map((op) => (
                                 <option key={op.value} value={op.value}>
@@ -661,7 +661,7 @@ export function WorkStepEditor({
                           {step.triggerCondition?.operator &&
                             !['exists', 'not_exists'].includes(step.triggerCondition.operator) && (
                             <div>
-                              <label className="mb-1 block text-xs text-gray-600">
+                              <label className="mb-1 block text-xs text-text-secondary">
                                 Value
                               </label>
                               <input
@@ -676,7 +676,7 @@ export function WorkStepEditor({
                                   })
                                 }
                                 placeholder="Value"
-                                className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full rounded-warm-lg border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                               />
                             </div>
                           )}
@@ -686,7 +686,7 @@ export function WorkStepEditor({
 
                     {/* Description */}
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                      <label className="mb-1 block text-sm font-medium text-text-secondary">
                         Description (optional)
                       </label>
                       <input
@@ -694,17 +694,17 @@ export function WorkStepEditor({
                         value={step.description}
                         onChange={(e) => updateStep(step.id, { description: e.target.value })}
                         placeholder="Brief note about this item"
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                       />
                     </div>
 
                     {/* Advanced Options Toggle */}
                     {(step.costType === 'per_unit' || step.costType === 'per_hour') && expectedSignals.filter(s => s.type === 'number').length > 0 && (
-                      <div className="border-t border-gray-100 pt-3">
+                      <div className="border-t border-border pt-3">
                         <button
                           type="button"
                           onClick={() => setShowAdvanced(prev => ({ ...prev, [step.id]: !prev[step.id] }))}
-                          className="text-xs text-gray-500 hover:text-gray-700"
+                          className="text-xs text-text-muted hover:text-text-primary"
                         >
                           {showAdvanced[step.id] ? 'Hide' : 'Show'} advanced options
                         </button>
@@ -723,7 +723,7 @@ export function WorkStepEditor({
         <button
           type="button"
           onClick={addStep}
-          className="inline-flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-gray-400 hover:text-gray-700"
+          className="inline-flex w-full items-center justify-center gap-1 rounded-warm-lg border border-dashed border-border px-3 py-2 text-sm text-text-secondary hover:border-border-strong hover:text-text-primary"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

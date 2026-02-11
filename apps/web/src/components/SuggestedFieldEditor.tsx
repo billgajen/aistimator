@@ -110,15 +110,15 @@ export function SuggestedFieldEditor({
   return (
     <div className="space-y-3">
       {fields.length === 0 ? (
-        <div className="rounded-lg border-2 border-dashed border-gray-300 p-4 text-center">
-          <p className="text-sm text-gray-500">No questions defined yet</p>
-          <p className="mb-2 text-xs text-gray-400">
+        <div className="rounded-warm-lg border-2 border-dashed border-border p-4 text-center">
+          <p className="text-sm text-text-muted">No questions defined yet</p>
+          <p className="mb-2 text-xs text-text-muted">
             Add questions to collect information for accurate pricing
           </p>
           <button
             type="button"
             onClick={addField}
-            className="text-sm font-medium text-blue-600 hover:text-blue-700"
+            className="text-sm font-medium text-primary hover:text-primary"
           >
             Add your first question
           </button>
@@ -128,7 +128,7 @@ export function SuggestedFieldEditor({
           {fields.map((field, index) => (
             <div
               key={index}
-              className="rounded-lg border border-gray-200 bg-white"
+              className="rounded-warm-lg border border-border bg-surface"
             >
               {/* Field Header */}
               <div
@@ -146,7 +146,7 @@ export function SuggestedFieldEditor({
                         moveField(index, 'up')
                       }}
                       disabled={index === 0}
-                      className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                      className="text-text-muted hover:text-text-secondary disabled:opacity-30"
                     >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -159,7 +159,7 @@ export function SuggestedFieldEditor({
                         moveField(index, 'down')
                       }}
                       disabled={index === fields.length - 1}
-                      className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                      className="text-text-muted hover:text-text-secondary disabled:opacity-30"
                     >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -167,19 +167,19 @@ export function SuggestedFieldEditor({
                     </button>
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">
-                      {field.label || <span className="italic text-gray-400">Unnamed Field</span>}
-                      {field.required && <span className="ml-1 text-red-500">*</span>}
+                    <p className="font-medium text-text-primary">
+                      {field.label || <span className="italic text-text-muted">Unnamed Field</span>}
+                      {field.required && <span className="ml-1 text-danger">*</span>}
                       {field.criticalForPricing && (
-                        <span className="ml-2 rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700">
+                        <span className="ml-2 rounded-full bg-tertiary-light px-2 py-0.5 text-xs text-tertiary">
                           Critical
                         </span>
                       )}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-text-muted">
                       {FIELD_TYPES.find((t) => t.value === field.type)?.label || field.type}
                       {needsOptions(field.type) && field.options && (
-                        <span className="ml-1 text-gray-400">
+                        <span className="ml-1 text-text-muted">
                           ({field.options.length} options)
                         </span>
                       )}
@@ -193,7 +193,7 @@ export function SuggestedFieldEditor({
                       e.stopPropagation()
                       removeField(index)
                     }}
-                    className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                    className="rounded p-1 text-text-muted hover:bg-danger-light hover:text-danger"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
@@ -205,7 +205,7 @@ export function SuggestedFieldEditor({
                     </svg>
                   </button>
                   <svg
-                    className={`h-5 w-5 text-gray-400 transition-transform ${
+                    className={`h-5 w-5 text-text-muted transition-transform ${
                       expandedField === String(index) ? 'rotate-180' : ''
                     }`}
                     fill="none"
@@ -219,10 +219,10 @@ export function SuggestedFieldEditor({
 
               {/* Field Details (Expanded) */}
               {expandedField === String(index) && (
-                <div className="space-y-4 border-t border-gray-100 px-4 py-4">
+                <div className="space-y-4 border-t border-border px-4 py-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                      <label className="mb-1 block text-sm font-medium text-text-secondary">
                         Label *
                       </label>
                       <input
@@ -235,11 +235,11 @@ export function SuggestedFieldEditor({
                           })
                         }}
                         placeholder="e.g., Number of Rooms"
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                      <label className="mb-1 block text-sm font-medium text-text-secondary">
                         Field Type
                       </label>
                       <select
@@ -252,7 +252,7 @@ export function SuggestedFieldEditor({
                               : undefined,
                           })
                         }
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                       >
                         {FIELD_TYPES.map((type) => (
                           <option key={type.value} value={type.value}>
@@ -264,7 +264,7 @@ export function SuggestedFieldEditor({
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label className="mb-1 block text-sm font-medium text-text-secondary">
                       Help Text
                     </label>
                     <input
@@ -272,28 +272,28 @@ export function SuggestedFieldEditor({
                       value={field.helpText || ''}
                       onChange={(e) => updateField(index, { helpText: e.target.value || undefined })}
                       placeholder="Instructions for the customer"
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                   </div>
 
                   {/* Options for dropdown/radio/checkbox */}
                   {needsOptions(field.type) && (
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                      <label className="mb-1 block text-sm font-medium text-text-secondary">
                         Options
                       </label>
-                      <div className="min-h-[60px] rounded-md border border-gray-300 p-2">
+                      <div className="min-h-[60px] rounded-warm-lg border border-border p-2">
                         <div className="flex flex-wrap gap-2">
                           {field.options?.map((option, optionIndex) => (
                             <span
                               key={optionIndex}
-                              className="inline-flex items-center gap-1 rounded-md bg-blue-100 px-2 py-1 text-sm text-blue-800"
+                              className="inline-flex items-center gap-1 rounded-warm-lg bg-primary-light px-2 py-1 text-sm text-primary"
                             >
                               {option}
                               <button
                                 type="button"
                                 onClick={() => removeOption(index, optionIndex)}
-                                className="text-blue-600 hover:text-blue-800"
+                                className="text-primary hover:text-primary"
                               >
                                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -320,7 +320,7 @@ export function SuggestedFieldEditor({
                           />
                         </div>
                       </div>
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-text-muted">
                         Press Enter to add each option
                       </p>
                     </div>
@@ -332,9 +332,9 @@ export function SuggestedFieldEditor({
                         type="checkbox"
                         checked={field.required}
                         onChange={(e) => updateField(index, { required: e.target.checked })}
-                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
                       />
-                      <span className="text-sm text-gray-700">Required</span>
+                      <span className="text-sm text-text-secondary">Required</span>
                     </label>
                     <label className="flex items-center gap-2">
                       <input
@@ -343,9 +343,9 @@ export function SuggestedFieldEditor({
                         onChange={(e) =>
                           updateField(index, { criticalForPricing: e.target.checked })
                         }
-                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
                       />
-                      <span className="text-sm text-gray-700">Critical for Pricing</span>
+                      <span className="text-sm text-text-secondary">Critical for Pricing</span>
                     </label>
                   </div>
                 </div>
@@ -360,7 +360,7 @@ export function SuggestedFieldEditor({
         <button
           type="button"
           onClick={addField}
-          className="inline-flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-gray-400 hover:text-gray-700"
+          className="inline-flex w-full items-center justify-center gap-1 rounded-warm-lg border border-dashed border-border px-3 py-2 text-sm text-text-secondary hover:border-border-strong hover:text-text-primary"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

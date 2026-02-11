@@ -94,18 +94,18 @@ export default function AdminQuotesPage() {
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      queued: 'bg-gray-100 text-gray-800',
-      generating: 'bg-blue-100 text-blue-800',
-      sent: 'bg-green-100 text-green-800',
+      queued: 'bg-background text-text-primary',
+      generating: 'bg-primary-light text-primary',
+      sent: 'bg-secondary-light text-secondary',
       viewed: 'bg-cyan-100 text-cyan-800',
       accepted: 'bg-emerald-100 text-emerald-800',
       paid: 'bg-teal-100 text-teal-800',
-      failed: 'bg-red-100 text-red-800',
-      expired: 'bg-orange-100 text-orange-800',
+      failed: 'bg-danger-light text-danger',
+      expired: 'bg-tertiary-light text-tertiary',
     }
     return (
       <span
-        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${styles[status] || 'bg-gray-100 text-gray-800'}`}
+        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${styles[status] || 'bg-background text-text-primary'}`}
       >
         {status}
       </span>
@@ -116,14 +116,14 @@ export default function AdminQuotesPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">Quotes</h1>
-      <p className="mt-2 text-gray-600">Search and manage quotes across all tenants.</p>
+      <h1 className="text-2xl font-bold text-text-primary">Quotes</h1>
+      <p className="mt-2 text-text-secondary">Search and manage quotes across all tenants.</p>
 
       {/* Toast */}
       {toast && (
         <div
-          className={`mt-4 rounded-lg p-4 ${
-            toast.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+          className={`mt-4 rounded-warm-lg p-4 ${
+            toast.type === 'success' ? 'bg-secondary-light text-secondary' : 'bg-danger-light text-danger'
           }`}
         >
           {toast.message}
@@ -137,12 +137,12 @@ export default function AdminQuotesPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by quote ID (qte_...) or customer email"
-          className="flex-1 rounded-md border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="flex-1 rounded-warm-lg border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-md border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="rounded-warm-lg border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
         >
           <option value="">All statuses</option>
           <option value="queued">Queued</option>
@@ -156,66 +156,66 @@ export default function AdminQuotesPage() {
         </select>
         <button
           type="submit"
-          className="rounded-md bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"
+          className="rounded-warm-lg bg-primary px-6 py-2 text-white hover:bg-primary-hover"
         >
           Search
         </button>
       </form>
 
       {/* Error State */}
-      {error && <div className="mt-4 rounded-lg bg-red-50 p-4 text-red-600">{error}</div>}
+      {error && <div className="mt-4 rounded-warm-lg bg-danger-light p-4 text-danger">{error}</div>}
 
       {/* Results Table */}
-      <div className="mt-6 overflow-hidden rounded-lg bg-white shadow">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="mt-6 overflow-hidden rounded-warm-lg bg-surface shadow">
+        <table className="min-w-full divide-y divide-border">
+          <thead className="bg-background">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-text-muted">
                 Quote ID
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-text-muted">
                 Tenant
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-text-muted">
                 Customer
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-text-muted">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-text-muted">
                 Total
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-text-muted">
                 Created
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-text-muted">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-border">
             {quotes.map((quote) => (
-              <tr key={quote.quoteId} className="hover:bg-gray-50">
+              <tr key={quote.quoteId} className="hover:bg-background">
                 <td className="whitespace-nowrap px-4 py-3">
-                  <code className="text-sm text-gray-600">{quote.quoteId}</code>
+                  <code className="text-sm text-text-secondary">{quote.quoteId}</code>
                 </td>
                 <td className="px-4 py-3">
                   <Link
                     href={`/admin/tenants?search=${quote.tenantId}`}
-                    className="text-sm text-blue-600 hover:underline"
+                    className="text-sm text-primary hover:underline"
                   >
                     {quote.tenantName}
                   </Link>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="text-sm font-medium text-gray-900">{quote.customerName}</div>
-                  <div className="text-sm text-gray-500">{quote.customerEmail}</div>
+                  <div className="text-sm font-medium text-text-primary">{quote.customerName}</div>
+                  <div className="text-sm text-text-muted">{quote.customerEmail}</div>
                 </td>
                 <td className="px-4 py-3">{getStatusBadge(quote.status)}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
+                <td className="whitespace-nowrap px-4 py-3 text-sm text-text-primary">
                   {quote.currency} {quote.total.toFixed(2)}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                <td className="whitespace-nowrap px-4 py-3 text-sm text-text-muted">
                   {new Date(quote.createdAt).toLocaleDateString()}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-sm">
@@ -223,7 +223,7 @@ export default function AdminQuotesPage() {
                     <button
                       onClick={() => handleRetry(quote.quoteId)}
                       disabled={retrying === quote.quoteId}
-                      className="rounded bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800 hover:bg-yellow-200 disabled:opacity-50"
+                      className="rounded bg-tertiary-light px-2 py-1 text-xs font-medium text-tertiary hover:bg-yellow-200 disabled:opacity-50"
                     >
                       {retrying === quote.quoteId ? 'Retrying...' : 'Retry'}
                     </button>
@@ -234,7 +234,7 @@ export default function AdminQuotesPage() {
 
             {quotes.length === 0 && !loading && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-text-muted">
                   No quotes found
                 </td>
               </tr>
@@ -245,7 +245,7 @@ export default function AdminQuotesPage() {
         {/* Loading */}
         {loading && (
           <div className="flex items-center justify-center py-8">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           </div>
         )}
 
@@ -254,7 +254,7 @@ export default function AdminQuotesPage() {
           <div className="border-t p-4 text-center">
             <button
               onClick={() => fetchQuotes(nextCursor, true)}
-              className="text-blue-600 hover:underline"
+              className="text-primary hover:underline"
             >
               Load more
             </button>

@@ -26,7 +26,7 @@ export function AIDraftBadge({
 }: AIDraftBadgeProps) {
   if (compact) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+      <span className="inline-flex items-center gap-1 rounded-full bg-tertiary-light px-2 py-0.5 text-xs font-medium text-tertiary">
         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
             strokeLinecap="round"
@@ -42,7 +42,7 @@ export function AIDraftBadge({
 
   return (
     <div className="flex items-center gap-2">
-      <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-700">
+      <span className="inline-flex items-center gap-1 rounded-full bg-tertiary-light px-2.5 py-1 text-xs font-medium text-tertiary">
         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
             strokeLinecap="round"
@@ -58,7 +58,7 @@ export function AIDraftBadge({
           type="button"
           onClick={onRegenerate}
           disabled={isRegenerating}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50"
+          className="inline-flex items-center gap-1 rounded-warm-lg px-2 py-1 text-xs text-text-secondary hover:bg-background hover:text-text-primary disabled:opacity-50"
         >
           <svg
             className={`h-3.5 w-3.5 ${isRegenerating ? 'animate-spin' : ''}`}
@@ -80,7 +80,7 @@ export function AIDraftBadge({
         <button
           type="button"
           onClick={onClear}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+          className="inline-flex items-center gap-1 rounded-warm-lg px-2 py-1 text-xs text-text-secondary hover:bg-background hover:text-text-primary"
         >
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path

@@ -35,15 +35,15 @@ export default function DemoPage() {
 
 function DemoPageLoading() {
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="bg-white shadow-sm">
+    <div className="min-h-screen bg-background">
+      <div className="bg-surface shadow-warm">
         <div className="max-w-4xl mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold text-gray-900">Widget Demo</h1>
-          <p className="text-gray-600 mt-1">Test the Estimator widget embed</p>
+          <h1 className="text-2xl font-bold text-text-primary">Widget Demo</h1>
+          <p className="text-text-secondary mt-1">Test the Estimator widget embed</p>
         </div>
       </div>
       <div className="flex items-center justify-center py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     </div>
   )
@@ -97,24 +97,24 @@ function DemoPageContent() {
   const embedCode = useEmbedCode(mode, tenantKey)
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-white shadow-sm">
+      <div className="bg-surface shadow-warm">
         <div className="max-w-4xl mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold text-gray-900">Widget Demo</h1>
-          <p className="text-gray-600 mt-1">Test the Estimator widget embed</p>
+          <h1 className="text-2xl font-bold text-text-primary">Widget Demo</h1>
+          <p className="text-text-secondary mt-1">Test the Estimator widget embed</p>
         </div>
       </div>
 
       {/* Configuration */}
       {!showDemo && (
         <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-surface rounded-warm-lg shadow p-6">
             <h2 className="text-lg font-semibold mb-4">Configuration</h2>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-text-secondary mb-1">
                   Tenant Key
                 </label>
                 <input
@@ -122,15 +122,15 @@ function DemoPageContent() {
                   value={tenantKey}
                   onChange={(e) => setTenantKey(e.target.value)}
                   placeholder="tkey_xxx"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border rounded-warm-lg focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-text-muted mt-1">
                   Get this from your tenant settings in the dashboard
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-secondary mb-2">
                   Embed Mode
                 </label>
                 <div className="grid grid-cols-3 gap-3">
@@ -160,7 +160,7 @@ function DemoPageContent() {
 
               <button
                 onClick={handleStartDemo}
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700"
+                className="w-full bg-primary text-white py-2 px-4 rounded-warm-lg font-medium hover:bg-primary-hover"
               >
                 Load Widget
               </button>
@@ -168,13 +168,13 @@ function DemoPageContent() {
           </div>
 
           {/* Embed code preview */}
-          <div className="bg-white rounded-lg shadow p-6 mt-6">
+          <div className="bg-surface rounded-warm-lg shadow p-6 mt-6">
             <h2 className="text-lg font-semibold mb-4">Embed Code</h2>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-text-secondary mb-4">
               Copy this code to embed the widget on your website:
             </p>
 
-            <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto whitespace-pre-wrap">
+            <pre className="bg-gray-900 text-gray-100 p-4 rounded-warm-lg text-sm overflow-x-auto whitespace-pre-wrap">
               {embedCode}
             </pre>
 
@@ -183,7 +183,7 @@ function DemoPageContent() {
                 navigator.clipboard.writeText(embedCode)
                 alert('Copied to clipboard!')
               }}
-              className="mt-4 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="mt-4 px-4 py-2 text-sm border border-border rounded-warm-lg hover:bg-background"
             >
               Copy to Clipboard
             </button>
@@ -194,24 +194,24 @@ function DemoPageContent() {
       {/* Demo area */}
       {showDemo && (
         <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <div className="bg-surface rounded-warm-lg shadow p-6 mb-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Widget Preview</h2>
               <button
                 onClick={handleReset}
-                className="text-sm text-gray-600 hover:text-gray-900"
+                className="text-sm text-text-secondary hover:text-text-primary"
               >
                 Reset Demo
               </button>
             </div>
 
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-text-secondary mb-4">
               Mode: <span className="font-medium">{mode}</span> |
-              Tenant Key: <code className="bg-gray-100 px-1 rounded">{tenantKey}</code>
+              Tenant Key: <code className="bg-background px-1 rounded">{tenantKey}</code>
             </p>
 
             {mode === 'iframe' && (
-              <div id="iframe-container" className="border rounded-lg overflow-hidden">
+              <div id="iframe-container" className="border rounded-warm-lg overflow-hidden">
                 <IframeWidget tenantKey={tenantKey} />
               </div>
             )}
@@ -219,14 +219,14 @@ function DemoPageContent() {
             {mode === 'inline' && (
               <div
                 id="widget-container"
-                className="border-2 border-dashed border-gray-300 rounded-lg p-4"
+                className="border-2 border-dashed border-border rounded-warm-lg p-4"
               >
-                <p className="text-gray-400 text-center">Widget will load here</p>
+                <p className="text-text-muted text-center">Widget will load here</p>
               </div>
             )}
 
             {mode === 'floating' && (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-text-muted">
                 Look for the floating button in the bottom-right corner of the page.
               </p>
             )}
@@ -240,13 +240,13 @@ function DemoPageContent() {
       {/* Simulated page content */}
       {showDemo && (
         <div className="max-w-4xl mx-auto px-4 pb-20">
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-surface rounded-warm-lg shadow p-6">
             <h2 className="text-xl font-semibold mb-4">Sample Page Content</h2>
-            <p className="text-gray-600 mb-4">
+            <p className="text-text-secondary mb-4">
               This is example page content to demonstrate how the widget looks
               when embedded on a real website.
             </p>
-            <p className="text-gray-600 mb-4">
+            <p className="text-text-secondary mb-4">
               Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do
               eiusmod tempor incididunt ut labore et dolore magna aliqua.
             </p>
@@ -274,14 +274,14 @@ function ModeOption({
   return (
     <button
       onClick={() => onSelect(mode)}
-      className={`p-3 rounded-lg border-2 text-left transition-colors ${
+      className={`p-3 rounded-warm-lg border-2 text-left transition-colors ${
         isSelected
-          ? 'border-blue-500 bg-blue-50'
-          : 'border-gray-200 hover:border-gray-300'
+          ? 'border-primary bg-primary-light'
+          : 'border-border hover:border-border'
       }`}
     >
       <div className="font-medium text-sm">{title}</div>
-      <div className="text-xs text-gray-500 mt-1">{description}</div>
+      <div className="text-xs text-text-muted mt-1">{description}</div>
     </button>
   )
 }

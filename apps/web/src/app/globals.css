@@ -1,3 +1,58 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --color-background: #FFFFFF;
+    --color-surface: #F4F4F5;
+    --color-text-primary: #09090B;
+    --color-text-secondary: #52525B;
+    --color-text-muted: #A1A1AA;
+    --color-primary: #09090B;
+    --color-primary-hover: #27272A;
+    --color-primary-light: #F4F4F5;
+    --color-secondary: #16A34A;
+    --color-secondary-light: #DCFCE7;
+    --color-tertiary: #D97706;
+    --color-tertiary-light: #FEF3C7;
+    --color-border: #E4E4E7;
+    --color-border-strong: #D4D4D8;
+    --color-danger: #DC2626;
+    --color-danger-light: #FEE2E2;
+
+    --font-display: var(--font-sora);
+    --font-body: var(--font-sora);
+    --font-mono: var(--font-jetbrains-mono);
+  }
+
+  body {
+    font-family: var(--font-body), system-ui, sans-serif;
+    color: var(--color-text-primary);
+    background-color: var(--color-background);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Fade-in animation */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.25s ease-out;
+}
+
+/* Staggered animation delays */
+.animation-delay-100 { animation-delay: 75ms; animation-fill-mode: both; }
+.animation-delay-200 { animation-delay: 150ms; animation-fill-mode: both; }
+.animation-delay-300 { animation-delay: 225ms; animation-fill-mode: both; }
+.animation-delay-400 { animation-delay: 300ms; animation-fill-mode: both; }

@@ -129,11 +129,11 @@ function BillingPageContent() {
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      active: 'bg-green-100 text-green-800',
-      trialing: 'bg-blue-100 text-blue-800',
-      past_due: 'bg-yellow-100 text-yellow-800',
-      canceled: 'bg-gray-100 text-gray-800',
-      none: 'bg-gray-100 text-gray-800',
+      active: 'bg-secondary-light text-secondary',
+      trialing: 'bg-blue-100 text-primary',
+      past_due: 'bg-tertiary-light text-tertiary',
+      canceled: 'bg-background text-text-primary',
+      none: 'bg-background text-text-primary',
     }
     const labels: Record<string, string> = {
       active: 'Active',
@@ -170,7 +170,7 @@ function BillingPageContent() {
     return (
       <div>
         <PageHeader title="Billing" description="Manage your subscription and payment methods" />
-        <div className="rounded-lg bg-red-50 p-4 text-red-600">{error}</div>
+        <div className="rounded-warm-lg bg-danger-light p-4 text-danger">{error}</div>
       </div>
     )
   }
@@ -185,8 +185,8 @@ function BillingPageContent() {
       {/* Toast notification */}
       {toast && (
         <div
-          className={`mb-4 rounded-lg p-4 ${
-            toast.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+          className={`mb-4 rounded-warm-lg p-4 ${
+            toast.type === 'success' ? 'bg-secondary-light text-secondary' : 'bg-danger-light text-danger'
           }`}
         >
           {toast.message}
@@ -194,11 +194,11 @@ function BillingPageContent() {
       )}
 
       {/* Current plan card */}
-      <div className="mb-8 rounded-lg bg-white p-6 shadow-sm">
+      <div className="mb-8 rounded-warm-lg bg-surface p-6 shadow-warm">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-medium text-gray-900">Current Plan</h2>
-            <p className="mt-1 text-sm text-gray-500">
+            <h2 className="text-lg font-medium text-text-primary">Current Plan</h2>
+            <p className="mt-1 text-sm text-text-muted">
               {currentPlan ? currentPlan.name : 'Free'} plan
             </p>
           </div>
@@ -208,7 +208,7 @@ function BillingPageContent() {
               <button
                 onClick={handlePortal}
                 disabled={portalLoading}
-                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                className="rounded-warm-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background disabled:opacity-50"
               >
                 {portalLoading ? 'Loading...' : 'Manage Billing'}
               </button>
@@ -218,22 +218,22 @@ function BillingPageContent() {
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           <div>
-            <p className="text-sm text-gray-500">Quotes this month</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">
+            <p className="text-sm text-text-muted">Quotes this month</p>
+            <p className="mt-1 text-2xl font-bold text-text-primary">
               {data?.usage.estimatesCreated || 0} / {data?.usage.planLimit || 50}
             </p>
             <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-200">
               <div
-                className={`h-full ${usagePercentage >= 90 ? 'bg-red-500' : usagePercentage >= 75 ? 'bg-yellow-500' : 'bg-blue-600'}`}
+                className={`h-full ${usagePercentage >= 90 ? 'bg-red-500' : usagePercentage >= 75 ? 'bg-yellow-500' : 'bg-primary'}`}
                 style={{ width: `${usagePercentage}%` }}
               />
             </div>
           </div>
           <div>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-text-muted">
               {data?.subscription.status === 'trialing' ? 'Trial ends' : 'Renews on'}
             </p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">
+            <p className="mt-1 text-2xl font-bold text-text-primary">
               {data?.subscription.currentPeriodEnd
                 ? new Date(data.subscription.currentPeriodEnd).toLocaleDateString('en-US', {
                     month: 'short',
@@ -243,25 +243,25 @@ function BillingPageContent() {
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">Monthly cost</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">
+            <p className="text-sm text-text-muted">Monthly cost</p>
+            <p className="mt-1 text-2xl font-bold text-text-primary">
               {currentPlan ? formatPrice(currentPlan.priceCents) : '$0'}
-              <span className="text-base font-normal text-gray-500">/mo</span>
+              <span className="text-base font-normal text-text-muted">/mo</span>
             </p>
           </div>
         </div>
 
         {data?.subscription.cancelAtPeriodEnd && (
-          <div className="mt-4 rounded-lg bg-yellow-50 p-3 text-sm text-yellow-800">
+          <div className="mt-4 rounded-warm-lg bg-tertiary-light p-3 text-sm text-tertiary">
             Your subscription will be canceled at the end of the current billing period.
           </div>
         )}
       </div>
 
       {/* Available plans */}
-      <div className="rounded-lg bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-medium text-gray-900">Available Plans</h2>
-        <p className="mt-1 text-sm text-gray-500">Choose a plan that fits your needs</p>
+      <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+        <h2 className="text-lg font-medium text-text-primary">Available Plans</h2>
+        <p className="mt-1 text-sm text-text-muted">Choose a plan that fits your needs</p>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {data?.availablePlans.map((plan) => (
@@ -277,7 +277,7 @@ function BillingPageContent() {
         </div>
 
         {data?.availablePlans.length === 0 && (
-          <div className="mt-6 text-center text-gray-500">
+          <div className="mt-6 text-center text-text-muted">
             No plans available at this time.
           </div>
         )}
@@ -301,27 +301,27 @@ function PlanCard({
 }) {
   return (
     <div
-      className={`relative rounded-lg border p-6 ${
-        isCurrent ? 'border-blue-500 ring-2 ring-blue-500' : 'border-gray-200'
+      className={`relative rounded-warm-lg border p-6 ${
+        isCurrent ? 'border-blue-500 ring-2 ring-blue-500' : 'border-border'
       }`}
     >
       {isCurrent && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <span className="inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-xs font-medium text-white">
+          <span className="inline-flex items-center rounded-full bg-primary px-3 py-1 text-xs font-medium text-white">
             Current Plan
           </span>
         </div>
       )}
 
       <div className="text-center">
-        <h3 className="text-lg font-semibold text-gray-900">{plan.name}</h3>
+        <h3 className="text-lg font-semibold text-text-primary">{plan.name}</h3>
         <div className="mt-2">
-          <span className="text-3xl font-bold text-gray-900">
+          <span className="text-3xl font-bold text-text-primary">
             ${(plan.priceCents / 100).toFixed(0)}
           </span>
-          <span className="text-gray-500">/mo</span>
+          <span className="text-text-muted">/mo</span>
         </div>
-        <p className="mt-2 text-sm text-gray-500">
+        <p className="mt-2 text-sm text-text-muted">
           {plan.monthlyEstimateLimit.toLocaleString()} estimates/month
         </p>
       </div>
@@ -337,12 +337,12 @@ function PlanCard({
       <button
         onClick={onSelect}
         disabled={disabled || loading}
-        className={`mt-6 w-full rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+        className={`mt-6 w-full rounded-warm-lg px-4 py-2 text-sm font-medium transition-colors ${
           isCurrent
-            ? 'cursor-not-allowed bg-gray-100 text-gray-500'
+            ? 'cursor-not-allowed bg-background text-text-muted'
             : disabled
-              ? 'cursor-not-allowed bg-gray-100 text-gray-400'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
+              ? 'cursor-not-allowed bg-background text-text-muted'
+              : 'bg-primary text-white hover:bg-primary-hover'
         }`}
       >
         {loading ? 'Loading...' : isCurrent ? 'Current Plan' : disabled ? 'Not Available' : 'Select Plan'}
@@ -363,7 +363,7 @@ function FeatureItem({ included, label }: { included: boolean; label: string }) 
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>
       )}
-      <span className={included ? 'text-gray-700' : 'text-gray-400'}>{label}</span>
+      <span className={included ? 'text-text-secondary' : 'text-text-muted'}>{label}</span>
     </li>
   )
 }

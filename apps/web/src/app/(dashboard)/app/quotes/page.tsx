@@ -158,9 +158,9 @@ export default function QuotesPage() {
 
   const formatCurrency = (amount: number, currency: string) => {
     const symbols: Record<string, string> = {
-      GBP: '£',
+      GBP: '\u00a3',
       USD: '$',
-      EUR: '€',
+      EUR: '\u20ac',
       AUD: 'A$',
       CAD: 'C$',
     }
@@ -187,15 +187,15 @@ export default function QuotesPage() {
 
   const getStatusBadge = (status: QuoteStatus) => {
     const config: Record<QuoteStatus, { label: string; className: string }> = {
-      queued: { label: 'Queued', className: 'bg-gray-100 text-gray-800' },
-      generating: { label: 'Processing', className: 'bg-yellow-100 text-yellow-800' },
-      pending_review: { label: 'Review Required', className: 'bg-amber-100 text-amber-800' },
-      sent: { label: 'Sent', className: 'bg-blue-100 text-blue-800' },
-      viewed: { label: 'Viewed', className: 'bg-indigo-100 text-indigo-800' },
-      accepted: { label: 'Accepted', className: 'bg-green-100 text-green-800' },
-      paid: { label: 'Paid', className: 'bg-green-100 text-green-800' },
-      expired: { label: 'Expired', className: 'bg-orange-100 text-orange-800' },
-      failed: { label: 'Failed', className: 'bg-red-100 text-red-800' },
+      queued: { label: 'Queued', className: 'bg-background text-text-secondary' },
+      generating: { label: 'Processing', className: 'bg-tertiary-light text-tertiary' },
+      pending_review: { label: 'Review Required', className: 'bg-tertiary-light text-tertiary' },
+      sent: { label: 'Sent', className: 'bg-primary-light text-primary' },
+      viewed: { label: 'Viewed', className: 'bg-primary-light text-primary' },
+      accepted: { label: 'Accepted', className: 'bg-secondary-light text-secondary' },
+      paid: { label: 'Paid', className: 'bg-secondary-light text-secondary' },
+      expired: { label: 'Expired', className: 'bg-background text-text-muted' },
+      failed: { label: 'Failed', className: 'bg-danger-light text-danger' },
     }
     const { label, className } = config[status] || config.sent
     return (
@@ -215,10 +215,10 @@ export default function QuotesPage() {
       {/* Toast notification */}
       {toast && (
         <div
-          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg ${
+          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-warm-lg shadow-warm-lg ${
             toast.type === 'success'
-              ? 'bg-green-50 text-green-800 border border-green-200'
-              : 'bg-red-50 text-red-800 border border-red-200'
+              ? 'bg-secondary-light text-secondary border border-secondary/20'
+              : 'bg-danger-light text-danger border border-danger/20'
           }`}
         >
           {toast.message}
@@ -231,13 +231,13 @@ export default function QuotesPage() {
           <input
             type="text"
             placeholder="Search by customer name or email..."
-            className="w-full max-w-md rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="w-full max-w-md rounded-warm-lg border border-border bg-surface px-4 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <select
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          className="rounded-warm-lg border border-border bg-surface px-4 py-2 text-sm text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as QuoteStatus | '')}
         >
@@ -256,7 +256,7 @@ export default function QuotesPage() {
 
       {/* Error state */}
       {error && (
-        <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 text-red-800">
+        <div className="mb-6 rounded-warm-lg bg-danger-light border border-danger/20 p-4 text-danger">
           {error}
         </div>
       )}
@@ -264,7 +264,7 @@ export default function QuotesPage() {
       {/* Loading state */}
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : quotes.length === 0 ? (
         <EmptyState
@@ -291,69 +291,69 @@ export default function QuotesPage() {
       ) : (
         <>
           {/* Quotes table */}
-          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+          <div className="overflow-x-auto rounded-xl border border-border bg-background">
+            <table className="min-w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-6 py-4 text-left text-[11px] font-bold text-text-muted uppercase tracking-widest">
                     Customer
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-[11px] font-bold text-text-muted uppercase tracking-widest">
                     Service
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-[11px] font-bold text-text-muted uppercase tracking-widest">
                     Total
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-[11px] font-bold text-text-muted uppercase tracking-widest">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-[11px] font-bold text-text-muted uppercase tracking-widest">
                     Created
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-right text-[11px] font-bold text-text-muted uppercase tracking-widest">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {quotes.map((quote) => (
-                  <tr key={quote.quoteId} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{quote.customerName}</div>
-                      <div className="text-sm text-gray-500">{quote.customerEmail}</div>
+                  <tr key={quote.quoteId} className="hover:bg-surface transition-colors">
+                    <td className="px-6 py-5 whitespace-nowrap">
+                      <div className="text-sm font-semibold text-text-primary">{quote.customerName}</div>
+                      <div className="text-sm text-text-secondary">{quote.customerEmail}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{quote.serviceName}</div>
+                    <td className="px-6 py-5 whitespace-nowrap">
+                      <div className="text-sm text-text-primary">{quote.serviceName}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
+                    <td className="px-6 py-5 whitespace-nowrap">
+                      <div className="text-sm font-medium text-text-primary">
                         {formatCurrency(quote.total, quote.currency)}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-5 whitespace-nowrap">
                       {getStatusBadge(quote.status)}
                       {quote.viewedAt && quote.status === 'viewed' && (
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-text-muted mt-1">
                           {formatDate(quote.viewedAt)} {formatTime(quote.viewedAt)}
                         </div>
                       )}
                       {quote.acceptedAt && (quote.status === 'accepted' || quote.status === 'paid') && (
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-text-muted mt-1">
                           {formatDate(quote.acceptedAt)} {formatTime(quote.acceptedAt)}
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{formatDate(quote.createdAt)}</div>
-                      <div className="text-xs text-gray-500">{formatTime(quote.createdAt)}</div>
+                    <td className="px-6 py-5 whitespace-nowrap">
+                      <div className="text-sm text-text-primary">{formatDate(quote.createdAt)}</div>
+                      <div className="text-xs text-text-muted">{formatTime(quote.createdAt)}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-6 py-5 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
                         {/* View Trace */}
                         {['sent', 'viewed', 'accepted', 'paid'].includes(quote.status) && (
                           <Link
                             href={`/app/quotes/${quote.quoteId}/trace`}
-                            className="text-gray-600 hover:text-gray-900"
+                            className="text-text-secondary hover:text-text-primary transition-colors"
                             title="View pricing trace"
                           >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -367,7 +367,7 @@ export default function QuotesPage() {
                           <button
                             onClick={() => handleCopyLink(quote.quoteId)}
                             disabled={actionLoading === quote.quoteId}
-                            className="text-gray-600 hover:text-gray-900 disabled:opacity-50"
+                            className="text-text-secondary hover:text-text-primary disabled:opacity-50 transition-colors"
                             title="Copy quote link"
                           >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -381,7 +381,7 @@ export default function QuotesPage() {
                           <button
                             onClick={() => handleDownloadPdf(quote.quoteId)}
                             disabled={actionLoading === quote.quoteId}
-                            className="text-gray-600 hover:text-gray-900 disabled:opacity-50"
+                            className="text-text-secondary hover:text-text-primary disabled:opacity-50 transition-colors"
                             title="Download PDF"
                           >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -395,7 +395,7 @@ export default function QuotesPage() {
                           <button
                             onClick={() => handleResendEmail(quote.quoteId)}
                             disabled={actionLoading === quote.quoteId}
-                            className="text-gray-600 hover:text-gray-900 disabled:opacity-50"
+                            className="text-text-secondary hover:text-text-primary disabled:opacity-50 transition-colors"
                             title="Resend email"
                           >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -406,7 +406,7 @@ export default function QuotesPage() {
 
                         {/* Loading indicator */}
                         {actionLoading === quote.quoteId && (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                         )}
                       </div>
                     </td>
@@ -422,11 +422,11 @@ export default function QuotesPage() {
               <button
                 onClick={() => fetchQuotes(nextCursor, true)}
                 disabled={loadingMore}
-                className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-primary hover:text-primary-hover disabled:opacity-50 transition-colors"
               >
                 {loadingMore ? (
                   <span className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                     Loading...
                   </span>
                 ) : (

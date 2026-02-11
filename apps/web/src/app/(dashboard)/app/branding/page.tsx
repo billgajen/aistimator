@@ -151,7 +151,7 @@ export default function BrandingPage() {
 
       {/* Success message */}
       {success && (
-        <div className="mb-4 rounded-md bg-green-50 p-4">
+        <div className="mb-4 rounded-warm-lg bg-secondary-light p-4">
           <div className="flex">
             <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
               <path
@@ -160,14 +160,14 @@ export default function BrandingPage() {
                 clipRule="evenodd"
               />
             </svg>
-            <p className="ml-3 text-sm text-green-700">Branding saved successfully</p>
+            <p className="ml-3 text-sm text-secondary">Branding saved successfully</p>
           </div>
         </div>
       )}
 
       {/* Error message */}
       {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-4">
+        <div className="mb-4 rounded-warm-lg bg-danger-light p-4">
           <div className="flex">
             <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
               <path
@@ -176,8 +176,8 @@ export default function BrandingPage() {
                 clipRule="evenodd"
               />
             </svg>
-            <p className="ml-3 text-sm text-red-700">{error}</p>
-            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
+            <p className="ml-3 text-sm text-danger">{error}</p>
+            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-danger">
               <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fillRule="evenodd"
@@ -194,14 +194,14 @@ export default function BrandingPage() {
         {/* Settings Column */}
         <div className="space-y-6">
           {/* Logo section */}
-          <div className="rounded-lg bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-medium text-gray-900">Logo</h2>
-            <p className="mt-1 text-sm text-gray-500">Your logo appears on quotes and the widget</p>
+          <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+            <h2 className="text-lg font-medium text-text-primary">Logo</h2>
+            <p className="mt-1 text-sm text-text-muted">Your logo appears on quotes and the widget</p>
 
-            <div className="mt-4 flex h-32 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
+            <div className="mt-4 flex h-32 items-center justify-center rounded-warm-lg border-2 border-dashed border-border bg-background">
               <div className="text-center">
                 <svg
-                  className="mx-auto h-8 w-8 text-gray-400"
+                  className="mx-auto h-8 w-8 text-text-muted"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -213,42 +213,42 @@ export default function BrandingPage() {
                     d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                   />
                 </svg>
-                <p className="mt-2 text-sm text-gray-500">Logo upload coming soon</p>
-                <p className="text-xs text-gray-400">PNG, JPG up to 2MB</p>
+                <p className="mt-2 text-sm text-text-muted">Logo upload coming soon</p>
+                <p className="text-xs text-text-muted">PNG, JPG up to 2MB</p>
               </div>
             </div>
           </div>
 
           {/* Colors section */}
-          <div className="rounded-lg bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-medium text-gray-900">Brand Colors</h2>
-            <p className="mt-1 text-sm text-gray-500">Customize the widget and quote appearance</p>
+          <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+            <h2 className="text-lg font-medium text-text-primary">Brand Colors</h2>
+            <p className="mt-1 text-sm text-text-muted">Customize the widget and quote appearance</p>
 
             <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700">Primary Color</label>
+              <label className="block text-sm font-medium text-text-secondary">Primary Color</label>
               <div className="mt-1 flex items-center gap-3">
                 <input
                   type="color"
                   value={branding.primaryColor}
                   onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
-                  className="h-10 w-10 cursor-pointer rounded-lg border border-gray-300"
+                  className="h-10 w-10 cursor-pointer rounded-warm-lg border border-border"
                 />
                 <input
                   type="text"
                   value={branding.primaryColor}
                   onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
                   pattern="^#[0-9A-Fa-f]{6}$"
-                  className="w-28 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-28 rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
-              <p className="mt-1 text-xs text-gray-500">Used for buttons, links, and accents</p>
+              <p className="mt-1 text-xs text-text-muted">Used for buttons, links, and accents</p>
             </div>
           </div>
 
           {/* Footer notes */}
-          <div className="rounded-lg bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-medium text-gray-900">Footer Notes</h2>
-            <p className="mt-1 text-sm text-gray-500">
+          <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+            <h2 className="text-lg font-medium text-text-primary">Footer Notes</h2>
+            <p className="mt-1 text-sm text-text-muted">
               Additional text shown at the bottom of quotes
             </p>
 
@@ -258,15 +258,15 @@ export default function BrandingPage() {
                 onChange={(e) => setBranding({ ...branding, footerNotes: e.target.value || null })}
                 placeholder="e.g., Thank you for your business! Payment terms: Net 30"
                 rows={3}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
           </div>
 
           {/* Template toggles */}
-          <div className="rounded-lg bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-medium text-gray-900">Quote Template</h2>
-            <p className="mt-1 text-sm text-gray-500">Choose which sections to show on quotes</p>
+          <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+            <h2 className="text-lg font-medium text-text-primary">Quote Template</h2>
+            <p className="mt-1 text-sm text-text-muted">Choose which sections to show on quotes</p>
 
             <div className="mt-4 space-y-4">
               <label className="flex items-center gap-3">
@@ -274,11 +274,11 @@ export default function BrandingPage() {
                   type="checkbox"
                   checked={template.showLineItems}
                   onChange={(e) => setTemplate({ ...template, showLineItems: e.target.checked })}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
                 />
                 <div>
-                  <span className="text-sm font-medium text-gray-700">Show line items</span>
-                  <p className="text-xs text-gray-500">Display itemized breakdown of costs</p>
+                  <span className="text-sm font-medium text-text-secondary">Show line items</span>
+                  <p className="text-xs text-text-muted">Display itemized breakdown of costs</p>
                 </div>
               </label>
 
@@ -289,11 +289,11 @@ export default function BrandingPage() {
                   onChange={(e) =>
                     setTemplate({ ...template, includeAssumptions: e.target.checked })
                   }
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
                 />
                 <div>
-                  <span className="text-sm font-medium text-gray-700">Include assumptions</span>
-                  <p className="text-xs text-gray-500">Show what the quote assumes to be true</p>
+                  <span className="text-sm font-medium text-text-secondary">Include assumptions</span>
+                  <p className="text-xs text-text-muted">Show what the quote assumes to be true</p>
                 </div>
               </label>
 
@@ -304,16 +304,16 @@ export default function BrandingPage() {
                   onChange={(e) =>
                     setTemplate({ ...template, includeExclusions: e.target.checked })
                   }
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
                 />
                 <div>
-                  <span className="text-sm font-medium text-gray-700">Include exclusions</span>
-                  <p className="text-xs text-gray-500">Show what is not included in the quote</p>
+                  <span className="text-sm font-medium text-text-secondary">Include exclusions</span>
+                  <p className="text-xs text-text-muted">Show what is not included in the quote</p>
                 </div>
               </label>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-text-secondary">
                   Quote validity (days)
                 </label>
                 <input
@@ -324,9 +324,9 @@ export default function BrandingPage() {
                   onChange={(e) =>
                     setTemplate({ ...template, validityDays: parseInt(e.target.value) || 30 })
                   }
-                  className="mt-1 w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="mt-1 w-24 rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-text-muted">
                   How long quotes remain valid for acceptance
                 </p>
               </div>
@@ -338,7 +338,7 @@ export default function BrandingPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex items-center rounded-warm-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
             >
               {saving ? (
                 <>
@@ -354,19 +354,19 @@ export default function BrandingPage() {
 
         {/* Preview Column */}
         <div className="lg:sticky lg:top-6 lg:self-start">
-          <div className="rounded-lg bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-medium text-gray-900">Preview</h2>
+          <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+            <h2 className="mb-4 text-lg font-medium text-text-primary">Preview</h2>
 
             {/* Quote Preview */}
             <div
-              className="rounded-lg border border-gray-200 bg-white p-6"
+              className="rounded-warm-lg border border-border bg-surface p-6"
               style={{ '--primary-color': branding.primaryColor } as React.CSSProperties}
             >
               {/* Header */}
-              <div className="mb-6 flex items-start justify-between border-b border-gray-200 pb-4">
+              <div className="mb-6 flex items-start justify-between border-b border-border pb-4">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">{tenantName || 'Your Business'}</h3>
-                  <p className="text-sm text-gray-500">Quote #{MOCK_QUOTE.id.slice(-8)}</p>
+                  <h3 className="text-xl font-bold text-text-primary">{tenantName || 'Your Business'}</h3>
+                  <p className="text-sm text-text-muted">Quote #{MOCK_QUOTE.id.slice(-8)}</p>
                 </div>
                 <div
                   className="rounded-full px-3 py-1 text-xs font-medium text-white"
@@ -378,25 +378,25 @@ export default function BrandingPage() {
 
               {/* Customer */}
               <div className="mb-4">
-                <p className="text-sm text-gray-500">Prepared for:</p>
-                <p className="font-medium text-gray-900">{MOCK_QUOTE.customer.name}</p>
+                <p className="text-sm text-text-muted">Prepared for:</p>
+                <p className="font-medium text-text-primary">{MOCK_QUOTE.customer.name}</p>
               </div>
 
               {/* Scope */}
               <div className="mb-4">
-                <p className="text-sm font-medium text-gray-700">Scope of Work</p>
-                <p className="mt-1 text-sm text-gray-600">{MOCK_QUOTE.content.scopeSummary}</p>
+                <p className="text-sm font-medium text-text-secondary">Scope of Work</p>
+                <p className="mt-1 text-sm text-text-secondary">{MOCK_QUOTE.content.scopeSummary}</p>
               </div>
 
               {/* Line Items */}
               {template.showLineItems && (
                 <div className="mb-4">
-                  <p className="mb-2 text-sm font-medium text-gray-700">Pricing Breakdown</p>
+                  <p className="mb-2 text-sm font-medium text-text-secondary">Pricing Breakdown</p>
                   <div className="space-y-1">
                     {MOCK_QUOTE.pricing.breakdown.map((item, i) => (
                       <div key={i} className="flex justify-between text-sm">
-                        <span className="text-gray-600">{item.label}</span>
-                        <span className="text-gray-900">{formatCurrency(item.amount)}</span>
+                        <span className="text-text-secondary">{item.label}</span>
+                        <span className="text-text-primary">{formatCurrency(item.amount)}</span>
                       </div>
                     ))}
                   </div>
@@ -406,8 +406,8 @@ export default function BrandingPage() {
               {/* Assumptions */}
               {template.includeAssumptions && MOCK_QUOTE.content.assumptions && (
                 <div className="mb-4">
-                  <p className="mb-1 text-sm font-medium text-gray-700">Assumptions</p>
-                  <ul className="list-inside list-disc text-sm text-gray-600">
+                  <p className="mb-1 text-sm font-medium text-text-secondary">Assumptions</p>
+                  <ul className="list-inside list-disc text-sm text-text-secondary">
                     {MOCK_QUOTE.content.assumptions.map((item, i) => (
                       <li key={i}>{item}</li>
                     ))}
@@ -418,8 +418,8 @@ export default function BrandingPage() {
               {/* Exclusions */}
               {template.includeExclusions && MOCK_QUOTE.content.exclusions && (
                 <div className="mb-4">
-                  <p className="mb-1 text-sm font-medium text-gray-700">Exclusions</p>
-                  <ul className="list-inside list-disc text-sm text-gray-600">
+                  <p className="mb-1 text-sm font-medium text-text-secondary">Exclusions</p>
+                  <ul className="list-inside list-disc text-sm text-text-secondary">
                     {MOCK_QUOTE.content.exclusions.map((item, i) => (
                       <li key={i}>{item}</li>
                     ))}
@@ -428,13 +428,13 @@ export default function BrandingPage() {
               )}
 
               {/* Total */}
-              <div className="border-t border-gray-200 pt-4">
+              <div className="border-t border-border pt-4">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Subtotal</span>
+                  <span className="text-text-secondary">Subtotal</span>
                   <span>{formatCurrency(MOCK_QUOTE.pricing.subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">
+                  <span className="text-text-secondary">
                     {MOCK_QUOTE.pricing.taxLabel} ({(MOCK_QUOTE.pricing.taxRate * 100).toFixed(0)}%)
                   </span>
                   <span>{formatCurrency(MOCK_QUOTE.pricing.taxAmount)}</span>
@@ -448,20 +448,20 @@ export default function BrandingPage() {
               </div>
 
               {/* Validity */}
-              <p className="mt-4 text-xs text-gray-500">
+              <p className="mt-4 text-xs text-text-muted">
                 This quote is valid for {template.validityDays} days from the date of issue.
               </p>
 
               {/* Footer notes */}
               {branding.footerNotes && (
-                <div className="mt-4 border-t border-gray-200 pt-4">
-                  <p className="text-xs text-gray-500">{branding.footerNotes}</p>
+                <div className="mt-4 border-t border-border pt-4">
+                  <p className="text-xs text-text-muted">{branding.footerNotes}</p>
                 </div>
               )}
 
               {/* Accept button preview */}
               <button
-                className="mt-4 w-full rounded-lg py-2 text-sm font-medium text-white"
+                className="mt-4 w-full rounded-warm-lg py-2 text-sm font-medium text-white"
                 style={{ backgroundColor: branding.primaryColor }}
               >
                 Accept Quote

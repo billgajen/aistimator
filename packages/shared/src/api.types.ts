@@ -109,7 +109,12 @@ export interface QuoteViewResponse {
   business: QuoteViewBusiness
   customer: QuoteViewCustomer
   pricing: QuotePricing
-  breakdown: Array<{ label: string; amount: number }>
+  breakdown: Array<{
+    label: string
+    amount: number
+    autoRecommended?: boolean
+    recommendationReason?: string
+  }>
   notes: QuoteContent
   validUntil?: string
   assets: QuoteViewAsset[]

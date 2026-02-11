@@ -329,7 +329,7 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
             <button
               onClick={saveConfig}
               disabled={saving}
-              className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
             >
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
@@ -339,7 +339,7 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
 
       {/* Error message */}
       {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-4">
+        <div className="mb-4 rounded-md bg-danger-light p-4">
           <div className="flex">
             <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
               <path
@@ -351,7 +351,7 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
             <div className="ml-3">
               <p className="text-sm text-red-700">{error}</p>
             </div>
-            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
+            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-danger">
               <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fillRule="evenodd"
@@ -366,17 +366,17 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
 
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Form Configuration */}
-        <div className="rounded-lg bg-white p-6 shadow-sm">
+        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-medium text-gray-900">Form Fields</h2>
-              <p className="mt-1 text-sm text-gray-500">
+              <h2 className="text-lg font-medium text-text-primary">Form Fields</h2>
+              <p className="mt-1 text-sm text-text-muted">
                 Configure the questions shown to customers
               </p>
             </div>
             <button
               onClick={() => setShowAddField(true)}
-              className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+              className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
             >
               <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -390,16 +390,16 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
             </div>
           ) : config.fields.length === 0 && !showAddField ? (
-            <div className="mt-6 rounded-lg border-2 border-dashed border-gray-300 p-8 text-center">
-              <svg className="mx-auto h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="mt-6 rounded-warm-lg border-2 border-dashed border-border p-8 text-center">
+              <svg className="mx-auto h-10 w-10 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="mt-2 text-sm text-text-muted">
                 No custom fields yet. Add fields to collect specific information from customers.
               </p>
               <button
                 onClick={() => setShowAddField(true)}
-                className="mt-4 inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-700"
+                className="mt-4 inline-flex items-center text-sm font-medium text-primary hover:text-primary"
               >
                 <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -413,13 +413,13 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
               {config.fields.map((field, index) => (
                 <div
                   key={field.fieldId}
-                  className="flex items-center gap-3 rounded-lg border border-gray-200 p-3"
+                  className="flex items-center gap-3 rounded-warm-lg border border-border p-3"
                 >
                   <div className="flex flex-col gap-1">
                     <button
                       onClick={() => moveField(index, 'up')}
                       disabled={index === 0}
-                      className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                      className="text-text-muted hover:text-text-secondary disabled:opacity-30"
                     >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -428,7 +428,7 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
                     <button
                       onClick={() => moveField(index, 'down')}
                       disabled={index === config.fields.length - 1}
-                      className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                      className="text-text-muted hover:text-text-secondary disabled:opacity-30"
                     >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -437,13 +437,13 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{field.label}</span>
+                      <span className="font-medium text-text-primary">{field.label}</span>
                       {field.required && (
                         <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">Required</span>
                       )}
                     </div>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
-                      <span className="rounded bg-gray-100 px-1.5 py-0.5">
+                    <div className="mt-1 flex items-center gap-2 text-xs text-text-muted">
+                      <span className="rounded bg-background px-1.5 py-0.5">
                         {FIELD_TYPES.find((t) => t.value === field.type)?.label || field.type}
                       </span>
                       <span className="font-mono">{field.fieldId}</span>
@@ -455,7 +455,7 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
                           {services.find((s) => s.id === field.serviceId)?.name || 'Service-specific'}
                         </span>
                       ) : (
-                        <span className="rounded bg-green-100 px-1.5 py-0.5 text-green-700">
+                        <span className="rounded bg-green-100 px-1.5 py-0.5 text-secondary">
                           All Services
                         </span>
                       )}
@@ -467,14 +467,14 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
                       className={`rounded px-2 py-1 text-xs ${
                         field.required
                           ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          : 'bg-background text-text-secondary hover:bg-gray-200'
                       }`}
                     >
                       {field.required ? 'Required' : 'Optional'}
                     </button>
                     <button
                       onClick={() => removeField(index)}
-                      className="text-gray-400 hover:text-red-600"
+                      className="text-text-muted hover:text-danger"
                     >
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -486,27 +486,27 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
 
               {/* Add field form */}
               {showAddField && (
-                <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
-                  <h3 className="font-medium text-gray-900">Add New Field</h3>
+                <div className="rounded-warm-lg border-2 border-primary/20 bg-primary-light p-4">
+                  <h3 className="font-medium text-text-primary">Add New Field</h3>
 
                   <div className="mt-4 space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Label *</label>
+                        <label className="block text-sm font-medium text-text-secondary">Label *</label>
                         <input
                           type="text"
                           value={newField.label}
                           onChange={(e) => setNewField((prev) => ({ ...prev, label: e.target.value }))}
                           placeholder="e.g., Surface Condition"
-                          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Field Type *</label>
+                        <label className="block text-sm font-medium text-text-secondary">Field Type *</label>
                         <select
                           value={newField.type}
                           onChange={(e) => setNewField((prev) => ({ ...prev, type: e.target.value as FieldType }))}
-                          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         >
                           {FIELD_TYPES.map((type) => (
                             <option key={type.value} value={type.value}>{type.label}</option>
@@ -517,31 +517,31 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">
+                        <label className="block text-sm font-medium text-text-secondary">
                           Field ID
-                          <span className="ml-1 text-xs font-normal text-gray-500">(auto-generated if blank)</span>
+                          <span className="ml-1 text-xs font-normal text-text-muted">(auto-generated if blank)</span>
                         </label>
                         <input
                           type="text"
                           value={newField.fieldId}
                           onChange={(e) => setNewField((prev) => ({ ...prev, fieldId: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') }))}
                           placeholder={generateFieldId(newField.label) || 'field_id'}
-                          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Show for Service</label>
+                        <label className="block text-sm font-medium text-text-secondary">Show for Service</label>
                         <select
                           value={newField.serviceId || ''}
                           onChange={(e) => setNewField((prev) => ({ ...prev, serviceId: e.target.value || null }))}
-                          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         >
                           <option value="">All Services (Global)</option>
                           {services.map((service) => (
                             <option key={service.id} value={service.id}>{service.name}</option>
                           ))}
                         </select>
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-text-muted">
                           Global fields show for all services. Service-specific fields only show when that service is selected.
                         </p>
                       </div>
@@ -553,15 +553,15 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
                           type="checkbox"
                           checked={newField.required}
                           onChange={(e) => setNewField((prev) => ({ ...prev, required: e.target.checked }))}
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
                         />
-                        <span className="text-sm text-gray-700">Required field</span>
+                        <span className="text-sm text-text-secondary">Required field</span>
                       </label>
                     </div>
 
                     {needsOptions && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Options *</label>
+                        <label className="block text-sm font-medium text-text-secondary">Options *</label>
                         <div className="mt-2 space-y-2">
                           {newField.options?.map((opt, optIndex) => (
                             <div key={optIndex} className="flex items-center gap-2">
@@ -570,19 +570,19 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
                                 value={opt.value}
                                 onChange={(e) => updateNewFieldOption(optIndex, 'value', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                                 placeholder="value"
-                                className="w-32 rounded-lg border border-gray-300 px-3 py-1.5 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-32 rounded-warm-lg border border-border px-3 py-1.5 font-mono text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                               />
                               <input
                                 type="text"
                                 value={opt.label}
                                 onChange={(e) => updateNewFieldOption(optIndex, 'label', e.target.value)}
                                 placeholder="Display label"
-                                className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="flex-1 rounded-warm-lg border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                               />
                               {(newField.options?.length || 0) > 1 && (
                                 <button
                                   onClick={() => removeNewFieldOption(optIndex)}
-                                  className="text-gray-400 hover:text-red-600"
+                                  className="text-text-muted hover:text-danger"
                                 >
                                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -593,12 +593,12 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
                           ))}
                           <button
                             onClick={addOption}
-                            className="text-sm text-blue-600 hover:text-blue-700"
+                            className="text-sm text-primary hover:text-primary"
                           >
                             + Add option
                           </button>
                         </div>
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-text-muted">
                           Use the value in multiplier rules (e.g., &quot;poor&quot; for condition field)
                         </p>
                       </div>
@@ -617,13 +617,13 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
                             serviceId: null,
                           })
                         }}
-                        className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        className="rounded-warm-lg border border-border px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-background"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={addField}
-                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                        className="rounded-warm-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
                       >
                         Add Field
                       </button>
@@ -636,7 +636,7 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
 
           {/* Tip about multipliers */}
           {config.fields.length > 0 && (
-            <div className="mt-6 rounded-lg bg-amber-50 p-4">
+            <div className="mt-6 rounded-warm-lg bg-amber-50 p-4">
               <div className="flex">
                 <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -654,16 +654,16 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
         </div>
 
         {/* Embed Code */}
-        <div className="rounded-lg bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-medium text-gray-900">Embed Code</h2>
-          <p className="mt-1 text-sm text-gray-500">
+        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+          <h2 className="text-lg font-medium text-text-primary">Embed Code</h2>
+          <p className="mt-1 text-sm text-text-muted">
             Copy this code to your website
           </p>
 
           {/* Tenant Key Display */}
-          <div className="mt-4 rounded-md bg-gray-50 p-3">
-            <p className="text-xs text-gray-500">Your Tenant Key</p>
-            <code className="text-sm font-mono text-gray-900">{tenantKey}</code>
+          <div className="mt-4 rounded-md bg-background p-3">
+            <p className="text-xs text-text-muted">Your Tenant Key</p>
+            <code className="text-sm font-mono text-text-primary">{tenantKey}</code>
           </div>
 
           {/* Mode selector */}
@@ -672,10 +672,10 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
               <button
                 key={mode}
                 onClick={() => setEmbedMode(mode)}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize ${
+                className={`rounded-warm-lg px-3 py-1.5 text-sm font-medium capitalize ${
                   embedMode === mode
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-blue-100 text-primary'
+                    : 'bg-background text-text-secondary hover:bg-gray-200'
                 }`}
               >
                 {mode}
@@ -684,13 +684,13 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
           </div>
 
           {/* Code preview */}
-          <pre className="mt-4 overflow-x-auto rounded-lg bg-gray-900 p-4 text-sm text-gray-100 whitespace-pre-wrap">
+          <pre className="mt-4 overflow-x-auto rounded-warm-lg bg-text-primary p-4 text-sm text-gray-100 whitespace-pre-wrap">
             {embedCode || 'Loading...'}
           </pre>
 
           <button
             onClick={handleCopy}
-            className="mt-4 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="mt-4 inline-flex items-center rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background"
           >
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -701,11 +701,11 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
       </div>
 
       {/* Preview link */}
-      <div className="mt-8 rounded-lg bg-blue-50 p-4">
+      <div className="mt-8 rounded-warm-lg bg-primary-light p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-medium text-blue-800">Test your widget</h3>
-            <p className="text-sm text-blue-700">
+            <h3 className="font-medium text-primary">Test your widget</h3>
+            <p className="text-sm text-primary">
               Preview how the widget looks and works before embedding
             </p>
           </div>
@@ -713,7 +713,7 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
             href={`/demo?tenantKey=${tenantKey}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
           >
             Open Demo Page
             <svg className="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

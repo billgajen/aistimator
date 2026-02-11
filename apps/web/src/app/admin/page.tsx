@@ -3,8 +3,8 @@ import Link from 'next/link'
 export default function AdminDashboard() {
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-      <p className="mt-2 text-gray-600">
+      <h1 className="text-2xl font-bold text-text-primary">Admin Dashboard</h1>
+      <p className="mt-2 text-text-secondary">
         Support tools for managing quotes and tenants across the platform.
       </p>
 
@@ -12,12 +12,12 @@ export default function AdminDashboard() {
         {/* Quotes Card */}
         <Link
           href="/admin/quotes"
-          className="block rounded-lg bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+          className="block rounded-warm-lg bg-surface p-6 shadow-warm transition-shadow hover:shadow-warm-hover"
         >
           <div className="flex items-center gap-4">
-            <div className="rounded-lg bg-blue-100 p-3">
+            <div className="rounded-warm-lg bg-primary-light p-3">
               <svg
-                className="h-6 w-6 text-blue-600"
+                className="h-6 w-6 text-primary"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -31,11 +31,11 @@ export default function AdminDashboard() {
               </svg>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Quotes</h2>
-              <p className="text-sm text-gray-500">Search and manage quotes</p>
+              <h2 className="text-lg font-semibold text-text-primary">Quotes</h2>
+              <p className="text-sm text-text-muted">Search and manage quotes</p>
             </div>
           </div>
-          <p className="mt-4 text-sm text-gray-600">
+          <p className="mt-4 text-sm text-text-secondary">
             Search quotes by ID or customer email. View details, retry failed jobs.
           </p>
         </Link>
@@ -43,12 +43,12 @@ export default function AdminDashboard() {
         {/* Tenants Card */}
         <Link
           href="/admin/tenants"
-          className="block rounded-lg bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+          className="block rounded-warm-lg bg-surface p-6 shadow-warm transition-shadow hover:shadow-warm-hover"
         >
           <div className="flex items-center gap-4">
-            <div className="rounded-lg bg-green-100 p-3">
+            <div className="rounded-warm-lg bg-secondary-light p-3">
               <svg
-                className="h-6 w-6 text-green-600"
+                className="h-6 w-6 text-secondary"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -62,11 +62,11 @@ export default function AdminDashboard() {
               </svg>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Tenants</h2>
-              <p className="text-sm text-gray-500">View tenant details</p>
+              <h2 className="text-lg font-semibold text-text-primary">Tenants</h2>
+              <p className="text-sm text-text-muted">View tenant details</p>
             </div>
           </div>
-          <p className="mt-4 text-sm text-gray-600">
+          <p className="mt-4 text-sm text-text-secondary">
             Search tenants by name or ID. View subscription status, usage, and services.
           </p>
         </Link>
@@ -74,12 +74,12 @@ export default function AdminDashboard() {
         {/* Activity Card */}
         <Link
           href="/admin/activity"
-          className="block rounded-lg bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+          className="block rounded-warm-lg bg-surface p-6 shadow-warm transition-shadow hover:shadow-warm-hover"
         >
           <div className="flex items-center gap-4">
-            <div className="rounded-lg bg-purple-100 p-3">
+            <div className="rounded-warm-lg bg-primary-light p-3">
               <svg
-                className="h-6 w-6 text-purple-600"
+                className="h-6 w-6 text-primary"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -93,20 +93,20 @@ export default function AdminDashboard() {
               </svg>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Activity Log</h2>
-              <p className="text-sm text-gray-500">Audit trail</p>
+              <h2 className="text-lg font-semibold text-text-primary">Activity Log</h2>
+              <p className="text-sm text-text-muted">Audit trail</p>
             </div>
           </div>
-          <p className="mt-4 text-sm text-gray-600">
+          <p className="mt-4 text-sm text-text-secondary">
             View admin actions and system events for debugging and auditing.
           </p>
         </Link>
       </div>
 
       {/* Quick Actions */}
-      <div className="mt-8 rounded-lg bg-yellow-50 p-4">
-        <h3 className="font-medium text-yellow-800">Support Tips</h3>
-        <ul className="mt-2 space-y-1 text-sm text-yellow-700">
+      <div className="mt-8 rounded-warm-lg bg-tertiary-light p-4">
+        <h3 className="font-medium text-tertiary">Support Tips</h3>
+        <ul className="mt-2 space-y-1 text-sm text-tertiary">
           <li>Search quotes by ID (e.g., qte_xxx) or customer email</li>
           <li>Failed quotes can be retried from the quote detail page</li>
           <li>All admin actions are logged for audit purposes</li>
