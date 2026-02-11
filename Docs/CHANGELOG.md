@@ -15,6 +15,62 @@
 
 ## Issues & Resolutions
 
+### 2026-02-11: Vercel Deployment Configuration
+
+**Context:** Needed to deploy the monorepo to Vercel for external testers. The standard deployment methods weren't working due to monorepo structure with pnpm workspaces.
+
+**Issue:** Initial CLI deployments completed in ~130ms without running the actual Next.js build. The dashboard Root Directory setting conflicted with CLI deployments.
+
+**Solution:** Used Vercel's builds API v2 in a root-level `vercel.json`:
+```json
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "apps/web/package.json",
+      "use": "@vercel/next",
+      "config": {
+        "installCommand": "cd ../.. && pnpm install"
+      }
+    }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "apps/web/$1" }
+  ]
+}
+```
+
+**Key learnings:**
+- The `builds` array with `@vercel/next` explicitly tells Vercel to build the Next.js app at `apps/web`
+- The `installCommand` in config navigates to root to install all workspace dependencies
+- Using `framework: null` doesn't work as expected for monorepos
+- The original `aistimator` project has a `rootDirectory: apps/web` setting that causes CLI deploy conflicts
+- Created a new `estimator-web` project that works correctly from root
+
+**Deployment URLs:**
+- Web App: https://estimator-web-phi.vercel.app
+- Worker: https://estimator-worker-production.billgajen.workers.dev
+
+---
+
+### 2026-02-11: Editorial Black Design System
+
+**Context:** User requested a bold, minimalist black & white design to replace the previous warm/thin design.
+
+**Design Tokens:**
+- Font: Sora (display + body), JetBrains Mono (code) via `next/font/google`
+- Colors: white bg (#FFFFFF), zinc-50 surface (#F4F4F5), near-black primary (#09090B), green secondary (#16A34A)
+- Typography: extrabold headings, semibold nav (text-[15px]), font-semibold buttons
+- Shadows: border-based (`0 0 0 1px`) flat editorial look
+
+**Component Library:** Created reusable components in `apps/web/src/components/ui/`:
+- Button, Input, Textarea, Select, Card, Badge, PageHeader
+- `cn()` utility at `apps/web/src/lib/cn.ts` (dependency-free)
+
+**Note:** Embed widget (`apps/web/src/app/embed/`) has minimal styling changes as it renders on customer sites.
+
+---
+
 ### 2026-02-06: Dashboard Setup Checks & Stats Bug Fixes
 
 **Context:** Three bugs in the dashboard prevented setup completion checks and quote stats from working correctly due to incorrect column names and wrong table references.
