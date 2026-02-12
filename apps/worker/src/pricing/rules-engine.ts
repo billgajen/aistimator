@@ -301,16 +301,8 @@ export function calculatePricing(
     }
   }
 
-  // Apply complexity multiplier from signals
-  const complexityMultiplier = getComplexityMultiplier(signals.complexity.level)
-  if (complexityMultiplier !== 1.0) {
-    const adjustmentAmount = runningSubtotal * (complexityMultiplier - 1)
-    const label = signals.complexity.level === 'low'
-      ? 'Simple job discount'
-      : `${signals.complexity.level.charAt(0).toUpperCase() + signals.complexity.level.slice(1)} complexity`
-    breakdown.push({ label, amount: Math.round(adjustmentAmount * 100) / 100 })
-    runningSubtotal = runningSubtotal * complexityMultiplier
-  }
+  // Note: Automatic complexity multiplier was removed.
+  // If a business wants complexity-based pricing, they can configure it as a multiplier rule with trigger conditions.
 
   // Note: Automatic access difficulty multiplier was removed.
   // Businesses can configure access-based pricing as work steps with trigger conditions if needed.
@@ -898,21 +890,8 @@ function generateMultiplierLabel(
   return `${fieldLabel}: ${valueLabel}`
 }
 
-/**
- * Get multiplier for complexity level
- */
-function getComplexityMultiplier(level: string): number {
-  switch (level) {
-    case 'low':
-      return 0.9
-    case 'medium':
-      return 1.0
-    case 'high':
-      return 1.25
-    default:
-      return 1.0
-  }
-}
+// Note: getComplexityMultiplier() was removed - automatic complexity multiplier is no longer applied.
+// If a business wants complexity-based pricing, they can configure it as a multiplier rule with trigger conditions.
 
 // Note: getAccessMultiplier() was removed - automatic global access multiplier is no longer applied.
 // If a business wants access-based pricing, they can configure it as a work step with trigger conditions.
@@ -1673,24 +1652,8 @@ export function calculatePricingWithTrace(
     }
   }
 
-  // Complexity multiplier
-  const complexityMultiplier = getComplexityMultiplier(signals.complexity.level)
-  if (complexityMultiplier !== 1.0) {
-    const adjustmentAmount = runningTotal * (complexityMultiplier - 1)
-    const prevTotal = runningTotal
-    runningTotal = runningTotal * complexityMultiplier
-    multiplierAdjustment += adjustmentAmount
-
-    traceSteps.push({
-      type: 'multiplier',
-      id: 'complexity',
-      description: signals.complexity.level === 'low' ? 'Simple job discount' : `${signals.complexity.level} complexity`,
-      signalsUsed: [{ key: 'complexity_level', value: signals.complexity.level }],
-      calculation: `${prevTotal} × ${complexityMultiplier} = ${runningTotal}`,
-      amount: Math.round(adjustmentAmount * 100) / 100,
-      runningTotal: Math.round(runningTotal * 100) / 100,
-    })
-  }
+  // Note: Automatic complexity multiplier was removed.
+  // If a business wants complexity-based pricing, they can configure it as a multiplier rule with trigger conditions.
 
   // Note: Automatic access difficulty multiplier was removed.
   // Businesses can configure access-based pricing as work steps with trigger conditions if needed.

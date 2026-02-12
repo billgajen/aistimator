@@ -15,6 +15,31 @@
 
 ## Issues & Resolutions
 
+### 2026-02-12: Removed Hardcoded Complexity Multiplier
+
+**Context:** The pricing engine was automatically applying a "Simple job discount" (10% off) when AI detected complexity as "low", and a 25% premium for "high" complexity. This violated the anti-hardcoding principle: "AI can extract signals and draft wording, but AI must not set the final price."
+
+**Issue:** Hardcoded values in `getComplexityMultiplier()` function were automatically adjusting prices based on AI-detected complexity:
+- `low` → 0.9 (10% discount, shown as "Simple job discount")
+- `medium` → 1.0 (no change)
+- `high` → 1.25 (25% premium)
+
+**Solution:** Removed the automatic complexity multiplier entirely from three locations in `apps/worker/src/pricing/rules-engine.ts`:
+1. `calculatePricing()` function (lines 304-313)
+2. `getComplexityMultiplier()` helper function (lines 904-915)
+3. `calculatePricingWithTrace()` function (lines 1676-1693)
+
+Replaced with explanatory comments following the same pattern used for the previously removed access difficulty multiplier.
+
+**Impact:**
+- Quotes will no longer show automatic "Simple job discount" or complexity premiums
+- Businesses can still configure complexity-based pricing manually as multiplier rules with trigger conditions
+- This aligns with the principle that pricing should be deterministic based on business configuration, not AI decisions
+
+**Related:** Follows same pattern as access difficulty multiplier removal (see line 315-316 comments in the file)
+
+---
+
 ### 2026-02-11: Vercel Deployment Configuration
 
 **Context:** Needed to deploy the monorepo to Vercel for external testers. The standard deployment methods weren't working due to monorepo structure with pnpm workspaces.
