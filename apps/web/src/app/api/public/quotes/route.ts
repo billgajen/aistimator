@@ -328,8 +328,8 @@ export async function POST(request: Request) {
       }
 
       // Note: We can't validate specific angles server-side without metadata
-      // The widget enforces this, but we can warn if no photos provided and angles required
-      if (requiredAngles.length > 0 && assetCount === 0) {
+      // Only enforce requiredAngles if minPhotos > 0 (respects the business setting)
+      if (minPhotos > 0 && requiredAngles.length > 0 && assetCount === 0) {
         return NextResponse.json(
           {
             error: {
