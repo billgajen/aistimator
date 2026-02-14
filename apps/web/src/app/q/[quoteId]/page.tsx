@@ -455,6 +455,7 @@ function StatusBadge({ status }: { status: QuoteStatus }) {
     queued: { label: 'Processing', className: 'bg-tertiary-light text-tertiary' },
     generating: { label: 'Processing', className: 'bg-tertiary-light text-tertiary' },
     pending_review: { label: 'Under Review', className: 'bg-tertiary-light text-tertiary' },
+    awaiting_clarification: { label: 'Awaiting Info', className: 'bg-tertiary-light text-tertiary' },
     sent: { label: 'Awaiting Response', className: 'bg-primary-light text-primary' },
     viewed: { label: 'Viewed', className: 'bg-primary-light text-primary' },
     accepted: { label: 'Accepted', className: 'bg-secondary-light text-secondary' },

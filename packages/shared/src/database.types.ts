@@ -13,6 +13,7 @@ export type QuoteStatus =
   | 'queued'
   | 'generating'
   | 'pending_review'
+  | 'awaiting_clarification'
   | 'sent'
   | 'viewed'
   | 'accepted'
@@ -551,6 +552,65 @@ export interface ExtractedSignalsV2 {
 }
 
 // ============================================================================
+// SIGNAL PROVENANCE TYPES (Phase 3: Signal Fusion)
+// ============================================================================
+
+/** Source of a signal value */
+export type SignalSource = 'form' | 'vision' | 'text' | 'inferred'
+
+/** Provenance tracking for a single signal */
+export interface SignalProvenance {
+  key: string
+  value: string | number | boolean
+  confidence: number
+  source: SignalSource
+  evidence?: string
+  overrideReason?: string
+}
+
+/** Conflict between two sources for the same signal */
+export interface SignalConflict {
+  key: string
+  formValue?: string | number | boolean
+  visionValue?: string | number | boolean
+  resolvedSource: SignalSource
+  resolution: string
+}
+
+// ============================================================================
+// QUALITY GATE TYPES (Phase 4)
+// ============================================================================
+
+/** A clarification question targeting a low-confidence signal */
+export interface ClarificationQuestion {
+  /** Unique ID for this question */
+  id: string
+  /** The signal key this question targets */
+  targetSignalKey: string
+  /** Human-readable question text */
+  question: string
+  /** Optional suggested answer options */
+  options?: string[]
+}
+
+/** Customer's answer to a clarification question */
+export interface ClarificationAnswer {
+  questionId: string
+  answer: string
+}
+
+/** Quality gate evaluation result */
+export interface QualityGateResult {
+  action: 'send' | 'ask_clarification' | 'require_review'
+  /** Questions to ask (when action = ask_clarification) */
+  questions?: ClarificationQuestion[]
+  /** Review reason (when action = require_review) */
+  reason?: string
+  /** Timestamp of evaluation */
+  evaluatedAt: string
+}
+
+// ============================================================================
 // PRICING TRACE TYPES
 // ============================================================================
 
@@ -619,6 +679,25 @@ export interface Quote {
   signals_json?: ExtractedSignalsV2 | null
   /** Step-by-step pricing calculation trace */
   pricing_trace_json?: PricingTrace | null
+  /** Triage agent decision: classification, photo strategy, returning customer info */
+  triage_json?: {
+    classification: 'simple' | 'standard' | 'complex'
+    photoStrategy: { skipVision: boolean; maxPhotos: number }
+    crossServiceCheck: boolean
+    returningCustomer: boolean
+    previousQuoteCount: number
+    reasons: string[]
+  } | null
+  /** Signal conflicts recorded during fusion (when vision and form disagree) */
+  signal_conflicts_json?: SignalConflict[] | null
+  /** Quality gate evaluation result */
+  quality_gate_json?: QualityGateResult | null
+  /** Clarification questions for customer */
+  clarification_questions_json?: ClarificationQuestion[] | null
+  /** Customer answers to clarification questions */
+  clarification_answers_json?: ClarificationAnswer[] | null
+  /** Number of clarification rounds (capped at 1) */
+  clarification_count?: number
   created_at: string
   sent_at: string | null
   viewed_at: string | null

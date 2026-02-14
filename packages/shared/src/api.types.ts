@@ -78,6 +78,20 @@ export interface CreateQuoteResponse {
 }
 
 // ============================================================================
+// Public Clarification API Types (Phase 4: Quality Gate)
+// ============================================================================
+
+export interface ClarifyQuoteRequest {
+  token: string
+  answers: Array<{ questionId: string; answer: string }>
+}
+
+export interface ClarifyQuoteResponse {
+  success: boolean
+  message: string
+}
+
+// ============================================================================
 // Public Quote View API Types
 // ============================================================================
 

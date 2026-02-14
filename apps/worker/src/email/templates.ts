@@ -225,3 +225,58 @@ function escapeHtml(text: string): string {
   }
   return text.replace(/[&<>"']/g, (char) => htmlEntities[char] || char)
 }
+
+// ============================================================================
+// CLARIFICATION EMAIL TEMPLATE (Phase 4: Quality Gate)
+// ============================================================================
+
+export interface ClarificationEmailData {
+  customerName: string
+  businessName: string
+  serviceName: string
+  clarifyUrl: string
+  questions: Array<{ question: string }>
+  primaryColor?: string
+}
+
+/**
+ * Email sent to customer when the quality gate requests clarification.
+ */
+export function customerClarificationEmail(data: ClarificationEmailData): string {
+  const questionsList = data.questions
+    .map((q) => `<li style="margin-bottom: 8px; color: #374151;">${escapeHtml(q.question)}</li>`)
+    .join('')
+
+  const content = `
+    <tr>
+      <td style="padding: 32px;">
+        <h1 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 800; color: #09090B;">
+          Quick question about your quote
+        </h1>
+        <p style="margin: 0 0 24px 0; color: #52525b; font-size: 15px; line-height: 1.6;">
+          Hi ${escapeHtml(data.customerName)},
+        </p>
+        <p style="margin: 0 0 16px 0; color: #52525b; font-size: 15px; line-height: 1.6;">
+          ${escapeHtml(data.businessName)} needs a little more information to finalize your ${escapeHtml(data.serviceName)} quote.
+          It will only take a moment:
+        </p>
+        <ul style="margin: 0 0 24px 0; padding-left: 20px; font-size: 14px;">
+          ${questionsList}
+        </ul>
+        <table role="presentation" style="margin: 0 auto;">
+          <tr>
+            <td style="background-color: #09090B; border-radius: 6px;">
+              <a href="${data.clarifyUrl}" style="display: inline-block; padding: 14px 32px; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none;">
+                Answer Questions
+              </a>
+            </td>
+          </tr>
+        </table>
+        <p style="margin: 24px 0 0 0; color: #a1a1aa; font-size: 13px;">
+          This helps us provide you with the most accurate quote possible.
+        </p>
+      </td>
+    </tr>`
+
+  return emailWrapper(content, data.primaryColor)
+}

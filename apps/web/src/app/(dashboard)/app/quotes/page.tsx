@@ -190,6 +190,7 @@ export default function QuotesPage() {
       queued: { label: 'Queued', className: 'bg-background text-text-secondary' },
       generating: { label: 'Processing', className: 'bg-tertiary-light text-tertiary' },
       pending_review: { label: 'Review Required', className: 'bg-tertiary-light text-tertiary' },
+      awaiting_clarification: { label: 'Awaiting Info', className: 'bg-tertiary-light text-tertiary' },
       sent: { label: 'Sent', className: 'bg-primary-light text-primary' },
       viewed: { label: 'Viewed', className: 'bg-primary-light text-primary' },
       accepted: { label: 'Accepted', className: 'bg-secondary-light text-secondary' },
