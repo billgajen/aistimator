@@ -1,15 +1,17 @@
 /**
  * AI Wording Generator
  *
- * Uses Gemini 1.5 Flash to generate professional quote wording:
+ * Uses Gemini 2.5 Flash to generate professional quote wording:
  * - Scope summary describing the work
  * - Assumptions and exclusions
  * - Additional notes
  *
  * IMPORTANT: This generates WORDING only, not pricing.
+ * Uses structured output (JSON schema) for reliable parsing.
  */
 
 import { GeminiClient } from './gemini'
+import { QUOTE_CONTENT_SCHEMA } from './schemas'
 import type { ExtractedSignals } from './signals'
 import type { PricingResult } from '../pricing/rules-engine'
 
@@ -332,17 +334,26 @@ export async function generateWording(
     prompt += `\n\nIMPORTANT: The pricing notes above are already shown separately on the quote. Do NOT repeat them verbatim in the "notes" field. Instead, synthesize any relevant information into a cohesive customer-facing note, or leave "notes" as an empty string if there's nothing additional to say.`
   }
 
-  const response = await client.generateText(prompt, getSystemPrompt(context.documentType))
-
   try {
-    const content = GeminiClient.parseJSON<QuoteContent>(response)
+    // Use structured output (JSON schema) for reliable parsing
+    const content = await client.generateWithSchema<QuoteContent>(
+      prompt,
+      QUOTE_CONTENT_SCHEMA,
+      getSystemPrompt(context.documentType)
+    )
     return validateContent(content, context)
   } catch (error) {
-    console.error('[Wording] Failed to parse Gemini response:', error)
-    console.error('[Wording] Raw response:', response)
+    console.error('[Wording] Structured output failed, falling back to text parsing:', error)
 
-    // Return default content
-    return getDefaultContent(context)
+    // Fallback: use text-based generation + parseJSON
+    try {
+      const response = await client.generateText(prompt, getSystemPrompt(context.documentType))
+      const content = GeminiClient.parseJSON<QuoteContent>(response)
+      return validateContent(content, context)
+    } catch (fallbackError) {
+      console.error('[Wording] Fallback also failed:', fallbackError)
+      return getDefaultContent(context)
+    }
   }
 }
 
