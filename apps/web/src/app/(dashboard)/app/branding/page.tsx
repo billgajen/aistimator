@@ -35,7 +35,7 @@ const MOCK_QUOTE = {
     ],
     subtotal: 850,
     taxLabel: 'VAT',
-    taxRate: 0.2,
+    taxRate: 20,
     taxAmount: 170,
     total: 1020,
   },
@@ -435,7 +435,7 @@ export default function BrandingPage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">
-                    {MOCK_QUOTE.pricing.taxLabel} ({(MOCK_QUOTE.pricing.taxRate * 100).toFixed(0)}%)
+                    {MOCK_QUOTE.pricing.taxLabel} ({MOCK_QUOTE.pricing.taxRate}%)
                   </span>
                   <span>{formatCurrency(MOCK_QUOTE.pricing.taxAmount)}</span>
                 </div>

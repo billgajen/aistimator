@@ -8,7 +8,7 @@
  * even when the business hasn't configured explicit work steps for every signal.
  */
 
-import type { GeminiClient } from './gemini'
+import { GeminiClient } from './gemini'
 import type { SignalRecommendation, WorkStepConfig } from '@estimator/shared'
 
 /**
@@ -190,25 +190,13 @@ function parseRecommendations(
   unusedSignals: UnusedSignal[]
 ): SignalRecommendation[] {
   try {
-    // Remove markdown code blocks if present
-    let cleaned = response.trim()
-    if (cleaned.startsWith('```json')) {
-      cleaned = cleaned.slice(7)
-    } else if (cleaned.startsWith('```')) {
-      cleaned = cleaned.slice(3)
-    }
-    if (cleaned.endsWith('```')) {
-      cleaned = cleaned.slice(0, -3)
-    }
-    cleaned = cleaned.trim()
-
-    const parsed = JSON.parse(cleaned) as {
+    const parsed = GeminiClient.parseJSON(response) as {
       recommendations?: Array<{
         signalKey: string
         workDescription: string
-        whatItInvolves?: string  // New field (no prices)
-        costBreakdown?: string   // Legacy field (may contain prices from old responses)
-        estimatedCost?: number   // Legacy field (ignored)
+        whatItInvolves?: string
+        costBreakdown?: string
+        estimatedCost?: number
         reason: string
       }>
     }
