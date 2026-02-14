@@ -15,6 +15,62 @@
 
 ## Issues & Resolutions
 
+### 2026-02-13: Agentic AI Transformation (5 Phases)
+
+**Context:** Major upgrade to transform the platform into an agentic AI product through 5 incremental phases, each independently deployable.
+
+**Phase 1: Gemini 2.5 Flash Migration + Structured Outputs**
+- Migrated model from `gemini-2.0-flash` to `gemini-2.5-flash` in all 3 call sites
+- Added `generateWithSchema<T>()` and `generateWithImagesAndSchema<T>()` methods to GeminiClient for structured JSON output via `response_mime_type: "application/json"` + `response_schema`
+- Created centralized JSON Schema definitions in `apps/worker/src/ai/schemas.ts`
+- Migrated signal extraction and wording generation to structured output with `parseJSON<T>()` fallback
+- **Files:** `gemini.ts`, `signals.ts`, `wording.ts`, `schemas.ts`, `service-matcher.ts`, `ai-draft/route.ts`
+
+**Phase 2: Triage Agent**
+- Heuristic-only triage (no AI call) classifies quotes as simple/standard/complex
+- Photo strategy optimization: skip vision for 0 photos, cap at 5 for 3+
+- Cross-service check gated by triage decision
+- Returning customer detection via `quote_requests` lookup
+- DB migration: `triage_json` column on quotes table
+- **Files:** `agents/types.ts`, `agents/triage.ts`, `quote-processor.ts`, migration 00000000000013
+
+**Phase 3: Signal Fusion with Provenance**
+- Observer pattern recorder tracks provenance of every signal (source: form/vision/text/inferred)
+- Records conflicts when form and vision disagree (AD-007: form always wins)
+- DB migration: `signal_conflicts_json` column on quotes table
+- **Files:** `agents/signal-fusion.ts`, `quote-processor.ts`, `database.types.ts`, migration 00000000000014
+
+**Phase 4: Quality Gate**
+- Three outputs: `send` (proceed), `ask_clarification` (max 2 targeted questions), `require_review` (flag for business)
+- Clarification flow: public API + customer-facing page at `/q/[quoteId]/clarify`
+- Max 1 clarification round (no infinite loops via `clarification_count` cap)
+- New statuses: `awaiting_clarification`, `pending_review` added to Postgres enum and all status maps
+- DB migration: clarification columns + quality gate JSON on quotes table
+- **Files:** `agents/quality-gate.ts`, `clarify/route.ts`, `clarify/page.tsx`, `email/templates.ts`, migration 00000000000015
+
+**Phase 5: Conversational Widget (A/B Test)**
+- Chat-based widget alternative to the multi-step form
+- Chat API (`/api/public/widget/chat`) uses Gemini 2.5 Flash structured output to extract fields from natural language
+- A/B test framework with sticky localStorage assignment (form/conversational/ab-test modes)
+- Widget analytics tracking (`/api/public/widget/analytics`) with `widget_analytics` table
+- Loader updated to read `data-display-mode` attribute and mount correct widget variant
+- Zero backend pipeline changes — conversational widget produces the same `CreateQuoteRequest`
+- DB migration: `widget_analytics` table with RLS, migration 00000000000016
+- **Files:** `ConversationalWidget.tsx`, `ChatBubble.tsx`, `ChatInput.tsx`, `ab-test.ts`, `chat/route.ts`, `analytics/route.ts`, `loader.tsx`, `types.ts`
+
+**Critical constraint maintained:** AI extracts signals and drafts wording. AI never sets prices. The deterministic rules engine remains the pricing authority.
+
+**Test results:** 168 tests passing (7 test files). Widget builds at 47.43 kB (11 modules).
+
+**Fixes during implementation:**
+- `awaiting_clarification` status added to dashboard quotes page and public quote view page status maps
+- Quality gate test `makePricing()` helper needed explicit `confidence` field (required by `PricingResult` type)
+- Phase 2 triage variable `descriptionAnswer` renamed to `triageDescriptionAnswer` to avoid redeclaration conflict in `quote-processor.ts`
+- Phase 3 FIX-8 access override block moved inside `if (structuredSignals)` scope for fusion recorder access
+- Phase 4 `GeminiClient` import changed to `import type` (only used as type parameter)
+
+---
+
 ### 2026-02-12: Removed Hardcoded Complexity Multiplier
 
 **Context:** The pricing engine was automatically applying a "Simple job discount" (10% off) when AI detected complexity as "low", and a 25% premium for "high" complexity. This violated the anti-hardcoding principle: "AI can extract signals and draft wording, but AI must not set the final price."
