@@ -62,6 +62,8 @@ export interface WordingContext {
   documentType?: DocumentTone
   /** Error code reported by customer (e.g., boiler error code "EA", "F1") */
   errorCode?: string
+  /** Learning context from business editing patterns (affects wording, not pricing) */
+  learningContext?: string
 }
 
 /**
@@ -332,6 +334,11 @@ export async function generateWording(
   // FIX-4: Instruct AI not to repeat pricing notes verbatim in content notes
   if (context.pricing.notes.length > 0) {
     prompt += `\n\nIMPORTANT: The pricing notes above are already shown separately on the quote. Do NOT repeat them verbatim in the "notes" field. Instead, synthesize any relevant information into a cohesive customer-facing note, or leave "notes" as an empty string if there's nothing additional to say.`
+  }
+
+  // Learning context from business editing patterns (affects wording only, not pricing per AD-001)
+  if (context.learningContext) {
+    prompt += `\n\n===== BUSINESS EDITING PATTERNS =====\nThe following patterns were observed from this business's previous edits to similar quotes. Use these to write better wording that matches the business's style and preferences:\n${context.learningContext}\n\nIMPORTANT: These patterns should influence WORDING ONLY (scope descriptions, assumptions, exclusions, notes). They must NOT change any pricing amounts.`
   }
 
   try {

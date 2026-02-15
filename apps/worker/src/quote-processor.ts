@@ -983,6 +983,24 @@ export async function processQuote(
     }
   }
 
+  // Fetch learning context if available (for AI wording improvement)
+  let learningContext: string | undefined
+  try {
+    const { data: learningData } = await supabase
+      .from('tenant_learning_context')
+      .select('prompt_context')
+      .eq('tenant_id', quoteData.quote.tenant_id)
+      .eq('service_id', quoteData.quote.service_id)
+      .single()
+
+    if (learningData?.prompt_context) {
+      learningContext = learningData.prompt_context
+      console.log('[Processor] Including learning context from business editing patterns')
+    }
+  } catch {
+    // Learning context is optional — don't block quote generation
+  }
+
   // Build wording context with service profile data
   const wordingContext = {
     businessName: tenant.name,
@@ -999,6 +1017,7 @@ export async function processQuote(
     projectDescription, // Customer's detailed project description
     documentType: quoteData.quote.document_type as 'instant_estimate' | 'formal_quote' | 'proposal' | 'sow',
     errorCode, // FIX-6: Pass error code to wording for contextual notes
+    learningContext, // Learning context from amendment patterns
   }
 
   if (gemini) {

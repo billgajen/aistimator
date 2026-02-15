@@ -193,6 +193,8 @@ export default function QuotesPage() {
       awaiting_clarification: { label: 'Awaiting Info', className: 'bg-tertiary-light text-tertiary' },
       sent: { label: 'Sent', className: 'bg-primary-light text-primary' },
       viewed: { label: 'Viewed', className: 'bg-primary-light text-primary' },
+      feedback_received: { label: 'Feedback', className: 'bg-tertiary-light text-tertiary' },
+      revised: { label: 'Revised', className: 'bg-primary-light text-primary' },
       accepted: { label: 'Accepted', className: 'bg-secondary-light text-secondary' },
       paid: { label: 'Paid', className: 'bg-secondary-light text-secondary' },
       expired: { label: 'Expired', className: 'bg-background text-text-muted' },
@@ -350,8 +352,20 @@ export default function QuotesPage() {
                     </td>
                     <td className="px-6 py-5 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
+                        {/* View / Edit */}
+                        <Link
+                          href={`/app/quotes/${quote.quoteId}`}
+                          className="text-text-secondary hover:text-text-primary transition-colors"
+                          title="View quote"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        </Link>
+
                         {/* View Trace */}
-                        {['sent', 'viewed', 'accepted', 'paid'].includes(quote.status) && (
+                        {['sent', 'viewed', 'accepted', 'paid', 'feedback_received', 'revised'].includes(quote.status) && (
                           <Link
                             href={`/app/quotes/${quote.quoteId}/trace`}
                             className="text-text-secondary hover:text-text-primary transition-colors"
