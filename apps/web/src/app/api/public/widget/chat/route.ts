@@ -18,6 +18,7 @@ interface ChatRequestBody {
   message: string
   conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>
   extractedFields?: Record<string, string | number | boolean | null>
+  fieldAnswers?: Array<{ fieldId: string; value: string }>
 }
 
 interface ExtractedFields {
@@ -27,6 +28,7 @@ interface ExtractedFields {
 interface ChatAPIResponse {
   reply: string
   extractedFields: ExtractedFields
+  fieldAnswers?: Array<{ fieldId: string; value: string }>
   nextQuestion?: string
   isComplete: boolean
   formData?: {
@@ -161,6 +163,32 @@ export async function POST(request: Request) {
     // Build the system prompt for Gemini
     const isStart = body.message === '__start__'
 
+    // Build list of required fields the AI must collect
+    const requiredFields = allFields.filter(f => f.required).map(f => f.label)
+    const requiredFieldIds = allFields.filter(f => f.required).map(f => f.fieldId)
+
+    // Build "already collected" context from both extractedFields and fieldAnswers
+    const collectedLines: string[] = []
+    const ef = body.extractedFields
+    if (ef) {
+      for (const [k, v] of Object.entries(ef)) {
+        if (v !== null && v !== undefined && v !== '') {
+          collectedLines.push(`  - ${k}: ${v}`)
+        }
+      }
+    }
+    const prevFieldAnswers = body.fieldAnswers || []
+    for (const fa of prevFieldAnswers) {
+      const field = allFields.find(f => f.fieldId === fa.fieldId)
+      collectedLines.push(`  - ${field?.label || fa.fieldId} (fieldId: ${fa.fieldId}): ${fa.value}`)
+    }
+
+    // Figure out which required fields are still missing
+    const collectedFieldIds = new Set(prevFieldAnswers.map(fa => fa.fieldId))
+    const missingRequired = allFields
+      .filter(f => f.required && !collectedFieldIds.has(f.fieldId))
+      .map(f => f.label)
+
     const systemPrompt = `You are a friendly quote assistant for "${tenant?.name || 'our business'}".
 Your job is to gather information for a quote request through natural conversation.
 
@@ -172,28 +200,31 @@ INFORMATION TO COLLECT:
 1. Customer name (REQUIRED)
 2. Customer email (REQUIRED)
 3. Customer phone (optional)
-${!selectedService ? '4. Which service they need (REQUIRED)\n' : ''}${fieldDescriptions ? `\nSERVICE-SPECIFIC FIELDS:\n${fieldDescriptions}` : ''}
+${!selectedService ? '4. Which service they need (REQUIRED)\n' : ''}${fieldDescriptions ? `\nSERVICE-SPECIFIC FIELDS TO ASK ABOUT:\n${fieldDescriptions}` : ''}
 
-RULES:
+${collectedLines.length > 0 ? `ALREADY COLLECTED FROM PREVIOUS MESSAGES:\n${collectedLines.join('\n')}\n\nInclude these in your extractedFields/fieldAnswers output. If the customer corrects any, use the new value.\n` : ''}
+${missingRequired.length > 0 ? `STILL NEEDED (ask about these):\n${missingRequired.map(f => `  - ${f}`).join('\n')}\n` : ''}
+
+COMPLETION RULES:
+- Set isComplete to true ONLY when you have ALL of the following:
+  * Customer name
+  * Customer email
+  ${selectedService ? '' : '* Service selection'}
+  ${requiredFields.length > 0 ? `* ALL required service fields: ${requiredFields.join(', ')}` : ''}
+- If you are still missing ANY required field, set isComplete to false and ask for it
+- The fieldAnswers array must contain ALL service-specific field values collected so far (not just new ones)
+
+CONVERSATION RULES:
 - Be conversational and helpful, not robotic
 - Ask one or two questions at a time, not all at once
 - When the customer provides info, acknowledge it naturally
-- Extract field values from their responses — include ALL fields collected so far in extractedFields, not just new ones from this message
-- When you have all REQUIRED information (name + email + project description at minimum), set isComplete to true
-- When isComplete is true, you MUST include ALL collected fields in extractedFields (customerName, customerEmail, etc.)
+- For select/dropdown fields, present the options naturally
+- For boolean fields (yes/no), ask naturally
 - Do NOT make up information the customer hasn't provided
 - Keep responses concise (2-3 sentences max)
+- A project description from the customer should go into the fieldAnswers with fieldId "_project_description"
 
-${(() => {
-  const ef = body.extractedFields
-  if (!ef || Object.keys(ef).length === 0) return ''
-  const collected = Object.entries(ef)
-    .filter(([, v]) => v !== null && v !== undefined && v !== '')
-    .map(([k, v]) => `  - ${k}: ${v}`)
-    .join('\n')
-  return collected ? `ALREADY COLLECTED FROM PREVIOUS MESSAGES:\n${collected}\n\nUse these values in your extractedFields output. If the customer corrects any, use the new value.\n` : ''
-})()}
-${isStart ? 'This is the start of the conversation. Greet the customer warmly and ask your first question.' : ''}`
+${isStart ? 'This is the start of the conversation. Greet the customer warmly and ask about their project first, then collect the specific fields one by one.' : ''}`
 
     // Build conversation messages for Gemini
     const geminiMessages: Array<{ role: string; parts: Array<{ text: string }> }> = []
@@ -318,32 +349,55 @@ ${isStart ? 'This is the start of the conversation. Greet the customer warmly an
       isComplete: parsed.isComplete,
     }
 
+    // Include fieldAnswers in response so client can accumulate them
+    if (parsed.fieldAnswers && parsed.fieldAnswers.length > 0) {
+      result.fieldAnswers = parsed.fieldAnswers
+    }
+
     // If complete, assemble formData for submission
     if (parsed.isComplete) {
-      const ef = parsed.extractedFields || {}
-      const resolvedServiceId = (ef.serviceId as string) || body.serviceId
+      const completedFields = parsed.extractedFields || {}
+      const resolvedServiceId = (completedFields.serviceId as string) || body.serviceId
 
-      if (resolvedServiceId && ef.customerName && ef.customerEmail) {
-        const answers: Array<{ fieldId: string; value: string | number | boolean | string[] }> = []
+      if (resolvedServiceId && completedFields.customerName && completedFields.customerEmail) {
+        // Merge accumulated fieldAnswers from previous turns with new ones
+        const answerMap = new Map<string, string>()
+        // Previous accumulated answers
+        for (const fa of prevFieldAnswers) {
+          answerMap.set(fa.fieldId, fa.value)
+        }
+        // New answers from this turn (override if same fieldId)
         if (parsed.fieldAnswers) {
           for (const fa of parsed.fieldAnswers) {
-            answers.push({ fieldId: fa.fieldId, value: fa.value })
+            answerMap.set(fa.fieldId, fa.value)
           }
         }
 
-        result.formData = {
-          serviceId: resolvedServiceId,
-          customer: {
-            name: ef.customerName as string,
-            email: ef.customerEmail as string,
-            phone: ef.customerPhone as string | undefined,
-          },
-          job: {
-            address: ef.address as string | undefined,
-            postcodeOrZip: ef.postcodeOrZip as string | undefined,
-            answers,
-          },
-          assetIds: [],
+        const answers: Array<{ fieldId: string; value: string | number | boolean | string[] }> = []
+        for (const [fieldId, value] of answerMap) {
+          answers.push({ fieldId, value })
+        }
+
+        // Verify all required fields are present
+        const hasAllRequired = requiredFieldIds.every(fid => answerMap.has(fid))
+        if (!hasAllRequired && requiredFieldIds.length > 0) {
+          // Missing required service fields — not actually complete
+          result.isComplete = false
+        } else {
+          result.formData = {
+            serviceId: resolvedServiceId,
+            customer: {
+              name: completedFields.customerName as string,
+              email: completedFields.customerEmail as string,
+              phone: completedFields.customerPhone as string | undefined,
+            },
+            job: {
+              address: completedFields.address as string | undefined,
+              postcodeOrZip: completedFields.postcodeOrZip as string | undefined,
+              answers,
+            },
+            assetIds: [],
+          }
         }
       } else {
         // Missing required fields — not actually complete
