@@ -5,8 +5,12 @@ import type { QuoteListItem, QuotesListResponse, QuoteStatus } from '@estimator/
 const VALID_STATUSES: QuoteStatus[] = [
   'queued',
   'generating',
+  'pending_review',
+  'awaiting_clarification',
   'sent',
   'viewed',
+  'feedback_received',
+  'revised',
   'accepted',
   'paid',
   'expired',

@@ -269,50 +269,6 @@ a) FORM/DESCRIPTION CONFLICTS
 
 ---
 
-## OUTPUT FORMAT
-
-Return a JSON object with this exact structure:
-
-{
-  "overallStatus": "PASS" | "FAIL" | "REVIEW_NEEDED",
-  "confidenceScore": 0.0-1.0,
-  "issues": [
-    {
-      "id": "unique-id",
-      "category": "pricing|scope|potential_work|cross_service|addons|notes|discounts|logic",
-      "severity": "critical|high|medium|low",
-      "check": "CHECK_1a",
-      "description": "Human readable description",
-      "found": "What was found in the quote",
-      "expected": "What was expected based on config/request",
-      "autoFixable": true|false,
-      "autoFix": {
-        "action": "add_work_step|remove_scope_text|remove_potential_work|remove_cross_service|remove_addon|add_note|flag_only",
-        "details": {
-          // For add_work_step: { "workStepId": "the-exact-id-from-config", "quantity": number }
-          // For remove_scope_text: { "pattern": "text to remove", "replacement": "optional replacement" }
-          // For remove_potential_work: { "itemIndex": 0 }
-          // For remove_cross_service: { "serviceId": "service-id" }
-          // For remove_addon: { "addonId": "addon-label-text" }
-          // For add_note: { "text": "note text", "position": "start|end" }
-        }
-      },
-      "suggestedConfigFix": "Optional config suggestion"
-    }
-  ],
-  "summary": {
-    "criticalCount": 0,
-    "highCount": 0,
-    "mediumCount": 0,
-    "lowCount": 0,
-    "autoFixableCount": 0,
-    "configIssueCount": 0
-  },
-  "calculatedExpectedTotal": 0,
-  "actualTotal": ${quote.pricing.total},
-  "pricingGapPercent": 0
-}
-
 ## IMPORTANT RULES
 
 1. BASE ALL CHECKS ON SERVICE CONFIGURATION - not arbitrary market rates
@@ -321,7 +277,7 @@ Return a JSON object with this exact structure:
 4. DISTINGUISH CONFIG ISSUES FROM PROCESSING ISSUES - config issues need business action
 5. EVERY ISSUE MUST HAVE EVIDENCE - quote the specific text/value that's wrong
 6. Be conservative - only flag real issues, not theoretical problems
-7. Return ONLY valid JSON, no markdown formatting or explanation outside the JSON`
+7. The actualTotal for this quote is ${quote.pricing.total}`
 }
 
 // ============================================================================
@@ -331,6 +287,51 @@ Return a JSON object with this exact structure:
 /**
  * Validate a generated quote using Gemini
  */
+/**
+ * JSON Schema for Gemini structured output — guarantees valid JSON response.
+ */
+const VALIDATION_RESULT_SCHEMA = {
+  type: 'object',
+  properties: {
+    overallStatus: { type: 'string', enum: ['PASS', 'FAIL', 'REVIEW_NEEDED'] },
+    confidenceScore: { type: 'number' },
+    issues: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          category: { type: 'string', enum: ['pricing', 'scope', 'potential_work', 'cross_service', 'addons', 'notes', 'discounts', 'logic'] },
+          severity: { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
+          check: { type: 'string' },
+          description: { type: 'string' },
+          found: { type: 'string' },
+          expected: { type: 'string' },
+          autoFixable: { type: 'boolean' },
+          suggestedConfigFix: { type: 'string' },
+        },
+        required: ['id', 'category', 'severity', 'check', 'description', 'found', 'expected', 'autoFixable'],
+      },
+    },
+    summary: {
+      type: 'object',
+      properties: {
+        criticalCount: { type: 'number' },
+        highCount: { type: 'number' },
+        mediumCount: { type: 'number' },
+        lowCount: { type: 'number' },
+        autoFixableCount: { type: 'number' },
+        configIssueCount: { type: 'number' },
+      },
+      required: ['criticalCount', 'highCount', 'mediumCount', 'lowCount', 'autoFixableCount', 'configIssueCount'],
+    },
+    calculatedExpectedTotal: { type: 'number' },
+    actualTotal: { type: 'number' },
+    pricingGapPercent: { type: 'number' },
+  },
+  required: ['overallStatus', 'confidenceScore', 'issues', 'summary', 'calculatedExpectedTotal', 'actualTotal', 'pricingGapPercent'],
+}
+
 export async function validateQuote(
   gemini: GeminiClient,
   quote: GeneratedQuoteForValidation,
@@ -341,17 +342,10 @@ export async function validateQuote(
   const prompt = buildValidationPrompt(customerRequest, serviceConfig, quote, _widgetFields)
 
   try {
-    const responseText = await gemini.generateText(prompt)
-
-    // Extract JSON from response
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-
-    if (!jsonMatch) {
-      console.error('[Validator] No JSON found in response:', responseText.substring(0, 200))
-      return getDefaultValidationResult(quote.pricing.total)
-    }
-
-    const result = JSON.parse(jsonMatch[0]) as ValidationResult
+    const result = await gemini.generateWithSchema<ValidationResult>(
+      prompt,
+      VALIDATION_RESULT_SCHEMA
+    )
 
     // Validate and normalize the result
     return normalizeValidationResult(result, quote.pricing.total)

@@ -13,6 +13,7 @@ const DEFAULT_TEMPLATE: TenantTemplate = {
   includeAssumptions: true,
   includeExclusions: true,
   validityDays: 30,
+  acceptQuoteEnabled: true,
 }
 
 /**

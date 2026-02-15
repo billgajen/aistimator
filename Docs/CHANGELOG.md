@@ -15,6 +15,169 @@
 
 ## Issues & Resolutions
 
+### 2026-02-15: Quote Editor Bugfixes & Improvements (4 Fixes)
+
+**Context:** Testing of the Quote Editor revealed issues: a tax rate conversion bug, missing UI sections for optional extras and pricing notes, a non-configurable Accept Quote button, and signal recommendations / cross-service pricing being silently lost on every edit save.
+
+**Fix 1: Tax Rate Bug**
+- **Root cause:** `PATCH /api/quotes/[quoteId]` stored `tenant.tax_rate` (decimal 0.2) directly into `pricing_json.taxRate`, but the rest of the system (client `useQuotePricing`, customer page) expects a whole-number percentage (20). On subsequent edits, the client would divide 0.2 by 100 again, causing progressive degradation (20% → 0.2% → 0.002%).
+- **Fix:** Convert `tenant.tax_rate * 100` when assigning to `pricing.taxRate`, and use raw `tenant.tax_rate` directly for tax amount calculation (was double-dividing by 100).
+- **File:** `apps/web/src/app/api/quotes/[quoteId]/route.ts` (lines 343-344)
+
+**Fix 2: Optional Extras & Pricing Notes Editor**
+- **Issue:** `useQuotePricing` hook already managed `availableAddons` and `pricingNotes` state, but QuoteEditor didn't destructure or render them.
+- **Fix:** Created `AddonsEditor.tsx` component for editing optional extras (label + price per addon, add/remove). Wired `availableAddons`/`setAvailableAddons` and `pricingNotes`/`setPricingNotes` into QuoteEditor with new editor sections using `AddonsEditor` and existing `ListSectionEditor`.
+- **Files:** `apps/web/src/components/quote-editor/AddonsEditor.tsx` (new), `apps/web/src/components/quote-editor/QuoteEditor.tsx`
+
+**Fix 3: Configurable Accept Quote Button**
+- **Issue:** The "Accept Quote" button on the customer page was always shown. Businesses needed the ability to toggle it off.
+- **Fix:** Added `acceptQuoteEnabled?: boolean` to `TenantTemplate` (defaults to `true` for backward compatibility). Public quote API now fetches `template_json` from tenant and includes `acceptQuoteEnabled` in response. Customer quote page conditionally renders Accept button. Branding page has a new toggle checkbox. Preview also respects the toggle.
+- **Files:** `packages/shared/src/database.types.ts`, `packages/shared/src/api.types.ts`, `apps/web/src/app/api/public/quotes/[quoteId]/route.ts`, `apps/web/src/app/q/[quoteId]/page.tsx`, `apps/web/src/app/(dashboard)/app/branding/page.tsx`, `apps/web/src/app/api/tenant/branding/route.ts`
+- **No migration needed** — `template_json` is JSONB, new key has a code-level default.
+
+**Fix 4: Potential Additional Work Editor & Data Preservation**
+- **Issue:** `signalRecommendations` and `crossServicePricing` are stored as extra fields inside `content_json`, but the editor's `buildContent()` didn't include them — silently wiped on every save. Also no UI to edit/remove AI-recommended "Potential Additional Work".
+- **Fix:** QuoteEditor now reads `signalRecommendations` and `crossServicePricing` from initial content, manages them as state, and includes them in `buildContent()`. Created `RecommendationsEditor.tsx` component allowing businesses to edit descriptions and remove irrelevant recommendations. Cross-service pricing is preserved but not yet editable.
+- **Files:** `apps/web/src/components/quote-editor/RecommendationsEditor.tsx` (new), `apps/web/src/components/quote-editor/QuoteEditor.tsx`
+
+**Key Design Decisions:**
+- **AD-014: Tax rate stored as percentage in pricing_json** — `pricing_json.taxRate` is always a whole-number percentage (e.g., 20 for 20%). DB `tenant.tax_rate` is a decimal (0.2). Conversion happens server-side in PATCH handler.
+- **AD-015: acceptQuoteEnabled defaults true via code** — No DB migration needed. Absence of the key in existing `template_json` is treated as `true` using `!== false` check.
+- **AD-016: content_json contains extra fields beyond QuoteContent type** — `signalRecommendations` and `crossServicePricing` are stored in `content_json` JSONB but not in the TypeScript `QuoteContent` interface. Editor must explicitly preserve these fields via extended type cast.
+
+### 2026-02-15: Quote Editor, Post-Quote Journey & Learning Loop (6 Phases, 13 Tickets)
+
+**Context:** Quotes were immutable after generation. No edit capability, no customer feedback mechanism, and the learning infrastructure (validation logs, config suggestions) was recorded but never consumed. This change adds business quote editing, customer feedback flow, and an amendment-based learning loop.
+
+**Phase A: Schema & Types (Tickets 1-2)**
+- Migration `00000000000017_quote_amendments.sql`: New enum values (`feedback_received`, `revised`), new columns on `quotes` (`business_notes`, `version`, `last_amended_at`, `last_amended_by`), new tables (`quote_feedback`, `quote_amendments`, `tenant_learning_context`) with RLS policies
+- Shared types: `QuoteFeedback`, `QuoteAmendment`, `LearningPattern`, `TenantLearningContext`, `AmendmentChange` in `database.types.ts`; `UpdateQuoteRequest/Response`, `SubmitFeedbackRequest/Response`, `QuoteDetailResponse`, `LearningContextResponse`, `AnalyzeLearningRequest/Response` in `api.types.ts`
+- `QuoteStatus` extended with `feedback_received` and `revised`
+
+**Phase B: Quote Edit API (Tickets 3-4)**
+- `PATCH /api/quotes/[quoteId]`: Optimistic locking via `version` field, server-side tax recalculation, structured diff computation, amendment logging, optional email resend with revised status
+- `GET /api/quotes/[quoteId]` enriched to return `QuoteDetailResponse` with amendments summary and feedback list
+
+**Phase C: Customer Feedback Flow (Tickets 5-6)**
+- `POST /api/public/quotes/[quoteId]/feedback`: Token-validated feedback submission, status update to `feedback_received`, business notification email
+- Customer quote page updated with "Send for Review" and "Send Feedback" buttons alongside Accept, version indicator badge for revised quotes, post-feedback confirmation state
+- Accept endpoint updated to allow accepting from `revised` and `feedback_received` statuses
+
+**Phase D: Business Quote Editor UI (Tickets 7-9)**
+- New business quote detail page at `/app/quotes/[quoteId]` with full quote view, pending feedback alerts, business notes, pricing breakdown, version history, timeline
+- Inline edit mode with lazy-loaded `QuoteEditor` component for mobile-first editing
+- `LineItemEditor`: Drag-drop reordering (HTML5 DnD desktop + pointer events mobile), editable labels/amounts, add/remove with confirm
+- `SectionEditor`: Auto-resizing textarea for text sections, editable list with add/remove for assumptions/exclusions
+- `useQuotePricing` hook: Real-time subtotal/tax/total calculation from line items
+- `useSortable` hook: Lightweight drag-drop implementation without external dependencies
+- Email templates: `generateRevisedQuoteEmailHtml`, `generateFeedbackNotificationEmailHtml` in both web and worker packages
+
+**Phase E: Learning Loop (Tickets 10-12)**
+- `amendment-analyzer.ts` in worker: Analyzes amendment patterns (price changes, item additions/removals, content edits) and generates natural-language prompt context
+- Learning integration in `quote-processor.ts`: Fetches `tenant_learning_context.prompt_context` and appends to AI wording prompt (wording only, not pricing per AD-001)
+- `POST /api/learning/analyze`: Manual re-analysis trigger with same pattern detection logic
+- `GET /api/learning/[serviceId]`: Returns patterns and prompt context for dashboard display
+- Auto-trigger: After PATCH amendment, checks if >= 5 amendments since last analysis and fires analysis
+
+**Phase F: Polish & Integration (Ticket 13)**
+- StatusBadge updated across quotes list page, customer quote page, and business detail page with `feedback_received` and `revised` statuses
+- `VALID_STATUSES` in quotes list API updated with all 12 statuses
+- "View" icon link added to quotes list table linking to `/app/quotes/[quoteId]`
+- Business notification email CTA now links to `/app/quotes/{quoteId}` instead of generic `/app/quotes`
+
+**Key Design Decisions:**
+- **AD-012: Optimistic locking via version field** — prevents conflicting concurrent edits without complex locking
+- **AD-013: Tax recalculated server-side** — client shows preview, server is truth
+- **AD-014: Learning affects wording only, not pricing** — respects AD-001. Price patterns are insights only
+- **AD-015: No external drag-drop library** — pointer events + HTML5 DnD sufficient for simple list reorder
+- **AD-016: Edit inline, not separate page** — reduces cognitive load, especially on mobile
+
+**Files Created:**
+- `supabase/migrations/00000000000017_quote_amendments.sql`
+- `apps/web/src/lib/email-templates.ts`
+- `apps/web/src/app/api/public/quotes/[quoteId]/feedback/route.ts`
+- `apps/web/src/app/(dashboard)/app/quotes/[quoteId]/page.tsx`
+- `apps/web/src/components/quote-editor/QuoteEditor.tsx`
+- `apps/web/src/components/quote-editor/LineItemEditor.tsx`
+- `apps/web/src/components/quote-editor/SectionEditor.tsx`
+- `apps/web/src/components/quote-editor/useQuotePricing.ts`
+- `apps/web/src/components/quote-editor/useSortable.ts`
+- `apps/web/src/app/api/learning/[serviceId]/route.ts`
+- `apps/web/src/app/api/learning/analyze/route.ts`
+- `apps/worker/src/ai/amendment-analyzer.ts`
+
+**Files Modified:**
+- `packages/shared/src/database.types.ts` — extended QuoteStatus, Quote type, added new table types
+- `packages/shared/src/api.types.ts` — added QuoteViewResponse.version, edit/feedback/learning API types
+- `apps/web/src/app/api/quotes/[quoteId]/route.ts` — added PATCH handler, enriched GET
+- `apps/web/src/app/api/quotes/route.ts` — updated VALID_STATUSES
+- `apps/web/src/app/q/[quoteId]/page.tsx` — feedback UI, version indicator, new statuses
+- `apps/web/src/app/api/public/quotes/[quoteId]/route.ts` — added version to response
+- `apps/web/src/app/api/public/quotes/[quoteId]/accept/route.ts` — allow accepting from revised/feedback_received
+- `apps/web/src/app/(dashboard)/app/quotes/page.tsx` — new statuses, View link
+- `apps/worker/src/ai/wording.ts` — learningContext in WordingContext and prompt
+- `apps/worker/src/quote-processor.ts` — fetch and pass learning context
+- `apps/worker/src/email/templates.ts` — feedback and revised quote email templates
+- `apps/worker/src/email/index.ts` — dashboard URL now links to specific quote
+
+---
+
+### 2026-02-13: Agentic AI Transformation (5 Phases)
+
+**Context:** Major upgrade to transform the platform into an agentic AI product through 5 incremental phases, each independently deployable.
+
+**Phase 1: Gemini 2.5 Flash Migration + Structured Outputs**
+- Migrated model from `gemini-2.0-flash` to `gemini-2.5-flash` in all 3 call sites
+- Added `generateWithSchema<T>()` and `generateWithImagesAndSchema<T>()` methods to GeminiClient for structured JSON output via `response_mime_type: "application/json"` + `response_schema`
+- Created centralized JSON Schema definitions in `apps/worker/src/ai/schemas.ts`
+- Migrated signal extraction and wording generation to structured output with `parseJSON<T>()` fallback
+- **Files:** `gemini.ts`, `signals.ts`, `wording.ts`, `schemas.ts`, `service-matcher.ts`, `ai-draft/route.ts`
+
+**Phase 2: Triage Agent**
+- Heuristic-only triage (no AI call) classifies quotes as simple/standard/complex
+- Photo strategy optimization: skip vision for 0 photos, cap at 5 for 3+
+- Cross-service check gated by triage decision
+- Returning customer detection via `quote_requests` lookup
+- DB migration: `triage_json` column on quotes table
+- **Files:** `agents/types.ts`, `agents/triage.ts`, `quote-processor.ts`, migration 00000000000013
+
+**Phase 3: Signal Fusion with Provenance**
+- Observer pattern recorder tracks provenance of every signal (source: form/vision/text/inferred)
+- Records conflicts when form and vision disagree (AD-007: form always wins)
+- DB migration: `signal_conflicts_json` column on quotes table
+- **Files:** `agents/signal-fusion.ts`, `quote-processor.ts`, `database.types.ts`, migration 00000000000014
+
+**Phase 4: Quality Gate**
+- Three outputs: `send` (proceed), `ask_clarification` (max 2 targeted questions), `require_review` (flag for business)
+- Clarification flow: public API + customer-facing page at `/q/[quoteId]/clarify`
+- Max 1 clarification round (no infinite loops via `clarification_count` cap)
+- New statuses: `awaiting_clarification`, `pending_review` added to Postgres enum and all status maps
+- DB migration: clarification columns + quality gate JSON on quotes table
+- **Files:** `agents/quality-gate.ts`, `clarify/route.ts`, `clarify/page.tsx`, `email/templates.ts`, migration 00000000000015
+
+**Phase 5: Conversational Widget (A/B Test)**
+- Chat-based widget alternative to the multi-step form
+- Chat API (`/api/public/widget/chat`) uses Gemini 2.5 Flash structured output to extract fields from natural language
+- A/B test framework with sticky localStorage assignment (form/conversational/ab-test modes)
+- Widget analytics tracking (`/api/public/widget/analytics`) with `widget_analytics` table
+- Loader updated to read `data-display-mode` attribute and mount correct widget variant
+- Zero backend pipeline changes — conversational widget produces the same `CreateQuoteRequest`
+- DB migration: `widget_analytics` table with RLS, migration 00000000000016
+- **Files:** `ConversationalWidget.tsx`, `ChatBubble.tsx`, `ChatInput.tsx`, `ab-test.ts`, `chat/route.ts`, `analytics/route.ts`, `loader.tsx`, `types.ts`
+
+**Critical constraint maintained:** AI extracts signals and drafts wording. AI never sets prices. The deterministic rules engine remains the pricing authority.
+
+**Test results:** 168 tests passing (7 test files). Widget builds at 47.43 kB (11 modules).
+
+**Fixes during implementation:**
+- `awaiting_clarification` status added to dashboard quotes page and public quote view page status maps
+- Quality gate test `makePricing()` helper needed explicit `confidence` field (required by `PricingResult` type)
+- Phase 2 triage variable `descriptionAnswer` renamed to `triageDescriptionAnswer` to avoid redeclaration conflict in `quote-processor.ts`
+- Phase 3 FIX-8 access override block moved inside `if (structuredSignals)` scope for fusion recorder access
+- Phase 4 `GeminiClient` import changed to `import type` (only used as type parameter)
+
+---
+
 ### 2026-02-12: Removed Hardcoded Complexity Multiplier
 
 **Context:** The pricing engine was automatically applying a "Simple job discount" (10% off) when AI detected complexity as "low", and a 25% premium for "high" complexity. This violated the anti-hardcoding principle: "AI can extract signals and draft wording, but AI must not set the final price."

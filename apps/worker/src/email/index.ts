@@ -100,7 +100,7 @@ export async function sendQuoteEmails(
   }
 
   const quoteViewUrl = `${config.appUrl}/q/${data.quoteId}?token=${data.quoteToken}`
-  const dashboardUrl = `${config.appUrl}/app/quotes` // Will link to quote details when implemented
+  const dashboardUrl = `${config.appUrl}/app/quotes/${data.quoteId}`
 
   const totalFormatted = formatCurrency(data.pricing.total, data.pricing.currency)
 

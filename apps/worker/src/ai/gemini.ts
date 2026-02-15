@@ -1,9 +1,10 @@
 /**
- * Gemini 1.5 Flash Client
+ * Gemini 2.5 Flash Client
  *
  * Handles communication with the Gemini API for:
  * - Vision extraction (signals from images)
  * - Text generation (scope summary, notes)
+ * - Structured output with JSON schema enforcement
  */
 
 export interface GeminiConfig {
@@ -33,7 +34,7 @@ export interface GeminiResponse {
   }
 }
 
-const DEFAULT_MODEL = 'gemini-2.0-flash'
+const DEFAULT_MODEL = 'gemini-2.5-flash'
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 
 export class GeminiClient {
@@ -111,17 +112,110 @@ export class GeminiClient {
   }
 
   /**
+   * Generate structured output with JSON schema enforcement.
+   * Uses Gemini's response_mime_type + response_schema to guarantee valid JSON.
+   * Returns parsed T directly — no markdown stripping needed.
+   */
+  async generateWithSchema<T>(
+    prompt: string,
+    schema: Record<string, unknown>,
+    systemPrompt?: string
+  ): Promise<T> {
+    const messages: GeminiMessage[] = []
+
+    if (systemPrompt) {
+      messages.push({
+        role: 'user',
+        parts: [{ text: systemPrompt }],
+      })
+      messages.push({
+        role: 'model',
+        parts: [{ text: 'Understood. I will follow these instructions.' }],
+      })
+    }
+
+    messages.push({
+      role: 'user',
+      parts: [{ text: prompt }],
+    })
+
+    const text = await this.generate(messages, {
+      responseMimeType: 'application/json',
+      responseSchema: schema,
+    })
+
+    return JSON.parse(text) as T
+  }
+
+  /**
+   * Generate structured output with images and JSON schema enforcement.
+   * Combines vision analysis with guaranteed JSON structure.
+   */
+  async generateWithImagesAndSchema<T>(
+    prompt: string,
+    images: Array<{ mimeType: string; base64: string }>,
+    schema: Record<string, unknown>,
+    systemPrompt?: string
+  ): Promise<T> {
+    const messages: GeminiMessage[] = []
+
+    if (systemPrompt) {
+      messages.push({
+        role: 'user',
+        parts: [{ text: systemPrompt }],
+      })
+      messages.push({
+        role: 'model',
+        parts: [{ text: 'Understood. I will follow these instructions.' }],
+      })
+    }
+
+    const parts: GeminiMessage['parts'] = images.map((img) => ({
+      inlineData: {
+        mimeType: img.mimeType,
+        data: img.base64,
+      },
+    }))
+    parts.push({ text: prompt })
+
+    messages.push({
+      role: 'user',
+      parts,
+    })
+
+    const text = await this.generate(messages, {
+      responseMimeType: 'application/json',
+      responseSchema: schema,
+    })
+
+    return JSON.parse(text) as T
+  }
+
+  /**
    * Internal generate method
    */
-  private async generate(messages: GeminiMessage[]): Promise<string> {
+  private async generate(
+    messages: GeminiMessage[],
+    structuredOutput?: {
+      responseMimeType: string
+      responseSchema: Record<string, unknown>
+    }
+  ): Promise<string> {
     const url = `${GEMINI_API_BASE}/${this.model}:generateContent?key=${this.apiKey}`
+
+    const generationConfig: Record<string, unknown> = {
+      maxOutputTokens: this.maxTokens,
+      temperature: 0.3,
+    }
+
+    if (structuredOutput) {
+      generationConfig.response_mime_type = structuredOutput.responseMimeType
+      generationConfig.response_schema = structuredOutput.responseSchema
+    }
 
     const body = {
       contents: messages,
-      generationConfig: {
-        maxOutputTokens: this.maxTokens,
-        temperature: 0.3, // Lower temperature for more consistent outputs
-      },
+      generationConfig,
     }
 
     const response = await fetch(url, {
@@ -170,6 +264,9 @@ export class GeminiClient {
       cleaned = cleaned.slice(0, -3)
     }
     cleaned = cleaned.trim()
+
+    // Fix trailing commas before } or ] (common Gemini 2.5 issue)
+    cleaned = cleaned.replace(/,\s*([\]}])/g, '$1')
 
     return JSON.parse(cleaned) as T
   }

@@ -408,7 +408,8 @@ export async function POST(request: Request) {
           currency: tenant.currency,
           subtotal: 0,
           taxLabel: tenant.tax_enabled ? tenant.tax_label : undefined,
-          taxRate: tenant.tax_enabled ? tenant.tax_rate : undefined,
+          // DB stores rate as decimal (0.20 = 20%), display expects whole number (20 = 20%)
+          taxRate: tenant.tax_enabled ? (tenant.tax_rate || 0) * 100 : undefined,
           taxAmount: 0,
           total: 0,
           breakdown: isGeneralInquiry

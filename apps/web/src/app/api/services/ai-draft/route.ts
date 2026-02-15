@@ -8,7 +8,7 @@ import type { ServiceDraftConfig, DocumentType } from '@estimator/shared'
  */
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
-const DEFAULT_MODEL = 'gemini-2.0-flash'
+const DEFAULT_MODEL = 'gemini-2.5-flash'
 
 /**
  * System prompt for service draft generation
@@ -168,13 +168,24 @@ async function generateServiceDraft(
     throw new Error('No response from Gemini')
   }
 
-  // Parse JSON from response
-  const jsonMatch = text.match(/\{[\s\S]*\}/)
+  // Parse JSON from response — strip markdown fences and fix common issues
+  let cleaned = text.trim()
+  if (cleaned.startsWith('```json')) cleaned = cleaned.slice(7)
+  else if (cleaned.startsWith('```')) cleaned = cleaned.slice(3)
+  if (cleaned.endsWith('```')) cleaned = cleaned.slice(0, -3)
+  cleaned = cleaned.trim()
+
+  // Extract the outermost JSON object
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
   if (!jsonMatch) {
     throw new Error('No JSON found in response')
   }
 
-  const draft = JSON.parse(jsonMatch[0]) as ServiceDraftConfig
+  let jsonStr = jsonMatch[0]
+  // Fix trailing commas before } or ] (common Gemini issue)
+  jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1')
+
+  const draft = JSON.parse(jsonStr) as ServiceDraftConfig
   return validateAndNormalizeDraft(draft, request)
 }
 

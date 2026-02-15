@@ -23,6 +23,9 @@ export interface WidgetConfig {
 
   /** Override API URL (for development) */
   apiUrl?: string
+
+  /** Display mode: form (default), conversational, or ab-test */
+  displayMode?: WidgetDisplayMode
 }
 
 export interface WidgetField {
@@ -98,3 +101,38 @@ export interface QuoteResponse {
   quoteViewUrl: string
   tokenExpiresAt: string
 }
+
+// ============================================================================
+// CONVERSATIONAL WIDGET TYPES (Phase 5)
+// ============================================================================
+
+/** A single chat message */
+export interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  /** Attached photo IDs */
+  attachmentIds?: string[]
+  timestamp: number
+}
+
+/** State of the conversational widget */
+export interface ConversationState {
+  messages: ChatMessage[]
+  extractedFields: Record<string, string | number | boolean>
+  isComplete: boolean
+  isLoading: boolean
+  selectedServiceId?: string
+}
+
+/** Response from the chat API */
+export interface ChatResponse {
+  reply: string
+  extractedFields: Record<string, string | number | boolean>
+  nextQuestion?: string
+  isComplete: boolean
+  formData?: FormData
+}
+
+/** Widget display mode */
+export type WidgetDisplayMode = 'form' | 'conversational' | 'ab-test'

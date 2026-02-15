@@ -9,17 +9,20 @@
  *   src="https://your-domain.com/widget.js"
  *   data-tenant-key="tkey_xxx"
  *   data-mode="inline|floating"
+ *   data-display-mode="form|conversational|ab-test"
  *   data-container="#my-container"
  *   data-service-id="svc_xxx"
  *   async
  * ></script>
  */
 
-import { render } from 'preact'
+import { render, type VNode } from 'preact'
 import { Widget } from './Widget'
+import { ConversationalWidget } from './ConversationalWidget'
 import { FloatingButton } from './FloatingButton'
 import { injectStyles } from './styles'
-import type { WidgetConfig } from './types'
+import { getWidgetMode } from './ab-test'
+import type { WidgetConfig, WidgetDisplayMode } from './types'
 
 declare global {
   interface Window {
@@ -35,6 +38,35 @@ declare global {
 let isOpen = false
 let modalContainer: HTMLElement | null = null
 let config: WidgetConfig | null = null
+let resolvedDisplayMode: 'form' | 'conversational' = 'form'
+
+/**
+ * Create the appropriate widget element based on display mode
+ */
+function createWidgetElement(
+  props: { tenantKey: string; serviceId?: string; apiUrl?: string; onClose?: () => void; inline?: boolean }
+): VNode {
+  if (resolvedDisplayMode === 'conversational') {
+    return (
+      <ConversationalWidget
+        tenantKey={props.tenantKey}
+        serviceId={props.serviceId}
+        apiUrl={props.apiUrl}
+        onClose={props.onClose}
+        inline={props.inline}
+      />
+    )
+  }
+  return (
+    <Widget
+      tenantKey={props.tenantKey}
+      serviceId={props.serviceId}
+      apiUrl={props.apiUrl}
+      onClose={props.onClose || (() => {})}
+      inline={props.inline || false}
+    />
+  )
+}
 
 /**
  * Initialize the widget
@@ -47,6 +79,9 @@ function init(widgetConfig: WidgetConfig) {
     console.error('[Estimator] tenantKey is required')
     return
   }
+
+  // Resolve display mode (form, conversational, or ab-test → sticky assignment)
+  resolvedDisplayMode = getWidgetMode(config.displayMode)
 
   // Inject styles
   injectStyles()
@@ -75,13 +110,13 @@ function initInlineMode() {
   }
 
   render(
-    <Widget
-      tenantKey={config.tenantKey}
-      serviceId={config.serviceId}
-      apiUrl={config.apiUrl}
-      onClose={() => {}}
-      inline={true}
-    />,
+    createWidgetElement({
+      tenantKey: config.tenantKey,
+      serviceId: config.serviceId,
+      apiUrl: config.apiUrl,
+      onClose: undefined,
+      inline: true,
+    }),
     container
   )
 }
@@ -125,13 +160,13 @@ function open() {
   render(
     <div className="estimator-modal-overlay" onClick={handleOverlayClick}>
       <div className="estimator-modal-content" onClick={(e) => e.stopPropagation()}>
-        <Widget
-          tenantKey={config.tenantKey}
-          serviceId={config.serviceId}
-          apiUrl={config.apiUrl}
-          onClose={close}
-          inline={false}
-        />
+        {createWidgetElement({
+          tenantKey: config.tenantKey,
+          serviceId: config.serviceId,
+          apiUrl: config.apiUrl,
+          onClose: close,
+          inline: false,
+        })}
       </div>
     </div>,
     modalContainer
@@ -193,6 +228,7 @@ function autoInitFromElement(script: HTMLScriptElement) {
   init({
     tenantKey,
     mode: (script.dataset.mode as 'inline' | 'floating') || 'floating',
+    displayMode: (script.dataset.displayMode as WidgetDisplayMode) || undefined,
     container: script.dataset.container,
     serviceId: script.dataset.serviceId,
     buttonLabel: script.dataset.buttonLabel,

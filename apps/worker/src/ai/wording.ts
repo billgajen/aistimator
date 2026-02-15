@@ -1,15 +1,17 @@
 /**
  * AI Wording Generator
  *
- * Uses Gemini 1.5 Flash to generate professional quote wording:
+ * Uses Gemini 2.5 Flash to generate professional quote wording:
  * - Scope summary describing the work
  * - Assumptions and exclusions
  * - Additional notes
  *
  * IMPORTANT: This generates WORDING only, not pricing.
+ * Uses structured output (JSON schema) for reliable parsing.
  */
 
 import { GeminiClient } from './gemini'
+import { QUOTE_CONTENT_SCHEMA } from './schemas'
 import type { ExtractedSignals } from './signals'
 import type { PricingResult } from '../pricing/rules-engine'
 
@@ -60,6 +62,8 @@ export interface WordingContext {
   documentType?: DocumentTone
   /** Error code reported by customer (e.g., boiler error code "EA", "F1") */
   errorCode?: string
+  /** Learning context from business editing patterns (affects wording, not pricing) */
+  learningContext?: string
 }
 
 /**
@@ -332,17 +336,31 @@ export async function generateWording(
     prompt += `\n\nIMPORTANT: The pricing notes above are already shown separately on the quote. Do NOT repeat them verbatim in the "notes" field. Instead, synthesize any relevant information into a cohesive customer-facing note, or leave "notes" as an empty string if there's nothing additional to say.`
   }
 
-  const response = await client.generateText(prompt, getSystemPrompt(context.documentType))
+  // Learning context from business editing patterns (affects wording only, not pricing per AD-001)
+  if (context.learningContext) {
+    prompt += `\n\n===== BUSINESS EDITING PATTERNS =====\nThe following patterns were observed from this business's previous edits to similar quotes. Use these to write better wording that matches the business's style and preferences:\n${context.learningContext}\n\nIMPORTANT: These patterns should influence WORDING ONLY (scope descriptions, assumptions, exclusions, notes). They must NOT change any pricing amounts.`
+  }
 
   try {
-    const content = GeminiClient.parseJSON<QuoteContent>(response)
+    // Use structured output (JSON schema) for reliable parsing
+    const content = await client.generateWithSchema<QuoteContent>(
+      prompt,
+      QUOTE_CONTENT_SCHEMA,
+      getSystemPrompt(context.documentType)
+    )
     return validateContent(content, context)
   } catch (error) {
-    console.error('[Wording] Failed to parse Gemini response:', error)
-    console.error('[Wording] Raw response:', response)
+    console.error('[Wording] Structured output failed, falling back to text parsing:', error)
 
-    // Return default content
-    return getDefaultContent(context)
+    // Fallback: use text-based generation + parseJSON
+    try {
+      const response = await client.generateText(prompt, getSystemPrompt(context.documentType))
+      const content = GeminiClient.parseJSON<QuoteContent>(response)
+      return validateContent(content, context)
+    } catch (fallbackError) {
+      console.error('[Wording] Fallback also failed:', fallbackError)
+      return getDefaultContent(context)
+    }
   }
 }
 
