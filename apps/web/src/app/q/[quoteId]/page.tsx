@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { QuoteViewResponse, QuoteStatus } from '@estimator/shared'
 
@@ -18,6 +18,12 @@ export default function QuotePage({ params }: QuotePageProps) {
   const [loading, setLoading] = useState(true)
   const [accepting, setAccepting] = useState(false)
   const [accepted, setAccepted] = useState(false)
+
+  // Feedback state
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
+  const [feedbackMode, setFeedbackMode] = useState<'none' | 'feedback' | 'review'>('none')
+  const [feedbackText, setFeedbackText] = useState('')
+  const [submittingFeedback, setSubmittingFeedback] = useState(false)
 
   useEffect(() => {
     async function fetchQuote() {
@@ -76,6 +82,39 @@ export default function QuotePage({ params }: QuotePageProps) {
     }
   }
 
+  const handleFeedback = useCallback(async (type: 'feedback' | 'approval_request') => {
+    if (!token || submittingFeedback) return
+    if (type === 'feedback' && !feedbackText.trim()) return
+
+    setSubmittingFeedback(true)
+    try {
+      const response = await fetch(`/api/public/quotes/${quoteId}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          feedbackType: type,
+          feedbackText: type === 'feedback' ? feedbackText.trim() : undefined,
+        }),
+      })
+
+      if (response.ok) {
+        setFeedbackSubmitted(true)
+        setFeedbackMode('none')
+        if (quote) {
+          setQuote({ ...quote, status: 'feedback_received' as QuoteStatus })
+        }
+      } else {
+        const data = await response.json()
+        alert(data.error?.message || 'Failed to submit feedback')
+      }
+    } catch {
+      alert('Failed to submit feedback')
+    } finally {
+      setSubmittingFeedback(false)
+    }
+  }, [token, quoteId, feedbackText, submittingFeedback, quote])
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -103,7 +142,9 @@ export default function QuotePage({ params }: QuotePageProps) {
     return null
   }
 
-  const { business, customer, pricing, notes, validUntil, assets, status, actions, crossServicePricing, signalRecommendations } = quote
+  const { business, customer, pricing, notes, validUntil, assets, status, actions, crossServicePricing, signalRecommendations, version: quoteVersion, acceptQuoteEnabled } = quote
+  const showAcceptButton = acceptQuoteEnabled !== false
+  const canSubmitFeedback = ['sent', 'viewed', 'revised'].includes(status) && !feedbackSubmitted && !accepted
 
   return (
     <div className="min-h-screen bg-background py-8 px-4">
@@ -139,6 +180,18 @@ export default function QuotePage({ params }: QuotePageProps) {
               <StatusBadge status={status} />
             </div>
           </div>
+
+          {/* Version indicator */}
+          {quoteVersion && quoteVersion > 1 && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-light text-primary">
+                Updated Quote (v{quoteVersion})
+              </span>
+              <p className="text-xs text-text-muted mt-1">
+                This quote has been revised by {business.name}.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Quote details */}
@@ -414,18 +467,89 @@ export default function QuotePage({ params }: QuotePageProps) {
           </div>
         )}
 
-        {/* Accept CTA */}
-        {!accepted && (status === 'sent' || status === 'viewed') && (
+        {/* Actions CTA */}
+        {canSubmitFeedback && (
           <div className="animate-fade-in-up animation-delay-300 bg-surface rounded-warm-2xl shadow-warm border border-border p-6">
-            <button
-              onClick={handleAccept}
-              disabled={accepting}
-              className="w-full bg-primary text-white py-3 px-4 rounded-lg font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {accepting ? 'Accepting...' : 'Accept Quote'}
-            </button>
-            <p className="text-xs text-text-muted text-center mt-3">
-              By accepting, you agree to proceed with this quote
+            {/* Accept button */}
+            {showAcceptButton && (
+              <>
+                <button
+                  onClick={handleAccept}
+                  disabled={accepting}
+                  className="w-full bg-secondary text-white py-3 px-4 rounded-lg font-semibold hover:bg-secondary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {accepting ? 'Accepting...' : 'Accept Quote'}
+                </button>
+                <p className="text-xs text-text-muted text-center mt-2">
+                  By accepting, you agree to proceed with this quote
+                </p>
+
+                {/* Divider */}
+                <div className="flex items-center my-5">
+                  <div className="flex-1 border-t border-border"></div>
+                  <span className="px-3 text-xs text-text-muted">or</span>
+                  <div className="flex-1 border-t border-border"></div>
+                </div>
+              </>
+            )}
+
+            {/* Feedback actions */}
+            {feedbackMode === 'none' && (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleFeedback('approval_request')}
+                  disabled={submittingFeedback}
+                  className="flex-1 py-2.5 px-4 text-sm font-medium text-text-primary border border-border rounded-lg hover:bg-background transition-colors disabled:opacity-50"
+                >
+                  {submittingFeedback ? 'Sending...' : 'Send for Review'}
+                </button>
+                <button
+                  onClick={() => setFeedbackMode('feedback')}
+                  className="flex-1 py-2.5 px-4 text-sm font-medium text-text-primary border border-border rounded-lg hover:bg-background transition-colors"
+                >
+                  Send Feedback
+                </button>
+              </div>
+            )}
+
+            {/* Feedback text input */}
+            {feedbackMode === 'feedback' && (
+              <div className="space-y-3">
+                <textarea
+                  value={feedbackText}
+                  onChange={(e) => setFeedbackText(e.target.value)}
+                  placeholder="Share your feedback, questions, or what you'd like changed..."
+                  className="w-full px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                  rows={3}
+                  autoFocus
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setFeedbackMode('none'); setFeedbackText('') }}
+                    className="flex-1 py-2.5 px-4 text-sm font-medium text-text-secondary border border-border rounded-lg hover:bg-background transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleFeedback('feedback')}
+                    disabled={submittingFeedback || !feedbackText.trim()}
+                    className="flex-1 py-2.5 px-4 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {submittingFeedback ? 'Sending...' : 'Submit Feedback'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Feedback submitted confirmation */}
+        {feedbackSubmitted && !accepted && (
+          <div className="animate-fade-in-up animation-delay-300 bg-primary-light border border-primary/20 rounded-warm-2xl p-6 text-center">
+            <div className="text-primary text-3xl mb-2">&#9993;</div>
+            <h3 className="font-display text-lg font-semibold text-text-primary mb-1">Feedback Sent</h3>
+            <p className="text-sm text-text-secondary">
+              Your message has been sent to {business.name}. They will review and get back to you.
             </p>
           </div>
         )}
@@ -458,6 +582,8 @@ function StatusBadge({ status }: { status: QuoteStatus }) {
     awaiting_clarification: { label: 'Awaiting Info', className: 'bg-tertiary-light text-tertiary' },
     sent: { label: 'Awaiting Response', className: 'bg-primary-light text-primary' },
     viewed: { label: 'Viewed', className: 'bg-primary-light text-primary' },
+    feedback_received: { label: 'Feedback Received', className: 'bg-tertiary-light text-tertiary' },
+    revised: { label: 'Updated', className: 'bg-primary-light text-primary' },
     accepted: { label: 'Accepted', className: 'bg-secondary-light text-secondary' },
     paid: { label: 'Paid', className: 'bg-secondary-light text-secondary' },
     expired: { label: 'Expired', className: 'bg-background text-text-muted' },

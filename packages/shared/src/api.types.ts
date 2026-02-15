@@ -2,7 +2,18 @@
  * API request/response types for the Estimator platform
  */
 
-import type { QuoteStatus, DocumentType, QuotePricing, QuoteContent, CrossServicePricing, SignalRecommendation } from './database.types'
+import type {
+  QuoteStatus,
+  DocumentType,
+  QuotePricing,
+  QuoteContent,
+  CrossServicePricing,
+  SignalRecommendation,
+  QuoteFeedback,
+  AmendmentSource,
+  FeedbackType,
+  LearningPattern,
+} from './database.types'
 
 // ============================================================================
 // Common Types
@@ -120,6 +131,8 @@ export interface QuoteViewResponse {
   quoteId: string
   status: QuoteStatus
   documentType: DocumentType
+  /** Quote version (incremented on each business edit) */
+  version?: number
   business: QuoteViewBusiness
   customer: QuoteViewCustomer
   pricing: QuotePricing
@@ -137,6 +150,8 @@ export interface QuoteViewResponse {
   crossServicePricing?: CrossServicePricing[]
   /** AI-recommended additional work based on unused signals */
   signalRecommendations?: SignalRecommendation[]
+  /** Whether the Accept Quote button is shown to customers */
+  acceptQuoteEnabled?: boolean
 }
 
 export interface AcceptQuoteRequest {
@@ -311,4 +326,117 @@ export interface CreateCheckoutResponse {
 
 export interface CreatePortalResponse {
   portalUrl: string
+}
+
+// ============================================================================
+// Quote Edit API Types
+// ============================================================================
+
+export interface UpdateQuoteRequest {
+  /** Optimistic lock — must match current DB version */
+  version: number
+  /** Full updated pricing */
+  pricing_json: QuotePricing
+  /** Full updated content */
+  content_json: QuoteContent
+  /** Internal notes visible only to business */
+  business_notes?: string
+  /** If true, send/re-send email after saving */
+  sendToCustomer?: boolean
+  /** If responding to feedback, link this feedback ID */
+  feedbackId?: string
+}
+
+export interface UpdateQuoteResponse {
+  quoteId: string
+  version: number
+  status: QuoteStatus
+  updatedAt: string
+}
+
+// ============================================================================
+// Customer Feedback API Types
+// ============================================================================
+
+export interface SubmitFeedbackRequest {
+  token: string
+  feedbackType: FeedbackType
+  feedbackText?: string
+}
+
+export interface SubmitFeedbackResponse {
+  success: boolean
+  message: string
+}
+
+// ============================================================================
+// Quote Detail API Types (enriched response for business dashboard)
+// ============================================================================
+
+export interface AmendmentSummary {
+  id: string
+  version: number
+  source: AmendmentSource
+  changeCount: number
+  createdAt: string
+  amendedBy: string
+}
+
+export interface QuoteDetailResponse {
+  quote: {
+    id: string
+    tenant_id: string
+    quote_request_id: string
+    service_id: string
+    customer_json: { name: string; email: string; phone?: string }
+    pricing_json: QuotePricing
+    document_type: DocumentType
+    content_json: QuoteContent
+    status: QuoteStatus
+    business_notes: string | null
+    version: number
+    last_amended_at: string | null
+    last_amended_by: string | null
+    created_at: string
+    sent_at: string | null
+    viewed_at: string | null
+    accepted_at: string | null
+    paid_at: string | null
+    signals_json?: unknown
+    pricing_trace_json?: unknown
+    triage_json?: unknown
+    quality_gate_json?: unknown
+  }
+  service: {
+    id: string
+    name: string
+    description: string | null
+    work_steps: unknown[]
+    expected_signals: unknown[]
+  }
+  amendments: AmendmentSummary[]
+  feedback: QuoteFeedback[]
+}
+
+// ============================================================================
+// Learning API Types
+// ============================================================================
+
+export interface LearningContextResponse {
+  serviceId: string
+  serviceName: string
+  patterns: LearningPattern[]
+  promptContext: string | null
+  totalAmendmentsAnalyzed: number
+  lastAnalyzedAt: string | null
+}
+
+export interface AnalyzeLearningRequest {
+  serviceId: string
+}
+
+export interface AnalyzeLearningResponse {
+  success: boolean
+  patternsFound: number
+  message: string
 }

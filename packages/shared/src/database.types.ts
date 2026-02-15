@@ -16,6 +16,8 @@ export type QuoteStatus =
   | 'awaiting_clarification'
   | 'sent'
   | 'viewed'
+  | 'feedback_received'
+  | 'revised'
   | 'accepted'
   | 'paid'
   | 'expired'
@@ -38,6 +40,7 @@ export interface TenantTemplate {
   includeAssumptions: boolean
   includeExclusions: boolean
   validityDays: number
+  acceptQuoteEnabled?: boolean
 }
 
 export interface Tenant {
@@ -698,6 +701,14 @@ export interface Quote {
   clarification_answers_json?: ClarificationAnswer[] | null
   /** Number of clarification rounds (capped at 1) */
   clarification_count?: number
+  /** Internal notes visible only to business */
+  business_notes?: string | null
+  /** Optimistic locking counter */
+  version: number
+  /** Last amendment timestamp */
+  last_amended_at?: string | null
+  /** User who last amended the quote */
+  last_amended_by?: string | null
   created_at: string
   sent_at: string | null
   viewed_at: string | null
@@ -1063,6 +1074,79 @@ export interface ValidationSettings {
   enabledChecks: ValidationEnabledChecks
   /** Email addresses to notify on flagged quotes */
   notifyOnFlaggedQuote?: string[]
+}
+
+// ============================================================================
+// QUOTE FEEDBACK & AMENDMENT TYPES
+// ============================================================================
+
+export type FeedbackType = 'feedback' | 'approval_request'
+export type FeedbackStatus = 'pending' | 'acknowledged' | 'resolved'
+export type AmendmentSource = 'manual' | 'feedback_response'
+
+export interface QuoteFeedback {
+  id: string
+  quote_id: string
+  tenant_id: string
+  feedback_type: FeedbackType
+  feedback_text: string | null
+  status: FeedbackStatus
+  created_at: string
+}
+
+export interface AmendmentChange {
+  field: string
+  path: string
+  before: unknown
+  after: unknown
+  type: 'added' | 'removed' | 'modified'
+}
+
+export interface QuoteAmendment {
+  id: string
+  quote_id: string
+  tenant_id: string
+  version: number
+  amended_by: string
+  before_pricing: QuotePricing
+  after_pricing: QuotePricing
+  before_content: QuoteContent
+  after_content: QuoteContent
+  changes_json: AmendmentChange[]
+  source: AmendmentSource
+  feedback_id: string | null
+  created_at: string
+}
+
+// ============================================================================
+// LEARNING CONTEXT TYPES
+// ============================================================================
+
+export type LearningPatternType =
+  | 'price_increase'
+  | 'price_decrease'
+  | 'item_removal'
+  | 'item_addition'
+  | 'scope_edit'
+  | 'note_addition'
+
+export interface LearningPattern {
+  type: LearningPatternType
+  field: string
+  direction?: 'increase' | 'decrease'
+  frequency: number
+  avgMagnitude?: number
+  description: string
+}
+
+export interface TenantLearningContext {
+  id: string
+  tenant_id: string
+  service_id: string
+  patterns_json: LearningPattern[]
+  prompt_context: string | null
+  total_amendments_analyzed: number
+  last_analyzed_at: string
 }
 
 // ============================================================================
