@@ -46,7 +46,8 @@ export async function GET(
         pdf_asset_id,
         tenants!tenant_id (
           id,
-          name
+          name,
+          template_json
         ),
         services!service_id (
           id,
@@ -108,7 +109,7 @@ export async function GET(
     }
 
     // Build response
-    const tenant = quote.tenants as { id: string; name: string }
+    const tenant = quote.tenants as { id: string; name: string; template_json: Record<string, unknown> | null }
     const pricing = quote.pricing_json as QuotePricing
     const content = quote.content_json as QuoteContent & {
       validityDays?: number
@@ -151,6 +152,7 @@ export async function GET(
       quoteId: quote.id,
       status: quote.status,
       documentType: quote.document_type,
+      version: quote.version ?? 1,
       business,
       customer: customerView,
       pricing: {
@@ -185,6 +187,8 @@ export async function GET(
       ...(content.signalRecommendations && content.signalRecommendations.length > 0 && {
         signalRecommendations: content.signalRecommendations,
       }),
+      // Accept quote toggle — defaults to true for backward compatibility
+      acceptQuoteEnabled: tenant.template_json?.acceptQuoteEnabled !== false,
     }
 
     return NextResponse.json(response)

@@ -17,6 +17,7 @@ const DEFAULT_TEMPLATE: TenantTemplate = {
   includeAssumptions: true,
   includeExclusions: true,
   validityDays: 30,
+  acceptQuoteEnabled: true,
 }
 
 // Mock quote data for preview
@@ -312,6 +313,21 @@ export default function BrandingPage() {
                 </div>
               </label>
 
+              <label className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={template.acceptQuoteEnabled !== false}
+                  onChange={(e) =>
+                    setTemplate({ ...template, acceptQuoteEnabled: e.target.checked })
+                  }
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                />
+                <div>
+                  <span className="text-sm font-medium text-text-secondary">Allow customers to accept quotes directly</span>
+                  <p className="text-xs text-text-muted">Show an &quot;Accept Quote&quot; button on the customer quote page</p>
+                </div>
+              </label>
+
               <div>
                 <label className="block text-sm font-medium text-text-secondary">
                   Quote validity (days)
@@ -460,12 +476,14 @@ export default function BrandingPage() {
               )}
 
               {/* Accept button preview */}
-              <button
-                className="mt-4 w-full rounded-warm-lg py-2 text-sm font-medium text-white"
-                style={{ backgroundColor: branding.primaryColor }}
-              >
-                Accept Quote
-              </button>
+              {template.acceptQuoteEnabled !== false && (
+                <button
+                  className="mt-4 w-full rounded-warm-lg py-2 text-sm font-medium text-white"
+                  style={{ backgroundColor: branding.primaryColor }}
+                >
+                  Accept Quote
+                </button>
+              )}
             </div>
           </div>
         </div>
