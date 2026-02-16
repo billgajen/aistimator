@@ -163,6 +163,11 @@ function ConversationalChat({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Track which service the conversation has resolved to
+  const hasMultipleServices = widgetData.services.length > 1
+  const initialServiceId = serviceId || (!hasMultipleServices ? widgetData.services[0]?.id : null)
+  const resolvedServiceIdRef = useRef<string | null>(initialServiceId || null)
+
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -170,14 +175,16 @@ function ConversationalChat({
 
   // Send opening message on mount
   useEffect(() => {
-    const serviceName = serviceId
-      ? widgetData.services.find(s => s.id === serviceId)?.name
-      : widgetData.services[0]?.name
+    const serviceName = initialServiceId
+      ? widgetData.services.find(s => s.id === initialServiceId)?.name
+      : null
     setMessages([{
       role: 'assistant',
-      text: `Hi! I'm here to help you get a quote${serviceName ? ` for ${serviceName}` : ''}. Tell me about what you need and I'll gather the details.`,
+      text: serviceName
+        ? `Hi! I'm here to help you get a quote for ${serviceName}. Tell me about what you need and I'll gather the details.`
+        : `Hi! Welcome! I can help you get a quote. What service are you looking for? We offer ${widgetData.services.map(s => s.name).join(', ')}.`,
     }])
-  }, [widgetData, serviceId])
+  }, [widgetData, initialServiceId])
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || [])
@@ -233,7 +240,7 @@ function ConversationalChat({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenantKey,
-          serviceId: serviceId || widgetData.services[0]?.id,
+          serviceId: resolvedServiceIdRef.current || undefined,
           message: text,
           conversationHistory: messages.map(m => ({
             role: m.role,
@@ -253,7 +260,34 @@ function ConversationalChat({
       }
 
       setMessages(prev => [...prev, { role: 'assistant', text: data.reply }])
-      if (data.extractedFields) setExtractedFields(data.extractedFields)
+      if (data.extractedFields) {
+        setExtractedFields(data.extractedFields)
+        // Update resolved service when AI identifies which service the customer wants
+        if (!resolvedServiceIdRef.current) {
+          let matched: typeof widgetData.services[0] | undefined
+          // First: check extractedFields.serviceId from AI
+          if (data.extractedFields.serviceId) {
+            const sid = data.extractedFields.serviceId as string
+            matched = widgetData.services.find(s => s.id === sid)
+              || widgetData.services.find(s => s.name.toLowerCase() === sid.toLowerCase())
+          }
+          // Fallback: scan the AI reply + user message for service name mentions
+          if (!matched) {
+            const combinedText = (text + ' ' + data.reply).toLowerCase()
+            // Sort by name length descending so "Manicure & Pedicure" matches before "Spa Package"
+            const sortedServices = [...widgetData.services].sort((a, b) => b.name.length - a.name.length)
+            for (const svc of sortedServices) {
+              if (combinedText.includes(svc.name.toLowerCase())) {
+                matched = svc
+                break
+              }
+            }
+          }
+          if (matched) {
+            resolvedServiceIdRef.current = matched.id
+          }
+        }
+      }
       // Accumulate field answers across turns
       if (data.fieldAnswers) {
         setFieldAnswers(prev => {

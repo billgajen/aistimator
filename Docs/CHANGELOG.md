@@ -15,6 +15,92 @@
 
 ## Issues & Resolutions
 
+### 2026-02-16: Conversational Chat — Multi-Service Awareness & Field Isolation
+
+**Context:** Two bugs: (1) chat always auto-selected the first service, ignoring others; (2) the chat API loaded fields from ALL service-specific widget_configs, not just the selected one. This caused plumbing fields ("where is the leak?") to appear when discussing spa services.
+
+**Root cause 1 (service lock):** `ConversationalChat` always sent `serviceId: widgetData.services[0]?.id` as fallback. The chat API's system prompt said "SELECTED SERVICE: [first service]" and the AI focused only on that.
+
+**Root cause 2 (field bleed):** The chat API's field loading loop iterated ALL widget_configs and included any field where `!field.serviceId`. Fields in service-specific configs don't have a `field.serviceId` property (scoped by `cfg.service_id` row), so `!field.serviceId` was always true — every service's fields leaked into every other service.
+
+**Fix:**
+- **Client — service resolution** (`embed/[tenantKey]/page.tsx`):
+  - `resolvedServiceIdRef` (ref, not state) starts `null` when multiple services exist
+  - Opening greeting lists all available services
+  - After each AI response, scans reply + user message text for service name matches (longest-first to avoid partial matches)
+  - Once matched, ref updates synchronously so the very next API call uses the correct serviceId
+- **Chat API — field isolation** (`api/public/widget/chat/route.ts`):
+  - Rewrote field loading to check `cfg.service_id` first: global config (`null`) fields are filtered by `field.serviceId` property; service-specific config fields are only included when `cfg.service_id === body.serviceId`
+  - Service-specific configs for OTHER services are now skipped entirely
+- **Chat API — prompt improvements**: system prompt now tells AI to set `extractedFields.serviceId` immediately when service is identified; maxOutputTokens increased from 1000→2000 to prevent response truncation
+
+**Files:** `apps/web/src/app/embed/[tenantKey]/page.tsx`, `apps/web/src/app/api/public/widget/chat/route.ts`
+
+---
+
+### 2026-02-15: Demo Conversational Mode, Bulk Service Upload & AI Refinement (3 Features)
+
+**Context:** Businesses needed (1) a way to preview the conversational embed mode, (2) a way to bulk-create services from a pricing document, and (3) per-service AI refinement after initial draft generation via document upload or chat.
+
+**Feature 1: Demo Page Conversational Mode**
+- Added 4th "Conversational" mode to `/demo` page alongside iframe/floating/inline
+- When selected, renders the embed page via iframe with `?mode=conversational` query param
+- Updated `useEmbedCode` to generate conversational embed snippet with `data-display-mode="conversational"`
+- Updated `IframeWidget` to accept optional `mode` prop for URL query params
+- **File:** `apps/web/src/app/demo/page.tsx`
+
+**Feature 2: Bulk Service Upload ("Upload Services")**
+- "Upload Services" button on services list page (next to "Add Service")
+- Opens modal with file drop zone accepting PDF, images, Word docs
+- Flow: upload to R2 via authenticated `/api/uploads/init` → send to Gemini via `/api/services/ai-draft/extract-services` → review checklist → create selected services via `/api/services`
+- Each created service gets full `ServiceDraftConfig` (scope, pricing, fields) and can be edited individually
+- **New files:**
+  - `apps/web/src/app/api/uploads/init/route.ts` — Authenticated upload endpoint (accepts PDF, images, Word docs)
+  - `apps/web/src/app/api/services/ai-draft/extract-services/route.ts` — Bulk document→multi-service extraction via Gemini
+  - `apps/web/src/components/services/BulkServiceUpload.tsx` — Modal UI component
+- **Modified:** `apps/web/src/app/(dashboard)/app/services/page.tsx` — added Upload Services button + BulkServiceUpload modal
+
+**Feature 3: Per-Service AI Refinement (Upload Doc + Chat)**
+- After AI draft generates, a collapsible "AI Refinement" panel appears on wizard steps 2-4
+- Two tabs: **Chat** (natural language instructions to refine config) and **Upload Doc** (extract pricing from document)
+- Chat: sends message + current config to Gemini, returns updated config with explanation
+- Upload: sends document to Gemini for pricing extraction, merges into form state
+- All wizard fields remain fully editable at all times — refinement is optional helper
+- **New files:**
+  - `apps/web/src/app/api/services/ai-draft/extract-pricing/route.ts` — Single-service document pricing extraction
+  - `apps/web/src/app/api/services/ai-draft/refine/route.ts` — Chat-based config refinement
+  - `apps/web/src/components/services/AIDraftRefinementPanel.tsx` — Collapsible panel with Chat + Upload tabs
+- **Modified:** `apps/web/src/app/(dashboard)/app/services/page.tsx` — added `applyDraftToForm()` helper, wired refinement panel
+
+**Shared Refactor: AI Draft Validation**
+- Extracted `validateAndNormalizeDraft()`, `parseGeminiJson()`, `callGemini()`, and all normalize helpers from `ai-draft/route.ts` into `ai-draft/shared.ts`
+- All AI draft endpoints (original, extract-services, extract-pricing, refine) now share this code
+- **New file:** `apps/web/src/app/api/services/ai-draft/shared.ts`
+- **Modified:** `apps/web/src/app/api/services/ai-draft/route.ts` — imports from shared.ts, removed duplicate functions
+
+**Key Design Decisions:**
+- **AD-017: Partial draft updates for refinement** — The refine and extract-pricing endpoints return partial `ServiceDraftConfig` that gets merged into form state via `applyDraftToForm()`. This avoids AI overwriting fields the user manually edited.
+- **AD-018: Authenticated uploads separate from public** — Dashboard uploads use `/api/uploads/init` (requires auth, derives tenantId from session) vs public widget uploads at `/api/public/uploads/init` (requires tenantKey). Dashboard uploads also accept Word docs.
+- **AD-019: Conversation history in refine endpoint** — The refine chat maintains rolling conversation history (last 6 messages) so context builds across messages (e.g., "now make that cheaper" refers to last adjustment).
+- **AD-020: Gemini vision for document extraction** — Both bulk and single-service extraction send uploaded documents as base64 inline data to Gemini 2.5 Flash for multimodal extraction, avoiding a separate OCR step.
+
+### 2026-02-15: AI Refinement — quantitySource/unitLabel Stripped by normalizeWorkSteps
+
+**Context:** When using the AI chat refinement to link a work step to a quantity signal (e.g., "Gutter Clearing should be based on gutter length"), Gemini correctly returned `quantitySource` and `unitLabel` fields on the work step. However, the `normalizeWorkSteps()` function in `shared.ts` stripped these fields because the `WorkStepInput` interface didn't include them.
+
+**Root cause:** `WorkStepInput` interface and `normalizeWorkSteps()` map output only preserved `id`, `name`, `description`, `costType`, `defaultCost`, `optional`, `triggerSignal`. The `quantitySource`, `unitLabel`, and `triggerCondition` fields from `WorkStepConfig` were silently dropped during normalization.
+
+**Fix:**
+- Added `quantitySource` and `unitLabel` to `WorkStepInput` interface
+- Added `normalizeQuantitySource()` helper — validates type is one of `form_field | constant | ai_signal`, preserves `fieldId`, `value`, `signalKey`
+- Added `normalizeTriggerCondition()` helper — validates operator is one of the valid operators
+- Updated `normalizeWorkSteps()` map to include `quantitySource`, `unitLabel`, and `triggerCondition` in output
+- Updated `refine/route.ts` system prompt to explicitly instruct AI about `quantitySource` usage (with `form_field`, `ai_signal`, `constant` types and `unitLabel`)
+
+**Files:** `apps/web/src/app/api/services/ai-draft/shared.ts`, `apps/web/src/app/api/services/ai-draft/refine/route.ts`
+
+---
+
 ### 2026-02-15: Quote Editor Bugfixes & Improvements (4 Fixes)
 
 **Context:** Testing of the Quote Editor revealed issues: a tax rate conversion bug, missing UI sections for optional extras and pricing notes, a non-configurable Accept Quote button, and signal recommendations / cross-service pricing being silently lost on every edit save.

@@ -122,20 +122,24 @@ export async function POST(request: Request) {
     for (const cfg of widgetConfigs || []) {
       const configJson = cfg.config_json as ConfigJson | null
       if (!configJson?.fields) continue
-      for (const field of configJson.fields) {
-        // Include global fields and fields matching selected service
-        if (!field.serviceId || field.serviceId === body.serviceId) {
-          allFields.push(field)
+
+      if (cfg.service_id === null) {
+        // Global config — include fields that are truly global (no serviceId)
+        // or scoped to the selected service via field.serviceId property
+        for (const field of configJson.fields) {
+          if (!field.serviceId || field.serviceId === body.serviceId) {
+            allFields.push(field)
+          }
         }
-      }
-      // Also include service-specific config fields
-      if (cfg.service_id === body.serviceId && configJson.fields) {
+      } else if (cfg.service_id === body.serviceId) {
+        // Service-specific config matching the selected service — include all fields
         for (const field of configJson.fields) {
           if (!allFields.some(f => f.fieldId === field.fieldId)) {
             allFields.push(field)
           }
         }
       }
+      // Skip service-specific configs for OTHER services entirely
     }
 
     const serviceList = (services || []).map(s => `- ${s.name} (ID: ${s.id})`).join('\n')
@@ -194,7 +198,7 @@ Your job is to gather information for a quote request through natural conversati
 
 AVAILABLE SERVICES:
 ${serviceList}
-${selectedService ? `\nSELECTED SERVICE: ${selectedService.name}` : '\nNo service selected yet — ask the customer which service they need.'}
+${selectedService ? `\nSELECTED SERVICE: ${selectedService.name} (ID: ${selectedService.id})` : '\nNo service selected yet — help the customer choose one. As soon as you identify which service they want, set extractedFields.serviceId to the exact service ID shown above (e.g., svc_xxx). Do NOT wait until the end — set it on the SAME turn you identify the service.'}
 
 INFORMATION TO COLLECT:
 1. Customer name (REQUIRED)
@@ -223,6 +227,8 @@ CONVERSATION RULES:
 - Do NOT make up information the customer hasn't provided
 - Keep responses concise (2-3 sentences max)
 - A project description from the customer should go into the fieldAnswers with fieldId "_project_description"
+- IMPORTANT: Only ask questions relevant to the SELECTED service. Never ask about other services' fields.
+- When a service is identified, IMMEDIATELY set extractedFields.serviceId to its ID. Do not delay this.
 
 ${isStart ? 'This is the start of the conversation. Greet the customer warmly and ask about their project first, then collect the specific fields one by one.' : ''}`
 
@@ -295,7 +301,7 @@ ${isStart ? 'This is the start of the conversation. Greet the customer warmly an
         systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: geminiMessages,
         generationConfig: {
-          maxOutputTokens: 1000,
+          maxOutputTokens: 2000,
           temperature: 0.7,
           response_mime_type: 'application/json',
           response_schema: responseSchema,

@@ -5,6 +5,8 @@ import { PageHeader } from '@/components/dashboard/EmptyState'
 import { AIDraftBadge } from '@/components/AIDraftBadge'
 import { WorkStepEditor } from '@/components/WorkStepEditor'
 import { SuggestedFieldEditor } from '@/components/SuggestedFieldEditor'
+import { BulkServiceUpload } from '@/components/services/BulkServiceUpload'
+import { AIDraftRefinementPanel } from '@/components/services/AIDraftRefinementPanel'
 import type {
   Service,
   DocumentType,
@@ -338,6 +340,9 @@ export default function ServicesPage() {
   const [generatingDraft, setGeneratingDraft] = useState(false)
   const [draftError, setDraftError] = useState<string | null>(null)
 
+  // Bulk upload state
+  const [showBulkUpload, setShowBulkUpload] = useState(false)
+
   // Quote Simulator state
   const [simulatorValues, setSimulatorValues] = useState<Record<string, string | number | boolean>>({})
   const [simulatorResult, setSimulatorResult] = useState<{
@@ -473,6 +478,40 @@ export default function ServicesPage() {
       setDraftError(err instanceof Error ? err.message : 'Failed to generate AI draft')
     } finally {
       setGeneratingDraft(false)
+    }
+  }
+
+  /**
+   * Apply a partial draft update to form data (used by AI refinement)
+   */
+  const applyDraftToForm = (draft: Partial<ServiceDraftConfig>) => {
+    setFormData((prev) => ({
+      ...prev,
+      ...(draft.scope && {
+        scopeIncludes: draft.scope.included ?? prev.scopeIncludes,
+        scopeExcludes: draft.scope.excluded ?? prev.scopeExcludes,
+        defaultAssumptions: draft.scope.assumptions ?? prev.defaultAssumptions,
+      }),
+      ...(draft.media && {
+        mediaConfig: {
+          minPhotos: draft.media.minPhotos ?? prev.mediaConfig.minPhotos,
+          maxPhotos: draft.media.maxPhotos ?? prev.mediaConfig.maxPhotos,
+          photoGuidance: draft.media.photoGuidance ?? prev.mediaConfig.photoGuidance,
+          requiredAngles: draft.media.requiredAngles,
+        },
+      }),
+      ...(draft.pricing && {
+        workSteps: draft.pricing.workSteps ?? prev.workSteps,
+        baseFee: draft.pricing.baseFee ?? prev.baseFee,
+        minimumCharge: draft.pricing.minimumCharge ?? prev.minimumCharge,
+      }),
+      ...(draft.expectedSignals && { expectedSignals: draft.expectedSignals }),
+      ...(draft.suggestedFields && { suggestedFields: draft.suggestedFields }),
+    }))
+
+    // Also update the aiDraft state so it reflects current state
+    if (aiDraft) {
+      setAiDraft((prev) => prev ? { ...prev, ...draft } : prev)
     }
   }
 
@@ -849,20 +888,31 @@ export default function ServicesPage() {
         title="Services"
         description="Define the services you offer to customers"
         actions={
-          <button
-            onClick={openCreateModal}
-            className="inline-flex items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
-          >
-            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            Add Service
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowBulkUpload(true)}
+              className="inline-flex items-center rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+            >
+              <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              Upload Services
+            </button>
+            <button
+              onClick={openCreateModal}
+              className="inline-flex items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+            >
+              <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              Add Service
+            </button>
+          </div>
         }
       />
 
@@ -1073,6 +1123,17 @@ export default function ServicesPage() {
 
             <form onSubmit={handleSubmit}>
               <div className="p-6">
+                {/* AI Refinement Panel — shown on steps 2-4 when AI draft exists */}
+                {aiDraft && activeStep !== 'basic' && activeStep !== 'test' && (
+                  <div className="mb-6">
+                    <AIDraftRefinementPanel
+                      formData={formData}
+                      aiDraft={aiDraft}
+                      onApplyDraft={applyDraftToForm}
+                    />
+                  </div>
+                )}
+
                 {/* Basic Info Step */}
                 {activeStep === 'basic' && (
                   <div className="space-y-4">
@@ -1897,6 +1958,13 @@ export default function ServicesPage() {
           </div>
         </div>
       )}
+
+      {/* Bulk Upload Modal */}
+      <BulkServiceUpload
+        open={showBulkUpload}
+        onClose={() => setShowBulkUpload(false)}
+        onServicesCreated={fetchServices}
+      />
     </div>
   )
 }
