@@ -60,7 +60,7 @@ export async function POST(
     }
 
     // Check if quote is in a valid state to accept
-    const validStatuses = ['sent', 'viewed']
+    const validStatuses = ['sent', 'viewed', 'revised', 'feedback_received']
     if (!validStatuses.includes(quote.status)) {
       return NextResponse.json(
         { error: { code: 'INVALID_STATUS', message: `Cannot accept quote with status: ${quote.status}` } },

@@ -17,7 +17,7 @@ declare global {
   }
 }
 
-type EmbedMode = 'floating' | 'inline' | 'iframe'
+type EmbedMode = 'floating' | 'inline' | 'iframe' | 'conversational'
 
 /**
  * Widget Demo Page
@@ -133,7 +133,7 @@ function DemoPageContent() {
                 <label className="block text-sm font-medium text-text-secondary mb-2">
                   Embed Mode
                 </label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <ModeOption
                     mode="iframe"
                     currentMode={mode}
@@ -154,6 +154,13 @@ function DemoPageContent() {
                     onSelect={setMode}
                     title="Inline"
                     description="Renders directly in a container."
+                  />
+                  <ModeOption
+                    mode="conversational"
+                    currentMode={mode}
+                    onSelect={setMode}
+                    title="Conversational"
+                    description="Chat-style guided experience."
                   />
                 </div>
               </div>
@@ -216,6 +223,12 @@ function DemoPageContent() {
               </div>
             )}
 
+            {mode === 'conversational' && (
+              <div id="iframe-container" className="border rounded-warm-lg overflow-hidden">
+                <IframeWidget tenantKey={tenantKey} mode="conversational" />
+              </div>
+            )}
+
             {mode === 'inline' && (
               <div
                 id="widget-container"
@@ -233,7 +246,7 @@ function DemoPageContent() {
           </div>
 
           {/* Inject the widget script for non-iframe modes */}
-          {mode !== 'iframe' && <WidgetLoader tenantKey={tenantKey} mode={mode} />}
+          {mode !== 'iframe' && mode !== 'conversational' && <WidgetLoader tenantKey={tenantKey} mode={mode} />}
         </div>
       )}
 
@@ -328,6 +341,18 @@ function useEmbedCode(mode: EmbedMode, tenantKey: string): string {
   async
 ></script>`
         break
+
+      case 'conversational':
+        code = `<!-- Estimator Widget (Conversational) -->
+<div id="estimator-widget"></div>
+<script
+  src="${origin}/iframe-loader.js"
+  data-tenant-key="${key}"
+  data-container="#estimator-widget"
+  data-display-mode="conversational"
+  async
+></script>`
+        break
     }
     setEmbedCode(code)
   }, [mode, tenantKey])
@@ -338,7 +363,7 @@ function useEmbedCode(mode: EmbedMode, tenantKey: string): string {
 /**
  * Iframe widget component
  */
-function IframeWidget({ tenantKey }: { tenantKey: string }) {
+function IframeWidget({ tenantKey, mode }: { tenantKey: string; mode?: string }) {
   const [height, setHeight] = useState(400)
 
   useEffect(() => {
@@ -357,7 +382,7 @@ function IframeWidget({ tenantKey }: { tenantKey: string }) {
 
   return (
     <iframe
-      src={`/embed/${tenantKey}`}
+      src={`/embed/${tenantKey}${mode ? `?mode=${mode}` : ''}`}
       style={{ width: '100%', height: `${height}px`, border: 'none' }}
       title="Get a Quote"
     />

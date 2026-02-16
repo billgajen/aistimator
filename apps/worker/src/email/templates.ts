@@ -225,3 +225,188 @@ function escapeHtml(text: string): string {
   }
   return text.replace(/[&<>"']/g, (char) => htmlEntities[char] || char)
 }
+
+// ============================================================================
+// CLARIFICATION EMAIL TEMPLATE (Phase 4: Quality Gate)
+// ============================================================================
+
+export interface ClarificationEmailData {
+  customerName: string
+  businessName: string
+  serviceName: string
+  clarifyUrl: string
+  questions: Array<{ question: string }>
+  primaryColor?: string
+}
+
+/**
+ * Email sent to customer when the quality gate requests clarification.
+ */
+// ============================================================================
+// FEEDBACK NOTIFICATION EMAIL (Quote Editor Flow)
+// ============================================================================
+
+export interface FeedbackNotificationEmailData {
+  businessName: string
+  customerName: string
+  serviceName: string
+  feedbackType: 'feedback' | 'approval_request'
+  feedbackText?: string
+  dashboardUrl: string
+  primaryColor?: string
+}
+
+/**
+ * Email sent to business owner when customer submits feedback on a quote.
+ */
+export function feedbackNotificationEmail(data: FeedbackNotificationEmailData): string {
+  const primaryColor = data.primaryColor || '#2563eb'
+  const feedbackLabel = data.feedbackType === 'approval_request' ? 'Review Request' : 'Feedback'
+
+  const feedbackSection = data.feedbackText
+    ? `
+      <div style="margin: 16px 0; padding: 16px; background-color: #fefce8; border-left: 4px solid #eab308; border-radius: 0 8px 8px 0;">
+        <p style="margin: 0 0 8px; font-weight: 600; color: #374151; font-size: 14px;">Customer message:</p>
+        <p style="margin: 0; color: #374151; font-size: 14px; line-height: 1.5; white-space: pre-wrap;">${escapeHtml(data.feedbackText)}</p>
+      </div>
+    `
+    : ''
+
+  const content = `
+    <div style="margin-bottom: 16px; display: inline-block; padding: 6px 12px; background-color: #fef3c7; border-radius: 6px;">
+      <span style="font-weight: 600; font-size: 13px; color: #92400e;">${feedbackLabel}</span>
+    </div>
+
+    <h1 style="margin: 0 0 8px; font-size: 20px; font-weight: 700; color: #111827;">
+      Customer ${feedbackLabel.toLowerCase()} on quote
+    </h1>
+    <p style="margin: 0 0 16px; color: #6b7280; font-size: 14px;">
+      ${escapeHtml(data.customerName)} &middot; ${escapeHtml(data.serviceName)}
+    </p>
+
+    ${feedbackSection}
+
+    <table role="presentation" style="width: 100%; margin: 24px 0;">
+      <tr>
+        <td style="text-align: center;">
+          <a href="${escapeHtml(data.dashboardUrl)}" style="display: inline-block; padding: 14px 28px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;">
+            View in Dashboard
+          </a>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin: 16px 0 0; color: #6b7280; font-size: 13px;">
+      You can review and respond to this ${feedbackLabel.toLowerCase()} from your dashboard.
+    </p>
+  `
+
+  return emailWrapper(content, primaryColor)
+}
+
+// ============================================================================
+// REVISED QUOTE EMAIL (Quote Editor Flow)
+// ============================================================================
+
+export interface RevisedQuoteEmailData {
+  customerName: string
+  businessName: string
+  serviceName: string
+  quoteViewUrl: string
+  total: string
+  primaryColor?: string
+}
+
+/**
+ * Email sent to customer when business edits and resends a quote.
+ */
+export function revisedQuoteEmail(data: RevisedQuoteEmailData): string {
+  const primaryColor = data.primaryColor || '#2563eb'
+
+  const content = `
+    <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: ${primaryColor};">
+      ${escapeHtml(data.businessName)}
+    </h1>
+    <p style="margin: 0 0 32px; color: #6b7280; font-size: 14px;">
+      Updated quote for ${escapeHtml(data.serviceName)}
+    </p>
+
+    <p style="margin: 0 0 16px; color: #374151; font-size: 16px; line-height: 1.5;">
+      Hi ${escapeHtml(data.customerName)},
+    </p>
+    <p style="margin: 0 0 24px; color: #374151; font-size: 16px; line-height: 1.5;">
+      Your quote has been updated. Please review the latest version:
+    </p>
+
+    <div style="margin: 24px 0; padding: 24px; background-color: #f0f9ff; border-radius: 8px; text-align: center;">
+      <p style="margin: 0 0 4px; color: #6b7280; font-size: 14px;">Updated Total</p>
+      <p style="margin: 0; font-size: 36px; font-weight: 700; color: ${primaryColor};">
+        ${escapeHtml(data.total)}
+      </p>
+    </div>
+
+    <table role="presentation" style="width: 100%; margin: 32px 0;">
+      <tr>
+        <td style="text-align: center;">
+          <a href="${escapeHtml(data.quoteViewUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
+            View Updated Quote
+          </a>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin: 24px 0 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
+      If you have any questions, simply reply to this email and we'll get back to you.
+    </p>
+
+    <p style="margin: 24px 0 0; color: #374151; font-size: 14px;">
+      Best regards,<br>
+      <strong>${escapeHtml(data.businessName)}</strong>
+    </p>
+  `
+
+  return emailWrapper(content, primaryColor)
+}
+
+// ============================================================================
+// CLARIFICATION EMAIL TEMPLATE (Phase 4: Quality Gate)
+// ============================================================================
+
+export function customerClarificationEmail(data: ClarificationEmailData): string {
+  const questionsList = data.questions
+    .map((q) => `<li style="margin-bottom: 8px; color: #374151;">${escapeHtml(q.question)}</li>`)
+    .join('')
+
+  const content = `
+    <tr>
+      <td style="padding: 32px;">
+        <h1 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 800; color: #09090B;">
+          Quick question about your quote
+        </h1>
+        <p style="margin: 0 0 24px 0; color: #52525b; font-size: 15px; line-height: 1.6;">
+          Hi ${escapeHtml(data.customerName)},
+        </p>
+        <p style="margin: 0 0 16px 0; color: #52525b; font-size: 15px; line-height: 1.6;">
+          ${escapeHtml(data.businessName)} needs a little more information to finalize your ${escapeHtml(data.serviceName)} quote.
+          It will only take a moment:
+        </p>
+        <ul style="margin: 0 0 24px 0; padding-left: 20px; font-size: 14px;">
+          ${questionsList}
+        </ul>
+        <table role="presentation" style="margin: 0 auto;">
+          <tr>
+            <td style="background-color: #09090B; border-radius: 6px;">
+              <a href="${data.clarifyUrl}" style="display: inline-block; padding: 14px 32px; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none;">
+                Answer Questions
+              </a>
+            </td>
+          </tr>
+        </table>
+        <p style="margin: 24px 0 0 0; color: #a1a1aa; font-size: 13px;">
+          This helps us provide you with the most accurate quote possible.
+        </p>
+      </td>
+    </tr>`
+
+  return emailWrapper(content, data.primaryColor)
+}

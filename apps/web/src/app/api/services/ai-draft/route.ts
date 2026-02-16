@@ -1,14 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
 import type { ServiceDraftConfig, DocumentType } from '@estimator/shared'
+import { validateAndNormalizeDraft, parseGeminiJson, GEMINI_API_BASE, DEFAULT_MODEL } from './shared'
 
 /**
  * POST /api/services/ai-draft
  * Generate an AI draft configuration for a new service
  */
-
-const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
-const DEFAULT_MODEL = 'gemini-2.0-flash'
 
 /**
  * System prompt for service draft generation
@@ -168,14 +166,8 @@ async function generateServiceDraft(
     throw new Error('No response from Gemini')
   }
 
-  // Parse JSON from response
-  const jsonMatch = text.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    throw new Error('No JSON found in response')
-  }
-
-  const draft = JSON.parse(jsonMatch[0]) as ServiceDraftConfig
-  return validateAndNormalizeDraft(draft, request)
+  const draft = parseGeminiJson<ServiceDraftConfig>(text)
+  return validateAndNormalizeDraft(draft)
 }
 
 /**
@@ -259,165 +251,6 @@ IMPORTANT:
 Respond with ONLY the JSON object, no other text.`
 }
 
-/**
- * Validate and normalize the AI-generated draft
- */
-function validateAndNormalizeDraft(
-  draft: Partial<ServiceDraftConfig>,
-  _request: DraftRequest
-): ServiceDraftConfig {
-  // Ensure scope
-  const scope = {
-    included: truncateArray(draft.scope?.included || ['Standard service'], 6),
-    excluded: truncateArray(draft.scope?.excluded || ['Additional services not specified'], 6),
-    assumptions: truncateArray(draft.scope?.assumptions || ['Standard conditions apply'], 6),
-  }
-
-  // Ensure media
-  const media = {
-    minPhotos: Math.max(0, Math.min(5, draft.media?.minPhotos || 1)),
-    maxPhotos: Math.max(1, Math.min(10, draft.media?.maxPhotos || 8)),
-    photoGuidance: draft.media?.photoGuidance || 'Please upload clear photos of the area or items that need service.',
-    requiredAngles: truncateArray(draft.media?.requiredAngles || [
-      { id: 'overview', label: 'Full view', guidance: 'Capture the entire area' }
-    ], 4),
-  }
-
-  // Ensure pricing
-  const validPricingModels = ['fixed', 'per_unit', 'tiered', 'inspection_first'] as const
-  const pricingModel = validPricingModels.includes(draft.pricing?.pricingModel as typeof validPricingModels[number])
-    ? draft.pricing!.pricingModel
-    : 'fixed'
-
-  const pricing = {
-    pricingModel,
-    unitType: draft.pricing?.unitType || null,
-    baseFee: Math.max(0, draft.pricing?.baseFee || 0),
-    minimumCharge: Math.max(0, draft.pricing?.minimumCharge || 50),
-    workSteps: truncateArray(normalizeWorkSteps(draft.pricing?.workSteps || []), 5),
-    addOns: truncateArray(normalizeAddons(draft.pricing?.addOns || []), 6),
-    siteVisit: {
-      alwaysRecommend: draft.pricing?.siteVisit?.alwaysRecommend || false,
-      confidenceBelowPct: Math.max(0, Math.min(100, draft.pricing?.siteVisit?.confidenceBelowPct || 60)),
-      estimateAbove: Math.max(0, draft.pricing?.siteVisit?.estimateAbove || 1000),
-    },
-  }
-
-  // Ensure expected signals
-  const expectedSignals = truncateArray(
-    normalizeExpectedSignals(draft.expectedSignals || []),
-    6
-  )
-
-  // Ensure suggested fields
-  const suggestedFields = truncateArray(
-    normalizeSuggestedFields(draft.suggestedFields || []),
-    6
-  )
-
-  return {
-    scope,
-    media,
-    pricing,
-    expectedSignals,
-    suggestedFields,
-  }
-}
-
-function truncateArray<T>(arr: T[], max: number): T[] {
-  return arr.slice(0, max)
-}
-
-interface WorkStepInput {
-  id?: string
-  name?: string
-  description?: string
-  costType?: string
-  defaultCost?: number
-  cost?: number
-  optional?: boolean
-  triggerSignal?: string
-  triggerCondition?: { operator: string; value?: string | number | boolean }
-}
-
-function normalizeWorkSteps(steps: WorkStepInput[]): ServiceDraftConfig['pricing']['workSteps'] {
-  return steps
-    .filter(step => step.name && step.name.length > 0)
-    .map((step, index) => ({
-      id: step.id || `step_${index + 1}`,
-      name: step.name!,
-      description: step.description || step.name!,
-      costType: (['fixed', 'per_unit', 'per_hour'] as const).includes(step.costType as 'fixed' | 'per_unit' | 'per_hour')
-        ? (step.costType as 'fixed' | 'per_unit' | 'per_hour')
-        : 'fixed',
-      defaultCost: Math.max(0, step.defaultCost || step.cost || 25),
-      optional: step.optional || false,
-      triggerSignal: step.optional ? step.triggerSignal : undefined,
-    }))
-}
-
-interface AddonInput {
-  name?: string
-  price?: number
-  description?: string
-}
-
-function normalizeAddons(addons: AddonInput[]): ServiceDraftConfig['pricing']['addOns'] {
-  return addons
-    .filter(addon => addon.name && addon.name.length > 0)
-    .map(addon => ({
-      name: addon.name!,
-      price: Math.max(0, addon.price || 0),
-      description: addon.description || addon.name!,
-    }))
-}
-
-interface ExpectedSignalInput {
-  signalKey?: string
-  type?: string
-  possibleValues?: string[]
-  description?: string
-}
-
-function normalizeExpectedSignals(signals: ExpectedSignalInput[]): ServiceDraftConfig['expectedSignals'] {
-  return signals
-    .filter(signal => signal.signalKey && signal.signalKey.length > 0)
-    .map(signal => ({
-      signalKey: signal.signalKey!,
-      type: (['number', 'enum', 'boolean', 'string'] as const).includes(signal.type as 'number' | 'enum' | 'boolean' | 'string')
-        ? (signal.type as 'number' | 'enum' | 'boolean' | 'string')
-        : 'string',
-      possibleValues: signal.type === 'enum' ? signal.possibleValues : undefined,
-      description: signal.description || signal.signalKey!,
-    }))
-}
-
-interface SuggestedFieldInput {
-  label?: string
-  fieldId?: string
-  type?: string
-  required?: boolean
-  options?: string[]
-  helpText?: string
-  criticalForPricing?: boolean
-}
-
-function normalizeSuggestedFields(fields: SuggestedFieldInput[]): ServiceDraftConfig['suggestedFields'] {
-  const validTypes = ['text', 'textarea', 'number', 'dropdown', 'radio', 'checkbox', 'boolean'] as const
-  return fields
-    .filter(field => field.label && field.label.length > 0)
-    .map((field, index) => ({
-      label: field.label!,
-      fieldId: field.fieldId || `field_${index + 1}`,
-      type: validTypes.includes(field.type as typeof validTypes[number])
-        ? (field.type as typeof validTypes[number])
-        : 'text',
-      required: field.required || false,
-      options: ['dropdown', 'radio', 'checkbox'].includes(field.type || '') ? field.options : undefined,
-      helpText: field.helpText,
-      criticalForPricing: field.criticalForPricing || false,
-    }))
-}
 
 /**
  * Get a fallback draft when AI fails

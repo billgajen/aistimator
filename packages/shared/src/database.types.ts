@@ -13,8 +13,11 @@ export type QuoteStatus =
   | 'queued'
   | 'generating'
   | 'pending_review'
+  | 'awaiting_clarification'
   | 'sent'
   | 'viewed'
+  | 'feedback_received'
+  | 'revised'
   | 'accepted'
   | 'paid'
   | 'expired'
@@ -37,6 +40,7 @@ export interface TenantTemplate {
   includeAssumptions: boolean
   includeExclusions: boolean
   validityDays: number
+  acceptQuoteEnabled?: boolean
 }
 
 export interface Tenant {
@@ -551,6 +555,65 @@ export interface ExtractedSignalsV2 {
 }
 
 // ============================================================================
+// SIGNAL PROVENANCE TYPES (Phase 3: Signal Fusion)
+// ============================================================================
+
+/** Source of a signal value */
+export type SignalSource = 'form' | 'vision' | 'text' | 'inferred'
+
+/** Provenance tracking for a single signal */
+export interface SignalProvenance {
+  key: string
+  value: string | number | boolean
+  confidence: number
+  source: SignalSource
+  evidence?: string
+  overrideReason?: string
+}
+
+/** Conflict between two sources for the same signal */
+export interface SignalConflict {
+  key: string
+  formValue?: string | number | boolean
+  visionValue?: string | number | boolean
+  resolvedSource: SignalSource
+  resolution: string
+}
+
+// ============================================================================
+// QUALITY GATE TYPES (Phase 4)
+// ============================================================================
+
+/** A clarification question targeting a low-confidence signal */
+export interface ClarificationQuestion {
+  /** Unique ID for this question */
+  id: string
+  /** The signal key this question targets */
+  targetSignalKey: string
+  /** Human-readable question text */
+  question: string
+  /** Optional suggested answer options */
+  options?: string[]
+}
+
+/** Customer's answer to a clarification question */
+export interface ClarificationAnswer {
+  questionId: string
+  answer: string
+}
+
+/** Quality gate evaluation result */
+export interface QualityGateResult {
+  action: 'send' | 'ask_clarification' | 'require_review'
+  /** Questions to ask (when action = ask_clarification) */
+  questions?: ClarificationQuestion[]
+  /** Review reason (when action = require_review) */
+  reason?: string
+  /** Timestamp of evaluation */
+  evaluatedAt: string
+}
+
+// ============================================================================
 // PRICING TRACE TYPES
 // ============================================================================
 
@@ -619,6 +682,33 @@ export interface Quote {
   signals_json?: ExtractedSignalsV2 | null
   /** Step-by-step pricing calculation trace */
   pricing_trace_json?: PricingTrace | null
+  /** Triage agent decision: classification, photo strategy, returning customer info */
+  triage_json?: {
+    classification: 'simple' | 'standard' | 'complex'
+    photoStrategy: { skipVision: boolean; maxPhotos: number }
+    crossServiceCheck: boolean
+    returningCustomer: boolean
+    previousQuoteCount: number
+    reasons: string[]
+  } | null
+  /** Signal conflicts recorded during fusion (when vision and form disagree) */
+  signal_conflicts_json?: SignalConflict[] | null
+  /** Quality gate evaluation result */
+  quality_gate_json?: QualityGateResult | null
+  /** Clarification questions for customer */
+  clarification_questions_json?: ClarificationQuestion[] | null
+  /** Customer answers to clarification questions */
+  clarification_answers_json?: ClarificationAnswer[] | null
+  /** Number of clarification rounds (capped at 1) */
+  clarification_count?: number
+  /** Internal notes visible only to business */
+  business_notes?: string | null
+  /** Optimistic locking counter */
+  version: number
+  /** Last amendment timestamp */
+  last_amended_at?: string | null
+  /** User who last amended the quote */
+  last_amended_by?: string | null
   created_at: string
   sent_at: string | null
   viewed_at: string | null
@@ -984,6 +1074,79 @@ export interface ValidationSettings {
   enabledChecks: ValidationEnabledChecks
   /** Email addresses to notify on flagged quotes */
   notifyOnFlaggedQuote?: string[]
+}
+
+// ============================================================================
+// QUOTE FEEDBACK & AMENDMENT TYPES
+// ============================================================================
+
+export type FeedbackType = 'feedback' | 'approval_request'
+export type FeedbackStatus = 'pending' | 'acknowledged' | 'resolved'
+export type AmendmentSource = 'manual' | 'feedback_response'
+
+export interface QuoteFeedback {
+  id: string
+  quote_id: string
+  tenant_id: string
+  feedback_type: FeedbackType
+  feedback_text: string | null
+  status: FeedbackStatus
+  created_at: string
+}
+
+export interface AmendmentChange {
+  field: string
+  path: string
+  before: unknown
+  after: unknown
+  type: 'added' | 'removed' | 'modified'
+}
+
+export interface QuoteAmendment {
+  id: string
+  quote_id: string
+  tenant_id: string
+  version: number
+  amended_by: string
+  before_pricing: QuotePricing
+  after_pricing: QuotePricing
+  before_content: QuoteContent
+  after_content: QuoteContent
+  changes_json: AmendmentChange[]
+  source: AmendmentSource
+  feedback_id: string | null
+  created_at: string
+}
+
+// ============================================================================
+// LEARNING CONTEXT TYPES
+// ============================================================================
+
+export type LearningPatternType =
+  | 'price_increase'
+  | 'price_decrease'
+  | 'item_removal'
+  | 'item_addition'
+  | 'scope_edit'
+  | 'note_addition'
+
+export interface LearningPattern {
+  type: LearningPatternType
+  field: string
+  direction?: 'increase' | 'decrease'
+  frequency: number
+  avgMagnitude?: number
+  description: string
+}
+
+export interface TenantLearningContext {
+  id: string
+  tenant_id: string
+  service_id: string
+  patterns_json: LearningPattern[]
+  prompt_context: string | null
+  total_amendments_analyzed: number
+  last_analyzed_at: string
 }
 
 // ============================================================================

@@ -1,11 +1,13 @@
 /**
  * AI Signal Extraction
  *
- * Extracts structured signals from images using Gemini 1.5 Flash.
+ * Extracts structured signals from images using Gemini 2.5 Flash.
  * Signals are used by the rules engine to compute pricing.
+ * Uses structured output (JSON schema) for reliable parsing.
  */
 
 import { GeminiClient } from './gemini'
+import { EXTRACTED_SIGNALS_SCHEMA } from './schemas'
 import type {
   DetectedItem,
   MatchedItem,
@@ -612,25 +614,37 @@ export async function extractStructuredSignals(
     console.log(`[Signals] Expected signals: ${context.expectedSignals.map(s => s.signalKey).join(', ')}`)
   }
 
-  const response = await client.generateWithImages(
-    prompt,
-    images,
-    SIGNAL_EXTRACTION_SYSTEM_PROMPT
-  )
-
   try {
-    const rawSignals = GeminiClient.parseJSON<ExtractedSignals & { signals?: ExtractedSignal[] }>(response)
+    // Use structured output (JSON schema) for reliable parsing
+    const rawSignals = await client.generateWithImagesAndSchema<ExtractedSignals & { signals?: ExtractedSignal[] }>(
+      prompt,
+      images,
+      EXTRACTED_SIGNALS_SCHEMA,
+      SIGNAL_EXTRACTION_SYSTEM_PROMPT
+    )
     const legacySignals = validateSignals(rawSignals)
 
     // Convert to V2 format — return both legacy and structured from a single Gemini call
     const structured = convertToSignalsV2(legacySignals, rawSignals.signals, context.expectedSignals)
     return { legacy: legacySignals, structured }
   } catch (error) {
-    console.error('[Signals] Failed to parse Gemini response:', error)
-    console.error('[Signals] Raw response:', response)
+    console.error('[Signals] Structured output failed, falling back to text parsing:', error)
 
-    // Return a default low-confidence result
-    return { legacy: getSignalsWithoutImages(), structured: getDefaultSignalsV2('Failed to parse AI response') }
+    // Fallback: use text-based generation + parseJSON
+    try {
+      const response = await client.generateWithImages(
+        prompt,
+        images,
+        SIGNAL_EXTRACTION_SYSTEM_PROMPT
+      )
+      const rawSignals = GeminiClient.parseJSON<ExtractedSignals & { signals?: ExtractedSignal[] }>(response)
+      const legacySignals = validateSignals(rawSignals)
+      const structured = convertToSignalsV2(legacySignals, rawSignals.signals, context.expectedSignals)
+      return { legacy: legacySignals, structured }
+    } catch (fallbackError) {
+      console.error('[Signals] Fallback also failed:', fallbackError)
+      return { legacy: getSignalsWithoutImages(), structured: getDefaultSignalsV2('Failed to parse AI response') }
+    }
   }
 }
 

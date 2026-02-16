@@ -125,10 +125,353 @@ function validateRequiredFields(
   return errors
 }
 
+// ============================================================================
+// CONVERSATIONAL CHAT COMPONENT
+// ============================================================================
+
+interface ChatMessage {
+  role: 'user' | 'assistant'
+  text: string
+  images?: string[] // preview URLs for user-uploaded images
+}
+
+interface ChatUploadedFile {
+  assetId: string
+  previewUrl: string
+  fileName: string
+  status: 'uploading' | 'complete' | 'error'
+}
+
+function ConversationalChat({
+  tenantKey,
+  widgetData,
+  serviceId,
+  onComplete,
+}: {
+  tenantKey: string
+  widgetData: WidgetData
+  serviceId?: string | null
+  onComplete: (result: QuoteResponse) => void
+}) {
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [input, setInput] = useState('')
+  const [sending, setSending] = useState(false)
+  const [extractedFields, setExtractedFields] = useState<Record<string, unknown>>({})
+  const [fieldAnswers, setFieldAnswers] = useState<Array<{ fieldId: string; value: string }>>([])
+  const [submitting, setSubmitting] = useState(false)
+  const [uploadedFiles, setUploadedFiles] = useState<ChatUploadedFile[]>([])
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Track which service the conversation has resolved to
+  const hasMultipleServices = widgetData.services.length > 1
+  const initialServiceId = serviceId || (!hasMultipleServices ? widgetData.services[0]?.id : null)
+  const resolvedServiceIdRef = useRef<string | null>(initialServiceId || null)
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  // Send opening message on mount
+  useEffect(() => {
+    const serviceName = initialServiceId
+      ? widgetData.services.find(s => s.id === initialServiceId)?.name
+      : null
+    setMessages([{
+      role: 'assistant',
+      text: serviceName
+        ? `Hi! I'm here to help you get a quote for ${serviceName}. Tell me about what you need and I'll gather the details.`
+        : `Hi! Welcome! I can help you get a quote. What service are you looking for? We offer ${widgetData.services.map(s => s.name).join(', ')}.`,
+    }])
+  }, [widgetData, initialServiceId])
+
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) continue
+
+      const previewUrl = URL.createObjectURL(file)
+      const tempId = `temp-${Date.now()}`
+
+      setUploadedFiles(prev => [...prev, { assetId: tempId, previewUrl, fileName: file.name, status: 'uploading' }])
+
+      try {
+        const initRes = await fetch('/api/public/uploads/init', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenantKey,
+            files: [{ fileName: file.name, contentType: file.type, sizeBytes: file.size }],
+          }),
+        })
+        const initData = await initRes.json()
+        if (!initRes.ok || !initData.uploads?.[0]) throw new Error('Upload init failed')
+
+        const { assetId, uploadUrl } = initData.uploads[0]
+
+        const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
+        if (!uploadRes.ok) throw new Error('Upload failed')
+
+        setUploadedFiles(prev => prev.map(f => f.assetId === tempId ? { ...f, assetId, status: 'complete' as const } : f))
+        setMessages(prev => [...prev, { role: 'user', text: `📷 ${file.name}`, images: [previewUrl] }])
+      } catch {
+        setUploadedFiles(prev => prev.map(f => f.assetId === tempId ? { ...f, status: 'error' as const } : f))
+        setMessages(prev => [...prev, { role: 'assistant', text: 'Failed to upload the image. Please try again.' }])
+      }
+    }
+    // Reset input so the same file can be selected again
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function handleSend() {
+    const text = input.trim()
+    if (!text || sending) return
+
+    setMessages(prev => [...prev, { role: 'user', text }])
+    setInput('')
+    setSending(true)
+
+    try {
+      const res = await fetch('/api/public/widget/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantKey,
+          serviceId: resolvedServiceIdRef.current || undefined,
+          message: text,
+          conversationHistory: messages.map(m => ({
+            role: m.role,
+            content: m.text,
+          })),
+          extractedFields,
+          fieldAnswers,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setMessages(prev => [...prev, { role: 'assistant', text: 'Sorry, something went wrong. Please try again.' }])
+        setSending(false)
+        return
+      }
+
+      setMessages(prev => [...prev, { role: 'assistant', text: data.reply }])
+      if (data.extractedFields) {
+        setExtractedFields(data.extractedFields)
+        // Update resolved service when AI identifies which service the customer wants
+        if (!resolvedServiceIdRef.current) {
+          let matched: typeof widgetData.services[0] | undefined
+          // First: check extractedFields.serviceId from AI
+          if (data.extractedFields.serviceId) {
+            const sid = data.extractedFields.serviceId as string
+            matched = widgetData.services.find(s => s.id === sid)
+              || widgetData.services.find(s => s.name.toLowerCase() === sid.toLowerCase())
+          }
+          // Fallback: scan the AI reply + user message for service name mentions
+          if (!matched) {
+            const combinedText = (text + ' ' + data.reply).toLowerCase()
+            // Sort by name length descending so "Manicure & Pedicure" matches before "Spa Package"
+            const sortedServices = [...widgetData.services].sort((a, b) => b.name.length - a.name.length)
+            for (const svc of sortedServices) {
+              if (combinedText.includes(svc.name.toLowerCase())) {
+                matched = svc
+                break
+              }
+            }
+          }
+          if (matched) {
+            resolvedServiceIdRef.current = matched.id
+          }
+        }
+      }
+      // Accumulate field answers across turns
+      if (data.fieldAnswers) {
+        setFieldAnswers(prev => {
+          const map = new Map(prev.map(fa => [fa.fieldId, fa.value]))
+          for (const fa of data.fieldAnswers) {
+            map.set(fa.fieldId, fa.value)
+          }
+          return Array.from(map, ([fieldId, value]) => ({ fieldId, value }))
+        })
+      }
+
+      // If conversation is complete, submit the quote
+      if (data.isComplete && data.formData) {
+        setSubmitting(true)
+        const completedAssetIds = uploadedFiles.filter(f => f.status === 'complete').map(f => f.assetId)
+        const quoteRes = await fetch('/api/public/quotes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...data.formData,
+            assetIds: completedAssetIds,
+            tenantKey,
+            source: { type: 'widget', mode: 'conversational' },
+          }),
+        })
+        const quoteData = await quoteRes.json()
+        if (quoteRes.ok) {
+          onComplete(quoteData)
+        } else {
+          setMessages(prev => [...prev, { role: 'assistant', text: `I've gathered all the details but there was an issue submitting: ${quoteData.error?.message || 'Unknown error'}. Please try again.` }])
+          setSubmitting(false)
+        }
+      }
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', text: 'Connection error. Please try again.' }])
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (submitting) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', gap: '12px' }}>
+        <div style={{ width: 32, height: 32, border: '3px solid #e5e7eb', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <p style={{ color: '#6b7280', fontSize: '14px' }}>Submitting your quote request...</p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '500px' }}>
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {messages.map((msg, i) => (
+          <div
+            key={i}
+            style={{
+              alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+              maxWidth: '80%',
+            }}
+          >
+            {msg.images && msg.images.length > 0 && (
+              <div style={{ display: 'flex', gap: '4px', marginBottom: '4px', justifyContent: 'flex-end' }}>
+                {msg.images.map((url, j) => (
+                  <img key={j} src={url} alt="Upload" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: '8px' }} />
+                ))}
+              </div>
+            )}
+            <div
+              style={{
+                padding: '10px 14px',
+                borderRadius: '12px',
+                fontSize: '14px',
+                lineHeight: '1.4',
+                ...(msg.role === 'user'
+                  ? { background: '#3b82f6', color: 'white', borderBottomRightRadius: '4px' }
+                  : { background: '#f3f4f6', color: '#111827', borderBottomLeftRadius: '4px' }),
+              }}
+            >
+              {msg.text}
+            </div>
+          </div>
+        ))}
+        {sending && (
+          <div style={{ alignSelf: 'flex-start', padding: '10px 14px', borderRadius: '12px', background: '#f3f4f6', color: '#9ca3af', fontSize: '14px' }}>
+            Typing...
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Upload previews */}
+      {uploadedFiles.length > 0 && (
+        <div style={{ padding: '8px 16px 0', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {uploadedFiles.map((f, i) => (
+            <div key={i} style={{ position: 'relative', width: 48, height: 48 }}>
+              <img src={f.previewUrl} alt={f.fileName} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: '6px', opacity: f.status === 'uploading' ? 0.5 : 1 }} />
+              {f.status === 'uploading' && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 16, height: 16, border: '2px solid #e5e7eb', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                </div>
+              )}
+              {f.status === 'error' && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,0.3)', borderRadius: '6px', fontSize: '16px' }}>!</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Input */}
+      <div style={{ borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleFileSelect}
+          style={{ display: 'none' }}
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          title="Add photos"
+          style={{
+            padding: '8px',
+            background: 'none',
+            border: '1px solid #d1d5db',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '18px',
+            lineHeight: 1,
+            color: '#6b7280',
+          }}
+        >
+          📷
+        </button>
+        <input
+          type="text"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
+          placeholder="Type your message..."
+          disabled={sending}
+          style={{
+            flex: 1,
+            padding: '10px 14px',
+            border: '1px solid #d1d5db',
+            borderRadius: '8px',
+            fontSize: '14px',
+            outline: 'none',
+          }}
+        />
+        <button
+          onClick={handleSend}
+          disabled={sending || !input.trim()}
+          style={{
+            padding: '10px 20px',
+            background: sending || !input.trim() ? '#9ca3af' : '#3b82f6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: 600,
+            cursor: sending || !input.trim() ? 'default' : 'pointer',
+          }}
+        >
+          Send
+        </button>
+      </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+    </div>
+  )
+}
+
+// ============================================================================
+// MAIN EMBED PAGE
+// ============================================================================
+
 export default function EmbedPage({ params }: EmbedPageProps) {
   const { tenantKey } = params
   const searchParams = useSearchParams()
   const serviceId = searchParams.get('serviceId')
+  const displayMode = searchParams.get('mode')
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [step, setStep] = useState<Step>('loading')
@@ -335,8 +678,8 @@ export default function EmbedPage({ params }: EmbedPageProps) {
       className="min-h-full bg-white"
       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
     >
-      {/* Progress indicator */}
-      {showProgress && (
+      {/* Progress indicator — form mode only */}
+      {displayMode !== 'conversational' && showProgress && (
         <ProgressIndicator steps={progressSteps} currentStep={currentProgressIndex} />
       )}
 
@@ -354,7 +697,22 @@ export default function EmbedPage({ params }: EmbedPageProps) {
           } : undefined}
         />
       )}
-      {step === 'service' && widgetData && (
+
+      {/* Conversational mode — replaces the form steps */}
+      {displayMode === 'conversational' && widgetData && step !== 'loading' && step !== 'error' && step !== 'success' && step !== 'submitting' && (
+        <ConversationalChat
+          tenantKey={tenantKey}
+          widgetData={widgetData}
+          serviceId={serviceId}
+          onComplete={(result) => {
+            setQuoteResult(result)
+            setStep('success')
+          }}
+        />
+      )}
+
+      {/* Standard form steps — only shown when NOT in conversational mode */}
+      {displayMode !== 'conversational' && step === 'service' && widgetData && (
         <ServiceStep
           tenantName={widgetData.tenantName}
           services={widgetData.services}
@@ -364,7 +722,7 @@ export default function EmbedPage({ params }: EmbedPageProps) {
           }}
         />
       )}
-      {step === 'details' && widgetData && (
+      {displayMode !== 'conversational' && step === 'details' && widgetData && (
         <DetailsStep
           fields={[
             ...(widgetData.globalFields || widgetData.fields || []),
@@ -385,7 +743,7 @@ export default function EmbedPage({ params }: EmbedPageProps) {
           onNext={() => setStep(showFilesStep ? 'files' : 'contact')}
         />
       )}
-      {step === 'files' && widgetData && (
+      {displayMode !== 'conversational' && step === 'files' && widgetData && (
         <FileUploadStep
           tenantKey={tenantKey}
           files={uploadedFiles}
@@ -398,7 +756,7 @@ export default function EmbedPage({ params }: EmbedPageProps) {
           onNext={() => setStep('contact')}
         />
       )}
-      {step === 'contact' && (
+      {displayMode !== 'conversational' && step === 'contact' && (
         <ContactStep
           name={customerName}
           email={customerEmail}
@@ -410,7 +768,7 @@ export default function EmbedPage({ params }: EmbedPageProps) {
           onSubmit={handleSubmit}
         />
       )}
-      {step === 'submitting' && <SubmittingState />}
+      {displayMode !== 'conversational' && step === 'submitting' && <SubmittingState />}
       {step === 'success' && quoteResult && (
         <SuccessState quoteUrl={quoteResult.quoteViewUrl} />
       )}

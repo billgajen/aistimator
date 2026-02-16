@@ -47,6 +47,11 @@ import type {
   GeneratedQuoteForValidation,
 } from './ai'
 import type { MatchedItem, ExtractedSignalsV2, PricingTrace, ExpectedSignalConfig, LowConfidenceMode, SignalRecommendation, WorkStepConfig, ValidationSettings, ValidationResult, ValidationOutcome, ServiceDraftConfig } from '@estimator/shared'
+import { classify as triageClassify, queryPreviousQuoteCount } from './agents/triage'
+import { initializeFusionFromStructuredSignals } from './agents/signal-fusion'
+import { evaluateQualityGate } from './agents/quality-gate'
+import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
+import type { QualityGateResult } from '@estimator/shared'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@estimator/shared'
@@ -364,11 +369,48 @@ export async function processQuote(
 
   const { quoteRequest, tenant, service, pricingRules, assets } = quoteData
 
+  // 1.5 Triage: classify request complexity and optimize processing
+  const imageAssetCount = assets.filter((a) => a.type === 'image').length
+  const triageDescriptionAnswer = quoteRequest.job_answers?.find(
+    (a) => a.fieldId === '_project_description' || a.fieldId === 'notes' || a.fieldId === 'description'
+  )
+  const descriptionText = triageDescriptionAnswer ? String(triageDescriptionAnswer.value) : ''
+
+  // Count work steps that source quantity from AI signals
+  const aiSignalWorkStepCount = (service.work_steps || []).filter(
+    (ws: WorkStepConfig) => ws.quantitySource?.type === 'ai_signal'
+  ).length
+
+  const previousQuoteCount = await queryPreviousQuoteCount(
+    supabase,
+    quoteRequest.customer_email,
+    tenant.id
+  )
+
+  const triageInput: TriageInput = {
+    photoCount: imageAssetCount,
+    description: descriptionText,
+    customerEmail: quoteRequest.customer_email,
+    tenantId: tenant.id,
+    tenantServiceCount: (quoteData.otherServices?.length ?? 0) + 1,
+    hasOtherServices: (quoteData.otherServices?.length ?? 0) > 0,
+    aiSignalWorkStepCount,
+  }
+
+  const triageDecision: TriageDecision = triageClassify(triageInput, previousQuoteCount)
+  console.log(`[Processor] Triage: ${triageDecision.classification} (returning: ${triageDecision.returningCustomer}, prev: ${triageDecision.previousQuoteCount})`)
+  console.log(`[Processor] Triage reasons: ${triageDecision.reasons.join('; ')}`)
+  console.log(`[Processor] Photo strategy: skip=${triageDecision.photoStrategy.skipVision}, max=${triageDecision.photoStrategy.maxPhotos}`)
+
   // 2. Extract signals from images
   let signals: ExtractedSignals
   let structuredSignals: ExtractedSignalsV2 | null = null
 
-  const imageAssets = assets.filter((a) => a.type === 'image')
+  // Apply triage photo strategy: limit which images to process
+  const allImageAssets = assets.filter((a) => a.type === 'image')
+  const imageAssets = triageDecision.photoStrategy.skipVision
+    ? []
+    : allImageAssets.slice(0, triageDecision.photoStrategy.maxPhotos)
   const gemini = createGeminiClient(env.GEMINI_API_KEY)
 
   // Extract customer notes for context
@@ -448,7 +490,11 @@ export async function processQuote(
   // AD-007: Form signals must ALWAYS override AI-extracted signals
   // This ensures form-provided values (like leak_count=2) are used in pricing even if expected_signals is empty
   // Form inputs OVERRIDE low-confidence vision signals (user knows better than AI guessing)
+  let fusionResult: FusedSignals | null = null
   if (structuredSignals) {
+    // Initialize signal fusion recorder to capture provenance and conflicts
+    const fusionRecorder = initializeFusionFromStructuredSignals(structuredSignals)
+
     const formAnswers = quoteRequest.job_answers || []
     const widgetFields = quoteData.widgetFields || []
 
@@ -554,12 +600,20 @@ export async function processQuote(
         // User-provided form data is the source of truth - they know their project better than AI vision
         if (existingSignal.source !== 'form' || existingSignal.value === null) {
           console.log(`[Processor] Form override: ${signalKey} = ${value} (was: ${existingSignal.value} from ${existingSignal.source})`)
+          // Record override with provenance
+          fusionRecorder.recordFormOverride(
+            signalKey,
+            value,
+            `Customer-provided: ${field?.label || answer.fieldId}`,
+            existingSignal
+          )
           structuredSignals.signals[existingSignalIndex] = formSignal
         } else {
           console.log(`[Processor] Keeping existing form signal "${signalKey}" = ${existingSignal.value}`)
         }
       } else {
         // Add new form signal
+        fusionRecorder.recordNewFormSignal(signalKey, value, `Customer-provided: ${field?.label || answer.fieldId}`)
         structuredSignals.signals.push(formSignal)
         console.log(`[Processor] Added form signal: ${signalKey} = ${value}`)
       }
@@ -578,39 +632,43 @@ export async function processQuote(
       .filter(s => s.confidence < confidenceThreshold)
       .map(s => s.key)
     console.log(`[Processor] Regenerated lowConfidenceSignals after form merge: [${structuredSignals.lowConfidenceSignals.join(', ')}]`)
-  }
 
-  // FIX-8: Form/description overrides vision for access difficulty
-  // If customer explicitly states access is easy, override AI vision assessment
-  if (structuredSignals && customerNotes) {
-    const accessOverride = detectAccessOverrideFromDescription(customerNotes)
-    if (accessOverride) {
-      const existingSignal = structuredSignals.signals.find(s => s.key === 'access_difficulty')
-      const accessSignal = {
-        key: 'access_difficulty',
-        value: accessOverride.value,
-        confidence: 1.0,
-        source: 'inferred' as const,
-        evidence: `Customer stated: "${accessOverride.matchedPhrase}"`
-      }
-
-      if (existingSignal) {
-        if (existingSignal.value !== accessOverride.value) {
-          console.log(`[Processor] FIX-8: Access override from description: "${accessOverride.value}" (was: "${existingSignal.value}" from ${existingSignal.source})`)
-          // Replace the existing signal
-          const index = structuredSignals.signals.indexOf(existingSignal)
-          structuredSignals.signals[index] = accessSignal
+    // FIX-8: Form/description overrides vision for access difficulty (inside same block for recorder access)
+    if (customerNotes) {
+      const accessOverride = detectAccessOverrideFromDescription(customerNotes)
+      if (accessOverride) {
+        const existingSignal = structuredSignals.signals.find(s => s.key === 'access_difficulty')
+        const accessSignal = {
+          key: 'access_difficulty',
+          value: accessOverride.value,
+          confidence: 1.0,
+          source: 'inferred' as const,
+          evidence: `Customer stated: "${accessOverride.matchedPhrase}"`
         }
-      } else {
-        structuredSignals.signals.push(accessSignal)
-        console.log(`[Processor] FIX-8: Access set from description: "${accessOverride.value}"`)
-      }
 
-      // Also update legacy signals
-      if (signals) {
-        signals.access = { difficulty: accessOverride.value as 'easy' | 'moderate' | 'difficult' | 'unknown' }
+        if (existingSignal) {
+          if (existingSignal.value !== accessOverride.value) {
+            console.log(`[Processor] FIX-8: Access override from description: "${accessOverride.value}" (was: "${existingSignal.value}" from ${existingSignal.source})`)
+            fusionRecorder.recordTextOverride('access_difficulty', accessOverride.value, accessOverride.matchedPhrase, existingSignal)
+            const index = structuredSignals.signals.indexOf(existingSignal)
+            structuredSignals.signals[index] = accessSignal
+          }
+        } else {
+          structuredSignals.signals.push(accessSignal)
+          fusionRecorder.recordNewFormSignal('access_difficulty', accessOverride.value, `Customer stated: "${accessOverride.matchedPhrase}"`)
+          console.log(`[Processor] FIX-8: Access set from description: "${accessOverride.value}"`)
+        }
+
+        // Also update legacy signals
+        if (signals) {
+          signals.access = { difficulty: accessOverride.value as 'easy' | 'moderate' | 'difficult' | 'unknown' }
+        }
       }
     }
+
+    // Finalize signal fusion — captures all provenance and conflicts
+    fusionResult = fusionRecorder.finalize()
+    console.log(`[Processor] Signal fusion: ${fusionResult.signals.length} signals tracked, ${fusionResult.conflicts.length} conflicts recorded`)
   }
 
   // 2.5 Extract inventory items if catalog is configured (works for any industry)
@@ -813,7 +871,8 @@ export async function processQuote(
     {
       enabled: tenant.tax_enabled,
       label: tenant.tax_label,
-      rate: tenant.tax_rate,
+      // DB stores rate as decimal (0.20 = 20%), pricing engine expects whole number (20 = 20%)
+      rate: (tenant.tax_rate || 0) * 100,
     },
     tenant.currency,
     // Pass job data with quantity and/or matched items
@@ -924,6 +983,24 @@ export async function processQuote(
     }
   }
 
+  // Fetch learning context if available (for AI wording improvement)
+  let learningContext: string | undefined
+  try {
+    const { data: learningData } = await supabase
+      .from('tenant_learning_context')
+      .select('prompt_context')
+      .eq('tenant_id', quoteData.quote.tenant_id)
+      .eq('service_id', quoteData.quote.service_id)
+      .single()
+
+    if (learningData?.prompt_context) {
+      learningContext = learningData.prompt_context
+      console.log('[Processor] Including learning context from business editing patterns')
+    }
+  } catch {
+    // Learning context is optional — don't block quote generation
+  }
+
   // Build wording context with service profile data
   const wordingContext = {
     businessName: tenant.name,
@@ -940,6 +1017,7 @@ export async function processQuote(
     projectDescription, // Customer's detailed project description
     documentType: quoteData.quote.document_type as 'instant_estimate' | 'formal_quote' | 'proposal' | 'sow',
     errorCode, // FIX-6: Pass error code to wording for contextual notes
+    learningContext, // Learning context from amendment patterns
   }
 
   if (gemini) {
@@ -956,12 +1034,19 @@ export async function processQuote(
   }
 
   // 4.5 Detect cross-service mentions and calculate pricing (with AI + keyword fallback)
-  const crossServiceRecommendations = await detectCrossServiceMentionsWithAI(
-    gemini,
-    projectDescription || '',
-    service.name,
-    quoteData.otherServices || []
-  )
+  // Skip if triage says no cross-service check needed
+  const crossServiceRecommendations = triageDecision.crossServiceCheck
+    ? await detectCrossServiceMentionsWithAI(
+        gemini,
+        projectDescription || '',
+        service.name,
+        quoteData.otherServices || []
+      )
+    : []
+
+  if (!triageDecision.crossServiceCheck) {
+    console.log('[Processor] Cross-service detection skipped by triage')
+  }
 
   const crossServicePricing: CrossServicePricing[] = []
 
@@ -1014,7 +1099,8 @@ export async function processQuote(
           {
             enabled: tenant.tax_enabled,
             label: tenant.tax_label,
-            rate: tenant.tax_rate,
+            // DB stores rate as decimal (0.20 = 20%), pricing engine expects whole number (20 = 20%)
+            rate: (tenant.tax_rate || 0) * 100,
           },
           tenant.currency
         )
@@ -1181,6 +1267,58 @@ export async function processQuote(
     }
   }
 
+  // 4.75 Quality Gate: evaluate quote quality and decide on next action
+  let qualityGateResult: QualityGateResult | undefined
+  const clarificationCount = (quoteData.quote as unknown as { clarification_count?: number }).clarification_count ?? 0
+
+  if (structuredSignals && gemini) {
+    try {
+      qualityGateResult = await evaluateQualityGate(
+        {
+          structuredSignals,
+          fusionResult,
+          pricing,
+          clarificationCount,
+          serviceName: service.name,
+          hasPhotos: allImageAssets.length > 0,
+        },
+        gemini
+      )
+
+      console.log(`[Processor] Quality gate: ${qualityGateResult.action}`)
+
+      if (qualityGateResult.action === 'ask_clarification' && qualityGateResult.questions) {
+        // Set status to awaiting_clarification, store questions, return early
+        const { error: clarifyError } = await supabase
+          .from('quotes')
+          .update({
+            status: 'awaiting_clarification',
+            clarification_questions_json: qualityGateResult.questions,
+            quality_gate_json: qualityGateResult,
+            // Also store what we have so far (signals, pricing) so re-processing is faster
+            signals_json: structuredSignals,
+            pricing_trace_json: pricingTrace,
+            triage_json: triageDecision,
+          })
+          .eq('id', quoteId)
+
+        if (clarifyError) {
+          console.error('[Processor] Failed to set clarification status:', clarifyError)
+        } else {
+          console.log(`[Processor] Quote ${quoteId} awaiting clarification (${qualityGateResult.questions.length} questions)`)
+          // TODO: Send clarification email when email integration is configured
+          return { success: true, signals, structuredSignals, pricing, pricingTrace, content }
+        }
+      } else if (qualityGateResult.action === 'require_review') {
+        finalStatus = 'pending_review'
+        console.log(`[Processor] Quality gate requires review: ${qualityGateResult.reason}`)
+      }
+    } catch (error) {
+      console.error('[Processor] Quality gate evaluation failed:', error)
+      // Continue without quality gate — don't block the quote
+    }
+  }
+
   // 4.8 Collect available (untriggered) addons for upsell display
   const availableAddons: Array<{ id: string; label: string; price: number }> = []
   if (rules.addons && rules.addons.length > 0) {
@@ -1272,6 +1410,16 @@ export async function processQuote(
       signals_json: structuredSignals,
       // Store pricing trace for transparency
       pricing_trace_json: pricingTrace,
+      // Store triage decision for analytics
+      triage_json: triageDecision,
+      // Store signal conflicts for auditing (Phase 3: Signal Fusion)
+      ...(fusionResult && fusionResult.conflicts.length > 0 && {
+        signal_conflicts_json: fusionResult.conflicts,
+      }),
+      // Store quality gate result (Phase 4)
+      ...(qualityGateResult && {
+        quality_gate_json: qualityGateResult,
+      }),
       status: finalStatus,
       // Only set sent_at if actually sending (not pending_review)
       ...(finalStatus === 'sent' && {
