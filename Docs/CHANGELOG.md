@@ -29,6 +29,26 @@
 
 ---
 
+### 2026-07-18: T-111 — WhatsApp Conversational Intake End-to-End (Phase 3, V2 Strategy)
+
+**Context:** WhatsApp quoting is an empty market category (V2 strategy §1: inbound conversations are free since Meta's July 2025 pricing change; Meta's Business Agent can't do configured priced quotes). The T-023 intake state machine and webhook wiring existed, but the flow had two defects that made real quotes impossible.
+
+**Bugs found & fixed (pre-existing, latent — fourth and fifth of the audit):**
+1. **WhatsApp photos never reached R2.** `handleMediaUpload` downloaded media from WhatsApp and inserted the asset ROW, but never wrote the bytes to R2 (a comment said "Upload to R2 via the upload API" above code that didn't). The worker later fetched nothing — every WhatsApp photo silently vanished from AI extraction. Now: `uploadToR2()` runs BEFORE the asset row is created (no phantom assets); upload failure tells the customer to resend rather than pretending success.
+2. **No job description was ever collected** — `job_answers` was hardcoded `[]`, so AI extraction had zero text signal and WhatsApp quotes priced from base fees alone.
+
+**Implementation:**
+- **New `awaiting_description` state** (after service selection): "Briefly describe the job — sizes, quantities or any details help us quote accurately" (min 10 chars). Stored as the `_project_description` form answer — the exact fieldId the worker's triage and signal extraction already read, so the whole pipeline (signals, addons, cross-service, T-108 confirmations) lights up with no worker changes.
+- **Any first message starts the flow** — previously a magic keyword ("quote"/"estimate") was required and "Hi, do you paint houses?" got a canned nudge. A dedicated business WhatsApp number exists to quote. Keyword re-trigger kept for the completed state.
+- Confirmation summary includes the job description (truncated at 80 chars).
+- Flow order: any message → service selection (auto-skips for single-service tenants) → description → name → email → phone (skip = WhatsApp number) → address → photos → confirm → quote link delivered in-thread. With T-109, that link shows the provisional range immediately and the T-108 confirm flow when needed — WhatsApp inherits the full accuracy engine.
+
+**Not done (noted for T-112):** guided WhatsApp Business API onboarding (credentials form remains raw); proactive in-thread "your final quote is ready" push from the worker (the in-thread link + hosted page live-updating covers the gap for v1).
+
+**Files:** `packages/shared/src/database.types.ts`, `apps/web/src/lib/whatsapp-intake.ts`
+
+---
+
 ### 2026-07-18: T-102 — Metered Overage Billing (Phase 0 complete, V2 Strategy)
 
 **Context:** Completes Phase 0 (deferred at T-101). The hard block at the plan limit converts worse than "keep quoting, pay per extra quote" — every blocked quote is a lost lead for the business and lost revenue for the platform. Uses Stripe's modern **Billing Meter Events API** (supported by the installed stripe v20 SDK), not the deprecated usage-records API.

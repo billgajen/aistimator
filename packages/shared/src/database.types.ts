@@ -802,6 +802,7 @@ export interface WhatsAppMessage {
 export type WhatsAppIntakeState =
   | 'idle'
   | 'awaiting_service'
+  | 'awaiting_description'
   | 'awaiting_name'
   | 'awaiting_email'
   | 'awaiting_phone'
@@ -821,6 +822,8 @@ export interface WhatsAppIntakeData {
   jobPostcode?: string
   assetIds?: string[]
   photoCount?: number
+  /** T-111: the customer's job description — feeds AI signal extraction */
+  projectDescription?: string
 }
 
 export interface WhatsAppConversation {

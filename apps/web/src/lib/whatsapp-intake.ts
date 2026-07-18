@@ -18,6 +18,7 @@ import {
   type IncomingMessage,
 } from './whatsapp'
 import { generateQuoteToken, getTokenExpiry } from './tokens'
+import { uploadToR2, isR2Configured } from './r2'
 import { enqueueQuoteJob } from './queue'
 import { incrementUsageCounter } from './usage'
 import { checkPlanLimit, maybeNotifyLimitReached, recordOverageQuote } from './plan-limits'
@@ -78,6 +79,9 @@ export async function processIntakeMessage(ctx: IntakeContext): Promise<IntakeRe
     case 'awaiting_service':
       return handleServiceSelection(ctx, text, currentData)
 
+    case 'awaiting_description':
+      return handleDescriptionInput(ctx, text, currentData)
+
     case 'awaiting_name':
       return handleNameInput(ctx, text, currentData)
 
@@ -119,14 +123,15 @@ export async function processIntakeMessage(ctx: IntakeContext): Promise<IntakeRe
 }
 
 /**
- * Handle idle state - check for trigger keywords
+ * Handle idle state (T-111): ANY first message starts the quote flow — the
+ * business's WhatsApp number exists to quote, and requiring a magic keyword
+ * ("quote") lost customers who opened with "Hi, do you paint houses?".
  */
 async function handleIdleState(ctx: IntakeContext, text: string): Promise<IntakeResult> {
-  if (!shouldStartIntake(text)) {
+  if (!text.trim()) {
     return {
       success: true,
-      responseText:
-        'Hi! Reply with "quote" or "estimate" to get a price for our services.',
+      responseText: 'Hi! Send us a message to get an instant quote for our services.',
     }
   }
 
@@ -151,9 +156,9 @@ async function handleIdleState(ctx: IntakeContext, text: string): Promise<Intake
     const service = services[0]!
     return {
       success: true,
-      newState: 'awaiting_name',
+      newState: 'awaiting_description',
       newData: { serviceId: service.id, serviceName: service.name },
-      responseText: `Great! I'll help you get a quote for *${service.name}*.\n\nFirst, what's your name?`,
+      responseText: `Hi! I'll get you an instant quote for *${service.name}*.\n\nFirst — briefly describe the job. What needs doing? Sizes, quantities or any details help us quote accurately.`,
     }
   }
 
@@ -222,9 +227,36 @@ async function handleServiceSelection(
 
   return {
     success: true,
-    newState: 'awaiting_name',
+    newState: 'awaiting_description',
     newData: { ...currentData, serviceId: matchedService.id, serviceName: matchedService.name },
-    responseText: `Great choice! *${matchedService.name}*\n\nWhat's your name?`,
+    responseText: `Great choice! *${matchedService.name}*\n\nBriefly describe the job — what needs doing? Sizes, quantities or any details help us quote accurately.`,
+  }
+}
+
+/**
+ * Handle job description (T-111) — the primary text signal for AI extraction.
+ * Without it, quotes were priced from base fees alone.
+ */
+function handleDescriptionInput(
+  _ctx: IntakeContext,
+  text: string,
+  currentData: WhatsAppIntakeData
+): IntakeResult {
+  const description = text.trim()
+
+  if (description.length < 10) {
+    return {
+      success: true,
+      responseText:
+        'Could you add a little more detail? Even one or two sentences about the job helps us price it accurately.',
+    }
+  }
+
+  return {
+    success: true,
+    newState: 'awaiting_name',
+    newData: { ...currentData, projectDescription: description },
+    responseText: `Perfect, thanks!\n\nNow, what's your name?`,
   }
 }
 
@@ -419,17 +451,40 @@ async function handleMediaUpload(
       }
     }
 
-    // Upload to R2 via the upload API
+    // Upload the actual bytes to R2 BEFORE creating the asset record (T-111).
+    // Previously only the asset row was created — the object was never written,
+    // so the worker fetched nothing and photos silently vanished from AI extraction.
     const r2Key = `whatsapp/${tenantId}/${ctx.conversation.id}/${Date.now()}_${message.mediaId}`
+    const contentType = mediaResult.contentType || 'image/jpeg'
 
-    // Store asset record in database
+    if (!isR2Configured()) {
+      console.error('[WhatsApp Intake] R2 not configured — cannot store media')
+      return {
+        success: true,
+        responseText:
+          "We couldn't save that photo — please continue, and mention key details in text instead.",
+      }
+    }
+
+    try {
+      await uploadToR2(r2Key, mediaResult.data, contentType)
+    } catch (uploadError) {
+      console.error('[WhatsApp Intake] R2 upload failed:', uploadError)
+      return {
+        success: true,
+        responseText:
+          "We couldn't save that photo — please try sending it again, or reply \"done\" to continue without it.",
+      }
+    }
+
+    // Store asset record in database (only after the object actually exists)
     const { data: asset, error: assetError } = await supabase
       .from('assets')
       .insert({
         tenant_id: tenantId,
         type: message.type === 'image' ? 'image' : 'document',
         file_name: `whatsapp_${message.type}_${Date.now()}`,
-        content_type: mediaResult.contentType || 'image/jpeg',
+        content_type: contentType,
         size_bytes: mediaResult.data.length,
         r2_key: r2Key,
       })
@@ -470,8 +525,12 @@ function generateConfirmationMessage(data: WhatsAppIntakeData): IntakeResult {
     ? `\n- Photos: ${data.photoCount} received`
     : '\n- Photos: None'
 
+  const descriptionText = data.projectDescription
+    ? `\n- Job: ${data.projectDescription.length > 80 ? `${data.projectDescription.slice(0, 77)}...` : data.projectDescription}`
+    : ''
+
   const summary = `Great! Here's a summary of your quote request:\n
-- Service: *${data.serviceName}*
+- Service: *${data.serviceName}*${descriptionText}
 - Name: ${data.customerName}
 - Email: ${data.customerEmail}
 - Phone: ${data.customerPhone}
@@ -589,7 +648,11 @@ async function createQuoteFromIntake(
         customer_phone: data.customerPhone || conversation.customer_phone,
         job_postcode: data.jobPostcode || null,
         job_address: data.jobAddress || null,
-        job_answers: [],
+        // T-111: the description feeds triage + AI signal extraction downstream
+        // (the worker reads the _project_description fieldId)
+        job_answers: data.projectDescription
+          ? [{ fieldId: '_project_description', value: data.projectDescription }]
+          : [],
         asset_ids: data.assetIds || [],
         source_json: { type: 'whatsapp' },
       })
