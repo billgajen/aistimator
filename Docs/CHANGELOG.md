@@ -29,6 +29,23 @@
 
 ---
 
+### 2026-07-18: T-113 — Vertical Pack Infrastructure (Phase 4, V2 Strategy)
+
+**Context:** AD-022 (vertical-first go-to-market on a generic engine). A pack is pure DATA — service templates with scope, media guidance, guided-capture angles (feeds T-107), default rates, expected signals, and customer questions — applied at onboarding as pre-filled, fully editable config. Anti-hardcoding holds: packs are content files, the engine never special-cases a vertical.
+
+**Implementation:**
+- **`apps/web/src/lib/vertical-packs/types.ts` (new):** `VerticalPack`/`VerticalPackService` — each service carries a complete `ServiceDraftConfig` plus addons/multipliers. Pack rates are documented as EDITABLE DEFAULTS, never authoritative.
+- **`apps/web/src/lib/vertical-packs/index.ts` (new):** registry (`listPacks`/`getPack`). Adding a vertical = one data file + one registry line. Registry ships empty; T-114 adds painting.
+- **Onboarding interview:** third source option "Use a template" (shown only when packs exist) → pack picker → services flow into the existing review → basics → create pipeline with **no network and no AI** — the fastest possible setup path. Pack services arrive priced (typical rates), so the pricing interview is skipped; the picker copy tells the business to review rates.
+
+**Design notes:**
+- Packs as data files (not a DB table): versioned with the code, zero migration, reviewable in PRs. A DB-backed pack store is a v2 option if packs ever become admin-editable.
+- `promptContext` exists on the pack type but is NOT sent on creation — the platform auto-generates AI vision context from pricing rules by design (services API explicitly rejects frontend prompt_context). Pack vision influence flows through requiredAngles/photoGuidance/expectedSignals/workSteps, which the auto-generation reads.
+
+**Files:** `apps/web/src/lib/vertical-packs/types.ts` (new), `apps/web/src/lib/vertical-packs/index.ts` (new), `apps/web/src/components/onboarding/OnboardingFlow.tsx`
+
+---
+
 ### 2026-07-18: T-112 — Guided WhatsApp Onboarding (Phase 3 complete, V2 Strategy)
 
 **Context:** The WhatsApp page was a raw credentials form ("paste your access token") with no validation — the audit flagged it as a setup-abandonment point. Full Meta Embedded Signup requires tech-provider approval (ops track, not code); this ticket delivers the best code-side experience: a guided walkthrough with live credential verification.

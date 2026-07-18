@@ -11,6 +11,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import type { ServiceDraftConfig, AddonConfig, MultiplierConfig } from '@estimator/shared'
 import { describePricingRules } from '@/lib/pricing-describe'
+import { listPacks, getPack } from '@/lib/vertical-packs'
 
 interface OnboardingFlowProps {
   businessName: string
@@ -58,9 +59,12 @@ export function OnboardingFlow({
   const [error, setError] = useState<string | null>(null)
 
   // Source step
-  const [sourceMode, setSourceMode] = useState<'website' | 'describe'>('website')
+  const [sourceMode, setSourceMode] = useState<'website' | 'describe' | 'template'>('website')
   const [websiteUrl, setWebsiteUrl] = useState('')
   const [businessDescription, setBusinessDescription] = useState('')
+  // T-113: vertical pack templates
+  const availablePacks = listPacks()
+  const [selectedPackId, setSelectedPackId] = useState<string | null>(null)
 
   // Extracted services
   const [services, setServices] = useState<DraftService[]>([])
@@ -90,6 +94,24 @@ export function OnboardingFlow({
   const [createdCount, setCreatedCount] = useState(0)
 
   const currencySymbol = CURRENCY_SYMBOLS[currency] || '$'
+
+  /** T-113: apply a vertical pack — no network, no AI, instant */
+  const handleApplyPack = () => {
+    const pack = selectedPackId ? getPack(selectedPackId) : undefined
+    if (!pack) return
+    setServices(
+      pack.services.map((svc) => ({
+        name: svc.name,
+        description: svc.description,
+        draft: svc.draft,
+        addons: svc.addons || [],
+        multipliers: svc.multipliers || [],
+        selected: true,
+      }))
+    )
+    setError(null)
+    setStep('services')
+  }
 
   /** Step 1 → 2: extract services from website or description */
   const handleExtract = async () => {
@@ -328,7 +350,23 @@ export function OnboardingFlow({
             First: where should we learn about your services?
           </p>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <div className={`mt-6 grid gap-3 ${availablePacks.length > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+            {availablePacks.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSourceMode('template')}
+                className={`rounded-xl border p-4 text-left transition-colors ${
+                  sourceMode === 'template'
+                    ? 'border-primary bg-surface'
+                    : 'border-border hover:border-border-strong'
+                }`}
+              >
+                <div className="font-semibold text-text-primary">Use a template</div>
+                <div className="mt-1 text-sm text-text-secondary">
+                  Ready-made setup for your trade — fastest start
+                </div>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setSourceMode('website')}
@@ -360,7 +398,40 @@ export function OnboardingFlow({
           </div>
 
           <div className="mt-4">
-            {sourceMode === 'website' ? (
+            {sourceMode === 'template' ? (
+              <div className="space-y-2">
+                {availablePacks.map((pack) => (
+                  <label
+                    key={pack.id}
+                    className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
+                      selectedPackId === pack.id
+                        ? 'border-primary bg-surface'
+                        : 'border-border hover:border-border-strong'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="pack"
+                      checked={selectedPackId === pack.id}
+                      onChange={() => setSelectedPackId(pack.id)}
+                      className="mt-1 h-4 w-4 border-border text-primary focus:ring-primary/30"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold text-text-primary">
+                        {pack.icon} {pack.name}
+                      </span>
+                      <span className="mt-0.5 block text-sm text-text-secondary">
+                        {pack.description}
+                      </span>
+                      <span className="mt-1 block text-xs text-text-muted">
+                        {pack.services.length} service{pack.services.length === 1 ? '' : 's'} with
+                        typical rates — review and adjust everything before going live
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : sourceMode === 'website' ? (
               <input
                 type="url"
                 value={websiteUrl}
@@ -393,8 +464,14 @@ export function OnboardingFlow({
           <div className="mt-4 flex items-center justify-between">
             <button
               type="button"
-              onClick={handleExtract}
-              disabled={sourceMode === 'website' ? !websiteUrl.trim() : !businessDescription.trim()}
+              onClick={sourceMode === 'template' ? handleApplyPack : handleExtract}
+              disabled={
+                sourceMode === 'template'
+                  ? !selectedPackId
+                  : sourceMode === 'website'
+                    ? !websiteUrl.trim()
+                    : !businessDescription.trim()
+              }
               className="inline-flex items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Continue
