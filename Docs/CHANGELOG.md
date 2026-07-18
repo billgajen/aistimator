@@ -29,6 +29,29 @@
 
 ---
 
+### 2026-07-18: Live End-to-End Verification (local stack + real Gemini)
+
+**Context:** First live run of the entire V2 build: local Supabase (migrations 19–21 applied), Next dev, wrangler dev worker, real Gemini. Full journey driven through the browser: signup → painting template onboarding → widget submission with photo → worker pipeline → hosted quote → plan-limit probe → calibration/benchmarks → pricing composer.
+
+**Verified working end-to-end:** painting landing page; signup+tenant trigger; onboarding template flow (3 services created); pack fields in widget; photo upload + T-107 quality gate; full worker pipeline — Gemini structured extraction (confidence 0.8), AD-002 form overrides (ceiling_height form beat vision), AI addon detection (woodwork auto-applied from customer phrasing), slugified-option multiplier normalization, **pricing penny-exact: (60+600+120)×1.2×1.2 VAT = £1123.20**; T-109 success-state polling flipped to "Your quote is ready!"; hosted quote page with Gemini scope wording; T-101 429 at limit + red dashboard banner; T-110 outcomes table; T-115 opt-in + k-anonymity empty state; T-104 composer round-trip English + live compile (rush addon compiled with sensible trigger keywords).
+
+**Bugs found & fixed (commit f555fd2):**
+1. `PATCH /api/tenant` → 405 (route exports PUT) — broke onboarding finish + benchmark opt-in; error path also crashed on empty body. Both call sites → PUT; error parsing guarded.
+2. `requiredAngles` dropped at service creation (onboarding + bulk import) — guided-capture slots never rendered for pack services.
+
+**Open findings (not yet fixed):**
+- Quote page renders auto-applied addons in "Recommended Add-ons" as if optional while their amount is already in the subtotal — visible lines don't sum to subtotal (£816 shown vs £936). Trust-damaging; needs a breakdown-rendering fix.
+- Compiler missed "Raise the room rate to £220" (kept $200, no ambiguity raised) while nailing the rush-service addon — prompt needs strengthening on mapping colloquial rate references to existing work steps, or must ask.
+- Analytics "Monthly Usage" defaults to limit 200 ("Free Plan") while enforcement/billing default to 50 — inconsistent no-subscription defaults; unify into one shared constant.
+- Service wizard has no requiredAngles editor and re-saving may drop angles (same class as fix #2).
+- Composer/wizard shows "$" regardless of tenant currency (£ tenants see $).
+- Signup creates NO subscriptions row — plans/overage all ride on defaults until checkout.
+- Local-env only: `handle_new_user` trigger needed `search_path = public, extensions` (gen_random_bytes); auth verification emails don't reach Mailpit.
+
+**Not yet exercised live:** T-108 clarify UI end-to-end (gate correctly chose 'send' at 0.8 confidence), Stripe overage metering (needs Meter ops), WhatsApp intake (needs Meta credentials), website extraction endpoint.
+
+---
+
 ### 2026-07-18: T-115 — Cross-Tenant Rate Benchmarks (V2 roadmap complete)
 
 **Context:** Final V2 roadmap ticket. "Similar decorators charge £10–14/sqm" — anonymized market context that becomes more valuable as painting tenants accumulate. Informational only; never feeds pricing (AD-001).
