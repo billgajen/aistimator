@@ -12,6 +12,9 @@ export * from './calibration'
 // Re-export rate benchmarks (T-115)
 export * from './benchmarks'
 
+// Re-export plausibility envelopes (T-116, Measurement Engine)
+export * from './envelopes'
+
 // ID prefixes for stable, readable IDs
 export const ID_PREFIXES = {
   tenant: 'tnt_',

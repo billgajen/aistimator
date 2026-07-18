@@ -279,6 +279,16 @@ export const paintingPack: VerticalPack = {
             signalKey: 'wall_area_sqm',
             type: 'number',
             description: 'Estimated total paintable wall area in square metres across all photographed sides',
+            // Plausibility envelope (T-116): per storey, a painted elevation
+            // spans roughly [4m wide × 2.3m high] to [12m wide × 3.0m high]
+            envelope: {
+              driverKey: 'storeys',
+              minPerUnit: 9,
+              maxPerUnit: 36,
+              defaultDriver: 2,
+              absoluteMin: 8,
+              absoluteMax: 500,
+            },
           },
           {
             signalKey: 'storeys',

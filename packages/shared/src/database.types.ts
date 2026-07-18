@@ -152,6 +152,19 @@ export interface ExpectedSignalConfig {
   possibleValues?: string[]
   /** Human-readable description of what this signal represents */
   description: string
+  /**
+   * Plausibility envelope (T-116, Measurement Engine M5) for quantity signals:
+   * deterministic bounds computed from known facts. Rides expected_signals
+   * persistence end-to-end — pack data, never hardcoded.
+   */
+  envelope?: {
+    driverKey?: string
+    minPerUnit?: number
+    maxPerUnit?: number
+    defaultDriver?: number
+    absoluteMin: number
+    absoluteMax: number
+  }
 }
 
 /**

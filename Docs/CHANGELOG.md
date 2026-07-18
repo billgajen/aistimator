@@ -29,6 +29,22 @@
 
 ---
 
+### 2026-07-18: Measurement Engine Adopted (V3 estimation core) + T-116 Plausibility Envelopes
+
+**Context:** User verdict after live testing: "same system, slightly improved" — correct about the estimation core. V2 rebuilt the workflow around the estimator; the core itself remained a single-shot vision guess with self-reported confidence (proven by 50 vs 60 sqm run-to-run variance on identical photos). Adopted `Docs/07-measurement-engine.md` as the estimation north star: reference-anchored measurement, ensemble variance as confidence, stakes-based model routing (measurement spend scales with estimate value), plausibility envelopes, interval pricing with declared AACE-style estimate grades (C Concept / B Measured / A Confirmed), value-of-information questioning, per-tenant measurement memory, and a Goldman-grade document with a quantity-takeoff table showing HOW each quantity was measured. New tickets T-116–T-123.
+
+**T-116 implemented — Plausibility Envelopes (M5):**
+- **`packages/shared/src/envelopes.ts` (new, pure math):** `computeEnvelope` (bounds scaled by a known driver, e.g. wall area = storeys × [9..36] sqm/storey, with absolute caps) + `enforceEnvelope` (accepted / clamped / fallback_injected) + comma-aware `coerceQuantity`.
+- **Envelope rules ship as pack DATA** on `ExpectedSignalConfig.envelope` — rides existing `expected_signals` persistence end-to-end, zero migrations, anti-hardcoding intact. Painting pack: `wall_area_sqm` envelope added.
+- **Worker integration (BEFORE pricing — ordering matters, the gate runs after pricing):** for every ai_signal quantity with an envelope: implausible measurements are CLAMPED to the nearest bound; missing measurements get the envelope MIDPOINT injected (evidence: "Estimated from typical range X–Y for this property", confidence 0.4). Both cases are added to `missingQuantitySignals` → customer clarification. **The envelope makes the quote sane; the customer makes it exact.** The bug-#10 guard also moved pre-pricing and now reads the same work-step source as the engine (`service.work_steps || rules.workSteps` — was inconsistently `rules.workSteps`).
+- **Structural result:** the £480 failure class is impossible three ways — quantity-1 clamps to the plausible floor, missing measurements price at the envelope midpoint with a clarification, absurd readings (photo of the wrong thing) clamp to the ceiling. Tested for exactly these three paths.
+
+**Tests:** 10 new (`envelopes.test.ts`) — driver scaling, defaultDriver, absolute caps, the three kill-paths of the live £480 quote, string coercion. Suite: 206 passing.
+
+**Files:** `Docs/07-measurement-engine.md` (new), `packages/shared/src/envelopes.ts` (new), `packages/shared/src/database.types.ts`, `packages/shared/src/index.ts`, `apps/web/src/lib/vertical-packs/painting.ts`, `apps/worker/src/quote-processor.ts`, `apps/worker/src/__tests__/envelopes.test.ts` (new)
+
+---
+
 ### 2026-07-18: Bug #10 — Missing/String AI Quantity Signals Priced Silently Wrong (found by user testing)
 
 **Context:** User submitted a real Exterior Painting quote (3-storey front elevation) and asked "is this accurate?". It was not: **"Exterior walls: 1 sqm × £18 = £18"**, total £480 (minimum charge masking a £368 calculation). Correct total after fix: **£1,716** — a 3.6× under-quote that sailed through every guard with gate action `send`. The flagship failure mode the accuracy engine exists to prevent.

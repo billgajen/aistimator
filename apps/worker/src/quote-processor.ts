@@ -52,6 +52,7 @@ import { initializeFusionFromStructuredSignals } from './agents/signal-fusion'
 import { evaluateQualityGate } from './agents/quality-gate'
 import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
 import type { QualityGateResult } from '@estimator/shared'
+import { computeEnvelope, enforceEnvelope } from '@estimator/shared'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@estimator/shared'
@@ -895,6 +896,74 @@ export async function processQuote(
     workSteps: service.work_steps || rules.workSteps,
   }
 
+  // Bug #10 guard: work steps that price per-unit from an AI signal the AI
+  // could NOT extract fall back to quantity 1 — structurally wrong pricing.
+  // A MISSING signal is never in lowConfidenceSignals, so these previously
+  // bypassed every guard (found live: 3-storey exterior priced as "1 sqm × £18").
+  // Collected here (pre-pricing) and routed to customer clarification at the gate.
+  const aiQuantitySteps = (rulesWithWorkSteps.workSteps || []).filter(
+    (step) => step.quantitySource?.type === 'ai_signal' && step.quantitySource.signalKey
+  )
+  const missingQuantitySignals = aiQuantitySteps
+    .filter((step) => {
+      const signal = structuredSignals?.signals.find(
+        (s) => s.key === step.quantitySource!.signalKey
+      )
+      if (!signal) return true
+      const numeric = Number(String(signal.value).replace(/,/g, ''))
+      return !Number.isFinite(numeric) || numeric <= 0
+    })
+    .map((step) => ({ signalKey: step.quantitySource!.signalKey!, stepName: step.name }))
+
+  // T-116 Measurement Engine M5: enforce plausibility envelopes on AI-measured
+  // quantities BEFORE pricing. Implausible measurements are clamped; missing
+  // ones get the envelope midpoint injected (Grade-C fallback) so pricing
+  // produces a sane provisional figure instead of quantity-1 — but both cases
+  // still go to clarification: the envelope makes the quote sane, the customer
+  // makes it exact.
+  if (structuredSignals) {
+    const quantityKeys = new Set(aiQuantitySteps.map((s) => s.quantitySource!.signalKey!))
+    const getKnown = (key: string) =>
+      structuredSignals.signals.find((s) => s.key === key)?.value
+
+    for (const es of service.expected_signals || []) {
+      if (!es.envelope || !quantityKeys.has(es.signalKey)) continue
+      const envelope = computeEnvelope(es.envelope, getKnown)
+      const existing = structuredSignals.signals.find((s) => s.key === es.signalKey)
+      const finding = enforceEnvelope(es.signalKey, existing?.value, envelope)
+
+      if (finding.action === 'accepted') continue
+
+      const stepName =
+        aiQuantitySteps.find((s) => s.quantitySource?.signalKey === es.signalKey)?.name ||
+        es.signalKey
+      console.log(
+        `[Processor] Envelope ${finding.action} for ${es.signalKey}: ` +
+          `${finding.originalValue ?? 'missing'} -> ${finding.effectiveValue} ` +
+          `(plausible ${envelope.min}-${envelope.max})`
+      )
+
+      if (existing) {
+        existing.value = finding.effectiveValue
+        existing.confidence = Math.min(existing.confidence, 0.4)
+        existing.evidence = `${finding.action === 'clamped' ? 'Adjusted to' : 'Estimated from'} typical range ${envelope.min}-${envelope.max} for this property`
+      } else {
+        structuredSignals.signals.push({
+          key: es.signalKey,
+          value: finding.effectiveValue,
+          confidence: 0.4,
+          source: 'inferred',
+          evidence: `Estimated from typical range ${envelope.min}-${envelope.max} for this property`,
+        })
+      }
+
+      // Both clamped and fallback quantities still need the customer's number
+      if (!missingQuantitySignals.some((m) => m.signalKey === es.signalKey)) {
+        missingQuantitySignals.push({ signalKey: es.signalKey, stepName })
+      }
+    }
+  }
+
   // Calculate pricing with full trace for transparency
   const { result: pricing, trace: pricingTrace } = calculatePricingWithTrace(
     rulesWithWorkSteps,
@@ -1303,23 +1372,6 @@ export async function processQuote(
   // 4.75 Quality Gate: evaluate quote quality and decide on next action
   let qualityGateResult: QualityGateResult | undefined
   const clarificationCount = (quoteData.quote as unknown as { clarification_count?: number }).clarification_count ?? 0
-
-  // Work steps that price per-unit from an AI signal the AI could NOT extract
-  // fall back to quantity 1 — structurally wrong pricing. A MISSING signal is
-  // never in lowConfidenceSignals, so these previously bypassed every guard
-  // (found live: 3-storey exterior priced as "1 sqm × £18"). Route them to
-  // customer clarification instead.
-  const missingQuantitySignals = (rules.workSteps || [])
-    .filter((step) => step.quantitySource?.type === 'ai_signal' && step.quantitySource.signalKey)
-    .filter((step) => {
-      const signal = structuredSignals?.signals.find(
-        (s) => s.key === step.quantitySource!.signalKey
-      )
-      if (!signal) return true
-      const numeric = Number(String(signal.value).replace(/,/g, ''))
-      return !Number.isFinite(numeric) || numeric <= 0
-    })
-    .map((step) => ({ signalKey: step.quantitySource!.signalKey!, stepName: step.name }))
 
   if (missingQuantitySignals.length > 0) {
     console.log(
