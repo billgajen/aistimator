@@ -10,6 +10,7 @@ import {
   measureQuantities,
   decideAdjudication,
   adjudicateMeasurement,
+  computeCalibrationFactor,
   type PassMeasurement,
 } from '../ai/measurement'
 
@@ -221,5 +222,35 @@ describe('T-119: adjudicateMeasurement', () => {
       run: async () => ({ finalValue: 0, lowValue: 0, highValue: 0, scopeResolution: 'n/a' }),
     })
     expect(result).toBeNull()
+  })
+})
+
+describe('T-123: measurement memory calibration', () => {
+  const ex = (measured: number, confirmed: number) => ({ measured, confirmed })
+
+  it('learns a consistent under-measurement bias from confirmed jobs', () => {
+    // AI consistently measures ~20% low
+    const result = computeCalibrationFactor([ex(50, 60), ex(40, 49), ex(33, 40), ex(55, 65)])
+    expect(result).not.toBeNull()
+    expect(result!.factor).toBeGreaterThan(1.15)
+    expect(result!.factor).toBeLessThan(1.3)
+    expect(result!.sample).toBe(4)
+  })
+
+  it('requires at least 3 confirmed examples', () => {
+    expect(computeCalibrationFactor([ex(50, 60), ex(40, 50)])).toBeNull()
+  })
+
+  it('treats near-1.0 factors as noise — no correction', () => {
+    expect(computeCalibrationFactor([ex(50, 51), ex(40, 40), ex(60, 59)])).toBeNull()
+  })
+
+  it('clamps extreme factors for safety', () => {
+    const result = computeCalibrationFactor([ex(10, 100), ex(10, 90), ex(10, 110)])
+    expect(result!.factor).toBe(2) // clamped, never 10x
+  })
+
+  it('ignores junk examples (zero/negative)', () => {
+    expect(computeCalibrationFactor([ex(0, 60), ex(-5, 50), ex(50, 60)])).toBeNull()
   })
 })

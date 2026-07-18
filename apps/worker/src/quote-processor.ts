@@ -53,7 +53,7 @@ import { evaluateQualityGate } from './agents/quality-gate'
 import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
 import type { QualityGateResult } from '@estimator/shared'
 import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking } from '@estimator/shared'
-import { measureQuantities, decideAdjudication, adjudicateMeasurement } from './ai/measurement'
+import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor } from './ai/measurement'
 import { buildTakeoff, buildReference } from './takeoff'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
@@ -516,12 +516,50 @@ export async function processQuote(
           unit: step.unitLabel || 'unit',
         }
       })
+      // T-123 Measurement memory: load this business's confirmed-job history
+      // for these signals — used as prompt calibration AND a deterministic
+      // correction factor applied by code (AD-024).
+      const calibrationBySignal = new Map<string, { factor: number; sample: number }>()
+      const calibrationHints: string[] = []
+      try {
+        const { data: exampleRows } = await supabase
+          .from('measurement_examples')
+          .select('signal_key, measured_value, confirmed_value')
+          .eq('tenant_id', tenant.id)
+          .eq('service_id', service.id)
+          .in('signal_key', targets.map((t) => t.signalKey))
+          .order('created_at', { ascending: false })
+          .limit(30)
+
+        for (const target of targets) {
+          const examples = (exampleRows || [])
+            .filter((r) => r.signal_key === target.signalKey)
+            .map((r) => ({ measured: Number(r.measured_value), confirmed: Number(r.confirmed_value) }))
+          if (examples.length === 0) continue
+          for (const ex of examples.slice(0, 5)) {
+            calibrationHints.push(
+              `- ${target.signalKey}: AI measured ${ex.measured}, confirmed true value was ${ex.confirmed}`
+            )
+          }
+          const calibration = computeCalibrationFactor(examples)
+          if (calibration) {
+            calibrationBySignal.set(target.signalKey, calibration)
+            console.log(
+              `[Processor] Calibration for ${target.signalKey}: ×${calibration.factor} from ${calibration.sample} confirmed jobs`
+            )
+          }
+        }
+      } catch (memoryError) {
+        console.error('[Processor] Measurement memory lookup failed:', memoryError)
+      }
+
       try {
         const measured = await measureQuantities({
           gemini,
           images: extractionResult.images,
           targets,
           passes: Number(env.MEASUREMENT_PASSES || 3),
+          calibrationHints,
         })
         for (let m of measured) {
           console.log(
@@ -562,6 +600,24 @@ export async function processQuote(
                 `[Processor] Adjudicated ${m.signalKey}: ${m.value} -> ${adjudicated.value} (${adjudicated.evidence})`
               )
               m = adjudicated
+            }
+          }
+
+          // T-123: apply the learned calibration factor deterministically
+          const calibration = calibrationBySignal.get(m.signalKey)
+          if (calibration) {
+            const corrected = Math.round(m.value * calibration.factor * 10) / 10
+            console.log(
+              `[Processor] Calibrated ${m.signalKey}: ${m.value} -> ${corrected} (×${calibration.factor})`
+            )
+            m = {
+              ...m,
+              value: corrected,
+              band: {
+                low: Math.round(m.band.low * calibration.factor * 10) / 10,
+                high: Math.round(m.band.high * calibration.factor * 10) / 10,
+              },
+              evidence: `${m.evidence}; calibrated ×${calibration.factor} from ${calibration.sample} confirmed jobs`,
             }
           }
 

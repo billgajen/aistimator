@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { enqueueQuoteJob } from '@/lib/queue'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import type { ClarifyQuoteRequest } from '@estimator/shared'
@@ -36,7 +37,9 @@ export async function POST(
     // Fetch quote and validate token + status
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
-      .select('id, status, quote_token_hash, token_expires_at, quote_request_id')
+      .select(
+        'id, tenant_id, service_id, status, quote_token_hash, token_expires_at, quote_request_id, signals_json, clarification_questions_json'
+      )
       .eq('id', quoteId)
       .single()
 
@@ -89,7 +92,66 @@ export async function POST(
       )
     }
 
-    // Note: The worker will pick up the re-queued quote and process it again.
+    // T-123 Measurement memory: every confirmed quantity is a calibration
+    // example — what the AI measured vs what the customer says is true.
+    // Fire-and-forget; failures never affect the clarification flow.
+    try {
+      const questions = (quote.clarification_questions_json || []) as Array<{
+        id: string
+        targetSignalKey: string
+      }>
+      const signals =
+        ((quote.signals_json as { signals?: Array<{ key: string; value: unknown }> } | null)
+          ?.signals) || []
+      const examples = body.answers
+        .map((answer) => {
+          const question = questions.find((q) => q.id === answer.questionId)
+          if (!question?.targetSignalKey) return null
+          const signal = signals.find((s) => s.key === question.targetSignalKey)
+          const measured = Number(String(signal?.value ?? '').replace(/,/g, ''))
+          const confirmed = Number(String(answer.answer).replace(/,/g, ''))
+          if (!Number.isFinite(measured) || measured <= 0) return null
+          if (!Number.isFinite(confirmed) || confirmed <= 0) return null
+          return {
+            tenant_id: quote.tenant_id,
+            service_id: quote.service_id,
+            signal_key: question.targetSignalKey,
+            measured_value: measured,
+            confirmed_value: confirmed,
+            source: 'clarification',
+          }
+        })
+        .filter((e): e is NonNullable<typeof e> => e !== null)
+
+      if (examples.length > 0) {
+        const { error: exampleError } = await supabase
+          .from('measurement_examples')
+          .insert(examples)
+        if (exampleError) {
+          console.error('[Clarify] Failed to store measurement examples:', exampleError)
+        } else {
+          console.log(`[Clarify] Stored ${examples.length} measurement example(s)`)
+        }
+      }
+    } catch (memoryError) {
+      console.error('[Clarify] Measurement memory capture failed:', memoryError)
+    }
+
+    // Bug #11 (found live): status='queued' alone re-queues NOTHING — the job
+    // must be dispatched explicitly or answered clarifications sit forever.
+    try {
+      await enqueueQuoteJob({
+        quoteId,
+        quoteRequestId: quote.quote_request_id,
+        tenantId: quote.tenant_id,
+        timestamp: Date.now(),
+        quoteToken: body.token,
+      })
+    } catch (queueError) {
+      console.error('[Clarify] Failed to re-enqueue quote for reprocessing:', queueError)
+      // Leave status='queued' — visible in the dashboard rather than silently lost
+    }
+
     // On re-processing, clarification_count >= 1 means the quality gate is skipped.
 
     return NextResponse.json({

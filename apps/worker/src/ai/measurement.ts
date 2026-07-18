@@ -181,6 +181,39 @@ const MEASUREMENT_SCHEMA: Record<string, unknown> = {
   required: ['measurements'],
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Measurement memory (T-123) — learn from confirmed jobs
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface CalibrationExample {
+  measured: number
+  confirmed: number
+}
+
+/**
+ * Deterministic calibration from confirmed jobs: the median ratio of
+ * confirmed/measured across at least 3 examples, clamped to [0.5, 2] for
+ * safety. Code applies the learned correction — AD-024, not prompt vibes.
+ */
+export function computeCalibrationFactor(
+  examples: CalibrationExample[]
+): { factor: number; sample: number } | null {
+  const ratios = examples
+    .filter((e) => e.measured > 0 && e.confirmed > 0)
+    .map((e) => e.confirmed / e.measured)
+  if (ratios.length < 3) return null
+
+  const sorted = [...ratios].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  const median =
+    sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!
+  const factor = Math.min(2, Math.max(0.5, median))
+
+  // A factor within 3% of 1.0 is noise — no correction
+  if (Math.abs(factor - 1) < 0.03) return null
+  return { factor: Math.round(factor * 100) / 100, sample: ratios.length }
+}
+
 export type RunPass = (passIndex: number) => Promise<PassMeasurement[]>
 
 /**
@@ -193,6 +226,8 @@ export async function measureQuantities(opts: {
   targets: MeasurementTarget[]
   passes?: number
   runPass?: RunPass
+  /** T-123: calibration lines from this business's confirmed jobs */
+  calibrationHints?: string[]
 }): Promise<MeasuredQuantity[]> {
   const { gemini, images, targets } = opts
   const passes = opts.passes ?? 3
@@ -200,10 +235,14 @@ export async function measureQuantities(opts: {
 
   const defaultRunPass: RunPass = async () => {
     if (!gemini) return []
+    const calibrationBlock =
+      opts.calibrationHints && opts.calibrationHints.length > 0
+        ? `\n\nCalibration from this business's previously CONFIRMED jobs:\n${opts.calibrationHints.join('\n')}\nAccount for any systematic bias these reveal.`
+        : ''
     const prompt = `Measure these targets from the photos, using the reference-anchored protocol:
 ${targets
   .map((t) => `- targetKey "${t.signalKey}" (unit: ${t.unit}): ${t.description}`)
-  .join('\n')}
+  .join('\n')}${calibrationBlock}
 
 Return one measurement entry per targetKey.`
     const result = await gemini.generateWithImagesAndSchema<{ measurements: PassMeasurement[] }>(

@@ -29,6 +29,24 @@
 
 ---
 
+### 2026-07-18: T-123 Measurement Memory — the Learning Loop (Measurement Engine COMPLETE)
+
+**Context:** The final Measurement Engine stage: every human-confirmed quantity becomes per-tenant calibration data. The estimator that has measured 200 of this business's jobs measures the 201st better — the moat, operating at the measurement layer.
+
+**Implementation:**
+- **Migration 22 `measurement_examples`:** tenant/service/signal + measured_value vs confirmed_value. **TEXT ids with NO foreign keys** — found live that local dev uses TEXT prefixed ids (tnt_...) while production uses UUID (the 2026-02-16 schema split, still real); TEXT holds both, RLS casts `::text` for cross-type safety. Also: block comments inside CREATE TABLE column lists break the supabase migration runner — use `--` line comments.
+- **Capture (write side):** the clarify API stores an example whenever a confirmed numeric answer targets a signal the AI had measured (fire-and-forget, never affects the flow). Verified live: answered "60" against measured 27 → row `wall_area_sqm | 27 | 60 | clarification`. Amendment-sourced capture is a follow-up (source enum already supports it).
+- **Injection (read side), two channels:** (1) recent examples (≤5/signal) as prompt calibration lines in the measurement passes; (2) **deterministic correction by code (AD-024):** `computeCalibrationFactor` — median confirmed/measured ratio over ≥3 examples, clamped [0.5, 2], <3% treated as noise — applied to the measured value AND its band, with "; calibrated ×1.51 from 3 confirmed jobs" appended to the evidence (faces the customer via the T-122 takeoff).
+- **Verified live, full loop:** ×1.51 learned from 3 confirmed jobs → applied 70.5→106.5 → customer's confirmed 60 then overrode everything (AD-002 — the human always wins) and itself became the next example.
+
+**Bug #11 found & fixed (pre-existing, latent — the clarification loop's FOURTH leg):** the clarify API set `status='queued'` but never dispatched the job — answered clarifications would sit queued forever in production. Now calls `enqueueQuoteJob` explicitly; failures leave the queued status visible rather than silently lost.
+
+**Tests:** 5 new calibration tests (bias learning, min-sample, noise threshold, clamping, junk guards). Suite: 243 passing.
+
+**Files:** `supabase/migrations/00000000000022_measurement_examples.sql` (new), `apps/web/src/app/api/public/quotes/[quoteId]/clarify/route.ts`, `apps/worker/src/ai/measurement.ts`, `apps/worker/src/quote-processor.ts`, `apps/worker/src/__tests__/measurement.test.ts`
+
+---
+
 ### 2026-07-18: T-122 The Document — Quantity Takeoff, Reference, Grade on the Page
 
 **Context:** The customer-facing document becomes a professional estimate that shows its work — the flagship differentiator no competitor has.
