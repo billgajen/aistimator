@@ -29,6 +29,30 @@
 
 ---
 
+### 2026-07-18: T-110 — Outcome Calibration Loop (Phase 2 complete, V2 Strategy)
+
+**Context:** The moat ticket (V2 strategy Flaw 2): amendment/acceptance data was collected but never fed back into pricing. Existing infra: `quote_amendments` stores `before_pricing`/`after_pricing` snapshots; `/api/learning/analyze` (fired on quote PATCH) detects patterns for AI wording context. Missing: actionable pricing suggestions and a business-facing surface.
+
+**Implementation:**
+- **`packages/shared/src/calibration.ts` (new):** deterministic calibration math (no AI anywhere). Per service, over recent outcomes:
+  - *raise_rates / lower_rates:* ≥3 amendments with ≥70% direction consistency and |median delta| ≥5% → "Your {service} quotes are usually raised ~15% before sending" with a `suggestedAction` phrased for the T-104 composer ("Increase all my rates for {service} by about 15%") — the calibration loop's apply path IS the plain-language compiler.
+  - *price_check:* acceptance <30% over ≥5 sent quotes (suppressed when lower_rates already fired — same root cause).
+  - *review_burden:* ≥50% of processed quotes stuck in pending_review → suggests adding required photos/questions to raise AI confidence (the threshold-tuning signal).
+  - Guards: minimum sample sizes throughout, zero-beforeTotal amendments ignored, sub-5% medians treated as noise.
+- **`GET /api/learning/calibration` (new):** computes live from the last 90 days (500 quotes / 200 amendments max) — no new tables, no stale state, no migration.
+- **Analytics page:** "Pricing Insights" cards (headline, detail, the exact composer phrase to apply, link to services) + a "Quote Outcomes by Service" table (sent / accepted / acceptance % / median edit before send). Explicit copy: "Suggestions only — nothing changes unless you apply it" (AD-001).
+
+**Design decisions:**
+- Calibration NEVER auto-applies — AD-001 is absolute. The suggestion's apply path is the business speaking to the pricing composer, keeping a human decision plus deterministic compilation between data and price.
+- Live computation over persisted aggregates: at current scale (hundreds of quotes/tenant) the query is cheap, and it can't drift stale. Revisit if a tenant exceeds ~500 quotes/90 days.
+- Math lives in `@estimator/shared` so the worker's vitest suite covers it (web has no test infra).
+
+**Tests:** 11 new (`apps/worker/src/__tests__/calibration.test.ts`) covering all suggestion rules, noise guards, and per-service isolation. Full suite: 181 passing.
+
+**Files:** `packages/shared/src/calibration.ts` (new), `packages/shared/src/index.ts`, `apps/web/src/app/api/learning/calibration/route.ts` (new), `apps/web/src/app/(dashboard)/app/analytics/page.tsx`, `apps/worker/src/__tests__/calibration.test.ts` (new)
+
+---
+
 ### 2026-07-18: T-109 — Range-First Quoting (Phase 2, V2 Strategy)
 
 **Context:** When a quote paused for clarification or business review, the customer got nothing — no price signal at all until an email arrived. Range-first principle: an instant estimated range always, the exact quote when it's final. Also fixed a third latent clarification bug (see T-108 for the first two).

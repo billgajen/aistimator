@@ -6,6 +6,9 @@ export * from './database.types'
 // Re-export API types
 export * from './api.types'
 
+// Re-export outcome calibration (T-110)
+export * from './calibration'
+
 // ID prefixes for stable, readable IDs
 export const ID_PREFIXES = {
   tenant: 'tnt_',

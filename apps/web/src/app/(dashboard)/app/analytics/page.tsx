@@ -1,13 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { PageHeader } from '@/components/dashboard/EmptyState'
-import type { AnalyticsResponse } from '@estimator/shared'
+import type { AnalyticsResponse, ServiceCalibration } from '@estimator/shared'
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // T-110: per-service pricing calibration from quote outcomes
+  const [calibration, setCalibration] = useState<ServiceCalibration[] | null>(null)
 
   useEffect(() => {
     async function fetchAnalytics() {
@@ -26,7 +29,19 @@ export default function AnalyticsPage() {
       }
     }
 
+    async function fetchCalibration() {
+      try {
+        const response = await fetch('/api/learning/calibration')
+        if (!response.ok) return // insights are best-effort; core analytics still render
+        const result = await response.json()
+        setCalibration(result.services || [])
+      } catch {
+        // Non-fatal
+      }
+    }
+
     fetchAnalytics()
+    fetchCalibration()
   }, [])
 
   // Format period to readable month/year
@@ -114,6 +129,96 @@ export default function AnalyticsPage() {
           </p>
         </div>
       </div>
+
+      {/* Pricing Insights (T-110): outcome calibration suggestions */}
+      {calibration && calibration.some((s) => s.suggestions.length > 0) && (
+        <div className="mb-8">
+          <h3 className="mb-1 text-lg font-semibold text-text-primary">Pricing Insights</h3>
+          <p className="mb-4 text-sm text-text-muted">
+            Based on how your quotes performed over the last 90 days. Suggestions only — nothing
+            changes unless you apply it.
+          </p>
+          <div className="space-y-3">
+            {calibration
+              .flatMap((svc) => svc.suggestions.map((sug) => ({ svc, sug })))
+              .map(({ svc, sug }, i) => (
+                <div
+                  key={`${svc.serviceId}-${sug.type}-${i}`}
+                  className="rounded-warm-lg bg-surface p-5 shadow-warm"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex h-2 w-2 shrink-0 rounded-full ${
+                            sug.type === 'raise_rates'
+                              ? 'bg-green-500'
+                              : sug.type === 'lower_rates'
+                                ? 'bg-amber-500'
+                                : 'bg-blue-500'
+                          }`}
+                        />
+                        <h4 className="font-semibold text-text-primary">{sug.headline}</h4>
+                      </div>
+                      <p className="mt-1 text-sm text-text-secondary">{sug.detail}</p>
+                      {(sug.type === 'raise_rates' || sug.type === 'lower_rates') && (
+                        <p className="mt-2 text-xs text-text-muted">
+                          To apply: open the service&apos;s pricing and tell the composer:{' '}
+                          <span className="font-medium text-text-secondary">
+                            &quot;{sug.suggestedAction}&quot;
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                    <Link
+                      href="/app/services"
+                      className="inline-flex shrink-0 items-center rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-background"
+                    >
+                      Adjust pricing →
+                    </Link>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* Per-service outcomes table (T-110) */}
+      {calibration && calibration.length > 0 && (
+        <div className="mb-8 rounded-warm-lg bg-surface p-6 shadow-warm">
+          <h3 className="mb-4 text-lg font-semibold text-text-primary">Quote Outcomes by Service</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-text-muted">
+                  <th className="pb-2 pr-4 font-medium">Service</th>
+                  <th className="pb-2 pr-4 font-medium">Sent</th>
+                  <th className="pb-2 pr-4 font-medium">Accepted</th>
+                  <th className="pb-2 pr-4 font-medium">Acceptance</th>
+                  <th className="pb-2 font-medium">Median edit before send</th>
+                </tr>
+              </thead>
+              <tbody>
+                {calibration.map((svc) => (
+                  <tr key={svc.serviceId} className="border-b border-border/50">
+                    <td className="py-2 pr-4 font-medium text-text-primary">{svc.serviceName}</td>
+                    <td className="py-2 pr-4 text-text-secondary">{svc.quotesSent}</td>
+                    <td className="py-2 pr-4 text-text-secondary">{svc.accepted}</td>
+                    <td className="py-2 pr-4 text-text-secondary">
+                      {svc.acceptanceRatePct !== null ? `${svc.acceptanceRatePct}%` : '—'}
+                    </td>
+                    <td className="py-2 text-text-secondary">
+                      {svc.medianDeltaPct !== null
+                        ? `${svc.medianDeltaPct > 0 ? '+' : ''}${svc.medianDeltaPct}%`
+                        : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Usage section */}
       <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
