@@ -20,6 +20,7 @@ import {
 import { generateQuoteToken, getTokenExpiry } from './tokens'
 import { enqueueQuoteJob } from './queue'
 import { incrementUsageCounter } from './usage'
+import { checkPlanLimit, maybeNotifyLimitReached } from './plan-limits'
 
 // Keywords that trigger intake start
 const TRIGGER_KEYWORDS = ['quote', 'estimate', 'price', 'pricing', 'cost', 'how much']
@@ -536,10 +537,27 @@ async function createQuoteFromIntake(
   }
 
   try {
+    // Enforce plan limit (T-101) before creating any records.
+    // Neutral customer-facing message — never expose the business's billing state.
+    const planLimit = await checkPlanLimit(supabase, tenantId)
+    if (!planLimit.allowed) {
+      console.warn(
+        `[WhatsApp Intake] Plan limit reached (${planLimit.used}/${planLimit.limit}) — rejecting intake`
+      )
+      return {
+        success: false,
+        error: 'PLAN_LIMIT_REACHED',
+        responseText:
+          'Sorry, instant quoting is temporarily unavailable. Please contact the business directly and they will get you a quote.',
+        newState: 'idle',
+        newData: {},
+      }
+    }
+
     // Get tenant details
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
-      .select('currency, tax_enabled, tax_label, tax_rate')
+      .select('name, currency, tax_enabled, tax_label, tax_rate')
       .eq('id', tenantId)
       .single()
 
@@ -638,6 +656,9 @@ async function createQuoteFromIntake(
 
     // Increment usage counter
     await incrementUsageCounter(supabase, tenantId, 'estimates_created')
+
+    // If this consumed the last quote in the plan, notify the business once (T-101)
+    await maybeNotifyLimitReached(supabase, tenantId, tenant.name)
 
     // Enqueue for processing
     await enqueueQuoteJob({

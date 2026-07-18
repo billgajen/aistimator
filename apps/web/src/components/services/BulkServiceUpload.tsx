@@ -81,9 +81,46 @@ export function BulkServiceUpload({ open, onClose, onServicesCreated }: BulkServ
   const [dragOver, setDragOver] = useState(false)
   const [createdCount, setCreatedCount] = useState(0)
   const [totalToCreate, setTotalToCreate] = useState(0)
+  const [sourceTab, setSourceTab] = useState<'document' | 'website'>('website')
+  const [websiteUrl, setWebsiteUrl] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   if (!open) return null
+
+  /** Extract services from the business's website (T-105) */
+  const handleWebsiteExtract = async () => {
+    if (!websiteUrl.trim()) return
+    setError(null)
+    setState('extracting')
+
+    try {
+      const res = await fetch('/api/services/ai-draft/extract-from-website', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: websiteUrl.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error?.message || 'Website extraction failed')
+
+      if (!data.services || data.services.length === 0) {
+        setError('No services found on that website. Try a page that lists your services, or upload a pricing document instead.')
+        setState('idle')
+        return
+      }
+
+      setServices(
+        data.services.map((svc: { name: string; description: string; draft: ServiceDraftConfig }) => ({
+          ...svc,
+          selected: true,
+          createMode: 'one' as const,
+        }))
+      )
+      setState('review')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+      setState('idle')
+    }
+  }
 
   const handleFile = async (file: File) => {
     if (!ACCEPTED_TYPES.includes(file.type)) {
@@ -227,6 +264,7 @@ export function BulkServiceUpload({ open, onClose, onServicesCreated }: BulkServ
     setError(null)
     setCreatedCount(0)
     setTotalToCreate(0)
+    setWebsiteUrl('')
     onClose()
   }
 
@@ -238,7 +276,7 @@ export function BulkServiceUpload({ open, onClose, onServicesCreated }: BulkServ
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-background shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-6 py-5">
-          <h2 className="font-display text-xl font-bold text-text-primary">Upload Services</h2>
+          <h2 className="font-display text-xl font-bold text-text-primary">Import Services</h2>
           <button
             onClick={handleClose}
             className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-surface hover:text-text-primary"
@@ -250,15 +288,76 @@ export function BulkServiceUpload({ open, onClose, onServicesCreated }: BulkServ
         </div>
 
         <div className="p-6">
-          {/* Idle: File drop zone */}
+          {/* Idle: source tabs (website / document) */}
           {(state === 'idle' || state === 'error') && (
             <div>
-              <p className="mb-4 text-sm text-text-secondary">
-                Upload a pricing document (PDF, image, or Word doc) containing your services and pricing.
-                AI will extract each service with its pricing structure.
-              </p>
+              {/* Source tabs */}
+              <div className="mb-4 flex rounded-lg border border-border bg-surface p-1">
+                <button
+                  type="button"
+                  onClick={() => { setSourceTab('website'); setError(null) }}
+                  className={`flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                    sourceTab === 'website'
+                      ? 'bg-background text-text-primary shadow-sm'
+                      : 'text-text-muted hover:text-text-secondary'
+                  }`}
+                >
+                  From your website
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setSourceTab('document'); setError(null) }}
+                  className={`flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                    sourceTab === 'document'
+                      ? 'bg-background text-text-primary shadow-sm'
+                      : 'text-text-muted hover:text-text-secondary'
+                  }`}
+                >
+                  Upload document
+                </button>
+              </div>
+
+              {sourceTab === 'website' && (
+                <div>
+                  <p className="mb-4 text-sm text-text-secondary">
+                    Paste your website address. We&apos;ll read your services and pricing pages and
+                    draft your service catalogue — you review everything before it&apos;s created.
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={websiteUrl}
+                      onChange={(e) => setWebsiteUrl(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleWebsiteExtract() } }}
+                      placeholder="www.yourbusiness.com"
+                      className="flex-1 rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={handleWebsiteExtract}
+                      disabled={!websiteUrl.trim()}
+                      className="inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Read My Site
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-text-muted">
+                    We read up to 4 pages (your homepage plus services/pricing pages). Prices are only
+                    imported when your site states them — nothing is invented.
+                  </p>
+                </div>
+              )}
+
+              {sourceTab === 'document' && (
+                <p className="mb-4 text-sm text-text-secondary">
+                  Upload a pricing document (PDF, image, or Word doc) containing your services and pricing.
+                  AI will extract each service with its pricing structure.
+                </p>
+              )}
 
               <div
+                style={{ display: sourceTab === 'document' ? undefined : 'none' }}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleDrop}
@@ -300,10 +399,17 @@ export function BulkServiceUpload({ open, onClose, onServicesCreated }: BulkServ
             <div className="flex flex-col items-center py-12">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
               <p className="mt-4 text-sm font-medium text-text-primary">
-                {state === 'uploading' ? 'Uploading document...' : 'AI is extracting services...'}
+                {state === 'uploading'
+                  ? 'Uploading document...'
+                  : sourceTab === 'website'
+                    ? 'Reading your website...'
+                    : 'AI is extracting services...'}
               </p>
               <p className="mt-1 text-xs text-text-muted">
-                {state === 'extracting' && 'This may take 10-20 seconds for large documents'}
+                {state === 'extracting' &&
+                  (sourceTab === 'website'
+                    ? 'Reading your homepage and services/pricing pages — this may take up to 30 seconds'
+                    : 'This may take 10-20 seconds for large documents')}
               </p>
             </div>
           )}
@@ -345,6 +451,12 @@ export function BulkServiceUpload({ open, onClose, onServicesCreated }: BulkServ
                       <div className="border-t border-border bg-surface/50 px-4 py-3">
                         {/* Items list */}
                         <div className="mb-3 space-y-1">
+                          {svc.draft.pricing.workSteps.length === 0 && (
+                            <p className="text-sm italic text-text-muted">
+                              No prices found for this service — you&apos;ll add pricing after import
+                              by describing it in plain English.
+                            </p>
+                          )}
                           {svc.draft.pricing.workSteps.map((step, si) => (
                             <div key={si} className="flex items-center justify-between text-sm">
                               <span className="text-text-secondary">{step.name}</span>

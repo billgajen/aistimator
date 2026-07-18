@@ -103,6 +103,11 @@ interface QuoteData {
       email: string
       phone?: string
     }
+    /** Clarification round tracking (T-108) — previously not projected, so the
+     * gate's loop cap and answer merging never saw these fields */
+    clarification_count?: number
+    clarification_questions_json?: Array<{ id: string; targetSignalKey: string }> | null
+    clarification_answers_json?: Array<{ questionId: string; answer: string }> | null
   }
   quoteRequest: {
     id: string
@@ -368,6 +373,34 @@ export async function processQuote(
   }
 
   const { quoteRequest, tenant, service, pricingRules, assets } = quoteData
+
+  // 1.2 Merge clarification answers as customer-provided form answers (T-108).
+  // On reprocess after clarification, each answer maps (via its question's
+  // targetSignalKey) to a synthetic form answer — inheriting the full AD-002
+  // override path: confidence 1.0, form-wins fusion, lowConfidence regeneration.
+  // Previously answers were stored but never read — reprocessing ignored them.
+  const clarQuestions = quoteData.quote.clarification_questions_json || []
+  const clarAnswers = quoteData.quote.clarification_answers_json || []
+  if (clarAnswers.length > 0 && clarQuestions.length > 0) {
+    const questionById = new Map(clarQuestions.map((q) => [q.id, q]))
+    for (const answer of clarAnswers) {
+      const question = questionById.get(answer.questionId)
+      const raw = String(answer.answer ?? '').trim()
+      if (!question?.targetSignalKey || raw === '') continue
+      // Numeric answers become numbers (comma-separator aware — see "1,500" lesson)
+      const numeric = raw.replace(/,(?=\d{3}\b)/g, '')
+      const value: string | number = /^\d+(\.\d+)?$/.test(numeric) ? parseFloat(numeric) : raw
+      quoteRequest.job_answers = quoteRequest.job_answers || []
+      // Clarification is the customer's most recent statement — replace any prior answer for the same key
+      quoteRequest.job_answers = quoteRequest.job_answers.filter(
+        (a) => a.fieldId !== question.targetSignalKey
+      )
+      quoteRequest.job_answers.push({ fieldId: question.targetSignalKey, value })
+      console.log(
+        `[Processor] Clarification answer merged: ${question.targetSignalKey} = ${value}`
+      )
+    }
+  }
 
   // 1.5 Triage: classify request complexity and optimize processing
   const imageAssetCount = assets.filter((a) => a.type === 'image').length
@@ -1299,6 +1332,10 @@ export async function processQuote(
             signals_json: structuredSignals,
             pricing_trace_json: pricingTrace,
             triage_json: triageDecision,
+            // T-109 range-first: store provisional pricing + content so the
+            // customer sees an estimated range immediately instead of nothing
+            pricing_json: pricing,
+            content_json: content,
           })
           .eq('id', quoteId)
 
@@ -1658,6 +1695,11 @@ async function loadQuoteData(
       service_id: quote.service_id,
       document_type: quote.document_type,
       customer_json: quote.customer_json as QuoteData['quote']['customer_json'],
+      clarification_count: quote.clarification_count ?? 0,
+      clarification_questions_json:
+        quote.clarification_questions_json as QuoteData['quote']['clarification_questions_json'],
+      clarification_answers_json:
+        quote.clarification_answers_json as QuoteData['quote']['clarification_answers_json'],
     },
     quoteRequest: quote.quote_requests as unknown as QuoteData['quoteRequest'],
     tenant: quote.tenants as unknown as QuoteData['tenant'],

@@ -7,6 +7,7 @@ import { WorkStepEditor } from '@/components/WorkStepEditor'
 import { SuggestedFieldEditor } from '@/components/SuggestedFieldEditor'
 import { BulkServiceUpload } from '@/components/services/BulkServiceUpload'
 import { AIDraftRefinementPanel } from '@/components/services/AIDraftRefinementPanel'
+import { PricingComposer } from '@/components/services/PricingComposer'
 import type {
   Service,
   DocumentType,
@@ -1374,6 +1375,47 @@ export default function ServicesPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* Plain-language pricing composer (T-104) — the default way to set pricing */}
+                    <PricingComposer
+                      serviceName={formData.name}
+                      serviceDescription={formData.description}
+                      current={{
+                        baseFee: formData.baseFee,
+                        minimumCharge: formData.minimumCharge,
+                        workSteps: formData.workSteps,
+                        addons: formData.addons,
+                        multipliers: formData.multipliers,
+                        suggestedFields: formData.suggestedFields,
+                        expectedSignals: formData.expectedSignals,
+                        currentConfig: aiDraft
+                          ? {
+                              ...aiDraft,
+                              pricing: {
+                                ...aiDraft.pricing,
+                                baseFee: formData.baseFee,
+                                minimumCharge: formData.minimumCharge,
+                                workSteps: formData.workSteps,
+                              },
+                              expectedSignals: formData.expectedSignals,
+                              suggestedFields: formData.suggestedFields,
+                            }
+                          : undefined,
+                      }}
+                      onApply={(result) => {
+                        applyDraftToForm(result.updatedConfig)
+                        setFormData((prev) => ({
+                          ...prev,
+                          addons: result.addons.length > 0 ? result.addons : prev.addons,
+                          multipliers:
+                            result.multipliers.length > 0 ? result.multipliers : prev.multipliers,
+                        }))
+                      }}
+                    />
+
+                    <p className="text-center text-xs font-medium uppercase tracking-wide text-text-muted">
+                      Or fine-tune manually
+                    </p>
 
                     {/* Base Pricing */}
                     <div className="rounded-lg border border-border p-4">

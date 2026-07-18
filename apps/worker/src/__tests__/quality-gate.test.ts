@@ -191,3 +191,64 @@ describe('evaluateQualityGate', () => {
     })
   })
 })
+
+describe('T-108: confirm_value questions', () => {
+  it('should build a deterministic confirm_value question when the AI extracted a value', async () => {
+    const result = await evaluateQualityGate(
+      {
+        structuredSignals: makeSignals({
+          signals: [
+            {
+              key: 'room_count',
+              value: 4,
+              confidence: 0.4,
+              source: 'vision',
+              evidence: 'Counted 4 distinct rooms across the photos',
+            },
+          ],
+          lowConfidenceSignals: ['room_count'],
+        }),
+        fusionResult: makeFusion(),
+        pricing: makePricing(),
+        clarificationCount: 0,
+        serviceName: 'Interior Painting',
+        hasPhotos: true,
+      },
+      null // no Gemini — confirm questions must not need AI
+    )
+
+    expect(result.action).toBe('ask_clarification')
+    const question = result.questions?.[0]
+    expect(question?.type).toBe('confirm_value')
+    expect(question?.targetSignalKey).toBe('room_count')
+    expect(question?.aiValue).toBe(4)
+    expect(question?.evidence).toContain('4 distinct rooms')
+    // Question text is code-generated from the value (AD-024), not AI-generated
+    expect(question?.question).toContain('room count')
+    expect(question?.question).toContain('4')
+  })
+
+  it('should fall back to a text question when the signal has no value', async () => {
+    const result = await evaluateQualityGate(
+      {
+        structuredSignals: makeSignals({
+          signals: [
+            { key: 'access_difficulty', value: '', confidence: 0.3, source: 'vision' },
+          ],
+          lowConfidenceSignals: ['access_difficulty'],
+        }),
+        fusionResult: makeFusion(),
+        pricing: makePricing(),
+        clarificationCount: 0,
+        serviceName: 'Interior Painting',
+        hasPhotos: true,
+      },
+      null
+    )
+
+    expect(result.action).toBe('ask_clarification')
+    const question = result.questions?.[0]
+    expect(question?.type).not.toBe('confirm_value')
+    expect(question?.targetSignalKey).toBe('access_difficulty')
+  })
+})

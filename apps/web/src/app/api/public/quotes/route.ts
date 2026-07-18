@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { enqueueQuoteJob } from '@/lib/queue'
 import { incrementUsageCounter } from '@/lib/usage'
+import { checkPlanLimit, maybeNotifyLimitReached } from '@/lib/plan-limits'
 import { validateServiceMatch } from '@/lib/ai/service-matcher'
 import { NextResponse } from 'next/server'
 
@@ -125,6 +126,25 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: { code: 'TENANT_NOT_FOUND', message: 'Tenant not found' } },
         { status: 500 }
+      )
+    }
+
+    // 3b. Enforce plan limit (T-101) — before any records are created.
+    // Customer-facing message is deliberately neutral: never expose the business's billing state.
+    const planLimit = await checkPlanLimit(supabase, tenantId)
+    if (!planLimit.allowed) {
+      console.warn(
+        `[Quotes] Plan limit reached for tenant (${planLimit.used}/${planLimit.limit}) — rejecting quote request`
+      )
+      return NextResponse.json(
+        {
+          error: {
+            code: 'PLAN_LIMIT_REACHED',
+            message:
+              'Online quoting is temporarily unavailable. Please contact the business directly to get your quote.',
+          },
+        },
+        { status: 429 }
       )
     }
 
@@ -457,6 +477,9 @@ export async function POST(request: Request) {
 
     // 12. Increment usage counter for estimates_created
     await incrementUsageCounter(supabase, tenantId, 'estimates_created')
+
+    // 12b. If this consumed the last quote in the plan, notify the business once (T-101)
+    await maybeNotifyLimitReached(supabase, tenantId, tenant.name)
 
     // 13. Enqueue job for processing (skip for general inquiries - they need manual review)
     let queueFailed = false

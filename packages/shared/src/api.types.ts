@@ -13,6 +13,7 @@ import type {
   AmendmentSource,
   FeedbackType,
   LearningPattern,
+  ClarificationQuestion,
 } from './database.types'
 
 // ============================================================================
@@ -136,6 +137,18 @@ export interface QuoteViewResponse {
   business: QuoteViewBusiness
   customer: QuoteViewCustomer
   pricing: QuotePricing
+  /**
+   * T-109 range-first: present when the quote is not yet final
+   * (awaiting_clarification / pending_review). Exact pricing is withheld and
+   * the customer sees this estimated range instead.
+   */
+  provisional?: {
+    rangeLow: number
+    rangeHigh: number
+    reason: 'awaiting_clarification' | 'pending_review'
+  }
+  /** Questions to answer when status is awaiting_clarification (T-108) */
+  clarificationQuestions?: ClarificationQuestion[]
   breakdown: Array<{
     label: string
     amount: number

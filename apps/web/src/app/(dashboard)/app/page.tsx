@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { checkPlanLimit } from '@/lib/plan-limits'
 import { PageHeader } from '@/components/dashboard/EmptyState'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -33,11 +34,20 @@ export default async function DashboardPage() {
     redirect('/signup?error=account_incomplete')
   }
 
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('name, branding_json')
-    .eq('id', profile.tenant_id)
-    .single()
+  const [{ data: tenant }, planLimit] = await Promise.all([
+    supabase
+      .from('tenants')
+      .select('name, branding_json')
+      .eq('id', profile.tenant_id)
+      .single(),
+    checkPlanLimit(supabase, profile.tenant_id),
+  ])
+
+  const usagePercent = planLimit.unlimited
+    ? 0
+    : Math.min(100, Math.round((planLimit.used / planLimit.limit) * 100))
+  const limitReached = !planLimit.unlimited && planLimit.used >= planLimit.limit
+  const nearLimit = !limitReached && usagePercent >= 80
 
   // Fetch real quote stats
   const { data: quoteStats } = await supabase
@@ -129,6 +139,73 @@ export default async function DashboardPage() {
         title={tenant?.name || 'Dashboard'}
         description="Overview of your quotes and activity"
       />
+
+      {/* Plan usage warnings (T-101) */}
+      {limitReached && (
+        <div className="mb-8 rounded-xl border border-red-300 bg-red-50 p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-display text-base font-bold text-red-900">
+                Monthly quote limit reached ({planLimit.used}/{planLimit.limit})
+              </h2>
+              <p className="mt-1 text-sm text-red-800">
+                New quote requests from your widget are paused — customers are being asked to contact
+                you directly. Upgrade to resume instant quoting.
+              </p>
+            </div>
+            <Link
+              href="/app/billing"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+            >
+              Upgrade Plan
+            </Link>
+          </div>
+        </div>
+      )}
+      {nearLimit && (
+        <div className="mb-8 rounded-xl border border-amber-300 bg-amber-50 p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-display text-base font-bold text-amber-900">
+                {usagePercent}% of your monthly quote limit used ({planLimit.used}/{planLimit.limit})
+              </h2>
+              <p className="mt-1 text-sm text-amber-800">
+                When the limit is reached, new quote requests will be paused until next month. Upgrade
+                now to avoid missing leads.
+              </p>
+            </div>
+            <Link
+              href="/app/billing"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90"
+            >
+              View Plans
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* AI onboarding hero — new tenants with no services yet (T-106) */}
+      {!hasService && (
+        <div className="mb-8 rounded-xl border border-primary bg-primary p-6 text-white">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-display text-xl font-bold">
+                Set up with AI — about 5 minutes
+              </h2>
+              <p className="mt-1 text-sm text-white/80">
+                Point us at your website (or describe your services), answer a couple of pricing
+                questions in plain English, and start quoting today.
+              </p>
+            </div>
+            <Link
+              href="/app/onboarding"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-primary transition-opacity hover:opacity-90"
+            >
+              Start Setup
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Setup Progress - only show if not all complete */}
       {!allComplete && (

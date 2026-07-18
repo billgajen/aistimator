@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { assessImageQuality } from '@/lib/image-quality'
 
 /**
  * Embedded Widget Page
@@ -22,6 +23,8 @@ interface ServiceMediaConfig {
   minPhotos: number
   maxPhotos: number
   photoGuidance: string | null
+  /** Guided capture slots (T-107) — returned by the public widget config API */
+  requiredAngles?: Array<{ id: string; label: string; guidance?: string }>
 }
 
 interface MeasurementModel {
@@ -79,9 +82,13 @@ interface UploadedFile {
   assetId: string
   file: File
   previewUrl: string
-  status: 'pending' | 'uploading' | 'complete' | 'error'
+  status: 'pending' | 'uploading' | 'complete' | 'error' | 'needs_review'
   progress: number
   error?: string
+  /** Which guided-capture slot this photo fills (T-107) */
+  angleId?: string
+  /** Soft quality issues awaiting the customer's decision (T-107) */
+  qualityIssues?: string[]
 }
 
 // Helper function to get human-readable unit labels
@@ -752,6 +759,7 @@ export default function EmbedPage({ params }: EmbedPageProps) {
           maxPhotos={serviceMediaConfig?.maxPhotos ?? widgetData.files.maxPhotos}
           maxDocs={widgetData.files.maxDocs}
           photoGuidance={serviceMediaConfig?.photoGuidance ?? null}
+          requiredAngles={serviceMediaConfig?.requiredAngles ?? []}
           onBack={() => setStep('details')}
           onNext={() => setStep('contact')}
         />
@@ -770,7 +778,7 @@ export default function EmbedPage({ params }: EmbedPageProps) {
       )}
       {displayMode !== 'conversational' && step === 'submitting' && <SubmittingState />}
       {step === 'success' && quoteResult && (
-        <SuccessState quoteUrl={quoteResult.quoteViewUrl} />
+        <SuccessState quoteUrl={quoteResult.quoteViewUrl} quoteId={quoteResult.quoteId} />
       )}
     </div>
   )
@@ -1211,6 +1219,7 @@ function FileUploadStep({
   maxPhotos,
   maxDocs,
   photoGuidance,
+  requiredAngles,
   onBack,
   onNext,
 }: {
@@ -1221,105 +1230,143 @@ function FileUploadStep({
   maxPhotos: number
   maxDocs: number
   photoGuidance: string | null
+  requiredAngles: Array<{ id: string; label: string; guidance?: string }>
   onBack: () => void
   onNext: () => void
 }) {
   const [isUploading, setIsUploading] = useState(false)
+  const [rejectMessage, setRejectMessage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Which guided-capture slot the next selected file should fill (T-107)
+  const pendingAngleRef = useRef<string | null>(null)
 
   const photoCount = files.filter((f) => f.file.type.startsWith('image/')).length
   const docCount = files.filter((f) => f.file.type === 'application/pdf').length
   const canAddPhotos = photoCount < maxPhotos
   const canAddDocs = docCount < maxDocs
 
+  async function startUpload(tempId: string, file: File) {
+    try {
+      // 1. Initialize upload
+      const initResponse = await fetch('/api/public/uploads/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantKey,
+          files: [{ fileName: file.name, contentType: file.type, sizeBytes: file.size }],
+        }),
+      })
+
+      const initData = await initResponse.json()
+
+      if (!initResponse.ok || !initData.uploads?.[0]) {
+        throw new Error(initData.error?.message || 'Failed to initialize upload')
+      }
+
+      const { assetId, uploadUrl } = initData.uploads[0]
+
+      // Update with assetId
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === tempId ? { ...f, assetId, status: 'uploading' as const } : f
+        )
+      )
+
+      // 2. Upload file to R2 (or fallback endpoint)
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type },
+      })
+
+      if (!uploadResponse.ok) {
+        throw new Error('Upload failed')
+      }
+
+      // Mark as complete
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === tempId ? { ...f, status: 'complete' as const, progress: 100 } : f
+        )
+      )
+    } catch (err) {
+      // Mark as error
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === tempId
+            ? { ...f, status: 'error' as const, error: err instanceof Error ? err.message : 'Upload failed' }
+            : f
+        )
+      )
+    }
+  }
+
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const selectedFiles = Array.from(e.target.files || [])
+    const angleId = pendingAngleRef.current
+    pendingAngleRef.current = null
     if (selectedFiles.length === 0) return
 
     setIsUploading(true)
+    setRejectMessage(null)
+
+    let currentPhotoCount = photoCount
+    let currentDocCount = docCount
+    let isFirst = true
 
     for (const file of selectedFiles) {
       // Check file type
       const isImage = file.type.startsWith('image/')
       const isDoc = file.type === 'application/pdf'
+      const fileAngleId = isImage && isFirst ? (angleId ?? undefined) : undefined
+      isFirst = false
 
       if (!isImage && !isDoc) {
         continue // Skip unsupported files
       }
 
       // Check limits
-      if (isImage && photoCount >= maxPhotos) continue
-      if (isDoc && docCount >= maxDocs) continue
+      if (isImage && currentPhotoCount >= maxPhotos) continue
+      if (isDoc && currentDocCount >= maxDocs) continue
+      if (isImage) currentPhotoCount++
+      if (isDoc) currentDocCount++
+
+      // Quality pre-check for photos (T-107): hard-reject tiny images,
+      // hold soft issues (blur/exposure) for the customer's decision
+      let qualityIssues: string[] | undefined
+      if (isImage) {
+        const quality = await assessImageQuality(file)
+        if (!quality.ok) {
+          setRejectMessage(quality.issues[0]?.message || 'This photo could not be used.')
+          currentPhotoCount--
+          continue
+        }
+        if (quality.issues.length > 0) {
+          qualityIssues = quality.issues.map((i) => i.message)
+        }
+      }
 
       // Create preview
       const previewUrl = URL.createObjectURL(file)
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`
 
-      // Add to list with pending status
+      // Add to list — photos with soft quality issues wait for the customer's
+      // decision (retake vs use anyway) before uploading
       const newFile: UploadedFile = {
         id: tempId,
         assetId: '',
         file,
         previewUrl,
-        status: 'pending',
+        status: qualityIssues ? 'needs_review' : 'pending',
         progress: 0,
+        angleId: fileAngleId,
+        qualityIssues,
       }
 
       setFiles((prev) => [...prev, newFile])
 
-      // Start upload
-      try {
-        // 1. Initialize upload
-        const initResponse = await fetch('/api/public/uploads/init', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tenantKey,
-            files: [{ fileName: file.name, contentType: file.type, sizeBytes: file.size }],
-          }),
-        })
-
-        const initData = await initResponse.json()
-
-        if (!initResponse.ok || !initData.uploads?.[0]) {
-          throw new Error(initData.error?.message || 'Failed to initialize upload')
-        }
-
-        const { assetId, uploadUrl } = initData.uploads[0]
-
-        // Update with assetId
-        setFiles((prev) =>
-          prev.map((f) =>
-            f.id === tempId ? { ...f, assetId, status: 'uploading' as const } : f
-          )
-        )
-
-        // 2. Upload file to R2 (or fallback endpoint)
-        const uploadResponse = await fetch(uploadUrl, {
-          method: 'PUT',
-          body: file,
-          headers: { 'Content-Type': file.type },
-        })
-
-        if (!uploadResponse.ok) {
-          throw new Error('Upload failed')
-        }
-
-        // Mark as complete
-        setFiles((prev) =>
-          prev.map((f) =>
-            f.id === tempId ? { ...f, status: 'complete' as const, progress: 100 } : f
-          )
-        )
-      } catch (err) {
-        // Mark as error
-        setFiles((prev) =>
-          prev.map((f) =>
-            f.id === tempId
-              ? { ...f, status: 'error' as const, error: err instanceof Error ? err.message : 'Upload failed' }
-              : f
-          )
-        )
+      if (!qualityIssues) {
+        await startUpload(tempId, file)
       }
     }
 
@@ -1328,6 +1375,15 @@ function FileUploadStep({
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
+  }
+
+  function handleUseAnyway(fileId: string) {
+    const target = files.find((f) => f.id === fileId)
+    if (!target) return
+    setFiles((prev) =>
+      prev.map((f) => (f.id === fileId ? { ...f, status: 'pending' as const } : f))
+    )
+    startUpload(fileId, target.file)
   }
 
   function handleRemove(fileId: string) {
@@ -1340,8 +1396,23 @@ function FileUploadStep({
     })
   }
 
-  const hasMinPhotos = photoCount >= minPhotos
-  const canContinue = hasMinPhotos && !isUploading && files.every((f) => f.status !== 'uploading')
+  function openPickerForAngle(angleId: string | null) {
+    pendingAngleRef.current = angleId
+    fileInputRef.current?.click()
+  }
+
+  const filledAngleIds = new Set(
+    files.filter((f) => f.angleId && f.status !== 'error').map((f) => f.angleId)
+  )
+  const hasGuidedCapture = requiredAngles.length > 0
+
+  const settledPhotoCount = files.filter(
+    (f) => f.file.type.startsWith('image/') && (f.status === 'complete' || f.status === 'uploading' || f.status === 'pending')
+  ).length
+  const hasUnresolvedReview = files.some((f) => f.status === 'needs_review')
+  const hasMinPhotos = settledPhotoCount >= minPhotos
+  const canContinue =
+    hasMinPhotos && !isUploading && !hasUnresolvedReview && files.every((f) => f.status !== 'uploading')
 
   return (
     <div className="p-6">
@@ -1356,6 +1427,65 @@ function FileUploadStep({
       {photoGuidance && (
         <div className="mb-4 p-3 bg-primary-light border border-primary/20 rounded-lg">
           <p className="text-sm text-blue-800">{photoGuidance}</p>
+        </div>
+      )}
+
+      {/* Guided capture slots (T-107): one card per configured angle */}
+      {hasGuidedCapture && (
+        <div className="mb-4">
+          <p className="text-xs font-medium text-text-secondary mb-2">
+            For the most accurate quote, we need these shots ({filledAngleIds.size} of{' '}
+            {requiredAngles.length} added):
+          </p>
+          <div className="space-y-2">
+            {requiredAngles.map((angle) => {
+              const filled = filledAngleIds.has(angle.id)
+              const slotFile = files.find((f) => f.angleId === angle.id && f.status !== 'error')
+              return (
+                <button
+                  key={angle.id}
+                  type="button"
+                  onClick={() => !filled && canAddPhotos && openPickerForAngle(angle.id)}
+                  disabled={filled || !canAddPhotos}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
+                    filled
+                      ? 'border-green-300 bg-green-50'
+                      : 'border-dashed border-border hover:border-primary/50 hover:bg-gray-50'
+                  }`}
+                >
+                  {filled && slotFile ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={slotFile.previewUrl}
+                      alt={angle.label}
+                      className="w-10 h-10 rounded object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <span className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center flex-shrink-0 text-lg">
+                      📷
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-text-primary">
+                      {angle.label}
+                      {filled && <span className="ml-2 text-green-600">✓</span>}
+                    </span>
+                    {angle.guidance && !filled && (
+                      <span className="block text-xs text-text-muted">{angle.guidance}</span>
+                    )}
+                  </span>
+                  {!filled && <span className="text-xs font-medium text-primary flex-shrink-0">Add photo</span>}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Hard-rejected photo message (too small etc.) */}
+      {rejectMessage && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-800">{rejectMessage}</p>
         </div>
       )}
 
@@ -1394,8 +1524,29 @@ function FileUploadStep({
               </div>
             )}
 
+            {/* Quality review overlay (T-107): retake vs use anyway */}
+            {file.status === 'needs_review' && (
+              <div className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center p-1.5 text-center">
+                <span className="text-amber-300 text-[10px] leading-tight mb-1.5">
+                  {file.qualityIssues?.[0] || 'This photo may be hard to analyse.'}
+                </span>
+                <button
+                  onClick={() => handleRemove(file.id)}
+                  className="w-full mb-1 px-1 py-1 bg-white text-gray-900 rounded text-[10px] font-semibold hover:bg-gray-100"
+                >
+                  Retake
+                </button>
+                <button
+                  onClick={() => handleUseAnyway(file.id)}
+                  className="w-full px-1 py-1 bg-transparent border border-white/60 text-white rounded text-[10px] hover:bg-white/10"
+                >
+                  Use anyway
+                </button>
+              </div>
+            )}
+
             {/* Remove button */}
-            {file.status !== 'uploading' && (
+            {file.status !== 'uploading' && file.status !== 'needs_review' && (
               <button
                 onClick={() => handleRemove(file.id)}
                 className="absolute top-1 right-1 w-6 h-6 bg-black bg-opacity-50 rounded-full text-white text-sm flex items-center justify-center hover:bg-opacity-75"
@@ -1406,26 +1557,28 @@ function FileUploadStep({
           </div>
         ))}
 
-        {/* Add button */}
-        {(canAddPhotos || canAddDocs) && (
-          <label className="aspect-square bg-gray-100 rounded-lg border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-gray-50">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={[
-                ...(canAddPhotos ? ['image/jpeg', 'image/png', 'image/webp'] : []),
-                ...(canAddDocs ? ['application/pdf'] : []),
-              ].join(',')}
-              multiple
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <div className="text-center">
-              <span className="text-2xl text-text-muted">+</span>
-              <p className="text-xs text-text-muted mt-1">Add</p>
-            </div>
-          </label>
-        )}
+        {/* Add button (shared input also serves the guided slots) */}
+        <label
+          className={`aspect-square bg-gray-100 rounded-lg border-2 border-dashed border-border items-center justify-center cursor-pointer hover:bg-gray-50 ${
+            canAddPhotos || canAddDocs ? 'flex' : 'hidden'
+          }`}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={[
+              ...(canAddPhotos ? ['image/jpeg', 'image/png', 'image/webp'] : []),
+              ...(canAddDocs ? ['application/pdf'] : []),
+            ].join(',')}
+            multiple
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          <div className="text-center">
+            <span className="text-2xl text-text-muted">+</span>
+            <p className="text-xs text-text-muted mt-1">Add</p>
+          </div>
+        </label>
       </div>
 
       {/* Status text */}
@@ -1552,15 +1705,135 @@ function SubmittingState() {
   )
 }
 
-function SuccessState({ quoteUrl }: { quoteUrl: string }) {
+function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string }) {
+  // T-108: poll quote status while the customer is still here — if the quote
+  // needs a quick confirmation, route them to it in-flow instead of waiting
+  // for an email they may never open.
+  const [liveStatus, setLiveStatus] = useState<string | null>(null)
+  // T-109: provisional range shown the moment pricing is computed
+  const [range, setRange] = useState<{ low: number; high: number; currency: string } | null>(null)
+
+  const token = (() => {
+    try {
+      return new URL(quoteUrl, window.location.origin).searchParams.get('token')
+    } catch {
+      return null
+    }
+  })()
+  const clarifyUrl = token ? `/q/${quoteId}/clarify?token=${token}` : null
+
+  useEffect(() => {
+    if (!token) return
+    let cancelled = false
+    let polls = 0
+    const maxPolls = 20 // ~60s of polling, then fall back to email
+
+    const interval = setInterval(async () => {
+      polls++
+      if (polls > maxPolls) {
+        clearInterval(interval)
+        return
+      }
+      try {
+        const res = await fetch(`/api/public/quotes/${quoteId}?token=${token}&poll=1`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (cancelled) return
+        if (data.provisional?.rangeLow) {
+          setRange({
+            low: data.provisional.rangeLow,
+            high: data.provisional.rangeHigh,
+            currency: data.pricing?.currency || 'GBP',
+          })
+        }
+        if (['awaiting_clarification', 'pending_review', 'sent', 'viewed'].includes(data.status)) {
+          setLiveStatus(data.status)
+          if (data.status === 'sent' || data.status === 'viewed') clearInterval(interval)
+        }
+      } catch {
+        // Polling is best-effort; email remains the fallback channel
+      }
+    }, 3000)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [quoteId, token])
+
+  const currencySymbol = range
+    ? { GBP: '£', USD: '$', EUR: '€', CAD: '$', AUD: '$', NZD: '$' }[range.currency] || range.currency
+    : ''
+  const rangeDisplay = range
+    ? `${currencySymbol}${range.low.toLocaleString()} – ${currencySymbol}${range.high.toLocaleString()}`
+    : null
+
+  // Quote needs a quick confirmation — bring the customer to it now
+  if (liveStatus === 'awaiting_clarification' && clarifyUrl) {
+    return (
+      <div className="text-center py-12 px-6">
+        <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-2xl">✋</span>
+        </div>
+        <h3 className="text-lg font-semibold text-text-primary mb-2">One quick check</h3>
+        {rangeDisplay && (
+          <p className="text-2xl font-bold text-text-primary mb-2">{rangeDisplay}</p>
+        )}
+        <p className="text-sm text-text-secondary mb-6">
+          {rangeDisplay
+            ? 'That’s our estimated range — confirm a couple of details to get your exact quote in seconds.'
+            : 'We’ve analysed your request — just confirm a couple of details and your quote will be ready in seconds.'}
+        </p>
+        <a
+          href={clarifyUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover"
+        >
+          Confirm Details
+        </a>
+      </div>
+    )
+  }
+
+  // Quote under business review — show the range so the customer isn't left with nothing
+  if (liveStatus === 'pending_review' && rangeDisplay) {
+    return (
+      <div className="text-center py-12 px-6">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-secondary text-2xl">✓</span>
+        </div>
+        <h3 className="text-lg font-semibold text-text-primary mb-2">Your estimated range</h3>
+        <p className="text-2xl font-bold text-text-primary mb-2">{rangeDisplay}</p>
+        <p className="text-sm text-text-secondary mb-6">
+          We&apos;re double-checking the details — your final quote will arrive by email shortly.
+        </p>
+        <a
+          href={quoteUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover"
+        >
+          View Estimate
+        </a>
+      </div>
+    )
+  }
+
+  const isReady = liveStatus === 'sent' || liveStatus === 'viewed'
+
   return (
     <div className="text-center py-12 px-6">
       <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
         <span className="text-secondary text-2xl">✓</span>
       </div>
-      <h3 className="text-lg font-semibold text-text-primary mb-2">Request Submitted!</h3>
+      <h3 className="text-lg font-semibold text-text-primary mb-2">
+        {isReady ? 'Your quote is ready!' : 'Request Submitted!'}
+      </h3>
       <p className="text-sm text-text-secondary mb-6">
-        We&apos;re preparing your quote. You&apos;ll receive it shortly.
+        {isReady
+          ? 'Your personalised quote has been prepared — take a look.'
+          : "We're preparing your quote. You'll receive it shortly."}
       </p>
       <a
         href={quoteUrl}

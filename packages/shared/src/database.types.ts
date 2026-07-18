@@ -594,6 +594,15 @@ export interface ClarificationQuestion {
   question: string
   /** Optional suggested answer options */
   options?: string[]
+  /**
+   * Question style (T-108). 'confirm_value' renders as one-tap confirmation of
+   * the AI's extracted value; 'text' (or absent) renders as a free-text/options question.
+   */
+  type?: 'confirm_value' | 'text'
+  /** The AI-extracted value being confirmed (confirm_value questions) */
+  aiValue?: string | number
+  /** What the AI saw that produced this value — shown to build customer trust */
+  evidence?: string
 }
 
 /** Customer's answer to a clarification question */

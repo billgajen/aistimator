@@ -157,7 +157,50 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
                   {q.question}
                 </label>
 
-                {q.options && q.options.length > 0 ? (
+                {q.type === 'confirm_value' && q.aiValue !== undefined ? (
+                  /* T-108: one-tap confirmation of the AI's extracted value */
+                  <div className="space-y-2">
+                    {q.evidence && (
+                      <p className="text-xs text-zinc-500 italic">
+                        What we saw: {q.evidence}
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAnswers(prev => ({ ...prev, [q.id]: String(q.aiValue) }))}
+                        className={`flex-1 px-4 py-3 rounded-md border text-sm font-semibold transition-colors ${
+                          answers[q.id] === String(q.aiValue)
+                            ? 'border-green-600 bg-green-50 text-green-800'
+                            : 'border-zinc-200 text-zinc-900 hover:border-zinc-400'
+                        }`}
+                      >
+                        ✓ Yes, {String(q.aiValue)} is right
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAnswers(prev => ({ ...prev, [q.id]: prev[q.id] === String(q.aiValue) || prev[q.id] === undefined ? '' : prev[q.id] || '' }))}
+                        className={`flex-1 px-4 py-3 rounded-md border text-sm font-semibold transition-colors ${
+                          answers[q.id] !== undefined && answers[q.id] !== String(q.aiValue)
+                            ? 'border-zinc-900 bg-zinc-50 text-zinc-900'
+                            : 'border-zinc-200 text-zinc-900 hover:border-zinc-400'
+                        }`}
+                      >
+                        No, let me correct it
+                      </button>
+                    </div>
+                    {answers[q.id] !== undefined && answers[q.id] !== String(q.aiValue) && (
+                      <input
+                        type="text"
+                        placeholder="Enter the correct value..."
+                        value={answers[q.id] || ''}
+                        onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                        autoFocus
+                        className="w-full px-3 py-2 border border-zinc-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                      />
+                    )}
+                  </div>
+                ) : q.options && q.options.length > 0 ? (
                   <div className="space-y-2">
                     {q.options.map((option) => (
                       <label key={option} className="flex items-center gap-3 cursor-pointer">

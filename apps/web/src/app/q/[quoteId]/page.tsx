@@ -146,6 +146,65 @@ export default function QuotePage({ params }: QuotePageProps) {
   const showAcceptButton = acceptQuoteEnabled !== false
   const canSubmitFeedback = ['sent', 'viewed', 'revised'].includes(status) && !feedbackSubmitted && !accepted
 
+  // T-109 range-first: provisional quotes show an estimated range, not exact pricing
+  if (quote.provisional) {
+    const { rangeLow, rangeHigh, reason } = quote.provisional
+    const symbol = { GBP: '£', USD: '$', EUR: '€', CAD: '$', AUD: '$', NZD: '$' }[pricing.currency] || pricing.currency
+    const fmt = (n: number) => `${symbol}${n.toLocaleString()}`
+    return (
+      <div className="min-h-screen bg-background py-8 px-4">
+        <div className="max-w-2xl mx-auto">
+          <div className="animate-fade-in-up bg-surface rounded-warm-2xl shadow-warm border border-border p-6 mb-6">
+            <div className="flex items-center justify-between">
+              <h1 className="font-display text-xl font-bold text-text-primary">{business.name}</h1>
+              <StatusBadge status={status} />
+            </div>
+          </div>
+
+          <div className="animate-fade-in-up animation-delay-100 bg-surface rounded-warm-2xl shadow-warm border border-border p-6 text-center">
+            <h2 className="font-display text-lg font-semibold text-text-primary mb-1">
+              Your estimate, {customer.name}
+            </h2>
+            <p className="text-sm text-text-muted mb-6">Estimated price range</p>
+            <p className="font-display text-4xl font-extrabold tracking-tight text-text-primary mb-6">
+              {fmt(rangeLow)} <span className="text-text-muted font-normal">–</span> {fmt(rangeHigh)}
+            </p>
+
+            {reason === 'awaiting_clarification' ? (
+              <>
+                <p className="text-sm text-text-secondary mb-5 max-w-md mx-auto">
+                  Confirm a couple of details and we&apos;ll turn this range into your exact quote —
+                  it takes less than a minute.
+                </p>
+                <a
+                  href={`/q/${quoteId}/clarify?token=${token}`}
+                  className="inline-block px-6 py-3 bg-primary text-white font-semibold rounded-warm-lg hover:opacity-90 transition-opacity"
+                >
+                  Confirm Details → Get Exact Quote
+                </a>
+              </>
+            ) : (
+              <p className="text-sm text-text-secondary max-w-md mx-auto">
+                {business.name} is double-checking the details of your quote. You&apos;ll receive
+                the final version by email shortly — no action needed.
+              </p>
+            )}
+
+            {pricing.notes && pricing.notes.length > 0 && (
+              <div className="mt-6 pt-5 border-t border-border text-left">
+                {pricing.notes.map((note, i) => (
+                  <p key={i} className="text-xs text-text-muted mb-1">
+                    {note}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background py-8 px-4">
       <div className="max-w-2xl mx-auto">

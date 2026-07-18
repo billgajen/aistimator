@@ -111,6 +111,7 @@ export async function evaluateQualityGate(
   const questions = await generateClarificationQuestions(
     signalsNeedingClarification.slice(0, 2),
     input.serviceName,
+    structuredSignals,
     gemini
   )
 
@@ -193,10 +194,52 @@ function identifySignalsForClarification(
 }
 
 /**
- * Generate targeted clarification questions using AI.
- * Falls back to template-based questions if AI is unavailable.
+ * Generate targeted clarification questions.
+ *
+ * T-108 (AD-024-consistent): when the AI extracted a concrete value, the
+ * question is built DETERMINISTICALLY by code as a one-tap confirmation of
+ * that value ("We counted 4 rooms — is that right?"), with the AI's evidence
+ * shown. A confirmed value becomes a 1.0-confidence customer signal (AD-002).
+ * AI-generated free-text questions remain only for signals with no value.
  */
 async function generateClarificationQuestions(
+  signalsToAsk: Array<{ key: string; reason: string }>,
+  serviceName: string,
+  structuredSignals: ExtractedSignalsV2,
+  gemini: GeminiClient | null
+): Promise<ClarificationQuestion[]> {
+  if (signalsToAsk.length === 0) return []
+
+  const confirmQuestions: ClarificationQuestion[] = []
+  const needsAiQuestion: Array<{ key: string; reason: string }> = []
+
+  for (const s of signalsToAsk) {
+    const signal = structuredSignals.signals.find(sig => sig.key === s.key)
+    const value = signal?.value
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      const label = s.key.replace(/_/g, ' ')
+      confirmQuestions.push({
+        id: `cq_${Date.now()}_c${confirmQuestions.length}`,
+        targetSignalKey: s.key,
+        question: `From your photos and details, we estimated ${label}: ${value}. Is that right?`,
+        type: 'confirm_value',
+        aiValue: typeof value === 'number' ? value : String(value),
+        evidence: signal?.evidence,
+      })
+    } else {
+      needsAiQuestion.push(s)
+    }
+  }
+
+  const textQuestions = await generateTextQuestions(needsAiQuestion, serviceName, gemini)
+  return [...confirmQuestions, ...textQuestions]
+}
+
+/**
+ * AI-generated free-text questions for signals with no extracted value.
+ * Falls back to template-based questions if AI is unavailable.
+ */
+async function generateTextQuestions(
   signalsToAsk: Array<{ key: string; reason: string }>,
   serviceName: string,
   gemini: GeminiClient | null
