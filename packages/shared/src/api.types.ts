@@ -14,6 +14,7 @@ import type {
   FeedbackType,
   LearningPattern,
   ClarificationQuestion,
+  TakeoffEntry,
 } from './database.types'
 
 // ============================================================================
@@ -149,6 +150,10 @@ export interface QuoteViewResponse {
   }
   /** Questions to answer when status is awaiting_clarification (T-108) */
   clarificationQuestions?: ClarificationQuestion[]
+  /** T-122: quantity takeoff with measurement methods */
+  takeoff?: TakeoffEntry[]
+  /** T-122: human-facing estimate reference (EST-2026-XXXXXX) */
+  reference?: string
   breakdown: Array<{
     label: string
     amount: number

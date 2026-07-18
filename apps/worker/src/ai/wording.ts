@@ -24,6 +24,10 @@ export interface QuoteContent {
   exclusions: string[]
   notes: string
   validityDays: number
+  /** T-122: quantity takeoff with measurement methods (attached post-wording) */
+  takeoff?: import('@estimator/shared').TakeoffEntry[]
+  /** T-122: human-facing estimate reference */
+  reference?: string
 }
 
 /**

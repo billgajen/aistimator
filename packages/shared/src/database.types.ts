@@ -517,8 +517,26 @@ export interface QuotePricing {
   }
 }
 
+/**
+ * T-122: one line of the quantity takeoff — what was priced, how much, and
+ * HOW the quantity was established (the measurement audit trail, customer-facing)
+ */
+export interface TakeoffEntry {
+  item: string
+  quantity?: number
+  unit?: string
+  rate?: number
+  amount: number
+  /** How the quantity/price was established — measurement evidence, "Provided by you", etc. */
+  method: string
+}
+
 export interface QuoteContent {
   scopeSummary?: string
+  /** T-122: quantity takeoff with measurement methods */
+  takeoff?: TakeoffEntry[]
+  /** T-122: human-facing estimate reference, e.g. EST-2026-4F2A1C */
+  reference?: string
   assumptions?: string[]
   exclusions?: string[]
   notes?: string

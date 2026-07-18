@@ -29,6 +29,24 @@
 
 ---
 
+### 2026-07-18: T-122 The Document — Quantity Takeoff, Reference, Grade on the Page
+
+**Context:** The customer-facing document becomes a professional estimate that shows its work — the flagship differentiator no competitor has.
+
+**Implementation:**
+- **`apps/worker/src/takeoff.ts` (new, pure):** `buildTakeoff` turns the pricing trace + measurement evidence into customer-facing lines — each with item, quantity × rate, amount, and **method**: the measurement evidence string for AI-measured quantities (the senior surveyor's audit note faces the customer), "Quantity provided by you" for form answers, "Fixed quantity"/"Standard charge" for fixed lines, "Estimated — to be confirmed" for fallbacks. Tax excluded (renders in totals). `buildReference` → deterministic human-facing ref `EST-{year}-{id tail}` (no counters, no migrations).
+- **Worker:** takeoff + reference attached to content after wording; stored in content_json.
+- **Two AD-016 traps found live and fixed:** BOTH final stores enumerate fields — content_json dropped `takeoff`/`reference` and pricing_json dropped `estimate` until added explicitly. Warning comments left at both sites.
+- **Delivery:** public GET passes `takeoff` (withheld while provisional — exact amounts) + `reference`; quote page gains a document header block (Reference · Prepared for · Valid until) and the **Measurement & takeoff** section.
+
+**Live on the user's real quote:** header `EST-2026-5110BD`; takeoff rendered with the senior audit note as the walls method (one run: *"Included only the white rendered sections… deducting all doors and windows; Junior 1 incorrectly claimed to include brickwork…"*). A later weaker run (ensemble failed → envelope fallback) correctly rendered **Ⓒ Concept £1,003–£2,753** with method "Adjusted to typical range 27–108" — the grade honestly tracks each run's evidence quality.
+
+**Tests:** 4 new (`takeoff.test.ts`) — evidence-as-method, form labelling, zero-line/tax exclusion, reference format. Suite: 238 passing.
+
+**Files:** `apps/worker/src/takeoff.ts` (new), `apps/worker/src/quote-processor.ts`, `apps/worker/src/ai/wording.ts`, `packages/shared/src/database.types.ts`, `packages/shared/src/api.types.ts`, `apps/web/src/app/api/public/quotes/[quoteId]/route.ts`, `apps/web/src/app/q/[quoteId]/page.tsx`, `apps/worker/src/__tests__/takeoff.test.ts` (new)
+
+---
+
 ### 2026-07-18: T-120 Interval Pricing + Estimate Grades, T-121 VOI Questioning (M6+M7)
 
 **Context:** Quantities stop pretending to be points; quotes stop pretending to be exact. Every quote now declares its precision class (AACE-style) and clarification questions fire only where the money is.

@@ -184,6 +184,9 @@ export async function GET(
         quote.clarification_questions_json && {
           clarificationQuestions: quote.clarification_questions_json,
         }),
+      // T-122: takeoff (withheld while provisional — exact amounts) + reference
+      ...(!isProvisional && content.takeoff?.length && { takeoff: content.takeoff }),
+      ...(content.reference && { reference: content.reference }),
       pricing: isProvisional
         ? {
             // Exact figures withheld while provisional — range shown instead

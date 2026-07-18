@@ -54,6 +54,7 @@ import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
 import type { QualityGateResult } from '@estimator/shared'
 import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking } from '@estimator/shared'
 import { measureQuantities, decideAdjudication, adjudicateMeasurement } from './ai/measurement'
+import { buildTakeoff, buildReference } from './takeoff'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@estimator/shared'
@@ -1323,6 +1324,15 @@ export async function processQuote(
     content = generateWordingFallback(wordingContext)
   }
 
+  // T-122: attach the quantity takeoff (measurement audit trail, customer-facing)
+  // and the human-facing estimate reference to the document content
+  content.takeoff = buildTakeoff({
+    trace: pricingTrace,
+    structuredSignals,
+    workSteps: rulesWithWorkSteps.workSteps || [],
+  })
+  content.reference = buildReference(quoteId, new Date().getFullYear())
+
   // 4.5 Detect cross-service mentions and calculate pricing (with AI + keyword fallback)
   // Skip if triage says no cross-service check needed
   const crossServiceRecommendations = triageDecision.crossServiceCheck
@@ -1653,6 +1663,9 @@ export async function processQuote(
         taxAmount: pricing.taxAmount,
         total: pricing.total,
         breakdown: pricing.breakdown,
+        // T-120: estimate grade + interval (AD-016: enumerated store — new
+        // pricing fields MUST be added here or they silently vanish)
+        ...(pricing.estimate && { estimate: pricing.estimate }),
         // Include pricing notes (warnings, site visit recommendations) — deduplicated
         ...(pricing.notes && pricing.notes.length > 0 && {
           notes: deduplicateNotes(pricing.notes),
@@ -1680,6 +1693,10 @@ export async function processQuote(
         exclusions: content.exclusions,
         notes: content.notes,
         validityDays: content.validityDays,
+        // T-122: takeoff + reference (AD-016: this store enumerates fields —
+        // new content fields MUST be added here or they silently vanish)
+        takeoff: content.takeoff,
+        reference: content.reference,
         // Store signals for reference (not displayed to customer)
         _signals: {
           confidence: signals.confidence,

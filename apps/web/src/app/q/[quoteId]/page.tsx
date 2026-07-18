@@ -142,7 +142,7 @@ export default function QuotePage({ params }: QuotePageProps) {
     return null
   }
 
-  const { business, customer, pricing, notes, validUntil, assets, status, actions, crossServicePricing, signalRecommendations, version: quoteVersion, acceptQuoteEnabled } = quote
+  const { business, customer, pricing, notes, validUntil, assets, status, actions, crossServicePricing, signalRecommendations, version: quoteVersion, acceptQuoteEnabled, takeoff, reference } = quote
   const showAcceptButton = acceptQuoteEnabled !== false
   const canSubmitFeedback = ['sent', 'viewed', 'revised'].includes(status) && !feedbackSubmitted && !accepted
 
@@ -239,6 +239,28 @@ export default function QuotePage({ params }: QuotePageProps) {
               <StatusBadge status={status} />
             </div>
           </div>
+
+          {/* T-122: document reference block */}
+          {reference && (
+            <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-2 sm:grid-cols-3 text-xs">
+              <div>
+                <span className="text-text-muted">Reference</span>
+                <p className="font-mono font-medium text-text-primary">{reference}</p>
+              </div>
+              <div>
+                <span className="text-text-muted">Prepared for</span>
+                <p className="font-medium text-text-primary">{customer.name}</p>
+              </div>
+              {validUntil && (
+                <div>
+                  <span className="text-text-muted">Valid until</span>
+                  <p className="font-medium text-text-primary">
+                    {new Date(validUntil).toLocaleDateString()}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Version indicator */}
           {quoteVersion && quoteVersion > 1 && (
@@ -377,6 +399,39 @@ export default function QuotePage({ params }: QuotePageProps) {
               )}
             </div>
           </div>
+
+          {/* T-122: quantity takeoff — every line shows HOW it was measured */}
+          {takeoff && takeoff.length > 0 && (
+            <div className="border border-border rounded-warm-lg p-4 mb-6">
+              <h3 className="text-sm font-medium text-text-primary mb-1">
+                Measurement &amp; takeoff
+              </h3>
+              <p className="text-xs text-text-muted mb-4">
+                How each part of your estimate was established.
+              </p>
+              <div className="space-y-3">
+                {takeoff.map((entry, index) => (
+                  <div key={index} className="border-b border-border/50 pb-3 last:border-0 last:pb-0">
+                    <div className="flex justify-between items-baseline text-sm">
+                      <span className="font-medium text-text-primary">{entry.item}</span>
+                      <span className="text-text-primary whitespace-nowrap">
+                        {formatCurrency(entry.amount, pricing.currency)}
+                      </span>
+                    </div>
+                    {entry.quantity !== undefined && (
+                      <p className="text-xs text-text-secondary">
+                        {entry.quantity}
+                        {entry.unit ? ` ${entry.unit}` : ''}
+                        {entry.rate !== undefined &&
+                          ` × ${formatCurrency(entry.rate, pricing.currency)}${entry.unit ? `/${entry.unit}` : ''}`}
+                      </p>
+                    )}
+                    <p className="text-xs text-text-muted italic mt-0.5">{entry.method}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Optional Extras (available addons not triggered) */}
           {pricing.availableAddons && pricing.availableAddons.length > 0 && (
