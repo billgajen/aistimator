@@ -380,6 +380,8 @@ export interface PricingRules {
   siteVisitRules?: SiteVisitRules
   /** Item catalog for inventory-based pricing (rentals, events, etc.) */
   itemCatalog?: ItemCatalogEntry[]
+  /** Work-step pricing — persisted in rules_json by the services API (T-115: now typed) */
+  workSteps?: WorkStepConfig[]
 }
 
 export interface ServicePricingRule {

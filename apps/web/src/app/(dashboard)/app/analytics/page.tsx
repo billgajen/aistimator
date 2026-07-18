@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { PageHeader } from '@/components/dashboard/EmptyState'
-import type { AnalyticsResponse, ServiceCalibration } from '@estimator/shared'
+import type { AnalyticsResponse, ServiceCalibration, ServiceBenchmark } from '@estimator/shared'
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsResponse | null>(null)
@@ -11,6 +11,13 @@ export default function AnalyticsPage() {
   const [error, setError] = useState<string | null>(null)
   // T-110: per-service pricing calibration from quote outcomes
   const [calibration, setCalibration] = useState<ServiceCalibration[] | null>(null)
+  // T-115: anonymized cross-tenant rate benchmarks (opt-in)
+  const [benchmarks, setBenchmarks] = useState<{
+    optedIn: boolean
+    currency?: string
+    benchmarks: ServiceBenchmark[]
+  } | null>(null)
+  const [optingIn, setOptingIn] = useState(false)
 
   useEffect(() => {
     async function fetchAnalytics() {
@@ -40,9 +47,40 @@ export default function AnalyticsPage() {
       }
     }
 
+    async function fetchBenchmarks() {
+      try {
+        const response = await fetch('/api/learning/benchmarks')
+        if (!response.ok) return
+        setBenchmarks(await response.json())
+      } catch {
+        // Non-fatal
+      }
+    }
+
     fetchAnalytics()
     fetchCalibration()
+    fetchBenchmarks()
   }, [])
+
+  // T-115: opt in to benchmark sharing, then refetch
+  async function handleBenchmarkOptIn() {
+    setOptingIn(true)
+    try {
+      const res = await fetch('/api/tenant', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ benchmarksOptIn: true }),
+      })
+      if (res.ok) {
+        const refreshed = await fetch('/api/learning/benchmarks')
+        if (refreshed.ok) setBenchmarks(await refreshed.json())
+      }
+    } catch {
+      // Non-fatal
+    } finally {
+      setOptingIn(false)
+    }
+  }
 
   // Format period to readable month/year
   const formatPeriod = (yyyymm: string) => {
@@ -217,6 +255,73 @@ export default function AnalyticsPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Market benchmarks (T-115) — anonymized, opt-in, informational only */}
+      {benchmarks && (
+        <div className="mb-8 rounded-warm-lg bg-surface p-6 shadow-warm">
+          <h3 className="text-lg font-semibold text-text-primary">Market Benchmarks</h3>
+          {!benchmarks.optedIn ? (
+            <div className="mt-2">
+              <p className="text-sm text-text-secondary">
+                See what similar businesses charge per room, square metre or hour — anonymized
+                across businesses in your currency. To see benchmarks, you share your own rates
+                into the same anonymous pool (nothing identifies your business).
+              </p>
+              <button
+                type="button"
+                onClick={handleBenchmarkOptIn}
+                disabled={optingIn}
+                className="mt-3 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {optingIn ? 'Enabling…' : 'Share & See Benchmarks'}
+              </button>
+            </div>
+          ) : benchmarks.benchmarks.length === 0 ? (
+            <p className="mt-2 text-sm text-text-muted">
+              Not enough comparable businesses yet — benchmarks appear once at least 3 other
+              businesses with similar services and your currency are sharing rates.
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {benchmarks.benchmarks.map((b, i) => {
+                const inRange = b.yourRate >= b.p25 && b.yourRate <= b.p75
+                const position =
+                  b.yourRate < b.p25 ? 'below' : b.yourRate > b.p75 ? 'above' : 'within'
+                return (
+                  <div key={`${b.serviceId}-${b.unit}-${i}`} className="rounded-lg border border-border p-4">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <p className="font-medium text-text-primary">
+                        {b.serviceName} — per {b.unit}
+                      </p>
+                      <p className="text-xs text-text-muted">
+                        {b.sampleTenants} similar businesses
+                      </p>
+                    </div>
+                    <p className="mt-1 text-sm text-text-secondary">
+                      Similar businesses charge{' '}
+                      <span className="font-semibold text-text-primary">
+                        {b.p25.toLocaleString()}–{b.p75.toLocaleString()}
+                      </span>{' '}
+                      per {b.unit} (median {b.median.toLocaleString()}). You charge{' '}
+                      <span
+                        className={`font-semibold ${
+                          inRange ? 'text-secondary' : 'text-amber-600'
+                        }`}
+                      >
+                        {b.yourRate.toLocaleString()}
+                      </span>
+                      {position !== 'within' && ` — ${position} the typical range`}.
+                    </p>
+                  </div>
+                )
+              })}
+              <p className="text-xs text-text-muted">
+                Informational only — benchmarks never change your pricing.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

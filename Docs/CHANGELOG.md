@@ -29,6 +29,30 @@
 
 ---
 
+### 2026-07-18: T-115 — Cross-Tenant Rate Benchmarks (V2 roadmap complete)
+
+**Context:** Final V2 roadmap ticket. "Similar decorators charge £10–14/sqm" — anonymized market context that becomes more valuable as painting tenants accumulate. Informational only; never feeds pricing (AD-001).
+
+**Privacy model (the core of this ticket):**
+- **Opt-in with reciprocity:** you see benchmarks only while sharing your own rates (`tenants.benchmarks_opt_in`, migration 21, default false). Opt-in happens at the point of value (analytics page) with explicit copy about what's shared.
+- **k-anonymity:** a benchmark requires ≥3 distinct OTHER tenants; below that, nothing renders.
+- **Per-tenant dedup:** one representative rate (median of their matching steps) per tenant per group — a tenant with many similar steps can neither skew the distribution nor bypass the k threshold.
+- **Same-currency only** — mixing GBP/USD would corrupt medians.
+- Cross-tenant reads use the admin client server-side, but ONLY aggregates (P25/median/P75 + tenant count) leave the endpoint.
+
+**Implementation:**
+- **`packages/shared/src/benchmarks.ts` (new):** pure math — `normalizeUnitLabel` (sqm/sq m/m2/square metre → one key; rooms/hours/walls likewise), `serviceTokens` (stopword-filtered name matching), `computeBenchmarks` (grouping + percentiles + guards).
+- **`GET /api/learning/benchmarks` (new):** requester's per-unit work-step rates vs. opted-in same-currency tenants' comparable services (unit match + name-token overlap). Returns `{optedIn, benchmarks}`.
+- **`PATCH /api/tenant`:** accepts `benchmarksOptIn`.
+- **Analytics page:** "Market Benchmarks" card — opt-in prompt → "Similar businesses charge 15–22 per sqm (median 19). You charge 18." with in/below/above-range coloring, sample counts, and "benchmarks never change your pricing" footer.
+- Shared `PricingRules` type now declares `workSteps?` (was persisted-but-untyped, AD-016 pattern — now typed).
+
+**Tests:** 10 new (`benchmarks.test.ts`) — k-anonymity enforcement, per-tenant dedup under adversarial shapes, unit-variant matching, token filtering, zero-rate guards. Full suite: 191 passing.
+
+**Files:** `supabase/migrations/00000000000021_benchmarks_opt_in.sql` (new), `packages/shared/src/benchmarks.ts` (new), `packages/shared/src/index.ts`, `packages/shared/src/database.types.ts`, `apps/web/src/app/api/learning/benchmarks/route.ts` (new), `apps/web/src/app/api/tenant/route.ts`, `apps/web/src/app/(dashboard)/app/analytics/page.tsx`, `apps/worker/src/__tests__/benchmarks.test.ts` (new)
+
+---
+
 ### 2026-07-18: T-114 — Painting & Decorating Pack + Landing Page (Phase 4, V2 Strategy)
 
 **Context:** The launch vertical (decided 2026-07-18, strategy §3). First pack in the T-113 registry, and the vertical landing page carrying the speed-to-lead pitch. All pack content is editable-default DATA in GBP; no vertical logic entered the engine.

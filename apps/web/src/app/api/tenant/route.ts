@@ -133,6 +133,7 @@ export async function PUT(request: NextRequest) {
       notificationEmail,
       defaultTermsText,
       templateJson,
+      benchmarksOptIn,
     } = body as {
       name?: string
       currency?: string
@@ -144,6 +145,7 @@ export async function PUT(request: NextRequest) {
       notificationEmail?: string | null
       defaultTermsText?: string | null
       templateJson?: Partial<TenantTemplate>
+      benchmarksOptIn?: boolean
     }
 
     // Build update object
@@ -186,6 +188,10 @@ export async function PUT(request: NextRequest) {
         )
       }
       updates.tax_rate = rate
+    }
+
+    if (benchmarksOptIn !== undefined) {
+      updates.benchmarks_opt_in = Boolean(benchmarksOptIn)
     }
 
     if (serviceAreaMode !== undefined) {

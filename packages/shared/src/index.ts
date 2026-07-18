@@ -9,6 +9,9 @@ export * from './api.types'
 // Re-export outcome calibration (T-110)
 export * from './calibration'
 
+// Re-export rate benchmarks (T-115)
+export * from './benchmarks'
+
 // ID prefixes for stable, readable IDs
 export const ID_PREFIXES = {
   tenant: 'tnt_',
