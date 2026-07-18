@@ -23,6 +23,7 @@ const COMPILE_SYSTEM_PROMPT = `You are an expert pricing engineer. A business ow
 
 CORE RULES:
 1. NEVER invent prices, rates, thresholds, or percentages that the owner did not state. If a number is missing or unclear, omit that item from the config and add a specific question to "ambiguities".
+1b. EVERY instruction in the description MUST be either applied or asked about — NEVER silently ignored. When the owner refers to an existing charge colloquially ("the room rate", "my hourly rate", "the per-metre price", "the call-out fee"), map it to the closest matching item in currentConfig by unit and meaning (e.g. "room rate" → the per-room work step; "call-out fee" → baseFee) and apply the change to it. If no confident match exists, add an ambiguity naming the options: "By 'room rate' did you mean 'Walls & ceilings' (£200/room)?"
 2. Every chargeable item in the description becomes a work step:
    - Flat charges → costType "fixed" with defaultCost
    - Rates ("£12 per sqm", "$50/hour") → costType "per_unit" (or "per_hour") with defaultCost = the rate and a clear unitLabel
@@ -39,8 +40,15 @@ CORE RULES:
 8. Preserve anything in currentConfig that the description doesn't contradict — this may be a partial edit, not a rewrite.
 9. suggestedFields must contain every field referenced by a quantitySource or multiplier. expectedSignals must contain every signal referenced by a triggerSignal or ai_signal quantity source.
 
-Return ONLY JSON:
+Return ONLY JSON. The "instructions" array comes FIRST and MUST contain one entry
+per distinct instruction in the owner's description — this is your accounting: every
+instruction is either applied (say exactly where) or asked about in "ambiguities".
+An instruction that appears in neither place is a failure.
 {
+  "instructions": [
+    { "instruction": "quoted from the description", "action": "applied", "target": "which config item changed and to what" },
+    { "instruction": "...", "action": "ambiguous", "target": "why — with the matching question in ambiguities" }
+  ],
   "updatedConfig": { ...complete ServiceDraftConfig (scope/media copied from currentConfig if provided)... },
   "addons": [ { "label": "...", "price": 0, "triggerKeywords": ["..."] } ],
   "multipliers": [ { "when": { "fieldId": "...", "operator": "equals", "equals": "..." }, "multiplier": 1.2 } ],
@@ -58,6 +66,8 @@ interface CompileRequest {
 }
 
 interface CompileAIResponse {
+  /** Per-instruction accounting — forces the model to handle every instruction */
+  instructions?: Array<{ instruction?: string; action?: string; target?: string }>
   updatedConfig?: Partial<ServiceDraftConfig>
   addons?: Array<{ label?: string; price?: number; triggerKeywords?: string[] }>
   multipliers?: Array<{
@@ -165,9 +175,15 @@ export async function POST(request: NextRequest) {
       contextParts.push(`Currency: ${body.currency}`)
     }
     if (body.currentConfig) {
+      // Keys deliberately distinct from the response schema — verification found
+      // Gemini mirrors this wrapper shape into updatedConfig when they match
       contextParts.push(
         `Current configuration (preserve anything not contradicted):\n\`\`\`json\n${JSON.stringify(
-          { config: body.currentConfig, addons: body.currentAddons || [], multipliers: body.currentMultipliers || [] },
+          {
+            currentDraftConfig: body.currentConfig,
+            currentAddons: body.currentAddons || [],
+            currentMultipliers: body.currentMultipliers || [],
+          },
           null,
           2
         )}\n\`\`\``
@@ -192,20 +208,45 @@ Compile this into the pricing configuration. Remember: never invent numbers — 
     })
 
     const result = parseGeminiJson<CompileAIResponse>(responseText)
+    if (result.instructions?.length) {
+      console.log(
+        '[Compile] Instruction accounting:',
+        result.instructions.map((i) => `"${i.instruction}" -> ${i.action}: ${i.target}`).join(' | ')
+      )
+    }
+
+    // Defensive unwrap (verification finding): despite the schema, Gemini may nest
+    // the draft under updatedConfig.config (mirroring the context wrapper) and/or
+    // place addons/multipliers inside updatedConfig instead of at the top level.
+    const rawUpdated = result.updatedConfig as
+      | (Partial<ServiceDraftConfig> & {
+          config?: Partial<ServiceDraftConfig>
+          addons?: CompileAIResponse['addons']
+          multipliers?: CompileAIResponse['multipliers']
+        })
+      | undefined
+    const updatedDraft = rawUpdated?.config ?? rawUpdated
+    const responseAddons = result.addons?.length ? result.addons : rawUpdated?.addons
+    const responseMultipliers = result.multipliers?.length ? result.multipliers : rawUpdated?.multipliers
+
+    console.log(
+      '[Compile] workStep costs:',
+      (updatedDraft?.pricing?.workSteps || []).map((s) => `${s.name}=${s.defaultCost}`).join(',')
+    )
 
     // Normalize through the same pipeline every other AI-draft path uses.
     // Start from currentConfig so scope/media survive when the AI omits them.
     const merged: Partial<ServiceDraftConfig> = {
       ...body.currentConfig,
-      ...result.updatedConfig,
+      ...updatedDraft,
     }
     // Bulk limits (10 steps/fields) — pasted price lists often have many lines
     const updatedConfig = validateAndNormalizeDraftBulk(merged)
 
     return NextResponse.json({
       updatedConfig,
-      addons: normalizeAddons(result.addons),
-      multipliers: normalizeMultipliers(result.multipliers),
+      addons: normalizeAddons(responseAddons),
+      multipliers: normalizeMultipliers(responseMultipliers),
       ambiguities: (result.ambiguities || []).filter((a) => a && a.trim().length > 0).slice(0, 8),
     })
   } catch (error) {

@@ -29,6 +29,22 @@
 
 ---
 
+### 2026-07-18: Verification Findings Fixed (all live re-verified)
+
+**Context:** Fixes for every open finding from the live verification below, each re-verified in the running app.
+
+1. **Quote page: auto-applied addons now render honestly.** They're part of the subtotal, so they appear in the main breakdown with an "Added for you — {reason}" annotation and an opt-out note, instead of a "Recommended Add-ons /each — contact us to add" panel. Breakdown lines now sum to the subtotal exactly (re-verified: 60+600+120+156 = £936). The truly-optional `availableAddons` section is unchanged.
+2. **Pricing compiler: "raise the room rate to £220" now works — root cause was NOT the prompt.** Instrumentation showed Gemini returning `updatedConfig` shaped like the CONTEXT wrapper (`{config, addons, multipliers}`) — the real config sat at `updatedConfig.config` where the merge never looked, so edits were applied-then-lost. Fixes: (a) context keys renamed (`currentDraftConfig`/`currentAddons`/`currentMultipliers`) so they can't mirror into the response shape; (b) defensive unwrap of nested `config`/`addons`/`multipliers`; (c) response contract now REQUIRES a per-instruction accounting array (`instructions: [{instruction, action: applied|ambiguous, target}]`, logged server-side) — silent skips are structurally impossible; (d) prompt rule 1b maps colloquial references ("room rate", "call-out fee") to existing config items or asks. Re-verified live: "£220 per room" in the review, rush addon intact.
+3. **No-subscription plan-limit default unified.** Analytics showed 200 ("Free Plan") while enforcement/billing used 50 — all three now use `DEFAULT_TRIAL_LIMIT` from `lib/plan-limits` (analytics label now "Free trial").
+4. **Composer currency symbol** — services page fetches tenant currency and passes the symbol; £ tenants no longer see $.
+5. **WorkStepEditor infinite render loop (pre-existing, found via 410 console errors during verification):** `numberQuestions` was a fresh `.filter()` array each render, re-firing a setState effect endlessly. Memoized; console now clean with the editor mounted.
+6. **False alarm corrected:** the service wizard DOES preserve `requiredAngles` on re-save (media_config round-trips wholesale) — no fix needed; noted so it isn't "re-fixed".
+7. **Deliberately not changed:** signup still creates no subscriptions row — the unified default (fix 3) makes trial behavior consistent, and the subscription row is properly created at checkout. Revisit only if trial mechanics need their own plan record.
+
+**Files:** `apps/web/src/app/q/[quoteId]/page.tsx`, `apps/web/src/app/api/services/ai-draft/compile/route.ts`, `apps/web/src/app/api/analytics/route.ts`, `apps/web/src/app/api/billing/route.ts`, `apps/web/src/app/(dashboard)/app/services/page.tsx`, `apps/web/src/components/services/PricingComposer.tsx` (prop already existed), `apps/web/src/components/WorkStepEditor.tsx`
+
+---
+
 ### 2026-07-18: Live End-to-End Verification (local stack + real Gemini)
 
 **Context:** First live run of the entire V2 build: local Supabase (migrations 19–21 applied), Next dev, wrangler dev worker, real Gemini. Full journey driven through the browser: signup → painting template onboarding → widget submission with photo → worker pipeline → hosted quote → plan-limit probe → calibration/benchmarks → pricing composer.

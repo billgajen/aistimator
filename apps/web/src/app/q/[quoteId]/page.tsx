@@ -278,51 +278,32 @@ export default function QuotePage({ params }: QuotePageProps) {
           <div className="border-t border-border pt-6 mb-6">
             <h3 className="text-sm font-medium text-text-primary mb-4">Pricing</h3>
 
-            {/* Main work items (non-recommended) */}
+            {/* All included work items — auto-applied items are IN the subtotal,
+                so they render here with an annotation, never as "optional"
+                suggestions (verification finding: lines didn't sum to subtotal) */}
             {pricing.breakdown && pricing.breakdown.length > 0 && (
               <div className="space-y-2 mb-4">
-                {pricing.breakdown
-                  .filter((item) => !item.autoRecommended)
-                  .map((item, index) => (
-                    <div key={index} className="flex justify-between text-sm">
+                {pricing.breakdown.map((item, index) => (
+                  <div key={index} className="flex justify-between items-start text-sm">
+                    <div>
                       <span className="text-text-secondary">{item.label}</span>
-                      <span className="text-text-primary">
-                        {formatCurrency(item.amount, pricing.currency)}
-                      </span>
+                      {item.autoRecommended && (
+                        <p className="text-xs text-secondary">
+                          Added for you{item.recommendationReason ? ` — ${item.recommendationReason.toLowerCase()}` : ''}
+                        </p>
+                      )}
                     </div>
-                  ))}
-              </div>
-            )}
-
-            {/* Recommended add-ons (auto-detected) */}
-            {pricing.breakdown?.some((item) => item.autoRecommended) && (
-              <div className="bg-secondary-light border border-secondary/20 rounded-lg p-4 mb-4">
-                <h4 className="text-sm font-medium text-secondary mb-3">
-                  Recommended Add-ons
-                </h4>
-                <p className="text-xs text-text-muted mb-3">
-                  Based on your request, we recommend:
-                </p>
-                <div className="space-y-2">
-                  {pricing.breakdown
-                    .filter((item) => item.autoRecommended)
-                    .map((item, index) => (
-                      <div key={index} className="flex justify-between items-start text-sm">
-                        <div>
-                          <span className="text-text-primary">{item.label}</span>
-                          {item.recommendationReason && (
-                            <p className="text-xs text-text-muted">{item.recommendationReason}</p>
-                          )}
-                        </div>
-                        <span className="text-secondary font-medium whitespace-nowrap">
-                          {formatCurrency(item.amount, pricing.currency)}/each
-                        </span>
-                      </div>
-                    ))}
-                </div>
-                <p className="text-xs text-text-muted mt-3 pt-3 border-t border-secondary/20">
-                  Contact us to confirm quantities and add to your quote.
-                </p>
+                    <span className="text-text-primary whitespace-nowrap">
+                      {formatCurrency(item.amount, pricing.currency)}
+                    </span>
+                  </div>
+                ))}
+                {pricing.breakdown.some((item) => item.autoRecommended) && (
+                  <p className="text-xs text-text-muted pt-1">
+                    Items marked &quot;added for you&quot; came from your description or photos —
+                    let us know if you&apos;d like any removed.
+                  </p>
+                )}
               </div>
             )}
 

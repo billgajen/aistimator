@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import type { WorkStepConfig, ExpectedSignalConfig, SuggestedField } from '@estimator/shared'
 
 /**
@@ -131,8 +131,13 @@ export function WorkStepEditor({
   const [showAdvanced, setShowAdvanced] = useState<Record<string, boolean>>({})
   const [autoLinkSuggestions, setAutoLinkSuggestions] = useState<Record<string, SuggestedField | null>>({})
 
-  // Number questions available for linking
-  const numberQuestions = suggestedFields.filter(f => f.type === 'number')
+  // Number questions available for linking. Memoized — a fresh filter array every
+  // render made the effect below re-fire endlessly ("Maximum update depth exceeded",
+  // found during live verification)
+  const numberQuestions = useMemo(
+    () => suggestedFields.filter(f => f.type === 'number'),
+    [suggestedFields]
+  )
 
   // Update auto-link suggestions when step names change
   useEffect(() => {

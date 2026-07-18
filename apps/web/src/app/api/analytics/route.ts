@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { DEFAULT_TRIAL_LIMIT } from '@/lib/plan-limits'
 import type { AnalyticsResponse, AnalyticsMetrics, UsageData } from '@estimator/shared'
 
 /**
@@ -112,8 +113,10 @@ export async function GET() {
       periodYYYYMM: currentPeriod,
       estimatesCreated: usageCounter?.estimates_created || 0,
       estimatesSent: usageCounter?.estimates_sent || 0,
-      planLimit: plan?.monthly_estimate_limit || 200, // Default to starter plan limit
-      planName: plan?.name || 'Free',
+      // Same no-subscription default as enforcement + billing (verification
+      // finding: analytics showed 200 while quote creation blocked at 50)
+      planLimit: plan?.monthly_estimate_limit || DEFAULT_TRIAL_LIMIT,
+      planName: plan?.name || 'Free trial',
     }
 
     const response: AnalyticsResponse = {

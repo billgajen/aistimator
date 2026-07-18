@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { getStripeClient, getSubscriptionDetails } from '@/lib/stripe'
+import { DEFAULT_TRIAL_LIMIT } from '@/lib/plan-limits'
 import { NextResponse } from 'next/server'
 import type { BillingResponse, PlanInfo, SubscriptionInfo, BillingUsage } from '@estimator/shared'
 
@@ -145,7 +146,7 @@ export async function GET() {
             ?.overage_price_cents ?? null)
         : null
     const created = usageCounter?.estimates_created || 0
-    const planLimit = subscriptionInfo.plan?.monthlyEstimateLimit || 50
+    const planLimit = subscriptionInfo.plan?.monthlyEstimateLimit || DEFAULT_TRIAL_LIMIT
 
     const usage: BillingUsage = {
       estimatesCreated: created,

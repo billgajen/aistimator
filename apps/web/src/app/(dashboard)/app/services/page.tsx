@@ -341,6 +341,19 @@ export default function ServicesPage() {
   const [generatingDraft, setGeneratingDraft] = useState(false)
   const [draftError, setDraftError] = useState<string | null>(null)
 
+  // Tenant currency for the pricing composer (verification finding: £ tenants saw $)
+  const [currencySymbol, setCurrencySymbol] = useState('$')
+  useEffect(() => {
+    fetch('/api/tenant')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const symbols: Record<string, string> = { GBP: '£', EUR: '€', USD: '$', CAD: '$', AUD: '$', NZD: '$' }
+        const currency = data?.tenant?.currency
+        if (currency && symbols[currency]) setCurrencySymbol(symbols[currency])
+      })
+      .catch(() => {})
+  }, [])
+
   // Bulk upload state
   const [showBulkUpload, setShowBulkUpload] = useState(false)
 
@@ -1380,6 +1393,7 @@ export default function ServicesPage() {
                     <PricingComposer
                       serviceName={formData.name}
                       serviceDescription={formData.description}
+                      currencySymbol={currencySymbol}
                       current={{
                         baseFee: formData.baseFee,
                         minimumCharge: formData.minimumCharge,
