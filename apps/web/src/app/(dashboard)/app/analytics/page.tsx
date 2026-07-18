@@ -67,7 +67,7 @@ export default function AnalyticsPage() {
     setOptingIn(true)
     try {
       const res = await fetch('/api/tenant', {
-        method: 'PATCH',
+        method: 'PUT', // the tenant route exports PUT (verified: PATCH 405s)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ benchmarksOptIn: true }),
       })

@@ -237,6 +237,8 @@ export function BulkServiceUpload({ open, onClose, onServicesCreated }: BulkServ
               minPhotos: svc.draft.media.minPhotos,
               maxPhotos: svc.draft.media.maxPhotos,
               photoGuidance: svc.draft.media.photoGuidance,
+              // Guided-capture slots (T-107) — same fix as OnboardingFlow
+              requiredAngles: svc.draft.media.requiredAngles,
             },
             workSteps: svc.draft.pricing.workSteps,
             expectedSignals: svc.draft.expectedSignals,

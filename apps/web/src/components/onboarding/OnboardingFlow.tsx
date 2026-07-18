@@ -239,7 +239,7 @@ export function OnboardingFlow({
         .map((v) => v.trim())
         .filter((v) => v.length > 0)
       const tenantRes = await fetch('/api/tenant', {
-        method: 'PATCH',
+        method: 'PUT', // the tenant route exports PUT (verified: PATCH 405s)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           currency,
@@ -250,8 +250,9 @@ export function OnboardingFlow({
         }),
       })
       if (!tenantRes.ok) {
-        const data = await tenantRes.json()
-        throw new Error(data.error?.message || 'Failed to save business settings')
+        // Guard: error responses may have no JSON body (e.g. 405)
+        const data = await tenantRes.json().catch(() => null)
+        throw new Error(data?.error?.message || `Failed to save business settings (${tenantRes.status})`)
       }
 
       // Create services (same payload shape as bulk import)
@@ -271,6 +272,9 @@ export function OnboardingFlow({
               minPhotos: svc.draft.media.minPhotos,
               maxPhotos: svc.draft.media.maxPhotos,
               photoGuidance: svc.draft.media.photoGuidance,
+              // Guided-capture slots (T-107) — verified missing here: without
+              // this line pack/AI-draft angles were silently dropped
+              requiredAngles: svc.draft.media.requiredAngles,
             },
             workSteps: svc.draft.pricing.workSteps,
             expectedSignals: svc.draft.expectedSignals,
