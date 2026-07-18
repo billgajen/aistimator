@@ -46,8 +46,18 @@ export async function GET() {
       .eq('tenant_id', profile.tenant_id)
       .single()
 
+    // T-112: values the business must paste into Meta's webhook configuration.
+    // Auth'd dashboard route only — the verify token is a shared handshake
+    // string, not a secret credential.
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const setup = {
+      webhookUrl: `${appUrl}/api/whatsapp/webhook`,
+      verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || null,
+    }
+
     return NextResponse.json({
       configured: !!config,
+      setup,
       config: config
         ? {
             phoneNumberId: config.phone_number_id,

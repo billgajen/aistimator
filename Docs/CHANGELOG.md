@@ -29,6 +29,22 @@
 
 ---
 
+### 2026-07-18: T-112 — Guided WhatsApp Onboarding (Phase 3 complete, V2 Strategy)
+
+**Context:** The WhatsApp page was a raw credentials form ("paste your access token") with no validation — the audit flagged it as a setup-abandonment point. Full Meta Embedded Signup requires tech-provider approval (ops track, not code); this ticket delivers the best code-side experience: a guided walkthrough with live credential verification.
+
+**Implementation:**
+- **`POST /api/whatsapp/verify` (new):** validates credentials against the Graph API (`GET /{phoneNumberId}?fields=display_phone_number,verified_name,quality_rating`, read-only, nothing persisted). Two modes: pre-save verification of new credentials, and `{useStored: true}` to health-check the saved connection (decrypts the stored token server-side). Meta's cryptic errors are translated: code 190 → "token invalid/expired, generate a permanent token in System Users"; code 100 → "you pasted the phone number, not the Phone Number ID".
+- **Verify-before-save:** the connect form now verifies with Meta BEFORE persisting — bad credentials fail at setup time with a clear message, not at the first customer message. Verified display number auto-fills if left blank.
+- **"Test Connection"** button on the status card → re-verifies the stored connection, reports verified name + quality rating.
+- **Guided 3-step walkthrough** (replaces the old instructions block): (1) create Meta app + add WhatsApp, with deep links; (2) webhook configuration with copy-buttons for the exact Callback URL and verify token (now served by the config GET — auth'd route; the verify token is a handshake string, not a credential); (3) where to find the Phone Number ID and how to mint a PERMANENT system-user token (explicitly warns off the 24h temporary token — the most common setup failure).
+
+**Known constraint:** Meta Embedded Signup (OAuth-style one-click connect) remains a v2 ops item — requires Meta tech-provider review. The walkthrough + verification is the practical ceiling without it.
+
+**Files:** `apps/web/src/app/api/whatsapp/verify/route.ts` (new), `apps/web/src/app/api/whatsapp/config/route.ts`, `apps/web/src/app/(dashboard)/app/whatsapp/page.tsx`
+
+---
+
 ### 2026-07-18: T-111 — WhatsApp Conversational Intake End-to-End (Phase 3, V2 Strategy)
 
 **Context:** WhatsApp quoting is an empty market category (V2 strategy §1: inbound conversations are free since Meta's July 2025 pricing change; Meta's Business Agent can't do configured priced quotes). The T-023 intake state machine and webhook wiring existed, but the flow had two defects that made real quotes impossible.
