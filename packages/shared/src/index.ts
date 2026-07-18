@@ -15,6 +15,9 @@ export * from './benchmarks'
 // Re-export plausibility envelopes (T-116, Measurement Engine)
 export * from './envelopes'
 
+// Re-export estimate grading + VOI (T-120/T-121, Measurement Engine)
+export * from './grading'
+
 // ID prefixes for stable, readable IDs
 export const ID_PREFIXES = {
   tenant: 'tnt_',

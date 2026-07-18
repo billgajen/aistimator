@@ -507,6 +507,14 @@ export interface QuotePricing {
   notes?: string[]
   /** Available addons that weren't triggered — shown as optional extras */
   availableAddons?: Array<{ id: string; label: string; price: number }>
+  /** T-120 Measurement Engine: declared estimate grade + interval */
+  estimate?: {
+    grade: 'A' | 'B' | 'C'
+    label: string
+    description: string
+    rangeLow?: number
+    rangeHigh?: number
+  }
 }
 
 export interface QuoteContent {
@@ -535,6 +543,14 @@ export interface ExtractedSignal {
   source: 'vision' | 'form' | 'nlp' | 'inferred'
   /** Brief explanation or photo reference */
   evidence?: string
+  /**
+   * T-120 Measurement Engine: plausible band for quantity signals.
+   * Set by ensemble (±cov), adjudication (senior band) or envelope (bounds).
+   * Absent for confirmed/exact values.
+   */
+  quantityBand?: { low: number; high: number }
+  /** T-120: how this quantity was established — drives the estimate grade */
+  basis?: 'confirmed' | 'measured' | 'adjudicated' | 'envelope'
 }
 
 /**

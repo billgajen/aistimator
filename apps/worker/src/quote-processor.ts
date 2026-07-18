@@ -52,7 +52,7 @@ import { initializeFusionFromStructuredSignals } from './agents/signal-fusion'
 import { evaluateQualityGate } from './agents/quality-gate'
 import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
 import type { QualityGateResult } from '@estimator/shared'
-import { computeEnvelope, enforceEnvelope } from '@estimator/shared'
+import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking } from '@estimator/shared'
 import { measureQuantities, decideAdjudication, adjudicateMeasurement } from './ai/measurement'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
@@ -570,6 +570,8 @@ export async function processQuote(
             existing.confidence = m.confidence
             existing.evidence = m.evidence
             existing.source = 'vision'
+            existing.quantityBand = m.band
+            existing.basis = m.basis
           } else {
             structuredSignals.signals.push({
               key: m.signalKey,
@@ -577,6 +579,8 @@ export async function processQuote(
               confidence: m.confidence,
               source: 'vision',
               evidence: m.evidence,
+              quantityBand: m.band,
+              basis: m.basis,
             })
           }
         }
@@ -1038,6 +1042,8 @@ export async function processQuote(
         existing.value = finding.effectiveValue
         existing.confidence = Math.min(existing.confidence, 0.4)
         existing.evidence = `${finding.action === 'clamped' ? 'Adjusted to' : 'Estimated from'} typical range ${envelope.min}-${envelope.max} for this property`
+        existing.quantityBand = { low: envelope.min, high: envelope.max }
+        existing.basis = 'envelope'
       } else {
         structuredSignals.signals.push({
           key: es.signalKey,
@@ -1045,6 +1051,8 @@ export async function processQuote(
           confidence: 0.4,
           source: 'inferred',
           evidence: `Estimated from typical range ${envelope.min}-${envelope.max} for this property`,
+          quantityBand: { low: envelope.min, high: envelope.max },
+          basis: 'envelope',
         })
       }
 
@@ -1055,40 +1063,129 @@ export async function processQuote(
     }
   }
 
-  // Calculate pricing with full trace for transparency
-  const { result: pricing, trace: pricingTrace } = calculatePricingWithTrace(
-    rulesWithWorkSteps,
-    signals,
-    structuredSignals,
-    formAnswers,
-    {
-      enabled: tenant.tax_enabled,
-      label: tenant.tax_label,
-      // DB stores rate as decimal (0.20 = 20%), pricing engine expects whole number (20 = 20%)
-      rate: (tenant.tax_rate || 0) * 100,
-    },
-    tenant.currency,
-    // Pass job data with quantity and/or matched items
-    Object.keys(jobData).length > 0 ? jobData : undefined,
-    // Pass addon detection context
-    {
-      projectDescription,
+  // Calculate pricing with full trace for transparency. Wrapped in a closure so
+  // T-120 interval pricing can re-run deterministically with band values.
+  const priceWithSignals = (ss: ExtractedSignalsV2 | null) =>
+    calculatePricingWithTrace(
+      rulesWithWorkSteps,
+      signals,
+      ss,
       formAnswers,
-    },
-    // Pass AI-detected addon IDs so they get marked as autoRecommended
-    aiDetectedAddonIds.size > 0 ? aiDetectedAddonIds : undefined,
-    // Pass service context for addon filtering
-    {
-      name: service.name,
-      scopeIncludes: service.scope_includes,
-    },
-    // Config version for trace
-    'v1'
-  )
+      {
+        enabled: tenant.tax_enabled,
+        label: tenant.tax_label,
+        // DB stores rate as decimal (0.20 = 20%), pricing engine expects whole number (20 = 20%)
+        rate: (tenant.tax_rate || 0) * 100,
+      },
+      tenant.currency,
+      // Pass job data with quantity and/or matched items
+      Object.keys(jobData).length > 0 ? jobData : undefined,
+      // Pass addon detection context
+      {
+        projectDescription,
+        formAnswers,
+      },
+      // Pass AI-detected addon IDs so they get marked as autoRecommended
+      aiDetectedAddonIds.size > 0 ? aiDetectedAddonIds : undefined,
+      // Pass service context for addon filtering
+      {
+        name: service.name,
+        scopeIncludes: service.scope_includes,
+      },
+      // Config version for trace
+      'v1'
+    )
+  const { result: pricing, trace: pricingTrace } = priceWithSignals(structuredSignals)
 
   console.log(`[Processor] Pricing calculated: ${pricing.currency} ${pricing.total}`)
   if (pricingTrace.trace.length > 0) {
     console.log(`[Processor] Pricing trace has ${pricingTrace.trace.length} steps`)
+  }
+
+  // T-120 (M6): interval pricing + declared estimate grade.
+  // T-121 (M7): value-of-information — ask about a quantity only when its
+  // uncertainty moves real money, not when an abstract threshold trips.
+  if (structuredSignals) {
+    const provenance = aiQuantitySteps
+      .map((step) => {
+        const s = structuredSignals.signals.find(
+          (x) => x.key === step.quantitySource!.signalKey
+        )
+        if (!s) return null
+        const confirmed = s.source === 'form' || s.confidence >= 1
+        return {
+          signalKey: s.key,
+          basis: (confirmed ? 'confirmed' : (s.basis ?? 'measured')) as
+            | 'confirmed'
+            | 'measured'
+            | 'adjudicated'
+            | 'envelope',
+          confidence: s.confidence,
+          band: confirmed ? undefined : s.quantityBand,
+          stepName: step.name,
+        }
+      })
+      .filter((p): p is NonNullable<typeof p> => p !== null)
+
+    const gradeResult = computeEstimateGrade(provenance)
+    const banded = provenance.filter((p) => p.band && p.basis !== 'confirmed')
+
+    let rangeLow: number | undefined
+    let rangeHigh: number | undefined
+    if (banded.length > 0) {
+      const withValues = (overrides: Record<string, number>): ExtractedSignalsV2 => ({
+        ...structuredSignals,
+        signals: structuredSignals.signals.map((s) =>
+          overrides[s.key] !== undefined ? { ...s, value: overrides[s.key]! } : s
+        ),
+      })
+      const lowOverrides: Record<string, number> = {}
+      const highOverrides: Record<string, number> = {}
+      for (const b of banded) {
+        lowOverrides[b.signalKey] = b.band!.low
+        highOverrides[b.signalKey] = b.band!.high
+      }
+      rangeLow = priceWithSignals(withValues(lowOverrides)).result.total
+      rangeHigh = priceWithSignals(withValues(highOverrides)).result.total
+
+      for (const b of banded) {
+        if (missingQuantitySignals.some((m) => m.signalKey === b.signalKey)) continue
+        const lowTotal = priceWithSignals(withValues({ [b.signalKey]: b.band!.low })).result.total
+        const highTotal = priceWithSignals(withValues({ [b.signalKey]: b.band!.high })).result
+          .total
+        const voi = isQuestionWorthAsking({
+          priceAtLow: lowTotal,
+          priceAtHigh: highTotal,
+          bestTotal: pricing.total,
+        })
+        if (voi.ask) {
+          console.log(
+            `[Processor] VOI: asking about ${b.signalKey} — price spread ${voi.spread} clears the bar`
+          )
+          missingQuantitySignals.push({ signalKey: b.signalKey, stepName: b.stepName })
+        } else {
+          console.log(
+            `[Processor] VOI: not asking about ${b.signalKey} — spread ${voi.spread} below bar`
+          )
+        }
+      }
+    }
+
+    pricing.estimate = {
+      grade: gradeResult.grade,
+      label: gradeResult.label,
+      description: gradeResult.description,
+      ...(rangeLow !== undefined &&
+        rangeHigh !== undefined &&
+        rangeLow !== rangeHigh && {
+          rangeLow: Math.round(rangeLow * 100) / 100,
+          rangeHigh: Math.round(rangeHigh * 100) / 100,
+        }),
+    }
+    console.log(
+      `[Processor] Estimate grade: ${gradeResult.grade} (${gradeResult.label})` +
+        (rangeLow !== undefined ? ` range ${rangeLow}-${rangeHigh}` : '')
+    )
   }
 
   // 3.5 Check for image vs form condition discrepancy

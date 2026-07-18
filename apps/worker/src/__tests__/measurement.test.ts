@@ -170,6 +170,8 @@ describe('T-119: adjudicateMeasurement', () => {
     cov: 0.08,
     passesUsed: 2,
     evidence: 'Measured across 2 independent passes',
+    band: { low: 20, high: 23.6 },
+    basis: 'measured' as const,
     rawPasses: [
       { value: 21.5, entry: { targetKey: 'wall_area_sqm', feasible: true, reasoning: 'measured left elevation only' } },
       { value: 22.1, entry: { targetKey: 'wall_area_sqm', feasible: true, reasoning: 'rendered section only' } },

@@ -206,6 +206,8 @@ export async function GET(
             ...(pricing.availableAddons && pricing.availableAddons.length > 0 && {
               availableAddons: pricing.availableAddons,
             }),
+            // T-120: declared estimate grade + interval
+            ...(pricing.estimate && { estimate: pricing.estimate }),
           },
       breakdown: isProvisional ? [] : pricing.breakdown || [],
       notes: {

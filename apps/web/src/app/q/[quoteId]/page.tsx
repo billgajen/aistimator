@@ -345,6 +345,36 @@ export default function QuotePage({ params }: QuotePageProps) {
                   {formatCurrency(pricing.total, pricing.currency)}
                 </span>
               </div>
+
+              {/* T-120: declared estimate grade + interval */}
+              {pricing.estimate && (
+                <div className="mt-3 rounded-lg bg-background border border-border p-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white ${
+                        pricing.estimate.grade === 'A'
+                          ? 'bg-secondary'
+                          : pricing.estimate.grade === 'B'
+                            ? 'bg-primary'
+                            : 'bg-amber-500'
+                      }`}
+                    >
+                      {pricing.estimate.grade}
+                    </span>
+                    <span className="text-sm font-semibold text-text-primary">
+                      {pricing.estimate.label} estimate
+                    </span>
+                    {pricing.estimate.rangeLow !== undefined &&
+                      pricing.estimate.rangeHigh !== undefined && (
+                        <span className="ml-auto text-sm text-text-secondary">
+                          {formatCurrency(pricing.estimate.rangeLow, pricing.currency)} –{' '}
+                          {formatCurrency(pricing.estimate.rangeHigh, pricing.currency)}
+                        </span>
+                      )}
+                  </div>
+                  <p className="mt-1 text-xs text-text-muted">{pricing.estimate.description}</p>
+                </div>
+              )}
             </div>
           </div>
 

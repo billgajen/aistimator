@@ -112,6 +112,14 @@ export interface PricingResult {
   }>
   /** Confidence level (0-1), affects whether range is shown */
   confidence: number
+  /** T-120 Measurement Engine: declared estimate grade + interval */
+  estimate?: {
+    grade: 'A' | 'B' | 'C'
+    label: string
+    description: string
+    rangeLow?: number
+    rangeHigh?: number
+  }
   /** If confidence is low, show a range */
   range?: {
     low: number

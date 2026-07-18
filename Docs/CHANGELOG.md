@@ -29,6 +29,24 @@
 
 ---
 
+### 2026-07-18: T-120 Interval Pricing + Estimate Grades, T-121 VOI Questioning (M6+M7)
+
+**Context:** Quantities stop pretending to be points; quotes stop pretending to be exact. Every quote now declares its precision class (AACE-style) and clarification questions fire only where the money is.
+
+**Implementation:**
+- **`packages/shared/src/grading.ts` (new, pure):** `computeEstimateGrade` — **A Confirmed** (every driver human-stated/confirmed, incl. quotes with no AI quantities at all), **B Measured** (measured/adjudicated with confidence ≥ 0.6), **C Concept** (any envelope-based driver or low measured confidence); each grade carries a customer-facing label + description. `isQuestionWorthAsking` — ask when price spread ≥ max(£75, 10% of total): a £200 spread on a £15k job is noise, a £100 spread on a £210 job is not.
+- **Bands ride the signals:** `ExtractedSignal.quantityBand` + `basis` set by ensemble (±cov), adjudication (senior band), envelope (bounds). Form-confirmed values are treated as exact regardless of stale bands.
+- **Worker:** the pricing call is wrapped in `priceWithSignals(ss)`; interval totals come from deterministic re-runs with band-low/band-high values substituted (exact through multipliers/minimums/tax — no linear approximations). Per-quantity VOI spreads are computed the same way; worthwhile questions append to the clarification list. `pricing.estimate = {grade, label, description, rangeLow?, rangeHigh?}` persists in pricing_json.
+- **Delivery:** public GET passes `estimate` through; the quote page shows a grade badge (A green / B black / C amber) + the interval + the grade description under the total.
+
+**Live on the user's real quote — the complete engine in one run:** ensemble passes disagreed on garage inclusion → senior adjudicated ("Junior 1 included the garage but underestimated its side elevation; Junior 2 excluded it entirely") → 32.5 sqm (band 25–40) → interval priced **£960–£1,284** around best **£1,122** → **Grade B (Measured)** → VOI computed £324 spread, cleared the bar → one confirmation question queued. A graded, banded, adjudicated, selectively-questioning estimate.
+
+**Tests:** 10 new (`grading.test.ts`) — grade matrix, VOI bars absolute/relative. Suite: 234 passing.
+
+**Files:** `packages/shared/src/grading.ts` (new), `packages/shared/src/index.ts`, `packages/shared/src/database.types.ts`, `apps/worker/src/ai/measurement.ts`, `apps/worker/src/pricing/rules-engine.ts`, `apps/worker/src/quote-processor.ts`, `apps/web/src/app/api/public/quotes/[quoteId]/route.ts`, `apps/web/src/app/q/[quoteId]/page.tsx`, `apps/worker/src/__tests__/grading.test.ts` (new), `apps/worker/src/__tests__/measurement.test.ts`
+
+---
+
 ### 2026-07-18: T-119 Adjudication Tier — Stakes-Based Model Routing (Measurement Engine M4)
 
 **Context:** T-117/118's known frontier was "precision without accuracy" — passes agreeing tightly on the wrong scope. M4 adds the senior reviewer: a stronger model that resolves the CAUSE of disagreement, routed by stakes.

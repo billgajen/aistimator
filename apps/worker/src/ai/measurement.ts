@@ -68,6 +68,10 @@ export interface MeasuredQuantity {
   evidence: string
   /** Raw pass entries retained for adjudication (T-119) */
   rawPasses: Array<{ value: number; entry: PassMeasurement }>
+  /** T-120: plausible band for interval pricing */
+  band: { low: number; high: number }
+  /** T-120: how this quantity was established */
+  basis: 'measured' | 'adjudicated'
 }
 
 const AREA_UNITS = new Set(['sqm', 'sq_m', 'square_metre', 'square_meter', 'm2', 'sqft', 'sq_ft'])
@@ -260,6 +264,11 @@ Return one measurement entry per targetKey.`
       passesUsed: values.length,
       evidence: `Measured across ${values.length} independent pass${values.length === 1 ? '' : 'es'} (spread ±${stats.spreadPct}%)${refNote}`,
       rawPasses,
+      band: {
+        low: Math.round(stats.median * (1 - stats.cov) * 10) / 10,
+        high: Math.round(stats.median * (1 + stats.cov) * 10) / 10,
+      },
+      basis: 'measured',
     })
   }
 
@@ -393,6 +402,8 @@ Re-examine the photos, resolve the scope, and produce your final measurement.`,
       passesUsed: measured.passesUsed,
       evidence: `Senior review of ${measured.passesUsed} takeoff${measured.passesUsed === 1 ? '' : 's'}: ${result.scopeResolution} (plausible ${low}-${high} ${target.unit})`,
       rawPasses: measured.rawPasses,
+      band: { low: Math.round(low * 10) / 10, high: Math.round(high * 10) / 10 },
+      basis: 'adjudicated',
     }
   } catch (error) {
     console.error('[Measurement] Adjudication failed:', error)
