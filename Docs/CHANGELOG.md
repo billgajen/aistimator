@@ -29,6 +29,23 @@
 
 ---
 
+### 2026-07-18: T-119 Adjudication Tier — Stakes-Based Model Routing (Measurement Engine M4)
+
+**Context:** T-117/118's known frontier was "precision without accuracy" — passes agreeing tightly on the wrong scope. M4 adds the senior reviewer: a stronger model that resolves the CAUSE of disagreement, routed by stakes.
+
+**Implementation:**
+- **`decideAdjudication` (pure, tested):** escalate when cov > `MEASUREMENT_COV_THRESHOLD` (0.15), when only one usable pass, or when the provisional step value ≥ `ADJUDICATION_VALUE_THRESHOLD` (1000) — **measurement spend scales with the money at stake.**
+- **`adjudicateMeasurement`:** the senior model (`ADJUDICATION_MODEL`, default `gemini-pro-latest` — found live that `gemini-2.5-pro` is closed to newer API keys) receives every junior pass's value/anchor/reasoning + the photos, with an explicit brief: do NOT average — resolve WHY they differ, re-examine the photos, produce final value + honest low–high band + one-sentence `scopeResolution` for the audit trail. Confidence derives from the adjudicator's band width (measured semantics preserved); failure returns null and the ensemble median stands — never blocks.
+- Gemini client factory accepts `{model, maxTokens}`; raw passes retained on `MeasuredQuantity.rawPasses`.
+
+**Live result on the user's real quote — the flagship demo of the whole engine:** 3 passes disagreed wildly (median 52, cov 0.91) → routed `high_variance` → senior model resolved: *"Included only the white rendered surfaces (main house front/sides, garage front and side) as brick is not typically painted; Junior 1 and 3 incorrectly included unpainted brickwork, while Junior 2 missed the garage side elevation"* → final 38.5 sqm (band 32–45) → quote sent at **£1,251.60** with the audit note stored as the measurement's evidence. The senior model applied domain judgment (paintable render vs unpainted brick) that no averaging could produce. T-122 will surface this note on the customer document's takeoff table.
+
+**Tests:** 7 new (routing matrix; adjudication merge with band-derived confidence; failure/nonsense guards). Suite: 224 passing.
+
+**Files:** `apps/worker/src/ai/measurement.ts`, `apps/worker/src/ai/gemini.ts`, `apps/worker/src/quote-processor.ts`, `apps/worker/src/index.ts`, `apps/worker/src/__tests__/measurement.test.ts`
+
+---
+
 ### 2026-07-18: T-117 Ensemble Extraction + T-118 Anchored Takeoff (Measurement Engine M2+M3)
 
 **Context:** Replaces single-shot quantity guessing for ai_signal quantities. New module `apps/worker/src/ai/measurement.ts`; runs ONLY for services with ai_signal quantity sources (zero extra cost for other quotes), between extraction and form merge (customer answers still win, AD-002) and before envelopes (implausible medians still caught).

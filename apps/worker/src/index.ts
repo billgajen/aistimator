@@ -28,6 +28,10 @@ export interface Env {
 
   // Measurement Engine (T-117): ensemble pass count for AI-measured quantities
   MEASUREMENT_PASSES?: string
+  // Measurement Engine (T-119): adjudication routing
+  ADJUDICATION_MODEL?: string
+  ADJUDICATION_VALUE_THRESHOLD?: string
+  MEASUREMENT_COV_THRESHOLD?: string
 
   // Email (Postmark)
   POSTMARK_API_TOKEN?: string

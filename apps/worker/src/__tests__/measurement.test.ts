@@ -8,6 +8,8 @@ import {
   computeAnchoredValue,
   computeEnsembleStats,
   measureQuantities,
+  decideAdjudication,
+  adjudicateMeasurement,
   type PassMeasurement,
 } from '../ai/measurement'
 
@@ -134,5 +136,88 @@ describe('measureQuantities (full ensemble with injected passes)', () => {
     })
     expect(results).toHaveLength(0)
     expect(called).toBe(0)
+  })
+})
+
+describe('T-119: stakes-based adjudication routing', () => {
+  const base = { cov: 0.05, passesUsed: 3, provisionalValue: 400 }
+
+  it('does not escalate tight, cheap, well-evidenced measurements', () => {
+    expect(decideAdjudication(base).shouldAdjudicate).toBe(false)
+  })
+
+  it('escalates high variance', () => {
+    const d = decideAdjudication({ ...base, cov: 0.25 })
+    expect(d).toEqual({ shouldAdjudicate: true, reason: 'high_variance' })
+  })
+
+  it('escalates single-pass evidence', () => {
+    const d = decideAdjudication({ ...base, passesUsed: 1 })
+    expect(d).toEqual({ shouldAdjudicate: true, reason: 'single_pass' })
+  })
+
+  it('escalates when real money rides on the number', () => {
+    const d = decideAdjudication({ ...base, provisionalValue: 1500 })
+    expect(d).toEqual({ shouldAdjudicate: true, reason: 'high_stakes' })
+  })
+})
+
+describe('T-119: adjudicateMeasurement', () => {
+  const measured = {
+    signalKey: 'wall_area_sqm',
+    value: 21.8,
+    confidence: 0.8,
+    cov: 0.08,
+    passesUsed: 2,
+    evidence: 'Measured across 2 independent passes',
+    rawPasses: [
+      { value: 21.5, entry: { targetKey: 'wall_area_sqm', feasible: true, reasoning: 'measured left elevation only' } },
+      { value: 22.1, entry: { targetKey: 'wall_area_sqm', feasible: true, reasoning: 'rendered section only' } },
+    ],
+  }
+
+  it('replaces the ensemble value with the senior resolution and band-derived confidence', async () => {
+    const result = await adjudicateMeasurement({
+      adjudicator: null,
+      images: IMAGES,
+      target: TARGET,
+      measured,
+      run: async () => ({
+        finalValue: 58,
+        lowValue: 52,
+        highValue: 64,
+        scopeResolution: 'Juniors measured only the rendered section; target includes both visible elevations',
+      }),
+    })
+    expect(result).not.toBeNull()
+    expect(result!.value).toBe(58)
+    expect(result!.confidence).toBeGreaterThanOrEqual(0.65) // ±10% band
+    expect(result!.evidence).toContain('Senior review')
+    expect(result!.evidence).toContain('both visible elevations')
+    expect(result!.evidence).toContain('52-64')
+  })
+
+  it('returns null on failure — the ensemble value stands, never blocks', async () => {
+    const result = await adjudicateMeasurement({
+      adjudicator: null,
+      images: IMAGES,
+      target: TARGET,
+      measured,
+      run: async () => {
+        throw new Error('model unavailable')
+      },
+    })
+    expect(result).toBeNull()
+  })
+
+  it('rejects nonsense adjudications (zero/negative)', async () => {
+    const result = await adjudicateMeasurement({
+      adjudicator: null,
+      images: IMAGES,
+      target: TARGET,
+      measured,
+      run: async () => ({ finalValue: 0, lowValue: 0, highValue: 0, scopeResolution: 'n/a' }),
+    })
+    expect(result).toBeNull()
   })
 })

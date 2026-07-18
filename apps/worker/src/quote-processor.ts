@@ -53,7 +53,7 @@ import { evaluateQualityGate } from './agents/quality-gate'
 import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
 import type { QualityGateResult } from '@estimator/shared'
 import { computeEnvelope, enforceEnvelope } from '@estimator/shared'
-import { measureQuantities } from './ai/measurement'
+import { measureQuantities, decideAdjudication, adjudicateMeasurement } from './ai/measurement'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@estimator/shared'
@@ -522,11 +522,49 @@ export async function processQuote(
           targets,
           passes: Number(env.MEASUREMENT_PASSES || 3),
         })
-        for (const m of measured) {
-          const existing = structuredSignals.signals.find((s) => s.key === m.signalKey)
+        for (let m of measured) {
           console.log(
             `[Processor] Measured ${m.signalKey} = ${m.value} (cov ${m.cov}, confidence ${m.confidence}, ${m.passesUsed} passes)`
           )
+
+          // T-119 M4: stakes-based adjudication. Escalate to the senior model
+          // when the ensemble disagrees, evidence is thin, or the number is
+          // worth real money (provisional step value ≥ threshold).
+          const step = measurementSteps.find(
+            (s) => s.quantitySource?.signalKey === m.signalKey
+          )
+          const provisionalValue = m.value * (step?.defaultCost ?? 0)
+          const decision = decideAdjudication({
+            cov: m.cov,
+            passesUsed: m.passesUsed,
+            provisionalValue,
+            covThreshold: Number(env.MEASUREMENT_COV_THRESHOLD || 0.15),
+            valueThreshold: Number(env.ADJUDICATION_VALUE_THRESHOLD || 1000),
+          })
+          if (decision.shouldAdjudicate) {
+            console.log(
+              `[Processor] Adjudicating ${m.signalKey} (${decision.reason}, provisional ${provisionalValue.toFixed(0)})`
+            )
+            const adjudicator = createGeminiClient(env.GEMINI_API_KEY, {
+              // gemini-pro-latest: 2.5-pro is closed to newer API keys (found live)
+              model: env.ADJUDICATION_MODEL || 'gemini-pro-latest',
+            })
+            const target = targets.find((t) => t.signalKey === m.signalKey)!
+            const adjudicated = await adjudicateMeasurement({
+              adjudicator,
+              images: extractionResult.images,
+              target,
+              measured: m,
+            })
+            if (adjudicated) {
+              console.log(
+                `[Processor] Adjudicated ${m.signalKey}: ${m.value} -> ${adjudicated.value} (${adjudicated.evidence})`
+              )
+              m = adjudicated
+            }
+          }
+
+          const existing = structuredSignals.signals.find((s) => s.key === m.signalKey)
           if (existing) {
             existing.value = m.value
             existing.confidence = m.confidence

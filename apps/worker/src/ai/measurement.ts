@@ -66,6 +66,8 @@ export interface MeasuredQuantity {
   cov: number
   passesUsed: number
   evidence: string
+  /** Raw pass entries retained for adjudication (T-119) */
+  rawPasses: Array<{ value: number; entry: PassMeasurement }>
 }
 
 const AREA_UNITS = new Set(['sqm', 'sq_m', 'square_metre', 'square_meter', 'm2', 'sqft', 'sq_ft'])
@@ -228,7 +230,7 @@ Return one measurement entry per targetKey.`
 
   const results: MeasuredQuantity[] = []
   for (const target of targets) {
-    const values: number[] = []
+    const rawPasses: Array<{ value: number; entry: PassMeasurement }> = []
     const referencesUsed: string[] = []
 
     for (const pass of allPasses) {
@@ -236,13 +238,14 @@ Return one measurement entry per targetKey.`
       if (!entry || entry.feasible === false) continue
       const value = computeAnchoredValue(target.unit, entry)
       if (value !== null && value > 0) {
-        values.push(value)
+        rawPasses.push({ value, entry })
         if (entry.referenceObject) referencesUsed.push(entry.referenceObject)
       }
     }
 
-    if (values.length === 0) continue // leave to the envelope fallback
+    if (rawPasses.length === 0) continue // leave to the envelope fallback
 
+    const values = rawPasses.map((p) => p.value)
     const stats = computeEnsembleStats(values)
     const refNote =
       referencesUsed.length > 0
@@ -256,10 +259,145 @@ Return one measurement entry per targetKey.`
       cov: stats.cov,
       passesUsed: values.length,
       evidence: `Measured across ${values.length} independent pass${values.length === 1 ? '' : 'es'} (spread ±${stats.spreadPct}%)${refNote}`,
+      rawPasses,
     })
   }
 
   return results
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M4 — Adjudication (T-119)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface AdjudicationResult {
+  finalValue: number
+  lowValue: number
+  highValue: number
+  /** One-sentence resolution of what the passes included/excluded */
+  scopeResolution: string
+}
+
+export interface AdjudicationDecision {
+  shouldAdjudicate: boolean
+  reason?: 'high_variance' | 'single_pass' | 'high_stakes'
+}
+
+/**
+ * Stakes-based routing (pure, testable): escalate to the senior model when
+ * the ensemble disagrees, evidence is thin, or real money rides on the number.
+ */
+export function decideAdjudication(opts: {
+  cov: number
+  passesUsed: number
+  provisionalValue: number
+  covThreshold?: number
+  valueThreshold?: number
+}): AdjudicationDecision {
+  const covThreshold = opts.covThreshold ?? 0.15
+  const valueThreshold = opts.valueThreshold ?? 1000
+
+  if (opts.passesUsed < 2) return { shouldAdjudicate: true, reason: 'single_pass' }
+  if (opts.cov > covThreshold) return { shouldAdjudicate: true, reason: 'high_variance' }
+  if (opts.provisionalValue >= valueThreshold) {
+    return { shouldAdjudicate: true, reason: 'high_stakes' }
+  }
+  return { shouldAdjudicate: false }
+}
+
+const ADJUDICATION_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    finalValue: { type: 'number' },
+    lowValue: { type: 'number' },
+    highValue: { type: 'number' },
+    scopeResolution: { type: 'string' },
+  },
+  required: ['finalValue', 'lowValue', 'highValue', 'scopeResolution'],
+}
+
+const ADJUDICATION_SYSTEM_PROMPT = `You are a SENIOR quantity surveyor reviewing junior surveyors' photo-based takeoffs before a quote goes to a client.
+
+Your job is NOT to average their numbers. It is to resolve WHY they differ:
+- Did they measure different scopes? (one included the garage, another did not)
+- Did one mis-identify the reference object or its size?
+- Is part of the target simply not visible in the photos?
+
+Protocol:
+1. Re-examine the photos yourself against the target definition.
+2. Determine the CORRECT scope for the target as described.
+3. Produce your final measurement with an honest low–high band
+   (what the value could plausibly be given what the photos show).
+4. scopeResolution: ONE sentence stating what you included/excluded and why
+   the juniors differed. This appears in the audit trail.
+Keep all prose minimal — the numbers and the scope sentence are what matter.`
+
+/**
+ * Run senior-model adjudication over disagreeing/thin/high-stakes measurements.
+ * `run` is injectable for tests. Failure returns null — never blocks the quote.
+ */
+export async function adjudicateMeasurement(opts: {
+  adjudicator: GeminiClient | null
+  images: Array<{ mimeType: string; base64: string }>
+  target: MeasurementTarget
+  measured: MeasuredQuantity
+  run?: () => Promise<AdjudicationResult>
+}): Promise<MeasuredQuantity | null> {
+  const { adjudicator, images, target, measured } = opts
+
+  const defaultRun = async (): Promise<AdjudicationResult> => {
+    if (!adjudicator) throw new Error('No adjudicator model configured')
+    const passSummaries = measured.rawPasses
+      .map(
+        (p, i) =>
+          `Junior ${i + 1}: ${p.value} ${target.unit}` +
+          (p.entry.referenceObject
+            ? ` (anchored to ${p.entry.referenceObject}, ${p.entry.widthInRefUnits ?? '?'}×${p.entry.heightInRefUnits ?? '?'} ref units)`
+            : ' (direct estimate)') +
+          (p.entry.reasoning ? ` — "${p.entry.reasoning}"` : '')
+      )
+      .join('\n')
+
+    return adjudicator.generateWithImagesAndSchema<AdjudicationResult>(
+      `Target: "${target.signalKey}" (unit: ${target.unit}) — ${target.description}
+
+Junior takeoffs to review:
+${passSummaries}
+
+Re-examine the photos, resolve the scope, and produce your final measurement.`,
+      images,
+      ADJUDICATION_SCHEMA,
+      ADJUDICATION_SYSTEM_PROMPT,
+      { temperature: 0.2, maxOutputTokens: 16384 }
+    )
+  }
+
+  try {
+    const run = opts.run ?? defaultRun
+    const result = await run()
+    if (!Number.isFinite(result.finalValue) || result.finalValue <= 0) return null
+
+    // Measured semantics preserved: confidence derives from the adjudicator's
+    // own band width, not a self-reported score
+    const low = Math.min(result.lowValue, result.finalValue)
+    const high = Math.max(result.highValue, result.finalValue)
+    const halfSpread = result.finalValue > 0 ? (high - low) / 2 / result.finalValue : 1
+    const confidence =
+      halfSpread <= 0.08 ? 0.9 : halfSpread <= 0.15 ? 0.8 : halfSpread <= 0.3 ? 0.65 : 0.45
+
+    return {
+      signalKey: target.signalKey,
+      value: Math.round(result.finalValue * 10) / 10,
+      confidence,
+      cov: Math.round(halfSpread * 1000) / 1000,
+      passesUsed: measured.passesUsed,
+      evidence: `Senior review of ${measured.passesUsed} takeoff${measured.passesUsed === 1 ? '' : 's'}: ${result.scopeResolution} (plausible ${low}-${high} ${target.unit})`,
+      rawPasses: measured.rawPasses,
+    }
+  } catch (error) {
+    console.error('[Measurement] Adjudication failed:', error)
+    return null
+  }
 }
 
 function mostCommon(items: string[]): string {

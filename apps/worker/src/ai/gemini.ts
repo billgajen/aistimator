@@ -281,11 +281,14 @@ export class GeminiClient {
 /**
  * Create a Gemini client from environment
  */
-export function createGeminiClient(apiKey: string | undefined): GeminiClient | null {
+export function createGeminiClient(
+  apiKey: string | undefined,
+  options?: { model?: string; maxTokens?: number }
+): GeminiClient | null {
   if (!apiKey) {
     console.warn('[Gemini] API key not configured')
     return null
   }
 
-  return new GeminiClient({ apiKey })
+  return new GeminiClient({ apiKey, model: options?.model, maxTokens: options?.maxTokens })
 }
