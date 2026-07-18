@@ -29,6 +29,22 @@
 
 ---
 
+### 2026-07-18: T-114 — Painting & Decorating Pack + Landing Page (Phase 4, V2 Strategy)
+
+**Context:** The launch vertical (decided 2026-07-18, strategy §3). First pack in the T-113 registry, and the vertical landing page carrying the speed-to-lead pitch. All pack content is editable-default DATA in GBP; no vertical logic entered the engine.
+
+**Pack contents (`lib/vertical-packs/painting.ts`):** three services designed to exercise every accuracy-engine system:
+- **Interior Painting** — per-ROOM pricing (customers can answer room counts exactly → form_field quantity source): £200/room walls & ceilings + £60 base + £250 minimum; heavy-prep step (£150) auto-triggers when photos show `prep_level = heavy`; high-ceiling multiplier ×1.2 from a customer question; woodwork/feature-wall addons with trigger keywords. Guided angles: wide shot per room + damage close-ups.
+- **Exterior Painting** — per-SQM pricing from **AI wall-area estimation** (customers can't measure render → ai_signal quantity source, deliberately exercising vision + the T-108 confirm step): £18/sqm + £100 base + £400 minimum; access-equipment step (£250) triggers at `storeys >= 2`; roofline/front-door addons. Guided angles: full elevation per side, ground-to-roof.
+- **Wallpapering** — per-wall (£140/wall), optional per-wall removal step triggered by a customer boolean, we-supply multiplier ×1.15, lining-paper addon.
+- Every quantity-bearing field carries `mapsToSignal` so form answers hit the canonical signal keys (the FIX-1 mapping path); expectedSignals give strict extraction schemas + T-108 confirmation targets.
+
+**Landing page (`/painting`, static):** Editorial Black style; hero "Quote every job in 60 seconds" + "Your rates set the price — never the AI"; verified stats band ONLY (40% never respond / 95% miss 5-min / 21× — with sources; the debunked stats from strategy §2 are not used); 4-step how-it-works; deterministic-pricing trust section; feature grid; CTAs to /signup and /demo.
+
+**Files:** `apps/web/src/lib/vertical-packs/painting.ts` (new), `apps/web/src/lib/vertical-packs/index.ts`, `apps/web/src/app/painting/page.tsx` (new)
+
+---
+
 ### 2026-07-18: T-113 — Vertical Pack Infrastructure (Phase 4, V2 Strategy)
 
 **Context:** AD-022 (vertical-first go-to-market on a generic engine). A pack is pure DATA — service templates with scope, media guidance, guided-capture angles (feeds T-107), default rates, expected signals, and customer questions — applied at onboarding as pre-filled, fully editable config. Anti-hardcoding holds: packs are content files, the engine never special-cases a vertical.

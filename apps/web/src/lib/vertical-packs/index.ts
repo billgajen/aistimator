@@ -7,11 +7,12 @@
  */
 
 import type { VerticalPack } from './types'
+import { paintingPack } from './painting'
 
 export type { VerticalPack, VerticalPackService } from './types'
 
-/** All available packs. T-114 adds the painting pack as the first entry. */
-const PACKS: VerticalPack[] = []
+/** All available packs. */
+const PACKS: VerticalPack[] = [paintingPack]
 
 export function listPacks(): VerticalPack[] {
   return PACKS
