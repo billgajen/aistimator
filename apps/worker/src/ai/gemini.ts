@@ -155,7 +155,8 @@ export class GeminiClient {
     prompt: string,
     images: Array<{ mimeType: string; base64: string }>,
     schema: Record<string, unknown>,
-    systemPrompt?: string
+    systemPrompt?: string,
+    options?: { temperature?: number; maxOutputTokens?: number }
   ): Promise<T> {
     const messages: GeminiMessage[] = []
 
@@ -183,10 +184,14 @@ export class GeminiClient {
       parts,
     })
 
-    const text = await this.generate(messages, {
-      responseMimeType: 'application/json',
-      responseSchema: schema,
-    })
+    const text = await this.generate(
+      messages,
+      {
+        responseMimeType: 'application/json',
+        responseSchema: schema,
+      },
+      options
+    )
 
     return JSON.parse(text) as T
   }
@@ -199,13 +204,14 @@ export class GeminiClient {
     structuredOutput?: {
       responseMimeType: string
       responseSchema: Record<string, unknown>
-    }
+    },
+    options?: { temperature?: number; maxOutputTokens?: number }
   ): Promise<string> {
     const url = `${GEMINI_API_BASE}/${this.model}:generateContent?key=${this.apiKey}`
 
     const generationConfig: Record<string, unknown> = {
-      maxOutputTokens: this.maxTokens,
-      temperature: 0.3,
+      maxOutputTokens: options?.maxOutputTokens ?? this.maxTokens,
+      temperature: options?.temperature ?? 0.3,
     }
 
     if (structuredOutput) {

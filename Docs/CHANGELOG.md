@@ -29,6 +29,26 @@
 
 ---
 
+### 2026-07-18: T-117 Ensemble Extraction + T-118 Anchored Takeoff (Measurement Engine M2+M3)
+
+**Context:** Replaces single-shot quantity guessing for ai_signal quantities. New module `apps/worker/src/ai/measurement.ts`; runs ONLY for services with ai_signal quantity sources (zero extra cost for other quotes), between extraction and form merge (customer answers still win, AD-002) and before envelopes (implausible medians still caught).
+
+**T-118 — reference-anchored takeoff:** the prompt forbids absolute eyeballing; the model finds a known-size reference in the photos (door 1.98 m, brick course 75 mm, fence panel 1.83 m…) and reports the target in REFERENCE MULTIPLES; code computes metres/areas (`computeAnchoredValue` — AD-024 for vision). Reference dimensions are physical constants in code (a UK door is a UK door), not business config; pack overrides can come later.
+
+**T-117 — ensemble:** N passes (`MEASUREMENT_PASSES` env, default 3) at temperature 0.7; `computeEnsembleStats` → median + coefficient of variation → MEASURED confidence bands (cov ≤ 0.08 → 0.9 … > 0.3 → 0.35). Self-reported model confidence is no longer used for quantities. Evidence string carries the method: "Measured across 3 independent passes (spread ±8%), anchored to entry door height". Individual pass failures tolerated; zero usable passes → envelope fallback takes over.
+
+**Gemini client:** `generateWithImagesAndSchema`/`generate` accept per-call `{temperature, maxOutputTokens}` — found live that Gemini 2.5 thinking tokens count against maxOutputTokens, truncating JSON mid-string at the 4096 default; measurement passes now run at 16384 with reasoning capped to two sentences.
+
+**Live end-to-end on the user's real quote — the full stack in concert:** ensemble measured 21.8 sqm (2 usable passes, cov 0.08 — precise but scope-limited: the model consistently measured a SUBSET of the elevation) → envelope said implausible for 3 storeys → clamped to the 27 floor → priced provisionally (£1,003) → gate routed to clarification: "we estimated wall area sqm: 27. Is that right?" → customer's answer reprices exactly. The £480 silent-failure is now an honest provisional + one question.
+
+**Known frontier (by design, next tickets):** tight ensemble agreement on the WRONG SCOPE (measuring part of the elevation) is precision without accuracy — exactly what M1 scene inventory + T-119 adjudication (a stronger model resolving what each pass included/excluded) exist to fix.
+
+**Tests:** 11 new (`measurement.test.ts`) — anchored geometry (prefers computation over model guess), ensemble bands, pass-failure tolerance, no-target short-circuit. Suite: 217 passing.
+
+**Files:** `apps/worker/src/ai/measurement.ts` (new), `apps/worker/src/ai/gemini.ts`, `apps/worker/src/quote-processor.ts`, `apps/worker/src/index.ts`, `apps/worker/src/__tests__/measurement.test.ts` (new)
+
+---
+
 ### 2026-07-18: Measurement Engine Adopted (V3 estimation core) + T-116 Plausibility Envelopes
 
 **Context:** User verdict after live testing: "same system, slightly improved" — correct about the estimation core. V2 rebuilt the workflow around the estimator; the core itself remained a single-shot vision guess with self-reported confidence (proven by 50 vs 60 sqm run-to-run variance on identical photos). Adopted `Docs/07-measurement-engine.md` as the estimation north star: reference-anchored measurement, ensemble variance as confidence, stakes-based model routing (measurement spend scales with estimate value), plausibility envelopes, interval pricing with declared AACE-style estimate grades (C Concept / B Measured / A Confirmed), value-of-information questioning, per-tenant measurement memory, and a Goldman-grade document with a quantity-takeoff table showing HOW each quantity was measured. New tickets T-116–T-123.

@@ -26,6 +26,9 @@ export interface Env {
   UPSTASH_REDIS_TOKEN?: string
   GEMINI_API_KEY?: string
 
+  // Measurement Engine (T-117): ensemble pass count for AI-measured quantities
+  MEASUREMENT_PASSES?: string
+
   // Email (Postmark)
   POSTMARK_API_TOKEN?: string
   POSTMARK_FROM_EMAIL?: string

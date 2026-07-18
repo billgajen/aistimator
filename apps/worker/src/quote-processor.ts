@@ -53,6 +53,7 @@ import { evaluateQualityGate } from './agents/quality-gate'
 import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
 import type { QualityGateResult } from '@estimator/shared'
 import { computeEnvelope, enforceEnvelope } from '@estimator/shared'
+import { measureQuantities } from './ai/measurement'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@estimator/shared'
@@ -495,6 +496,58 @@ export async function processQuote(
     const extractionResult = await extractSignalsFromAssets(gemini, imageAssets, signalContext, env)
     signals = extractionResult.signals
     structuredSignals = extractionResult.structuredSignals
+
+    // Measurement Engine M2+M3 (T-117/T-118): for quantities priced from AI
+    // signals, replace the single-shot guess with a reference-anchored
+    // ensemble. Runs BEFORE form merge (customer answers still win, AD-002)
+    // and BEFORE envelopes (implausible medians still get caught).
+    const measurementSteps = (service.work_steps || pricingRules?.workSteps || []).filter(
+      (s) => s.quantitySource?.type === 'ai_signal' && s.quantitySource.signalKey
+    )
+    if (measurementSteps.length > 0 && structuredSignals && extractionResult.images?.length) {
+      const targets = measurementSteps.map((step) => {
+        const es = (service.expected_signals || []).find(
+          (e) => e.signalKey === step.quantitySource!.signalKey
+        )
+        return {
+          signalKey: step.quantitySource!.signalKey!,
+          description: es?.description || `Quantity for "${step.name}"`,
+          unit: step.unitLabel || 'unit',
+        }
+      })
+      try {
+        const measured = await measureQuantities({
+          gemini,
+          images: extractionResult.images,
+          targets,
+          passes: Number(env.MEASUREMENT_PASSES || 3),
+        })
+        for (const m of measured) {
+          const existing = structuredSignals.signals.find((s) => s.key === m.signalKey)
+          console.log(
+            `[Processor] Measured ${m.signalKey} = ${m.value} (cov ${m.cov}, confidence ${m.confidence}, ${m.passesUsed} passes)`
+          )
+          if (existing) {
+            existing.value = m.value
+            existing.confidence = m.confidence
+            existing.evidence = m.evidence
+            existing.source = 'vision'
+          } else {
+            structuredSignals.signals.push({
+              key: m.signalKey,
+              value: m.value,
+              confidence: m.confidence,
+              source: 'vision',
+              evidence: m.evidence,
+            })
+          }
+        }
+      } catch (measureError) {
+        // Measurement is an accuracy upgrade, never a blocker — the envelope
+        // and clarification guards still protect the quote downstream
+        console.error('[Processor] Measurement ensemble failed:', measureError)
+      }
+    }
   } else if (imageAssets.length > 0 && !gemini) {
     console.warn('[Processor] Gemini not configured, skipping signal extraction')
     signals = getSignalsWithoutImages()
@@ -1796,6 +1849,8 @@ async function loadQuoteData(
 interface SignalExtractionResult {
   signals: ExtractedSignals
   structuredSignals: ExtractedSignalsV2 | null
+  /** Fetched images, returned so the measurement ensemble can reuse them (T-117) */
+  images?: Array<{ mimeType: string; base64: string }>
 }
 
 /**
@@ -1846,7 +1901,7 @@ async function extractSignalsFromAssets(
       console.log(`[Processor] Using structured signal extraction with ${signalContext.expectedSignals.length} expected signals`)
       const result = await extractStructuredSignals(gemini, images, signalContext)
 
-      return { signals: result.legacy, structuredSignals: result.structured }
+      return { signals: result.legacy, structuredSignals: result.structured, images }
     }
 
     // Default: extract legacy signals and convert to structured format
@@ -1865,7 +1920,7 @@ async function extractSignalsFromAssets(
       lowConfidenceSignals: [],
     }
 
-    return { signals, structuredSignals }
+    return { signals, structuredSignals, images }
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error'
     console.error(`[Processor] Signal extraction failed: ${errorMsg}`)
