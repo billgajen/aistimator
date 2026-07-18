@@ -252,3 +252,58 @@ describe('T-108: confirm_value questions', () => {
     expect(question?.targetSignalKey).toBe('access_difficulty')
   })
 })
+
+describe('Bug #10: missing quantity signals (found live — 1 sqm exterior quote)', () => {
+  it('asks for clarification when an ai_signal quantity is missing, even at high confidence', async () => {
+    const result = await evaluateQualityGate(
+      {
+        structuredSignals: makeSignals({ overallConfidence: 0.83 }), // high — gate would otherwise send
+        fusionResult: makeFusion(),
+        pricing: makePricing(),
+        clarificationCount: 0,
+        serviceName: 'Exterior Painting',
+        hasPhotos: true,
+        missingQuantitySignals: [{ signalKey: 'wall_area_sqm', stepName: 'Exterior walls' }],
+      },
+      null // must work without Gemini (template question fallback)
+    )
+
+    expect(result.action).toBe('ask_clarification')
+    const question = result.questions?.find((q) => q.targetSignalKey === 'wall_area_sqm')
+    expect(question).toBeDefined()
+    // Missing signal has no value — must be a text question, never confirm_value
+    expect(question?.type).not.toBe('confirm_value')
+  })
+
+  it('does not ask when the quantity signal exists with a usable value', async () => {
+    const result = await evaluateQualityGate(
+      {
+        structuredSignals: makeSignals(),
+        fusionResult: makeFusion(),
+        pricing: makePricing(),
+        clarificationCount: 0,
+        serviceName: 'Exterior Painting',
+        hasPhotos: true,
+        missingQuantitySignals: [], // processor found the signal usable
+      },
+      null
+    )
+    expect(result.action).toBe('send')
+  })
+
+  it('still respects the one-round clarification cap', async () => {
+    const result = await evaluateQualityGate(
+      {
+        structuredSignals: makeSignals(),
+        fusionResult: makeFusion(),
+        pricing: makePricing(),
+        clarificationCount: 1,
+        serviceName: 'Exterior Painting',
+        hasPhotos: true,
+        missingQuantitySignals: [{ signalKey: 'wall_area_sqm', stepName: 'Exterior walls' }],
+      },
+      null
+    )
+    expect(result.action).toBe('send')
+  })
+})

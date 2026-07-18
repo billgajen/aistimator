@@ -29,6 +29,22 @@
 
 ---
 
+### 2026-07-18: Bug #10 — Missing/String AI Quantity Signals Priced Silently Wrong (found by user testing)
+
+**Context:** User submitted a real Exterior Painting quote (3-storey front elevation) and asked "is this accurate?". It was not: **"Exterior walls: 1 sqm × £18 = £18"**, total £480 (minimum charge masking a £368 calculation). Correct total after fix: **£1,716** — a 3.6× under-quote that sailed through every guard with gate action `send`. The flagship failure mode the accuracy engine exists to prevent.
+
+**Two root causes, both fixed:**
+1. **Missing quantity signals bypassed all guards.** The walls step prices per-sqm from `ai_signal: wall_area_sqm`. When extraction produces NO such signal, the engine falls back to quantity 1 and marks `quantityTrusted: false` in the trace — but the quality gate only inspects `lowConfidenceSignals`, and a MISSING signal is never in that list. Fix: processor detects work steps whose ai_signal quantity is absent/non-numeric in fused signals → passes `missingQuantitySignals` to the gate → gate routes them to customer clarification FIRST (they're structurally wrong, not merely uncertain), producing a text question via the existing T-108 machinery; the answer merges back as a confidence-1.0 signal and the step prices correctly on reprocess. One-round cap respected.
+2. **String-typed AI quantities were rejected.** On reprocess Gemini returned `wall_area_sqm: "50"` (string) — the engine's `typeof value === 'number'` check discarded a valid extraction and silently priced quantity 1. The ISSUE-2 lesson (coerceToNumber for comma-aware string parsing) was applied to form-field quantities but never to the ai_signal paths. Fix: both ai_signal quantity sites (per_unit + per_hour) now coerce string values.
+
+**Live re-verified on the user's actual quote:** reprocessed through the fixed pipeline → "Exterior walls £18 × 60 (sqm) = £1,080", subtotal £1,430, total £1,716, breakdown label now shows the quantity transparently. (60 sqm remains an AI estimate at ~0.7 confidence — site-visit note retained; T-110 calibration will tune over time.)
+
+**Tests:** 5 new (3 quality-gate: missing-quantity clarification without Gemini, usable-signal pass-through, one-round cap; 2 engine: string coercion to 50×£18=£900, true-missing fallback to 1×£18). Suite: 196 passing.
+
+**Files:** `apps/worker/src/quote-processor.ts`, `apps/worker/src/agents/quality-gate.ts`, `apps/worker/src/pricing/rules-engine.ts`, `apps/worker/src/__tests__/quality-gate.test.ts`, `apps/worker/src/__tests__/quote-processing.test.ts`
+
+---
+
 ### 2026-07-18: Verification Findings Fixed (all live re-verified)
 
 **Context:** Fixes for every open finding from the live verification below, each re-verified in the running app.

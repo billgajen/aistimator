@@ -29,6 +29,13 @@ export interface QualityGateInput {
   serviceName: string
   /** Whether customer provided photos */
   hasPhotos: boolean
+  /**
+   * AI-signal quantity sources the extraction could NOT produce (missing or
+   * non-numeric). These make per-unit pricing structurally wrong (quantity
+   * falls back to 1) and MUST be clarified — a missing signal never appears
+   * in lowConfidenceSignals, so this is the only guard for them.
+   */
+  missingQuantitySignals?: Array<{ signalKey: string; stepName: string }>
 }
 
 /** Schema for AI-generated clarification questions */
@@ -94,11 +101,22 @@ export async function evaluateQualityGate(
   const conflicts = fusionResult?.conflicts || []
 
   // Determine if clarification is needed
-  const signalsNeedingClarification = identifySignalsForClarification(
+  const identified = identifySignalsForClarification(
     lowConfSignals,
     conflicts,
     structuredSignals
   )
+
+  // Missing quantity signals FIRST — without them the price is structurally
+  // wrong (per-unit steps priced at quantity 1), not merely uncertain
+  const missing = (input.missingQuantitySignals || []).map((m) => ({
+    key: m.signalKey,
+    reason: `Required to price "${m.stepName}" but could not be measured from the photos — ask the customer for the value directly`,
+  }))
+  const signalsNeedingClarification = [
+    ...missing,
+    ...identified.filter((s) => !missing.some((m) => m.key === s.key)),
+  ]
 
   if (signalsNeedingClarification.length === 0) {
     return {

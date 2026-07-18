@@ -1265,10 +1265,17 @@ function calculateWorkStepCost(
           }
 
           case 'ai_signal': {
-            // Use AI-extracted signal value (lower trust)
+            // Use AI-extracted signal value (lower trust).
+            // Bug #10 (found live): Gemini frequently returns numeric signals as
+            // STRINGS ("50") — apply the same coercion as form fields (ISSUE-2),
+            // or a valid extraction silently priced as quantity 1.
             const signal = getSignalValue(step.quantitySource.signalKey || '', structuredSignals, legacySignals)
-            if (typeof signal.value === 'number' && signal.value > 0) {
-              quantity = signal.value
+            const aiQuantity =
+              typeof signal.value === 'number'
+                ? signal.value
+                : coerceToNumber(String(signal.value ?? ''))
+            if (aiQuantity !== null && aiQuantity > 0) {
+              quantity = aiQuantity
               quantitySource = 'ai_signal'
               quantityTrusted = false  // AI = lower trust, mark in trace
               signalsUsed.push({ key: step.quantitySource.signalKey || 'ai_signal', value: quantity })
@@ -1363,8 +1370,13 @@ function calculateWorkStepCost(
 
           case 'ai_signal': {
             const signal = getSignalValue(step.quantitySource.signalKey || '', structuredSignals, legacySignals)
-            if (typeof signal.value === 'number' && signal.value > 0) {
-              hours = signal.value
+            // Bug #10: coerce string-typed AI values (same as the per_unit path)
+            const aiHours =
+              typeof signal.value === 'number'
+                ? signal.value
+                : coerceToNumber(String(signal.value ?? ''))
+            if (aiHours !== null && aiHours > 0) {
+              hours = aiHours
               quantitySource = 'ai_signal'
               quantityTrusted = false
               signalsUsed.push({ key: step.quantitySource.signalKey || 'ai_signal', value: hours })

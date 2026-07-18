@@ -1304,6 +1304,31 @@ export async function processQuote(
   let qualityGateResult: QualityGateResult | undefined
   const clarificationCount = (quoteData.quote as unknown as { clarification_count?: number }).clarification_count ?? 0
 
+  // Work steps that price per-unit from an AI signal the AI could NOT extract
+  // fall back to quantity 1 — structurally wrong pricing. A MISSING signal is
+  // never in lowConfidenceSignals, so these previously bypassed every guard
+  // (found live: 3-storey exterior priced as "1 sqm × £18"). Route them to
+  // customer clarification instead.
+  const missingQuantitySignals = (rules.workSteps || [])
+    .filter((step) => step.quantitySource?.type === 'ai_signal' && step.quantitySource.signalKey)
+    .filter((step) => {
+      const signal = structuredSignals?.signals.find(
+        (s) => s.key === step.quantitySource!.signalKey
+      )
+      if (!signal) return true
+      const numeric = Number(String(signal.value).replace(/,/g, ''))
+      return !Number.isFinite(numeric) || numeric <= 0
+    })
+    .map((step) => ({ signalKey: step.quantitySource!.signalKey!, stepName: step.name }))
+
+  if (missingQuantitySignals.length > 0) {
+    console.log(
+      `[Processor] Unpriceable quantity signals (missing/unusable): ${missingQuantitySignals
+        .map((m) => `${m.signalKey} (for "${m.stepName}")`)
+        .join(', ')}`
+    )
+  }
+
   if (structuredSignals && gemini) {
     try {
       qualityGateResult = await evaluateQualityGate(
@@ -1314,6 +1339,7 @@ export async function processQuote(
           clarificationCount,
           serviceName: service.name,
           hasPhotos: allImageAssets.length > 0,
+          missingQuantitySignals,
         },
         gemini
       )
