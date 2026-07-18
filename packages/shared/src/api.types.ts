@@ -297,6 +297,8 @@ export interface PlanInfo {
   monthlyEstimateLimit: number
   priceCents: number
   currency: string
+  /** T-102: per-quote price beyond the monthly limit (null/absent = hard block) */
+  overagePriceCents?: number | null
   features: {
     pdfGeneration: boolean
     emailNotifications: boolean
@@ -321,6 +323,10 @@ export interface BillingUsage {
   planLimit: number
   periodStart: string
   periodEnd: string
+  /** T-102: quotes beyond the plan limit this period (billed as overage when enabled) */
+  overageUsed?: number
+  /** T-102: per-quote overage price on the current plan (null = overage not available) */
+  overagePriceCents?: number | null
 }
 
 export interface BillingResponse {

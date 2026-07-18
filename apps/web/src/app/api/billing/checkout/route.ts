@@ -130,13 +130,17 @@ export async function POST(request: Request) {
     const successUrl = `${appUrl}/app/billing?success=true`
     const cancelUrl = `${appUrl}/app/billing?canceled=true`
 
-    // Create checkout session
+    // Create checkout session — attach the metered overage price when the plan
+    // supports per-quote overage billing (T-102)
+    const meteredPriceId = (plan as { stripe_metered_price_id?: string | null })
+      .stripe_metered_price_id
     const session = await createCheckoutSession(stripe, {
       customerId,
       priceId: stripePriceId,
       tenantId,
       successUrl,
       cancelUrl,
+      meteredPriceId: meteredPriceId || undefined,
     })
 
     if (!session.url) {

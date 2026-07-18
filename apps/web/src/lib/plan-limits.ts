@@ -2,28 +2,53 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCurrentPeriod } from './usage'
 import { sendEmail, isPostmarkConfigured } from './postmark'
 import { generateLimitReachedEmailHtml } from './email-templates'
+import { getStripeClient, reportOverageMeterEvent, formatPrice } from './stripe'
 
 /** Default monthly estimate limit for tenants without a subscription (trial). Matches /api/billing. */
 export const DEFAULT_TRIAL_LIMIT = 50
 
 export interface PlanLimitStatus {
+  /** true while within the plan limit (or unlimited) */
   allowed: boolean
   used: number
   limit: number
   /** limit <= 0 means the plan is unlimited */
   unlimited: boolean
+  /**
+   * T-102: over-limit quotes may proceed as metered overage when the plan
+   * defines an overage price AND the subscription is active (never free/trial).
+   */
+  overageAvailable: boolean
+  /** Per-quote overage price when overageAvailable */
+  overagePriceCents: number | null
+  /** Stripe customer to meter overage events against */
+  stripeCustomerId: string | null
 }
 
 /**
  * Pure limit evaluation — kept separate from IO for testability.
  */
-export function evaluateLimit(used: number, limit: number): PlanLimitStatus {
+export function evaluateLimit(
+  used: number,
+  limit: number,
+  overage?: { priceCents: number | null; subscriptionActive: boolean; stripeCustomerId: string | null }
+): PlanLimitStatus {
   const unlimited = limit <= 0
+  const overageAvailable = Boolean(
+    overage &&
+      overage.priceCents !== null &&
+      overage.priceCents > 0 &&
+      overage.subscriptionActive &&
+      overage.stripeCustomerId
+  )
   return {
     allowed: unlimited || used < limit,
     used,
     limit,
     unlimited,
+    overageAvailable,
+    overagePriceCents: overageAvailable ? overage!.priceCents : null,
+    stripeCustomerId: overage?.stripeCustomerId ?? null,
   }
 }
 
@@ -43,7 +68,9 @@ export async function checkPlanLimit(
     const [{ data: subscription }, { data: usageCounter }] = await Promise.all([
       supabase
         .from('subscriptions')
-        .select('status, plans!plan_id (monthly_estimate_limit)')
+        .select(
+          'status, stripe_customer_id, plans!plan_id (monthly_estimate_limit, overage_price_cents, stripe_metered_price_id)'
+        )
         .eq('tenant_id', tenantId)
         .single(),
       supabase
@@ -54,14 +81,58 @@ export async function checkPlanLimit(
         .single(),
     ])
 
-    const plan = subscription?.plans as { monthly_estimate_limit: number } | null | undefined
+    const plan = subscription?.plans as {
+      monthly_estimate_limit: number
+      overage_price_cents?: number | null
+      stripe_metered_price_id?: string | null
+    } | null | undefined
     const limit = plan?.monthly_estimate_limit ?? DEFAULT_TRIAL_LIMIT
     const used = usageCounter?.estimates_created ?? 0
 
-    return evaluateLimit(used, limit)
+    return evaluateLimit(used, limit, {
+      priceCents: plan?.overage_price_cents ?? null,
+      // Overage only bills reliably on an active paid subscription — never trial
+      subscriptionActive:
+        subscription?.status === 'active' && Boolean(plan?.stripe_metered_price_id),
+      stripeCustomerId: subscription?.stripe_customer_id ?? null,
+    })
   } catch (error) {
     console.error('[PlanLimits] Failed to check plan limit, allowing request:', error)
-    return { allowed: true, used: 0, limit: DEFAULT_TRIAL_LIMIT, unlimited: false }
+    return {
+      allowed: true,
+      used: 0,
+      limit: DEFAULT_TRIAL_LIMIT,
+      unlimited: false,
+      overageAvailable: false,
+      overagePriceCents: null,
+      stripeCustomerId: null,
+    }
+  }
+}
+
+/**
+ * Meter one over-limit quote to Stripe (T-102). Fire-and-forget from the
+ * caller's perspective — a metering failure must never fail the quote (we
+ * absorb the cost rather than lose the lead), but it is logged loudly.
+ */
+export async function recordOverageQuote(
+  status: PlanLimitStatus,
+  quoteId: string
+): Promise<void> {
+  if (!status.overageAvailable || !status.stripeCustomerId) return
+  const stripe = getStripeClient()
+  if (!stripe) {
+    console.error('[PlanLimits] Overage quote but Stripe not configured — not billed:', quoteId)
+    return
+  }
+  const result = await reportOverageMeterEvent(stripe, {
+    customerId: status.stripeCustomerId,
+    quoteId,
+  })
+  if (result.success) {
+    console.log(`[PlanLimits] Overage quote metered: ${quoteId}`)
+  } else {
+    console.error(`[PlanLimits] OVERAGE NOT BILLED for quote ${quoteId}: ${result.error}`)
   }
 }
 
@@ -132,14 +203,22 @@ export async function maybeNotifyLimitReached(
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+    // T-102: with overage active the message is "billing continues", not "paused"
+    const overagePriceLabel =
+      status.overageAvailable && status.overagePriceCents
+        ? formatPrice(status.overagePriceCents, 'usd')
+        : undefined
     await sendEmail({
       to,
-      subject: `You've reached your monthly quote limit (${status.limit})`,
+      subject: overagePriceLabel
+        ? `Monthly quote limit reached — extra quotes now ${overagePriceLabel} each`
+        : `You've reached your monthly quote limit (${status.limit})`,
       htmlBody: generateLimitReachedEmailHtml({
         businessName,
         used: status.used,
         limit: status.limit,
         billingUrl: `${appUrl}/app/billing`,
+        overagePriceLabel,
       }),
       tag: 'plan-limit-reached',
     })

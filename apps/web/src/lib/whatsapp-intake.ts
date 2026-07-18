@@ -20,7 +20,7 @@ import {
 import { generateQuoteToken, getTokenExpiry } from './tokens'
 import { enqueueQuoteJob } from './queue'
 import { incrementUsageCounter } from './usage'
-import { checkPlanLimit, maybeNotifyLimitReached } from './plan-limits'
+import { checkPlanLimit, maybeNotifyLimitReached, recordOverageQuote } from './plan-limits'
 
 // Keywords that trigger intake start
 const TRIGGER_KEYWORDS = ['quote', 'estimate', 'price', 'pricing', 'cost', 'how much']
@@ -537,10 +537,12 @@ async function createQuoteFromIntake(
   }
 
   try {
-    // Enforce plan limit (T-101) before creating any records.
+    // Enforce plan limit (T-101/T-102) before creating any records.
+    // Over the limit with overage available → proceed and meter; otherwise block.
     // Neutral customer-facing message — never expose the business's billing state.
     const planLimit = await checkPlanLimit(supabase, tenantId)
-    if (!planLimit.allowed) {
+    const isOverageQuote = !planLimit.allowed && planLimit.overageAvailable
+    if (!planLimit.allowed && !planLimit.overageAvailable) {
       console.warn(
         `[WhatsApp Intake] Plan limit reached (${planLimit.used}/${planLimit.limit}) — rejecting intake`
       )
@@ -659,6 +661,11 @@ async function createQuoteFromIntake(
 
     // If this consumed the last quote in the plan, notify the business once (T-101)
     await maybeNotifyLimitReached(supabase, tenantId, tenant.name)
+
+    // Meter this quote to Stripe when it's beyond the plan limit (T-102)
+    if (isOverageQuote) {
+      await recordOverageQuote(planLimit, quote.id)
+    }
 
     // Enqueue for processing
     await enqueueQuoteJob({

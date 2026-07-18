@@ -194,7 +194,23 @@ export function generateLimitReachedEmailHtml(data: {
   used: number
   limit: number
   billingUrl: string
+  /** T-102: when set, quoting continues as metered overage at this price */
+  overagePriceLabel?: string
 }): string {
+  const consequence = data.overagePriceLabel
+    ? `<strong>Quoting continues uninterrupted</strong> — extra quotes are now billed at
+       <strong>${escapeHtml(data.overagePriceLabel)} each</strong> on your next invoice. Upgrade
+       to a bigger plan if you expect this regularly; it usually works out cheaper.`
+    : `<strong>New quote requests from your website are now paused</strong> — customers will be asked to
+       contact you directly instead. Upgrade your plan to resume instant quoting immediately, or wait
+       until your limit resets at the start of next month.`
+  return generateLimitReachedEmailBody(data, consequence)
+}
+
+function generateLimitReachedEmailBody(
+  data: { businessName: string; used: number; limit: number; billingUrl: string },
+  consequenceHtml: string
+): string {
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -221,9 +237,7 @@ export function generateLimitReachedEmailHtml(data: {
                 You've used <strong>${data.used} of ${data.limit}</strong> quotes on your current plan this month.
               </p>
               <p style="margin: 0 0 24px; color: #374151; font-size: 16px; line-height: 1.5;">
-                <strong>New quote requests from your website are now paused</strong> — customers will be asked to
-                contact you directly instead. Upgrade your plan to resume instant quoting immediately, or wait
-                until your limit resets at the start of next month.
+                ${consequenceHtml}
               </p>
 
               <table role="presentation" style="width: 100%; margin: 32px 0;">

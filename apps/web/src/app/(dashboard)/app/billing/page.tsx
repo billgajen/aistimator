@@ -228,6 +228,25 @@ function BillingPageContent() {
                 style={{ width: `${usagePercentage}%` }}
               />
             </div>
+            {/* T-102: overage status */}
+            {data?.usage.overagePriceCents ? (
+              <p className="mt-2 text-xs text-text-muted">
+                Beyond your limit, extra quotes are billed at{' '}
+                <span className="font-medium text-text-secondary">
+                  {formatPrice(data.usage.overagePriceCents)} each
+                </span>
+                {(data.usage.overageUsed || 0) > 0 && (
+                  <>
+                    {' '}
+                    — <span className="font-medium text-text-secondary">{data.usage.overageUsed} overage quote{data.usage.overageUsed === 1 ? '' : 's'}</span> this period
+                  </>
+                )}
+              </p>
+            ) : (data?.usage.estimatesCreated || 0) >= (data?.usage.planLimit || 50) ? (
+              <p className="mt-2 text-xs text-red-600">
+                Limit reached — new quote requests are paused until you upgrade
+              </p>
+            ) : null}
           </div>
           <div>
             <p className="text-sm text-text-muted">

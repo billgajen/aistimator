@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { enqueueQuoteJob } from '@/lib/queue'
 import { incrementUsageCounter } from '@/lib/usage'
-import { checkPlanLimit, maybeNotifyLimitReached } from '@/lib/plan-limits'
+import { checkPlanLimit, maybeNotifyLimitReached, recordOverageQuote } from '@/lib/plan-limits'
 import { validateServiceMatch } from '@/lib/ai/service-matcher'
 import { NextResponse } from 'next/server'
 
@@ -129,10 +129,13 @@ export async function POST(request: Request) {
       )
     }
 
-    // 3b. Enforce plan limit (T-101) — before any records are created.
-    // Customer-facing message is deliberately neutral: never expose the business's billing state.
+    // 3b. Enforce plan limit (T-101/T-102) — before any records are created.
+    // Over the limit: metered overage lets the quote proceed (active paid plans
+    // with overage pricing); otherwise hard block. Customer-facing message is
+    // deliberately neutral: never expose the business's billing state.
     const planLimit = await checkPlanLimit(supabase, tenantId)
-    if (!planLimit.allowed) {
+    const isOverageQuote = !planLimit.allowed && planLimit.overageAvailable
+    if (!planLimit.allowed && !planLimit.overageAvailable) {
       console.warn(
         `[Quotes] Plan limit reached for tenant (${planLimit.used}/${planLimit.limit}) — rejecting quote request`
       )
@@ -480,6 +483,12 @@ export async function POST(request: Request) {
 
     // 12b. If this consumed the last quote in the plan, notify the business once (T-101)
     await maybeNotifyLimitReached(supabase, tenantId, tenant.name)
+
+    // 12c. Meter this quote to Stripe when it's beyond the plan limit (T-102).
+    // Uses the quote ID as the idempotency identifier — retries can't double-bill.
+    if (isOverageQuote) {
+      await recordOverageQuote(planLimit, quote.id)
+    }
 
     // 13. Enqueue job for processing (skip for general inquiries - they need manual review)
     let queueFailed = false

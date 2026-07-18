@@ -140,8 +140,32 @@ export default async function DashboardPage() {
         description="Overview of your quotes and activity"
       />
 
-      {/* Plan usage warnings (T-101) */}
-      {limitReached && (
+      {/* Plan usage warnings (T-101/T-102) */}
+      {limitReached && planLimit.overageAvailable && (
+        <div className="mb-8 rounded-xl border border-amber-300 bg-amber-50 p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-display text-base font-bold text-amber-900">
+                Plan limit passed ({planLimit.used}/{planLimit.limit}) — overage billing active
+              </h2>
+              <p className="mt-1 text-sm text-amber-800">
+                Quoting continues uninterrupted. Extra quotes are billed at{' '}
+                {planLimit.overagePriceCents
+                  ? `$${(planLimit.overagePriceCents / 100).toFixed(2)}`
+                  : 'your plan rate'}{' '}
+                each — upgrading to a bigger plan usually works out cheaper.
+              </p>
+            </div>
+            <Link
+              href="/app/billing"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90"
+            >
+              Compare Plans
+            </Link>
+          </div>
+        </div>
+      )}
+      {limitReached && !planLimit.overageAvailable && (
         <div className="mb-8 rounded-xl border border-red-300 bg-red-50 p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>

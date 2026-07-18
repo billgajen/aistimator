@@ -29,6 +29,32 @@
 
 ---
 
+### 2026-07-18: T-102 — Metered Overage Billing (Phase 0 complete, V2 Strategy)
+
+**Context:** Completes Phase 0 (deferred at T-101). The hard block at the plan limit converts worse than "keep quoting, pay per extra quote" — every blocked quote is a lost lead for the business and lost revenue for the platform. Uses Stripe's modern **Billing Meter Events API** (supported by the installed stripe v20 SDK), not the deprecated usage-records API.
+
+**Behavior matrix:**
+| Tenant state | At limit |
+|---|---|
+| Free/trial, or plan without overage | Hard block (T-101 unchanged) |
+| Active paid plan with `overage_price_cents` + metered price | Quote proceeds, one meter event billed |
+
+**Implementation:**
+- **Migration 20:** `plans.overage_price_cents` (null = no overage) + `plans.stripe_metered_price_id`. Additive only.
+- **`lib/stripe.ts`:** `createCheckoutSession` attaches the metered price as a second line item (no quantity — Stripe requirement); `reportOverageMeterEvent()` posts to `billing.meterEvents` with **the quote ID as `identifier`** — Stripe dedupes on it, so retries/replays can never double-bill.
+- **`lib/plan-limits.ts`:** `PlanLimitStatus` gains `overageAvailable`/`overagePriceCents`/`stripeCustomerId`. Overage requires ALL of: overage price on plan, metered price configured, subscription status `active` (never trialing — metering a trial bills nothing), Stripe customer present. `recordOverageQuote()` meters fire-and-forget: **a metering failure never fails the quote** (absorb the cost rather than lose the lead) but logs `OVERAGE NOT BILLED` loudly.
+- **Both intake points** (public quotes API, WhatsApp): over-limit + overage → proceed and meter after quote creation.
+- **Surfaces:** limit-reached email switches to "Quoting continues — extra quotes billed at $X each"; dashboard banner becomes amber "overage billing active" instead of red "paused"; billing page shows overage rate + overage count this period. `PlanInfo`/`BillingUsage` extended.
+- `STRIPE_OVERAGE_METER_EVENT` env (default `estimate_overage`) added to both `.env.example`s.
+
+**Stripe setup required (ops, not code):** create a Meter named per `STRIPE_OVERAGE_METER_EVENT`, create a metered price on it per plan, set `plans.stripe_metered_price_id` + `overage_price_cents`. Existing subscriptions need the metered item added (new checkouts get it automatically).
+
+**Known constraints:** overage price display assumes USD (consistent with existing billing UI hardcoding — multi-currency billing remains v2 backlog). Proration on plan change is delegated to Stripe's defaults via the existing checkout/portal flows.
+
+**Files:** `supabase/migrations/00000000000020_plan_overage.sql` (new), `apps/web/src/lib/stripe.ts`, `apps/web/src/lib/plan-limits.ts`, `apps/web/src/lib/email-templates.ts`, `apps/web/src/app/api/public/quotes/route.ts`, `apps/web/src/lib/whatsapp-intake.ts`, `apps/web/src/app/api/billing/route.ts`, `apps/web/src/app/api/billing/checkout/route.ts`, `apps/web/src/app/(dashboard)/app/billing/page.tsx`, `apps/web/src/app/(dashboard)/app/page.tsx`, `packages/shared/src/api.types.ts`, `.env.example`, `apps/web/.env.example`
+
+---
+
 ### 2026-07-18: T-110 — Outcome Calibration Loop (Phase 2 complete, V2 Strategy)
 
 **Context:** The moat ticket (V2 strategy Flaw 2): amendment/acceptance data was collected but never fed back into pricing. Existing infra: `quote_amendments` stores `before_pricing`/`after_pricing` snapshots; `/api/learning/analyze` (fired on quote PATCH) detects patterns for AI wording context. Missing: actionable pricing suggestions and a business-facing surface.
