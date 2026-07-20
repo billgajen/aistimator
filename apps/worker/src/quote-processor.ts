@@ -1674,6 +1674,24 @@ export async function processQuote(
   let qualityGateResult: QualityGateResult | undefined
   const clarificationCount = (quoteData.quote as unknown as { clarification_count?: number }).clarification_count ?? 0
 
+  // R3-1: the wording layer flagged that photos/description contradict a
+  // customer-stated price driver (e.g. 2 hours booked, photos show a 4-hour
+  // job). A stated-but-doubted quantity must never carry Grade A "exact".
+  const quantityConcern = (content.quantityConcern || '').trim() || undefined
+  const quantityConcernFieldId = (content.quantityConcernFieldId || '').trim() || undefined
+  if (quantityConcern && pricing.estimate && pricing.estimate.grade === 'A') {
+    const capped = computeEstimateGrade([
+      { signalKey: 'stated_quantity_concern', basis: 'measured', confidence: 0.7 },
+    ])
+    pricing.estimate = {
+      ...pricing.estimate,
+      grade: capped.grade,
+      label: capped.label,
+      description: capped.description,
+    }
+    console.log(`[Processor] R3-1: grade capped to ${capped.grade} — ${quantityConcern}`)
+  }
+
   if (missingQuantitySignals.length > 0) {
     console.log(
       `[Processor] Unpriceable quantity signals (missing/unusable): ${missingQuantitySignals
@@ -1734,6 +1752,10 @@ export async function processQuote(
           missingQuantitySignals,
           // T-127: placeholder ×1 quantities that must be clarified in-flow
           defaultedQuantitySteps,
+          // R3-1: stated-quantity doubt from the wording layer
+          quantityConcern: quantityConcern
+            ? { reason: quantityConcern, fieldId: quantityConcernFieldId }
+            : undefined,
           // T-126 send-guard inputs
           workStepsConfigured: rulesWithWorkSteps.workSteps?.length ?? 0,
           workStepLinesPriced: pricingTrace.trace.filter((t) => t.type === 'work_step').length,

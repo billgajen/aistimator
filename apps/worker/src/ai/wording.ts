@@ -37,6 +37,14 @@ export interface QuoteContent {
    */
   serviceMismatch?: boolean
   mismatchReason?: string
+  /**
+   * R3-1: photos/description contradict a customer-stated price driver
+   * (e.g. 2 hours booked, photos show a 4-hour job). Captured structurally so
+   * the processor can ask in-flow and cap the grade — previously the doubt
+   * lived only in the notes prose under a Grade A "exact" badge.
+   */
+  quantityConcern?: string
+  quantityConcernFieldId?: string
 }
 
 /**
@@ -196,8 +204,21 @@ Write the quote content as a JSON object with this exact structure:
   "notes": "Any additional notes or recommendations (optional, can be empty string)",
   "validityDays": 30,
   "serviceMismatch": false,
-  "mismatchReason": ""
+  "mismatchReason": "",
+  "quantityConcern": "",
+  "quantityConcernFieldId": ""
 }
+
+===== STATED QUANTITY SANITY CHECK (quantityConcern) =====
+Compare the customer's stated price-driving quantities (hours, areas, counts
+in their form answers above) against the photos and description. If the
+evidence suggests a stated quantity is likely TOO LOW or TOO HIGH for the job
+described (e.g. photos show heavy clutter but only 2 hours booked), set
+"quantityConcern" to ONE friendly customer-facing sentence naming the doubt
+and what would be realistic, and set "quantityConcernFieldId" to that answer's
+fieldId (the value in square brackets). Do NOT bury the doubt only in notes —
+this field is what lets the system act on it. Leave both as empty strings when
+the stated quantities look plausible or the photos cannot inform them.
 
 ===== WRONG-SERVICE DETECTION (serviceMismatch) =====
 Set "serviceMismatch": true ONLY when the customer's request is fundamentally
@@ -340,7 +361,7 @@ export async function generateWording(
   // Format form answers if available
   if (context.formAnswers && context.formAnswers.length > 0) {
     const formAnswersText = context.formAnswers
-      .map((a) => `- ${a.question}: ${a.answer}`)
+      .map((a) => `- [${a.fieldId}] ${a.question}: ${a.answer}`)
       .join('\n')
     prompt = prompt.replace(/{{#if FORM_ANSWERS}}([\s\S]*?){{\/if}}/g, '$1')
     prompt = prompt.replace('{{FORM_ANSWERS}}', formAnswersText)
@@ -438,6 +459,9 @@ function validateContent(content: Partial<QuoteContent>, context: WordingContext
     // enumerates fields — the AD-016 trap — so it MUST be listed here)
     serviceMismatch: content.serviceMismatch === true,
     mismatchReason: typeof content.mismatchReason === 'string' && content.mismatchReason ? content.mismatchReason : undefined,
+    // R3-1: stated-quantity doubt, same AD-016 rule
+    quantityConcern: typeof content.quantityConcern === 'string' && content.quantityConcern.trim() ? content.quantityConcern.trim() : undefined,
+    quantityConcernFieldId: typeof content.quantityConcernFieldId === 'string' && content.quantityConcernFieldId.trim() ? content.quantityConcernFieldId.trim() : undefined,
   }
 }
 

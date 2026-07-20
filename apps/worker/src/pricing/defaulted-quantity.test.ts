@@ -103,6 +103,48 @@ describe('T-127: defaulted quantities are visible and clarifiable', () => {
     expect(trace.trace.find((t) => t.id === 'fencing')?.quantityTrusted).toBe(true)
   })
 
+  it('R3-1: a stated-quantity concern triggers an in-flow confirmation question', async () => {
+    const result = await evaluateQualityGate(
+      {
+        structuredSignals: structured(),
+        fusionResult: null,
+        pricing: { currency: 'GBP', subtotal: 272, taxLabel: 'VAT', taxRate: 20, taxAmount: 45, total: 272, breakdown: [{ label: 'Hourly cleaning', amount: 56 }], notes: [] },
+        clarificationCount: 0,
+        serviceName: 'Home Cleaning',
+        hasPhotos: true,
+        quantityConcern: { reason: 'From your photos, 2 hours may not be enough for a full deep clean — many similar jobs need 3-4 hours.', fieldId: 'hours_required' },
+        workStepsConfigured: 1,
+        workStepLinesPriced: 1,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      null
+    )
+    expect(result.action).toBe('ask_clarification')
+    expect(result.questions?.[0]?.targetSignalKey).toBe('hours_required')
+  })
+
+  it('R3-1 cosmetics: multiplier lines carry human labels with percentages', () => {
+    const rules: PricingRules = {
+      baseFee: 0, minimumCharge: 0, addons: [],
+      multipliers: [
+        { when: { fieldId: 'is_deep_clean', operator: 'equals', equals: true }, multiplier: 1.5 },
+        { when: { fieldId: 'job_urgency', operator: 'equals', equals: 'emergency' }, multiplier: 1.25 },
+      ],
+      workSteps: [
+        { id: 'clean', name: 'Cleaning', description: '', costType: 'fixed', defaultCost: 100, optional: false },
+      ],
+    }
+    const { result } = calculatePricingWithTrace(
+      rules, signals(), structured(),
+      [{ fieldId: 'is_deep_clean', value: true }, { fieldId: 'job_urgency', value: 'emergency' }],
+      noTax, 'GBP'
+    )
+    const labels = result.breakdown.map((l) => l.label)
+    expect(labels).toContain('Deep clean surcharge (+50%)')
+    expect(labels.some((l) => l.includes('Emergency surcharge (+25%)'))).toBe(true)
+    expect(labels.some((l) => /: true/.test(l))).toBe(false)
+  })
+
   it('legacy steps (no quantitySource) honour a direct answer keyed by step id', () => {
     const rules: PricingRules = {
       baseFee: 0, minimumCharge: 0, addons: [], multipliers: [],

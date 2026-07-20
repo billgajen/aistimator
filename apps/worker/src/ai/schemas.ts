@@ -185,8 +185,17 @@ export const QUOTE_CONTENT_SCHEMA: Record<string, unknown> = {
       type: 'string',
       description: 'When serviceMismatch is true: one sentence naming what the customer actually needs',
     },
+    quantityConcern: {
+      type: 'string',
+      description:
+        'Empty string normally. Set to ONE customer-facing sentence when the photos/description suggest a customer-stated price-driving quantity (hours, area, counts) is likely too low or too high for the described job. Never invent concerns the photos cannot support.',
+    },
+    quantityConcernFieldId: {
+      type: 'string',
+      description: 'When quantityConcern is set: the exact fieldId (shown in square brackets in the form answers) of the doubted answer, else empty string',
+    },
   },
-  required: ['scopeSummary', 'assumptions', 'exclusions', 'notes', 'validityDays', 'serviceMismatch'],
+  required: ['scopeSummary', 'assumptions', 'exclusions', 'notes', 'validityDays', 'serviceMismatch', 'quantityConcern'],
 }
 
 /**

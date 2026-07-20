@@ -906,33 +906,38 @@ function generateMultiplierLabel(
   const { fieldId, equals, value } = mult.when
   const matchedValue = equals ?? value
 
+  // R3-1 cosmetics: customer-facing labels, never raw conditions like
+  // "Is Deep Clean: true". Always show the percentage.
+  const pct = Math.round((mult.multiplier - 1) * 100)
+  const pctSuffix = pct >= 0 ? ` (+${pct}%)` : ` (-${Math.abs(pct)}%)`
+  const kind = pct >= 0 ? 'surcharge' : 'discount'
+
   // T-125: subtotal-conditional multipliers get an order-value label
   if (mult.when.subject === 'subtotal' || !fieldId) {
     const op = mult.when.operator || 'gt'
     const relation = op === 'lt' || op === 'lte' ? 'under' : 'over'
-    const kind = mult.multiplier < 1 ? 'Discount' : 'Adjustment'
-    return `${kind} for jobs ${relation} ${matchedValue}`
+    return `${pct >= 0 ? 'Adjustment' : 'Discount'} for jobs ${relation} ${matchedValue}${pctSuffix}`
   }
 
-  // Strip common UI suffixes from fieldId for cleaner display
-  // e.g., "pest_type_input" → "pest_type", "room_select" → "room"
-  const cleanedFieldId = fieldId
-    .replace(/_(input|select|field|type|dropdown|choice)$/i, '')
+  const humanize = (s2: string): string =>
+    s2
+      .replace(/_(input|select|field|dropdown|choice)$/i, '')
+      .replace(/^(is|has|needs|requires)_/i, '')
+      .replace(/_/g, ' ')
+      .trim()
+      .replace(/^\w/, (c) => c.toUpperCase())
 
-  // Format the cleaned field ID into a readable label
-  // e.g., "pest_type" → "Pest Type", "dent_size" → "Dent Size"
-  const fieldLabel = cleanedFieldId
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
+  // Boolean condition ("is_deep_clean equals true") -> "Deep clean surcharge (+50%)"
+  if (matchedValue === true || matchedValue === 'true' || String(matchedValue).toLowerCase() === 'yes') {
+    return `${humanize(fieldId)} ${kind}${pctSuffix}`
+  }
 
-  // Format the value
-  const valueLabel = typeof matchedValue === 'string'
-    ? matchedValue.charAt(0).toUpperCase() + matchedValue.slice(1).replace(/_/g, ' ')
-    : String(matchedValue)
+  // Enum condition ("job_urgency equals emergency") -> "Emergency surcharge (+50%)"
+  if (typeof matchedValue === 'string') {
+    return `${humanize(matchedValue)} ${kind}${pctSuffix}`
+  }
 
-  // Use "Field: Value" format for professional labels
-  // e.g., "Pest Type: Mice", "Dent Size: Large"
-  return `${fieldLabel}: ${valueLabel}`
+  return `${humanize(fieldId)} ${kind}${pctSuffix}`
 }
 
 // Note: getComplexityMultiplier() was removed - automatic complexity multiplier is no longer applied.

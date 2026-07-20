@@ -43,6 +43,12 @@ export interface QualityGateInput {
    * (answers merge back as form answers via targetSignalKey).
    */
   defaultedQuantitySteps?: Array<{ askKey: string; stepName: string }>
+  /**
+   * R3-1: the wording layer concluded a customer-STATED price driver is
+   * contradicted by the photos/description. Ask the customer to confirm the
+   * quantity (answer merges back as a form answer via the fieldId).
+   */
+  quantityConcern?: { reason: string; fieldId?: string }
   /** T-126 send-guard: how many work steps the config defines */
   workStepsConfigured?: number
   /** T-126 send-guard: how many work-step lines actually priced */
@@ -138,7 +144,17 @@ export async function evaluateQualityGate(
       key: d.askKey,
       reason: `The quantity for "${d.stepName}" was not provided — the line is currently priced at a single-unit placeholder; ask the customer for the actual value`,
     }))
-  const structural = [...missing, ...defaulted]
+  // R3-1: stated-but-doubted quantities — the concern is already a
+  // customer-facing sentence, so ask it directly (the confirm-template would
+  // absurdly ask the customer to confirm the number they themselves typed)
+  const concern = input.quantityConcern
+    ? [{
+        key: input.quantityConcern.fieldId || 'stated_quantity',
+        reason: input.quantityConcern.reason,
+        direct: true,
+      }]
+    : []
+  const structural = [...missing, ...concern.filter((c) => !missing.some((m) => m.key === c.key)), ...defaulted]
   const signalsNeedingClarification = [
     ...structural,
     ...identified.filter((s) => !structural.some((m) => m.key === s.key)),
@@ -275,6 +291,15 @@ async function generateClarificationQuestions(
   const needsAiQuestion: Array<{ key: string; reason: string }> = []
 
   for (const s of signalsToAsk) {
+    // R3-1: direct entries already carry the exact customer-facing question
+    if ((s as { direct?: boolean }).direct) {
+      confirmQuestions.push({
+        id: `cq_${Date.now()}_d${confirmQuestions.length}`,
+        targetSignalKey: s.key,
+        question: `${s.reason} What should we allow for?`,
+      })
+      continue
+    }
     const signal = structuredSignals.signals.find(sig => sig.key === s.key)
     const value = signal?.value
     if (value !== undefined && value !== null && String(value).trim() !== '') {
