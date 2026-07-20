@@ -128,6 +128,66 @@ structural gaps, then truthfulness, then the strategic re-wiring:
 Re-run the gauntlet (`node scripts/hardcore-test/run.mjs`) after each ticket —
 the run-4 scoreboard above is the baseline to beat.
 
+## Round 2 — 20 blind scenarios (2026-07-20, run `ca09d5c6`)
+
+SpaceX-style second gauntlet. 20 NEW businesses with nastier pricing models;
+customer requests authored **blind** by an agent that saw only names+taglines
+(2 wrong-business plants, hagglers, unit confusion, imperfect English);
+customer form/clarification answers **simulated in-character** at runtime by
+Gemini (`customer-sim.mjs`) — no pre-scripted hints anywhere.
+
+**Outcome:** 18/20 quoted (16 sent + 2 correctly HELD at review by the
+T-126/T-127 machinery), 1 harness JSON blip (fixed, re-run clean). Grades
+honestly mixed (A×11, B×3, C×4). The T-127 clarify loop ran in-character in 5
+scenarios; measurement engine priced gutter metres (25m) and hedge length
+(19m) from photos at Grade B; hagglers moved nothing (AD-001 held); the £0
+tutoring quote and the nothing-bound locksmith quote were both held for review
+exactly as designed.
+
+### New findings (round 2 — each needs a ticket)
+
+- **R2-1 — Wrong-service requests are QUOTED, with a polite disclaimer.**
+  The freezer-repair request was sent a £455 ice sculpture (Grade A); the
+  smart-thermostat ticket got £65 of bee cut-out labour. The WORDING layer
+  explicitly says "we don't offer appliance repair" — the system KNOWS — but
+  service matching didn't reject (match mode off/unconfident by default for
+  new tenants) and pricing doesn't consult the mismatch. Fix direction: when
+  the wording/matching layer detects a mismatch, gate the quote (reject or
+  review), never price-and-apologise.
+- **R2-2 — Menu-pricing anti-pattern (the biggest one).** Price-list configs
+  compile every catalogue item as an unconditional step, and the engine prices
+  ALL of them ×1 regardless of what the customer asked for: S23 quoted dining
+  chairs + armchair + sofa + chaise (£1,940) to a customer who said — twice,
+  in clarification answers — "only my grandfather's wingback armchair"; S20
+  priced every room type; S16 every surface type. Clarify answers cannot
+  deselect lines. Fix direction: catalogue-style steps need request-relevance
+  binding (per-item `when`/AI-signal presence, or itemCatalog semantics) and
+  clarification must be able to zero a line.
+- **R2-3 — Auxiliary-only quotes.** S22 sent £16 (pair surcharge + £1 travel)
+  with NO training session line; S17 sent a £383 "bathroom renovation" that is
+  tiling only — the from-price bases (F2b) failed to compile and the
+  surcharges priced alone. The T-126 guard passes because ≥1 step priced.
+  Fix direction: primary-step concept (highest-value/base step must price or
+  the quote holds), folded into the F2b range-pricing ticket.
+- **R2-4 — Penalty/contingency fees charged up front.** S24 included the £60
+  "wasted journey fee (prohibited items)" as a NORMAL line because the
+  customer mentioned a fridge — a conditional penalty priced as a certainty.
+  Should be an exclusion warning, not a charge.
+- **R2-5 — Negative credit lines inexpressible.** S28's "resale value offset"
+  never appeared — normalizers clamp costs ≥ 0. Legitimate pricing model
+  (trade-in/credit) with no schema home. F2 family.
+- **R2-6 — Keyword addon false positive.** Smoke run: "I have logo files"
+  bought a £320 Logo Design (keyword trigger can't tell mention from need).
+  Compile-nondeterministic (absent in the full run).
+
+### Round-2 wins worth keeping
+
+Send-guard held both degenerate quotes; blind personas answered forms
+plausibly (a confused pensioner forced through an ice-sculpture form picks
+"single_block" — realistic!); derived quantities, block discounts (S26
+−£35.20 contract line), tier splits and thresholds all penny-exact; no price
+was ever AI-invented.
+
 ## Harness notes
 
 Per-scenario artifacts (compile, service, widget config, submission, public

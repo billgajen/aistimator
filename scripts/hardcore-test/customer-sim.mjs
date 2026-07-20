@@ -5,22 +5,32 @@
 // give a forced honest guess, like a real person facing a mandatory field).
 
 async function callGeminiJson(apiKey, systemPrompt, userPrompt) {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        generationConfig: { temperature: 0.3, maxOutputTokens: 8192, responseMimeType: 'application/json' },
-      }),
+  // up to 3 attempts — malformed/truncated JSON from the model killed S25 live
+  let lastErr
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            generationConfig: { temperature: 0.3, maxOutputTokens: 8192, responseMimeType: 'application/json' },
+          }),
+        }
+      )
+      if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 200)}`)
+      const data = await res.json()
+      const text = (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('')
+      return JSON.parse(text)
+    } catch (err) {
+      lastErr = err
+      console.log(`[customer-sim] attempt ${attempt} failed: ${String(err.message).slice(0, 120)}`)
     }
-  )
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 200)}`)
-  const data = await res.json()
-  const text = (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('')
-  return JSON.parse(text)
+  }
+  throw lastErr
 }
 
 const CUSTOMER_SYSTEM = `You are role-playing a REAL customer filling in a quote-request form on a small business website. You are not helpful AI — you are this specific person, with only their knowledge. Rules:
