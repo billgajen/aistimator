@@ -26,6 +26,7 @@ export function loadEnv() {
     supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321',
     anonKey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     serviceKey: env.SUPABASE_SERVICE_ROLE_KEY,
+    geminiKey: env.GEMINI_API_KEY,
   }
   if (!cfg.anonKey || !cfg.serviceKey) {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY in apps/web/.env.local')

@@ -1,8 +1,11 @@
 // Hardcore E2E runner — drives the full stack over HTTP, no browser.
-// Usage: node scripts/hardcore-test/run.mjs [--only S01,S05] [--skip-clarify]
+// Usage: node scripts/hardcore-test/run.mjs [--only S01,S05] [--skip-clarify] [--round2]
+// --round2: 20 blind-authored scenarios (scenarios2.mjs + requests2.json),
+// customer answers simulated in-character via Gemini (customer-sim.mjs).
 import path from 'node:path'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { scenarios } from './scenarios.mjs'
+import { simulateFieldAnswers, simulateClarifyAnswers } from './customer-sim.mjs'
 import {
   ROOT, loadEnv, makeSupabase, sessionCookieHeader, http, expectOk,
   collectAssets, uploadAssets, buildAnswers, pollQuote, answerClarifications,
@@ -14,6 +17,7 @@ const args = process.argv.slice(2)
 const onlyArg = args.find((a) => a.startsWith('--only'))
 const only = onlyArg ? (onlyArg.includes('=') ? onlyArg.split('=')[1] : args[args.indexOf(onlyArg) + 1]).split(',') : null
 const skipClarify = args.includes('--skip-clarify')
+const round2 = args.includes('--round2')
 
 const cfg = loadEnv()
 const sb = makeSupabase(cfg)
@@ -148,7 +152,19 @@ async function runScenario(scenario) {
     const widgetCfg = expectOk('widget config', await http('GET', `${cfg.appUrl}/api/public/widget/config?tenantKey=${tenantKey}`))
     saveJson(dir, 'widget-config.json', widgetCfg)
     const fields = [...(widgetCfg.globalFields || []), ...((widgetCfg.serviceFields || {})[serviceId] || [])]
-    const { answers, log: answerLog } = buildAnswers(scenario, fields)
+    let answers, answerLog
+    if (scenario.sim) {
+      const simmed = await simulateFieldAnswers({
+        apiKey: cfg.geminiKey,
+        persona: scenario.persona,
+        request: scenario.request,
+        fields: fields.filter((f) => f.fieldId !== '_project_description'),
+      })
+      answers = [{ fieldId: '_project_description', value: scenario.request }, ...simmed.answers]
+      answerLog = simmed.log
+    } else {
+      ;({ answers, log: answerLog } = buildAnswers(scenario, fields))
+    }
     result.steps.answerLog = answerLog
 
     // 7. Upload assets
@@ -169,6 +185,16 @@ async function runScenario(scenario) {
       },
       timeoutMs: 600_000,
     })
+    // Round 2 plants deliberately mismatched requests — a service-match
+    // rejection is a correct OUTCOME there, not a harness failure.
+    if (!submitRes.ok && ['SERVICE_MISMATCH', 'SERVICE_NOT_AVAILABLE'].includes(submitRes.json?.error?.code)) {
+      saveJson(dir, 'submission.json', submitRes.json)
+      result.finalStatus = `rejected:${submitRes.json.error.code}`
+      result.checks.push({ level: 'info', name: 'service matching rejected the request', detail: submitRes.json.error.message?.slice(0, 160) })
+      log(scenario.id, `service matching rejected: ${submitRes.json.error.code}`)
+      saveJson(dir, 'result.json', result)
+      return result
+    }
     const submit = expectOk('submit quote', submitRes)
     saveJson(dir, 'submission.json', submit)
     result.steps.processingSeconds = Math.round((Date.now() - t0) / 1000)
@@ -186,7 +212,17 @@ async function runScenario(scenario) {
     const clarificationLog = []
     if (quote.status === 'awaiting_clarification' && !skipClarify) {
       const questions = quote.clarificationQuestions || []
-      const { answers: clarifyAnswers, log: cl } = answerClarifications(scenario, questions)
+      let clarifyAnswers, cl
+      if (scenario.sim) {
+        ;({ answers: clarifyAnswers, log: cl } = await simulateClarifyAnswers({
+          apiKey: cfg.geminiKey,
+          persona: scenario.persona,
+          request: scenario.request,
+          questions,
+        }))
+      } else {
+        ;({ answers: clarifyAnswers, log: cl } = answerClarifications(scenario, questions))
+      }
       clarificationLog.push(...cl)
       log(scenario.id, `answering ${clarifyAnswers.length} clarification question(s)`)
       expectOk('clarify', await http('POST', `${cfg.appUrl}/api/public/quotes/${quoteId}/clarify`, {
@@ -249,7 +285,25 @@ function writeReport(results) {
   writeFileSync(path.join(outRoot, 'REPORT.md'), lines.join('\n'))
 }
 
-const selected = scenarios.filter((s) => !only || only.includes(s.id))
+let allScenarios = scenarios
+if (round2) {
+  const { businesses } = await import('./scenarios2.mjs')
+  const requests = JSON.parse(readFileSync(path.join(ROOT, 'scripts/hardcore-test/requests2.json'), 'utf8'))
+  allScenarios = businesses.map((b) => {
+    const r = requests[b.id]
+    if (!r) throw new Error(`requests2.json is missing ${b.id}`)
+    return {
+      ...b,
+      sim: true,
+      expect: { needsPhotos: false },
+      request: r.request,
+      persona: r.persona,
+      customer: { name: r.customerName, email: r.email, postcode: r.postcode },
+    }
+  })
+}
+
+const selected = allScenarios.filter((s) => !only || only.includes(s.id))
 console.log(`Running ${selected.length} scenario(s) → ${outRoot}`)
 const results = []
 for (const s of selected) {
