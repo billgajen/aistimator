@@ -52,7 +52,7 @@ import { initializeFusionFromStructuredSignals } from './agents/signal-fusion'
 import { evaluateQualityGate } from './agents/quality-gate'
 import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
 import type { QualityGateResult } from '@estimator/shared'
-import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking } from '@estimator/shared'
+import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking, extractFormulaIdentifiers } from '@estimator/shared'
 import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor } from './ai/measurement'
 import { buildTakeoff, buildReference } from './takeoff'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing } from './pricing'
@@ -1635,6 +1635,45 @@ export async function processQuote(
     )
   }
 
+  // T-127 (hardcore F3): work-step lines whose quantity DEFAULTED to 1 —
+  // unanswered form field, unresolvable derived formula, or legacy fallback.
+  // These prices are placeholders (the £85 "fence" that should be £1,700), so
+  // they feed the clarification gate like missing AI-signal quantities do.
+  // VOI bar: worth asking if a plausible quantity (up to ~10 units) would move
+  // the total past max(£75, 10%).
+  const defaultedQuantitySteps: Array<{ askKey: string; stepName: string }> = []
+  for (const traceStep of pricingTrace.trace) {
+    if (traceStep.type !== 'work_step') continue
+    if (traceStep.quantitySource !== 'legacy_fallback' && traceStep.quantitySource !== 'derived_unresolved') continue
+    const step = rulesWithWorkSteps.workSteps?.find((ws) => ws.id === traceStep.id)
+    if (!step) continue
+    let askKey: string | undefined
+    if (step.quantitySource?.type === 'form_field' && step.quantitySource.fieldId) {
+      askKey = step.quantitySource.fieldId
+    } else if (step.quantitySource?.type === 'derived' && step.quantitySource.formula) {
+      const idents = extractFormulaIdentifiers(step.quantitySource.formula) || []
+      askKey = idents.find((id) => !formAnswers.some((a) => a.fieldId === id)) ?? idents[0]
+    } else {
+      // Legacy step (no quantitySource): the engine honours a direct form
+      // answer keyed by the step id, so the clarify round can close the loop
+      askKey = step.id
+    }
+    if (!askKey) continue
+    const { ask } = isQuestionWorthAsking({
+      priceAtLow: pricing.total,
+      priceAtHigh: pricing.total + step.defaultCost * 9,
+      bestTotal: pricing.total,
+    })
+    if (ask) defaultedQuantitySteps.push({ askKey, stepName: step.name })
+  }
+  if (defaultedQuantitySteps.length > 0) {
+    console.log(
+      `[Processor] Defaulted-quantity steps (priced at placeholder ×1): ${defaultedQuantitySteps
+        .map((d) => `${d.stepName} (ask: ${d.askKey})`)
+        .join(', ')}`
+    )
+  }
+
   if (structuredSignals && gemini) {
     try {
       qualityGateResult = await evaluateQualityGate(
@@ -1646,6 +1685,8 @@ export async function processQuote(
           serviceName: service.name,
           hasPhotos: allImageAssets.length > 0,
           missingQuantitySignals,
+          // T-127: placeholder ×1 quantities that must be clarified in-flow
+          defaultedQuantitySteps,
           // T-126 send-guard inputs
           workStepsConfigured: rulesWithWorkSteps.workSteps?.length ?? 0,
           workStepLinesPriced: pricingTrace.trace.filter((t) => t.type === 'work_step').length,

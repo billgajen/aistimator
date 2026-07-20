@@ -36,6 +36,13 @@ export interface QualityGateInput {
    * in lowConfidenceSignals, so this is the only guard for them.
    */
   missingQuantitySignals?: Array<{ signalKey: string; stepName: string }>
+  /**
+   * T-127 (hardcore F3): work-step lines priced on a DEFAULTED quantity (×1
+   * placeholder — unanswered form field / unresolvable formula / legacy
+   * fallback). askKey is the fieldId/identifier the clarify round should fill
+   * (answers merge back as form answers via targetSignalKey).
+   */
+  defaultedQuantitySteps?: Array<{ askKey: string; stepName: string }>
   /** T-126 send-guard: how many work steps the config defines */
   workStepsConfigured?: number
   /** T-126 send-guard: how many work-step lines actually priced */
@@ -117,9 +124,18 @@ export async function evaluateQualityGate(
     key: m.signalKey,
     reason: `Required to price "${m.stepName}" but could not be measured from the photos — ask the customer for the value directly`,
   }))
+  // T-127: defaulted ×1 quantities are equally structural — the line is a
+  // placeholder price, not an estimate
+  const defaulted = (input.defaultedQuantitySteps || [])
+    .filter((d) => !missing.some((m) => m.key === d.askKey))
+    .map((d) => ({
+      key: d.askKey,
+      reason: `The quantity for "${d.stepName}" was not provided — the line is currently priced at a single-unit placeholder; ask the customer for the actual value`,
+    }))
+  const structural = [...missing, ...defaulted]
   const signalsNeedingClarification = [
-    ...missing,
-    ...identified.filter((s) => !missing.some((m) => m.key === s.key)),
+    ...structural,
+    ...identified.filter((s) => !structural.some((m) => m.key === s.key)),
   ]
 
   if (signalsNeedingClarification.length === 0) {

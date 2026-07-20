@@ -1424,6 +1424,28 @@ function calculateWorkStepCost(
       }
       // 2. LEGACY FALLBACK (deprecated, for backward compatibility only)
       else {
+        // T-127: a clarification answer for a legacy step merges back as a
+        // form answer keyed by the STEP ID — honour it before heuristics so
+        // the ask→answer→reprocess loop actually fixes the price
+        const directAnswer = formAnswers.find((a) => a.fieldId === step.id)
+        const directQty = directAnswer
+          ? (typeof directAnswer.value === 'number' ? directAnswer.value : coerceToNumber(directAnswer.value))
+          : null
+        if (directQty !== null && directQty > 0) {
+          const cost = directQty * step.defaultCost
+          const displayUnit = unitLabel.charAt(0).toUpperCase() + unitLabel.slice(1)
+          signalsUsed.push({ key: step.id, value: directQty })
+          return {
+            cost,
+            calculation: `${directQty} ${unitLabel} × ${step.defaultCost}/${unitLabel.replace(/s$/, '')} = ${cost}`,
+            signalsUsed,
+            quantitySource: 'form_field',
+            quantityTrusted: true,
+            quantity: directQty,
+            unitLabel: displayUnit,
+          }
+        }
+
         console.warn(`[Pricing] "${step.name}": No quantitySource configured, using legacy fallback (DEPRECATED - please configure explicit quantitySource)`)
 
         // Try triggerSignal first (if set)
@@ -1539,6 +1561,25 @@ function calculateWorkStepCost(
       }
       // 2. LEGACY FALLBACK - estimate hours based on complexity
       else {
+        // T-127: honour a clarification answer keyed by the step id (see per_unit)
+        const directAnswer = formAnswers.find((a) => a.fieldId === step.id)
+        const directHours = directAnswer
+          ? (typeof directAnswer.value === 'number' ? directAnswer.value : coerceToNumber(directAnswer.value))
+          : null
+        if (directHours !== null && directHours > 0) {
+          const cost = directHours * step.defaultCost
+          signalsUsed.push({ key: step.id, value: directHours })
+          return {
+            cost,
+            calculation: `${directHours} hours × ${step.defaultCost}/hour = ${cost}`,
+            signalsUsed,
+            quantitySource: 'form_field',
+            quantityTrusted: true,
+            quantity: directHours,
+            unitLabel: 'Hrs',
+          }
+        }
+
         console.warn(`[Pricing] "${step.name}": No quantitySource for per_hour, using complexity-based estimation (DEPRECATED)`)
         const complexitySignal = getSignalValue('complexity_level', structuredSignals, legacySignals)
 

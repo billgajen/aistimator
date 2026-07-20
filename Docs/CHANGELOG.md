@@ -43,6 +43,22 @@
 
 ---
 
+### 2026-07-20: T-127 — Defaulted Quantities Trigger In-Flow Clarification (F3)
+
+**The gap (hardcore F3):** work-step quantities that DEFAULTED to 1 (unanswered form field, unresolvable derived formula, legacy fallback) priced silently as placeholders — the £85 "fence" that should be £1,700 — labelled "Estimated — to be confirmed" yet sent Grade A. VOI/T-108 never fired in 40 generations because clarification only evaluated AI signals.
+
+**Built:**
+- Processor collects `defaultedQuantitySteps` from `legacy_fallback`/`derived_unresolved` trace entries, resolves each step's **askKey** (form fieldId / first missing formula identifier / step id for legacy), and applies the VOI bar (`isQuestionWorthAsking`, swing modelled as rate×9) so pennies-per-unit steps don't waste the 2-question budget.
+- Quality gate treats them as structural (same always-ask priority as missing AI-signal quantities), deduped, capped at 2, 1 round max.
+- **Loop closure:** clarify answers already merge back as form answers keyed by `targetSignalKey` (bug-#11 flow); engine now also honours a direct form answer keyed by the STEP ID in both legacy per_unit and per_hour fallbacks, so even quantitySource-less steps reprice from an answer.
+- 5 new worker tests (269 pass), incl. the fence ×1 → ask → 20 → £1,700 sequence.
+
+**Live verification (`scripts/hardcore-test/verify-t127.mjs`, full HTTP loop):** submission without fence length → `awaiting_clarification` with "Could you tell me the approximate length of the closeboard fencing…?" targeting `fence_length_m` → answer "20" → reprocess → **sent at £1,700** (was: silent £85 Grade A). Also incidentally re-proved the T-126 send-guard: a mis-seeded £0 config went to `pending_review`, not to the customer.
+
+**Files:** `apps/worker/src/quote-processor.ts`, `apps/worker/src/agents/quality-gate.ts`, `apps/worker/src/pricing/{rules-engine.ts,defaulted-quantity.test.ts}`, `scripts/hardcore-test/verify-t127.mjs`
+
+---
+
 ### 2026-07-20: T-126 — Form-Bound Step Conditions + Structural Send-Guard (F7)
 
 **The gap (hardcore F7):** work-step triggers only understood AI signals, so conditional fixed charges decided by customer answers ("SUV +£25", "weekend +£20", "£420 if it's a baby grand") compiled to empty `triggerCondition: {operator:'equals'}` stubs the engine silently dropped. Worst case: every step of the piano-move config dropped and a **£0 quote auto-sent** — the quality gate's zero-total check required `breakdown.length > 0`, which is false in exactly that failure.
