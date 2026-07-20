@@ -13,6 +13,7 @@
 import { GeminiClient } from './gemini'
 import { QUOTE_CONTENT_SCHEMA } from './schemas'
 import type { ExtractedSignals } from './signals'
+import type { TakeoffEntry } from '@estimator/shared'
 import type { PricingResult } from '../pricing/rules-engine'
 
 /**
@@ -25,7 +26,7 @@ export interface QuoteContent {
   notes: string
   validityDays: number
   /** T-122: quantity takeoff with measurement methods (attached post-wording) */
-  takeoff?: import('@estimator/shared').TakeoffEntry[]
+  takeoff?: TakeoffEntry[]
   /** T-122: human-facing estimate reference */
   reference?: string
 }
