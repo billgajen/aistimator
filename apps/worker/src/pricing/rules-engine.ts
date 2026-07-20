@@ -731,9 +731,19 @@ function shouldApplyMultiplier(
   const answer = answers.find((a) => a.fieldId === mult.when.fieldId)
   if (!answer) return false
 
-  const operator = mult.when.operator || 'equals'
-  const compareValue = mult.when.equals ?? mult.when.value
+  return compareAnswerValue(answer.value, mult.when.operator || 'equals', mult.when.equals ?? mult.when.value)
+}
 
+/**
+ * Compare a form answer against a configured condition value (T-126: shared
+ * by multiplier conditions and work-step `when` conditions).
+ */
+function compareAnswerValue(
+  answerValue: unknown,
+  operator: string,
+  compareValue: string | number | boolean | undefined
+): boolean {
+  const answer = { value: answerValue }
   switch (operator) {
     case 'equals':
       // Type-aware comparison to handle form data types vs config value types
@@ -747,7 +757,7 @@ function shouldApplyMultiplier(
           typeof v === 'string' && v.toLowerCase() === compareValueLower
         )
         if (hasMatch) {
-          console.log(`[Pricing] Multiplier array match: field "${mult.when.fieldId}" contains "${compareValue}"`)
+          console.log(`[Pricing] Condition array match: answer contains "${compareValue}"`)
         }
         return hasMatch
       }
@@ -1104,6 +1114,27 @@ function shouldTriggerWorkStep(
   legacySignals: ExtractedSignals,
   formAnswers?: FormAnswer[]
 ): { trigger: boolean; signalValue?: string | number | boolean } {
+  // T-126: explicit form-bound condition governs the step outright —
+  // conditional charges ("SUV +£25", "weekend +£20") bind to form answers
+  // with the same comparison semantics as multiplier conditions.
+  if (step.when?.fieldId) {
+    const answer = formAnswers?.find((a) => a.fieldId === step.when!.fieldId)
+    if (!answer || answer.value == null) {
+      console.log(`[Pricing] Work step "${step.name}": when-condition field "${step.when.fieldId}" unanswered - skipping`)
+      return { trigger: false }
+    }
+    const matched = compareAnswerValue(
+      answer.value,
+      step.when.operator || 'equals',
+      step.when.equals ?? step.when.value
+    )
+    console.log(`[Pricing] Work step "${step.name}": when ${step.when.fieldId} ${step.when.operator || 'equals'} ${step.when.equals ?? step.when.value} -> ${matched}`)
+    return {
+      trigger: matched,
+      signalValue: typeof answer.value === 'object' ? String(answer.value) : (answer.value as string | number | boolean),
+    }
+  }
+
   // Non-optional steps always trigger
   if (!step.optional) {
     return { trigger: true }

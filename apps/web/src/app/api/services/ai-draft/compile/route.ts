@@ -38,9 +38,11 @@ CORE RULES:
    d. constant for fixed quantities
 3b. PERCENTAGE CHARGES ("10% service charge on food"): a work step with costType "percent", defaultCost = the percentage number, and "percentOf" = an array of the work-step ids it applies to (or "subtotal" for everything so far). Never ask the customer for a percentage amount.
 3c. ORDER-VALUE RULES ("10% discount on jobs over £5,000"): a multiplier with { "when": { "subject": "subtotal", "operator": "gt", "value": 5000 }, "multiplier": 0.9 }. No customer question needed.
-4. Conditional charges ("add X when Y", "extra for Z") become either:
-   - An optional work step with triggerSignal + triggerCondition (when the condition comes from photos/AI), OR
-   - A multiplier (when the condition comes from a customer answer): { "when": { "fieldId": "<fieldId>", "operator": "equals|gt|gte|lt|lte", "equals": <value> }, "multiplier": <number> } — create the customer question in suggestedFields if it doesn't exist. Percentage adjustments become multipliers ("add 20%" → 1.2, "10% discount" → 0.9).
+4. Conditional charges ("add X when Y", "extra for Z") — pick by what decides the condition and what it does:
+   - FIXED charge decided by a customer answer ("SUV or 7-seater £95 instead of £70" → base £70 step + £25 surcharge step; "weekend +£20"; "£420 if it's a baby grand"): a work step with "when": { "fieldId": "<fieldId>", "operator": "equals", "equals": "<value>" }. The equals value MUST exactly match one of that field's options (or true/false for a boolean field). Create the customer question in suggestedFields if it doesn't exist.
+   - PERCENTAGE adjustment decided by a customer answer: a multiplier { "when": { "fieldId": "<fieldId>", "operator": "equals|gt|gte|lt|lte", "equals": <value> }, "multiplier": <number> } ("add 20%" → 1.2, "10% discount" → 0.9).
+   - Condition detected from PHOTOS/AI: an optional work step with triggerSignal + a COMPLETE triggerCondition (operator AND value) and a matching expectedSignals entry.
+   NEVER emit a triggerCondition or "when" without both an operator and a comparison value, and never an optional step with no when/triggerSignal/quantitySource — such steps are silently dropped by the pricing engine and the charge is lost.
 5. Optional extras the CUSTOMER chooses ("rush service +£50") become addons: { "label": ..., "price": ... }. Add triggerKeywords only for phrases a customer would plausibly type.
 6. "Minimum charge", "minimum job", "call-out fee": call-out/base fees → baseFee; minimum totals → minimumCharge.
 7. Field IDs: short snake_case (e.g. "wall_area_sqm"). Signal keys likewise. Keep IDs stable if currentConfig already defines matching items.
@@ -66,6 +68,7 @@ An instruction that appears in neither place is a failure.
       "workSteps": [
         { "id": "snake_case_id", "name": "...", "costType": "fixed|per_unit|per_hour", "defaultCost": 0, "unitLabel": "sqm", "optional": false, "quantitySource": { "type": "form_field", "fieldId": "..." } },
         { "id": "derived_example", "name": "...", "costType": "per_unit", "defaultCost": 0, "unitLabel": "...", "optional": false, "quantitySource": { "type": "derived", "formula": "ceil(max(0, some_field - 1000) / 500)" } },
+        { "id": "conditional_example", "name": "SUV surcharge", "costType": "fixed", "defaultCost": 25, "optional": true, "when": { "fieldId": "vehicle_type", "operator": "equals", "equals": "suv_or_7_seater" } },
         { "id": "percent_example", "name": "Service charge", "costType": "percent", "defaultCost": 10, "optional": false, "percentOf": ["step_id_1", "step_id_2"] }
       ]
     },

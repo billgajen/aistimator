@@ -43,6 +43,20 @@
 
 ---
 
+### 2026-07-20: T-126 — Form-Bound Step Conditions + Structural Send-Guard (F7)
+
+**The gap (hardcore F7):** work-step triggers only understood AI signals, so conditional fixed charges decided by customer answers ("SUV +£25", "weekend +£20", "£420 if it's a baby grand") compiled to empty `triggerCondition: {operator:'equals'}` stubs the engine silently dropped. Worst case: every step of the piano-move config dropped and a **£0 quote auto-sent** — the quality gate's zero-total check required `breakdown.length > 0`, which is false in exactly that failure.
+
+**Built:**
+- `WorkStepConfig.when: { fieldId, operator, equals|value }` — same shape and comparison semantics as multiplier conditions (`compareAnswerValue()` extracted from `shouldApplyMultiplier` and shared). A `when` governs the step outright, optional or not; unanswered field → step skipped with a trace log.
+- Compiler prompt rule 4 rewritten: fixed conditional charges → `when` steps (equals value MUST match a field option), percentage ones → multipliers, photo-decided ones → complete triggerSignal+triggerCondition; explicit warning that partial conditions are dropped. `normalizeStepWhen()` refuses conditions lacking fieldId or a comparison value.
+- **Structural send-guard** (two layers): quality gate now flags `total <= 0` regardless of breakdown, plus "N steps configured, 0 priced"; and a processor-level backstop applies the same checks even when the AI gate didn't run (no Gemini / errored) — a £0 or nothing-bound quote can never auto-send, it goes to `pending_review`.
+- 8 new worker tests (S04 surcharge binding incl. option-format normalization, S09 multi-item contains-matching, the exact S09 empty-breakdown £0 gate case). 264 pass.
+
+**Files:** `packages/shared/src/database.types.ts`, `apps/worker/src/pricing/{rules-engine.ts,conditional-steps.test.ts}`, `apps/worker/src/agents/quality-gate.ts`, `apps/worker/src/quote-processor.ts`, `apps/web/src/app/api/services/ai-draft/{compile/route.ts,shared.ts}`
+
+---
+
 ### 2026-07-20: T-125 — Derived Quantities, Percent Steps, Subtotal Multipliers (F2)
 
 **The gap (hardcore F2):** the engine couldn't express computed quantities — transaction tiers, mile thresholds, staff ratios, percentage charges, order-value discounts. The compiler pushed the arithmetic onto customer form fields, which customers misanswered: S05 swung from **£361,471 to £1,487** across runs of the same pricing text; S09 sent a £0 quote; S02 double-counted tiers.

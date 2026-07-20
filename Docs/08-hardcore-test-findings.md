@@ -57,6 +57,7 @@ never violated. The failures are all in **what the config could express** and
   pricing text. This is the #1 structural gap. Design direction: a small typed
   expression layer over form fields/signals in `WorkStepConfig.quantitySource`
   (still deterministic, still config — no AI in the maths).
+- **F2b (observation, 2026-07-20 post-T-125):** *range/category pricing* ("crown reduction £450 small / £900 large", "removal **from** £1,400") still has no schema home — `defaultCost` is a single number. The compiler nondeterministically models it well (category `when` steps) or badly (one S07 run produced a junk "£1 × 18" step priced £18 for a tree removal, sent Grade A). Candidate: min/max bounds on work steps feeding the T-120 interval, or category-conditioned `when` steps as the blessed pattern in the prompt. Track under T-127/T-128 plausibility work.
 - **F7 — Conditional fixed charges can't bind to form answers.** Step triggers
   key on AI signals only; the compiler emits `triggerCondition: {operator:
   'equals'}` with no value/signal for "SUV +£25", "weekend +£20", "if piano" —

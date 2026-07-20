@@ -145,6 +145,18 @@ export interface WorkStepConfig {
     value?: string | number | boolean
   }
   /**
+   * T-126: form-bound condition — the step applies only when the customer's
+   * answer matches (same shape as multiplier conditions). Use for conditional
+   * fixed charges like "SUV +£25" or "weekend +£20". Takes precedence over
+   * triggerSignal when both are present.
+   */
+  when?: {
+    fieldId: string
+    operator?: 'equals' | 'contains' | 'gt' | 'lt' | 'gte' | 'lte'
+    equals?: string | number | boolean
+    value?: string | number
+  }
+  /**
    * Explicit quantity source (required for per_unit/per_hour)
    * - form_field: Use value from customer's form answer (most trusted)
    * - constant: Fixed quantity (e.g., always 1)

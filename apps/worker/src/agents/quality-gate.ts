@@ -36,6 +36,10 @@ export interface QualityGateInput {
    * in lowConfidenceSignals, so this is the only guard for them.
    */
   missingQuantitySignals?: Array<{ signalKey: string; stepName: string }>
+  /** T-126 send-guard: how many work steps the config defines */
+  workStepsConfigured?: number
+  /** T-126 send-guard: how many work-step lines actually priced */
+  workStepLinesPriced?: number
 }
 
 /** Schema for AI-generated clarification questions */
@@ -160,9 +164,19 @@ function checkForCriticalIssues(input: QualityGateInput): string | null {
     return `Very low overall confidence (${(structuredSignals.overallConfidence * 100).toFixed(0)}%) — AI could not extract reliable signals from photos`
   }
 
-  // Zero total with work steps configured (pricing likely failed)
-  if (pricing.total <= 0 && pricing.breakdown.length > 0) {
-    return 'Pricing calculated to £0 or below despite having work steps — likely a configuration issue'
+  // T-126 send-guard (hardcore F7): a £0 quote must NEVER auto-send.
+  // The old check required breakdown.length > 0 — but the worst failure mode
+  // (every configured step failed to bind) produces an EMPTY breakdown, which
+  // is exactly when the guard is needed (S09 sent a £0 piano-move quote).
+  if (pricing.total <= 0) {
+    return 'Pricing calculated to £0 or below — nothing could be priced from the configuration; needs review'
+  }
+
+  // T-126 send-guard: config defines work steps but none applied — the quote
+  // is priced from base fee/addons/minimum only, which for a step-priced
+  // service means the request's actual work went unpriced.
+  if ((input.workStepsConfigured ?? 0) > 0 && (input.workStepLinesPriced ?? 0) === 0) {
+    return `None of the ${input.workStepsConfigured} configured work steps applied to this request — conditional charges may have failed to bind; needs review`
   }
 
   // Site visit strongly recommended

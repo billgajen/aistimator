@@ -1646,6 +1646,9 @@ export async function processQuote(
           serviceName: service.name,
           hasPhotos: allImageAssets.length > 0,
           missingQuantitySignals,
+          // T-126 send-guard inputs
+          workStepsConfigured: rulesWithWorkSteps.workSteps?.length ?? 0,
+          workStepLinesPriced: pricingTrace.trace.filter((t) => t.type === 'work_step').length,
         },
         gemini
       )
@@ -1685,6 +1688,30 @@ export async function processQuote(
     } catch (error) {
       console.error('[Processor] Quality gate evaluation failed:', error)
       // Continue without quality gate — don't block the quote
+    }
+  }
+
+  // 4.76 T-126 structural send-guard — runs even when the AI quality gate
+  // didn't (no gemini / no structured signals / gate error). A £0 quote, or a
+  // quote where every configured work step failed to bind, must never
+  // auto-send (hardcore F7: a £0 piano-move quote reached the customer).
+  if (finalStatus === 'sent' && qualityGateResult?.action !== 'ask_clarification') {
+    const stepsConfigured = rulesWithWorkSteps.workSteps?.length ?? 0
+    const stepLinesPriced = pricingTrace.trace.filter((t) => t.type === 'work_step').length
+    let guardReason: string | null = null
+    if (pricing.total <= 0) {
+      guardReason = 'Pricing calculated to £0 or below — nothing could be priced from the configuration'
+    } else if (stepsConfigured > 0 && stepLinesPriced === 0) {
+      guardReason = `None of the ${stepsConfigured} configured work steps applied — conditional charges may have failed to bind`
+    }
+    if (guardReason) {
+      finalStatus = 'pending_review'
+      console.log(`[Processor] Structural send-guard: ${guardReason}`)
+      qualityGateResult = {
+        action: 'require_review',
+        reason: guardReason,
+        evaluatedAt: new Date().toISOString(),
+      }
     }
   }
 

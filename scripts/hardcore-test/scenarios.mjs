@@ -383,7 +383,8 @@ const HINTS = {
       { match: /log|timber/, value: true },
       { match: /tpo|preservation/, value: true },
       { match: /remov|reduction|option|type of work|service/, value: 'Full removal' },
-      { match: /height|size|metre|tall|large/, value: 'Large (10m+)' },
+      { match: /height|metre/, value: 15 }, // numeric when the field is a number input
+      { match: /size|tall|large|categor/, value: 'Large (10m+)' },
       { match: /access/, value: 'Through the side gate, bottom of the garden' },
     ],
     clarify: [
@@ -425,6 +426,8 @@ const HINTS = {
   S10: {
     fieldHints: [
       { match: /additional|extra/, value: 1 }, // "two nests total" = 1 additional beyond the first
+      { match: /how many|number|count|num_/, value: 2 },
+      { match: /pest_type|type of pest|issue|problem/, value: 'Both wasps and mice' },
       { match: /nest|wasp/, value: 2 },
       { match: /mice|mouse|rodent|programme|visit/, value: true },
       { match: /landlord|tenant|managed|rented|who|payer|property/, value: 'Yes — rented, landlord pays' },

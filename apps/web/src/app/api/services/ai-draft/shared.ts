@@ -112,6 +112,7 @@ interface WorkStepInput {
   optional?: boolean
   triggerSignal?: string
   triggerCondition?: { operator: string; value?: string | number | boolean }
+  when?: { fieldId?: string; operator?: string; equals?: string | number | boolean; value?: string | number }
   quantitySource?: {
     type?: string
     fieldId?: string
@@ -136,6 +137,26 @@ function normalizeQuantitySource(qs: WorkStepInput['quantitySource']): ServiceDr
     value: qs.value,
     signalKey: qs.signalKey,
     formula: qs.formula,
+  }
+}
+
+/**
+ * T-126: form-bound step condition. Requires BOTH a fieldId and a comparison
+ * value — a partial condition would silently drop the step at pricing time
+ * (the exact hardcore-F7 failure this exists to prevent).
+ */
+function normalizeStepWhen(when: WorkStepInput['when']): ServiceDraftConfig['pricing']['workSteps'][0]['when'] | undefined {
+  if (!when?.fieldId) return undefined
+  const compare = when.equals ?? when.value
+  if (compare === undefined || compare === null || compare === '') return undefined
+  const validOps = ['equals', 'contains', 'gt', 'lt', 'gte', 'lte'] as const
+  return {
+    fieldId: when.fieldId,
+    operator: validOps.includes(when.operator as typeof validOps[number])
+      ? (when.operator as typeof validOps[number])
+      : 'equals',
+    equals: when.equals,
+    value: when.value,
   }
 }
 
@@ -171,6 +192,7 @@ export function normalizeWorkSteps(steps: WorkStepInput[]): ServiceDraftConfig['
       optional: step.optional || false,
       triggerSignal: step.optional ? step.triggerSignal : undefined,
       triggerCondition: step.optional ? normalizeTriggerCondition(step.triggerCondition) : undefined,
+      when: normalizeStepWhen(step.when),
       quantitySource: normalizeQuantitySource(step.quantitySource),
       unitLabel: step.unitLabel || undefined,
     }))
