@@ -148,6 +148,10 @@ exactly as designed.
 
 ✅ **ALL SHIPPED 2026-07-20:** R2-1 (`8652798` — matcher MAX_TOKENS root cause + worker mismatch gate; freezer request now held with "needs an appliance repair technician", thermostat request routed to general inquiry) and R2-2/R2-3/R2-4/R2-5/F2b (T-131, `630692f` — live: S23 £1,940→£678 armchair-only with honest range, S22 £16→£63 exact, S24 penalty→exclusion, S17 £383→£6,775 with band to £9,275). R2-6 (keyword addons mention≠need) remains open — post-launch. Original finding details below for the record.
 
+**R2-7 (found in the final regression, OPEN):** mutually-exclusive package steps can BOTH price when a compile run emits them without `when`-binding to the mode choice — S27 tutoring sent £873 = online block (£378) + in-home block (£495) for one student. Compile-adherence variance on rule 4b; no guard detects it (steps are neither £0 nor unbound nor catalogue). Fix directions: (a) compiler self-check pass validating that steps named as alternatives share a `when` field, (b) gate heuristic — multiple fixed package-ish steps priced with no conditions → review. Regression scoreboard: 29/30 correct, this was the single wrong-money quote.
+
+**R2-1b (calibration, OPEN):** the fixed matcher occasionally routes VALID requests to general inquiry (S12 dog-groom ramble) — over-caution. Failure mode is lost automation, never wrong money; tune thresholds/prompt post-launch.
+
 - **R2-1 — Wrong-service requests are QUOTED, with a polite disclaimer.**
   The freezer-repair request was sent a £455 ice sculpture (Grade A); the
   smart-thermostat ticket got £65 of bee cut-out labour. The WORDING layer
