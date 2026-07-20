@@ -82,8 +82,12 @@ Be strict: If the description clearly describes a different type of work (e.g., 
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
-          maxOutputTokens: 500,
+          // R2-1 root cause: 500 tokens with 2.5-flash meant THINKING consumed
+          // the whole budget (MAX_TOKENS mid-JSON), the parse failed, and the
+          // fallback failed open — every mismatch check silently passed.
+          maxOutputTokens: 2048,
           temperature: 0.1, // Low temperature for consistent results
+          responseMimeType: 'application/json',
         },
       }),
     })
@@ -103,6 +107,10 @@ Be strict: If the description clearly describes a different type of work (e.g., 
     }
 
     const data = await response.json()
+    const finishReason = data.candidates?.[0]?.finishReason
+    if (finishReason && finishReason !== 'STOP') {
+      console.warn(`[ServiceMatcher] Non-STOP finish (${finishReason}) — response may be truncated`)
+    }
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
 
     // Parse JSON from response

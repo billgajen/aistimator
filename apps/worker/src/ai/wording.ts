@@ -29,6 +29,14 @@ export interface QuoteContent {
   takeoff?: TakeoffEntry[]
   /** T-122: human-facing estimate reference */
   reference?: string
+  /**
+   * R2-1: true when the request is fundamentally for a service this business
+   * does not provide (wrong trade). Captured structurally so the processor can
+   * gate the quote — previously the wording admitted the mismatch in prose
+   * while the priced quote shipped anyway.
+   */
+  serviceMismatch?: boolean
+  mismatchReason?: string
 }
 
 /**
@@ -186,8 +194,18 @@ Write the quote content as a JSON object with this exact structure:
   "assumptions": ["list", "of", "assumptions", "we're making"],
   "exclusions": ["list", "of", "what's NOT included"],
   "notes": "Any additional notes or recommendations (optional, can be empty string)",
-  "validityDays": 30
+  "validityDays": 30,
+  "serviceMismatch": false,
+  "mismatchReason": ""
 }
+
+===== WRONG-SERVICE DETECTION (serviceMismatch) =====
+Set "serviceMismatch": true ONLY when the customer's request is fundamentally
+for a DIFFERENT TRADE this business does not provide at all — e.g. appliance
+repair requested from an ice sculpture studio, or smart-home tech support
+requested from a beekeeper. Then set "mismatchReason" to one sentence naming
+what they actually need. A valid request that ALSO asks for extra out-of-scope
+items is NOT a mismatch — handle those via exclusions/notes as usual.
 
 Guidelines:
 - scopeSummary should clearly describe the work in plain English, referencing what's included if provided
@@ -416,6 +434,10 @@ function validateContent(content: Partial<QuoteContent>, context: WordingContext
       : getDefaultExclusions(context),
     notes,
     validityDays: typeof content.validityDays === 'number' ? content.validityDays : 30,
+    // R2-1: thread the structural mismatch verdict through (this return
+    // enumerates fields — the AD-016 trap — so it MUST be listed here)
+    serviceMismatch: content.serviceMismatch === true,
+    mismatchReason: typeof content.mismatchReason === 'string' && content.mismatchReason ? content.mismatchReason : undefined,
   }
 }
 

@@ -1762,7 +1762,11 @@ export async function processQuote(
     const stepsConfigured = rulesWithWorkSteps.workSteps?.length ?? 0
     const stepLinesPriced = pricingTrace.trace.filter((t) => t.type === 'work_step').length
     let guardReason: string | null = null
-    if (pricing.total <= 0) {
+    if (content.serviceMismatch) {
+      // R2-1: the wording layer detected the request is for a different trade
+      // entirely — never send a priced quote with an apology attached
+      guardReason = `Request appears to be for a service this business does not offer${content.mismatchReason ? ` — ${content.mismatchReason}` : ''}`
+    } else if (pricing.total <= 0) {
       guardReason = 'Pricing calculated to £0 or below — nothing could be priced from the configuration'
     } else if (stepsConfigured > 0 && stepLinesPriced === 0) {
       guardReason = `None of the ${stepsConfigured} configured work steps applied — conditional charges may have failed to bind`

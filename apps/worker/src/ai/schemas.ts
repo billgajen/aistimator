@@ -176,8 +176,17 @@ export const QUOTE_CONTENT_SCHEMA: Record<string, unknown> = {
       type: 'number',
       description: 'Quote validity in days (typically 30)',
     },
+    serviceMismatch: {
+      type: 'boolean',
+      description:
+        'true ONLY if the customer is fundamentally asking for a different trade this business does not provide at all (e.g. appliance repair from an ice sculptor). Extra out-of-scope items alongside a valid request are NOT a mismatch.',
+    },
+    mismatchReason: {
+      type: 'string',
+      description: 'When serviceMismatch is true: one sentence naming what the customer actually needs',
+    },
   },
-  required: ['scopeSummary', 'assumptions', 'exclusions', 'notes', 'validityDays'],
+  required: ['scopeSummary', 'assumptions', 'exclusions', 'notes', 'validityDays', 'serviceMismatch'],
 }
 
 /**
