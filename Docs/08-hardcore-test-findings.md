@@ -144,7 +144,9 @@ scenarios; measurement engine priced gutter metres (25m) and hedge length
 tutoring quote and the nothing-bound locksmith quote were both held for review
 exactly as designed.
 
-### New findings (round 2 — each needs a ticket)
+### New findings (round 2)
+
+✅ **ALL SHIPPED 2026-07-20:** R2-1 (`8652798` — matcher MAX_TOKENS root cause + worker mismatch gate; freezer request now held with "needs an appliance repair technician", thermostat request routed to general inquiry) and R2-2/R2-3/R2-4/R2-5/F2b (T-131, `630692f` — live: S23 £1,940→£678 armchair-only with honest range, S22 £16→£63 exact, S24 penalty→exclusion, S17 £383→£6,775 with band to £9,275). R2-6 (keyword addons mention≠need) remains open — post-launch. Original finding details below for the record.
 
 - **R2-1 — Wrong-service requests are QUOTED, with a polite disclaimer.**
   The freezer-repair request was sent a £455 ice sculpture (Grade A); the
