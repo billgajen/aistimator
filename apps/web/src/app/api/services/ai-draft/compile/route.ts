@@ -40,7 +40,7 @@ CORE RULES:
 8. Preserve anything in currentConfig that the description doesn't contradict — this may be a partial edit, not a rewrite.
 9. suggestedFields must contain every field referenced by a quantitySource or multiplier. expectedSignals must contain every signal referenced by a triggerSignal or ai_signal quantity source.
 
-Return ONLY JSON. The "instructions" array comes FIRST and MUST contain one entry
+Return ONLY JSON, exactly in the shape below. Work steps live at updatedConfig.pricing.workSteps (NOT at the top of updatedConfig), each with "name" (not "label"). The "instructions" array comes FIRST and MUST contain one entry
 per distinct instruction in the owner's description — this is your accounting: every
 instruction is either applied (say exactly where) or asked about in "ambiguities".
 An instruction that appears in neither place is a failure.
@@ -49,7 +49,18 @@ An instruction that appears in neither place is a failure.
     { "instruction": "quoted from the description", "action": "applied", "target": "which config item changed and to what" },
     { "instruction": "...", "action": "ambiguous", "target": "why — with the matching question in ambiguities" }
   ],
-  "updatedConfig": { ...complete ServiceDraftConfig (scope/media copied from currentConfig if provided)... },
+  "updatedConfig": {
+    "scope": { "included": ["..."], "excluded": ["..."], "assumptions": ["..."] },
+    "media": { "minPhotos": 1, "maxPhotos": 8, "photoGuidance": "..." },
+    "pricing": {
+      "pricingModel": "fixed|per_unit|tiered|inspection_first",
+      "baseFee": 0,
+      "minimumCharge": 0,
+      "workSteps": [ { "id": "snake_case_id", "name": "...", "costType": "fixed|per_unit|per_hour", "defaultCost": 0, "unitLabel": "sqm", "optional": false, "quantitySource": { "type": "form_field", "fieldId": "..." } } ]
+    },
+    "expectedSignals": [ { "signalKey": "...", "type": "number|enum|boolean|string", "description": "..." } ],
+    "suggestedFields": [ { "fieldId": "...", "label": "...", "type": "number|text|dropdown|radio|boolean", "required": true, "criticalForPricing": true, "options": ["only for dropdown/radio"] } ]
+  },
   "addons": [ { "label": "...", "price": 0, "triggerKeywords": ["..."] } ],
   "multipliers": [ { "when": { "fieldId": "...", "operator": "equals", "equals": "..." }, "multiplier": 1.2 } ],
   "ambiguities": [ "Specific question about missing/unclear information" ]
@@ -204,7 +215,9 @@ Compile this into the pricing configuration. Remember: never invent numbers — 
       systemPrompt: COMPILE_SYSTEM_PROMPT,
       userPrompt,
       temperature: 0.2, // compilation should be precise, not creative
-      maxOutputTokens: 8192,
+      // 2.5-flash thinking tokens count against this budget (same trap as the
+      // measurement 4096 truncation) — 16384 leaves headroom for long price lists
+      maxOutputTokens: 16384,
     })
 
     const result = parseGeminiJson<CompileAIResponse>(responseText)
@@ -228,6 +241,19 @@ Compile this into the pricing configuration. Remember: never invent numbers — 
     const updatedDraft = rawUpdated?.config ?? rawUpdated
     const responseAddons = result.addons?.length ? result.addons : rawUpdated?.addons
     const responseMultipliers = result.multipliers?.length ? result.multipliers : rawUpdated?.multipliers
+
+    // Shape-drift tolerance (hardcore-test finding, 2026-07-20): the model
+    // sometimes emits workSteps at the draft root instead of under pricing —
+    // which used to silently discard the ENTIRE compilation.
+    if (updatedDraft) {
+      const rootSteps = (updatedDraft as { workSteps?: unknown[] }).workSteps
+      if (Array.isArray(rootSteps) && rootSteps.length && !updatedDraft.pricing?.workSteps?.length) {
+        updatedDraft.pricing = {
+          ...(updatedDraft.pricing ?? {}),
+          workSteps: rootSteps,
+        } as ServiceDraftConfig['pricing']
+      }
+    }
 
     console.log(
       '[Compile] workStep costs:',

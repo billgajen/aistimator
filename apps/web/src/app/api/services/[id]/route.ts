@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { normalizeFieldOption } from '@/lib/field-options'
 import { type NextRequest, NextResponse } from 'next/server'
 import type {
   DocumentType,
@@ -279,7 +280,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         criticalForPricing: f.criticalForPricing || false,
         mapsToSignal: f.mapsToSignal || undefined,
         ...(f.options && f.options.length > 0 && {
-          options: f.options.map((opt: string) => ({ value: opt.toLowerCase().replace(/\s+/g, '_'), label: opt })),
+          options: f.options.map(normalizeFieldOption),
         }),
       }))
 

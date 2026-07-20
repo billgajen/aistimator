@@ -38,7 +38,9 @@ export function validateAndNormalizeDraft(
     pricingModel,
     unitType: draft.pricing?.unitType || null,
     baseFee: Math.max(0, draft.pricing?.baseFee || 0),
-    minimumCharge: Math.max(0, draft.pricing?.minimumCharge || 50),
+    // ?? not || — a stated £0 minimum is valid, and an absent one must NOT
+    // invent a price (core rule 1: never invent numbers the owner didn't state)
+    minimumCharge: Math.max(0, draft.pricing?.minimumCharge ?? 0),
     workSteps: truncateArray(normalizeWorkSteps(draft.pricing?.workSteps || []), 5),
     addOns: truncateArray(normalizeAddons(draft.pricing?.addOns || []), 6),
     siteVisit: {
@@ -98,10 +100,14 @@ export function truncateArray<T>(arr: T[], max: number): T[] {
 interface WorkStepInput {
   id?: string
   name?: string
+  /** Model output drift: steps sometimes arrive with `label` instead of `name` */
+  label?: string
   description?: string
   costType?: string
   defaultCost?: number
   cost?: number
+  /** Model output drift: cost sometimes arrives as `price` */
+  price?: number
   optional?: boolean
   triggerSignal?: string
   triggerCondition?: { operator: string; value?: string | number | boolean }
@@ -138,15 +144,17 @@ function normalizeTriggerCondition(tc: WorkStepInput['triggerCondition']): Servi
 
 export function normalizeWorkSteps(steps: WorkStepInput[]): ServiceDraftConfig['pricing']['workSteps'] {
   return steps
-    .filter(step => step.name && step.name.length > 0)
+    .filter(step => (step.name || step.label || '').length > 0)
     .map((step, index) => ({
       id: step.id || `step_${index + 1}`,
-      name: step.name!,
-      description: step.description || step.name!,
+      name: (step.name || step.label)!,
+      description: step.description || (step.name || step.label)!,
       costType: (['fixed', 'per_unit', 'per_hour'] as const).includes(step.costType as 'fixed' | 'per_unit' | 'per_hour')
         ? (step.costType as 'fixed' | 'per_unit' | 'per_hour')
         : 'fixed',
-      defaultCost: Math.max(0, step.defaultCost || step.cost || 25),
+      // ?? chain, ending at 0: a missing cost must surface as £0 (visible),
+      // never be invented (previously defaulted to 25)
+      defaultCost: Math.max(0, step.defaultCost ?? step.cost ?? step.price ?? 0),
       optional: step.optional || false,
       triggerSignal: step.optional ? step.triggerSignal : undefined,
       triggerCondition: step.optional ? normalizeTriggerCondition(step.triggerCondition) : undefined,
