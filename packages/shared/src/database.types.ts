@@ -101,13 +101,19 @@ export interface ServiceMediaConfig {
  */
 export interface QuantitySource {
   /** Source type for the quantity */
-  type: 'form_field' | 'constant' | 'ai_signal'
+  type: 'form_field' | 'constant' | 'ai_signal' | 'derived'
   /** For form_field: which question provides the quantity */
   fieldId?: string
   /** For constant: fixed quantity (e.g., 1 for "Kitchen" which is always 1 per house) */
   value?: number
   /** For ai_signal: which AI signal to use (use with caution - lower trust) */
   signalKey?: string
+  /**
+   * For derived (T-125): deterministic expression over form fieldIds / signal
+   * keys, e.g. "ceil(max(0, num_transactions - 1000) / 500)". Evaluated by
+   * packages/shared/src/formula.ts — arithmetic, ceil/floor/round/abs/min/max.
+   */
+  formula?: string
 }
 
 /**
@@ -117,9 +123,18 @@ export interface WorkStepConfig {
   id: string
   name: string
   description: string
-  costType: 'fixed' | 'per_unit' | 'per_hour'
-  /** Default cost (fixed amount, or per-unit/hour rate) - used as starting point, can be overridden */
+  costType: 'fixed' | 'per_unit' | 'per_hour' | 'percent'
+  /**
+   * Default cost (fixed amount, or per-unit/hour rate).
+   * For costType 'percent' (T-125): the percentage, e.g. 10 for 10%.
+   */
   defaultCost: number
+  /**
+   * For costType 'percent' (T-125): what the percentage applies to —
+   * 'subtotal' (running total when evaluated, after all non-percent steps) or
+   * an array of work-step ids whose priced amounts are summed.
+   */
+  percentOf?: string[] | 'subtotal'
   /** Optional steps only apply when trigger condition is met */
   optional: boolean
   /** Signal key that determines if this step is needed */
@@ -376,7 +391,14 @@ export interface AddonConfig {
 
 export interface MultiplierConfig {
   when: {
-    fieldId: string
+    /**
+     * What the condition tests (T-125): 'field' (default) compares a form
+     * answer; 'subtotal' compares the running subtotal at multiplier time —
+     * enables order-value rules like "10% off jobs over £5,000" (× 0.9).
+     */
+    subject?: 'field' | 'subtotal'
+    /** Required unless subject is 'subtotal' */
+    fieldId?: string
     operator?: string
     equals?: string | number | boolean
     value?: string | number
@@ -693,7 +715,7 @@ export interface PricingTraceStep {
   /** Running total after this step */
   runningTotal: number
   /** For per-unit steps: where the quantity came from */
-  quantitySource?: 'form_field' | 'constant' | 'ai_signal' | 'legacy_fallback'
+  quantitySource?: 'form_field' | 'constant' | 'ai_signal' | 'legacy_fallback' | 'derived' | 'derived_unresolved'
   /** Whether the quantity is fully trusted (form/constant) vs estimated (AI) */
   quantityTrusted?: boolean
 }

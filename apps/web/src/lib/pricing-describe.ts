@@ -120,13 +120,17 @@ function describeAddon(addon: AddonConfig, symbol: string): string {
 }
 
 function describeMultiplier(m: MultiplierConfig, pricing: DescribablePricing): string {
-  const label = fieldLabel(m.when.fieldId, pricing.suggestedFields)
   const conditionValue = m.when.equals ?? m.when.value
   const pct = Math.round((m.multiplier - 1) * 100)
   const effect =
     m.multiplier >= 1
       ? `increase the price by ${pct}%`
       : `decrease the price by ${Math.abs(pct)}%`
+  // T-125: subtotal-conditioned multipliers (order-value rules) have no field
+  if (m.when.subject === 'subtotal' || !m.when.fieldId) {
+    return `When the job total ${operatorPhrase(m.when.operator, conditionValue)}: ${effect} (×${m.multiplier})`
+  }
+  const label = fieldLabel(m.when.fieldId, pricing.suggestedFields)
   return `When ${label} ${operatorPhrase(m.when.operator, conditionValue)}: ${effect} (×${m.multiplier})`
 }
 

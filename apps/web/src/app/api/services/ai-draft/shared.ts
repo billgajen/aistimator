@@ -4,6 +4,7 @@
  */
 
 import type { ServiceDraftConfig } from '@estimator/shared'
+import { extractFormulaIdentifiers } from '@estimator/shared'
 
 /**
  * Validate and normalize an AI-generated draft config
@@ -116,19 +117,25 @@ interface WorkStepInput {
     fieldId?: string
     value?: number
     signalKey?: string
+    formula?: string
   }
   unitLabel?: string
+  percentOf?: string[] | 'subtotal'
 }
 
 function normalizeQuantitySource(qs: WorkStepInput['quantitySource']): ServiceDraftConfig['pricing']['workSteps'][0]['quantitySource'] | undefined {
   if (!qs || !qs.type) return undefined
-  const validTypes = ['form_field', 'constant', 'ai_signal'] as const
+  const validTypes = ['form_field', 'constant', 'ai_signal', 'derived'] as const
   if (!validTypes.includes(qs.type as typeof validTypes[number])) return undefined
+  // T-125: derived formulas must at least parse — an unparsable formula would
+  // silently price at quantity 1 downstream
+  if (qs.type === 'derived' && (!qs.formula || extractFormulaIdentifiers(qs.formula) === null)) return undefined
   return {
-    type: qs.type as 'form_field' | 'constant' | 'ai_signal',
+    type: qs.type as 'form_field' | 'constant' | 'ai_signal' | 'derived',
     fieldId: qs.fieldId,
     value: qs.value,
     signalKey: qs.signalKey,
+    formula: qs.formula,
   }
 }
 
@@ -149,12 +156,18 @@ export function normalizeWorkSteps(steps: WorkStepInput[]): ServiceDraftConfig['
       id: step.id || `step_${index + 1}`,
       name: (step.name || step.label)!,
       description: step.description || (step.name || step.label)!,
-      costType: (['fixed', 'per_unit', 'per_hour'] as const).includes(step.costType as 'fixed' | 'per_unit' | 'per_hour')
-        ? (step.costType as 'fixed' | 'per_unit' | 'per_hour')
+      costType: (['fixed', 'per_unit', 'per_hour', 'percent'] as const).includes(step.costType as 'fixed' | 'per_unit' | 'per_hour' | 'percent')
+        ? (step.costType as 'fixed' | 'per_unit' | 'per_hour' | 'percent')
         : 'fixed',
       // ?? chain, ending at 0: a missing cost must surface as £0 (visible),
       // never be invented (previously defaulted to 25)
       defaultCost: Math.max(0, step.defaultCost ?? step.cost ?? step.price ?? 0),
+      // T-125: percent steps carry what the percentage applies to
+      percentOf: step.costType === 'percent'
+        ? (step.percentOf === 'subtotal' || (Array.isArray(step.percentOf) && step.percentOf.every((s) => typeof s === 'string'))
+            ? step.percentOf
+            : 'subtotal')
+        : undefined,
       optional: step.optional || false,
       triggerSignal: step.optional ? step.triggerSignal : undefined,
       triggerCondition: step.optional ? normalizeTriggerCondition(step.triggerCondition) : undefined,

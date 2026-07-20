@@ -131,8 +131,9 @@ export const scenarios = [
       'and both need self assessments. What will it cost to get us fully up to date?',
     expect: {
       needsPhotos: false, // document upload instead (bank-statement.csv, 2,388 rows)
-      // £850 + 3×£150 (2,400 tx → 3 extra tiers) + 3×£95 VAT + 2×£160 SA = £2,205 before payroll/tidy-up
-      minTotal: 2205,
+      // £850 + 3×£150 (2,400 tx → 3 extra tiers) + 3×£95 VAT + 2×£160 SA = £1,905 before payroll/tidy-up
+      minTotal: 1900,
+      approxTotalRange: [1900, 2600],
       invariants: [
         'no vision/measurement passes — quantities come from text and document',
         'transaction tiering: ~2,400 tx → base + 3 extra tiers (£450), not 2.8 tiers',

@@ -43,6 +43,25 @@
 
 ---
 
+### 2026-07-20: T-125 — Derived Quantities, Percent Steps, Subtotal Multipliers (F2)
+
+**The gap (hardcore F2):** the engine couldn't express computed quantities — transaction tiers, mile thresholds, staff ratios, percentage charges, order-value discounts. The compiler pushed the arithmetic onto customer form fields, which customers misanswered: S05 swung from **£361,471 to £1,487** across runs of the same pricing text; S09 sent a £0 quote; S02 double-counted tiers.
+
+**Built:**
+- **AD-024: deterministic quantity formulas.** `packages/shared/src/formula.ts` — a ~180-line safe expression evaluator (no eval; `+ - * / ( )`, `ceil/floor/round/abs/min/max`, identifiers = form fieldIds/signal keys; length/token caps; unknown identifier or bad syntax fails the WHOLE formula so callers fall back explicitly, never price on garbage). Work steps take `quantitySource: { type: 'derived', formula }`. Trust propagates: all-form operands → trusted; any AI-signal operand → untrusted; unresolved → `derived_unresolved` + quantity-1 fallback flagged in the trace (T-127 hook).
+- **Percent work steps:** `costType: 'percent'`, `defaultCost` = the percentage, `percentOf` = step ids (service charge on food lines) or `'subtotal'`. Evaluated after all non-percent steps.
+- **Subtotal multipliers:** `when: { subject: 'subtotal', operator, value }` — order-value rules ("10% off over £5,000" ×0.9) with no customer question. `when.fieldId` is now optional; all consumers guarded.
+- Compiler prompt teaches all three (rules 3b/3c + schema examples with the exact gauntlet formulas); web normalizers validate formulas parse (`extractFormulaIdentifiers`) before accepting.
+- 13 new worker tests encode the gauntlet disasters as regressions (2,400 tx → 3 tiers not £360k; 20 miles → £0 line; £4,430 → no discount). 256 total pass.
+
+**Live verification (gauntlet re-run, all penny-exact vs pricing text):** S02 £832.50 (min/max tier split + ×1.5 emergency), S03 £4,520 (discount withheld below £5k), S05 £1,921 (3 derived tier blocks), S06 £12,068 (derived canapés 128, derived staff 9, percent service charge £948 on exactly the food lines), S09 £1,432.50 (3 flights × 2 items derived, 225 excess miles derived) — S09 was the £0-quote scenario.
+
+**Ops lesson:** running `next build` while `next dev` is live clobbers `.next` and 500s every API route until the dev server restarts. Restart `pnpm dev:web` after any build.
+
+**Files:** `packages/shared/src/{formula.ts,index.ts,database.types.ts}`, `apps/worker/src/pricing/{rules-engine.ts,derived-pricing.test.ts}`, `apps/worker/src/ai/signals.ts`, `apps/web/src/app/api/services/ai-draft/{compile/route.ts,shared.ts}`, `apps/web/src/lib/pricing-describe.ts`
+
+---
+
 ### 2026-07-20: T-129 — Public API Now Enforces Per-Service Required Fields (F4)
 
 **What broke (hardcore F4):** `POST /api/public/quotes` validated required/critical fields against only the **global** `widget_configs` row (`service_id IS NULL`). The per-service rows that `POST /api/services` creates from compiled `suggestedFields` were never checked, so submissions omitting required price-driving quantities were accepted and the engine priced them at quantity 1 (the £85 fence).

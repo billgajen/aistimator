@@ -18,6 +18,9 @@ export * from './envelopes'
 // Re-export estimate grading + VOI (T-120/T-121, Measurement Engine)
 export * from './grading'
 
+// Re-export deterministic quantity formulas (T-125)
+export * from './formula'
+
 // ID prefixes for stable, readable IDs
 export const ID_PREFIXES = {
   tenant: 'tnt_',

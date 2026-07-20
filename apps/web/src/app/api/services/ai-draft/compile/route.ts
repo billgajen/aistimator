@@ -29,8 +29,15 @@ CORE RULES:
    - Rates ("£12 per sqm", "$50/hour") → costType "per_unit" (or "per_hour") with defaultCost = the rate and a clear unitLabel
 3. QUANTITY SOURCES for per-unit steps, in priority order:
    a. form_field (STRONGLY PREFERRED — deterministic): create a matching question in suggestedFields (type "number", required, criticalForPricing: true) and link via { "type": "form_field", "fieldId": "<fieldId>" }
-   b. ai_signal (only when the customer genuinely can't answer, e.g. "amount of moss coverage"): add a matching entry to expectedSignals and link via { "type": "ai_signal", "signalKey": "<key>" }
-   c. constant for fixed quantities
+   b. derived (for ANY quantity computed from other answers — tiers, thresholds, ratios): { "type": "derived", "formula": "<expression>" }. The formula references fieldIds/signalKeys and supports + - * / ( ) and ceil, floor, round, abs, min, max. ALWAYS use derived instead of asking the customer to do arithmetic. Examples:
+      - "£150 per extra 500 transactions after the first 1,000" → ask total transactions once, step quantity: "ceil(max(0, num_transactions - 1000) / 500)"
+      - "£2.10 per mile beyond 25 miles" → ask total miles, quantity: "max(0, total_distance_miles - 25)"
+      - "one waiter per 15 guests" → quantity: "ceil((num_adult_guests + num_child_guests) / 15)"
+      - tiered rates ("first 10 at £45, then £30") → ask ONE total field; first-tier step quantity "min(num_slates, 10)", second-tier step quantity "max(0, num_slates - 10)"
+   c. ai_signal (only when the customer genuinely can't answer, e.g. "amount of moss coverage"): add a matching entry to expectedSignals and link via { "type": "ai_signal", "signalKey": "<key>" }
+   d. constant for fixed quantities
+3b. PERCENTAGE CHARGES ("10% service charge on food"): a work step with costType "percent", defaultCost = the percentage number, and "percentOf" = an array of the work-step ids it applies to (or "subtotal" for everything so far). Never ask the customer for a percentage amount.
+3c. ORDER-VALUE RULES ("10% discount on jobs over £5,000"): a multiplier with { "when": { "subject": "subtotal", "operator": "gt", "value": 5000 }, "multiplier": 0.9 }. No customer question needed.
 4. Conditional charges ("add X when Y", "extra for Z") become either:
    - An optional work step with triggerSignal + triggerCondition (when the condition comes from photos/AI), OR
    - A multiplier (when the condition comes from a customer answer): { "when": { "fieldId": "<fieldId>", "operator": "equals|gt|gte|lt|lte", "equals": <value> }, "multiplier": <number> } — create the customer question in suggestedFields if it doesn't exist. Percentage adjustments become multipliers ("add 20%" → 1.2, "10% discount" → 0.9).
@@ -56,13 +63,17 @@ An instruction that appears in neither place is a failure.
       "pricingModel": "fixed|per_unit|tiered|inspection_first",
       "baseFee": 0,
       "minimumCharge": 0,
-      "workSteps": [ { "id": "snake_case_id", "name": "...", "costType": "fixed|per_unit|per_hour", "defaultCost": 0, "unitLabel": "sqm", "optional": false, "quantitySource": { "type": "form_field", "fieldId": "..." } } ]
+      "workSteps": [
+        { "id": "snake_case_id", "name": "...", "costType": "fixed|per_unit|per_hour", "defaultCost": 0, "unitLabel": "sqm", "optional": false, "quantitySource": { "type": "form_field", "fieldId": "..." } },
+        { "id": "derived_example", "name": "...", "costType": "per_unit", "defaultCost": 0, "unitLabel": "...", "optional": false, "quantitySource": { "type": "derived", "formula": "ceil(max(0, some_field - 1000) / 500)" } },
+        { "id": "percent_example", "name": "Service charge", "costType": "percent", "defaultCost": 10, "optional": false, "percentOf": ["step_id_1", "step_id_2"] }
+      ]
     },
     "expectedSignals": [ { "signalKey": "...", "type": "number|enum|boolean|string", "description": "..." } ],
     "suggestedFields": [ { "fieldId": "...", "label": "...", "type": "number|text|dropdown|radio|boolean", "required": true, "criticalForPricing": true, "options": ["only for dropdown/radio"] } ]
   },
   "addons": [ { "label": "...", "price": 0, "triggerKeywords": ["..."] } ],
-  "multipliers": [ { "when": { "fieldId": "...", "operator": "equals", "equals": "..." }, "multiplier": 1.2 } ],
+  "multipliers": [ { "when": { "fieldId": "...", "operator": "equals", "equals": "..." }, "multiplier": 1.2 }, { "when": { "subject": "subtotal", "operator": "gt", "value": 5000 }, "multiplier": 0.9 } ],
   "ambiguities": [ "Specific question about missing/unclear information" ]
 }`
 
@@ -82,7 +93,7 @@ interface CompileAIResponse {
   updatedConfig?: Partial<ServiceDraftConfig>
   addons?: Array<{ label?: string; price?: number; triggerKeywords?: string[] }>
   multipliers?: Array<{
-    when?: { fieldId?: string; operator?: string; equals?: string | number | boolean; value?: string | number }
+    when?: { subject?: string; fieldId?: string; operator?: string; equals?: string | number | boolean; value?: string | number }
     multiplier?: number
   }>
   ambiguities?: string[]
@@ -105,7 +116,8 @@ function normalizeMultipliers(multipliers: CompileAIResponse['multipliers']): Mu
   return (multipliers || [])
     .filter(
       (m) =>
-        m.when?.fieldId &&
+        // T-125: subtotal-conditioned multipliers need no fieldId
+        (m.when?.fieldId || m.when?.subject === 'subtotal') &&
         typeof m.multiplier === 'number' &&
         m.multiplier > 0 &&
         m.multiplier < 10
@@ -113,8 +125,9 @@ function normalizeMultipliers(multipliers: CompileAIResponse['multipliers']): Mu
     .slice(0, 8)
     .map((m) => ({
       when: {
-        fieldId: m.when!.fieldId!,
-        operator: validOps.includes(m.when!.operator || '') ? m.when!.operator : 'equals',
+        subject: m.when!.subject === 'subtotal' ? ('subtotal' as const) : undefined,
+        fieldId: m.when!.fieldId,
+        operator: validOps.includes(m.when!.operator || '') ? m.when!.operator : m.when!.subject === 'subtotal' ? 'gt' : 'equals',
         equals: m.when!.equals,
         value: m.when!.value,
       },
