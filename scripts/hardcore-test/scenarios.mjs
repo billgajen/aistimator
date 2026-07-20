@@ -286,12 +286,13 @@ const HINTS = {
   S01: {
     fieldHints: [
       { match: /above|storey|floor|level|scaffold/, value: true },
-      // T-129 rejects non-numeric answers to required number fields, so this
-      // customer now guesses like the widget would force them to. T-130 should
-      // make this photo-measured instead of asked.
-      { match: /area|sqm|square|size|m2/, value: 40 },
+      // T-130: the area field is now OPTIONAL ("if you know it") — this
+      // customer genuinely doesn't, so it stays unanswered and the
+      // measurement engine must measure it from the photos.
+      { match: /area|sqm|square|size|m2/, value: 'Not sure — typical two-storey 3-bed semi' },
     ],
     clarify: [
+      { match: /estimat|is that right|correct|confirm/, answer: 'Sounds about right — go with your estimate.' },
       { match: /area|size|sqm|square|metre|wide|dimension/, answer: "I honestly don't know the area — it's the front of a typical two-storey 3-bed semi, roughly 8 metres wide. Just the front elevation." },
       { match: /scope|which wall|surface|elevation|side/, answer: 'Just the front of the house, including around the windows where it is peeling.' },
     ],

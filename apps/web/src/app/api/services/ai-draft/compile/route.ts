@@ -27,14 +27,17 @@ CORE RULES:
 2. Every chargeable item in the description becomes a work step:
    - Flat charges → costType "fixed" with defaultCost
    - Rates ("£12 per sqm", "$50/hour") → costType "per_unit" (or "per_hour") with defaultCost = the rate and a clear unitLabel
-3. QUANTITY SOURCES for per-unit steps, in priority order:
-   a. form_field (STRONGLY PREFERRED — deterministic): create a matching question in suggestedFields (type "number", required, criticalForPricing: true) and link via { "type": "form_field", "fieldId": "<fieldId>" }
-   b. derived (for ANY quantity computed from other answers — tiers, thresholds, ratios): { "type": "derived", "formula": "<expression>" }. The formula references fieldIds/signalKeys and supports + - * / ( ) and ceil, floor, round, abs, min, max. ALWAYS use derived instead of asking the customer to do arithmetic. Examples:
+3. QUANTITY SOURCES for per-unit steps — choose by WHO can know the quantity:
+   a. PHOTO-MEASURABLE quantities (physical dimensions and visible counts: wall/lawn/patio areas, fence/ridge lengths, window/slate/room counts, tree height class): use { "type": "ai_signal", "signalKey": "<key>" } so the measurement engine measures them from the customer's photos. REQUIRED companions:
+      - a matching expectedSignals entry: { "signalKey": "<key>", "type": "number", "description": "<what to measure, with a visual anchor hint, e.g. 'total exterior masonry area in square metres — use the front door (~2m tall) as a scale reference'>" }
+      - an OPTIONAL number field in suggestedFields with fieldId EQUAL to the signalKey (required: false, criticalForPricing: false, label ending "— if you know it"): a customer-stated value always overrides the measurement (AD-002)
+      - media.minPhotos at least 1, and photoGuidance telling the customer exactly what to photograph for the measurement
+   b. CUSTOMER-KNOWLEDGE quantities (guests, transactions, distances, dates, payslips, hours — nothing a photo can show): form_field (required, criticalForPricing: true) via { "type": "form_field", "fieldId": "<fieldId>" }
+   c. derived (for ANY quantity computed from other answers or signals — tiers, thresholds, ratios): { "type": "derived", "formula": "<expression>" }. The formula references fieldIds/signalKeys and supports + - * / ( ) and ceil, floor, round, abs, min, max. ALWAYS use derived instead of asking the customer to do arithmetic. Examples:
       - "£150 per extra 500 transactions after the first 1,000" → ask total transactions once, step quantity: "ceil(max(0, num_transactions - 1000) / 500)"
       - "£2.10 per mile beyond 25 miles" → ask total miles, quantity: "max(0, total_distance_miles - 25)"
       - "one waiter per 15 guests" → quantity: "ceil((num_adult_guests + num_child_guests) / 15)"
       - tiered rates ("first 10 at £45, then £30") → ask ONE total field; first-tier step quantity "min(num_slates, 10)", second-tier step quantity "max(0, num_slates - 10)"
-   c. ai_signal (only when the customer genuinely can't answer, e.g. "amount of moss coverage"): add a matching entry to expectedSignals and link via { "type": "ai_signal", "signalKey": "<key>" }
    d. constant for fixed quantities
 3b. PERCENTAGE CHARGES ("10% service charge on food"): a work step with costType "percent", defaultCost = the percentage number, and "percentOf" = an array of the work-step ids it applies to (or "subtotal" for everything so far). Never ask the customer for a percentage amount.
 3c. ORDER-VALUE RULES ("10% discount on jobs over £5,000"): a multiplier with { "when": { "subject": "subtotal", "operator": "gt", "value": 5000 }, "multiplier": 0.9 }. No customer question needed.
@@ -67,6 +70,7 @@ An instruction that appears in neither place is a failure.
       "minimumCharge": 0,
       "workSteps": [
         { "id": "snake_case_id", "name": "...", "costType": "fixed|per_unit|per_hour", "defaultCost": 0, "unitLabel": "sqm", "optional": false, "quantitySource": { "type": "form_field", "fieldId": "..." } },
+        { "id": "measured_example", "name": "Exterior painting", "costType": "per_unit", "defaultCost": 28, "unitLabel": "sqm", "optional": false, "quantitySource": { "type": "ai_signal", "signalKey": "masonry_area_sqm" } },
         { "id": "derived_example", "name": "...", "costType": "per_unit", "defaultCost": 0, "unitLabel": "...", "optional": false, "quantitySource": { "type": "derived", "formula": "ceil(max(0, some_field - 1000) / 500)" } },
         { "id": "conditional_example", "name": "SUV surcharge", "costType": "fixed", "defaultCost": 25, "optional": true, "when": { "fieldId": "vehicle_type", "operator": "equals", "equals": "suv_or_7_seater" } },
         { "id": "percent_example", "name": "Service charge", "costType": "percent", "defaultCost": 10, "optional": false, "percentOf": ["step_id_1", "step_id_2"] }

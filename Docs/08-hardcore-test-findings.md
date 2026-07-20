@@ -99,7 +99,7 @@ never violated. The failures are all in **what the config could express** and
 One ticket at a time, per working style. Quick wins first, then the two
 structural gaps, then truthfulness, then the strategic re-wiring:
 
-- ✅ **SHIPPED 2026-07-20: T-129 (F4), T-125 (F2), T-126 (F7), T-127 (F3), T-128 (F6)** — see CHANGELOG entries. Live: S02–S10 penny-exact vs pricing text (S05 £1,921 was £361,471; S09 £1,432.50 was £0; S04 £190 with when-bound surcharges); £85-fence → clarification → £1,700; unhelpful answer → Grade C not A. Only T-130 (F5) and the F2b observation remain.
+- ✅ **ALL TICKETS SHIPPED 2026-07-20: T-129 (F4), T-125 (F2), T-126 (F7), T-127 (F3), T-128 (F6), T-130 (F5)** — see CHANGELOG entries. Final baseline run `2026-07-20-16-51-59-df6caa0f`: 9/10 delivered (8 sent + S07 correctly HELD at pending_review by the send-guard when the compiler produced a junk config — the F2b case, now caught instead of sent). Grades finally vary honestly (A×5/B×3/C×1 instead of uniform A); S01 priced FROM PHOTOS via ensemble+adjudication at £1,739.60 Grade B with interval £1,650–£1,818. **Open residue:** F2b range-pricing expressiveness (compiler still nondeterministic on "£450/£900 by size, from £1,400" — but failures now land in review, not with customers); S09 run-variance (stairs step occasionally compiles unbound — warn caught it); confirm-question quotes pre-adjudication value (cosmetic).
 - **T-129 (F4, small):** `POST /api/public/quotes` must validate required/
   critical fields from per-service `widget_configs` rows, not only the global
   row. ~1 route change + test.

@@ -43,6 +43,20 @@
 
 ---
 
+### 2026-07-20: T-130 — Measurement Engine Wired Into Compiler Tenants (F5)
+
+**The gap (hardcore F5):** the compiler prompt said form_field "STRONGLY PREFERRED", so every quantity became a customer question, zero `ai_signal` sources existed, and the entire V3 measurement engine (M1–M7) sat idle for compiler-built tenants — photos informed wording, never price, across all 40 gauntlet generations.
+
+**Design (AD-023 aligned):** quantity sources now chosen by WHO can know the quantity. Photo-measurable ones (areas, lengths, visible counts) compile to `ai_signal` + an `expectedSignals` entry (with a visual-anchor description) + an **optional** same-key number field ("— if you know it") so a customer-stated value overrides the measurement via existing form-wins fusion; `media.minPhotos ≥ 1` + photoGuidance. Customer-knowledge quantities (guests, transactions, miles) stay required form fields; computed ones stay `derived`. Engine needed NO changes — measurement keys off `quantitySource.type === 'ai_signal'` (verified at quote-processor.ts:505).
+
+**Live verification (S01 painting, real photos, full pipeline):** ensemble measured the front elevation → **senior adjudication fired** ("unpainted brick plinth must be excluded — Junior 2 incorrectly included it") → **38.5 sqm, band 32–45, basis `adjudicated`** → **£1,078, interval £896–£1,260, Grade B "Measured"**, takeoff row shows the measurement method. In-flow confirmation asked; the customer's vague "sounds about right" correctly did not override. First compiler-built quote ever priced from photos.
+
+**Observation (minor, logged):** the confirm_value question quoted the pre-adjudication ensemble value (55) while the final adjudicated value was 38.5 — question generation runs before adjudication settles. Cosmetic ordering; candidate tidy-up alongside F2b.
+
+**Files:** `apps/web/src/app/api/services/ai-draft/compile/route.ts` (prompt only), `scripts/hardcore-test/scenarios.mjs` (S01 back to its true story)
+
+---
+
 ### 2026-07-20: T-128 — Grade Honesty: Untrusted Quantities Cap the Grade (F6)
 
 **The gap (hardcore F6):** grading only saw AI-signal provenance, so quotes priced on placeholder ×1 fallbacks or AI-operand formulas still claimed Grade A "this price is exact" (every gauntlet quote graded A, including the £85 fence and the £361k accounting quote).
