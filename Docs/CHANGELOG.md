@@ -15,6 +15,54 @@
 
 ## Issues & Resolutions
 
+### 2026-07-20: Compiler Silently Discarded Entire Compilations (all 10 gauntlet verticals quoted £50 Grade A)
+
+**What broke:** First full hardcore run: ALL 10 scenarios compiled to an empty pricing model → every quote went out at the £50 normalizer default (S07 £180 via addons), **Grade A "this price is exact"** — a 128-guest wedding for £50. S05 died on repeated compile HTTP 500s.
+
+**Root cause (verified by direct Gemini reproduction, `finishReason: STOP`, valid JSON):** NOT truncation. `COMPILE_SYSTEM_PROMPT` showed `"updatedConfig": { ...complete ServiceDraftConfig... }` without ever spelling out the internal shape — Gemini guessed, emitting `workSteps` at the **root** of updatedConfig with **`label`** instead of `name`. `validateAndNormalizeDraftBulk` reads only `draft.pricing.workSteps` and `normalizeWorkSteps` filters on `step.name` → the whole compilation was silently discarded. Then `validateAndNormalizeDraft` **invented** `minimumCharge: 50` (a `|| 50` default — violating core rule "never invent numbers" and the anti-hardcoding principle), giving the deterministic engine a £50 fixed price it dutifully quoted. Grading then correctly saw "no unresolved quantities" → Grade A. Garbage-in-config is invisible to grading — separate finding, not yet addressed.
+
+**Fix (compile robustness, 4 changes):**
+1. `compile/route.ts` prompt: explicit updatedConfig JSON schema (pricing.workSteps with `name`, quantitySource, suggestedFields...) + "workSteps live at updatedConfig.pricing.workSteps, NOT at the top" instruction.
+2. `compile/route.ts`: shape-drift hoist — root-level `workSteps` arrays are moved into `pricing.workSteps` before normalization (belt-and-braces alongside the existing `updatedConfig.config` unwrap).
+3. `shared.ts normalizeWorkSteps`: accepts `label` as `name` fallback and `price` as cost fallback; missing cost now normalizes to visible £0, never invented £25.
+4. `shared.ts`: `minimumCharge || 50` → `?? 0`; compile `maxOutputTokens` 8192 → 16384 (2.5-flash thinking tokens count against the budget — same class as the measurement 4096 truncation; suspected cause of the intermittent 500s).
+
+**Constraint reaffirmed:** normalizer defaults must never introduce prices. Remaining invented-default audit (scope placeholders, photoGuidance) is cosmetic, left as-is.
+
+**Files:** `apps/web/src/app/api/services/ai-draft/compile/route.ts`, `apps/web/src/app/api/services/ai-draft/shared.ts`
+
+---
+
+### 2026-07-20: Services API 500 on Compiler-Emitted Object Options
+
+**What broke:** Hardcore run 3, S01: `POST /api/services` returned 500. The compiler emitted `suggestedFields[].options` as `{label, value}` objects (dropdown for scaffold access); both services routes assumed `string[]` and called `opt.toLowerCase()` → TypeError. Nondeterministic — the same scenario compiled to a boolean field (no options) in run 2 and saved fine.
+
+**Fix:** `normalizeFieldOption()` in `apps/web/src/lib/field-options.ts` accepts both shapes; used by POST `/api/services` and PATCH `/api/services/[id]` when building widget fields.
+
+**Files:** `apps/web/src/lib/field-options.ts` (new), `apps/web/src/app/api/services/route.ts`, `apps/web/src/app/api/services/[id]/route.ts`
+
+---
+
+### 2026-07-20: Hardcore Gauntlet Complete — Findings F2–F7 Documented
+
+**Outcome:** 4 full runs. Final run: 10/10 quotes sent, every total penny-reconciled against config via pricing traces (AD-001 held throughout). Six open findings documented in **`Docs/08-hardcore-test-findings.md`** (the canonical list): F2 derived quantities inexpressible (S05 swung +£359k/−£718 across runs on identical pricing text), F7 conditional charges can't bind to form answers → steps silently dropped → **£0 quote sent** (S09), F3 missing quantities price at ×1 with no VOI/clarification ever firing (0 of 40 generations), F6 Grade-A blind spots, F4 per-service required fields unvalidated at the public API, F5 measurement engine never engages for compiler-built tenants (photos decorative). Each needs its own ticket; none fixed yet beyond F1/F8 above.
+
+---
+
+### 2026-07-20: Hardcore E2E Harness (terminal-driven, 10-vertical gauntlet) + First Findings
+
+**Context:** User requested a hardcore API-level test — 10 completely different business types (incl. a digital service) with adversarial customer requests — run entirely from the terminal, no browser.
+
+**Built:** `scripts/hardcore-test/` — `SCENARIOS.md` (spec), `scenarios.mjs` (10 tenants: painting, roofing, landscaping, car valeting, accounting, catering, tree surgery, window cleaning, piano moving, pest control — with fieldHints/clarify hints so the "customer" answers in character), `lib.mjs` (Supabase admin REST, **@supabase/ssr 0.4.1 cookie minting** `sb-127-auth-token` = `base64-`+base64url(session), chunked at 3180; public upload → R2 PUT; polling; HEIC→JPEG via sips), `checks.mjs` (triage assertions), `run.mjs` (orchestrator; per-run results dir + REPORT.md). Assets: `test-assets/hardcore/` (gitignored) — user drops real photos; S05 synthetic bank statement (CSV + hand-built 3-page PDF, 2,388 tx) generated.
+
+**Key plumbing facts (verified live):** dashboard routes are cookie-auth ONLY (Docs/02 "Bearer" claim is wrong); local dev processes quotes synchronously via `CLOUDFLARE_WORKER_URL` `/process` (submission POST blocks through the whole AI pipeline); `tenant_sites`/`tenant_key` has NO creation API (dashboard server components create it lazily) — harness inserts it via service-role; **the signup trigger DOES fire on `auth.admin.createUser({email_confirm:true})` locally** (creates tenant+profile; setup-tenant then 409s — harness handles both paths); public uploads accept images+PDF only (no CSV).
+
+**Findings already (S06 smoke run):** (1) **Compiler fails on per-head/derived pricing** — catering description reproducibly yields EMPTY pricing (no work steps; normalizer default `minimumCharge: 50` papers over it) or HTTP 500 (suspected 8192-token truncation, same class as the measurement 4096 truncation bug); (2) **Grade A on a config-starved quote** — 128-guest wedding quoted at £380 (marquee addon only, later £50) with grade A "this price is exact": grading trusts quantity provenance but has no signal for "config never priced the request". Both to be confirmed/expanded in the full 10-scenario run before fixing.
+
+**Files:** `scripts/hardcore-test/*`, `test-assets/hardcore/*` (gitignored), `.gitignore`
+
+---
+
 ### 2026-07-18: V2 Strategy Adopted — Vertical Wedge, Horizontal Engine
 
 **Context:** Full strategic review (codebase audit + verified market research, July 2026) diagnosed five structural flaws behind the two chronic complaints — hard setup and inaccurate quotes: (1) hand-authored pricing DSL forces AI to fuzzy-match language into rigid schemas (root cause of the recurring signal-matching/negation/keyword bug themes below); (2) no outcome→calibration feedback loop despite `quote_amendments` infrastructure; (3) uncertainty handled via review queue/wide ranges instead of in-flow customer confirmation; (4) usage limits unenforced — revenue structurally impossible; (5) WhatsApp intake is a stub while WhatsApp quoting is an empty market category.
