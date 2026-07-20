@@ -18,7 +18,13 @@ export type EstimateGrade = 'A' | 'B' | 'C'
 
 export interface QuantityProvenance {
   signalKey: string
-  basis: 'confirmed' | 'measured' | 'adjudicated' | 'envelope'
+  /**
+   * 'defaulted' (T-128, hardcore F6): the quantity fell back to a ×1
+   * placeholder (unanswered form field, unresolvable derived formula, legacy
+   * fallback) — the line's price is structurally unreliable, not merely
+   * uncertain. Caps the grade at C like an envelope-derived quantity.
+   */
+  basis: 'confirmed' | 'measured' | 'adjudicated' | 'envelope' | 'defaulted'
   confidence: number
 }
 
@@ -57,7 +63,7 @@ export function computeEstimateGrade(quantities: QuantityProvenance[]): Estimate
 
   for (const q of quantities) {
     if (q.basis === 'confirmed') continue
-    if (q.basis === 'envelope' || q.confidence < GRADE_B_MIN_CONFIDENCE) {
+    if (q.basis === 'envelope' || q.basis === 'defaulted' || q.confidence < GRADE_B_MIN_CONFIDENCE) {
       grade = 'C'
       break
     }

@@ -1176,13 +1176,35 @@ export async function processQuote(
             | 'confirmed'
             | 'measured'
             | 'adjudicated'
-            | 'envelope',
+            | 'envelope'
+            | 'defaulted',
           confidence: s.confidence,
           band: confirmed ? undefined : s.quantityBand,
           stepName: step.name,
         }
       })
       .filter((p): p is NonNullable<typeof p> => p !== null)
+
+    // T-128 (hardcore F6): the trace knows about quantity trust the signal
+    // provenance can't see — placeholder ×1 fallbacks cap the grade at C
+    // ('defaulted'), and AI-operand derived quantities cap at B. Without this,
+    // form/derived/legacy steps were invisible to grading and every such
+    // quote claimed Grade A "this price is exact".
+    const seenKeys = new Set(provenance.map((p) => p.signalKey))
+    for (const t of pricingTrace.trace) {
+      if (t.type !== 'work_step' || t.quantityTrusted !== false) continue
+      const key = t.id || 'work_step'
+      if (seenKeys.has(key)) continue
+      seenKeys.add(key)
+      const isDefaulted = t.quantitySource === 'legacy_fallback' || t.quantitySource === 'derived_unresolved'
+      provenance.push({
+        signalKey: key,
+        basis: isDefaulted ? 'defaulted' : 'measured',
+        confidence: isDefaulted ? 0.2 : 0.7,
+        band: undefined,
+        stepName: key,
+      })
+    }
 
     const gradeResult = computeEstimateGrade(provenance)
     const banded = provenance.filter((p) => p.band && p.basis !== 'confirmed')

@@ -43,6 +43,18 @@ describe('computeEstimateGrade (M6 — the declared precision class)', () => {
     expect(result.label).toBe('Measured')
     expect(result.description).toContain('photos')
   })
+
+  // T-128 (hardcore F6): placeholder ×1 quantities must never claim
+  // "this price is exact"
+  it('a defaulted quantity caps the grade at C regardless of everything else', () => {
+    const result = computeEstimateGrade([q('confirmed', 1), q('defaulted', 0.2)])
+    expect(result.grade).toBe('C')
+  })
+
+  it('untrusted-but-resolved quantities (AI operands) cap at B', () => {
+    const result = computeEstimateGrade([q('confirmed', 1), q('measured', 0.7)])
+    expect(result.grade).toBe('B')
+  })
 })
 
 describe('isQuestionWorthAsking (M7 — ask where the money is)', () => {

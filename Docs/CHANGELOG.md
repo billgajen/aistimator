@@ -43,6 +43,20 @@
 
 ---
 
+### 2026-07-20: T-128 — Grade Honesty: Untrusted Quantities Cap the Grade (F6)
+
+**The gap (hardcore F6):** grading only saw AI-signal provenance, so quotes priced on placeholder ×1 fallbacks or AI-operand formulas still claimed Grade A "this price is exact" (every gauntlet quote graded A, including the £85 fence and the £361k accounting quote).
+
+**Built:** new provenance basis `'defaulted'` in `shared/grading.ts` (caps at C, like envelope); processor merges trace-level trust into provenance before grading — `legacy_fallback`/`derived_unresolved` work-step lines → `defaulted` (C), untrusted-but-resolved (AI-operand derived / ai_signal) → measured 0.7 (B). Conditional steps that legitimately didn't bind (customer answered "small car") do NOT cap — absence-by-answer is confirmed information. 2 new tests (271 pass).
+
+**Live verification (`verify-t128.mjs`):** fence probe → T-127 question → customer answers "Not sure at all" → round spent → **sent £85 Grade C (Concept)** with the confirm-to-tighten framing (was: Grade A "exact"). The T-127+T-128 chain: ask where the money is; when the customer can't answer, say honestly what the price rests on.
+
+**Note:** F2b (range/category pricing plausibility — the S07 junk £1×18 config) is NOT covered by trust caps (the formula resolved "cleanly") and stays open; it needs rate-plausibility/benchmark checks, tracked in `Docs/08-hardcore-test-findings.md`.
+
+**Files:** `packages/shared/src/grading.ts`, `apps/worker/src/quote-processor.ts`, `apps/worker/src/__tests__/grading.test.ts`, `scripts/hardcore-test/verify-t128.mjs`
+
+---
+
 ### 2026-07-20: T-127 — Defaulted Quantities Trigger In-Flow Clarification (F3)
 
 **The gap (hardcore F3):** work-step quantities that DEFAULTED to 1 (unanswered form field, unresolvable derived formula, legacy fallback) priced silently as placeholders — the £85 "fence" that should be £1,700 — labelled "Estimated — to be confirmed" yet sent Grade A. VOI/T-108 never fired in 40 generations because clarification only evaluated AI signals.
