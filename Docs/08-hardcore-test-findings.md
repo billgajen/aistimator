@@ -99,7 +99,7 @@ never violated. The failures are all in **what the config could express** and
 One ticket at a time, per working style. Quick wins first, then the two
 structural gaps, then truthfulness, then the strategic re-wiring:
 
-- ✅ **T-129 (F4) SHIPPED 2026-07-20** and ✅ **T-125 (F2) SHIPPED 2026-07-20** — see CHANGELOG entries; live re-run priced S02/S03/S05/S06/S09 penny-exact vs their pricing text (S05 £1,921 was £361,471; S09 £1,432.50 was £0).
+- ✅ **SHIPPED 2026-07-20: T-129 (F4), T-125 (F2), T-126 (F7), T-127 (F3), T-128 (F6)** — see CHANGELOG entries. Live: S02–S10 penny-exact vs pricing text (S05 £1,921 was £361,471; S09 £1,432.50 was £0; S04 £190 with when-bound surcharges); £85-fence → clarification → £1,700; unhelpful answer → Grade C not A. Only T-130 (F5) and the F2b observation remain.
 - **T-129 (F4, small):** `POST /api/public/quotes` must validate required/
   critical fields from per-service `widget_configs` rows, not only the global
   row. ~1 route change + test.
