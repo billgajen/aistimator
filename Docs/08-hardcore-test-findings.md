@@ -150,6 +150,8 @@ exactly as designed.
 
 **R2-7 (found in the final regression, OPEN):** mutually-exclusive package steps can BOTH price when a compile run emits them without `when`-binding to the mode choice — S27 tutoring sent £873 = online block (£378) + in-home block (£495) for one student. Compile-adherence variance on rule 4b; no guard detects it (steps are neither £0 nor unbound nor catalogue). Fix directions: (a) compiler self-check pass validating that steps named as alternatives share a `when` field, (b) gate heuristic — multiple fixed package-ish steps priced with no conditions → review. Regression scoreboard: 29/30 correct, this was the single wrong-money quote.
 
+**R3-1 (found by the user's manual test, SHIPPED `3338ef2`):** stated-quantity vs photo-evidence conflicts — a cleaning quote claimed Grade A "exact" for 2 stated hours while its own notes said the photos suggest more. Now: structured `quantityConcern` from the wording layer → in-flow question ("2 hours may not be enough… What should we allow for?") → answer reprices (£272.26 → £398.26 verified live); grade capped at B while doubted. Multiplier labels humanized ("Deep clean surcharge (+50%)" not "Is Deep Clean: true").
+
 **R2-1b (calibration, OPEN):** the fixed matcher occasionally routes VALID requests to general inquiry (S12 dog-groom ramble) — over-caution. Failure mode is lost automation, never wrong money; tune thresholds/prompt post-launch.
 
 - **R2-1 — Wrong-service requests are QUOTED, with a polite disclaimer.**
