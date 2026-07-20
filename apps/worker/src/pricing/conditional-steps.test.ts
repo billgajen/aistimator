@@ -140,4 +140,14 @@ describe('structural send-guard (quality gate)', () => {
     )
     expect(result.action).toBe('send')
   })
+
+  it('R2-3: holds a quote whose mandatory step compiled at £0 (the £16 PT quote)', async () => {
+    const result = await evaluateQualityGate(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      gateInput({ workStepsConfigured: 3, workStepLinesPriced: 2, zeroCostSteps: ['Personal Training Package'] }) as any,
+      null
+    )
+    expect(result.action).toBe('require_review')
+    expect(result.reason).toContain('Personal Training Package')
+  })
 })

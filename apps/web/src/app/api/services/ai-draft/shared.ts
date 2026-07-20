@@ -119,9 +119,11 @@ interface WorkStepInput {
     value?: number
     signalKey?: string
     formula?: string
+    missingMeansZero?: boolean
   }
   unitLabel?: string
   percentOf?: string[] | 'subtotal'
+  costBand?: { low?: number; high?: number }
 }
 
 function normalizeQuantitySource(qs: WorkStepInput['quantitySource']): ServiceDraftConfig['pricing']['workSteps'][0]['quantitySource'] | undefined {
@@ -137,6 +139,8 @@ function normalizeQuantitySource(qs: WorkStepInput['quantitySource']): ServiceDr
     value: qs.value,
     signalKey: qs.signalKey,
     formula: qs.formula,
+    // T-131 (R2-2): catalogue semantics — unanswered field = quantity 0
+    missingMeansZero: qs.missingMeansZero === true ? true : undefined,
   }
 }
 
@@ -177,12 +181,19 @@ export function normalizeWorkSteps(steps: WorkStepInput[]): ServiceDraftConfig['
       id: step.id || `step_${index + 1}`,
       name: (step.name || step.label)!,
       description: step.description || (step.name || step.label)!,
-      costType: (['fixed', 'per_unit', 'per_hour', 'percent'] as const).includes(step.costType as 'fixed' | 'per_unit' | 'per_hour' | 'percent')
-        ? (step.costType as 'fixed' | 'per_unit' | 'per_hour' | 'percent')
+      costType: (['fixed', 'per_unit', 'per_hour', 'percent', 'credit'] as const).includes(step.costType as 'fixed' | 'per_unit' | 'per_hour' | 'percent' | 'credit')
+        ? (step.costType as 'fixed' | 'per_unit' | 'per_hour' | 'percent' | 'credit')
         : 'fixed',
       // ?? chain, ending at 0: a missing cost must surface as £0 (visible),
       // never be invented (previously defaulted to 25)
       defaultCost: Math.max(0, step.defaultCost ?? step.cost ?? step.price ?? 0),
+      // T-131 (F2b): stated cost band (from-prices/ranges) — never invented
+      costBand:
+        step.costBand &&
+        typeof step.costBand.low === 'number' && typeof step.costBand.high === 'number' &&
+        step.costBand.low >= 0 && step.costBand.high > step.costBand.low
+          ? { low: step.costBand.low, high: step.costBand.high }
+          : undefined,
       // T-125: percent steps carry what the percentage applies to
       percentOf: step.costType === 'percent'
         ? (step.percentOf === 'subtotal' || (Array.isArray(step.percentOf) && step.percentOf.every((s) => typeof s === 'string'))

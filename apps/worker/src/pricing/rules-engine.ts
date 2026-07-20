@@ -1262,7 +1262,8 @@ function resolveDerivedQuantity(
   formula: string | undefined,
   structuredSignals: ExtractedSignal[] | undefined,
   legacySignals: ExtractedSignals,
-  formAnswers: FormAnswer[]
+  formAnswers: FormAnswer[],
+  zeroDefaultFields?: Set<string>
 ): {
   resolved: boolean
   quantity: number
@@ -1291,6 +1292,13 @@ function resolveDerivedQuantity(
       allTrusted = false // AI-sourced operand — lower trust
       signalsUsed.push({ key: name, value: n })
       return n
+    }
+    // T-131 (R2-2): identifiers backed by missingMeansZero catalogue fields
+    // resolve to a TRUSTED zero when unanswered ("not requested") — the
+    // formula stays resolvable and T-127 asks no spurious catalogue question
+    if (zeroDefaultFields?.has(name)) {
+      signalsUsed.push({ key: name, value: 0 })
+      return 0
     }
     return undefined
   })
@@ -1327,7 +1335,8 @@ function calculateWorkStepCost(
   step: WorkStepConfig,
   structuredSignals: ExtractedSignal[] | undefined,
   legacySignals: ExtractedSignals,
-  formAnswers: FormAnswer[]
+  formAnswers: FormAnswer[],
+  zeroDefaultFields?: Set<string>
 ): WorkStepCostResult {
   const signalsUsed: Array<{ key: string; value: string | number | boolean }> = []
   const unitLabel = step.unitLabel || 'units'
@@ -1369,6 +1378,20 @@ function calculateWorkStepCost(
               } else {
                 console.warn(`[Pricing] "${step.name}": Form field "${step.quantitySource.fieldId}" has non-numeric value: ${formAnswer.value}`)
               }
+            } else if (step.quantitySource.missingMeansZero) {
+              // T-131 (R2-2): catalogue semantics — unanswered means "not
+              // requested", a TRUSTED zero, not an untrusted ×1 placeholder.
+              // The zero-cost skip drops the line; T-127 must not ask about it.
+              console.log(`[Pricing] "${step.name}": catalogue item not requested (field unanswered, missingMeansZero) - quantity 0`)
+              return {
+                cost: 0,
+                calculation: 'Not requested (0)',
+                signalsUsed,
+                quantitySource: 'form_field',
+                quantityTrusted: true,
+                quantity: 0,
+                unitLabel,
+              }
             } else {
               console.warn(`[Pricing] "${step.name}": Form field "${step.quantitySource.fieldId}" not answered, using default quantity 1`)
             }
@@ -1407,7 +1430,7 @@ function calculateWorkStepCost(
 
           case 'derived': {
             // T-125: deterministic formula over form fields / signals
-            const derived = resolveDerivedQuantity(step.quantitySource.formula, structuredSignals, legacySignals, formAnswers)
+            const derived = resolveDerivedQuantity(step.quantitySource.formula, structuredSignals, legacySignals, formAnswers, zeroDefaultFields)
             if (derived.resolved) {
               quantity = derived.quantity
               quantitySource = 'derived'
@@ -1544,7 +1567,7 @@ function calculateWorkStepCost(
 
           case 'derived': {
             // T-125: deterministic formula over form fields / signals
-            const derived = resolveDerivedQuantity(step.quantitySource.formula, structuredSignals, legacySignals, formAnswers)
+            const derived = resolveDerivedQuantity(step.quantitySource.formula, structuredSignals, legacySignals, formAnswers, zeroDefaultFields)
             if (derived.resolved) {
               hours = derived.quantity
               quantitySource = 'derived'
@@ -1604,6 +1627,33 @@ function calculateWorkStepCost(
         quantityTrusted,
         quantity: hours,
         unitLabel: 'Hrs',
+      }
+    }
+
+    case 'credit': {
+      // T-131 (R2-5): a deduction line (trade-in/resale offset). Quantity
+      // resolves like per_unit when a source is configured, else ×1.
+      let creditQty = 1
+      const quantityTrusted = true
+      let quantitySource: WorkStepCostResult['quantitySource'] = 'constant'
+      if (step.quantitySource) {
+        const q = getQuantityFromSource(step.quantitySource, structuredSignals, legacySignals, formAnswers)
+        if (q > 0) {
+          creditQty = q
+          quantitySource = step.quantitySource.type === 'derived' ? 'derived' : step.quantitySource.type
+        } else {
+          creditQty = 0
+        }
+      }
+      const credit = -(creditQty * step.defaultCost)
+      return {
+        cost: credit,
+        calculation: `Credit: -${creditQty * step.defaultCost}`,
+        signalsUsed,
+        quantitySource,
+        quantityTrusted,
+        quantity: creditQty,
+        unitLabel: step.unitLabel,
       }
     }
 
@@ -1667,6 +1717,12 @@ export function calculatePricingWithTrace(
   // other steps, so they evaluate after every non-percent step has run.
   const percentSteps: WorkStepConfig[] = []
   const stepAmountsById = new Map<string, number>()
+  // T-131: catalogue fields whose absence means quantity zero (for derived formulas)
+  const zeroDefaultFields = new Set(
+    (rules.workSteps || [])
+      .filter((ws) => ws.quantitySource?.missingMeansZero && ws.quantitySource.fieldId)
+      .map((ws) => ws.quantitySource!.fieldId!)
+  )
   if (rules.workSteps && rules.workSteps.length > 0) {
     const signalsArray = structuredSignals?.signals
 
@@ -1684,7 +1740,7 @@ export function calculatePricingWithTrace(
         continue
       }
 
-      const stepResult = calculateWorkStepCost(step, signalsArray, signals, answers)
+      const stepResult = calculateWorkStepCost(step, signalsArray, signals, answers, zeroDefaultFields)
 
       // ISSUE-3 FIX: Skip zero-cost line items (e.g., "0 sockets × £25 = £0")
       // This prevents unprofessional-looking quotes with $0 line items

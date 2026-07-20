@@ -114,6 +114,13 @@ export interface QuantitySource {
    * packages/shared/src/formula.ts — arithmetic, ceil/floor/round/abs/min/max.
    */
   formula?: string
+  /**
+   * T-131 (R2-2, catalogue semantics): when true, an unanswered form field
+   * means quantity ZERO ("the customer didn't ask for this item") — the line
+   * is dropped as a trusted non-selection, instead of the untrusted ×1
+   * placeholder fallback. Use for price-list/menu items.
+   */
+  missingMeansZero?: boolean
 }
 
 /**
@@ -123,12 +130,24 @@ export interface WorkStepConfig {
   id: string
   name: string
   description: string
-  costType: 'fixed' | 'per_unit' | 'per_hour' | 'percent'
+  /**
+   * 'credit' (T-131, R2-5): a deduction — trade-in/resale offsets. Priced
+   * like fixed/per_unit but SUBTRACTED, rendered as a negative line.
+   */
+  costType: 'fixed' | 'per_unit' | 'per_hour' | 'percent' | 'credit'
   /**
    * Default cost (fixed amount, or per-unit/hour rate).
    * For costType 'percent' (T-125): the percentage, e.g. 10 for 10%.
+   * For costType 'credit' (T-131): the deduction amount (positive number).
    */
   defaultCost: number
+  /**
+   * T-131 (F2b, bounded pricing): honest uncertainty band for from-prices and
+   * stated ranges ("from £4,800", "£40 to £120"). defaultCost carries the
+   * from/low anchor; the band widens the customer-facing estimate interval
+   * and caps the grade at B. Never AI-invented — only from stated figures.
+   */
+  costBand?: { low: number; high: number }
   /**
    * For costType 'percent' (T-125): what the percentage applies to —
    * 'subtotal' (running total when evaluated, after all non-percent steps) or

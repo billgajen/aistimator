@@ -1206,6 +1206,25 @@ export async function processQuote(
       })
     }
 
+    // T-131 (F2b): steps priced on a from-price with a stated cost band carry
+    // RATE uncertainty — widen the customer-facing interval and cap the grade
+    // at B (the anchor is stated, the final figure is not confirmed).
+    const costBandSpread = { low: 0, high: 0 }
+    for (const t of pricingTrace.trace) {
+      if (t.type !== 'work_step') continue
+      const bandStep = rulesWithWorkSteps.workSteps?.find((ws) => ws.id === t.id)
+      const band = bandStep?.costBand
+      if (!band || !(band.high > band.low) || bandStep.defaultCost <= 0) continue
+      const qty = Math.abs(t.amount) / bandStep.defaultCost
+      costBandSpread.low += Math.max(0, (bandStep.defaultCost - band.low) * qty)
+      costBandSpread.high += Math.max(0, (band.high - bandStep.defaultCost) * qty)
+      const rateKey = `${t.id}_rate`
+      if (!seenKeys.has(rateKey)) {
+        seenKeys.add(rateKey)
+        provenance.push({ signalKey: rateKey, basis: 'measured', confidence: 0.7, band: undefined, stepName: bandStep.name })
+      }
+    }
+
     const gradeResult = computeEstimateGrade(provenance)
     const banded = provenance.filter((p) => p.band && p.basis !== 'confirmed')
 
@@ -1248,6 +1267,12 @@ export async function processQuote(
           )
         }
       }
+    }
+
+    // T-131 (F2b): rate bands widen whatever interval quantity bands produced
+    if (costBandSpread.low > 0 || costBandSpread.high > 0) {
+      rangeLow = Math.max(0, Math.round(((rangeLow ?? pricing.total) - costBandSpread.low) * 100) / 100)
+      rangeHigh = Math.round(((rangeHigh ?? pricing.total) + costBandSpread.high) * 100) / 100
     }
 
     pricing.estimate = {
@@ -1712,6 +1737,10 @@ export async function processQuote(
           // T-126 send-guard inputs
           workStepsConfigured: rulesWithWorkSteps.workSteps?.length ?? 0,
           workStepLinesPriced: pricingTrace.trace.filter((t) => t.type === 'work_step').length,
+          // R2-3: mandatory steps the compiler priced at £0 (inexpressible)
+          zeroCostSteps: (rulesWithWorkSteps.workSteps || [])
+            .filter((ws) => !ws.optional && ws.costType !== 'percent' && (ws.defaultCost ?? 0) <= 0)
+            .map((ws) => ws.name),
         },
         gemini
       )
@@ -1770,6 +1799,16 @@ export async function processQuote(
       guardReason = 'Pricing calculated to £0 or below — nothing could be priced from the configuration'
     } else if (stepsConfigured > 0 && stepLinesPriced === 0) {
       guardReason = `None of the ${stepsConfigured} configured work steps applied — conditional charges may have failed to bind`
+    } else {
+      // R2-3: a mandatory £0-cost step = the compiler could not establish the
+      // primary price (block packages, from-prices) — surcharges must not
+      // ship without the service itself (the £16 personal-training quote)
+      const zeroCost = (rulesWithWorkSteps.workSteps || [])
+        .filter((ws) => !ws.optional && ws.costType !== 'percent' && (ws.defaultCost ?? 0) <= 0)
+        .map((ws) => ws.name)
+      if (zeroCost.length > 0) {
+        guardReason = `The price for ${zeroCost.map((n) => `"${n}"`).join(', ')} could not be established from the pricing configuration`
+      }
     }
     if (guardReason) {
       finalStatus = 'pending_review'

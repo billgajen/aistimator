@@ -47,6 +47,12 @@ export interface QualityGateInput {
   workStepsConfigured?: number
   /** T-126 send-guard: how many work-step lines actually priced */
   workStepLinesPriced?: number
+  /**
+   * R2-3: names of non-optional steps configured at £0 — the compiler could
+   * not establish their price (block packages, from-prices), so the quote is
+   * missing its primary work and must not auto-send.
+   */
+  zeroCostSteps?: string[]
 }
 
 /** Schema for AI-generated clarification questions */
@@ -193,6 +199,13 @@ function checkForCriticalIssues(input: QualityGateInput): string | null {
   // service means the request's actual work went unpriced.
   if ((input.workStepsConfigured ?? 0) > 0 && (input.workStepLinesPriced ?? 0) === 0) {
     return `None of the ${input.workStepsConfigured} configured work steps applied to this request — conditional charges may have failed to bind; needs review`
+  }
+
+  // R2-3 send-guard: a mandatory step compiled at £0 means the pricing
+  // description couldn't be expressed (block packages, from-prices) — the
+  // quote would ship surcharges without the service itself (£16 PT quote)
+  if (input.zeroCostSteps && input.zeroCostSteps.length > 0) {
+    return `The price for ${input.zeroCostSteps.map((s) => `"${s}"`).join(', ')} could not be established from the pricing configuration — the quote is missing its primary work; needs review`
   }
 
   // Site visit strongly recommended

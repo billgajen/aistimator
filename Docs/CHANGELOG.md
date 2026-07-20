@@ -43,6 +43,22 @@
 
 ---
 
+### 2026-07-20: T-131 — Catalogue & Bounded Pricing (R2-2, R2-3, R2-4, R2-5, F2b)
+
+**The gaps (round-2 blind testing):** price-list configs quoted the ENTIRE catalogue to every customer (£1,940 of furniture for one armchair — customer said "only the armchair" twice); block-package pricing compiled to mandatory £0 steps whose surcharges shipped alone (£16 PT quote); from-prices/ranges had no schema home; credits (resale offsets) were clamped away; contingency penalties priced on mere mention (£60 for mentioning a fridge).
+
+**Built:**
+- **R2-2 catalogue semantics:** `quantitySource.missingMeansZero` — an unanswered per-item field is a TRUSTED zero ("not requested", line dropped), not the untrusted ×1 fallback; no T-127 question, no grade cap. Compiler rule 4c: price-list items compile as per_unit steps with optional per-item fields, never unconditional fixed steps.
+- **R2-3 zero-cost guard:** a mandatory non-percent step at £0 = the compiler failed to establish the primary price → quality gate + processor backstop hold the quote. Compiler rule 4b: block packages become when-bound steps per option; NEVER a £0 placeholder.
+- **F2b bounded pricing:** `WorkStepConfig.costBand {low, high}` from STATED figures only (defaultCost = the from/low anchor). Priced at the anchor; the band widens the customer-facing interval (added to quantity-band spread) and caps the grade at B via a rate provenance entry. Compiler rule 4d.
+- **R2-5 credits:** `costType 'credit'` — subtracts, renders negative, positive defaultCost so the never-invent clamp still holds. Compiler rule 4e.
+- **R2-4 penalties:** compiler rule 4f — fees contingent on on-the-job discoveries compile as exclusions/notes wording, never priced lines.
+- 6 new worker tests (277 pass) incl. the exact S23 armchair-only case.
+
+**Files:** `packages/shared/src/database.types.ts`, `apps/worker/src/pricing/{rules-engine.ts,catalogue-pricing.test.ts}`, `apps/worker/src/{quote-processor.ts,agents/quality-gate.ts}`, `apps/web/src/app/api/services/ai-draft/{compile/route.ts,shared.ts}`
+
+---
+
 ### 2026-07-20: T-130 — Measurement Engine Wired Into Compiler Tenants (F5)
 
 **The gap (hardcore F5):** the compiler prompt said form_field "STRONGLY PREFERRED", so every quantity became a customer question, zero `ai_signal` sources existed, and the entire V3 measurement engine (M1–M7) sat idle for compiler-built tenants — photos informed wording, never price, across all 40 gauntlet generations.
