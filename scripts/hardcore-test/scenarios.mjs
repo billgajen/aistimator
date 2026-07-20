@@ -285,7 +285,10 @@ const HINTS = {
   S01: {
     fieldHints: [
       { match: /above|storey|floor|level|scaffold/, value: true },
-      { match: /area|sqm|square|size|m2/, value: 'Not sure — typical two-storey 3-bed semi' }, // non-numeric on purpose: this customer cannot answer
+      // T-129 rejects non-numeric answers to required number fields, so this
+      // customer now guesses like the widget would force them to. T-130 should
+      // make this photo-measured instead of asked.
+      { match: /area|sqm|square|size|m2/, value: 40 },
     ],
     clarify: [
       { match: /area|size|sqm|square|metre|wide|dimension/, answer: "I honestly don't know the area — it's the front of a typical two-storey 3-bed semi, roughly 8 metres wide. Just the front elevation." },
@@ -296,7 +299,8 @@ const HINTS = {
   S02: {
     fieldHints: [
       { match: /first/, value: 7 },
-      { match: /beyond|second|after|extra/, value: 0 },
+      { match: /beyond|second|after|extra|additional/, value: 0 },
+      { match: /ridge|repoint/, value: 2 }, // forced guess post-T-129 ("maybe a metre or two")
       { match: /tower|day/, value: 1 },
       { match: /urgen|emergency|when|timing/, value: 'emergency this week within 48 hours' },
       { match: /slate|count|how many/, value: 7 },
@@ -312,6 +316,7 @@ const HINTS = {
       { match: /lawn|turf|grass/, value: 50 },
       { match: /fenc/, value: 20 },
       { match: /patio/, value: 11 },
+      { match: /waste|load|skip/, value: 2 }, // forced guess post-T-129
     ],
     clarify: [
       { match: /lawn|turf/, answer: 'Lawn is 30ft by 18ft.' },

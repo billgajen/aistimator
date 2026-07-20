@@ -43,6 +43,18 @@
 
 ---
 
+### 2026-07-20: T-129 — Public API Now Enforces Per-Service Required Fields (F4)
+
+**What broke (hardcore F4):** `POST /api/public/quotes` validated required/critical fields against only the **global** `widget_configs` row (`service_id IS NULL`). The per-service rows that `POST /api/services` creates from compiled `suggestedFields` were never checked, so submissions omitting required price-driving quantities were accepted and the engine priced them at quantity 1 (the £85 fence).
+
+**Fix:** validation now loads all `widget_configs` rows for the tenant and merges global fields (honouring their `serviceId` scoping) with the selected service's row, deduped by fieldId. Additionally, a required **number** field answered with non-numeric text counts as missing — previously junk text silently became a ×1 fallback (S01's vague area answer). General inquiries skip service-bound field validation (they aren't for that service's form).
+
+**Verified live:** missing per-service fields → 400 listing them; junk text in number field → 400 naming it; complete answers → passes to the next gate. Harness scenarios updated: customers now give forced in-character guesses for fields the widget would require (S01 area 40, S02 ridge 2, S03 waste 2) — noting the conversion-risk tension that T-130 resolves by measuring photo-measurable quantities instead of asking.
+
+**Files:** `apps/web/src/app/api/public/quotes/route.ts`, `scripts/hardcore-test/scenarios.mjs`
+
+---
+
 ### 2026-07-20: Hardcore Gauntlet Complete — Findings F2–F7 Documented
 
 **Outcome:** 4 full runs. Final run: 10/10 quotes sent, every total penny-reconciled against config via pricing traces (AD-001 held throughout). Six open findings documented in **`Docs/08-hardcore-test-findings.md`** (the canonical list): F2 derived quantities inexpressible (S05 swung +£359k/−£718 across runs on identical pricing text), F7 conditional charges can't bind to form answers → steps silently dropped → **£0 quote sent** (S09), F3 missing quantities price at ×1 with no VOI/clarification ever firing (0 of 40 generations), F6 Grade-A blind spots, F4 per-service required fields unvalidated at the public API, F5 measurement engine never engages for compiler-built tenants (photos decorative). Each needs its own ticket; none fixed yet beyond F1/F8 above.

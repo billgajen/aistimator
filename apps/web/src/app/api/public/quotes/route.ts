@@ -258,66 +258,84 @@ export async function POST(request: Request) {
       // county_state mode would need additional lookup - skip for now
     }
 
-    // 6. Validate required form fields from widget config
-    const { data: widgetConfig } = await supabase
+    // 6. Validate required form fields from widget config.
+    // T-129 (hardcore-test F4): fields live in TWO places — the global row
+    // (service_id NULL, fields optionally scoped via a serviceId property) AND
+    // a per-service row created by /api/services from compiled suggestedFields.
+    // Validating only the global row let every per-service required field
+    // through unanswered, which the engine then priced at quantity 1.
+    type WidgetField = {
+      fieldId: string
+      label: string
+      type?: string
+      required: boolean
+      serviceId?: string | null
+      criticalForPricing?: boolean
+    }
+    const { data: widgetConfigRows } = await supabase
       .from('widget_configs')
-      .select('config_json')
+      .select('service_id, config_json')
       .eq('tenant_id', tenantId)
-      .is('service_id', null)
-      .single()
 
-    if (widgetConfig?.config_json) {
-      const config = widgetConfig.config_json as {
-        fields?: Array<{
-          fieldId: string
-          label: string
-          required: boolean
-          serviceId?: string | null
-          criticalForPricing?: boolean
-        }>
+    // General inquiries aren't bound to the selected service's form
+    if (widgetConfigRows && widgetConfigRows.length > 0 && !isGeneralInquiry) {
+      const fieldsToValidate: WidgetField[] = []
+      for (const row of widgetConfigRows) {
+        const fields = (row.config_json as { fields?: WidgetField[] } | null)?.fields
+        if (!fields?.length) continue
+        if (row.service_id === null) {
+          // Global row: fields apply when unscoped or scoped to this service
+          fieldsToValidate.push(...fields.filter((f) => !f.serviceId || f.serviceId === body.serviceId))
+        } else if (row.service_id === body.serviceId) {
+          fieldsToValidate.push(...fields)
+        }
       }
 
-      if (config.fields && config.fields.length > 0) {
-        // Only validate fields that are global (no serviceId) or match the selected service
-        const applicableFields = config.fields.filter((f) => !f.serviceId || f.serviceId === body.serviceId)
-        // Required fields OR criticalForPricing fields must be validated
-        const requiredFields = applicableFields.filter((f) => f.required || f.criticalForPricing)
-        const answers = body.job?.answers || []
-        const answerMap = new Map(answers.map((a) => [a.fieldId, a.value]))
+      // Required fields OR criticalForPricing fields must be validated (dedupe by fieldId)
+      const seen = new Set<string>()
+      const requiredFields = fieldsToValidate.filter((f) => {
+        if (!(f.required || f.criticalForPricing) || seen.has(f.fieldId)) return false
+        seen.add(f.fieldId)
+        return true
+      })
+      const answers = body.job?.answers || []
+      const answerMap = new Map(answers.map((a) => [a.fieldId, a.value]))
 
-        const missingFields: string[] = []
-        const missingCriticalFields: string[] = []
-        for (const field of requiredFields) {
-          const value = answerMap.get(field.fieldId)
-          const isEmpty =
-            value === undefined ||
-            value === null ||
-            value === '' ||
-            (Array.isArray(value) && value.length === 0)
+      const missingFields: string[] = []
+      const missingCriticalFields: string[] = []
+      for (const field of requiredFields) {
+        const value = answerMap.get(field.fieldId)
+        const isEmpty =
+          value === undefined ||
+          value === null ||
+          value === '' ||
+          (Array.isArray(value) && value.length === 0) ||
+          // a number field answered with non-numeric text is not an answer —
+          // the engine would silently fall back to quantity 1
+          (field.type === 'number' && !Number.isFinite(Number(value)))
 
-          if (isEmpty) {
-            if (field.criticalForPricing) {
-              missingCriticalFields.push(field.label)
-            } else if (field.required) {
-              missingFields.push(field.label)
-            }
+        if (isEmpty) {
+          if (field.criticalForPricing) {
+            missingCriticalFields.push(field.label)
+          } else if (field.required) {
+            missingFields.push(field.label)
           }
         }
+      }
 
-        if (missingFields.length > 0 || missingCriticalFields.length > 0) {
-          const allMissing = [...missingFields, ...missingCriticalFields]
-          return NextResponse.json(
-            {
-              error: {
-                code: 'VALIDATION_ERROR',
-                message: missingCriticalFields.length > 0
-                  ? `Missing critical fields for accurate pricing: ${missingCriticalFields.join(', ')}`
-                  : `Missing required fields: ${allMissing.join(', ')}`,
-              },
+      if (missingFields.length > 0 || missingCriticalFields.length > 0) {
+        const allMissing = [...missingFields, ...missingCriticalFields]
+        return NextResponse.json(
+          {
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: missingCriticalFields.length > 0
+                ? `Missing critical fields for accurate pricing: ${missingCriticalFields.join(', ')}`
+                : `Missing required fields: ${allMissing.join(', ')}`,
             },
-            { status: 400 }
-          )
-        }
+          },
+          { status: 400 }
+        )
       }
     }
 
