@@ -142,13 +142,13 @@ export default async function DashboardPage() {
 
       {/* Plan usage warnings (T-101/T-102) */}
       {limitReached && planLimit.overageAvailable && (
-        <div className="mb-8 rounded-xl border border-amber-300 bg-amber-50 p-5">
+        <div className="mb-8 rounded-warm-xl border border-tape/40 bg-butter/50 p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="font-display text-base font-bold text-amber-900">
+              <h2 className="font-display text-base font-bold text-tertiary">
                 Plan limit passed ({planLimit.used}/{planLimit.limit}) — overage billing active
               </h2>
-              <p className="mt-1 text-sm text-amber-800">
+              <p className="mt-1 text-sm text-tertiary">
                 Quoting continues uninterrupted. Extra quotes are billed at{' '}
                 {planLimit.overagePriceCents
                   ? `$${(planLimit.overagePriceCents / 100).toFixed(2)}`
@@ -166,20 +166,20 @@ export default async function DashboardPage() {
         </div>
       )}
       {limitReached && !planLimit.overageAvailable && (
-        <div className="mb-8 rounded-xl border border-red-300 bg-red-50 p-5">
+        <div className="mb-8 rounded-warm-xl border border-danger/30 bg-danger-light/50 p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="font-display text-base font-bold text-red-900">
+              <h2 className="font-display text-base font-bold text-danger">
                 Monthly quote limit reached ({planLimit.used}/{planLimit.limit})
               </h2>
-              <p className="mt-1 text-sm text-red-800">
+              <p className="mt-1 text-sm text-danger">
                 New quote requests from your widget are paused — customers are being asked to contact
                 you directly. Upgrade to resume instant quoting.
               </p>
             </div>
             <Link
               href="/app/billing"
-              className="inline-flex shrink-0 items-center justify-center rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg bg-danger px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90"
             >
               Upgrade Plan
             </Link>
@@ -187,13 +187,13 @@ export default async function DashboardPage() {
         </div>
       )}
       {nearLimit && (
-        <div className="mb-8 rounded-xl border border-amber-300 bg-amber-50 p-5">
+        <div className="mb-8 rounded-warm-xl border border-tape/40 bg-butter/50 p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="font-display text-base font-bold text-amber-900">
+              <h2 className="font-display text-base font-bold text-tertiary">
                 {usagePercent}% of your monthly quote limit used ({planLimit.used}/{planLimit.limit})
               </h2>
-              <p className="mt-1 text-sm text-amber-800">
+              <p className="mt-1 text-sm text-tertiary">
                 When the limit is reached, new quote requests will be paused until next month. Upgrade
                 now to avoid missing leads.
               </p>
@@ -233,7 +233,7 @@ export default async function DashboardPage() {
 
       {/* Setup Progress - only show if not all complete */}
       {!allComplete && (
-        <div className="mb-8 rounded-xl border border-border bg-background p-6">
+        <div className="mb-8 rounded-warm-xl bg-white shadow-warm-md p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display text-lg font-bold text-text-primary">Complete your setup</h2>
             <span className="text-sm font-medium text-text-secondary">{completedCount} of {setupSteps.length} done</span>
@@ -242,7 +242,7 @@ export default async function DashboardPage() {
           {/* Progress bar */}
           <div className="h-2 w-full rounded-full bg-surface mb-5">
             <div
-              className="h-2 rounded-full bg-secondary transition-all"
+              className="h-2 rounded-full bg-primary transition-all"
               style={{ width: `${(completedCount / setupSteps.length) * 100}%` }}
             />
           </div>
@@ -255,7 +255,7 @@ export default async function DashboardPage() {
                 href={step.href}
                 className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                   step.completed
-                    ? 'bg-secondary-light text-secondary'
+                    ? 'bg-mint text-primary'
                     : 'bg-surface text-text-secondary hover:bg-surface hover:text-text-primary'
                 }`}
               >
@@ -329,9 +329,9 @@ export default async function DashboardPage() {
 
 function StatCard({ title, value }: { title: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-background p-6">
-      <p className="text-sm font-medium text-text-muted">{title}</p>
-      <p className="mt-2 font-display text-4xl font-extrabold tracking-tight text-text-primary">{value}</p>
+    <div className="rounded-warm-xl bg-white shadow-warm-md p-6">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">{title}</p>
+      <p className="figure mt-3 text-4xl font-medium tracking-tight text-text-primary">{value}</p>
     </div>
   )
 }
@@ -350,9 +350,9 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="flex items-start gap-4 rounded-xl border border-border bg-background p-5 transition-all hover:border-border-strong"
+      className="flex items-start gap-4 rounded-warm-xl bg-white shadow-warm-md p-5 transition-all hover:shadow-warm-hover hover:-translate-y-0.5"
     >
-      <div className="rounded-lg bg-surface p-2.5 text-text-primary">{icon}</div>
+      <div className="rounded-warm-lg bg-mint p-2.5 text-primary">{icon}</div>
       <div>
         <h3 className="font-semibold text-text-primary">{title}</h3>
         <p className="mt-0.5 text-sm text-text-secondary">{description}</p>
