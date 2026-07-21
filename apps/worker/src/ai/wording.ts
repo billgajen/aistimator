@@ -13,6 +13,7 @@
 import { GeminiClient } from './gemini'
 import { QUOTE_CONTENT_SCHEMA } from './schemas'
 import type { ExtractedSignals } from './signals'
+import type { TakeoffEntry } from '@estimator/shared'
 import type { PricingResult } from '../pricing/rules-engine'
 
 /**
@@ -24,6 +25,26 @@ export interface QuoteContent {
   exclusions: string[]
   notes: string
   validityDays: number
+  /** T-122: quantity takeoff with measurement methods (attached post-wording) */
+  takeoff?: TakeoffEntry[]
+  /** T-122: human-facing estimate reference */
+  reference?: string
+  /**
+   * R2-1: true when the request is fundamentally for a service this business
+   * does not provide (wrong trade). Captured structurally so the processor can
+   * gate the quote — previously the wording admitted the mismatch in prose
+   * while the priced quote shipped anyway.
+   */
+  serviceMismatch?: boolean
+  mismatchReason?: string
+  /**
+   * R3-1: photos/description contradict a customer-stated price driver
+   * (e.g. 2 hours booked, photos show a 4-hour job). Captured structurally so
+   * the processor can ask in-flow and cap the grade — previously the doubt
+   * lived only in the notes prose under a Grade A "exact" badge.
+   */
+  quantityConcern?: string
+  quantityConcernFieldId?: string
 }
 
 /**
@@ -181,8 +202,31 @@ Write the quote content as a JSON object with this exact structure:
   "assumptions": ["list", "of", "assumptions", "we're making"],
   "exclusions": ["list", "of", "what's NOT included"],
   "notes": "Any additional notes or recommendations (optional, can be empty string)",
-  "validityDays": 30
+  "validityDays": 30,
+  "serviceMismatch": false,
+  "mismatchReason": "",
+  "quantityConcern": "",
+  "quantityConcernFieldId": ""
 }
+
+===== STATED QUANTITY SANITY CHECK (quantityConcern) =====
+Compare the customer's stated price-driving quantities (hours, areas, counts
+in their form answers above) against the photos and description. If the
+evidence suggests a stated quantity is likely TOO LOW or TOO HIGH for the job
+described (e.g. photos show heavy clutter but only 2 hours booked), set
+"quantityConcern" to ONE friendly customer-facing sentence naming the doubt
+and what would be realistic, and set "quantityConcernFieldId" to that answer's
+fieldId (the value in square brackets). Do NOT bury the doubt only in notes —
+this field is what lets the system act on it. Leave both as empty strings when
+the stated quantities look plausible or the photos cannot inform them.
+
+===== WRONG-SERVICE DETECTION (serviceMismatch) =====
+Set "serviceMismatch": true ONLY when the customer's request is fundamentally
+for a DIFFERENT TRADE this business does not provide at all — e.g. appliance
+repair requested from an ice sculpture studio, or smart-home tech support
+requested from a beekeeper. Then set "mismatchReason" to one sentence naming
+what they actually need. A valid request that ALSO asks for extra out-of-scope
+items is NOT a mismatch — handle those via exclusions/notes as usual.
 
 Guidelines:
 - scopeSummary should clearly describe the work in plain English, referencing what's included if provided
@@ -317,7 +361,7 @@ export async function generateWording(
   // Format form answers if available
   if (context.formAnswers && context.formAnswers.length > 0) {
     const formAnswersText = context.formAnswers
-      .map((a) => `- ${a.question}: ${a.answer}`)
+      .map((a) => `- [${a.fieldId}] ${a.question}: ${a.answer}`)
       .join('\n')
     prompt = prompt.replace(/{{#if FORM_ANSWERS}}([\s\S]*?){{\/if}}/g, '$1')
     prompt = prompt.replace('{{FORM_ANSWERS}}', formAnswersText)
@@ -411,6 +455,13 @@ function validateContent(content: Partial<QuoteContent>, context: WordingContext
       : getDefaultExclusions(context),
     notes,
     validityDays: typeof content.validityDays === 'number' ? content.validityDays : 30,
+    // R2-1: thread the structural mismatch verdict through (this return
+    // enumerates fields — the AD-016 trap — so it MUST be listed here)
+    serviceMismatch: content.serviceMismatch === true,
+    mismatchReason: typeof content.mismatchReason === 'string' && content.mismatchReason ? content.mismatchReason : undefined,
+    // R3-1: stated-quantity doubt, same AD-016 rule
+    quantityConcern: typeof content.quantityConcern === 'string' && content.quantityConcern.trim() ? content.quantityConcern.trim() : undefined,
+    quantityConcernFieldId: typeof content.quantityConcernFieldId === 'string' && content.quantityConcernFieldId.trim() ? content.quantityConcernFieldId.trim() : undefined,
   }
 }
 

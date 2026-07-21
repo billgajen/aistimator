@@ -1,0 +1,142 @@
+{
+  "S11": {
+    "request": "HELP - back door key has snapped off in the lock and im locked out, my dog is inside and I need to do the school run at 3. Its a upvc door I think? How quick can somone get to Hillsborough and roughly what am I looking at cost wise??",
+    "persona": "Panicked mum of two, works part-time. Knows it's a uPVC back door and her address; does not know the lock brand or whether the mechanism is damaged. Has no price expectation, will pay whatever within reason today.",
+    "customerName": "Claire Beddows",
+    "email": "claire.beddows@example.com",
+    "postcode": "S6 4GH"
+  },
+  "S12": {
+    "request": "Hello, I have a cockapoo called Biscuit, he's 4 and an absolute sweetheart but he HATES the groomers in town ever since they nicked his ear, my daughter found you online and said you come to the house which would be so much better for him. He's got quite matted round his back end because he rolls in everything on our walks along the canal, and he probably needs his nails doing too. While you're here could you also do our cat Marmalade's claws? She won't let me near them. What sort of price would it be for the two of them, and do you need access to our outside tap? We're retired so any day suits.",
+    "persona": "Retired librarian, 68. Knows: dog is a cockapoo, ~10kg, 4 years old, matted rear, last groomed 5 months ago; flexible on dates; has driveway and outside tap. Doesn't know: grooming terminology (full groom vs de-mat), that a dog groomer likely won't touch the cat. No firm budget but expects around £40-50.",
+    "customerName": "Margaret Hollis",
+    "email": "mags.hollis@example.com",
+    "postcode": "SK4 2LP"
+  },
+  "S13": {
+    "request": "Getting married 14th March next year at Hazlewood Barn near Ripon. Another photographer has quoted us £950 for the full day so I'll be honest, that's the number to beat. Do you do video as well? And my fiancée really wants a drone shot of the barn. What's included and can you match or better £950?",
+    "persona": "Groom, 31, works in sales, negotiates everything. Knows: exact date, venue name, roughly 80 guests, ceremony at 1pm. Doesn't know: what documentary photography means, that this studio may not do video or drone work. Anchored hard on £950.",
+    "customerName": "Josh Trelawney",
+    "email": "josh.trelawney@example.com",
+    "postcode": "HG4 2QT"
+  },
+  "S14": {
+    "request": "How much roughly to clear the gutters on a normal 3 bed semi?",
+    "persona": "Busy dad, 44, just wants a ballpark before committing. Knows: 3-bed semi, two storeys, has a conservatory at the back (won't think to mention it). Doesn't know: linear metres of guttering, when they were last cleaned, whether anything is broken.",
+    "customerName": "Daniel Okafor",
+    "email": "d.okafor@example.com",
+    "postcode": "NG9 1FR"
+  },
+  "S15": {
+    "request": "Hi there, I'm finally moving out of the family home after 32 years, downsizing from a 3 bed semi in Chorlton to a bungalow near my daughter in Lytham which is about an hour away. My husband passed two years ago and his garage is still full of his tools and whatnot, some of it's going to my son-in-law and some to the tip honestly. Theres also an upright piano in the front room that my mother left me, does that cost extra? I havent packed anything yet and I'm dreading it, do you do the boxes and packing or is that seperate? Not in a rush, sometime in September ideally. What would it all come to roughly?",
+    "persona": "Widow, 67, retired nurse. Knows: 3-bed semi to bungalow, Chorlton to Lytham (~50 miles), upright piano, garage full of tools, September timeframe, flexible dates. Doesn't know: volume in cubic feet/van loads, that disposal runs may be a separate service, hasn't decluttered yet so quantity is uncertain.",
+    "customerName": "Pauline Garrity",
+    "email": "pauline.garrity@example.com",
+    "postcode": "M21 8DF"
+  },
+  "S16": {
+    "request": "Hi, want the driveway doing before summer. Block paving, about 40 foot by 12 — or is it metres you work in? Whatever, it's a normal 2-car drive. Loads of moss and weeds between the blocks. Next door had theirs done last year for £80 so somewhere round that would be ideal. I've attached a couple of photos so you can see the state of it. Do you re-sand it after or is that extra?",
+    "persona": "Homeowner, 52, warehouse manager, price-anchored by neighbour's (probably misremembered) £80. Knows: block paving, 2-car drive, heavy moss, has photos. Doesn't know: actual measurements (guesses 40ft x 12ft but unsure of units), that sealing/re-sanding is usually extra, that £80 is unrealistic.",
+    "customerName": "Steve Marchant",
+    "email": "stevemarchant70@example.com",
+    "postcode": "WA8 6PL"
+  },
+  "S17": {
+    "request": "Hello sir, we are wanting to make full new bathroom in our house. Now is very old, from previous owner, pink colour suite, very bad. We want shower walking in type, no bath tub, and my wife want the tiles going to ceiling. Bathroom is not big, maybe 2 metre and half by 2 metre. Also possible you can do small tiles work in kitchen also, behind the cooker? Please tell cost approximately and how many days work. We have some pictures from Pinterest what we like. Thank you very much.",
+    "persona": "Non-native English speaker (Turkish), 39, taxi driver, first house in the UK. Knows: bathroom roughly 2.5m x 2m, wants walk-in shower and no bath, floor-to-ceiling tiles, has Pinterest reference pictures. Doesn't know: that a bathroom company may not do kitchen splashbacks, UK price norms (expects ~£3k for everything), correct trade terms.",
+    "customerName": "Emre Yildirim",
+    "email": "emre.yildirim@example.com",
+    "postcode": "LU3 1TS"
+  },
+  "S18": {
+    "request": "Hi, we've got a Kia EV3 arriving end of next month so need a charger fitted at home. Our fuse box thing says 60 amp on it — is that enough kilowatts per hour or do we need the 3-phase? House is a 2018 build, driveway right next to the meter box. Also while your electrician is here could he move an outside socket that's in a stupid place? What's the all-in price fitted?",
+    "persona": "Accountant, 45, first EV, has done confused Googling. Knows: car model, delivery date (end of next month), 2018-build detached house, driveway adjacent to meter box, wants a tethered-looking charger like his colleague's. Doesn't know: electrical terminology (mixes up amps/kW, asks about 3-phase unnecessarily), that moving a socket may be out of scope, about OZEV grant eligibility.",
+    "customerName": "Richard Vane",
+    "email": "r.vane@example.com",
+    "postcode": "OX16 3JW"
+  },
+  "S19": {
+    "request": "We had a small chimney fire on Sunday night — fire brigade came out, everything's fine but the insurance company are saying they need a sweep certificate and a proper camera survey of the flue before they'll process anything, and they've given us until the end of next week. It's a wood burner in the living room, we've been in the house 6 years and honestly it's never been swept in that time which I now know is terrible. How soon could you come and what would the sweep plus camera survey cost? We're not using the fire obviously.",
+    "persona": "Homeowner, 38, marketing manager, shaken and on an insurance deadline. Knows: wood burner, single flue, fire was Sunday, deadline end of next week, never swept in 6 years, insurer wants certificate + camera survey. Doesn't know: flue liner type, chimney height, what a survey normally costs.",
+    "customerName": "Hannah Prydderch",
+    "email": "hannah.prydderch@example.com",
+    "postcode": "LL29 7DU"
+  },
+  "S20": {
+    "request": "hi, moving out of our rented house next friday and the landlord is being funny about the carpets, our cat had a few accidents in the back bedroom and you can defintely still smell it. need 3 bedrooms plus stairs and landing done, and probably the living room to be safe. can you get the smell out properly? its our whole deposit riding on this so needs to be before thursday ideally. how much?",
+    "persona": "Renter, 27, nursery worker, deposit (£1,100) at stake, hard deadline of Thursday. Knows: 3 bedrooms + stairs/landing + living room, cat urine in back bedroom, must be done before Thursday. Doesn't know: room sizes in any units, carpet fibre types, that urine treatment may cost extra.",
+    "customerName": "Beth Sillito",
+    "email": "bethsillito@example.com",
+    "postcode": "DE23 8UP"
+  },
+  "S21": {
+    "request": "Hi, I own Crumb & Co, a café in Didsbury — two sites actually as of March. Our 'website' is currently just a Facebook page and a years-out-of-date Google listing, and we're losing catering enquiries because people can't find a menu or contact us properly. I need a proper site: menus, opening hours for both sites, a catering enquiry form, and ideally people being able to book our function room upstairs. My nephew mentioned we should have an app too but I don't know if that's overkill. What does something like this cost and how long does it take? I can send over our logo and some photos a customer took for us.",
+    "persona": "Café owner (B2B), 54, two sites, zero technical knowledge, has logo files and photos. Knows: business details, both addresses, what enquiries she's losing, function room seats 30. Doesn't know: hosting/domains, difference between a website and an app, realistic budget (thinking maybe £500).",
+    "customerName": "Denise Whitlow",
+    "email": "denise@example.com",
+    "postcode": "M20 6RJ"
+  },
+  "S22": {
+    "request": "How much roughly for personal training? And is it cheaper if my mate trains with me, we'd both come.",
+    "persona": "Warehouse operative, 29, wants to get fit for five-a-side, never had a PT. Knows: himself and one mate, both free weekday evenings, happy to train in the park. Doesn't know: session lengths, block pricing, what he actually wants beyond 'get fitter'. Mentally comparing against his £24.99 gym membership.",
+    "customerName": "Kieran Doyle",
+    "email": "kdoyle94@example.com",
+    "postcode": "L14 3PB"
+  },
+  "S23": {
+    "request": "I wonder if you can help. I've inherited my grandfather's wingback armchair — he had it as long as I can remember, it sat by the fire in his cottage and it's honestly the thing I wanted most when he passed last spring. The seat has gone completely, there's a spring poking through, one arm is wobbly, and the fabric (a green velvet-ish thing) is worn through on both arms. I don't want it modernised, I want it to still be HIS chair, just usable — my grandmother says it might have horsehair inside, is that a thing you deal with? I've attached photos from a few angles. I have no idea at all what this sort of work costs so please be gentle, but it's not about money really.",
+    "persona": "Solicitor, 41, sentimental heirloom job, not price-sensitive but has no reference point. Knows: it's a wingback armchair, roughly 1950s, one broken spring, wobbly arm, worn green fabric, has photos. Doesn't know: fabric meterage, whether frame is sound underneath, timescales; would say yes to traditional materials.",
+    "customerName": "Rachel Ainscough",
+    "email": "rachel.ainscough@example.com",
+    "postcode": "YO24 1DE"
+  },
+  "S24": {
+    "request": "Need a skip this week for a garden clearout — old shed I've smashed up, a load of soil and turf, few fence panels. Reckon it's about 200 cubic feet of stuff? No idea what that is in yards, whatever the normal size is. Couple of questions: there's two corrugated roof sheets off the shed that might be the asbestos type, can they go in? And an old fridge? Skip would have to go on the road as the drive's full — you sort the permit don't you. Price for the week?",
+    "persona": "DIY enthusiast, 48, plasterer by trade so thinks he knows waste but doesn't know skip sizing. Knows: exact contents (shed timber, ~1 tonne soil/turf, 4 fence panels, 2 possibly-asbestos sheets, 1 fridge), needs on-road placement, wants it within the week. Doesn't know: skip sizes in yards, that asbestos and fridges are prohibited, permit costs.",
+    "customerName": "Gary Pemberton",
+    "email": "gazpemberton@example.com",
+    "postcode": "WV11 2BS"
+  },
+  "S25": {
+    "request": "How much to clean the solar panels on a bungalow? Think there's 10 of them.",
+    "persona": "Retired engineer, 71, noticed output dropping on his monitoring app. Knows: bungalow (easy single-storey access), 10 panels, system installed 2019, exact generation figures if asked. Doesn't know: panel dimensions, whether bird proofing is needed (there are pigeons, he won't mention them unless asked).",
+    "customerName": "Alan Fothergill",
+    "email": "alan.fothergill@example.com",
+    "postcode": "PO21 4EU"
+  },
+  "S26": {
+    "request": "Good morning, I'm the property manager at Kestrel Lettings and we're reviewing grounds maintenance contracts for two blocks we manage: Alder Court (12 flats, communal lawn front and rear, boundary hedge along the road) and Fairfax House (smaller, mostly shrub borders and a strip of grass). Current contractor is unreliable and residents are complaining. We'd want a scheduled visit every 2-3 weeks March to October, less over winter, all green waste removed, and invoicing monthly to our office with a PO number. Could you quote per visit or per month for both sites? Site visits can be arranged any weekday.",
+    "persona": "B2B customer — property manager, 35, professional and process-driven. Knows: both site addresses, number of flats, desired visit frequency, invoicing requirements, budget ceiling of ~£380/month across both sites (won't volunteer it). Doesn't know: lawn areas in square metres, hedge species or lengths.",
+    "customerName": "Tom Ferriday",
+    "email": "t.ferriday@example.com",
+    "postcode": "RG1 8BN"
+  },
+  "S27": {
+    "request": "Hi, looking for some help for my son Oliver, he's in Year 10 doing Edexcel maths and his mock came back as a grade 4 which was a shock as he's always been fine at maths, his teacher says he rushes and makes silly mistakes but honestly I think he's lost confidence since he moved sets, he sits with a boy who distracts him. He needs a 6 for the sixth form course he wants (engineering). Exams are next June so we've got time but I don't want to leave it. Would weekly sessions be enough? Also do you cover physics because that's slipping too, and my younger daughter is doing the 11+ next year — do you do that? We'd prefer someone coming to the house, Tuesdays or Thursdays after 5.",
+    "persona": "Mum, 46, NHS admin, anxious about school. Knows: son Year 10, Edexcel, mock grade 4, target grade 6, exams next June, available Tue/Thu after 5pm, prefers in-home. Doesn't know: hourly rates, that a maths tutor may not cover physics or 11+, what specification topics he's weak on.",
+    "customerName": "Sarah Kandiah",
+    "email": "sarah.kandiah@example.com",
+    "postcode": "CR2 7HA"
+  },
+  "S28": {
+    "request": "Hello, I'm sorry if this is a bit disjointed. My dad passed away three weeks ago and I need his house cleared — it's a 2 bed terrace in Wigan, he lived there 40 years so it's full, every cupboard, the loft, a small yard with bits in it. Some furniture is decent and should go to charity if possible, that would have mattered to him. My brother lives in Australia so it's all on me and I'm only up at weekends, I'm based in Bristol. The estate agent wants it empty by the end of August for probate valuation. I can send photos of each room if that helps. Could you give me an idea of cost and whether the charity thing is something you actually do or just say?",
+    "persona": "Bereaved daughter, 52, teacher, based 200 miles away, only available weekends. Knows: 2-bed terrace, 40 years of contents, loft and yard included, end-of-August deadline, can provide room photos, wants charity donation of good furniture. Doesn't know: volume in van loads, whether anything is valuable, that clearances can sometimes credit resale value against cost.",
+    "customerName": "Julie Hartop",
+    "email": "julie.hartop@example.com",
+    "postcode": "BS16 5DN"
+  },
+  "S29": {
+    "request": "Hi, my chest freezer in the garage has packed in — it's icing up round the top but nothing's staying frozen and there's a puddle underneath. It's a Beko, about 8 years old. Do you repair freezers or is it just air conditioning you do? I found you when I searched ice repairs near me. Need someone fairly soon as I've got a load of meat in there from the farm shop.",
+    "persona": "WRONG BUSINESS — pensioner, 74, searched 'ice repair near me' and found an ice sculpture company. Knows: Beko chest freezer, ~8 years old, symptoms, garage location. Doesn't know: that this business carves ice sculptures for events and has nothing to do with appliance repair.",
+    "customerName": "Derek Sowerby",
+    "email": "derek.sowerby@example.com",
+    "postcode": "CA2 5XR"
+  },
+  "S30": {
+    "request": "Hi, my Hive thermostat has been showing offline for four days and the heating is stuck on schedule, British Gas keep me on hold for an hour then cut me off. Saw your name and you're local — how much for someone to come out and get it reconnected? It's the Hive Mini I think, the hub has a flashing amber light.",
+    "persona": "WRONG BUSINESS — office worker, 43, confused the beekeeping outfit with Hive smart heating support. Knows: Hive Mini thermostat, hub flashing amber, offline 4 days, British Gas is the energy supplier. Doesn't know: that this is a honeybee swarm rescue service with no connection to smart thermostats.",
+    "customerName": "Nathan Grewal",
+    "email": "n.grewal@example.com",
+    "postcode": "MK5 7GD"
+  }
+}

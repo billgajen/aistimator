@@ -22,6 +22,7 @@ import type {
   ExtractedSignalsV2,
   ExtractedSignal,
 } from '@estimator/shared'
+import { evaluateFormula } from '@estimator/shared'
 import type { CrossServiceEstimate } from '../ai/cross-service'
 
 /**
@@ -40,7 +41,9 @@ export interface PricingRules {
   }>
   multipliers: Array<{
     when: {
-      fieldId: string
+      /** 'field' (default) tests a form answer; 'subtotal' tests the running subtotal (T-125) */
+      subject?: 'field' | 'subtotal'
+      fieldId?: string
       operator?: 'equals' | 'contains' | 'gt' | 'lt' | 'gte' | 'lte'
       equals?: string | number | boolean
       value?: string | number
@@ -112,6 +115,14 @@ export interface PricingResult {
   }>
   /** Confidence level (0-1), affects whether range is shown */
   confidence: number
+  /** T-120 Measurement Engine: declared estimate grade + interval */
+  estimate?: {
+    grade: 'A' | 'B' | 'C'
+    label: string
+    description: string
+    rangeLow?: number
+    rangeHigh?: number
+  }
   /** If confidence is low, show a range */
   range?: {
     low: number
@@ -165,7 +176,8 @@ export function calculatePricing(
   jobData?: JobData,
   addonContext?: AddonDetectionContext,
   aiDetectedAddonIds?: Set<string>,
-  serviceContext?: ServiceContext
+  serviceContext?: ServiceContext,
+  aiAddonDetectionRan?: boolean
 ): PricingResult {
   const breakdown: PricingResult['breakdown'] = []
   const notes: string[] = []
@@ -263,7 +275,7 @@ export function calculatePricing(
   const searchableText = buildSearchableText(addonContext)
 
   for (const addon of rules.addons) {
-    const addonMatch = shouldApplyAddon(addon, signals, answers, searchableText, aiDetectedAddonIds, serviceContext)
+    const addonMatch = shouldApplyAddon(addon, signals, answers, searchableText, aiDetectedAddonIds, serviceContext, aiAddonDetectionRan)
     if (addonMatch.apply) {
       breakdown.push({
         label: addon.label,
@@ -290,7 +302,7 @@ export function calculatePricing(
   let runningSubtotal = subtotal
 
   for (const mult of rules.multipliers) {
-    if (shouldApplyMultiplier(mult, answers)) {
+    if (shouldApplyMultiplier(mult, answers, runningSubtotal)) {
       const adjustmentAmount = runningSubtotal * (mult.multiplier - 1)
       if (adjustmentAmount !== 0) {
         // Generate descriptive label from the condition if none provided
@@ -505,8 +517,11 @@ function isKeywordNegated(text: string, keyword: string): boolean {
     `\\b(${negationWords.join('|')})\\s+(\\w+\\s+){0,2}${escapeRegExp(keywordLower)}\\b`,
     'i'
   )
-
   return negationPattern.test(textLower)
+  // R2-6 note: possession phrases ("I have logo files") are NOT suppressible
+  // by regex — "we have a dog" (cause: needs the addon) and "we have a logo"
+  // (deliverable: doesn't) are grammatically identical. Intent reading is the
+  // AI addon detector's job; when it runs, bare keyword matches never charge.
 }
 
 /**
@@ -547,7 +562,8 @@ function shouldApplyAddon(
   answers: FormAnswer[],
   searchableText: string,
   aiDetectedAddonIds?: Set<string>,
-  serviceContext?: ServiceContext
+  serviceContext?: ServiceContext,
+  aiAddonDetectionRan?: boolean
 ): AddonMatchResult {
   // 1. Check if addon is explicitly selected in form answers
   const answer = answers.find((a) => a.fieldId === addon.id)
@@ -565,8 +581,14 @@ function shouldApplyAddon(
     return { apply: true, autoRecommended: false }
   }
 
-  // 2. Check keyword triggers in project description
-  if (addon.triggerKeywords && addon.triggerKeywords.length > 0 && searchableText) {
+  // 2. Check keyword triggers in project description.
+  // R2-6: when AI addon detection RAN, it is the authority on description
+  // intent — it reads context ("I have logo files" = owns one, not wants
+  // one). Anything it did not detect must not be auto-charged off a bare
+  // keyword; the addon still surfaces in the availableAddons upsell list.
+  if (aiAddonDetectionRan) {
+    // skip keyword auto-apply entirely
+  } else if (addon.triggerKeywords && addon.triggerKeywords.length > 0 && searchableText) {
     // Check for global addon suppressor phrases first (e.g., "no extras", "budget only")
     // If customer explicitly says they don't want extras, skip all keyword-based addons
     if (hasGlobalAddonSuppressor(searchableText)) {
@@ -699,14 +721,40 @@ function formatConditionName(condition: string): string {
  */
 function shouldApplyMultiplier(
   mult: PricingRules['multipliers'][0],
-  answers: FormAnswer[]
+  answers: FormAnswer[],
+  currentSubtotal?: number
 ): boolean {
+  // T-125: subtotal-conditional multipliers ("10% off jobs over £5,000" → ×0.9)
+  if (mult.when.subject === 'subtotal') {
+    if (currentSubtotal === undefined) return false
+    const compareNum = coerceToNumber(mult.when.equals ?? mult.when.value)
+    if (compareNum === null) return false
+    switch (mult.when.operator || 'gt') {
+      case 'gt': return currentSubtotal > compareNum
+      case 'gte': return currentSubtotal >= compareNum
+      case 'lt': return currentSubtotal < compareNum
+      case 'lte': return currentSubtotal <= compareNum
+      case 'equals': return currentSubtotal === compareNum
+      default: return false
+    }
+  }
+
   const answer = answers.find((a) => a.fieldId === mult.when.fieldId)
   if (!answer) return false
 
-  const operator = mult.when.operator || 'equals'
-  const compareValue = mult.when.equals ?? mult.when.value
+  return compareAnswerValue(answer.value, mult.when.operator || 'equals', mult.when.equals ?? mult.when.value)
+}
 
+/**
+ * Compare a form answer against a configured condition value (T-126: shared
+ * by multiplier conditions and work-step `when` conditions).
+ */
+function compareAnswerValue(
+  answerValue: unknown,
+  operator: string,
+  compareValue: string | number | boolean | undefined
+): boolean {
+  const answer = { value: answerValue }
   switch (operator) {
     case 'equals':
       // Type-aware comparison to handle form data types vs config value types
@@ -720,7 +768,7 @@ function shouldApplyMultiplier(
           typeof v === 'string' && v.toLowerCase() === compareValueLower
         )
         if (hasMatch) {
-          console.log(`[Pricing] Multiplier array match: field "${mult.when.fieldId}" contains "${compareValue}"`)
+          console.log(`[Pricing] Condition array match: answer contains "${compareValue}"`)
         }
         return hasMatch
       }
@@ -869,25 +917,38 @@ function generateMultiplierLabel(
   const { fieldId, equals, value } = mult.when
   const matchedValue = equals ?? value
 
-  // Strip common UI suffixes from fieldId for cleaner display
-  // e.g., "pest_type_input" → "pest_type", "room_select" → "room"
-  const cleanedFieldId = fieldId
-    .replace(/_(input|select|field|type|dropdown|choice)$/i, '')
+  // R3-1 cosmetics: customer-facing labels, never raw conditions like
+  // "Is Deep Clean: true". Always show the percentage.
+  const pct = Math.round((mult.multiplier - 1) * 100)
+  const pctSuffix = pct >= 0 ? ` (+${pct}%)` : ` (-${Math.abs(pct)}%)`
+  const kind = pct >= 0 ? 'surcharge' : 'discount'
 
-  // Format the cleaned field ID into a readable label
-  // e.g., "pest_type" → "Pest Type", "dent_size" → "Dent Size"
-  const fieldLabel = cleanedFieldId
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
+  // T-125: subtotal-conditional multipliers get an order-value label
+  if (mult.when.subject === 'subtotal' || !fieldId) {
+    const op = mult.when.operator || 'gt'
+    const relation = op === 'lt' || op === 'lte' ? 'under' : 'over'
+    return `${pct >= 0 ? 'Adjustment' : 'Discount'} for jobs ${relation} ${matchedValue}${pctSuffix}`
+  }
 
-  // Format the value
-  const valueLabel = typeof matchedValue === 'string'
-    ? matchedValue.charAt(0).toUpperCase() + matchedValue.slice(1).replace(/_/g, ' ')
-    : String(matchedValue)
+  const humanize = (s2: string): string =>
+    s2
+      .replace(/_(input|select|field|dropdown|choice)$/i, '')
+      .replace(/^(is|has|needs|requires)_/i, '')
+      .replace(/_/g, ' ')
+      .trim()
+      .replace(/^\w/, (c) => c.toUpperCase())
 
-  // Use "Field: Value" format for professional labels
-  // e.g., "Pest Type: Mice", "Dent Size: Large"
-  return `${fieldLabel}: ${valueLabel}`
+  // Boolean condition ("is_deep_clean equals true") -> "Deep clean surcharge (+50%)"
+  if (matchedValue === true || matchedValue === 'true' || String(matchedValue).toLowerCase() === 'yes') {
+    return `${humanize(fieldId)} ${kind}${pctSuffix}`
+  }
+
+  // Enum condition ("job_urgency equals emergency") -> "Emergency surcharge (+50%)"
+  if (typeof matchedValue === 'string') {
+    return `${humanize(matchedValue)} ${kind}${pctSuffix}`
+  }
+
+  return `${humanize(fieldId)} ${kind}${pctSuffix}`
 }
 
 // Note: getComplexityMultiplier() was removed - automatic complexity multiplier is no longer applied.
@@ -1069,6 +1130,27 @@ function shouldTriggerWorkStep(
   legacySignals: ExtractedSignals,
   formAnswers?: FormAnswer[]
 ): { trigger: boolean; signalValue?: string | number | boolean } {
+  // T-126: explicit form-bound condition governs the step outright —
+  // conditional charges ("SUV +£25", "weekend +£20") bind to form answers
+  // with the same comparison semantics as multiplier conditions.
+  if (step.when?.fieldId) {
+    const answer = formAnswers?.find((a) => a.fieldId === step.when!.fieldId)
+    if (!answer || answer.value == null) {
+      console.log(`[Pricing] Work step "${step.name}": when-condition field "${step.when.fieldId}" unanswered - skipping`)
+      return { trigger: false }
+    }
+    const matched = compareAnswerValue(
+      answer.value,
+      step.when.operator || 'equals',
+      step.when.equals ?? step.when.value
+    )
+    console.log(`[Pricing] Work step "${step.name}": when ${step.when.fieldId} ${step.when.operator || 'equals'} ${step.when.equals ?? step.when.value} -> ${matched}`)
+    return {
+      trigger: matched,
+      signalValue: typeof answer.value === 'object' ? String(answer.value) : (answer.value as string | number | boolean),
+    }
+  }
+
   // Non-optional steps always trigger
   if (!step.optional) {
     return { trigger: true }
@@ -1176,11 +1258,146 @@ function getQuantityFromSource(
       return typeof value === 'number' ? value : 0
     }
 
+    case 'derived': {
+      const result = resolveDerivedQuantity(source.formula, structuredSignals, legacySignals, formAnswers || [])
+      return result.resolved ? result.quantity : 0
+    }
+
     default:
       return 0
   }
 }
 
+/**
+ * Resolve a derived-quantity formula (T-125). Identifiers resolve from form
+ * answers first (trusted), then AI signals (untrusted). Any unresolvable
+ * identifier or evaluation error fails the whole formula — the caller falls
+ * back explicitly instead of pricing on garbage. Result clamps to >= 0.
+ */
+function resolveDerivedQuantity(
+  formula: string | undefined,
+  structuredSignals: ExtractedSignal[] | undefined,
+  legacySignals: ExtractedSignals,
+  formAnswers: FormAnswer[],
+  zeroDefaultFields?: Set<string>
+): {
+  resolved: boolean
+  quantity: number
+  trusted: boolean
+  error?: string
+  signalsUsed: Array<{ key: string; value: string | number | boolean }>
+} {
+  const signalsUsed: Array<{ key: string; value: string | number | boolean }> = []
+  if (!formula) {
+    return { resolved: false, quantity: 0, trusted: false, error: 'No formula configured', signalsUsed }
+  }
+
+  let allTrusted = true
+  const result = evaluateFormula(formula, (name) => {
+    const answer = formAnswers.find((a) => a.fieldId === name)
+    if (answer?.value != null) {
+      const n = typeof answer.value === 'number' ? answer.value : coerceToNumber(answer.value)
+      if (n !== null) {
+        signalsUsed.push({ key: name, value: n })
+        return n
+      }
+    }
+    const signal = getSignalValue(name, structuredSignals, legacySignals)
+    const n = typeof signal.value === 'number' ? signal.value : coerceToNumber(String(signal.value ?? ''))
+    if (n !== null && signal.value !== undefined) {
+      allTrusted = false // AI-sourced operand — lower trust
+      signalsUsed.push({ key: name, value: n })
+      return n
+    }
+    // T-131 (R2-2): identifiers backed by missingMeansZero catalogue fields
+    // resolve to a TRUSTED zero when unanswered ("not requested") — the
+    // formula stays resolvable and T-127 asks no spurious catalogue question
+    if (zeroDefaultFields?.has(name)) {
+      signalsUsed.push({ key: name, value: 0 })
+      return 0
+    }
+    return undefined
+  })
+
+  if (!result.ok) {
+    return { resolved: false, quantity: 0, trusted: false, error: result.error, signalsUsed }
+  }
+  return { resolved: true, quantity: Math.max(0, result.value), trusted: allTrusted, signalsUsed }
+}
+
+
+
+/**
+ * R2-7: detect mutually-exclusive-looking steps that ALL priced. When a
+ * compile run emits package alternatives ("Online Tutoring (Block of 10)" /
+ * "In-home Tutoring (Block of 10)") without when-binding them to the choice
+ * field, the customer gets charged for both. Heuristic: two priced FIXED
+ * steps with no conditions whose names share >=60% of their tokens.
+ */
+export function findLookalikeUnconditionedSteps(
+  steps: WorkStepConfig[],
+  pricedStepIds: Set<string>
+): Array<[string, string]> {
+  const candidates = steps.filter(
+    (st) =>
+      st.costType === 'fixed' &&
+      !st.when &&
+      !st.triggerSignal &&
+      !st.quantitySource &&
+      pricedStepIds.has(st.id)
+  )
+  const tokens = (name: string): Set<string> =>
+    new Set(name.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 1))
+  const jaccard = (nameA: string, nameB: string): number => {
+    const a = tokens(nameA)
+    const b = tokens(nameB)
+    if (a.size === 0 || b.size === 0) return 0
+    let inter = 0
+    for (const t of a) if (b.has(t)) inter++
+    const union = a.size + b.size - inter
+    return union > 0 ? inter / union : 0
+  }
+
+  const pairs: Array<[string, string]> = []
+  for (let i = 0; i < candidates.length; i++) {
+    for (let j = i + 1; j < candidates.length; j++) {
+      const stepA = candidates[i]
+      const stepB = candidates[j]
+      if (!stepA || !stepB) continue
+      if (jaccard(stepA.name, stepB.name) >= 0.6) {
+        pairs.push([stepA.name, stepB.name])
+      }
+    }
+  }
+
+  // (b) Two priced steps drawing their quantity from the SAME form field,
+  // neither when-bound, with similar names — one "hours" field cannot buy
+  // both "Online (per hour)" AND "In-home (per hour)". Derived formulas are
+  // exempt (tier splits legitimately share a field via min/max).
+  const byField = new Map<string, WorkStepConfig[]>()
+  for (const st of steps) {
+    if (st.when || st.triggerSignal) continue
+    if (!pricedStepIds.has(st.id)) continue
+    if (st.quantitySource?.type === 'form_field' && st.quantitySource.fieldId) {
+      const group = byField.get(st.quantitySource.fieldId) || []
+      group.push(st)
+      byField.set(st.quantitySource.fieldId, group)
+    }
+  }
+  for (const group of byField.values()) {
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const stepA = group[i]
+        const stepB = group[j]
+        if (!stepA || !stepB) continue
+        if (jaccard(stepA.name, stepB.name) >= 0.4 && !pairs.some(([x, y]) => x === stepA.name && y === stepB.name)) {
+          pairs.push([stepA.name, stepB.name])
+        }
+      }
+    }
+  }
+  return pairs
+}
 
 /**
  * Result of work step cost calculation with explicit source tracking
@@ -1189,7 +1406,7 @@ interface WorkStepCostResult {
   cost: number
   calculation: string
   signalsUsed: Array<{ key: string; value: string | number | boolean }>
-  quantitySource: 'form_field' | 'constant' | 'ai_signal' | 'legacy_fallback'
+  quantitySource: 'form_field' | 'constant' | 'ai_signal' | 'legacy_fallback' | 'derived' | 'derived_unresolved'
   quantityTrusted: boolean
   /** The resolved quantity (for per_unit) or hours (for per_hour). undefined for fixed cost. */
   quantity?: number
@@ -1207,7 +1424,8 @@ function calculateWorkStepCost(
   step: WorkStepConfig,
   structuredSignals: ExtractedSignal[] | undefined,
   legacySignals: ExtractedSignals,
-  formAnswers: FormAnswer[]
+  formAnswers: FormAnswer[],
+  zeroDefaultFields?: Set<string>
 ): WorkStepCostResult {
   const signalsUsed: Array<{ key: string; value: string | number | boolean }> = []
   const unitLabel = step.unitLabel || 'units'
@@ -1249,6 +1467,20 @@ function calculateWorkStepCost(
               } else {
                 console.warn(`[Pricing] "${step.name}": Form field "${step.quantitySource.fieldId}" has non-numeric value: ${formAnswer.value}`)
               }
+            } else if (step.quantitySource.missingMeansZero) {
+              // T-131 (R2-2): catalogue semantics — unanswered means "not
+              // requested", a TRUSTED zero, not an untrusted ×1 placeholder.
+              // The zero-cost skip drops the line; T-127 must not ask about it.
+              console.log(`[Pricing] "${step.name}": catalogue item not requested (field unanswered, missingMeansZero) - quantity 0`)
+              return {
+                cost: 0,
+                calculation: 'Not requested (0)',
+                signalsUsed,
+                quantitySource: 'form_field',
+                quantityTrusted: true,
+                quantity: 0,
+                unitLabel,
+              }
             } else {
               console.warn(`[Pricing] "${step.name}": Form field "${step.quantitySource.fieldId}" not answered, using default quantity 1`)
             }
@@ -1265,10 +1497,17 @@ function calculateWorkStepCost(
           }
 
           case 'ai_signal': {
-            // Use AI-extracted signal value (lower trust)
+            // Use AI-extracted signal value (lower trust).
+            // Bug #10 (found live): Gemini frequently returns numeric signals as
+            // STRINGS ("50") — apply the same coercion as form fields (ISSUE-2),
+            // or a valid extraction silently priced as quantity 1.
             const signal = getSignalValue(step.quantitySource.signalKey || '', structuredSignals, legacySignals)
-            if (typeof signal.value === 'number' && signal.value > 0) {
-              quantity = signal.value
+            const aiQuantity =
+              typeof signal.value === 'number'
+                ? signal.value
+                : coerceToNumber(String(signal.value ?? ''))
+            if (aiQuantity !== null && aiQuantity > 0) {
+              quantity = aiQuantity
               quantitySource = 'ai_signal'
               quantityTrusted = false  // AI = lower trust, mark in trace
               signalsUsed.push({ key: step.quantitySource.signalKey || 'ai_signal', value: quantity })
@@ -1277,10 +1516,48 @@ function calculateWorkStepCost(
             }
             break
           }
+
+          case 'derived': {
+            // T-125: deterministic formula over form fields / signals
+            const derived = resolveDerivedQuantity(step.quantitySource.formula, structuredSignals, legacySignals, formAnswers, zeroDefaultFields)
+            if (derived.resolved) {
+              quantity = derived.quantity
+              quantitySource = 'derived'
+              quantityTrusted = derived.trusted
+              signalsUsed.push(...derived.signalsUsed)
+            } else {
+              quantitySource = 'derived_unresolved'
+              quantityTrusted = false
+              console.warn(`[Pricing] "${step.name}": derived formula failed (${derived.error}), using default quantity 1`)
+            }
+            break
+          }
         }
       }
       // 2. LEGACY FALLBACK (deprecated, for backward compatibility only)
       else {
+        // T-127: a clarification answer for a legacy step merges back as a
+        // form answer keyed by the STEP ID — honour it before heuristics so
+        // the ask→answer→reprocess loop actually fixes the price
+        const directAnswer = formAnswers.find((a) => a.fieldId === step.id)
+        const directQty = directAnswer
+          ? (typeof directAnswer.value === 'number' ? directAnswer.value : coerceToNumber(directAnswer.value))
+          : null
+        if (directQty !== null && directQty > 0) {
+          const cost = directQty * step.defaultCost
+          const displayUnit = unitLabel.charAt(0).toUpperCase() + unitLabel.slice(1)
+          signalsUsed.push({ key: step.id, value: directQty })
+          return {
+            cost,
+            calculation: `${directQty} ${unitLabel} × ${step.defaultCost}/${unitLabel.replace(/s$/, '')} = ${cost}`,
+            signalsUsed,
+            quantitySource: 'form_field',
+            quantityTrusted: true,
+            quantity: directQty,
+            unitLabel: displayUnit,
+          }
+        }
+
         console.warn(`[Pricing] "${step.name}": No quantitySource configured, using legacy fallback (DEPRECATED - please configure explicit quantitySource)`)
 
         // Try triggerSignal first (if set)
@@ -1363,11 +1640,32 @@ function calculateWorkStepCost(
 
           case 'ai_signal': {
             const signal = getSignalValue(step.quantitySource.signalKey || '', structuredSignals, legacySignals)
-            if (typeof signal.value === 'number' && signal.value > 0) {
-              hours = signal.value
+            // Bug #10: coerce string-typed AI values (same as the per_unit path)
+            const aiHours =
+              typeof signal.value === 'number'
+                ? signal.value
+                : coerceToNumber(String(signal.value ?? ''))
+            if (aiHours !== null && aiHours > 0) {
+              hours = aiHours
               quantitySource = 'ai_signal'
               quantityTrusted = false
               signalsUsed.push({ key: step.quantitySource.signalKey || 'ai_signal', value: hours })
+            }
+            break
+          }
+
+          case 'derived': {
+            // T-125: deterministic formula over form fields / signals
+            const derived = resolveDerivedQuantity(step.quantitySource.formula, structuredSignals, legacySignals, formAnswers, zeroDefaultFields)
+            if (derived.resolved) {
+              hours = derived.quantity
+              quantitySource = 'derived'
+              quantityTrusted = derived.trusted
+              signalsUsed.push(...derived.signalsUsed)
+            } else {
+              quantitySource = 'derived_unresolved'
+              quantityTrusted = false
+              console.warn(`[Pricing] "${step.name}": derived formula failed (${derived.error}), using default hours 1`)
             }
             break
           }
@@ -1375,6 +1673,25 @@ function calculateWorkStepCost(
       }
       // 2. LEGACY FALLBACK - estimate hours based on complexity
       else {
+        // T-127: honour a clarification answer keyed by the step id (see per_unit)
+        const directAnswer = formAnswers.find((a) => a.fieldId === step.id)
+        const directHours = directAnswer
+          ? (typeof directAnswer.value === 'number' ? directAnswer.value : coerceToNumber(directAnswer.value))
+          : null
+        if (directHours !== null && directHours > 0) {
+          const cost = directHours * step.defaultCost
+          signalsUsed.push({ key: step.id, value: directHours })
+          return {
+            cost,
+            calculation: `${directHours} hours × ${step.defaultCost}/hour = ${cost}`,
+            signalsUsed,
+            quantitySource: 'form_field',
+            quantityTrusted: true,
+            quantity: directHours,
+            unitLabel: 'Hrs',
+          }
+        }
+
         console.warn(`[Pricing] "${step.name}": No quantitySource for per_hour, using complexity-based estimation (DEPRECATED)`)
         const complexitySignal = getSignalValue('complexity_level', structuredSignals, legacySignals)
 
@@ -1399,6 +1716,33 @@ function calculateWorkStepCost(
         quantityTrusted,
         quantity: hours,
         unitLabel: 'Hrs',
+      }
+    }
+
+    case 'credit': {
+      // T-131 (R2-5): a deduction line (trade-in/resale offset). Quantity
+      // resolves like per_unit when a source is configured, else ×1.
+      let creditQty = 1
+      const quantityTrusted = true
+      let quantitySource: WorkStepCostResult['quantitySource'] = 'constant'
+      if (step.quantitySource) {
+        const q = getQuantityFromSource(step.quantitySource, structuredSignals, legacySignals, formAnswers)
+        if (q > 0) {
+          creditQty = q
+          quantitySource = step.quantitySource.type === 'derived' ? 'derived' : step.quantitySource.type
+        } else {
+          creditQty = 0
+        }
+      }
+      const credit = -(creditQty * step.defaultCost)
+      return {
+        cost: credit,
+        calculation: `Credit: -${creditQty * step.defaultCost}`,
+        signalsUsed,
+        quantitySource,
+        quantityTrusted,
+        quantity: creditQty,
+        unitLabel: step.unitLabel,
       }
     }
 
@@ -1430,7 +1774,8 @@ export function calculatePricingWithTrace(
   addonContext?: AddonDetectionContext,
   aiDetectedAddonIds?: Set<string>,
   serviceContext?: ServiceContext,
-  configVersion?: string
+  configVersion?: string,
+  aiAddonDetectionRan?: boolean
 ): PricingResultWithTrace {
   const traceSteps: PricingTraceStep[] = []
   const notes: string[] = []
@@ -1458,10 +1803,24 @@ export function calculatePricingWithTrace(
   }
 
   // 2. Work steps (new model with explicit quantity sources - AD-005)
+  // T-125: percent steps are deferred — they apply to amounts priced by the
+  // other steps, so they evaluate after every non-percent step has run.
+  const percentSteps: WorkStepConfig[] = []
+  const stepAmountsById = new Map<string, number>()
+  // T-131: catalogue fields whose absence means quantity zero (for derived formulas)
+  const zeroDefaultFields = new Set(
+    (rules.workSteps || [])
+      .filter((ws) => ws.quantitySource?.missingMeansZero && ws.quantitySource.fieldId)
+      .map((ws) => ws.quantitySource!.fieldId!)
+  )
   if (rules.workSteps && rules.workSteps.length > 0) {
     const signalsArray = structuredSignals?.signals
 
     for (const step of rules.workSteps) {
+      if (step.costType === 'percent') {
+        percentSteps.push(step)
+        continue
+      }
       const { trigger, signalValue } = shouldTriggerWorkStep(step, signalsArray, signals, answers)
 
       console.log(`[Pricing] Work step "${step.name}": optional=${step.optional}, triggerSignal=${step.triggerSignal}, trigger=${trigger}, signalValue=${signalValue}`)
@@ -1471,7 +1830,7 @@ export function calculatePricingWithTrace(
         continue
       }
 
-      const stepResult = calculateWorkStepCost(step, signalsArray, signals, answers)
+      const stepResult = calculateWorkStepCost(step, signalsArray, signals, answers, zeroDefaultFields)
 
       // ISSUE-3 FIX: Skip zero-cost line items (e.g., "0 sockets × £25 = £0")
       // This prevents unprofessional-looking quotes with $0 line items
@@ -1507,12 +1866,53 @@ export function calculatePricingWithTrace(
         quantityTrusted: stepResult.quantityTrusted,
       })
 
+      // Track priced amount by step id so percent steps can reference it
+      stepAmountsById.set(step.id, stepResult.cost)
+
       // Add note if using legacy fallback (no explicit quantitySource)
       if (stepResult.quantitySource === 'legacy_fallback') {
         notes.push(`"${step.name}" uses legacy quantity estimation - consider configuring explicit quantity source`)
       } else if (stepResult.quantitySource === 'ai_signal' && !stepResult.quantityTrusted) {
         notes.push(`"${step.name}" quantity from AI signal (lower confidence)`)
       }
+    }
+
+    // T-125: percent steps — defaultCost is the percentage; percentOf names
+    // the step ids it applies to, or 'subtotal' for the running total so far.
+    for (const step of percentSteps) {
+      const { trigger } = shouldTriggerWorkStep(step, signalsArray, signals, answers)
+      if (!trigger) {
+        console.log(`[Pricing] Skipping percent step "${step.name}" - trigger not satisfied`)
+        continue
+      }
+      let base: number
+      let baseDescription: string
+      if (Array.isArray(step.percentOf)) {
+        base = step.percentOf.reduce((sum, id) => sum + (stepAmountsById.get(id) ?? 0), 0)
+        baseDescription = step.percentOf.join(' + ')
+      } else {
+        base = runningTotal
+        baseDescription = 'subtotal'
+      }
+      const amount = Math.round(base * (step.defaultCost / 100) * 100) / 100
+      if (amount === 0) {
+        console.log(`[Pricing] Skipping percent step "${step.name}" - zero amount`)
+        continue
+      }
+      runningTotal += amount
+      workStepsTotal += amount
+      stepAmountsById.set(step.id, amount)
+      traceSteps.push({
+        type: 'work_step',
+        id: step.id,
+        description: step.name,
+        signalsUsed: [],
+        calculation: `${step.defaultCost}% of ${baseDescription} (${Math.round(base * 100) / 100}) = ${amount}`,
+        amount,
+        runningTotal,
+        quantitySource: 'derived',
+        quantityTrusted: true,
+      })
     }
   }
 
@@ -1597,7 +1997,7 @@ export function calculatePricingWithTrace(
   const searchableText = buildSearchableText(addonContext)
 
   for (const addon of rules.addons) {
-    const addonMatch = shouldApplyAddon(addon, signals, answers, searchableText, aiDetectedAddonIds, serviceContext)
+    const addonMatch = shouldApplyAddon(addon, signals, answers, searchableText, aiDetectedAddonIds, serviceContext, aiAddonDetectionRan)
     if (addonMatch.apply) {
       runningTotal += addon.price
       addonsTotal += addon.price
@@ -1632,18 +2032,19 @@ export function calculatePricingWithTrace(
   const subtotalBeforeMultipliers = runningTotal
 
   for (const mult of rules.multipliers) {
-    if (shouldApplyMultiplier(mult, answers)) {
+    if (shouldApplyMultiplier(mult, answers, runningTotal)) {
       const adjustmentAmount = runningTotal * (mult.multiplier - 1)
       if (adjustmentAmount !== 0) {
         const label = mult.label || generateMultiplierLabel(mult, answers)
+        const conditionKey = mult.when.subject === 'subtotal' ? 'subtotal' : mult.when.fieldId || 'condition'
         runningTotal = runningTotal * mult.multiplier
         multiplierAdjustment += adjustmentAmount
 
         traceSteps.push({
           type: 'multiplier',
-          id: mult.when.fieldId,
+          id: conditionKey,
           description: label,
-          signalsUsed: [{ key: mult.when.fieldId, value: mult.when.equals ?? mult.when.value ?? '' }],
+          signalsUsed: [{ key: conditionKey, value: mult.when.equals ?? mult.when.value ?? '' }],
           calculation: `${subtotalBeforeMultipliers} × ${mult.multiplier} = ${runningTotal}`,
           amount: Math.round(adjustmentAmount * 100) / 100,
           runningTotal: Math.round(runningTotal * 100) / 100,
@@ -1761,9 +2162,9 @@ export function calculatePricingWithTrace(
         .map(s => s.quantitySource!.fieldId!)
     )
 
-    // Also track fields used in multipliers
+    // Also track fields used in multipliers (subtotal-conditioned ones have none)
     for (const mult of rules.multipliers) {
-      usedFormFields.add(mult.when.fieldId)
+      if (mult.when.fieldId) usedFormFields.add(mult.when.fieldId)
     }
 
     // Find numeric form fields that were provided but not used

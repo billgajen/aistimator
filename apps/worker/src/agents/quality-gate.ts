@@ -29,6 +29,36 @@ export interface QualityGateInput {
   serviceName: string
   /** Whether customer provided photos */
   hasPhotos: boolean
+  /**
+   * AI-signal quantity sources the extraction could NOT produce (missing or
+   * non-numeric). These make per-unit pricing structurally wrong (quantity
+   * falls back to 1) and MUST be clarified — a missing signal never appears
+   * in lowConfidenceSignals, so this is the only guard for them.
+   */
+  missingQuantitySignals?: Array<{ signalKey: string; stepName: string }>
+  /**
+   * T-127 (hardcore F3): work-step lines priced on a DEFAULTED quantity (×1
+   * placeholder — unanswered form field / unresolvable formula / legacy
+   * fallback). askKey is the fieldId/identifier the clarify round should fill
+   * (answers merge back as form answers via targetSignalKey).
+   */
+  defaultedQuantitySteps?: Array<{ askKey: string; stepName: string }>
+  /**
+   * R3-1: the wording layer concluded a customer-STATED price driver is
+   * contradicted by the photos/description. Ask the customer to confirm the
+   * quantity (answer merges back as a form answer via the fieldId).
+   */
+  quantityConcern?: { reason: string; fieldId?: string }
+  /** T-126 send-guard: how many work steps the config defines */
+  workStepsConfigured?: number
+  /** T-126 send-guard: how many work-step lines actually priced */
+  workStepLinesPriced?: number
+  /**
+   * R2-3: names of non-optional steps configured at £0 — the compiler could
+   * not establish their price (block packages, from-prices), so the quote is
+   * missing its primary work and must not auto-send.
+   */
+  zeroCostSteps?: string[]
 }
 
 /** Schema for AI-generated clarification questions */
@@ -94,11 +124,41 @@ export async function evaluateQualityGate(
   const conflicts = fusionResult?.conflicts || []
 
   // Determine if clarification is needed
-  const signalsNeedingClarification = identifySignalsForClarification(
+  const identified = identifySignalsForClarification(
     lowConfSignals,
     conflicts,
     structuredSignals
   )
+
+  // Missing quantity signals FIRST — without them the price is structurally
+  // wrong (per-unit steps priced at quantity 1), not merely uncertain
+  const missing = (input.missingQuantitySignals || []).map((m) => ({
+    key: m.signalKey,
+    reason: `Required to price "${m.stepName}" but could not be measured from the photos — ask the customer for the value directly`,
+  }))
+  // T-127: defaulted ×1 quantities are equally structural — the line is a
+  // placeholder price, not an estimate
+  const defaulted = (input.defaultedQuantitySteps || [])
+    .filter((d) => !missing.some((m) => m.key === d.askKey))
+    .map((d) => ({
+      key: d.askKey,
+      reason: `The quantity for "${d.stepName}" was not provided — the line is currently priced at a single-unit placeholder; ask the customer for the actual value`,
+    }))
+  // R3-1: stated-but-doubted quantities — the concern is already a
+  // customer-facing sentence, so ask it directly (the confirm-template would
+  // absurdly ask the customer to confirm the number they themselves typed)
+  const concern = input.quantityConcern
+    ? [{
+        key: input.quantityConcern.fieldId || 'stated_quantity',
+        reason: input.quantityConcern.reason,
+        direct: true,
+      }]
+    : []
+  const structural = [...missing, ...concern.filter((c) => !missing.some((m) => m.key === c.key)), ...defaulted]
+  const signalsNeedingClarification = [
+    ...structural,
+    ...identified.filter((s) => !structural.some((m) => m.key === s.key)),
+  ]
 
   if (signalsNeedingClarification.length === 0) {
     return {
@@ -111,6 +171,7 @@ export async function evaluateQualityGate(
   const questions = await generateClarificationQuestions(
     signalsNeedingClarification.slice(0, 2),
     input.serviceName,
+    structuredSignals,
     gemini
   )
 
@@ -141,9 +202,26 @@ function checkForCriticalIssues(input: QualityGateInput): string | null {
     return `Very low overall confidence (${(structuredSignals.overallConfidence * 100).toFixed(0)}%) — AI could not extract reliable signals from photos`
   }
 
-  // Zero total with work steps configured (pricing likely failed)
-  if (pricing.total <= 0 && pricing.breakdown.length > 0) {
-    return 'Pricing calculated to £0 or below despite having work steps — likely a configuration issue'
+  // T-126 send-guard (hardcore F7): a £0 quote must NEVER auto-send.
+  // The old check required breakdown.length > 0 — but the worst failure mode
+  // (every configured step failed to bind) produces an EMPTY breakdown, which
+  // is exactly when the guard is needed (S09 sent a £0 piano-move quote).
+  if (pricing.total <= 0) {
+    return 'Pricing calculated to £0 or below — nothing could be priced from the configuration; needs review'
+  }
+
+  // T-126 send-guard: config defines work steps but none applied — the quote
+  // is priced from base fee/addons/minimum only, which for a step-priced
+  // service means the request's actual work went unpriced.
+  if ((input.workStepsConfigured ?? 0) > 0 && (input.workStepLinesPriced ?? 0) === 0) {
+    return `None of the ${input.workStepsConfigured} configured work steps applied to this request — conditional charges may have failed to bind; needs review`
+  }
+
+  // R2-3 send-guard: a mandatory step compiled at £0 means the pricing
+  // description couldn't be expressed (block packages, from-prices) — the
+  // quote would ship surcharges without the service itself (£16 PT quote)
+  if (input.zeroCostSteps && input.zeroCostSteps.length > 0) {
+    return `The price for ${input.zeroCostSteps.map((s) => `"${s}"`).join(', ')} could not be established from the pricing configuration — the quote is missing its primary work; needs review`
   }
 
   // Site visit strongly recommended
@@ -193,10 +271,61 @@ function identifySignalsForClarification(
 }
 
 /**
- * Generate targeted clarification questions using AI.
- * Falls back to template-based questions if AI is unavailable.
+ * Generate targeted clarification questions.
+ *
+ * T-108 (AD-024-consistent): when the AI extracted a concrete value, the
+ * question is built DETERMINISTICALLY by code as a one-tap confirmation of
+ * that value ("We counted 4 rooms — is that right?"), with the AI's evidence
+ * shown. A confirmed value becomes a 1.0-confidence customer signal (AD-002).
+ * AI-generated free-text questions remain only for signals with no value.
  */
 async function generateClarificationQuestions(
+  signalsToAsk: Array<{ key: string; reason: string }>,
+  serviceName: string,
+  structuredSignals: ExtractedSignalsV2,
+  gemini: GeminiClient | null
+): Promise<ClarificationQuestion[]> {
+  if (signalsToAsk.length === 0) return []
+
+  const confirmQuestions: ClarificationQuestion[] = []
+  const needsAiQuestion: Array<{ key: string; reason: string }> = []
+
+  for (const s of signalsToAsk) {
+    // R3-1: direct entries already carry the exact customer-facing question
+    if ((s as { direct?: boolean }).direct) {
+      confirmQuestions.push({
+        id: `cq_${Date.now()}_d${confirmQuestions.length}`,
+        targetSignalKey: s.key,
+        question: `${s.reason} What should we allow for?`,
+      })
+      continue
+    }
+    const signal = structuredSignals.signals.find(sig => sig.key === s.key)
+    const value = signal?.value
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      const label = s.key.replace(/_/g, ' ')
+      confirmQuestions.push({
+        id: `cq_${Date.now()}_c${confirmQuestions.length}`,
+        targetSignalKey: s.key,
+        question: `From your photos and details, we estimated ${label}: ${value}. Is that right?`,
+        type: 'confirm_value',
+        aiValue: typeof value === 'number' ? value : String(value),
+        evidence: signal?.evidence,
+      })
+    } else {
+      needsAiQuestion.push(s)
+    }
+  }
+
+  const textQuestions = await generateTextQuestions(needsAiQuestion, serviceName, gemini)
+  return [...confirmQuestions, ...textQuestions]
+}
+
+/**
+ * AI-generated free-text questions for signals with no extracted value.
+ * Falls back to template-based questions if AI is unavailable.
+ */
+async function generateTextQuestions(
   signalsToAsk: Array<{ key: string; reason: string }>,
   serviceName: string,
   gemini: GeminiClient | null

@@ -101,13 +101,26 @@ export interface ServiceMediaConfig {
  */
 export interface QuantitySource {
   /** Source type for the quantity */
-  type: 'form_field' | 'constant' | 'ai_signal'
+  type: 'form_field' | 'constant' | 'ai_signal' | 'derived'
   /** For form_field: which question provides the quantity */
   fieldId?: string
   /** For constant: fixed quantity (e.g., 1 for "Kitchen" which is always 1 per house) */
   value?: number
   /** For ai_signal: which AI signal to use (use with caution - lower trust) */
   signalKey?: string
+  /**
+   * For derived (T-125): deterministic expression over form fieldIds / signal
+   * keys, e.g. "ceil(max(0, num_transactions - 1000) / 500)". Evaluated by
+   * packages/shared/src/formula.ts — arithmetic, ceil/floor/round/abs/min/max.
+   */
+  formula?: string
+  /**
+   * T-131 (R2-2, catalogue semantics): when true, an unanswered form field
+   * means quantity ZERO ("the customer didn't ask for this item") — the line
+   * is dropped as a trusted non-selection, instead of the untrusted ×1
+   * placeholder fallback. Use for price-list/menu items.
+   */
+  missingMeansZero?: boolean
 }
 
 /**
@@ -117,9 +130,30 @@ export interface WorkStepConfig {
   id: string
   name: string
   description: string
-  costType: 'fixed' | 'per_unit' | 'per_hour'
-  /** Default cost (fixed amount, or per-unit/hour rate) - used as starting point, can be overridden */
+  /**
+   * 'credit' (T-131, R2-5): a deduction — trade-in/resale offsets. Priced
+   * like fixed/per_unit but SUBTRACTED, rendered as a negative line.
+   */
+  costType: 'fixed' | 'per_unit' | 'per_hour' | 'percent' | 'credit'
+  /**
+   * Default cost (fixed amount, or per-unit/hour rate).
+   * For costType 'percent' (T-125): the percentage, e.g. 10 for 10%.
+   * For costType 'credit' (T-131): the deduction amount (positive number).
+   */
   defaultCost: number
+  /**
+   * T-131 (F2b, bounded pricing): honest uncertainty band for from-prices and
+   * stated ranges ("from £4,800", "£40 to £120"). defaultCost carries the
+   * from/low anchor; the band widens the customer-facing estimate interval
+   * and caps the grade at B. Never AI-invented — only from stated figures.
+   */
+  costBand?: { low: number; high: number }
+  /**
+   * For costType 'percent' (T-125): what the percentage applies to —
+   * 'subtotal' (running total when evaluated, after all non-percent steps) or
+   * an array of work-step ids whose priced amounts are summed.
+   */
+  percentOf?: string[] | 'subtotal'
   /** Optional steps only apply when trigger condition is met */
   optional: boolean
   /** Signal key that determines if this step is needed */
@@ -128,6 +162,18 @@ export interface WorkStepConfig {
   triggerCondition?: {
     operator: 'equals' | 'gt' | 'gte' | 'lt' | 'lte' | 'exists' | 'not_exists'
     value?: string | number | boolean
+  }
+  /**
+   * T-126: form-bound condition — the step applies only when the customer's
+   * answer matches (same shape as multiplier conditions). Use for conditional
+   * fixed charges like "SUV +£25" or "weekend +£20". Takes precedence over
+   * triggerSignal when both are present.
+   */
+  when?: {
+    fieldId: string
+    operator?: 'equals' | 'contains' | 'gt' | 'lt' | 'gte' | 'lte'
+    equals?: string | number | boolean
+    value?: string | number
   }
   /**
    * Explicit quantity source (required for per_unit/per_hour)
@@ -152,6 +198,19 @@ export interface ExpectedSignalConfig {
   possibleValues?: string[]
   /** Human-readable description of what this signal represents */
   description: string
+  /**
+   * Plausibility envelope (T-116, Measurement Engine M5) for quantity signals:
+   * deterministic bounds computed from known facts. Rides expected_signals
+   * persistence end-to-end — pack data, never hardcoded.
+   */
+  envelope?: {
+    driverKey?: string
+    minPerUnit?: number
+    maxPerUnit?: number
+    defaultDriver?: number
+    absoluteMin: number
+    absoluteMax: number
+  }
 }
 
 /**
@@ -363,7 +422,14 @@ export interface AddonConfig {
 
 export interface MultiplierConfig {
   when: {
-    fieldId: string
+    /**
+     * What the condition tests (T-125): 'field' (default) compares a form
+     * answer; 'subtotal' compares the running subtotal at multiplier time —
+     * enables order-value rules like "10% off jobs over £5,000" (× 0.9).
+     */
+    subject?: 'field' | 'subtotal'
+    /** Required unless subject is 'subtotal' */
+    fieldId?: string
     operator?: string
     equals?: string | number | boolean
     value?: string | number
@@ -380,6 +446,8 @@ export interface PricingRules {
   siteVisitRules?: SiteVisitRules
   /** Item catalog for inventory-based pricing (rentals, events, etc.) */
   itemCatalog?: ItemCatalogEntry[]
+  /** Work-step pricing — persisted in rules_json by the services API (T-115: now typed) */
+  workSteps?: WorkStepConfig[]
 }
 
 export interface ServicePricingRule {
@@ -492,10 +560,36 @@ export interface QuotePricing {
   notes?: string[]
   /** Available addons that weren't triggered — shown as optional extras */
   availableAddons?: Array<{ id: string; label: string; price: number }>
+  /** T-120 Measurement Engine: declared estimate grade + interval */
+  estimate?: {
+    grade: 'A' | 'B' | 'C'
+    label: string
+    description: string
+    rangeLow?: number
+    rangeHigh?: number
+  }
+}
+
+/**
+ * T-122: one line of the quantity takeoff — what was priced, how much, and
+ * HOW the quantity was established (the measurement audit trail, customer-facing)
+ */
+export interface TakeoffEntry {
+  item: string
+  quantity?: number
+  unit?: string
+  rate?: number
+  amount: number
+  /** How the quantity/price was established — measurement evidence, "Provided by you", etc. */
+  method: string
 }
 
 export interface QuoteContent {
   scopeSummary?: string
+  /** T-122: quantity takeoff with measurement methods */
+  takeoff?: TakeoffEntry[]
+  /** T-122: human-facing estimate reference, e.g. EST-2026-4F2A1C */
+  reference?: string
   assumptions?: string[]
   exclusions?: string[]
   notes?: string
@@ -520,6 +614,14 @@ export interface ExtractedSignal {
   source: 'vision' | 'form' | 'nlp' | 'inferred'
   /** Brief explanation or photo reference */
   evidence?: string
+  /**
+   * T-120 Measurement Engine: plausible band for quantity signals.
+   * Set by ensemble (±cov), adjudication (senior band) or envelope (bounds).
+   * Absent for confirmed/exact values.
+   */
+  quantityBand?: { low: number; high: number }
+  /** T-120: how this quantity was established — drives the estimate grade */
+  basis?: 'confirmed' | 'measured' | 'adjudicated' | 'envelope'
 }
 
 /**
@@ -594,6 +696,15 @@ export interface ClarificationQuestion {
   question: string
   /** Optional suggested answer options */
   options?: string[]
+  /**
+   * Question style (T-108). 'confirm_value' renders as one-tap confirmation of
+   * the AI's extracted value; 'text' (or absent) renders as a free-text/options question.
+   */
+  type?: 'confirm_value' | 'text'
+  /** The AI-extracted value being confirmed (confirm_value questions) */
+  aiValue?: string | number
+  /** What the AI saw that produced this value — shown to build customer trust */
+  evidence?: string
 }
 
 /** Customer's answer to a clarification question */
@@ -635,7 +746,7 @@ export interface PricingTraceStep {
   /** Running total after this step */
   runningTotal: number
   /** For per-unit steps: where the quantity came from */
-  quantitySource?: 'form_field' | 'constant' | 'ai_signal' | 'legacy_fallback'
+  quantitySource?: 'form_field' | 'constant' | 'ai_signal' | 'legacy_fallback' | 'derived' | 'derived_unresolved'
   /** Whether the quantity is fully trusted (form/constant) vs estimated (AI) */
   quantityTrusted?: boolean
 }
@@ -793,6 +904,7 @@ export interface WhatsAppMessage {
 export type WhatsAppIntakeState =
   | 'idle'
   | 'awaiting_service'
+  | 'awaiting_description'
   | 'awaiting_name'
   | 'awaiting_email'
   | 'awaiting_phone'
@@ -812,6 +924,8 @@ export interface WhatsAppIntakeData {
   jobPostcode?: string
   assetIds?: string[]
   photoCount?: number
+  /** T-111: the customer's job description — feeds AI signal extraction */
+  projectDescription?: string
 }
 
 export interface WhatsAppConversation {

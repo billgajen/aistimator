@@ -16,8 +16,11 @@ export default function WhatsAppSettingsPage() {
   const [config, setConfig] = useState<WhatsAppConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  // T-112: webhook values the business pastes into Meta
+  const [setup, setSetup] = useState<{ webhookUrl: string; verifyToken: string | null } | null>(null)
 
   // Form state
   const [phoneNumberId, setPhoneNumberId] = useState('')
@@ -45,6 +48,7 @@ export default function WhatsAppSettingsPage() {
       const data = await response.json()
       setConfigured(data.configured)
       setConfig(data.config)
+      setSetup(data.setup || null)
 
       if (data.config) {
         setPhoneNumberId(data.config.phoneNumberId)
@@ -63,6 +67,27 @@ export default function WhatsAppSettingsPage() {
     setSaving(true)
 
     try {
+      // T-112: verify new credentials against the Graph API BEFORE saving —
+      // catches bad tokens/IDs at setup time instead of at the first customer message
+      if (accessToken) {
+        const verifyRes = await fetch('/api/whatsapp/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phoneNumberId, accessToken }),
+        })
+        const verifyData = await verifyRes.json()
+        if (!verifyRes.ok) {
+          throw new Error(verifyData.error?.message || 'Credential verification failed')
+        }
+        if (verifyData.displayPhoneNumber && !displayPhoneNumber) {
+          setDisplayPhoneNumber(verifyData.displayPhoneNumber)
+        }
+        setToast({
+          message: `Verified with Meta: ${verifyData.verifiedName || 'OK'} (${verifyData.displayPhoneNumber || phoneNumberId})`,
+          type: 'success',
+        })
+      }
+
       const response = await fetch('/api/whatsapp/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -89,6 +114,33 @@ export default function WhatsAppSettingsPage() {
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  /** T-112: re-verify the stored connection against the Graph API */
+  async function handleTestConnection() {
+    setTesting(true)
+    try {
+      const response = await fetch('/api/whatsapp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ useStored: true }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Connection test failed')
+      }
+      setToast({
+        message: `Connection healthy — ${data.verifiedName || 'verified'} (${data.displayPhoneNumber || ''})${data.qualityRating ? `, quality: ${data.qualityRating}` : ''}`,
+        type: 'success',
+      })
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'Connection test failed',
+        type: 'error',
+      })
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -182,15 +234,25 @@ export default function WhatsAppSettingsPage() {
             </div>
           </div>
           {configured && (
-            <span
-              className={`rounded-full px-3 py-1 text-sm font-medium ${
-                config?.isActive
-                  ? 'bg-secondary-light text-secondary'
-                  : 'bg-background text-text-primary'
-              }`}
-            >
-              {config?.isActive ? 'Active' : 'Inactive'}
-            </span>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleTestConnection}
+                disabled={testing}
+                className="rounded-warm-lg border border-border px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-background disabled:opacity-50"
+              >
+                {testing ? 'Testing…' : 'Test Connection'}
+              </button>
+              <span
+                className={`rounded-full px-3 py-1 text-sm font-medium ${
+                  config?.isActive
+                    ? 'bg-secondary-light text-secondary'
+                    : 'bg-background text-text-primary'
+                }`}
+              >
+                {config?.isActive ? 'Active' : 'Inactive'}
+              </span>
+            </div>
           )}
         </div>
       </div>
@@ -294,25 +356,103 @@ export default function WhatsAppSettingsPage() {
         </form>
       </div>
 
-      {/* Setup Instructions */}
-      <div className="mt-6 rounded-warm-lg bg-primary-light p-6">
-        <h3 className="font-medium text-primary">Setup Instructions</h3>
-        <ol className="mt-3 list-inside list-decimal space-y-2 text-sm text-primary">
-          <li>Go to Meta Business Suite and create a WhatsApp Business account</li>
-          <li>Navigate to WhatsApp &gt; API Setup to get your Phone Number ID</li>
-          <li>Generate a permanent access token in System Users settings</li>
-          <li>Configure your webhook URL in Meta Business Suite:</li>
-        </ol>
-        <div className="mt-3 rounded bg-surface p-3">
-          <p className="text-xs text-text-muted">Webhook URL:</p>
-          <code className="text-sm text-text-primary">
-            {typeof window !== 'undefined' ? window.location.origin : ''}/api/whatsapp/webhook
-          </code>
+      {/* Guided setup walkthrough (T-112) */}
+      {!configured && (
+        <div className="mt-6 space-y-4">
+          <h3 className="font-display text-lg font-bold text-text-primary">
+            Step-by-step setup (~15 minutes, one time)
+          </h3>
+
+          <div className="rounded-warm-lg bg-surface p-5 shadow-warm">
+            <h4 className="font-semibold text-text-primary">
+              <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">1</span>
+              Create your Meta app with WhatsApp
+            </h4>
+            <ol className="mt-3 list-inside list-decimal space-y-1.5 text-sm text-text-secondary">
+              <li>
+                Go to{' '}
+                <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline">
+                  developers.facebook.com/apps
+                </a>{' '}
+                → <span className="font-medium">Create App</span> → type <span className="font-medium">Business</span>
+              </li>
+              <li>In the app dashboard, click <span className="font-medium">Add Product</span> → <span className="font-medium">WhatsApp</span> → Set up</li>
+              <li>Link (or create) your WhatsApp Business phone number when prompted</li>
+            </ol>
+          </div>
+
+          <div className="rounded-warm-lg bg-surface p-5 shadow-warm">
+            <h4 className="font-semibold text-text-primary">
+              <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">2</span>
+              Point Meta&apos;s webhook at us
+            </h4>
+            <p className="mt-2 text-sm text-text-secondary">
+              In your Meta app: <span className="font-medium">WhatsApp → Configuration → Webhook → Edit</span>. Paste these two values, then subscribe to the{' '}
+              <span className="font-medium">messages</span> field:
+            </p>
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center gap-2 rounded bg-background p-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-text-muted">Callback URL</p>
+                  <code className="block truncate text-sm text-text-primary">{setup?.webhookUrl || '…'}</code>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setup?.webhookUrl && navigator.clipboard.writeText(setup.webhookUrl)}
+                  className="shrink-0 rounded border border-border px-2 py-1 text-xs font-medium text-text-secondary hover:bg-surface"
+                >
+                  Copy
+                </button>
+              </div>
+              <div className="flex items-center gap-2 rounded bg-background p-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-text-muted">Verify token</p>
+                  <code className="block truncate text-sm text-text-primary">
+                    {setup?.verifyToken || 'Not configured — set WHATSAPP_VERIFY_TOKEN on the server first'}
+                  </code>
+                </div>
+                {setup?.verifyToken && (
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(setup.verifyToken!)}
+                    className="shrink-0 rounded border border-border px-2 py-1 text-xs font-medium text-text-secondary hover:bg-surface"
+                  >
+                    Copy
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-warm-lg bg-surface p-5 shadow-warm">
+            <h4 className="font-semibold text-text-primary">
+              <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">3</span>
+              Get your credentials and connect above
+            </h4>
+            <ol className="mt-3 list-inside list-decimal space-y-1.5 text-sm text-text-secondary">
+              <li>
+                <span className="font-medium">Phone Number ID</span>: WhatsApp → API Setup — the long number under your phone number (not the phone number itself)
+              </li>
+              <li>
+                <span className="font-medium">Permanent access token</span>:{' '}
+                <a href="https://business.facebook.com/settings/system-users" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline">
+                  Business Settings → System Users
+                </a>{' '}
+                → create a system user → <span className="font-medium">Generate token</span> with{' '}
+                <code className="text-xs">whatsapp_business_messaging</code> and <code className="text-xs">whatsapp_business_management</code> permissions.
+                (The API Setup page&apos;s temporary token expires in 24h — don&apos;t use it.)
+              </li>
+              <li>Paste both into the form above — we verify them with Meta before saving</li>
+            </ol>
+          </div>
+
+          <p className="text-xs text-text-muted">
+            Once connected, any customer message to your WhatsApp number starts an instant quote
+            conversation — and because customers message you first, these conversations are free
+            under Meta&apos;s pricing.
+          </p>
         </div>
-        <p className="mt-3 text-xs text-primary">
-          Verify token: Use the value from your WHATSAPP_VERIFY_TOKEN environment variable
-        </p>
-      </div>
+      )}
     </div>
   )
 }

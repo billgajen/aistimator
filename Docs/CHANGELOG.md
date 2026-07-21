@@ -15,6 +15,656 @@
 
 ## Issues & Resolutions
 
+### 2026-07-21: Design System v2 — "The Measured Document" (commit 1aef8e4)
+
+**Context:** user rejected the Editorial Black B&W look ("old Google Bootstrap template") and asked for a billion-dollar-grade redesign: pastel-leaning brand colours, ultra attention to detail, priority on the estimate page, widget and form fields; marketing site to follow separately.
+
+**Direction:** identity grounded in the product's own world — paper, ink, and the measuring tape. Juniper `#205E56` brand; porcelain/mint/mist/butter pastel surfaces; tape `#DCAF3E` reserved exclusively for measurement UI; ink `#1B2823` text. Type: Bricolage Grotesque / Instrument Sans / Spline Sans Mono (all figures tabular via `.figure`). Signature elements in `globals.css`: `.tape-rule` tick dividers, `.grade-seal` A/B/C assay stamp (`--seal-gap` for coloured grounds), `shadow-document`. Tokens are CSS-variable-backed so the dashboard re-skins automatically; the estimate page and embed widget were deep-restyled by hand. The marketing website must build on these same tokens.
+
+**Files:** `apps/web/src/app/{globals.css,layout.tsx}`, `apps/web/tailwind.config.ts`, `apps/web/src/app/q/[quoteId]/page.tsx`, `apps/web/src/app/embed/[tenantKey]/page.tsx`
+
+---
+
+
+### 2026-07-20: Compiler Silently Discarded Entire Compilations (all 10 gauntlet verticals quoted £50 Grade A)
+
+**What broke:** First full hardcore run: ALL 10 scenarios compiled to an empty pricing model → every quote went out at the £50 normalizer default (S07 £180 via addons), **Grade A "this price is exact"** — a 128-guest wedding for £50. S05 died on repeated compile HTTP 500s.
+
+**Root cause (verified by direct Gemini reproduction, `finishReason: STOP`, valid JSON):** NOT truncation. `COMPILE_SYSTEM_PROMPT` showed `"updatedConfig": { ...complete ServiceDraftConfig... }` without ever spelling out the internal shape — Gemini guessed, emitting `workSteps` at the **root** of updatedConfig with **`label`** instead of `name`. `validateAndNormalizeDraftBulk` reads only `draft.pricing.workSteps` and `normalizeWorkSteps` filters on `step.name` → the whole compilation was silently discarded. Then `validateAndNormalizeDraft` **invented** `minimumCharge: 50` (a `|| 50` default — violating core rule "never invent numbers" and the anti-hardcoding principle), giving the deterministic engine a £50 fixed price it dutifully quoted. Grading then correctly saw "no unresolved quantities" → Grade A. Garbage-in-config is invisible to grading — separate finding, not yet addressed.
+
+**Fix (compile robustness, 4 changes):**
+1. `compile/route.ts` prompt: explicit updatedConfig JSON schema (pricing.workSteps with `name`, quantitySource, suggestedFields...) + "workSteps live at updatedConfig.pricing.workSteps, NOT at the top" instruction.
+2. `compile/route.ts`: shape-drift hoist — root-level `workSteps` arrays are moved into `pricing.workSteps` before normalization (belt-and-braces alongside the existing `updatedConfig.config` unwrap).
+3. `shared.ts normalizeWorkSteps`: accepts `label` as `name` fallback and `price` as cost fallback; missing cost now normalizes to visible £0, never invented £25.
+4. `shared.ts`: `minimumCharge || 50` → `?? 0`; compile `maxOutputTokens` 8192 → 16384 (2.5-flash thinking tokens count against the budget — same class as the measurement 4096 truncation; suspected cause of the intermittent 500s).
+
+**Constraint reaffirmed:** normalizer defaults must never introduce prices. Remaining invented-default audit (scope placeholders, photoGuidance) is cosmetic, left as-is.
+
+**Files:** `apps/web/src/app/api/services/ai-draft/compile/route.ts`, `apps/web/src/app/api/services/ai-draft/shared.ts`
+
+---
+
+### 2026-07-20: Services API 500 on Compiler-Emitted Object Options
+
+**What broke:** Hardcore run 3, S01: `POST /api/services` returned 500. The compiler emitted `suggestedFields[].options` as `{label, value}` objects (dropdown for scaffold access); both services routes assumed `string[]` and called `opt.toLowerCase()` → TypeError. Nondeterministic — the same scenario compiled to a boolean field (no options) in run 2 and saved fine.
+
+**Fix:** `normalizeFieldOption()` in `apps/web/src/lib/field-options.ts` accepts both shapes; used by POST `/api/services` and PATCH `/api/services/[id]` when building widget fields.
+
+**Files:** `apps/web/src/lib/field-options.ts` (new), `apps/web/src/app/api/services/route.ts`, `apps/web/src/app/api/services/[id]/route.ts`
+
+---
+
+### 2026-07-20: T-131 — Catalogue & Bounded Pricing (R2-2, R2-3, R2-4, R2-5, F2b)
+
+**The gaps (round-2 blind testing):** price-list configs quoted the ENTIRE catalogue to every customer (£1,940 of furniture for one armchair — customer said "only the armchair" twice); block-package pricing compiled to mandatory £0 steps whose surcharges shipped alone (£16 PT quote); from-prices/ranges had no schema home; credits (resale offsets) were clamped away; contingency penalties priced on mere mention (£60 for mentioning a fridge).
+
+**Built:**
+- **R2-2 catalogue semantics:** `quantitySource.missingMeansZero` — an unanswered per-item field is a TRUSTED zero ("not requested", line dropped), not the untrusted ×1 fallback; no T-127 question, no grade cap. Compiler rule 4c: price-list items compile as per_unit steps with optional per-item fields, never unconditional fixed steps.
+- **R2-3 zero-cost guard:** a mandatory non-percent step at £0 = the compiler failed to establish the primary price → quality gate + processor backstop hold the quote. Compiler rule 4b: block packages become when-bound steps per option; NEVER a £0 placeholder.
+- **F2b bounded pricing:** `WorkStepConfig.costBand {low, high}` from STATED figures only (defaultCost = the from/low anchor). Priced at the anchor; the band widens the customer-facing interval (added to quantity-band spread) and caps the grade at B via a rate provenance entry. Compiler rule 4d.
+- **R2-5 credits:** `costType 'credit'` — subtracts, renders negative, positive defaultCost so the never-invent clamp still holds. Compiler rule 4e.
+- **R2-4 penalties:** compiler rule 4f — fees contingent on on-the-job discoveries compile as exclusions/notes wording, never priced lines.
+- 6 new worker tests (277 pass) incl. the exact S23 armchair-only case.
+
+**Files:** `packages/shared/src/database.types.ts`, `apps/worker/src/pricing/{rules-engine.ts,catalogue-pricing.test.ts}`, `apps/worker/src/{quote-processor.ts,agents/quality-gate.ts}`, `apps/web/src/app/api/services/ai-draft/{compile/route.ts,shared.ts}`
+
+---
+
+### 2026-07-20: T-130 — Measurement Engine Wired Into Compiler Tenants (F5)
+
+**The gap (hardcore F5):** the compiler prompt said form_field "STRONGLY PREFERRED", so every quantity became a customer question, zero `ai_signal` sources existed, and the entire V3 measurement engine (M1–M7) sat idle for compiler-built tenants — photos informed wording, never price, across all 40 gauntlet generations.
+
+**Design (AD-023 aligned):** quantity sources now chosen by WHO can know the quantity. Photo-measurable ones (areas, lengths, visible counts) compile to `ai_signal` + an `expectedSignals` entry (with a visual-anchor description) + an **optional** same-key number field ("— if you know it") so a customer-stated value overrides the measurement via existing form-wins fusion; `media.minPhotos ≥ 1` + photoGuidance. Customer-knowledge quantities (guests, transactions, miles) stay required form fields; computed ones stay `derived`. Engine needed NO changes — measurement keys off `quantitySource.type === 'ai_signal'` (verified at quote-processor.ts:505).
+
+**Live verification (S01 painting, real photos, full pipeline):** ensemble measured the front elevation → **senior adjudication fired** ("unpainted brick plinth must be excluded — Junior 2 incorrectly included it") → **38.5 sqm, band 32–45, basis `adjudicated`** → **£1,078, interval £896–£1,260, Grade B "Measured"**, takeoff row shows the measurement method. In-flow confirmation asked; the customer's vague "sounds about right" correctly did not override. First compiler-built quote ever priced from photos.
+
+**Observation (minor, logged):** the confirm_value question quoted the pre-adjudication ensemble value (55) while the final adjudicated value was 38.5 — question generation runs before adjudication settles. Cosmetic ordering; candidate tidy-up alongside F2b.
+
+**Files:** `apps/web/src/app/api/services/ai-draft/compile/route.ts` (prompt only), `scripts/hardcore-test/scenarios.mjs` (S01 back to its true story)
+
+---
+
+### 2026-07-20: T-128 — Grade Honesty: Untrusted Quantities Cap the Grade (F6)
+
+**The gap (hardcore F6):** grading only saw AI-signal provenance, so quotes priced on placeholder ×1 fallbacks or AI-operand formulas still claimed Grade A "this price is exact" (every gauntlet quote graded A, including the £85 fence and the £361k accounting quote).
+
+**Built:** new provenance basis `'defaulted'` in `shared/grading.ts` (caps at C, like envelope); processor merges trace-level trust into provenance before grading — `legacy_fallback`/`derived_unresolved` work-step lines → `defaulted` (C), untrusted-but-resolved (AI-operand derived / ai_signal) → measured 0.7 (B). Conditional steps that legitimately didn't bind (customer answered "small car") do NOT cap — absence-by-answer is confirmed information. 2 new tests (271 pass).
+
+**Live verification (`verify-t128.mjs`):** fence probe → T-127 question → customer answers "Not sure at all" → round spent → **sent £85 Grade C (Concept)** with the confirm-to-tighten framing (was: Grade A "exact"). The T-127+T-128 chain: ask where the money is; when the customer can't answer, say honestly what the price rests on.
+
+**Note:** F2b (range/category pricing plausibility — the S07 junk £1×18 config) is NOT covered by trust caps (the formula resolved "cleanly") and stays open; it needs rate-plausibility/benchmark checks, tracked in `Docs/08-hardcore-test-findings.md`.
+
+**Files:** `packages/shared/src/grading.ts`, `apps/worker/src/quote-processor.ts`, `apps/worker/src/__tests__/grading.test.ts`, `scripts/hardcore-test/verify-t128.mjs`
+
+---
+
+### 2026-07-20: T-127 — Defaulted Quantities Trigger In-Flow Clarification (F3)
+
+**The gap (hardcore F3):** work-step quantities that DEFAULTED to 1 (unanswered form field, unresolvable derived formula, legacy fallback) priced silently as placeholders — the £85 "fence" that should be £1,700 — labelled "Estimated — to be confirmed" yet sent Grade A. VOI/T-108 never fired in 40 generations because clarification only evaluated AI signals.
+
+**Built:**
+- Processor collects `defaultedQuantitySteps` from `legacy_fallback`/`derived_unresolved` trace entries, resolves each step's **askKey** (form fieldId / first missing formula identifier / step id for legacy), and applies the VOI bar (`isQuestionWorthAsking`, swing modelled as rate×9) so pennies-per-unit steps don't waste the 2-question budget.
+- Quality gate treats them as structural (same always-ask priority as missing AI-signal quantities), deduped, capped at 2, 1 round max.
+- **Loop closure:** clarify answers already merge back as form answers keyed by `targetSignalKey` (bug-#11 flow); engine now also honours a direct form answer keyed by the STEP ID in both legacy per_unit and per_hour fallbacks, so even quantitySource-less steps reprice from an answer.
+- 5 new worker tests (269 pass), incl. the fence ×1 → ask → 20 → £1,700 sequence.
+
+**Live verification (`scripts/hardcore-test/verify-t127.mjs`, full HTTP loop):** submission without fence length → `awaiting_clarification` with "Could you tell me the approximate length of the closeboard fencing…?" targeting `fence_length_m` → answer "20" → reprocess → **sent at £1,700** (was: silent £85 Grade A). Also incidentally re-proved the T-126 send-guard: a mis-seeded £0 config went to `pending_review`, not to the customer.
+
+**Files:** `apps/worker/src/quote-processor.ts`, `apps/worker/src/agents/quality-gate.ts`, `apps/worker/src/pricing/{rules-engine.ts,defaulted-quantity.test.ts}`, `scripts/hardcore-test/verify-t127.mjs`
+
+---
+
+### 2026-07-20: T-126 — Form-Bound Step Conditions + Structural Send-Guard (F7)
+
+**The gap (hardcore F7):** work-step triggers only understood AI signals, so conditional fixed charges decided by customer answers ("SUV +£25", "weekend +£20", "£420 if it's a baby grand") compiled to empty `triggerCondition: {operator:'equals'}` stubs the engine silently dropped. Worst case: every step of the piano-move config dropped and a **£0 quote auto-sent** — the quality gate's zero-total check required `breakdown.length > 0`, which is false in exactly that failure.
+
+**Built:**
+- `WorkStepConfig.when: { fieldId, operator, equals|value }` — same shape and comparison semantics as multiplier conditions (`compareAnswerValue()` extracted from `shouldApplyMultiplier` and shared). A `when` governs the step outright, optional or not; unanswered field → step skipped with a trace log.
+- Compiler prompt rule 4 rewritten: fixed conditional charges → `when` steps (equals value MUST match a field option), percentage ones → multipliers, photo-decided ones → complete triggerSignal+triggerCondition; explicit warning that partial conditions are dropped. `normalizeStepWhen()` refuses conditions lacking fieldId or a comparison value.
+- **Structural send-guard** (two layers): quality gate now flags `total <= 0` regardless of breakdown, plus "N steps configured, 0 priced"; and a processor-level backstop applies the same checks even when the AI gate didn't run (no Gemini / errored) — a £0 or nothing-bound quote can never auto-send, it goes to `pending_review`.
+- 8 new worker tests (S04 surcharge binding incl. option-format normalization, S09 multi-item contains-matching, the exact S09 empty-breakdown £0 gate case). 264 pass.
+
+**Files:** `packages/shared/src/database.types.ts`, `apps/worker/src/pricing/{rules-engine.ts,conditional-steps.test.ts}`, `apps/worker/src/agents/quality-gate.ts`, `apps/worker/src/quote-processor.ts`, `apps/web/src/app/api/services/ai-draft/{compile/route.ts,shared.ts}`
+
+---
+
+### 2026-07-20: T-125 — Derived Quantities, Percent Steps, Subtotal Multipliers (F2)
+
+**The gap (hardcore F2):** the engine couldn't express computed quantities — transaction tiers, mile thresholds, staff ratios, percentage charges, order-value discounts. The compiler pushed the arithmetic onto customer form fields, which customers misanswered: S05 swung from **£361,471 to £1,487** across runs of the same pricing text; S09 sent a £0 quote; S02 double-counted tiers.
+
+**Built:**
+- **AD-024: deterministic quantity formulas.** `packages/shared/src/formula.ts` — a ~180-line safe expression evaluator (no eval; `+ - * / ( )`, `ceil/floor/round/abs/min/max`, identifiers = form fieldIds/signal keys; length/token caps; unknown identifier or bad syntax fails the WHOLE formula so callers fall back explicitly, never price on garbage). Work steps take `quantitySource: { type: 'derived', formula }`. Trust propagates: all-form operands → trusted; any AI-signal operand → untrusted; unresolved → `derived_unresolved` + quantity-1 fallback flagged in the trace (T-127 hook).
+- **Percent work steps:** `costType: 'percent'`, `defaultCost` = the percentage, `percentOf` = step ids (service charge on food lines) or `'subtotal'`. Evaluated after all non-percent steps.
+- **Subtotal multipliers:** `when: { subject: 'subtotal', operator, value }` — order-value rules ("10% off over £5,000" ×0.9) with no customer question. `when.fieldId` is now optional; all consumers guarded.
+- Compiler prompt teaches all three (rules 3b/3c + schema examples with the exact gauntlet formulas); web normalizers validate formulas parse (`extractFormulaIdentifiers`) before accepting.
+- 13 new worker tests encode the gauntlet disasters as regressions (2,400 tx → 3 tiers not £360k; 20 miles → £0 line; £4,430 → no discount). 256 total pass.
+
+**Live verification (gauntlet re-run, all penny-exact vs pricing text):** S02 £832.50 (min/max tier split + ×1.5 emergency), S03 £4,520 (discount withheld below £5k), S05 £1,921 (3 derived tier blocks), S06 £12,068 (derived canapés 128, derived staff 9, percent service charge £948 on exactly the food lines), S09 £1,432.50 (3 flights × 2 items derived, 225 excess miles derived) — S09 was the £0-quote scenario.
+
+**Ops lesson:** running `next build` while `next dev` is live clobbers `.next` and 500s every API route until the dev server restarts. Restart `pnpm dev:web` after any build.
+
+**Files:** `packages/shared/src/{formula.ts,index.ts,database.types.ts}`, `apps/worker/src/pricing/{rules-engine.ts,derived-pricing.test.ts}`, `apps/worker/src/ai/signals.ts`, `apps/web/src/app/api/services/ai-draft/{compile/route.ts,shared.ts}`, `apps/web/src/lib/pricing-describe.ts`
+
+---
+
+### 2026-07-20: T-129 — Public API Now Enforces Per-Service Required Fields (F4)
+
+**What broke (hardcore F4):** `POST /api/public/quotes` validated required/critical fields against only the **global** `widget_configs` row (`service_id IS NULL`). The per-service rows that `POST /api/services` creates from compiled `suggestedFields` were never checked, so submissions omitting required price-driving quantities were accepted and the engine priced them at quantity 1 (the £85 fence).
+
+**Fix:** validation now loads all `widget_configs` rows for the tenant and merges global fields (honouring their `serviceId` scoping) with the selected service's row, deduped by fieldId. Additionally, a required **number** field answered with non-numeric text counts as missing — previously junk text silently became a ×1 fallback (S01's vague area answer). General inquiries skip service-bound field validation (they aren't for that service's form).
+
+**Verified live:** missing per-service fields → 400 listing them; junk text in number field → 400 naming it; complete answers → passes to the next gate. Harness scenarios updated: customers now give forced in-character guesses for fields the widget would require (S01 area 40, S02 ridge 2, S03 waste 2) — noting the conversion-risk tension that T-130 resolves by measuring photo-measurable quantities instead of asking.
+
+**Files:** `apps/web/src/app/api/public/quotes/route.ts`, `scripts/hardcore-test/scenarios.mjs`
+
+---
+
+### 2026-07-20: Hardcore Gauntlet Complete — Findings F2–F7 Documented
+
+**Outcome:** 4 full runs. Final run: 10/10 quotes sent, every total penny-reconciled against config via pricing traces (AD-001 held throughout). Six open findings documented in **`Docs/08-hardcore-test-findings.md`** (the canonical list): F2 derived quantities inexpressible (S05 swung +£359k/−£718 across runs on identical pricing text), F7 conditional charges can't bind to form answers → steps silently dropped → **£0 quote sent** (S09), F3 missing quantities price at ×1 with no VOI/clarification ever firing (0 of 40 generations), F6 Grade-A blind spots, F4 per-service required fields unvalidated at the public API, F5 measurement engine never engages for compiler-built tenants (photos decorative). Each needs its own ticket; none fixed yet beyond F1/F8 above.
+
+---
+
+### 2026-07-20: Hardcore E2E Harness (terminal-driven, 10-vertical gauntlet) + First Findings
+
+**Context:** User requested a hardcore API-level test — 10 completely different business types (incl. a digital service) with adversarial customer requests — run entirely from the terminal, no browser.
+
+**Built:** `scripts/hardcore-test/` — `SCENARIOS.md` (spec), `scenarios.mjs` (10 tenants: painting, roofing, landscaping, car valeting, accounting, catering, tree surgery, window cleaning, piano moving, pest control — with fieldHints/clarify hints so the "customer" answers in character), `lib.mjs` (Supabase admin REST, **@supabase/ssr 0.4.1 cookie minting** `sb-127-auth-token` = `base64-`+base64url(session), chunked at 3180; public upload → R2 PUT; polling; HEIC→JPEG via sips), `checks.mjs` (triage assertions), `run.mjs` (orchestrator; per-run results dir + REPORT.md). Assets: `test-assets/hardcore/` (gitignored) — user drops real photos; S05 synthetic bank statement (CSV + hand-built 3-page PDF, 2,388 tx) generated.
+
+**Key plumbing facts (verified live):** dashboard routes are cookie-auth ONLY (Docs/02 "Bearer" claim is wrong); local dev processes quotes synchronously via `CLOUDFLARE_WORKER_URL` `/process` (submission POST blocks through the whole AI pipeline); `tenant_sites`/`tenant_key` has NO creation API (dashboard server components create it lazily) — harness inserts it via service-role; **the signup trigger DOES fire on `auth.admin.createUser({email_confirm:true})` locally** (creates tenant+profile; setup-tenant then 409s — harness handles both paths); public uploads accept images+PDF only (no CSV).
+
+**Findings already (S06 smoke run):** (1) **Compiler fails on per-head/derived pricing** — catering description reproducibly yields EMPTY pricing (no work steps; normalizer default `minimumCharge: 50` papers over it) or HTTP 500 (suspected 8192-token truncation, same class as the measurement 4096 truncation bug); (2) **Grade A on a config-starved quote** — 128-guest wedding quoted at £380 (marquee addon only, later £50) with grade A "this price is exact": grading trusts quantity provenance but has no signal for "config never priced the request". Both to be confirmed/expanded in the full 10-scenario run before fixing.
+
+**Files:** `scripts/hardcore-test/*`, `test-assets/hardcore/*` (gitignored), `.gitignore`
+
+---
+
+### 2026-07-18: V2 Strategy Adopted — Vertical Wedge, Horizontal Engine
+
+**Context:** Full strategic review (codebase audit + verified market research, July 2026) diagnosed five structural flaws behind the two chronic complaints — hard setup and inaccurate quotes: (1) hand-authored pricing DSL forces AI to fuzzy-match language into rigid schemas (root cause of the recurring signal-matching/negation/keyword bug themes below); (2) no outcome→calibration feedback loop despite `quote_amendments` infrastructure; (3) uncertainty handled via review queue/wide ranges instead of in-flow customer confirmation; (4) usage limits unenforced — revenue structurally impossible; (5) WhatsApp intake is a stub while WhatsApp quoting is an empty market category.
+
+**Decision:** Adopted `Docs/06-v2-strategy.md` as north star. Key calls:
+- **AD-021: Plain-language pricing compiler.** Businesses describe pricing in natural language; AI compiles it (config-time, reviewable) into the existing deterministic `PricingRules`. Quote-time AI produces only quantities/facts with evidence. Extends AD-001/AD-003; removes the DSL-editing UX, not the rules engine.
+- **AD-022: Vertical-first go-to-market on a generic engine.** Launch vertical: painting & decorating (open lane — PaintScout has no AI, no customer widget). Vertical packs are pure configuration (templates, editable rate defaults, vision guidance) — anti-hardcoding principle holds.
+- **AD-023: Uncertainty resolves in-flow.** Low-confidence extractions become customer confirmation steps (→ 1.0 confidence per AD-002) plus range-first delivery, instead of defaulting to pending_review.
+- Roadmap: Phase 0 billing enforcement (T-101/T-102) before all else; then setup revolution (T-104–106), accuracy engine (T-107–110), WhatsApp intake (T-111–112), painting pack (T-113–115).
+
+**Files:** `Docs/06-v2-strategy.md` (new)
+
+---
+
+### 2026-07-18: T-123 Measurement Memory — the Learning Loop (Measurement Engine COMPLETE)
+
+**Context:** The final Measurement Engine stage: every human-confirmed quantity becomes per-tenant calibration data. The estimator that has measured 200 of this business's jobs measures the 201st better — the moat, operating at the measurement layer.
+
+**Implementation:**
+- **Migration 22 `measurement_examples`:** tenant/service/signal + measured_value vs confirmed_value. **TEXT ids with NO foreign keys** — found live that local dev uses TEXT prefixed ids (tnt_...) while production uses UUID (the 2026-02-16 schema split, still real); TEXT holds both, RLS casts `::text` for cross-type safety. Also: block comments inside CREATE TABLE column lists break the supabase migration runner — use `--` line comments.
+- **Capture (write side):** the clarify API stores an example whenever a confirmed numeric answer targets a signal the AI had measured (fire-and-forget, never affects the flow). Verified live: answered "60" against measured 27 → row `wall_area_sqm | 27 | 60 | clarification`. Amendment-sourced capture is a follow-up (source enum already supports it).
+- **Injection (read side), two channels:** (1) recent examples (≤5/signal) as prompt calibration lines in the measurement passes; (2) **deterministic correction by code (AD-024):** `computeCalibrationFactor` — median confirmed/measured ratio over ≥3 examples, clamped [0.5, 2], <3% treated as noise — applied to the measured value AND its band, with "; calibrated ×1.51 from 3 confirmed jobs" appended to the evidence (faces the customer via the T-122 takeoff).
+- **Verified live, full loop:** ×1.51 learned from 3 confirmed jobs → applied 70.5→106.5 → customer's confirmed 60 then overrode everything (AD-002 — the human always wins) and itself became the next example.
+
+**Bug #11 found & fixed (pre-existing, latent — the clarification loop's FOURTH leg):** the clarify API set `status='queued'` but never dispatched the job — answered clarifications would sit queued forever in production. Now calls `enqueueQuoteJob` explicitly; failures leave the queued status visible rather than silently lost.
+
+**Tests:** 5 new calibration tests (bias learning, min-sample, noise threshold, clamping, junk guards). Suite: 243 passing.
+
+**Files:** `supabase/migrations/00000000000022_measurement_examples.sql` (new), `apps/web/src/app/api/public/quotes/[quoteId]/clarify/route.ts`, `apps/worker/src/ai/measurement.ts`, `apps/worker/src/quote-processor.ts`, `apps/worker/src/__tests__/measurement.test.ts`
+
+---
+
+### 2026-07-18: T-122 The Document — Quantity Takeoff, Reference, Grade on the Page
+
+**Context:** The customer-facing document becomes a professional estimate that shows its work — the flagship differentiator no competitor has.
+
+**Implementation:**
+- **`apps/worker/src/takeoff.ts` (new, pure):** `buildTakeoff` turns the pricing trace + measurement evidence into customer-facing lines — each with item, quantity × rate, amount, and **method**: the measurement evidence string for AI-measured quantities (the senior surveyor's audit note faces the customer), "Quantity provided by you" for form answers, "Fixed quantity"/"Standard charge" for fixed lines, "Estimated — to be confirmed" for fallbacks. Tax excluded (renders in totals). `buildReference` → deterministic human-facing ref `EST-{year}-{id tail}` (no counters, no migrations).
+- **Worker:** takeoff + reference attached to content after wording; stored in content_json.
+- **Two AD-016 traps found live and fixed:** BOTH final stores enumerate fields — content_json dropped `takeoff`/`reference` and pricing_json dropped `estimate` until added explicitly. Warning comments left at both sites.
+- **Delivery:** public GET passes `takeoff` (withheld while provisional — exact amounts) + `reference`; quote page gains a document header block (Reference · Prepared for · Valid until) and the **Measurement & takeoff** section.
+
+**Live on the user's real quote:** header `EST-2026-5110BD`; takeoff rendered with the senior audit note as the walls method (one run: *"Included only the white rendered sections… deducting all doors and windows; Junior 1 incorrectly claimed to include brickwork…"*). A later weaker run (ensemble failed → envelope fallback) correctly rendered **Ⓒ Concept £1,003–£2,753** with method "Adjusted to typical range 27–108" — the grade honestly tracks each run's evidence quality.
+
+**Tests:** 4 new (`takeoff.test.ts`) — evidence-as-method, form labelling, zero-line/tax exclusion, reference format. Suite: 238 passing.
+
+**Files:** `apps/worker/src/takeoff.ts` (new), `apps/worker/src/quote-processor.ts`, `apps/worker/src/ai/wording.ts`, `packages/shared/src/database.types.ts`, `packages/shared/src/api.types.ts`, `apps/web/src/app/api/public/quotes/[quoteId]/route.ts`, `apps/web/src/app/q/[quoteId]/page.tsx`, `apps/worker/src/__tests__/takeoff.test.ts` (new)
+
+---
+
+### 2026-07-18: T-120 Interval Pricing + Estimate Grades, T-121 VOI Questioning (M6+M7)
+
+**Context:** Quantities stop pretending to be points; quotes stop pretending to be exact. Every quote now declares its precision class (AACE-style) and clarification questions fire only where the money is.
+
+**Implementation:**
+- **`packages/shared/src/grading.ts` (new, pure):** `computeEstimateGrade` — **A Confirmed** (every driver human-stated/confirmed, incl. quotes with no AI quantities at all), **B Measured** (measured/adjudicated with confidence ≥ 0.6), **C Concept** (any envelope-based driver or low measured confidence); each grade carries a customer-facing label + description. `isQuestionWorthAsking` — ask when price spread ≥ max(£75, 10% of total): a £200 spread on a £15k job is noise, a £100 spread on a £210 job is not.
+- **Bands ride the signals:** `ExtractedSignal.quantityBand` + `basis` set by ensemble (±cov), adjudication (senior band), envelope (bounds). Form-confirmed values are treated as exact regardless of stale bands.
+- **Worker:** the pricing call is wrapped in `priceWithSignals(ss)`; interval totals come from deterministic re-runs with band-low/band-high values substituted (exact through multipliers/minimums/tax — no linear approximations). Per-quantity VOI spreads are computed the same way; worthwhile questions append to the clarification list. `pricing.estimate = {grade, label, description, rangeLow?, rangeHigh?}` persists in pricing_json.
+- **Delivery:** public GET passes `estimate` through; the quote page shows a grade badge (A green / B black / C amber) + the interval + the grade description under the total.
+
+**Live on the user's real quote — the complete engine in one run:** ensemble passes disagreed on garage inclusion → senior adjudicated ("Junior 1 included the garage but underestimated its side elevation; Junior 2 excluded it entirely") → 32.5 sqm (band 25–40) → interval priced **£960–£1,284** around best **£1,122** → **Grade B (Measured)** → VOI computed £324 spread, cleared the bar → one confirmation question queued. A graded, banded, adjudicated, selectively-questioning estimate.
+
+**Tests:** 10 new (`grading.test.ts`) — grade matrix, VOI bars absolute/relative. Suite: 234 passing.
+
+**Files:** `packages/shared/src/grading.ts` (new), `packages/shared/src/index.ts`, `packages/shared/src/database.types.ts`, `apps/worker/src/ai/measurement.ts`, `apps/worker/src/pricing/rules-engine.ts`, `apps/worker/src/quote-processor.ts`, `apps/web/src/app/api/public/quotes/[quoteId]/route.ts`, `apps/web/src/app/q/[quoteId]/page.tsx`, `apps/worker/src/__tests__/grading.test.ts` (new), `apps/worker/src/__tests__/measurement.test.ts`
+
+---
+
+### 2026-07-18: T-119 Adjudication Tier — Stakes-Based Model Routing (Measurement Engine M4)
+
+**Context:** T-117/118's known frontier was "precision without accuracy" — passes agreeing tightly on the wrong scope. M4 adds the senior reviewer: a stronger model that resolves the CAUSE of disagreement, routed by stakes.
+
+**Implementation:**
+- **`decideAdjudication` (pure, tested):** escalate when cov > `MEASUREMENT_COV_THRESHOLD` (0.15), when only one usable pass, or when the provisional step value ≥ `ADJUDICATION_VALUE_THRESHOLD` (1000) — **measurement spend scales with the money at stake.**
+- **`adjudicateMeasurement`:** the senior model (`ADJUDICATION_MODEL`, default `gemini-pro-latest` — found live that `gemini-2.5-pro` is closed to newer API keys) receives every junior pass's value/anchor/reasoning + the photos, with an explicit brief: do NOT average — resolve WHY they differ, re-examine the photos, produce final value + honest low–high band + one-sentence `scopeResolution` for the audit trail. Confidence derives from the adjudicator's band width (measured semantics preserved); failure returns null and the ensemble median stands — never blocks.
+- Gemini client factory accepts `{model, maxTokens}`; raw passes retained on `MeasuredQuantity.rawPasses`.
+
+**Live result on the user's real quote — the flagship demo of the whole engine:** 3 passes disagreed wildly (median 52, cov 0.91) → routed `high_variance` → senior model resolved: *"Included only the white rendered surfaces (main house front/sides, garage front and side) as brick is not typically painted; Junior 1 and 3 incorrectly included unpainted brickwork, while Junior 2 missed the garage side elevation"* → final 38.5 sqm (band 32–45) → quote sent at **£1,251.60** with the audit note stored as the measurement's evidence. The senior model applied domain judgment (paintable render vs unpainted brick) that no averaging could produce. T-122 will surface this note on the customer document's takeoff table.
+
+**Tests:** 7 new (routing matrix; adjudication merge with band-derived confidence; failure/nonsense guards). Suite: 224 passing.
+
+**Files:** `apps/worker/src/ai/measurement.ts`, `apps/worker/src/ai/gemini.ts`, `apps/worker/src/quote-processor.ts`, `apps/worker/src/index.ts`, `apps/worker/src/__tests__/measurement.test.ts`
+
+---
+
+### 2026-07-18: T-117 Ensemble Extraction + T-118 Anchored Takeoff (Measurement Engine M2+M3)
+
+**Context:** Replaces single-shot quantity guessing for ai_signal quantities. New module `apps/worker/src/ai/measurement.ts`; runs ONLY for services with ai_signal quantity sources (zero extra cost for other quotes), between extraction and form merge (customer answers still win, AD-002) and before envelopes (implausible medians still caught).
+
+**T-118 — reference-anchored takeoff:** the prompt forbids absolute eyeballing; the model finds a known-size reference in the photos (door 1.98 m, brick course 75 mm, fence panel 1.83 m…) and reports the target in REFERENCE MULTIPLES; code computes metres/areas (`computeAnchoredValue` — AD-024 for vision). Reference dimensions are physical constants in code (a UK door is a UK door), not business config; pack overrides can come later.
+
+**T-117 — ensemble:** N passes (`MEASUREMENT_PASSES` env, default 3) at temperature 0.7; `computeEnsembleStats` → median + coefficient of variation → MEASURED confidence bands (cov ≤ 0.08 → 0.9 … > 0.3 → 0.35). Self-reported model confidence is no longer used for quantities. Evidence string carries the method: "Measured across 3 independent passes (spread ±8%), anchored to entry door height". Individual pass failures tolerated; zero usable passes → envelope fallback takes over.
+
+**Gemini client:** `generateWithImagesAndSchema`/`generate` accept per-call `{temperature, maxOutputTokens}` — found live that Gemini 2.5 thinking tokens count against maxOutputTokens, truncating JSON mid-string at the 4096 default; measurement passes now run at 16384 with reasoning capped to two sentences.
+
+**Live end-to-end on the user's real quote — the full stack in concert:** ensemble measured 21.8 sqm (2 usable passes, cov 0.08 — precise but scope-limited: the model consistently measured a SUBSET of the elevation) → envelope said implausible for 3 storeys → clamped to the 27 floor → priced provisionally (£1,003) → gate routed to clarification: "we estimated wall area sqm: 27. Is that right?" → customer's answer reprices exactly. The £480 silent-failure is now an honest provisional + one question.
+
+**Known frontier (by design, next tickets):** tight ensemble agreement on the WRONG SCOPE (measuring part of the elevation) is precision without accuracy — exactly what M1 scene inventory + T-119 adjudication (a stronger model resolving what each pass included/excluded) exist to fix.
+
+**Tests:** 11 new (`measurement.test.ts`) — anchored geometry (prefers computation over model guess), ensemble bands, pass-failure tolerance, no-target short-circuit. Suite: 217 passing.
+
+**Files:** `apps/worker/src/ai/measurement.ts` (new), `apps/worker/src/ai/gemini.ts`, `apps/worker/src/quote-processor.ts`, `apps/worker/src/index.ts`, `apps/worker/src/__tests__/measurement.test.ts` (new)
+
+---
+
+### 2026-07-18: Measurement Engine Adopted (V3 estimation core) + T-116 Plausibility Envelopes
+
+**Context:** User verdict after live testing: "same system, slightly improved" — correct about the estimation core. V2 rebuilt the workflow around the estimator; the core itself remained a single-shot vision guess with self-reported confidence (proven by 50 vs 60 sqm run-to-run variance on identical photos). Adopted `Docs/07-measurement-engine.md` as the estimation north star: reference-anchored measurement, ensemble variance as confidence, stakes-based model routing (measurement spend scales with estimate value), plausibility envelopes, interval pricing with declared AACE-style estimate grades (C Concept / B Measured / A Confirmed), value-of-information questioning, per-tenant measurement memory, and a Goldman-grade document with a quantity-takeoff table showing HOW each quantity was measured. New tickets T-116–T-123.
+
+**T-116 implemented — Plausibility Envelopes (M5):**
+- **`packages/shared/src/envelopes.ts` (new, pure math):** `computeEnvelope` (bounds scaled by a known driver, e.g. wall area = storeys × [9..36] sqm/storey, with absolute caps) + `enforceEnvelope` (accepted / clamped / fallback_injected) + comma-aware `coerceQuantity`.
+- **Envelope rules ship as pack DATA** on `ExpectedSignalConfig.envelope` — rides existing `expected_signals` persistence end-to-end, zero migrations, anti-hardcoding intact. Painting pack: `wall_area_sqm` envelope added.
+- **Worker integration (BEFORE pricing — ordering matters, the gate runs after pricing):** for every ai_signal quantity with an envelope: implausible measurements are CLAMPED to the nearest bound; missing measurements get the envelope MIDPOINT injected (evidence: "Estimated from typical range X–Y for this property", confidence 0.4). Both cases are added to `missingQuantitySignals` → customer clarification. **The envelope makes the quote sane; the customer makes it exact.** The bug-#10 guard also moved pre-pricing and now reads the same work-step source as the engine (`service.work_steps || rules.workSteps` — was inconsistently `rules.workSteps`).
+- **Structural result:** the £480 failure class is impossible three ways — quantity-1 clamps to the plausible floor, missing measurements price at the envelope midpoint with a clarification, absurd readings (photo of the wrong thing) clamp to the ceiling. Tested for exactly these three paths.
+
+**Tests:** 10 new (`envelopes.test.ts`) — driver scaling, defaultDriver, absolute caps, the three kill-paths of the live £480 quote, string coercion. Suite: 206 passing.
+
+**Files:** `Docs/07-measurement-engine.md` (new), `packages/shared/src/envelopes.ts` (new), `packages/shared/src/database.types.ts`, `packages/shared/src/index.ts`, `apps/web/src/lib/vertical-packs/painting.ts`, `apps/worker/src/quote-processor.ts`, `apps/worker/src/__tests__/envelopes.test.ts` (new)
+
+---
+
+### 2026-07-18: Bug #10 — Missing/String AI Quantity Signals Priced Silently Wrong (found by user testing)
+
+**Context:** User submitted a real Exterior Painting quote (3-storey front elevation) and asked "is this accurate?". It was not: **"Exterior walls: 1 sqm × £18 = £18"**, total £480 (minimum charge masking a £368 calculation). Correct total after fix: **£1,716** — a 3.6× under-quote that sailed through every guard with gate action `send`. The flagship failure mode the accuracy engine exists to prevent.
+
+**Two root causes, both fixed:**
+1. **Missing quantity signals bypassed all guards.** The walls step prices per-sqm from `ai_signal: wall_area_sqm`. When extraction produces NO such signal, the engine falls back to quantity 1 and marks `quantityTrusted: false` in the trace — but the quality gate only inspects `lowConfidenceSignals`, and a MISSING signal is never in that list. Fix: processor detects work steps whose ai_signal quantity is absent/non-numeric in fused signals → passes `missingQuantitySignals` to the gate → gate routes them to customer clarification FIRST (they're structurally wrong, not merely uncertain), producing a text question via the existing T-108 machinery; the answer merges back as a confidence-1.0 signal and the step prices correctly on reprocess. One-round cap respected.
+2. **String-typed AI quantities were rejected.** On reprocess Gemini returned `wall_area_sqm: "50"` (string) — the engine's `typeof value === 'number'` check discarded a valid extraction and silently priced quantity 1. The ISSUE-2 lesson (coerceToNumber for comma-aware string parsing) was applied to form-field quantities but never to the ai_signal paths. Fix: both ai_signal quantity sites (per_unit + per_hour) now coerce string values.
+
+**Live re-verified on the user's actual quote:** reprocessed through the fixed pipeline → "Exterior walls £18 × 60 (sqm) = £1,080", subtotal £1,430, total £1,716, breakdown label now shows the quantity transparently. (60 sqm remains an AI estimate at ~0.7 confidence — site-visit note retained; T-110 calibration will tune over time.)
+
+**Tests:** 5 new (3 quality-gate: missing-quantity clarification without Gemini, usable-signal pass-through, one-round cap; 2 engine: string coercion to 50×£18=£900, true-missing fallback to 1×£18). Suite: 196 passing.
+
+**Files:** `apps/worker/src/quote-processor.ts`, `apps/worker/src/agents/quality-gate.ts`, `apps/worker/src/pricing/rules-engine.ts`, `apps/worker/src/__tests__/quality-gate.test.ts`, `apps/worker/src/__tests__/quote-processing.test.ts`
+
+---
+
+### 2026-07-18: Verification Findings Fixed (all live re-verified)
+
+**Context:** Fixes for every open finding from the live verification below, each re-verified in the running app.
+
+1. **Quote page: auto-applied addons now render honestly.** They're part of the subtotal, so they appear in the main breakdown with an "Added for you — {reason}" annotation and an opt-out note, instead of a "Recommended Add-ons /each — contact us to add" panel. Breakdown lines now sum to the subtotal exactly (re-verified: 60+600+120+156 = £936). The truly-optional `availableAddons` section is unchanged.
+2. **Pricing compiler: "raise the room rate to £220" now works — root cause was NOT the prompt.** Instrumentation showed Gemini returning `updatedConfig` shaped like the CONTEXT wrapper (`{config, addons, multipliers}`) — the real config sat at `updatedConfig.config` where the merge never looked, so edits were applied-then-lost. Fixes: (a) context keys renamed (`currentDraftConfig`/`currentAddons`/`currentMultipliers`) so they can't mirror into the response shape; (b) defensive unwrap of nested `config`/`addons`/`multipliers`; (c) response contract now REQUIRES a per-instruction accounting array (`instructions: [{instruction, action: applied|ambiguous, target}]`, logged server-side) — silent skips are structurally impossible; (d) prompt rule 1b maps colloquial references ("room rate", "call-out fee") to existing config items or asks. Re-verified live: "£220 per room" in the review, rush addon intact.
+3. **No-subscription plan-limit default unified.** Analytics showed 200 ("Free Plan") while enforcement/billing used 50 — all three now use `DEFAULT_TRIAL_LIMIT` from `lib/plan-limits` (analytics label now "Free trial").
+4. **Composer currency symbol** — services page fetches tenant currency and passes the symbol; £ tenants no longer see $.
+5. **WorkStepEditor infinite render loop (pre-existing, found via 410 console errors during verification):** `numberQuestions` was a fresh `.filter()` array each render, re-firing a setState effect endlessly. Memoized; console now clean with the editor mounted.
+6. **False alarm corrected:** the service wizard DOES preserve `requiredAngles` on re-save (media_config round-trips wholesale) — no fix needed; noted so it isn't "re-fixed".
+7. **Deliberately not changed:** signup still creates no subscriptions row — the unified default (fix 3) makes trial behavior consistent, and the subscription row is properly created at checkout. Revisit only if trial mechanics need their own plan record.
+
+**Files:** `apps/web/src/app/q/[quoteId]/page.tsx`, `apps/web/src/app/api/services/ai-draft/compile/route.ts`, `apps/web/src/app/api/analytics/route.ts`, `apps/web/src/app/api/billing/route.ts`, `apps/web/src/app/(dashboard)/app/services/page.tsx`, `apps/web/src/components/services/PricingComposer.tsx` (prop already existed), `apps/web/src/components/WorkStepEditor.tsx`
+
+---
+
+### 2026-07-18: Live End-to-End Verification (local stack + real Gemini)
+
+**Context:** First live run of the entire V2 build: local Supabase (migrations 19–21 applied), Next dev, wrangler dev worker, real Gemini. Full journey driven through the browser: signup → painting template onboarding → widget submission with photo → worker pipeline → hosted quote → plan-limit probe → calibration/benchmarks → pricing composer.
+
+**Verified working end-to-end:** painting landing page; signup+tenant trigger; onboarding template flow (3 services created); pack fields in widget; photo upload + T-107 quality gate; full worker pipeline — Gemini structured extraction (confidence 0.8), AD-002 form overrides (ceiling_height form beat vision), AI addon detection (woodwork auto-applied from customer phrasing), slugified-option multiplier normalization, **pricing penny-exact: (60+600+120)×1.2×1.2 VAT = £1123.20**; T-109 success-state polling flipped to "Your quote is ready!"; hosted quote page with Gemini scope wording; T-101 429 at limit + red dashboard banner; T-110 outcomes table; T-115 opt-in + k-anonymity empty state; T-104 composer round-trip English + live compile (rush addon compiled with sensible trigger keywords).
+
+**Bugs found & fixed (commit f555fd2):**
+1. `PATCH /api/tenant` → 405 (route exports PUT) — broke onboarding finish + benchmark opt-in; error path also crashed on empty body. Both call sites → PUT; error parsing guarded.
+2. `requiredAngles` dropped at service creation (onboarding + bulk import) — guided-capture slots never rendered for pack services.
+
+**Open findings (not yet fixed):**
+- Quote page renders auto-applied addons in "Recommended Add-ons" as if optional while their amount is already in the subtotal — visible lines don't sum to subtotal (£816 shown vs £936). Trust-damaging; needs a breakdown-rendering fix.
+- Compiler missed "Raise the room rate to £220" (kept $200, no ambiguity raised) while nailing the rush-service addon — prompt needs strengthening on mapping colloquial rate references to existing work steps, or must ask.
+- Analytics "Monthly Usage" defaults to limit 200 ("Free Plan") while enforcement/billing default to 50 — inconsistent no-subscription defaults; unify into one shared constant.
+- Service wizard has no requiredAngles editor and re-saving may drop angles (same class as fix #2).
+- Composer/wizard shows "$" regardless of tenant currency (£ tenants see $).
+- Signup creates NO subscriptions row — plans/overage all ride on defaults until checkout.
+- Local-env only: `handle_new_user` trigger needed `search_path = public, extensions` (gen_random_bytes); auth verification emails don't reach Mailpit.
+
+**Not yet exercised live:** T-108 clarify UI end-to-end (gate correctly chose 'send' at 0.8 confidence), Stripe overage metering (needs Meter ops), WhatsApp intake (needs Meta credentials), website extraction endpoint.
+
+---
+
+### 2026-07-18: T-115 — Cross-Tenant Rate Benchmarks (V2 roadmap complete)
+
+**Context:** Final V2 roadmap ticket. "Similar decorators charge £10–14/sqm" — anonymized market context that becomes more valuable as painting tenants accumulate. Informational only; never feeds pricing (AD-001).
+
+**Privacy model (the core of this ticket):**
+- **Opt-in with reciprocity:** you see benchmarks only while sharing your own rates (`tenants.benchmarks_opt_in`, migration 21, default false). Opt-in happens at the point of value (analytics page) with explicit copy about what's shared.
+- **k-anonymity:** a benchmark requires ≥3 distinct OTHER tenants; below that, nothing renders.
+- **Per-tenant dedup:** one representative rate (median of their matching steps) per tenant per group — a tenant with many similar steps can neither skew the distribution nor bypass the k threshold.
+- **Same-currency only** — mixing GBP/USD would corrupt medians.
+- Cross-tenant reads use the admin client server-side, but ONLY aggregates (P25/median/P75 + tenant count) leave the endpoint.
+
+**Implementation:**
+- **`packages/shared/src/benchmarks.ts` (new):** pure math — `normalizeUnitLabel` (sqm/sq m/m2/square metre → one key; rooms/hours/walls likewise), `serviceTokens` (stopword-filtered name matching), `computeBenchmarks` (grouping + percentiles + guards).
+- **`GET /api/learning/benchmarks` (new):** requester's per-unit work-step rates vs. opted-in same-currency tenants' comparable services (unit match + name-token overlap). Returns `{optedIn, benchmarks}`.
+- **`PATCH /api/tenant`:** accepts `benchmarksOptIn`.
+- **Analytics page:** "Market Benchmarks" card — opt-in prompt → "Similar businesses charge 15–22 per sqm (median 19). You charge 18." with in/below/above-range coloring, sample counts, and "benchmarks never change your pricing" footer.
+- Shared `PricingRules` type now declares `workSteps?` (was persisted-but-untyped, AD-016 pattern — now typed).
+
+**Tests:** 10 new (`benchmarks.test.ts`) — k-anonymity enforcement, per-tenant dedup under adversarial shapes, unit-variant matching, token filtering, zero-rate guards. Full suite: 191 passing.
+
+**Files:** `supabase/migrations/00000000000021_benchmarks_opt_in.sql` (new), `packages/shared/src/benchmarks.ts` (new), `packages/shared/src/index.ts`, `packages/shared/src/database.types.ts`, `apps/web/src/app/api/learning/benchmarks/route.ts` (new), `apps/web/src/app/api/tenant/route.ts`, `apps/web/src/app/(dashboard)/app/analytics/page.tsx`, `apps/worker/src/__tests__/benchmarks.test.ts` (new)
+
+---
+
+### 2026-07-18: T-114 — Painting & Decorating Pack + Landing Page (Phase 4, V2 Strategy)
+
+**Context:** The launch vertical (decided 2026-07-18, strategy §3). First pack in the T-113 registry, and the vertical landing page carrying the speed-to-lead pitch. All pack content is editable-default DATA in GBP; no vertical logic entered the engine.
+
+**Pack contents (`lib/vertical-packs/painting.ts`):** three services designed to exercise every accuracy-engine system:
+- **Interior Painting** — per-ROOM pricing (customers can answer room counts exactly → form_field quantity source): £200/room walls & ceilings + £60 base + £250 minimum; heavy-prep step (£150) auto-triggers when photos show `prep_level = heavy`; high-ceiling multiplier ×1.2 from a customer question; woodwork/feature-wall addons with trigger keywords. Guided angles: wide shot per room + damage close-ups.
+- **Exterior Painting** — per-SQM pricing from **AI wall-area estimation** (customers can't measure render → ai_signal quantity source, deliberately exercising vision + the T-108 confirm step): £18/sqm + £100 base + £400 minimum; access-equipment step (£250) triggers at `storeys >= 2`; roofline/front-door addons. Guided angles: full elevation per side, ground-to-roof.
+- **Wallpapering** — per-wall (£140/wall), optional per-wall removal step triggered by a customer boolean, we-supply multiplier ×1.15, lining-paper addon.
+- Every quantity-bearing field carries `mapsToSignal` so form answers hit the canonical signal keys (the FIX-1 mapping path); expectedSignals give strict extraction schemas + T-108 confirmation targets.
+
+**Landing page (`/painting`, static):** Editorial Black style; hero "Quote every job in 60 seconds" + "Your rates set the price — never the AI"; verified stats band ONLY (40% never respond / 95% miss 5-min / 21× — with sources; the debunked stats from strategy §2 are not used); 4-step how-it-works; deterministic-pricing trust section; feature grid; CTAs to /signup and /demo.
+
+**Files:** `apps/web/src/lib/vertical-packs/painting.ts` (new), `apps/web/src/lib/vertical-packs/index.ts`, `apps/web/src/app/painting/page.tsx` (new)
+
+---
+
+### 2026-07-18: T-113 — Vertical Pack Infrastructure (Phase 4, V2 Strategy)
+
+**Context:** AD-022 (vertical-first go-to-market on a generic engine). A pack is pure DATA — service templates with scope, media guidance, guided-capture angles (feeds T-107), default rates, expected signals, and customer questions — applied at onboarding as pre-filled, fully editable config. Anti-hardcoding holds: packs are content files, the engine never special-cases a vertical.
+
+**Implementation:**
+- **`apps/web/src/lib/vertical-packs/types.ts` (new):** `VerticalPack`/`VerticalPackService` — each service carries a complete `ServiceDraftConfig` plus addons/multipliers. Pack rates are documented as EDITABLE DEFAULTS, never authoritative.
+- **`apps/web/src/lib/vertical-packs/index.ts` (new):** registry (`listPacks`/`getPack`). Adding a vertical = one data file + one registry line. Registry ships empty; T-114 adds painting.
+- **Onboarding interview:** third source option "Use a template" (shown only when packs exist) → pack picker → services flow into the existing review → basics → create pipeline with **no network and no AI** — the fastest possible setup path. Pack services arrive priced (typical rates), so the pricing interview is skipped; the picker copy tells the business to review rates.
+
+**Design notes:**
+- Packs as data files (not a DB table): versioned with the code, zero migration, reviewable in PRs. A DB-backed pack store is a v2 option if packs ever become admin-editable.
+- `promptContext` exists on the pack type but is NOT sent on creation — the platform auto-generates AI vision context from pricing rules by design (services API explicitly rejects frontend prompt_context). Pack vision influence flows through requiredAngles/photoGuidance/expectedSignals/workSteps, which the auto-generation reads.
+
+**Files:** `apps/web/src/lib/vertical-packs/types.ts` (new), `apps/web/src/lib/vertical-packs/index.ts` (new), `apps/web/src/components/onboarding/OnboardingFlow.tsx`
+
+---
+
+### 2026-07-18: T-112 — Guided WhatsApp Onboarding (Phase 3 complete, V2 Strategy)
+
+**Context:** The WhatsApp page was a raw credentials form ("paste your access token") with no validation — the audit flagged it as a setup-abandonment point. Full Meta Embedded Signup requires tech-provider approval (ops track, not code); this ticket delivers the best code-side experience: a guided walkthrough with live credential verification.
+
+**Implementation:**
+- **`POST /api/whatsapp/verify` (new):** validates credentials against the Graph API (`GET /{phoneNumberId}?fields=display_phone_number,verified_name,quality_rating`, read-only, nothing persisted). Two modes: pre-save verification of new credentials, and `{useStored: true}` to health-check the saved connection (decrypts the stored token server-side). Meta's cryptic errors are translated: code 190 → "token invalid/expired, generate a permanent token in System Users"; code 100 → "you pasted the phone number, not the Phone Number ID".
+- **Verify-before-save:** the connect form now verifies with Meta BEFORE persisting — bad credentials fail at setup time with a clear message, not at the first customer message. Verified display number auto-fills if left blank.
+- **"Test Connection"** button on the status card → re-verifies the stored connection, reports verified name + quality rating.
+- **Guided 3-step walkthrough** (replaces the old instructions block): (1) create Meta app + add WhatsApp, with deep links; (2) webhook configuration with copy-buttons for the exact Callback URL and verify token (now served by the config GET — auth'd route; the verify token is a handshake string, not a credential); (3) where to find the Phone Number ID and how to mint a PERMANENT system-user token (explicitly warns off the 24h temporary token — the most common setup failure).
+
+**Known constraint:** Meta Embedded Signup (OAuth-style one-click connect) remains a v2 ops item — requires Meta tech-provider review. The walkthrough + verification is the practical ceiling without it.
+
+**Files:** `apps/web/src/app/api/whatsapp/verify/route.ts` (new), `apps/web/src/app/api/whatsapp/config/route.ts`, `apps/web/src/app/(dashboard)/app/whatsapp/page.tsx`
+
+---
+
+### 2026-07-18: T-111 — WhatsApp Conversational Intake End-to-End (Phase 3, V2 Strategy)
+
+**Context:** WhatsApp quoting is an empty market category (V2 strategy §1: inbound conversations are free since Meta's July 2025 pricing change; Meta's Business Agent can't do configured priced quotes). The T-023 intake state machine and webhook wiring existed, but the flow had two defects that made real quotes impossible.
+
+**Bugs found & fixed (pre-existing, latent — fourth and fifth of the audit):**
+1. **WhatsApp photos never reached R2.** `handleMediaUpload` downloaded media from WhatsApp and inserted the asset ROW, but never wrote the bytes to R2 (a comment said "Upload to R2 via the upload API" above code that didn't). The worker later fetched nothing — every WhatsApp photo silently vanished from AI extraction. Now: `uploadToR2()` runs BEFORE the asset row is created (no phantom assets); upload failure tells the customer to resend rather than pretending success.
+2. **No job description was ever collected** — `job_answers` was hardcoded `[]`, so AI extraction had zero text signal and WhatsApp quotes priced from base fees alone.
+
+**Implementation:**
+- **New `awaiting_description` state** (after service selection): "Briefly describe the job — sizes, quantities or any details help us quote accurately" (min 10 chars). Stored as the `_project_description` form answer — the exact fieldId the worker's triage and signal extraction already read, so the whole pipeline (signals, addons, cross-service, T-108 confirmations) lights up with no worker changes.
+- **Any first message starts the flow** — previously a magic keyword ("quote"/"estimate") was required and "Hi, do you paint houses?" got a canned nudge. A dedicated business WhatsApp number exists to quote. Keyword re-trigger kept for the completed state.
+- Confirmation summary includes the job description (truncated at 80 chars).
+- Flow order: any message → service selection (auto-skips for single-service tenants) → description → name → email → phone (skip = WhatsApp number) → address → photos → confirm → quote link delivered in-thread. With T-109, that link shows the provisional range immediately and the T-108 confirm flow when needed — WhatsApp inherits the full accuracy engine.
+
+**Not done (noted for T-112):** guided WhatsApp Business API onboarding (credentials form remains raw); proactive in-thread "your final quote is ready" push from the worker (the in-thread link + hosted page live-updating covers the gap for v1).
+
+**Files:** `packages/shared/src/database.types.ts`, `apps/web/src/lib/whatsapp-intake.ts`
+
+---
+
+### 2026-07-18: T-102 — Metered Overage Billing (Phase 0 complete, V2 Strategy)
+
+**Context:** Completes Phase 0 (deferred at T-101). The hard block at the plan limit converts worse than "keep quoting, pay per extra quote" — every blocked quote is a lost lead for the business and lost revenue for the platform. Uses Stripe's modern **Billing Meter Events API** (supported by the installed stripe v20 SDK), not the deprecated usage-records API.
+
+**Behavior matrix:**
+| Tenant state | At limit |
+|---|---|
+| Free/trial, or plan without overage | Hard block (T-101 unchanged) |
+| Active paid plan with `overage_price_cents` + metered price | Quote proceeds, one meter event billed |
+
+**Implementation:**
+- **Migration 20:** `plans.overage_price_cents` (null = no overage) + `plans.stripe_metered_price_id`. Additive only.
+- **`lib/stripe.ts`:** `createCheckoutSession` attaches the metered price as a second line item (no quantity — Stripe requirement); `reportOverageMeterEvent()` posts to `billing.meterEvents` with **the quote ID as `identifier`** — Stripe dedupes on it, so retries/replays can never double-bill.
+- **`lib/plan-limits.ts`:** `PlanLimitStatus` gains `overageAvailable`/`overagePriceCents`/`stripeCustomerId`. Overage requires ALL of: overage price on plan, metered price configured, subscription status `active` (never trialing — metering a trial bills nothing), Stripe customer present. `recordOverageQuote()` meters fire-and-forget: **a metering failure never fails the quote** (absorb the cost rather than lose the lead) but logs `OVERAGE NOT BILLED` loudly.
+- **Both intake points** (public quotes API, WhatsApp): over-limit + overage → proceed and meter after quote creation.
+- **Surfaces:** limit-reached email switches to "Quoting continues — extra quotes billed at $X each"; dashboard banner becomes amber "overage billing active" instead of red "paused"; billing page shows overage rate + overage count this period. `PlanInfo`/`BillingUsage` extended.
+- `STRIPE_OVERAGE_METER_EVENT` env (default `estimate_overage`) added to both `.env.example`s.
+
+**Stripe setup required (ops, not code):** create a Meter named per `STRIPE_OVERAGE_METER_EVENT`, create a metered price on it per plan, set `plans.stripe_metered_price_id` + `overage_price_cents`. Existing subscriptions need the metered item added (new checkouts get it automatically).
+
+**Known constraints:** overage price display assumes USD (consistent with existing billing UI hardcoding — multi-currency billing remains v2 backlog). Proration on plan change is delegated to Stripe's defaults via the existing checkout/portal flows.
+
+**Files:** `supabase/migrations/00000000000020_plan_overage.sql` (new), `apps/web/src/lib/stripe.ts`, `apps/web/src/lib/plan-limits.ts`, `apps/web/src/lib/email-templates.ts`, `apps/web/src/app/api/public/quotes/route.ts`, `apps/web/src/lib/whatsapp-intake.ts`, `apps/web/src/app/api/billing/route.ts`, `apps/web/src/app/api/billing/checkout/route.ts`, `apps/web/src/app/(dashboard)/app/billing/page.tsx`, `apps/web/src/app/(dashboard)/app/page.tsx`, `packages/shared/src/api.types.ts`, `.env.example`, `apps/web/.env.example`
+
+---
+
+### 2026-07-18: T-110 — Outcome Calibration Loop (Phase 2 complete, V2 Strategy)
+
+**Context:** The moat ticket (V2 strategy Flaw 2): amendment/acceptance data was collected but never fed back into pricing. Existing infra: `quote_amendments` stores `before_pricing`/`after_pricing` snapshots; `/api/learning/analyze` (fired on quote PATCH) detects patterns for AI wording context. Missing: actionable pricing suggestions and a business-facing surface.
+
+**Implementation:**
+- **`packages/shared/src/calibration.ts` (new):** deterministic calibration math (no AI anywhere). Per service, over recent outcomes:
+  - *raise_rates / lower_rates:* ≥3 amendments with ≥70% direction consistency and |median delta| ≥5% → "Your {service} quotes are usually raised ~15% before sending" with a `suggestedAction` phrased for the T-104 composer ("Increase all my rates for {service} by about 15%") — the calibration loop's apply path IS the plain-language compiler.
+  - *price_check:* acceptance <30% over ≥5 sent quotes (suppressed when lower_rates already fired — same root cause).
+  - *review_burden:* ≥50% of processed quotes stuck in pending_review → suggests adding required photos/questions to raise AI confidence (the threshold-tuning signal).
+  - Guards: minimum sample sizes throughout, zero-beforeTotal amendments ignored, sub-5% medians treated as noise.
+- **`GET /api/learning/calibration` (new):** computes live from the last 90 days (500 quotes / 200 amendments max) — no new tables, no stale state, no migration.
+- **Analytics page:** "Pricing Insights" cards (headline, detail, the exact composer phrase to apply, link to services) + a "Quote Outcomes by Service" table (sent / accepted / acceptance % / median edit before send). Explicit copy: "Suggestions only — nothing changes unless you apply it" (AD-001).
+
+**Design decisions:**
+- Calibration NEVER auto-applies — AD-001 is absolute. The suggestion's apply path is the business speaking to the pricing composer, keeping a human decision plus deterministic compilation between data and price.
+- Live computation over persisted aggregates: at current scale (hundreds of quotes/tenant) the query is cheap, and it can't drift stale. Revisit if a tenant exceeds ~500 quotes/90 days.
+- Math lives in `@estimator/shared` so the worker's vitest suite covers it (web has no test infra).
+
+**Tests:** 11 new (`apps/worker/src/__tests__/calibration.test.ts`) covering all suggestion rules, noise guards, and per-service isolation. Full suite: 181 passing.
+
+**Files:** `packages/shared/src/calibration.ts` (new), `packages/shared/src/index.ts`, `apps/web/src/app/api/learning/calibration/route.ts` (new), `apps/web/src/app/(dashboard)/app/analytics/page.tsx`, `apps/worker/src/__tests__/calibration.test.ts` (new)
+
+---
+
+### 2026-07-18: T-109 — Range-First Quoting (Phase 2, V2 Strategy)
+
+**Context:** When a quote paused for clarification or business review, the customer got nothing — no price signal at all until an email arrived. Range-first principle: an instant estimated range always, the exact quote when it's final. Also fixed a third latent clarification bug (see T-108 for the first two).
+
+**Bug found & fixed (pre-existing, latent):** the public quote GET never returned `clarificationQuestions` — the clarify page fetched them from this endpoint and always fell into "No questions found for this quote". Combined with T-108's findings, the entire clarification feature had never worked end-to-end: questions couldn't load, answers weren't read, and the round cap was never counted. All three legs now fixed and typed (`QuoteViewResponse.clarificationQuestions`).
+
+**Implementation:**
+- **Worker:** the awaiting_clarification early-return now also stores `pricing_json` + `content_json` (pricing is already computed by the time the gate runs) — provisional pricing exists the moment the pipeline pauses.
+- **Public GET** (`/api/public/quotes/[quoteId]`): for provisional statuses (awaiting_clarification / pending_review) exact figures are WITHHELD (subtotal/total zeroed, breakdown empty) and a `provisional: { rangeLow, rangeHigh, reason }` field is returned instead — the engine's confidence-based range when present, else ±12% rounded to 10s. Rationale: showing an exact price that the business may then amend erodes trust; a range makes revision expected. `acceptQuoteEnabled` forced false while provisional.
+- **Hosted quote page** (`/q/[quoteId]`): provisional quotes render a dedicated view — big range display, then: awaiting_clarification → "Confirm Details → Get Exact Quote" CTA into the T-108 confirm flow; pending_review → "[Business] is double-checking your quote — final version by email shortly." No accept/PDF/feedback surfaces.
+- **Widget SuccessState:** polling now captures the provisional range — the customer sees "£450 – £620" within seconds of submission, with the confirm CTA (awaiting_clarification) or "we're double-checking the details" (pending_review). The 5-minute speed-to-lead window is satisfied even when the final quote needs review.
+
+**Design decision:** the range is computed from stored deterministic pricing, never invented at display time by AI — display-layer code only formats what the engine produced (consistent with AD-001/AD-024).
+
+**Files:** `apps/worker/src/quote-processor.ts`, `packages/shared/src/api.types.ts`, `apps/web/src/app/api/public/quotes/[quoteId]/route.ts`, `apps/web/src/app/q/[quoteId]/page.tsx`, `apps/web/src/app/embed/[tenantKey]/page.tsx`
+
+---
+
+### 2026-07-18: T-108 — Quantity Confirmation In-Flow (Phase 2, V2 Strategy)
+
+**Context:** Uncertainty was handled at the wrong moment (V2 strategy Flaw 3) — low-confidence extractions went to review queues or wide ranges instead of being resolved by the customer while they're still present. T-108 turns the existing clarification checkpoint into a one-tap confirmation flow — and fixed two latent bugs that made the existing loop non-functional.
+
+**Bugs found & fixed (pre-existing, latent):**
+1. **Clarification answers were never read.** The clarify API stored `clarification_answers_json` and re-queued the quote, but the worker never loaded the field — reprocessing re-ran extraction identically and answers had ZERO effect on the quote. Customers answered questions into a void.
+2. **`clarification_count` was never projected.** `loadQuoteData()` returned a 6-field projection of the quote; the gate's loop-cap read `quoteData.quote.clarification_count` which was always undefined → 0. The "max 1 round" cap only worked by accident of bug #1 (answers being ignored meant status flow still terminated). Both clarification fields + count are now in the projection.
+
+**Implementation:**
+- **Worker — answers merge as customer signals** (`quote-processor.ts` step 1.2): on reprocess, each clarification answer maps via its question's `targetSignalKey` to a synthetic form answer appended to `job_answers` (replacing any prior answer for that key — the clarification is the customer's most recent statement). This inherits the entire AD-002 pipeline untouched: confidence 1.0, form-wins fusion, conflict provenance, lowConfidence regeneration. Numeric answers coerced with comma-separator handling (the "1,500" lesson).
+- **Quality gate — deterministic confirm-value questions** (`quality-gate.ts`): when a low-confidence signal HAS an extracted value, the question is built by CODE (AD-024): "From your photos and details, we estimated room count: 4. Is that right?" with `type: 'confirm_value'`, `aiValue`, and the vision `evidence`. No Gemini call needed. AI-generated free-text questions remain only for valueless signals. `ClarificationQuestion` gains optional `type`/`aiValue`/`evidence` (backwards compatible).
+- **Clarify page** (`/q/[quoteId]/clarify`): confirm_value questions render as "✓ Yes, 4 is right" / "No, let me correct it" (reveals input), with the AI's evidence shown ("What we saw: …") for trust.
+- **Widget in-flow continuation** (`embed/[tenantKey]/page.tsx` SuccessState): after submission the widget polls quote status (3s interval, ~60s budget, `&poll=1` so polling doesn't trip the sent→viewed analytics transition — guard added to the public GET). If the quote needs confirmation, the customer — still present — sees "One quick check" routing straight to the confirm page; when the quote sends, the panel flips to "Your quote is ready!". Email remains the fallback for customers who leave.
+
+**Tests:** 2 new quality-gate tests (confirm_value construction without Gemini; text fallback for valueless signals). Full worker suite: 170 passing.
+
+**Files:** `packages/shared/src/database.types.ts`, `apps/worker/src/agents/quality-gate.ts`, `apps/worker/src/quote-processor.ts`, `apps/web/src/app/q/[quoteId]/clarify/page.tsx`, `apps/web/src/app/api/public/quotes/[quoteId]/route.ts`, `apps/web/src/app/embed/[tenantKey]/page.tsx`, `apps/worker/src/__tests__/quality-gate.test.ts`
+
+---
+
+### 2026-07-18: T-107 — Guided Photo Capture & Image Pre-Validation (Phase 2, V2 Strategy)
+
+**Context:** First "accuracy engine" ticket. Bad photos silently produced bad estimates — vision confidence drops, counts go wrong, and nothing told the customer their photo was unusable (V2 strategy Flaw 3 / pipeline audit "photo quality assumptions"). Fix: guide the shot before it's taken, validate it before it's uploaded.
+
+**Implementation:**
+- **`apps/web/src/lib/image-quality.ts` (new):** browser-side `assessImageQuality(file)` — decodes to a downscaled canvas (max 320px) and checks: resolution (< 480px shortest side = HARD reject), exposure (mean luminance < 35 too dark / > 240 washed out = soft), sharpness (Laplacian variance < 25 = blurry, soft). **Fails open** — any internal error returns ok, a quality-check bug must never block an upload.
+- **Embed widget `FileUploadStep`** (`embed/[tenantKey]/page.tsx`):
+  - *Guided capture slots:* when the service's `media_config.requiredAngles` is configured (schema existed since the draft-config work; now surfaced to customers), each angle renders as a tappable slot card with label + guidance ("Full view — capture the entire area"), progress "2 of 3 added", filled-state thumbnail. Slots are encouragement, not a hard gate — `minPhotos` remains the enforced minimum.
+  - *Reject-and-retake UX:* hard failures (tiny images) are rejected with a plain-language message; soft issues (blur/exposure) show the photo with a "Retake / Use anyway" overlay — the photo is NOT uploaded until the customer decides, and Continue is blocked while any photo awaits a decision.
+  - Upload logic refactored: `startUpload()` extracted; per-slot file targeting via a shared hidden input + pending-angle ref.
+- `UploadedFile` gains `status: 'needs_review'`, `angleId`, `qualityIssues`.
+
+**Design decisions:**
+- Soft issues are the customer's call ("use anyway") — legitimate photos can be dark (under-sink leaks); hard-blocking would cost leads. Only unusably-small images are hard-rejected.
+- Quality thresholds are deliberately conservative (warn only on clear failures) — false "blurry" warnings erode trust faster than missed ones cost accuracy.
+
+**Known constraint:** implemented on the embed surface (`/embed/[tenantKey]` — iframe mode, conversational host, demo). The Preact widget package (`packages/widget`, floating/inline modes) has a separate upload implementation and does not yet include guided capture/validation — follow-up when that surface is next touched (it cannot share React components; the pure `image-quality.ts` module can be ported).
+
+**Files:** `apps/web/src/lib/image-quality.ts` (new), `apps/web/src/app/embed/[tenantKey]/page.tsx`
+
+---
+
+### 2026-07-18: T-106 — Onboarding Interview (Phase 1 complete, V2 Strategy)
+
+**Context:** Final "setup revolution" ticket. Conversational setup replacing the 5-step wizard as the default path for new tenants; the wizard remains as the manual/advanced route. Target achieved by composition: signup → interview → first test quote in well under 10 minutes.
+
+**Design decision — scripted interview, AI at the seams.** Not a freeform agent: flow control is a deterministic client-side step machine (source → services → pricing → basics → create → done); AI is invoked only through the existing extraction (T-105) and compilation (T-104) endpoints. Consistent with the platform philosophy (deterministic orchestration, AI for extraction), and reuses every quality guard those endpoints already have.
+
+**Implementation:**
+- **`extract-from-website` endpoint:** now accepts `{ text }` as an alternative to `{ url }` — the interview's "I'll describe my services" path sends the owner's own words through the same extraction+normalization pipeline (min length 30 chars for text vs 200 for sites).
+- **`components/onboarding/OnboardingFlow.tsx` (new):** the interview. One question per screen, conversational tone. Key steps:
+  - *Source:* "Read my website" (URL) or "I'll describe it" (textarea) → extraction
+  - *Services:* extracted list with checkboxes; unpriced services labelled "we'll ask you next"
+  - *Pricing interview:* loops over selected unpriced services — "How do you charge for X?" → T-104 compile → deterministic English review (AD-024) → "That's right" / "Let me rephrase" / "Skip for now"
+  - *Basics:* currency, tax toggle (label + % rate, converted to DECIMAL 0-1 for `PATCH /api/tenant` per the tax-conversion lessons), optional postcode allowlist (fixes "service area buried in Settings" friction — now part of default onboarding)
+  - *Create:* tenant PATCH + `POST /api/services` per service (same payload as bulk import, including compiled addons/multipliers in pricingRules)
+  - *Done:* "Open My Widget" (`/embed/[tenantKey]`) for an immediate test quote + copyable embed snippet
+- **`app/onboarding/page.tsx` (new):** server component; fetches tenant basics and gets-or-creates the tenant_key (same logic as the widget page).
+- **Dashboard** (`app/page.tsx`): tenants with no services see a "Set up with AI — about 5 minutes" hero card linking to `/app/onboarding`, above the setup checklist.
+
+**Notes:**
+- Pricing can be skipped per service ("Skip for now") — services are still created and can be priced later via the T-104 composer in the wizard. Deliberate: never block onboarding completion on a pricing answer.
+- Services are created only at the END of the interview (drafts accumulate client-side) — avoids PATCH complexity and half-configured services if the user abandons mid-flow.
+
+**Files:** `apps/web/src/components/onboarding/OnboardingFlow.tsx` (new), `apps/web/src/app/(dashboard)/app/onboarding/page.tsx` (new), `apps/web/src/app/api/services/ai-draft/extract-from-website/route.ts`, `apps/web/src/app/(dashboard)/app/page.tsx`
+
+---
+
+### 2026-07-18: T-105 — Website-URL Onboarding (Phase 1, V2 Strategy)
+
+**Context:** Second "setup revolution" ticket. "Paste your website" → AI reads the site's services/pricing pages → drafts the full service catalogue for review. Builds directly on the bulk-extraction machinery (2026-02-15) — the endpoint returns the same `{services}` contract as `extract-services`, so the review→create pipeline is reused unchanged.
+
+**Implementation:**
+- **`apps/web/src/lib/website-extract.ts` (new):** dependency-free site fetcher. `validatePublicUrl()` is an SSRF guard (http/https only, default ports, blocks loopback/private ranges/link-local/cloud-metadata/`.local`); redirects are followed manually with per-hop re-validation (max 3) so a redirect can't escape into private space. `findRelevantLinks()` scores same-origin links by pricing/services keywords; fetches homepage + top 3 (10s timeout, 1.5MB/page cap); regex-based `htmlToText()` (no cheerio — LLM input doesn't need a real DOM); combined text capped at 30k chars.
+- **`POST /api/services/ai-draft/extract-from-website` (new):** feeds site text to Gemini with the extract-services rules. Key prompt rules: prices imported ONLY when the site states them; services without stated prices are created with empty workSteps (business then prices them via the T-104 composer — deliberate synergy); marketing prose consolidated to one clean entry per service. `maxDuration = 60` for fetch+AI time. 422 with a helpful message for JS-rendered sites with no readable text.
+- **`BulkServiceUpload.tsx`:** renamed "Import Services" with two source tabs — "From your website" (default, URL input) and "Upload document" (existing flow untouched). Both feed the same review checklist; review cards for unpriced services explain pricing comes after import.
+
+**Known constraints:**
+- DNS-rebinding SSRF (public hostname → private IP) not guarded in v1 — acceptable on serverless (Vercel) where internal network exposure is limited; revisit if self-hosting.
+- Heavily JavaScript-rendered sites (no SSR/static HTML) return little text — handled with a clear error steering users to document upload. A headless-render fallback is a v2 option.
+- `validateAndNormalizeDraft`'s existing `minimumCharge || 50` default means unpriced website services get a £/$50 minimum — pre-existing behavior shared by all draft paths, left unchanged.
+
+**Files:** `apps/web/src/lib/website-extract.ts` (new), `apps/web/src/app/api/services/ai-draft/extract-from-website/route.ts` (new), `apps/web/src/components/services/BulkServiceUpload.tsx`
+
+---
+
+### 2026-07-18: T-104 — Plain-Language Pricing Compiler (Phase 1, V2 Strategy)
+
+**Context:** The service wizard required businesses to hand-author pricing DSL (signal keys, trigger conditions, multiplier operators) — the root cause of both setup friction and the recurring signal-matching bug themes (see V2 strategy entry above, Flaw 1). First "setup revolution" ticket.
+
+**New architectural decision — AD-024: AI compiles, code explains.** The AI authors pricing config ONCE at compile time from the business's plain-language description; the review summary the business approves is rendered **deterministically by code from the compiled config** (`lib/pricing-describe.ts`), never by the AI. What the business reads is exactly what the pricing engine executes — no possibility of a summary that doesn't match the rules. Extends AD-001/AD-021.
+
+**Implementation:**
+- **`apps/web/src/lib/pricing-describe.ts` (new):** pure `describePricingRules()` renders base fee, work steps (incl. quantity sources: form field / AI signal / constant), addons (incl. auto-trigger conditions), multipliers, and minimum charge as grouped plain-English lines; `describePricingAsText()` flattens for future use (T-105/T-106 will reuse).
+- **`POST /api/services/ai-draft/compile` (new):** plain-language description (typed or pasted price list, max 20k chars) → complete config via the existing `validateAndNormalizeDraftBulk` pipeline (bulk limits — price lists have many lines). Key prompt rules: **never invent numbers** — unclear items are omitted and returned as `ambiguities[]` questions; form_field quantity sources strongly preferred over ai_signal (mirrors refine endpoint's priority order); `currentConfig` passed as context so partial edits preserve unmentioned rules. Temperature 0.2 (compilation, not creativity). Returns `{updatedConfig, addons, multipliers, ambiguities}` — addons/multipliers in `AddonConfig`/`MultiplierConfig` form shapes since `ServiceDraftConfig` doesn't model multipliers.
+- **`components/services/PricingComposer.tsx` (new):** leads the wizard's pricing step. Textarea → Compile → deterministic review cards ("Here's what your pricing will do") + amber ambiguity questions → Apply (via existing `applyDraftToForm` + addon/multiplier merge). Edit mode shows "Your current pricing in plain English" (collapsed) so businesses read existing rules in language, never config fields, and describe deltas ("raise the base fee to £150").
+- **Wizard integration** (`services/page.tsx`): composer sits above the existing manual editors, which remain unchanged under "Or fine-tune manually" — no regression risk to the advanced path or the AI refinement panel.
+
+**Design decisions:**
+- Empty compile results for addons/multipliers do NOT clear existing form values (guards against the "configuration loss on update" recurring theme).
+- Ambiguities are questions to the business, answered by editing the description and recompiling — not a chat thread (the refine panel already covers conversational iteration).
+
+**Files:** `apps/web/src/lib/pricing-describe.ts` (new), `apps/web/src/app/api/services/ai-draft/compile/route.ts` (new), `apps/web/src/components/services/PricingComposer.tsx` (new), `apps/web/src/app/(dashboard)/app/services/page.tsx`
+
+---
+
+### 2026-07-18: T-101 — Enforce Monthly Plan Limits (Phase 0, V2 Strategy)
+
+**Context:** Usage counters were tracked (`usage_counters.estimates_created`) but never enforced — quote #51 on a 50-quote plan succeeded silently. Revenue was structurally impossible. First ticket of the V2 roadmap (`Docs/06-v2-strategy.md` §5 Phase 0).
+
+**Implementation:**
+- **`apps/web/src/lib/plan-limits.ts` (new):** `checkPlanLimit()` resolves the limit from subscription→plan (`monthly_estimate_limit`), defaulting to 50 for tenants without a subscription (same default as `/api/billing`); `limit <= 0` means unlimited. Pure `evaluateLimit()` separated from IO. **Fails open** on lookup errors — a billing read failure must never block a customer quote.
+- **Enforcement at both quote-creation entry points, before any records are created:**
+  - `POST /api/public/quotes` → HTTP 429 `PLAN_LIMIT_REACHED`. Customer-facing message is deliberately neutral ("Online quoting is temporarily unavailable…") — never exposes the business's billing state. Widget already renders `error.message`, so no widget changes needed.
+  - WhatsApp intake (`createQuoteFromIntake`) → friendly text reply, conversation resets to idle.
+- **Once-per-period business notification:** after the increment that consumes the last quote, `maybeNotifyLimitReached()` sends a Postmark email (new `generateLimitReachedEmailHtml` template) with an upgrade CTA. Guarded by new `usage_counters.limit_notified_at` column claimed via conditional update (`IS NULL`) so concurrent requests can't double-send. Recipient: `tenants.notification_email`, falling back to the tenant owner's account email (same resolution as the worker's business emails).
+- **Dashboard warning banners** (`/app` overview): amber at ≥80% usage, red with Upgrade CTA at 100%.
+- **Migration 19** (`00000000000019_usage_limit_notified.sql`): additive `ALTER TABLE usage_counters ADD COLUMN limit_notified_at TIMESTAMPTZ` — follows the migration-16/17 lessons (no new RLS, no ID type assumptions).
+
+**Design decisions:**
+- Enforcement checks `estimates_created` (intake volume), not `estimates_sent` — the metered unit is a processed request, and blocking at intake protects AI processing costs.
+- Fail-open on limit-check errors: prioritises never losing a lead over strict enforcement in a degraded state.
+- The check is read-then-insert (not atomic with the increment), so a burst at the boundary could allow a couple of extra quotes — acceptable overage; deliberate simplicity.
+
+**Not done (deferred to T-102):** metered overage billing via Stripe usage records; plan structure for widget-as-SKU.
+
+**Files:** `apps/web/src/lib/plan-limits.ts` (new), `apps/web/src/lib/email-templates.ts`, `apps/web/src/app/api/public/quotes/route.ts`, `apps/web/src/lib/whatsapp-intake.ts`, `apps/web/src/app/(dashboard)/app/page.tsx`, `supabase/migrations/00000000000019_usage_limit_notified.sql`
+
+---
+
+### 2026-02-16: Production Migration Fixes — UUID Types & RLS Patterns
+
+**Context:** Migrations 13-17 had never been applied to production Supabase. When attempting `db push`, migrations 16 and 17 failed due to schema mismatches between migration files and the actual production database.
+
+**Root causes:**
+1. **Migration 16 (conversational_widget):** `widget_analytics.tenant_id` was declared as `TEXT` but `tenants.id` is `UUID` on production. Also used `get_current_tenant_id()` function which doesn't exist — production uses subquery-based RLS policies via `user_profiles`.
+2. **Migration 17 (quote_amendments):** Used `TEXT` primary keys with `generate_prefixed_id()` prefix function, but production DB uses `UUID` with `gen_random_uuid()` for all ID columns. Also used `get_current_tenant_id()` RLS pattern. The `generate_prefixed_id()` function didn't exist on production.
+
+**Fix:**
+- **Migration 16:** Changed `tenant_id TEXT` to `UUID`, replaced `get_current_tenant_id()` RLS with `tenant_id IN (SELECT ... FROM user_profiles WHERE id = auth.uid())`, replaced `auth.role()` with `auth.jwt() ->> 'role'`.
+- **Migration 17:** Changed all ID columns from `TEXT DEFAULT generate_prefixed_id(...)` to `UUID DEFAULT gen_random_uuid()`, changed `tenant_id`/`quote_id`/`service_id`/`feedback_id` to `UUID`, added `CREATE OR REPLACE FUNCTION generate_prefixed_id()` as safety net, replaced all `get_current_tenant_id()` RLS with subquery pattern.
+- Used `supabase migration repair` to mark migrations 0-12 as applied (already existed in DB), then pushed 13-17 incrementally, fixing errors between attempts.
+
+**Key lesson:** Production Supabase was set up with UUID-typed columns via SQL editor, not through the migration files. Always verify actual production schema types (via `supabase db dump`) before writing new migrations that reference existing tables.
+
+**Files:** `supabase/migrations/00000000000016_conversational_widget.sql`, `supabase/migrations/00000000000017_quote_amendments.sql`
+
+---
+
 ### 2026-02-16: Conversational Chat — Multi-Service Awareness & Field Isolation
 
 **Context:** Two bugs: (1) chat always auto-selected the first service, ignoring others; (2) the chat API loaded fields from ALL service-specific widget_configs, not just the selected one. This caused plumbing fields ("where is the leak?") to appear when discussing spa services.

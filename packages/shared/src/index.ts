@@ -6,6 +6,21 @@ export * from './database.types'
 // Re-export API types
 export * from './api.types'
 
+// Re-export outcome calibration (T-110)
+export * from './calibration'
+
+// Re-export rate benchmarks (T-115)
+export * from './benchmarks'
+
+// Re-export plausibility envelopes (T-116, Measurement Engine)
+export * from './envelopes'
+
+// Re-export estimate grading + VOI (T-120/T-121, Measurement Engine)
+export * from './grading'
+
+// Re-export deterministic quantity formulas (T-125)
+export * from './formula'
+
 // ID prefixes for stable, readable IDs
 export const ID_PREFIXES = {
   tenant: 'tnt_',

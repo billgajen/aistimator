@@ -30,7 +30,9 @@ export interface PricingRulesForContext {
   }>
   multipliers?: Array<{
     when: {
-      fieldId: string
+      /** 'field' (default) or 'subtotal' (T-125 order-value rules) */
+      subject?: 'field' | 'subtotal'
+      fieldId?: string
       operator?: string
       equals?: string | number | boolean
       value?: string | number
@@ -102,7 +104,8 @@ export function autoGeneratePromptContext(
   if (pricingRules?.multipliers && pricingRules.multipliers.length > 0) {
     const severityFields = pricingRules.multipliers
       .map(m => m.when.fieldId)
-      .filter(id => {
+      .filter((id): id is string => {
+        if (!id) return false
         const idLower = id.toLowerCase()
         return idLower.includes('size') ||
                idLower.includes('severity') ||

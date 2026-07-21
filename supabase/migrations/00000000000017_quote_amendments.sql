@@ -27,8 +27,8 @@ COMMENT ON COLUMN quotes.last_amended_by IS 'User who made the most recent amend
 -- Quote feedback table (customer → business communication)
 CREATE TABLE IF NOT EXISTS quote_feedback (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  quote_id UUID NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  quote_id TEXT NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   feedback_type TEXT NOT NULL CHECK (feedback_type IN ('feedback', 'approval_request')),
   feedback_text TEXT,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'acknowledged', 'resolved')),
@@ -79,8 +79,8 @@ GRANT ALL ON quote_feedback TO service_role;
 -- Quote amendments table (edit history)
 CREATE TABLE IF NOT EXISTS quote_amendments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  quote_id UUID NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  quote_id TEXT NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   version INTEGER NOT NULL,
   amended_by UUID NOT NULL REFERENCES auth.users(id),
   before_pricing JSONB NOT NULL,
@@ -131,8 +131,8 @@ GRANT ALL ON quote_amendments TO service_role;
 -- Tenant learning context table (AI improvement from amendment patterns)
 CREATE TABLE IF NOT EXISTS tenant_learning_context (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  service_id UUID NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  service_id TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
   patterns_json JSONB NOT NULL DEFAULT '[]'::jsonb,
   prompt_context TEXT,
   total_amendments_analyzed INTEGER NOT NULL DEFAULT 0,

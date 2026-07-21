@@ -7,6 +7,7 @@ import { WorkStepEditor } from '@/components/WorkStepEditor'
 import { SuggestedFieldEditor } from '@/components/SuggestedFieldEditor'
 import { BulkServiceUpload } from '@/components/services/BulkServiceUpload'
 import { AIDraftRefinementPanel } from '@/components/services/AIDraftRefinementPanel'
+import { PricingComposer } from '@/components/services/PricingComposer'
 import type {
   Service,
   DocumentType,
@@ -339,6 +340,19 @@ export default function ServicesPage() {
   const [aiDraft, setAiDraft] = useState<ServiceDraftConfig | null>(null)
   const [generatingDraft, setGeneratingDraft] = useState(false)
   const [draftError, setDraftError] = useState<string | null>(null)
+
+  // Tenant currency for the pricing composer (verification finding: £ tenants saw $)
+  const [currencySymbol, setCurrencySymbol] = useState('$')
+  useEffect(() => {
+    fetch('/api/tenant')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const symbols: Record<string, string> = { GBP: '£', EUR: '€', USD: '$', CAD: '$', AUD: '$', NZD: '$' }
+        const currency = data?.tenant?.currency
+        if (currency && symbols[currency]) setCurrencySymbol(symbols[currency])
+      })
+      .catch(() => {})
+  }, [])
 
   // Bulk upload state
   const [showBulkUpload, setShowBulkUpload] = useState(false)
@@ -1053,13 +1067,16 @@ export default function ServicesPage() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-background shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 backdrop-blur-[3px] p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-warm-2xl bg-background shadow-document">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-border px-6 py-5">
-              <h2 className="font-display text-xl font-bold text-text-primary">
-                {editingService ? 'Edit Service' : 'Add Service'}
-              </h2>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-tertiary mb-0.5">Service setup</p>
+                <h2 className="font-display text-xl font-bold text-text-primary">
+                  {editingService ? 'Edit service' : 'New service'}
+                </h2>
+              </div>
               <button
                 onClick={closeModal}
                 className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-surface hover:text-text-primary"
@@ -1074,50 +1091,50 @@ export default function ServicesPage() {
               </button>
             </div>
 
-            {/* Step Indicators */}
-            <div className="border-b border-border bg-surface/50 px-6 py-4">
-              <nav className="flex items-center justify-between">
-                {steps.map((step, index) => (
-                  <div key={step.id} className="flex items-center">
-                    <div className="flex items-center">
-                      <span
-                        className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
-                          activeStep === step.id
-                            ? 'bg-primary text-white'
-                            : WIZARD_STEPS.indexOf(activeStep) > index
-                            ? 'bg-secondary text-white'
-                            : 'border-2 border-border bg-background text-text-muted'
-                        }`}
-                      >
-                        {WIZARD_STEPS.indexOf(activeStep) > index ? (
-                          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path
-                              fillRule="evenodd"
-                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        ) : (
-                          step.number
-                        )}
-                      </span>
-                      <span
-                        className={`ml-2.5 text-sm font-semibold ${
-                          activeStep === step.id ? 'text-text-primary' : 'text-text-muted'
-                        }`}
-                      >
-                        {step.label}
-                      </span>
+            {/* Step Indicators — one quiet line: numbers always, label only where it matters */}
+            <div className="border-b border-border px-6 pt-4 pb-3">
+              <nav className="flex items-center gap-2.5" aria-label="Setup steps">
+                {steps.map((step, index) => {
+                  const isActive = activeStep === step.id
+                  const isDone = WIZARD_STEPS.indexOf(activeStep) > index
+                  return (
+                    <div key={step.id} className={`flex items-center gap-2.5 ${index < steps.length - 1 ? 'flex-1' : ''}`}>
+                      <div className="flex items-center gap-2 shrink-0" title={step.label}>
+                        <span
+                          className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-all ${
+                            isActive
+                              ? 'bg-primary text-white ring-2 ring-tape/50 ring-offset-1'
+                              : isDone
+                                ? 'bg-primary text-white'
+                                : 'border border-border bg-surface text-text-muted'
+                          }`}
+                        >
+                          {isDone ? (
+                            <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
+                              <path
+                                fillRule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          ) : (
+                            step.number
+                          )}
+                        </span>
+                        <span
+                          className={`whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.08em] ${
+                            isActive ? 'text-primary' : 'hidden'
+                          }`}
+                        >
+                          {step.label}
+                        </span>
+                      </div>
+                      {index < steps.length - 1 && (
+                        <div className={isDone ? 'flex-1 h-[3px] rounded-full bg-primary/60' : 'flex-1 tape-rule opacity-50'} />
+                      )}
                     </div>
-                    {index < steps.length - 1 && (
-                      <div
-                        className={`mx-4 h-0.5 w-8 rounded-full transition-colors ${
-                          WIZARD_STEPS.indexOf(activeStep) > index ? 'bg-secondary' : 'bg-border'
-                        }`}
-                      />
-                    )}
-                  </div>
-                ))}
+                  )
+                })}
               </nav>
             </div>
 
@@ -1374,6 +1391,48 @@ export default function ServicesPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* Plain-language pricing composer (T-104) — the default way to set pricing */}
+                    <PricingComposer
+                      serviceName={formData.name}
+                      serviceDescription={formData.description}
+                      currencySymbol={currencySymbol}
+                      current={{
+                        baseFee: formData.baseFee,
+                        minimumCharge: formData.minimumCharge,
+                        workSteps: formData.workSteps,
+                        addons: formData.addons,
+                        multipliers: formData.multipliers,
+                        suggestedFields: formData.suggestedFields,
+                        expectedSignals: formData.expectedSignals,
+                        currentConfig: aiDraft
+                          ? {
+                              ...aiDraft,
+                              pricing: {
+                                ...aiDraft.pricing,
+                                baseFee: formData.baseFee,
+                                minimumCharge: formData.minimumCharge,
+                                workSteps: formData.workSteps,
+                              },
+                              expectedSignals: formData.expectedSignals,
+                              suggestedFields: formData.suggestedFields,
+                            }
+                          : undefined,
+                      }}
+                      onApply={(result) => {
+                        applyDraftToForm(result.updatedConfig)
+                        setFormData((prev) => ({
+                          ...prev,
+                          addons: result.addons.length > 0 ? result.addons : prev.addons,
+                          multipliers:
+                            result.multipliers.length > 0 ? result.multipliers : prev.multipliers,
+                        }))
+                      }}
+                    />
+
+                    <p className="text-center text-xs font-medium uppercase tracking-wide text-text-muted">
+                      Or fine-tune manually
+                    </p>
 
                     {/* Base Pricing */}
                     <div className="rounded-lg border border-border p-4">

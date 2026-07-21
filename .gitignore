@@ -35,6 +35,10 @@ pnpm-debug.log*
 # Test coverage
 coverage/
 
+# Hardcore test assets (personal photos — never commit)
+test-assets/
+scripts/hardcore-test/results/
+
 # Turborepo (if added later)
 .turbo/
 .vercel

@@ -77,8 +77,11 @@ export async function GET(
       )
     }
 
-    // Update viewed_at if not already set
-    if (!quote.viewed_at) {
+    // Update viewed_at if not already set.
+    // Skip when this is a background status poll (T-108) — the widget polls
+    // after submission and must not count as the customer viewing the quote.
+    const isStatusPoll = url.searchParams.get('poll') === '1'
+    if (!quote.viewed_at && !isStatusPoll) {
       await supabase
         .from('quotes')
         .update({
@@ -148,6 +151,25 @@ export async function GET(
       actions.pdfUrl = `${appUrl}/api/public/quotes/${quoteId}/pdf?token=${token}`
     }
 
+    // T-109 range-first: while the quote is provisional (awaiting customer
+    // confirmation or business review), withhold exact pricing and expose an
+    // estimated range instead — the final price may still change.
+    const isProvisional =
+      quote.status === 'awaiting_clarification' || quote.status === 'pending_review'
+    let provisional: QuoteViewResponse['provisional']
+    if (isProvisional && (pricing.total || 0) > 0) {
+      const storedRange = (pricing as { range?: { low?: number; high?: number } }).range
+      const total = pricing.total || 0
+      // Prefer the engine's confidence-based range; fall back to ±12%, rounded to 10s
+      const low = storedRange?.low ?? Math.floor((total * 0.88) / 10) * 10
+      const high = storedRange?.high ?? Math.ceil((total * 1.12) / 10) * 10
+      provisional = {
+        rangeLow: low,
+        rangeHigh: high,
+        reason: quote.status as 'awaiting_clarification' | 'pending_review',
+      }
+    }
+
     const response: QuoteViewResponse = {
       quoteId: quote.id,
       status: quote.status,
@@ -155,20 +177,42 @@ export async function GET(
       version: quote.version ?? 1,
       business,
       customer: customerView,
-      pricing: {
-        currency: pricing.currency || 'GBP',
-        subtotal: pricing.subtotal || 0,
-        taxLabel: pricing.taxLabel,
-        taxRate: pricing.taxRate,
-        taxAmount: pricing.taxAmount || 0,
-        total: pricing.total || 0,
-        breakdown: pricing.breakdown || [],
-        notes: pricing.notes || [],
-        ...(pricing.availableAddons && pricing.availableAddons.length > 0 && {
-          availableAddons: pricing.availableAddons,
+      ...(provisional && { provisional }),
+      // T-108: surface stored questions so the clarify page can render them
+      // (previously never returned — the clarify page could not load questions)
+      ...(quote.status === 'awaiting_clarification' &&
+        quote.clarification_questions_json && {
+          clarificationQuestions: quote.clarification_questions_json,
         }),
-      },
-      breakdown: pricing.breakdown || [],
+      // T-122: takeoff (withheld while provisional — exact amounts) + reference
+      ...(!isProvisional && content.takeoff?.length && { takeoff: content.takeoff }),
+      ...(content.reference && { reference: content.reference }),
+      pricing: isProvisional
+        ? {
+            // Exact figures withheld while provisional — range shown instead
+            currency: pricing.currency || 'GBP',
+            subtotal: 0,
+            taxAmount: 0,
+            total: 0,
+            breakdown: [],
+            notes: pricing.notes || [],
+          }
+        : {
+            currency: pricing.currency || 'GBP',
+            subtotal: pricing.subtotal || 0,
+            taxLabel: pricing.taxLabel,
+            taxRate: pricing.taxRate,
+            taxAmount: pricing.taxAmount || 0,
+            total: pricing.total || 0,
+            breakdown: pricing.breakdown || [],
+            notes: pricing.notes || [],
+            ...(pricing.availableAddons && pricing.availableAddons.length > 0 && {
+              availableAddons: pricing.availableAddons,
+            }),
+            // T-120: declared estimate grade + interval
+            ...(pricing.estimate && { estimate: pricing.estimate }),
+          },
+      breakdown: isProvisional ? [] : pricing.breakdown || [],
       notes: {
         scopeSummary: content.scopeSummary,
         assumptions: content.assumptions,
@@ -187,8 +231,9 @@ export async function GET(
       ...(content.signalRecommendations && content.signalRecommendations.length > 0 && {
         signalRecommendations: content.signalRecommendations,
       }),
-      // Accept quote toggle — defaults to true for backward compatibility
-      acceptQuoteEnabled: tenant.template_json?.acceptQuoteEnabled !== false,
+      // Accept quote toggle — defaults to true for backward compatibility.
+      // Never accept-able while provisional (price isn't final yet).
+      acceptQuoteEnabled: !isProvisional && tenant.template_json?.acceptQuoteEnabled !== false,
     }
 
     return NextResponse.json(response)

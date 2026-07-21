@@ -13,6 +13,8 @@ import type {
   AmendmentSource,
   FeedbackType,
   LearningPattern,
+  ClarificationQuestion,
+  TakeoffEntry,
 } from './database.types'
 
 // ============================================================================
@@ -136,6 +138,22 @@ export interface QuoteViewResponse {
   business: QuoteViewBusiness
   customer: QuoteViewCustomer
   pricing: QuotePricing
+  /**
+   * T-109 range-first: present when the quote is not yet final
+   * (awaiting_clarification / pending_review). Exact pricing is withheld and
+   * the customer sees this estimated range instead.
+   */
+  provisional?: {
+    rangeLow: number
+    rangeHigh: number
+    reason: 'awaiting_clarification' | 'pending_review'
+  }
+  /** Questions to answer when status is awaiting_clarification (T-108) */
+  clarificationQuestions?: ClarificationQuestion[]
+  /** T-122: quantity takeoff with measurement methods */
+  takeoff?: TakeoffEntry[]
+  /** T-122: human-facing estimate reference (EST-2026-XXXXXX) */
+  reference?: string
   breakdown: Array<{
     label: string
     amount: number
@@ -284,6 +302,8 @@ export interface PlanInfo {
   monthlyEstimateLimit: number
   priceCents: number
   currency: string
+  /** T-102: per-quote price beyond the monthly limit (null/absent = hard block) */
+  overagePriceCents?: number | null
   features: {
     pdfGeneration: boolean
     emailNotifications: boolean
@@ -308,6 +328,10 @@ export interface BillingUsage {
   planLimit: number
   periodStart: string
   periodEnd: string
+  /** T-102: quotes beyond the plan limit this period (billed as overage when enabled) */
+  overageUsed?: number
+  /** T-102: per-quote overage price on the current plan (null = overage not available) */
+  overagePriceCents?: number | null
 }
 
 export interface BillingResponse {

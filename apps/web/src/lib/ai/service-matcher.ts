@@ -73,7 +73,12 @@ Respond with ONLY a JSON object in this exact format:
   "reason": "brief explanation"
 }
 
-Be strict: If the description clearly describes a different type of work (e.g., "patio cleaning" when "Kitchen Renovation" is selected), return isMatch: false.`
+Calibration rules (R2-1b):
+- isMatch false is ONLY for a fundamentally DIFFERENT TRADE (e.g. appliance repair requested from an ice sculptor, "patio cleaning" when "Kitchen Renovation" is selected).
+- A rambling, vague, emotional, or badly-written request that is plausibly within the selected service's trade IS a match — customers write messily.
+- A valid request that ALSO asks for extra out-of-scope items IS a match (the extras get handled elsewhere).
+- When genuinely unsure, return isMatch: true with lower confidence — a wrong rejection loses a real customer; a wrong acceptance is caught by later review.
+- Reserve confidence >= 0.8 with isMatch: false for cases where you are certain the core need is a different trade.`
 
   try {
     const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
@@ -82,8 +87,12 @@ Be strict: If the description clearly describes a different type of work (e.g., 
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
-          maxOutputTokens: 500,
+          // R2-1 root cause: 500 tokens with 2.5-flash meant THINKING consumed
+          // the whole budget (MAX_TOKENS mid-JSON), the parse failed, and the
+          // fallback failed open — every mismatch check silently passed.
+          maxOutputTokens: 2048,
           temperature: 0.1, // Low temperature for consistent results
+          responseMimeType: 'application/json',
         },
       }),
     })
@@ -103,6 +112,10 @@ Be strict: If the description clearly describes a different type of work (e.g., 
     }
 
     const data = await response.json()
+    const finishReason = data.candidates?.[0]?.finishReason
+    if (finishReason && finishReason !== 'STOP') {
+      console.warn(`[ServiceMatcher] Non-STOP finish (${finishReason}) — response may be truncated`)
+    }
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
 
     // Parse JSON from response

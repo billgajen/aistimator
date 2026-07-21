@@ -183,3 +183,90 @@ export function generateFeedbackNotificationEmailHtml(data: {
 </html>
   `.trim()
 }
+
+/**
+ * Plan limit reached email — sent to business once per period when their
+ * monthly estimate limit is hit (T-101). New quote requests are blocked
+ * until they upgrade or the period resets.
+ */
+export function generateLimitReachedEmailHtml(data: {
+  businessName: string
+  used: number
+  limit: number
+  billingUrl: string
+  /** T-102: when set, quoting continues as metered overage at this price */
+  overagePriceLabel?: string
+}): string {
+  const consequence = data.overagePriceLabel
+    ? `<strong>Quoting continues uninterrupted</strong> — extra quotes are now billed at
+       <strong>${escapeHtml(data.overagePriceLabel)} each</strong> on your next invoice. Upgrade
+       to a bigger plan if you expect this regularly; it usually works out cheaper.`
+    : `<strong>New quote requests from your website are now paused</strong> — customers will be asked to
+       contact you directly instead. Upgrade your plan to resume instant quoting immediately, or wait
+       until your limit resets at the start of next month.`
+  return generateLimitReachedEmailBody(data, consequence)
+}
+
+function generateLimitReachedEmailBody(
+  data: { businessName: string; used: number; limit: number; billingUrl: string },
+  consequenceHtml: string
+): string {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monthly Quote Limit Reached</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="padding: 40px;">
+              <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: #dc2626;">
+                Monthly quote limit reached
+              </h1>
+              <p style="margin: 0 0 32px; color: #6b7280; font-size: 14px;">
+                ${escapeHtml(data.businessName)}
+              </p>
+
+              <p style="margin: 0 0 16px; color: #374151; font-size: 16px; line-height: 1.5;">
+                You've used <strong>${data.used} of ${data.limit}</strong> quotes on your current plan this month.
+              </p>
+              <p style="margin: 0 0 24px; color: #374151; font-size: 16px; line-height: 1.5;">
+                ${consequenceHtml}
+              </p>
+
+              <table role="presentation" style="width: 100%; margin: 32px 0;">
+                <tr>
+                  <td style="text-align: center;">
+                    <a href="${escapeHtml(data.billingUrl)}" style="display: inline-block; padding: 16px 32px; background-color: #09090b; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
+                      Upgrade Your Plan
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 24px 0 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
+                Every missed instant quote is a lead your competitors can answer first.
+              </p>
+            </td>
+          </tr>
+        </table>
+        <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
+          <tr>
+            <td style="text-align: center; color: #9ca3af; font-size: 12px;">
+              Powered by Estimator
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+}

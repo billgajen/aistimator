@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { getStripeClient, getSubscriptionDetails } from '@/lib/stripe'
+import { DEFAULT_TRIAL_LIMIT } from '@/lib/plan-limits'
 import { NextResponse } from 'next/server'
 import type { BillingResponse, PlanInfo, SubscriptionInfo, BillingUsage } from '@estimator/shared'
 
@@ -138,12 +139,23 @@ export async function GET() {
     const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
+    // T-102: overage details from the current plan (active subscriptions only)
+    const currentPlanOverage =
+      subscription?.status === 'active'
+        ? ((subscription.plans as { overage_price_cents?: number | null } | null)
+            ?.overage_price_cents ?? null)
+        : null
+    const created = usageCounter?.estimates_created || 0
+    const planLimit = subscriptionInfo.plan?.monthlyEstimateLimit || DEFAULT_TRIAL_LIMIT
+
     const usage: BillingUsage = {
-      estimatesCreated: usageCounter?.estimates_created || 0,
+      estimatesCreated: created,
       estimatesSent: usageCounter?.estimates_sent || 0,
-      planLimit: subscriptionInfo.plan?.monthlyEstimateLimit || 50, // Default trial limit
+      planLimit, // Default trial limit
       periodStart: periodStart.toISOString(),
       periodEnd: periodEnd.toISOString(),
+      overageUsed: planLimit > 0 ? Math.max(0, created - planLimit) : 0,
+      overagePriceCents: currentPlanOverage,
     }
 
     // Transform plans to API format
@@ -162,6 +174,7 @@ export async function GET() {
         monthlyEstimateLimit: p.monthly_estimate_limit,
         priceCents: p.price_cents,
         currency: 'usd',
+        overagePriceCents: (p as { overage_price_cents?: number | null }).overage_price_cents ?? null,
         features: {
           pdfGeneration: features?.pdf_generation ?? true,
           emailNotifications: features?.email_notifications ?? true,

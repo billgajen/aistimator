@@ -52,7 +52,10 @@ import { initializeFusionFromStructuredSignals } from './agents/signal-fusion'
 import { evaluateQualityGate } from './agents/quality-gate'
 import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
 import type { QualityGateResult } from '@estimator/shared'
-import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing } from './pricing'
+import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking, extractFormulaIdentifiers } from '@estimator/shared'
+import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor } from './ai/measurement'
+import { buildTakeoff, buildReference } from './takeoff'
+import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing, findLookalikeUnconditionedSteps } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@estimator/shared'
 import { sendQuoteEmails, isEmailConfigured } from './email'
@@ -103,6 +106,11 @@ interface QuoteData {
       email: string
       phone?: string
     }
+    /** Clarification round tracking (T-108) — previously not projected, so the
+     * gate's loop cap and answer merging never saw these fields */
+    clarification_count?: number
+    clarification_questions_json?: Array<{ id: string; targetSignalKey: string }> | null
+    clarification_answers_json?: Array<{ questionId: string; answer: string }> | null
   }
   quoteRequest: {
     id: string
@@ -369,6 +377,34 @@ export async function processQuote(
 
   const { quoteRequest, tenant, service, pricingRules, assets } = quoteData
 
+  // 1.2 Merge clarification answers as customer-provided form answers (T-108).
+  // On reprocess after clarification, each answer maps (via its question's
+  // targetSignalKey) to a synthetic form answer — inheriting the full AD-002
+  // override path: confidence 1.0, form-wins fusion, lowConfidence regeneration.
+  // Previously answers were stored but never read — reprocessing ignored them.
+  const clarQuestions = quoteData.quote.clarification_questions_json || []
+  const clarAnswers = quoteData.quote.clarification_answers_json || []
+  if (clarAnswers.length > 0 && clarQuestions.length > 0) {
+    const questionById = new Map(clarQuestions.map((q) => [q.id, q]))
+    for (const answer of clarAnswers) {
+      const question = questionById.get(answer.questionId)
+      const raw = String(answer.answer ?? '').trim()
+      if (!question?.targetSignalKey || raw === '') continue
+      // Numeric answers become numbers (comma-separator aware — see "1,500" lesson)
+      const numeric = raw.replace(/,(?=\d{3}\b)/g, '')
+      const value: string | number = /^\d+(\.\d+)?$/.test(numeric) ? parseFloat(numeric) : raw
+      quoteRequest.job_answers = quoteRequest.job_answers || []
+      // Clarification is the customer's most recent statement — replace any prior answer for the same key
+      quoteRequest.job_answers = quoteRequest.job_answers.filter(
+        (a) => a.fieldId !== question.targetSignalKey
+      )
+      quoteRequest.job_answers.push({ fieldId: question.targetSignalKey, value })
+      console.log(
+        `[Processor] Clarification answer merged: ${question.targetSignalKey} = ${value}`
+      )
+    }
+  }
+
   // 1.5 Triage: classify request complexity and optimize processing
   const imageAssetCount = assets.filter((a) => a.type === 'image').length
   const triageDescriptionAnswer = quoteRequest.job_answers?.find(
@@ -461,6 +497,156 @@ export async function processQuote(
     const extractionResult = await extractSignalsFromAssets(gemini, imageAssets, signalContext, env)
     signals = extractionResult.signals
     structuredSignals = extractionResult.structuredSignals
+
+    // Measurement Engine M2+M3 (T-117/T-118): for quantities priced from AI
+    // signals, replace the single-shot guess with a reference-anchored
+    // ensemble. Runs BEFORE form merge (customer answers still win, AD-002)
+    // and BEFORE envelopes (implausible medians still get caught).
+    const measurementSteps = (service.work_steps || pricingRules?.workSteps || []).filter(
+      (s) => s.quantitySource?.type === 'ai_signal' && s.quantitySource.signalKey
+    )
+    if (measurementSteps.length > 0 && structuredSignals && extractionResult.images?.length) {
+      const targets = measurementSteps.map((step) => {
+        const es = (service.expected_signals || []).find(
+          (e) => e.signalKey === step.quantitySource!.signalKey
+        )
+        return {
+          signalKey: step.quantitySource!.signalKey!,
+          description: es?.description || `Quantity for "${step.name}"`,
+          unit: step.unitLabel || 'unit',
+        }
+      })
+      // T-123 Measurement memory: load this business's confirmed-job history
+      // for these signals — used as prompt calibration AND a deterministic
+      // correction factor applied by code (AD-024).
+      const calibrationBySignal = new Map<string, { factor: number; sample: number }>()
+      const calibrationHints: string[] = []
+      try {
+        const { data: exampleRows } = await supabase
+          .from('measurement_examples')
+          .select('signal_key, measured_value, confirmed_value')
+          .eq('tenant_id', tenant.id)
+          .eq('service_id', service.id)
+          .in('signal_key', targets.map((t) => t.signalKey))
+          .order('created_at', { ascending: false })
+          .limit(30)
+
+        for (const target of targets) {
+          const examples = (exampleRows || [])
+            .filter((r) => r.signal_key === target.signalKey)
+            .map((r) => ({ measured: Number(r.measured_value), confirmed: Number(r.confirmed_value) }))
+          if (examples.length === 0) continue
+          for (const ex of examples.slice(0, 5)) {
+            calibrationHints.push(
+              `- ${target.signalKey}: AI measured ${ex.measured}, confirmed true value was ${ex.confirmed}`
+            )
+          }
+          const calibration = computeCalibrationFactor(examples)
+          if (calibration) {
+            calibrationBySignal.set(target.signalKey, calibration)
+            console.log(
+              `[Processor] Calibration for ${target.signalKey}: ×${calibration.factor} from ${calibration.sample} confirmed jobs`
+            )
+          }
+        }
+      } catch (memoryError) {
+        console.error('[Processor] Measurement memory lookup failed:', memoryError)
+      }
+
+      try {
+        const measured = await measureQuantities({
+          gemini,
+          images: extractionResult.images,
+          targets,
+          passes: Number(env.MEASUREMENT_PASSES || 3),
+          calibrationHints,
+        })
+        for (let m of measured) {
+          console.log(
+            `[Processor] Measured ${m.signalKey} = ${m.value} (cov ${m.cov}, confidence ${m.confidence}, ${m.passesUsed} passes)`
+          )
+
+          // T-119 M4: stakes-based adjudication. Escalate to the senior model
+          // when the ensemble disagrees, evidence is thin, or the number is
+          // worth real money (provisional step value ≥ threshold).
+          const step = measurementSteps.find(
+            (s) => s.quantitySource?.signalKey === m.signalKey
+          )
+          const provisionalValue = m.value * (step?.defaultCost ?? 0)
+          const decision = decideAdjudication({
+            cov: m.cov,
+            passesUsed: m.passesUsed,
+            provisionalValue,
+            covThreshold: Number(env.MEASUREMENT_COV_THRESHOLD || 0.15),
+            valueThreshold: Number(env.ADJUDICATION_VALUE_THRESHOLD || 1000),
+          })
+          if (decision.shouldAdjudicate) {
+            console.log(
+              `[Processor] Adjudicating ${m.signalKey} (${decision.reason}, provisional ${provisionalValue.toFixed(0)})`
+            )
+            const adjudicator = createGeminiClient(env.GEMINI_API_KEY, {
+              // gemini-pro-latest: 2.5-pro is closed to newer API keys (found live)
+              model: env.ADJUDICATION_MODEL || 'gemini-pro-latest',
+            })
+            const target = targets.find((t) => t.signalKey === m.signalKey)!
+            const adjudicated = await adjudicateMeasurement({
+              adjudicator,
+              images: extractionResult.images,
+              target,
+              measured: m,
+            })
+            if (adjudicated) {
+              console.log(
+                `[Processor] Adjudicated ${m.signalKey}: ${m.value} -> ${adjudicated.value} (${adjudicated.evidence})`
+              )
+              m = adjudicated
+            }
+          }
+
+          // T-123: apply the learned calibration factor deterministically
+          const calibration = calibrationBySignal.get(m.signalKey)
+          if (calibration) {
+            const corrected = Math.round(m.value * calibration.factor * 10) / 10
+            console.log(
+              `[Processor] Calibrated ${m.signalKey}: ${m.value} -> ${corrected} (×${calibration.factor})`
+            )
+            m = {
+              ...m,
+              value: corrected,
+              band: {
+                low: Math.round(m.band.low * calibration.factor * 10) / 10,
+                high: Math.round(m.band.high * calibration.factor * 10) / 10,
+              },
+              evidence: `${m.evidence}; calibrated ×${calibration.factor} from ${calibration.sample} confirmed jobs`,
+            }
+          }
+
+          const existing = structuredSignals.signals.find((s) => s.key === m.signalKey)
+          if (existing) {
+            existing.value = m.value
+            existing.confidence = m.confidence
+            existing.evidence = m.evidence
+            existing.source = 'vision'
+            existing.quantityBand = m.band
+            existing.basis = m.basis
+          } else {
+            structuredSignals.signals.push({
+              key: m.signalKey,
+              value: m.value,
+              confidence: m.confidence,
+              source: 'vision',
+              evidence: m.evidence,
+              quantityBand: m.band,
+              basis: m.basis,
+            })
+          }
+        }
+      } catch (measureError) {
+        // Measurement is an accuracy upgrade, never a blocker — the envelope
+        // and clarification guards still protect the quote downstream
+        console.error('[Processor] Measurement ensemble failed:', measureError)
+      }
+    }
   } else if (imageAssets.length > 0 && !gemini) {
     console.warn('[Processor] Gemini not configured, skipping signal extraction')
     signals = getSignalsWithoutImages()
@@ -735,6 +921,7 @@ export async function processQuote(
 
   // Track AI-detected addon IDs so we can mark them as autoRecommended in pricing
   const aiDetectedAddonIds = new Set<string>()
+  let aiAddonDetectionRan = false
 
   // 3.5 AI-powered addon detection from customer description
   if (gemini && projectDescription && rules.addons && rules.addons.length > 0) {
@@ -752,6 +939,9 @@ export async function processQuote(
         projectDescription,
         availableAddons
       )
+      // R2-6: AI detection completed — it is now the authority on which
+      // addons the description implies; bare keyword matches must not charge
+      aiAddonDetectionRan = true
 
       // Add detected addons as form answers so they get applied by pricing engine
       for (const detected of detectedAddons) {
@@ -862,40 +1052,250 @@ export async function processQuote(
     workSteps: service.work_steps || rules.workSteps,
   }
 
-  // Calculate pricing with full trace for transparency
-  const { result: pricing, trace: pricingTrace } = calculatePricingWithTrace(
-    rulesWithWorkSteps,
-    signals,
-    structuredSignals,
-    formAnswers,
-    {
-      enabled: tenant.tax_enabled,
-      label: tenant.tax_label,
-      // DB stores rate as decimal (0.20 = 20%), pricing engine expects whole number (20 = 20%)
-      rate: (tenant.tax_rate || 0) * 100,
-    },
-    tenant.currency,
-    // Pass job data with quantity and/or matched items
-    Object.keys(jobData).length > 0 ? jobData : undefined,
-    // Pass addon detection context
-    {
-      projectDescription,
-      formAnswers,
-    },
-    // Pass AI-detected addon IDs so they get marked as autoRecommended
-    aiDetectedAddonIds.size > 0 ? aiDetectedAddonIds : undefined,
-    // Pass service context for addon filtering
-    {
-      name: service.name,
-      scopeIncludes: service.scope_includes,
-    },
-    // Config version for trace
-    'v1'
+  // Bug #10 guard: work steps that price per-unit from an AI signal the AI
+  // could NOT extract fall back to quantity 1 — structurally wrong pricing.
+  // A MISSING signal is never in lowConfidenceSignals, so these previously
+  // bypassed every guard (found live: 3-storey exterior priced as "1 sqm × £18").
+  // Collected here (pre-pricing) and routed to customer clarification at the gate.
+  const aiQuantitySteps = (rulesWithWorkSteps.workSteps || []).filter(
+    (step) => step.quantitySource?.type === 'ai_signal' && step.quantitySource.signalKey
   )
+  const missingQuantitySignals = aiQuantitySteps
+    .filter((step) => {
+      const signal = structuredSignals?.signals.find(
+        (s) => s.key === step.quantitySource!.signalKey
+      )
+      if (!signal) return true
+      const numeric = Number(String(signal.value).replace(/,/g, ''))
+      return !Number.isFinite(numeric) || numeric <= 0
+    })
+    .map((step) => ({ signalKey: step.quantitySource!.signalKey!, stepName: step.name }))
+
+  // T-116 Measurement Engine M5: enforce plausibility envelopes on AI-measured
+  // quantities BEFORE pricing. Implausible measurements are clamped; missing
+  // ones get the envelope midpoint injected (Grade-C fallback) so pricing
+  // produces a sane provisional figure instead of quantity-1 — but both cases
+  // still go to clarification: the envelope makes the quote sane, the customer
+  // makes it exact.
+  if (structuredSignals) {
+    const quantityKeys = new Set(aiQuantitySteps.map((s) => s.quantitySource!.signalKey!))
+    const getKnown = (key: string) =>
+      structuredSignals.signals.find((s) => s.key === key)?.value
+
+    for (const es of service.expected_signals || []) {
+      if (!es.envelope || !quantityKeys.has(es.signalKey)) continue
+      const envelope = computeEnvelope(es.envelope, getKnown)
+      const existing = structuredSignals.signals.find((s) => s.key === es.signalKey)
+      const finding = enforceEnvelope(es.signalKey, existing?.value, envelope)
+
+      if (finding.action === 'accepted') continue
+
+      const stepName =
+        aiQuantitySteps.find((s) => s.quantitySource?.signalKey === es.signalKey)?.name ||
+        es.signalKey
+      console.log(
+        `[Processor] Envelope ${finding.action} for ${es.signalKey}: ` +
+          `${finding.originalValue ?? 'missing'} -> ${finding.effectiveValue} ` +
+          `(plausible ${envelope.min}-${envelope.max})`
+      )
+
+      if (existing) {
+        existing.value = finding.effectiveValue
+        existing.confidence = Math.min(existing.confidence, 0.4)
+        existing.evidence = `${finding.action === 'clamped' ? 'Adjusted to' : 'Estimated from'} typical range ${envelope.min}-${envelope.max} for this property`
+        existing.quantityBand = { low: envelope.min, high: envelope.max }
+        existing.basis = 'envelope'
+      } else {
+        structuredSignals.signals.push({
+          key: es.signalKey,
+          value: finding.effectiveValue,
+          confidence: 0.4,
+          source: 'inferred',
+          evidence: `Estimated from typical range ${envelope.min}-${envelope.max} for this property`,
+          quantityBand: { low: envelope.min, high: envelope.max },
+          basis: 'envelope',
+        })
+      }
+
+      // Both clamped and fallback quantities still need the customer's number
+      if (!missingQuantitySignals.some((m) => m.signalKey === es.signalKey)) {
+        missingQuantitySignals.push({ signalKey: es.signalKey, stepName })
+      }
+    }
+  }
+
+  // Calculate pricing with full trace for transparency. Wrapped in a closure so
+  // T-120 interval pricing can re-run deterministically with band values.
+  const priceWithSignals = (ss: ExtractedSignalsV2 | null) =>
+    calculatePricingWithTrace(
+      rulesWithWorkSteps,
+      signals,
+      ss,
+      formAnswers,
+      {
+        enabled: tenant.tax_enabled,
+        label: tenant.tax_label,
+        // DB stores rate as decimal (0.20 = 20%), pricing engine expects whole number (20 = 20%)
+        rate: (tenant.tax_rate || 0) * 100,
+      },
+      tenant.currency,
+      // Pass job data with quantity and/or matched items
+      Object.keys(jobData).length > 0 ? jobData : undefined,
+      // Pass addon detection context
+      {
+        projectDescription,
+        formAnswers,
+      },
+      // Pass AI-detected addon IDs so they get marked as autoRecommended
+      aiDetectedAddonIds.size > 0 ? aiDetectedAddonIds : undefined,
+      // Pass service context for addon filtering
+      {
+        name: service.name,
+        scopeIncludes: service.scope_includes,
+      },
+      // Config version for trace
+      'v1',
+      // R2-6: whether AI addon detection ran (keyword auto-apply defers to it)
+      aiAddonDetectionRan
+    )
+  const { result: pricing, trace: pricingTrace } = priceWithSignals(structuredSignals)
 
   console.log(`[Processor] Pricing calculated: ${pricing.currency} ${pricing.total}`)
   if (pricingTrace.trace.length > 0) {
     console.log(`[Processor] Pricing trace has ${pricingTrace.trace.length} steps`)
+  }
+
+  // T-120 (M6): interval pricing + declared estimate grade.
+  // T-121 (M7): value-of-information — ask about a quantity only when its
+  // uncertainty moves real money, not when an abstract threshold trips.
+  if (structuredSignals) {
+    const provenance = aiQuantitySteps
+      .map((step) => {
+        const s = structuredSignals.signals.find(
+          (x) => x.key === step.quantitySource!.signalKey
+        )
+        if (!s) return null
+        const confirmed = s.source === 'form' || s.confidence >= 1
+        return {
+          signalKey: s.key,
+          basis: (confirmed ? 'confirmed' : (s.basis ?? 'measured')) as
+            | 'confirmed'
+            | 'measured'
+            | 'adjudicated'
+            | 'envelope'
+            | 'defaulted',
+          confidence: s.confidence,
+          band: confirmed ? undefined : s.quantityBand,
+          stepName: step.name,
+        }
+      })
+      .filter((p): p is NonNullable<typeof p> => p !== null)
+
+    // T-128 (hardcore F6): the trace knows about quantity trust the signal
+    // provenance can't see — placeholder ×1 fallbacks cap the grade at C
+    // ('defaulted'), and AI-operand derived quantities cap at B. Without this,
+    // form/derived/legacy steps were invisible to grading and every such
+    // quote claimed Grade A "this price is exact".
+    const seenKeys = new Set(provenance.map((p) => p.signalKey))
+    for (const t of pricingTrace.trace) {
+      if (t.type !== 'work_step' || t.quantityTrusted !== false) continue
+      const key = t.id || 'work_step'
+      if (seenKeys.has(key)) continue
+      seenKeys.add(key)
+      const isDefaulted = t.quantitySource === 'legacy_fallback' || t.quantitySource === 'derived_unresolved'
+      provenance.push({
+        signalKey: key,
+        basis: isDefaulted ? 'defaulted' : 'measured',
+        confidence: isDefaulted ? 0.2 : 0.7,
+        band: undefined,
+        stepName: key,
+      })
+    }
+
+    // T-131 (F2b): steps priced on a from-price with a stated cost band carry
+    // RATE uncertainty — widen the customer-facing interval and cap the grade
+    // at B (the anchor is stated, the final figure is not confirmed).
+    const costBandSpread = { low: 0, high: 0 }
+    for (const t of pricingTrace.trace) {
+      if (t.type !== 'work_step') continue
+      const bandStep = rulesWithWorkSteps.workSteps?.find((ws) => ws.id === t.id)
+      const band = bandStep?.costBand
+      if (!band || !(band.high > band.low) || bandStep.defaultCost <= 0) continue
+      const qty = Math.abs(t.amount) / bandStep.defaultCost
+      costBandSpread.low += Math.max(0, (bandStep.defaultCost - band.low) * qty)
+      costBandSpread.high += Math.max(0, (band.high - bandStep.defaultCost) * qty)
+      const rateKey = `${t.id}_rate`
+      if (!seenKeys.has(rateKey)) {
+        seenKeys.add(rateKey)
+        provenance.push({ signalKey: rateKey, basis: 'measured', confidence: 0.7, band: undefined, stepName: bandStep.name })
+      }
+    }
+
+    const gradeResult = computeEstimateGrade(provenance)
+    const banded = provenance.filter((p) => p.band && p.basis !== 'confirmed')
+
+    let rangeLow: number | undefined
+    let rangeHigh: number | undefined
+    if (banded.length > 0) {
+      const withValues = (overrides: Record<string, number>): ExtractedSignalsV2 => ({
+        ...structuredSignals,
+        signals: structuredSignals.signals.map((s) =>
+          overrides[s.key] !== undefined ? { ...s, value: overrides[s.key]! } : s
+        ),
+      })
+      const lowOverrides: Record<string, number> = {}
+      const highOverrides: Record<string, number> = {}
+      for (const b of banded) {
+        lowOverrides[b.signalKey] = b.band!.low
+        highOverrides[b.signalKey] = b.band!.high
+      }
+      rangeLow = priceWithSignals(withValues(lowOverrides)).result.total
+      rangeHigh = priceWithSignals(withValues(highOverrides)).result.total
+
+      for (const b of banded) {
+        if (missingQuantitySignals.some((m) => m.signalKey === b.signalKey)) continue
+        const lowTotal = priceWithSignals(withValues({ [b.signalKey]: b.band!.low })).result.total
+        const highTotal = priceWithSignals(withValues({ [b.signalKey]: b.band!.high })).result
+          .total
+        const voi = isQuestionWorthAsking({
+          priceAtLow: lowTotal,
+          priceAtHigh: highTotal,
+          bestTotal: pricing.total,
+        })
+        if (voi.ask) {
+          console.log(
+            `[Processor] VOI: asking about ${b.signalKey} — price spread ${voi.spread} clears the bar`
+          )
+          missingQuantitySignals.push({ signalKey: b.signalKey, stepName: b.stepName })
+        } else {
+          console.log(
+            `[Processor] VOI: not asking about ${b.signalKey} — spread ${voi.spread} below bar`
+          )
+        }
+      }
+    }
+
+    // T-131 (F2b): rate bands widen whatever interval quantity bands produced
+    if (costBandSpread.low > 0 || costBandSpread.high > 0) {
+      rangeLow = Math.max(0, Math.round(((rangeLow ?? pricing.total) - costBandSpread.low) * 100) / 100)
+      rangeHigh = Math.round(((rangeHigh ?? pricing.total) + costBandSpread.high) * 100) / 100
+    }
+
+    pricing.estimate = {
+      grade: gradeResult.grade,
+      label: gradeResult.label,
+      description: gradeResult.description,
+      ...(rangeLow !== undefined &&
+        rangeHigh !== undefined &&
+        rangeLow !== rangeHigh && {
+          rangeLow: Math.round(rangeLow * 100) / 100,
+          rangeHigh: Math.round(rangeHigh * 100) / 100,
+        }),
+    }
+    console.log(
+      `[Processor] Estimate grade: ${gradeResult.grade} (${gradeResult.label})` +
+        (rangeLow !== undefined ? ` range ${rangeLow}-${rangeHigh}` : '')
+    )
   }
 
   // 3.5 Check for image vs form condition discrepancy
@@ -1032,6 +1432,15 @@ export async function processQuote(
     console.log('[Processor] Generating wording without AI')
     content = generateWordingFallback(wordingContext)
   }
+
+  // T-122: attach the quantity takeoff (measurement audit trail, customer-facing)
+  // and the human-facing estimate reference to the document content
+  content.takeoff = buildTakeoff({
+    trace: pricingTrace,
+    structuredSignals,
+    workSteps: rulesWithWorkSteps.workSteps || [],
+  })
+  content.reference = buildReference(quoteId, new Date().getFullYear())
 
   // 4.5 Detect cross-service mentions and calculate pricing (with AI + keyword fallback)
   // Skip if triage says no cross-service check needed
@@ -1271,6 +1680,71 @@ export async function processQuote(
   let qualityGateResult: QualityGateResult | undefined
   const clarificationCount = (quoteData.quote as unknown as { clarification_count?: number }).clarification_count ?? 0
 
+  // R3-1: the wording layer flagged that photos/description contradict a
+  // customer-stated price driver (e.g. 2 hours booked, photos show a 4-hour
+  // job). A stated-but-doubted quantity must never carry Grade A "exact".
+  const quantityConcern = (content.quantityConcern || '').trim() || undefined
+  const quantityConcernFieldId = (content.quantityConcernFieldId || '').trim() || undefined
+  if (quantityConcern && pricing.estimate && pricing.estimate.grade === 'A') {
+    const capped = computeEstimateGrade([
+      { signalKey: 'stated_quantity_concern', basis: 'measured', confidence: 0.7 },
+    ])
+    pricing.estimate = {
+      ...pricing.estimate,
+      grade: capped.grade,
+      label: capped.label,
+      description: capped.description,
+    }
+    console.log(`[Processor] R3-1: grade capped to ${capped.grade} — ${quantityConcern}`)
+  }
+
+  if (missingQuantitySignals.length > 0) {
+    console.log(
+      `[Processor] Unpriceable quantity signals (missing/unusable): ${missingQuantitySignals
+        .map((m) => `${m.signalKey} (for "${m.stepName}")`)
+        .join(', ')}`
+    )
+  }
+
+  // T-127 (hardcore F3): work-step lines whose quantity DEFAULTED to 1 —
+  // unanswered form field, unresolvable derived formula, or legacy fallback.
+  // These prices are placeholders (the £85 "fence" that should be £1,700), so
+  // they feed the clarification gate like missing AI-signal quantities do.
+  // VOI bar: worth asking if a plausible quantity (up to ~10 units) would move
+  // the total past max(£75, 10%).
+  const defaultedQuantitySteps: Array<{ askKey: string; stepName: string }> = []
+  for (const traceStep of pricingTrace.trace) {
+    if (traceStep.type !== 'work_step') continue
+    if (traceStep.quantitySource !== 'legacy_fallback' && traceStep.quantitySource !== 'derived_unresolved') continue
+    const step = rulesWithWorkSteps.workSteps?.find((ws) => ws.id === traceStep.id)
+    if (!step) continue
+    let askKey: string | undefined
+    if (step.quantitySource?.type === 'form_field' && step.quantitySource.fieldId) {
+      askKey = step.quantitySource.fieldId
+    } else if (step.quantitySource?.type === 'derived' && step.quantitySource.formula) {
+      const idents = extractFormulaIdentifiers(step.quantitySource.formula) || []
+      askKey = idents.find((id) => !formAnswers.some((a) => a.fieldId === id)) ?? idents[0]
+    } else {
+      // Legacy step (no quantitySource): the engine honours a direct form
+      // answer keyed by the step id, so the clarify round can close the loop
+      askKey = step.id
+    }
+    if (!askKey) continue
+    const { ask } = isQuestionWorthAsking({
+      priceAtLow: pricing.total,
+      priceAtHigh: pricing.total + step.defaultCost * 9,
+      bestTotal: pricing.total,
+    })
+    if (ask) defaultedQuantitySteps.push({ askKey, stepName: step.name })
+  }
+  if (defaultedQuantitySteps.length > 0) {
+    console.log(
+      `[Processor] Defaulted-quantity steps (priced at placeholder ×1): ${defaultedQuantitySteps
+        .map((d) => `${d.stepName} (ask: ${d.askKey})`)
+        .join(', ')}`
+    )
+  }
+
   if (structuredSignals && gemini) {
     try {
       qualityGateResult = await evaluateQualityGate(
@@ -1281,6 +1755,20 @@ export async function processQuote(
           clarificationCount,
           serviceName: service.name,
           hasPhotos: allImageAssets.length > 0,
+          missingQuantitySignals,
+          // T-127: placeholder ×1 quantities that must be clarified in-flow
+          defaultedQuantitySteps,
+          // R3-1: stated-quantity doubt from the wording layer
+          quantityConcern: quantityConcern
+            ? { reason: quantityConcern, fieldId: quantityConcernFieldId }
+            : undefined,
+          // T-126 send-guard inputs
+          workStepsConfigured: rulesWithWorkSteps.workSteps?.length ?? 0,
+          workStepLinesPriced: pricingTrace.trace.filter((t) => t.type === 'work_step').length,
+          // R2-3: mandatory steps the compiler priced at £0 (inexpressible)
+          zeroCostSteps: (rulesWithWorkSteps.workSteps || [])
+            .filter((ws) => !ws.optional && ws.costType !== 'percent' && (ws.defaultCost ?? 0) <= 0)
+            .map((ws) => ws.name),
         },
         gemini
       )
@@ -1299,6 +1787,10 @@ export async function processQuote(
             signals_json: structuredSignals,
             pricing_trace_json: pricingTrace,
             triage_json: triageDecision,
+            // T-109 range-first: store provisional pricing + content so the
+            // customer sees an estimated range immediately instead of nothing
+            pricing_json: pricing,
+            content_json: content,
           })
           .eq('id', quoteId)
 
@@ -1316,6 +1808,57 @@ export async function processQuote(
     } catch (error) {
       console.error('[Processor] Quality gate evaluation failed:', error)
       // Continue without quality gate — don't block the quote
+    }
+  }
+
+  // 4.76 T-126 structural send-guard — runs even when the AI quality gate
+  // didn't (no gemini / no structured signals / gate error). A £0 quote, or a
+  // quote where every configured work step failed to bind, must never
+  // auto-send (hardcore F7: a £0 piano-move quote reached the customer).
+  if (finalStatus === 'sent' && qualityGateResult?.action !== 'ask_clarification') {
+    const stepsConfigured = rulesWithWorkSteps.workSteps?.length ?? 0
+    const stepLinesPriced = pricingTrace.trace.filter((t) => t.type === 'work_step').length
+    let guardReason: string | null = null
+    if (content.serviceMismatch) {
+      // R2-1: the wording layer detected the request is for a different trade
+      // entirely — never send a priced quote with an apology attached
+      guardReason = `Request appears to be for a service this business does not offer${content.mismatchReason ? ` — ${content.mismatchReason}` : ''}`
+    } else if (pricing.total <= 0) {
+      guardReason = 'Pricing calculated to £0 or below — nothing could be priced from the configuration'
+    } else if (stepsConfigured > 0 && stepLinesPriced === 0) {
+      guardReason = `None of the ${stepsConfigured} configured work steps applied — conditional charges may have failed to bind`
+    } else {
+      // R2-3: a mandatory £0-cost step = the compiler could not establish the
+      // primary price (block packages, from-prices) — surcharges must not
+      // ship without the service itself (the £16 personal-training quote)
+      const zeroCost = (rulesWithWorkSteps.workSteps || [])
+        .filter((ws) => !ws.optional && ws.costType !== 'percent' && (ws.defaultCost ?? 0) <= 0)
+        .map((ws) => ws.name)
+      if (zeroCost.length > 0) {
+        guardReason = `The price for ${zeroCost.map((n) => `"${n}"`).join(', ')} could not be established from the pricing configuration`
+      } else {
+        // R2-7: package alternatives both priced (compile emitted them
+        // without when-binding to the choice field) — £873 for online AND
+        // in-home tutoring for one student
+        const pricedIds = new Set(
+          pricingTrace.trace.filter((t) => t.type === 'work_step' && t.id).map((t) => t.id as string)
+        )
+        const lookalikes = findLookalikeUnconditionedSteps(rulesWithWorkSteps.workSteps || [], pricedIds)
+        if (lookalikes.length > 0) {
+          guardReason = `Steps that look like mutually-exclusive options were ALL priced (${lookalikes
+            .map(([a, b]) => `"${a}" + "${b}"`)
+            .join('; ')}) — the customer may be charged for alternatives`
+        }
+      }
+    }
+    if (guardReason) {
+      finalStatus = 'pending_review'
+      console.log(`[Processor] Structural send-guard: ${guardReason}`)
+      qualityGateResult = {
+        action: 'require_review',
+        reason: guardReason,
+        evaluatedAt: new Date().toISOString(),
+      }
     }
   }
 
@@ -1350,6 +1893,9 @@ export async function processQuote(
         taxAmount: pricing.taxAmount,
         total: pricing.total,
         breakdown: pricing.breakdown,
+        // T-120: estimate grade + interval (AD-016: enumerated store — new
+        // pricing fields MUST be added here or they silently vanish)
+        ...(pricing.estimate && { estimate: pricing.estimate }),
         // Include pricing notes (warnings, site visit recommendations) — deduplicated
         ...(pricing.notes && pricing.notes.length > 0 && {
           notes: deduplicateNotes(pricing.notes),
@@ -1377,6 +1923,10 @@ export async function processQuote(
         exclusions: content.exclusions,
         notes: content.notes,
         validityDays: content.validityDays,
+        // T-122: takeoff + reference (AD-016: this store enumerates fields —
+        // new content fields MUST be added here or they silently vanish)
+        takeoff: content.takeoff,
+        reference: content.reference,
         // Store signals for reference (not displayed to customer)
         _signals: {
           confidence: signals.confidence,
@@ -1658,6 +2208,11 @@ async function loadQuoteData(
       service_id: quote.service_id,
       document_type: quote.document_type,
       customer_json: quote.customer_json as QuoteData['quote']['customer_json'],
+      clarification_count: quote.clarification_count ?? 0,
+      clarification_questions_json:
+        quote.clarification_questions_json as QuoteData['quote']['clarification_questions_json'],
+      clarification_answers_json:
+        quote.clarification_answers_json as QuoteData['quote']['clarification_answers_json'],
     },
     quoteRequest: quote.quote_requests as unknown as QuoteData['quoteRequest'],
     tenant: quote.tenants as unknown as QuoteData['tenant'],
@@ -1676,6 +2231,8 @@ async function loadQuoteData(
 interface SignalExtractionResult {
   signals: ExtractedSignals
   structuredSignals: ExtractedSignalsV2 | null
+  /** Fetched images, returned so the measurement ensemble can reuse them (T-117) */
+  images?: Array<{ mimeType: string; base64: string }>
 }
 
 /**
@@ -1726,7 +2283,7 @@ async function extractSignalsFromAssets(
       console.log(`[Processor] Using structured signal extraction with ${signalContext.expectedSignals.length} expected signals`)
       const result = await extractStructuredSignals(gemini, images, signalContext)
 
-      return { signals: result.legacy, structuredSignals: result.structured }
+      return { signals: result.legacy, structuredSignals: result.structured, images }
     }
 
     // Default: extract legacy signals and convert to structured format
@@ -1745,7 +2302,7 @@ async function extractSignalsFromAssets(
       lowConfidenceSignals: [],
     }
 
-    return { signals, structuredSignals }
+    return { signals, structuredSignals, images }
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error'
     console.error(`[Processor] Signal extraction failed: ${errorMsg}`)

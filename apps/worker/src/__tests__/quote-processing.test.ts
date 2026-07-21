@@ -1133,3 +1133,70 @@ describe('resolveSignalType', () => {
     })
   })
 })
+
+// ---------------------------------------------------------------------------
+// Bug #10 (found live): string-typed AI signal quantities must be coerced.
+// Gemini returned wall_area_sqm as "50" (string); the strict number check
+// rejected it and a 3-storey exterior priced as 1 sqm.
+// ---------------------------------------------------------------------------
+describe('Bug #10: ai_signal quantity coercion', () => {
+  const wallRules: PricingRules = {
+    baseFee: 100,
+    minimumCharge: 400,
+    addons: [],
+    multipliers: [],
+    workSteps: [
+      {
+        id: 'step_walls_sqm',
+        name: 'Exterior walls',
+        description: 'Per sqm',
+        costType: 'per_unit',
+        defaultCost: 18,
+        optional: false,
+        unitLabel: 'sqm',
+        quantitySource: { type: 'ai_signal', signalKey: 'wall_area_sqm' },
+      },
+    ],
+  }
+
+  const signalsWithStringArea: ExtractedSignalsV2 = {
+    extractedAt: new Date().toISOString(),
+    overallConfidence: 0.8,
+    signals: [
+      // deliberately a STRING, as Gemini returns it
+      { key: 'wall_area_sqm', value: '50' as unknown as number, confidence: 0.7, source: 'vision' },
+    ],
+    complexity: { level: 'medium', factors: [] },
+    siteVisitRecommended: false,
+    lowConfidenceSignals: [],
+  }
+
+  it('uses a string-typed AI signal value as the quantity', () => {
+    const result = calculatePricingWithTrace(
+      wallRules,
+      { confidence: 0.8, warnings: [] } as unknown as ExtractedSignals,
+      signalsWithStringArea,
+      [],
+      ukVatConfig,
+      'GBP'
+    )
+    const wallsLine = result.result.breakdown.find((b) => b.label.includes('Exterior walls'))
+    expect(wallsLine?.amount).toBe(900) // 50 sqm × £18 — not 1 × £18
+    const traceStep = result.trace.trace.find((t) => t.id === 'step_walls_sqm')
+    expect(traceStep?.quantitySource).toBe('ai_signal')
+  })
+
+  it('falls back to quantity 1 when the signal is truly missing', () => {
+    const noSignal: ExtractedSignalsV2 = { ...signalsWithStringArea, signals: [] }
+    const result = calculatePricingWithTrace(
+      wallRules,
+      { confidence: 0.8, warnings: [] } as unknown as ExtractedSignals,
+      noSignal,
+      [],
+      ukVatConfig,
+      'GBP'
+    )
+    const wallsLine = result.result.breakdown.find((b) => b.label.includes('Exterior walls'))
+    expect(wallsLine?.amount).toBe(18) // 1 × £18 — the case the quality gate now catches
+  })
+})

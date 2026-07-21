@@ -4,6 +4,7 @@
  */
 
 import type { ServiceDraftConfig } from '@estimator/shared'
+import { extractFormulaIdentifiers } from '@estimator/shared'
 
 /**
  * Validate and normalize an AI-generated draft config
@@ -38,7 +39,9 @@ export function validateAndNormalizeDraft(
     pricingModel,
     unitType: draft.pricing?.unitType || null,
     baseFee: Math.max(0, draft.pricing?.baseFee || 0),
-    minimumCharge: Math.max(0, draft.pricing?.minimumCharge || 50),
+    // ?? not || — a stated £0 minimum is valid, and an absent one must NOT
+    // invent a price (core rule 1: never invent numbers the owner didn't state)
+    minimumCharge: Math.max(0, draft.pricing?.minimumCharge ?? 0),
     workSteps: truncateArray(normalizeWorkSteps(draft.pricing?.workSteps || []), 5),
     addOns: truncateArray(normalizeAddons(draft.pricing?.addOns || []), 6),
     siteVisit: {
@@ -98,31 +101,66 @@ export function truncateArray<T>(arr: T[], max: number): T[] {
 interface WorkStepInput {
   id?: string
   name?: string
+  /** Model output drift: steps sometimes arrive with `label` instead of `name` */
+  label?: string
   description?: string
   costType?: string
   defaultCost?: number
   cost?: number
+  /** Model output drift: cost sometimes arrives as `price` */
+  price?: number
   optional?: boolean
   triggerSignal?: string
   triggerCondition?: { operator: string; value?: string | number | boolean }
+  when?: { fieldId?: string; operator?: string; equals?: string | number | boolean; value?: string | number }
   quantitySource?: {
     type?: string
     fieldId?: string
     value?: number
     signalKey?: string
+    formula?: string
+    missingMeansZero?: boolean
   }
   unitLabel?: string
+  percentOf?: string[] | 'subtotal'
+  costBand?: { low?: number; high?: number }
 }
 
 function normalizeQuantitySource(qs: WorkStepInput['quantitySource']): ServiceDraftConfig['pricing']['workSteps'][0]['quantitySource'] | undefined {
   if (!qs || !qs.type) return undefined
-  const validTypes = ['form_field', 'constant', 'ai_signal'] as const
+  const validTypes = ['form_field', 'constant', 'ai_signal', 'derived'] as const
   if (!validTypes.includes(qs.type as typeof validTypes[number])) return undefined
+  // T-125: derived formulas must at least parse — an unparsable formula would
+  // silently price at quantity 1 downstream
+  if (qs.type === 'derived' && (!qs.formula || extractFormulaIdentifiers(qs.formula) === null)) return undefined
   return {
-    type: qs.type as 'form_field' | 'constant' | 'ai_signal',
+    type: qs.type as 'form_field' | 'constant' | 'ai_signal' | 'derived',
     fieldId: qs.fieldId,
     value: qs.value,
     signalKey: qs.signalKey,
+    formula: qs.formula,
+    // T-131 (R2-2): catalogue semantics — unanswered field = quantity 0
+    missingMeansZero: qs.missingMeansZero === true ? true : undefined,
+  }
+}
+
+/**
+ * T-126: form-bound step condition. Requires BOTH a fieldId and a comparison
+ * value — a partial condition would silently drop the step at pricing time
+ * (the exact hardcore-F7 failure this exists to prevent).
+ */
+function normalizeStepWhen(when: WorkStepInput['when']): ServiceDraftConfig['pricing']['workSteps'][0]['when'] | undefined {
+  if (!when?.fieldId) return undefined
+  const compare = when.equals ?? when.value
+  if (compare === undefined || compare === null || compare === '') return undefined
+  const validOps = ['equals', 'contains', 'gt', 'lt', 'gte', 'lte'] as const
+  return {
+    fieldId: when.fieldId,
+    operator: validOps.includes(when.operator as typeof validOps[number])
+      ? (when.operator as typeof validOps[number])
+      : 'equals',
+    equals: when.equals,
+    value: when.value,
   }
 }
 
@@ -138,18 +176,34 @@ function normalizeTriggerCondition(tc: WorkStepInput['triggerCondition']): Servi
 
 export function normalizeWorkSteps(steps: WorkStepInput[]): ServiceDraftConfig['pricing']['workSteps'] {
   return steps
-    .filter(step => step.name && step.name.length > 0)
+    .filter(step => (step.name || step.label || '').length > 0)
     .map((step, index) => ({
       id: step.id || `step_${index + 1}`,
-      name: step.name!,
-      description: step.description || step.name!,
-      costType: (['fixed', 'per_unit', 'per_hour'] as const).includes(step.costType as 'fixed' | 'per_unit' | 'per_hour')
-        ? (step.costType as 'fixed' | 'per_unit' | 'per_hour')
+      name: (step.name || step.label)!,
+      description: step.description || (step.name || step.label)!,
+      costType: (['fixed', 'per_unit', 'per_hour', 'percent', 'credit'] as const).includes(step.costType as 'fixed' | 'per_unit' | 'per_hour' | 'percent' | 'credit')
+        ? (step.costType as 'fixed' | 'per_unit' | 'per_hour' | 'percent' | 'credit')
         : 'fixed',
-      defaultCost: Math.max(0, step.defaultCost || step.cost || 25),
+      // ?? chain, ending at 0: a missing cost must surface as £0 (visible),
+      // never be invented (previously defaulted to 25)
+      defaultCost: Math.max(0, step.defaultCost ?? step.cost ?? step.price ?? 0),
+      // T-131 (F2b): stated cost band (from-prices/ranges) — never invented
+      costBand:
+        step.costBand &&
+        typeof step.costBand.low === 'number' && typeof step.costBand.high === 'number' &&
+        step.costBand.low >= 0 && step.costBand.high > step.costBand.low
+          ? { low: step.costBand.low, high: step.costBand.high }
+          : undefined,
+      // T-125: percent steps carry what the percentage applies to
+      percentOf: step.costType === 'percent'
+        ? (step.percentOf === 'subtotal' || (Array.isArray(step.percentOf) && step.percentOf.every((s) => typeof s === 'string'))
+            ? step.percentOf
+            : 'subtotal')
+        : undefined,
       optional: step.optional || false,
       triggerSignal: step.optional ? step.triggerSignal : undefined,
       triggerCondition: step.optional ? normalizeTriggerCondition(step.triggerCondition) : undefined,
+      when: normalizeStepWhen(step.when),
       quantitySource: normalizeQuantitySource(step.quantitySource),
       unitLabel: step.unitLabel || undefined,
     }))
