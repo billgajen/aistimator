@@ -176,7 +176,8 @@ export function calculatePricing(
   jobData?: JobData,
   addonContext?: AddonDetectionContext,
   aiDetectedAddonIds?: Set<string>,
-  serviceContext?: ServiceContext
+  serviceContext?: ServiceContext,
+  aiAddonDetectionRan?: boolean
 ): PricingResult {
   const breakdown: PricingResult['breakdown'] = []
   const notes: string[] = []
@@ -274,7 +275,7 @@ export function calculatePricing(
   const searchableText = buildSearchableText(addonContext)
 
   for (const addon of rules.addons) {
-    const addonMatch = shouldApplyAddon(addon, signals, answers, searchableText, aiDetectedAddonIds, serviceContext)
+    const addonMatch = shouldApplyAddon(addon, signals, answers, searchableText, aiDetectedAddonIds, serviceContext, aiAddonDetectionRan)
     if (addonMatch.apply) {
       breakdown.push({
         label: addon.label,
@@ -516,8 +517,11 @@ function isKeywordNegated(text: string, keyword: string): boolean {
     `\\b(${negationWords.join('|')})\\s+(\\w+\\s+){0,2}${escapeRegExp(keywordLower)}\\b`,
     'i'
   )
-
   return negationPattern.test(textLower)
+  // R2-6 note: possession phrases ("I have logo files") are NOT suppressible
+  // by regex — "we have a dog" (cause: needs the addon) and "we have a logo"
+  // (deliverable: doesn't) are grammatically identical. Intent reading is the
+  // AI addon detector's job; when it runs, bare keyword matches never charge.
 }
 
 /**
@@ -558,7 +562,8 @@ function shouldApplyAddon(
   answers: FormAnswer[],
   searchableText: string,
   aiDetectedAddonIds?: Set<string>,
-  serviceContext?: ServiceContext
+  serviceContext?: ServiceContext,
+  aiAddonDetectionRan?: boolean
 ): AddonMatchResult {
   // 1. Check if addon is explicitly selected in form answers
   const answer = answers.find((a) => a.fieldId === addon.id)
@@ -576,8 +581,14 @@ function shouldApplyAddon(
     return { apply: true, autoRecommended: false }
   }
 
-  // 2. Check keyword triggers in project description
-  if (addon.triggerKeywords && addon.triggerKeywords.length > 0 && searchableText) {
+  // 2. Check keyword triggers in project description.
+  // R2-6: when AI addon detection RAN, it is the authority on description
+  // intent — it reads context ("I have logo files" = owns one, not wants
+  // one). Anything it did not detect must not be auto-charged off a bare
+  // keyword; the addon still surfaces in the availableAddons upsell list.
+  if (aiAddonDetectionRan) {
+    // skip keyword auto-apply entirely
+  } else if (addon.triggerKeywords && addon.triggerKeywords.length > 0 && searchableText) {
     // Check for global addon suppressor phrases first (e.g., "no extras", "budget only")
     // If customer explicitly says they don't want extras, skip all keyword-based addons
     if (hasGlobalAddonSuppressor(searchableText)) {
@@ -1315,6 +1326,79 @@ function resolveDerivedQuantity(
 }
 
 
+
+/**
+ * R2-7: detect mutually-exclusive-looking steps that ALL priced. When a
+ * compile run emits package alternatives ("Online Tutoring (Block of 10)" /
+ * "In-home Tutoring (Block of 10)") without when-binding them to the choice
+ * field, the customer gets charged for both. Heuristic: two priced FIXED
+ * steps with no conditions whose names share >=60% of their tokens.
+ */
+export function findLookalikeUnconditionedSteps(
+  steps: WorkStepConfig[],
+  pricedStepIds: Set<string>
+): Array<[string, string]> {
+  const candidates = steps.filter(
+    (st) =>
+      st.costType === 'fixed' &&
+      !st.when &&
+      !st.triggerSignal &&
+      !st.quantitySource &&
+      pricedStepIds.has(st.id)
+  )
+  const tokens = (name: string): Set<string> =>
+    new Set(name.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 1))
+  const jaccard = (nameA: string, nameB: string): number => {
+    const a = tokens(nameA)
+    const b = tokens(nameB)
+    if (a.size === 0 || b.size === 0) return 0
+    let inter = 0
+    for (const t of a) if (b.has(t)) inter++
+    const union = a.size + b.size - inter
+    return union > 0 ? inter / union : 0
+  }
+
+  const pairs: Array<[string, string]> = []
+  for (let i = 0; i < candidates.length; i++) {
+    for (let j = i + 1; j < candidates.length; j++) {
+      const stepA = candidates[i]
+      const stepB = candidates[j]
+      if (!stepA || !stepB) continue
+      if (jaccard(stepA.name, stepB.name) >= 0.6) {
+        pairs.push([stepA.name, stepB.name])
+      }
+    }
+  }
+
+  // (b) Two priced steps drawing their quantity from the SAME form field,
+  // neither when-bound, with similar names — one "hours" field cannot buy
+  // both "Online (per hour)" AND "In-home (per hour)". Derived formulas are
+  // exempt (tier splits legitimately share a field via min/max).
+  const byField = new Map<string, WorkStepConfig[]>()
+  for (const st of steps) {
+    if (st.when || st.triggerSignal) continue
+    if (!pricedStepIds.has(st.id)) continue
+    if (st.quantitySource?.type === 'form_field' && st.quantitySource.fieldId) {
+      const group = byField.get(st.quantitySource.fieldId) || []
+      group.push(st)
+      byField.set(st.quantitySource.fieldId, group)
+    }
+  }
+  for (const group of byField.values()) {
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const stepA = group[i]
+        const stepB = group[j]
+        if (!stepA || !stepB) continue
+        if (jaccard(stepA.name, stepB.name) >= 0.4 && !pairs.some(([x, y]) => x === stepA.name && y === stepB.name)) {
+          pairs.push([stepA.name, stepB.name])
+        }
+      }
+    }
+  }
+  return pairs
+}
+
 /**
  * Result of work step cost calculation with explicit source tracking
  */
@@ -1690,7 +1774,8 @@ export function calculatePricingWithTrace(
   addonContext?: AddonDetectionContext,
   aiDetectedAddonIds?: Set<string>,
   serviceContext?: ServiceContext,
-  configVersion?: string
+  configVersion?: string,
+  aiAddonDetectionRan?: boolean
 ): PricingResultWithTrace {
   const traceSteps: PricingTraceStep[] = []
   const notes: string[] = []
@@ -1912,7 +1997,7 @@ export function calculatePricingWithTrace(
   const searchableText = buildSearchableText(addonContext)
 
   for (const addon of rules.addons) {
-    const addonMatch = shouldApplyAddon(addon, signals, answers, searchableText, aiDetectedAddonIds, serviceContext)
+    const addonMatch = shouldApplyAddon(addon, signals, answers, searchableText, aiDetectedAddonIds, serviceContext, aiAddonDetectionRan)
     if (addonMatch.apply) {
       runningTotal += addon.price
       addonsTotal += addon.price

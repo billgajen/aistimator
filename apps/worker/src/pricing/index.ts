@@ -9,6 +9,7 @@ export {
   calculatePricingWithTrace,
   getDefaultPricingRules,
   calculateCrossServicePricing,
+  findLookalikeUnconditionedSteps,
 } from './rules-engine'
 
 export type {

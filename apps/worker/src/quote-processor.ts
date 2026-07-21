@@ -55,7 +55,7 @@ import type { QualityGateResult } from '@estimator/shared'
 import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking, extractFormulaIdentifiers } from '@estimator/shared'
 import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor } from './ai/measurement'
 import { buildTakeoff, buildReference } from './takeoff'
-import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing } from './pricing'
+import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing, findLookalikeUnconditionedSteps } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@estimator/shared'
 import { sendQuoteEmails, isEmailConfigured } from './email'
@@ -921,6 +921,7 @@ export async function processQuote(
 
   // Track AI-detected addon IDs so we can mark them as autoRecommended in pricing
   const aiDetectedAddonIds = new Set<string>()
+  let aiAddonDetectionRan = false
 
   // 3.5 AI-powered addon detection from customer description
   if (gemini && projectDescription && rules.addons && rules.addons.length > 0) {
@@ -938,6 +939,9 @@ export async function processQuote(
         projectDescription,
         availableAddons
       )
+      // R2-6: AI detection completed — it is now the authority on which
+      // addons the description implies; bare keyword matches must not charge
+      aiAddonDetectionRan = true
 
       // Add detected addons as form answers so they get applied by pricing engine
       for (const detected of detectedAddons) {
@@ -1150,7 +1154,9 @@ export async function processQuote(
         scopeIncludes: service.scope_includes,
       },
       // Config version for trace
-      'v1'
+      'v1',
+      // R2-6: whether AI addon detection ran (keyword auto-apply defers to it)
+      aiAddonDetectionRan
     )
   const { result: pricing, trace: pricingTrace } = priceWithSignals(structuredSignals)
 
@@ -1830,6 +1836,19 @@ export async function processQuote(
         .map((ws) => ws.name)
       if (zeroCost.length > 0) {
         guardReason = `The price for ${zeroCost.map((n) => `"${n}"`).join(', ')} could not be established from the pricing configuration`
+      } else {
+        // R2-7: package alternatives both priced (compile emitted them
+        // without when-binding to the choice field) — £873 for online AND
+        // in-home tutoring for one student
+        const pricedIds = new Set(
+          pricingTrace.trace.filter((t) => t.type === 'work_step' && t.id).map((t) => t.id as string)
+        )
+        const lookalikes = findLookalikeUnconditionedSteps(rulesWithWorkSteps.workSteps || [], pricedIds)
+        if (lookalikes.length > 0) {
+          guardReason = `Steps that look like mutually-exclusive options were ALL priced (${lookalikes
+            .map(([a, b]) => `"${a}" + "${b}"`)
+            .join('; ')}) — the customer may be charged for alternatives`
+        }
       }
     }
     if (guardReason) {
