@@ -152,7 +152,7 @@ exactly as designed.
 
 **R3-1 (found by the user's manual test, SHIPPED `3338ef2`):** stated-quantity vs photo-evidence conflicts — a cleaning quote claimed Grade A "exact" for 2 stated hours while its own notes said the photos suggest more. Now: structured `quantityConcern` from the wording layer → in-flow question ("2 hours may not be enough… What should we allow for?") → answer reprices (£272.26 → £398.26 verified live); grade capped at B while doubted. Multiplier labels humanized ("Deep clean surcharge (+50%)" not "Is Deep Clean: true").
 
-**R2-1b (calibration, OPEN):** the fixed matcher occasionally routes VALID requests to general inquiry (S12 dog-groom ramble) — over-caution. Failure mode is lost automation, never wrong money; tune thresholds/prompt post-launch.
+**R2-7/R2-1b/R2-6 ALL SHIPPED 2026-07-21 (`21ae2e3`):** R2-7 — compiler rule 4b hardened + `findLookalikeUnconditionedSteps()` guard (name-overlap AND same-quantity-field detection; live: S27 £873 both-modes → £55 in-home only). R2-1b — matcher calibration rules (mismatch = different trade only; live: S12 general-inquiry detour → £53 real quote). R2-6 — AI addon detection is the authority on description intent, bare keywords never auto-charge when it ran (live: S21 "I have logo files" no longer buys a £320 logo). **No open product findings remain from either hardcore campaign.**
 
 - **R2-1 — Wrong-service requests are QUOTED, with a polite disclaimer.**
   The freezer-repair request was sent a £455 ice sculpture (Grade A); the
