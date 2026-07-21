@@ -15,6 +15,17 @@
 
 ## Issues & Resolutions
 
+### 2026-07-21: PRODUCTION DEPLOYED 🚀
+
+**Live:** web `https://estimator-web-phi.vercel.app` (Vercel, SYNC_QUOTE_PROCESSING=true, maxDuration 60s on AI routes) · worker `estimator-worker-production.billgajen.workers.dev` (8 secrets, R2 bound, no queues) · DB Supabase `ygsuzeveesgrafgpkrev` eu-central-1 (23 migrations + seed via management API — old project `iyvpqykjjymtavjkktgo` was paused >90 days, unrestorable) · Stripe TEST mode: meter `estimate_overage`, product + 3 metered prices (50/40/30p) wired into plans, webhook `we_1TvesO3J76egMmNyRb8SSdn4`.
+
+**Deploy-found fixes (f13d0e4):** migrations 16/17 had UUID FKs against TEXT parents, 18 duplicated a migration-2 policy — committed files had drifted from applied reality; fixed + policy guards added.
+
+**Post-launch list:** Postmark token (emails off), Stripe live keys, Cloudflare Workers Paid for queues, Supabase plan upgrade (free tier pauses — killed the old project), custom domain.
+
+---
+
+
 ### 2026-07-21: Design System v2 — "The Measured Document" (commit 1aef8e4)
 
 **Context:** user rejected the Editorial Black B&W look ("old Google Bootstrap template") and asked for a billion-dollar-grade redesign: pastel-leaning brand colours, ultra attention to detail, priority on the estimate page, widget and form fields; marketing site to follow separately.
