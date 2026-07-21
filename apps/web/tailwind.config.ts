@@ -34,6 +34,7 @@ const config: Config = {
           light: 'var(--color-danger-light)',
         },
         ink: 'var(--color-ink)',
+        'ink-deep': 'var(--color-ink-deep)',
         mist: 'var(--color-mist)',
         mint: 'var(--color-mint)',
         butter: 'var(--color-butter)',

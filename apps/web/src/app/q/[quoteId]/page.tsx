@@ -320,8 +320,9 @@ export default function QuotePage({ params }: QuotePageProps) {
               )}
 
               {pricing.notes && pricing.notes.length > 0 && (
-                <div className="bg-butter/60 border border-tape/30 rounded-warm-lg px-4 py-3 mb-5">
-                  <ul className="text-[13px] leading-relaxed text-text-secondary space-y-1">
+                <div className="bg-butter/50 border border-tape/30 rounded-warm-lg px-4 py-3.5 mb-5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-tertiary mb-1.5">Worth knowing</p>
+                  <ul className="text-[13px] leading-relaxed text-tertiary space-y-1.5">
                     {pricing.notes.map((note, index) => (
                       <li key={index}>{note}</li>
                     ))}
@@ -527,8 +528,10 @@ export default function QuotePage({ params }: QuotePageProps) {
             {/* Notes */}
             {notes.notes && (
               <section className="mb-2">
-                <SectionLabel>A note from {business.name}</SectionLabel>
-                <p className="text-[13px] leading-relaxed text-text-secondary">{notes.notes}</p>
+                <SectionLabel tone="tape">A note from {business.name}</SectionLabel>
+                <div className="border-l-2 border-tape/60 pl-4">
+                  <p className="text-[13px] leading-relaxed text-text-secondary">{notes.notes}</p>
+                </div>
               </section>
             )}
           </div>

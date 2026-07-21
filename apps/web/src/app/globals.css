@@ -21,6 +21,7 @@
 
     /* Ink */
     --color-ink: #1B2823;
+    --color-ink-deep: #141F1A;   /* dashboard sidebar */
     --color-text-primary: #1B2823;
     --color-text-secondary: #4F5D57;
     --color-text-muted: #8A948E;

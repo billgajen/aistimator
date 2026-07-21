@@ -23,18 +23,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 transform border-r border-border bg-background transition-transform duration-200 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 transform bg-ink-deep transition-transform duration-200 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex h-full flex-col">
-          {/* Logo */}
+          {/* Wordmark */}
           <div className="flex h-20 items-center justify-between px-6">
-            <Link href="/app" className="font-display text-2xl font-extrabold tracking-tight text-text-primary">
-              Estimator
+            <Link href="/app" className="group">
+              <span className="font-display text-[22px] font-bold tracking-tight text-white">
+                Aistimator
+              </span>
+              <div className="tape-rule-light mt-1 w-24 opacity-40 group-hover:opacity-70 transition-opacity" />
             </Link>
             <button
-              className="lg:hidden text-text-secondary"
+              className="lg:hidden text-white/60 hover:text-white"
               onClick={() => setSidebarOpen(false)}
               aria-label="Close sidebar"
             >
@@ -68,11 +71,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </nav>
 
           {/* User section */}
-          <div className="border-t border-border px-4 py-4">
+          <div className="border-t border-white/10 px-4 py-4">
             <form action="/api/auth/signout" method="POST">
               <button
                 type="submit"
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-text-secondary hover:bg-surface transition-colors"
+                className="flex w-full items-center gap-3 rounded-warm-lg px-3 py-2.5 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white transition-colors"
               >
                 <SignOutIcon className="h-5 w-5" />
                 Sign out
@@ -95,7 +98,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <span className="font-display text-xl font-extrabold tracking-tight text-text-primary">Estimator</span>
+          <span className="font-display text-xl font-bold tracking-tight text-text-primary">Aistimator</span>
         </header>
 
         {/* Page content */}
@@ -109,7 +112,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 function NavSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-6">
-      <h3 className="mb-3 px-3 text-[11px] font-bold uppercase tracking-widest text-text-muted">
+      <h3 className="mb-2.5 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/30">
         {title}
       </h3>
       <div className="space-y-0.5">{children}</div>
@@ -134,13 +137,16 @@ function NavItem({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] transition-colors ${
+      className={`relative flex items-center gap-3 rounded-warm-lg px-3 py-2.5 text-[14.5px] transition-colors ${
         isActive
-          ? 'bg-primary-light text-text-primary font-semibold'
-          : 'text-text-secondary font-medium hover:bg-surface hover:text-text-primary'
+          ? 'bg-white/[0.07] text-butter font-semibold'
+          : 'text-white/65 font-medium hover:bg-white/5 hover:text-white'
       }`}
     >
-      <Icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-text-primary' : 'text-text-muted'}`} />
+      {isActive && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-tape" />
+      )}
+      <Icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-tape' : 'text-white/40'}`} />
       {label}
     </Link>
   )

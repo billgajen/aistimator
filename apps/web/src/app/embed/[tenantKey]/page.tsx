@@ -682,13 +682,13 @@ export default function EmbedPage({ params }: EmbedPageProps) {
   return (
     <div
       ref={containerRef}
-      className="min-h-full bg-background font-body"
+      className="min-h-full bg-background font-body p-3 sm:px-6 sm:py-10"
     >
-      <div className="max-w-xl mx-auto">
+      <div className="max-w-xl mx-auto bg-white rounded-warm-2xl border border-border shadow-warm-lg overflow-hidden pb-2">
       {/* Widget letterhead */}
       {displayMode !== 'conversational' && widgetData && step !== 'loading' && step !== 'error' && step !== 'success' && (
         <div className="px-6 pt-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary mb-0.5">Instant estimate</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-tertiary mb-0.5">Instant estimate</p>
           <h2 className="font-display text-lg font-bold text-text-primary leading-tight">{widgetData.tenantName}</h2>
         </div>
       )}
@@ -789,6 +789,11 @@ export default function EmbedPage({ params }: EmbedPageProps) {
         <SuccessState quoteUrl={quoteResult.quoteViewUrl} quoteId={quoteResult.quoteId} />
       )}
       </div>
+      <div className="max-w-xl mx-auto mt-4 flex items-center justify-center gap-3">
+        <div className="tape-rule w-12 opacity-50" />
+        <span className="figure text-[10px] text-text-muted">Powered by Aistimator</span>
+        <div className="tape-rule w-12 opacity-50" />
+      </div>
     </div>
   )
 }
@@ -806,10 +811,12 @@ function ProgressIndicator({ steps, currentStep }: { steps: string[]; currentSte
             <div key={label} className="flex items-center gap-3 flex-1 last:flex-none">
               <div className="flex items-center gap-2 shrink-0">
                 <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                    isCompleted || isActive
-                      ? 'bg-primary text-white'
-                      : 'bg-surface border border-border text-text-muted'
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    isActive
+                      ? 'bg-primary text-white ring-2 ring-tape/50 ring-offset-1'
+                      : isCompleted
+                        ? 'bg-primary text-white'
+                        : 'bg-surface border border-border text-text-muted'
                   }`}
                 >
                   {isCompleted ? (
@@ -994,7 +1001,7 @@ function DetailsStep({
   }
 
   const inputErrorClass = 'border-danger/50 bg-danger-light/30 focus:ring-danger/25 focus:border-danger'
-  const inputNormalClass = 'border-border bg-white focus:ring-primary/25 focus:border-primary'
+  const inputNormalClass = 'border-border bg-background focus:ring-primary/25 focus:border-primary focus:bg-white'
 
   return (
     <div className="p-6">
