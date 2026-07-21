@@ -18,10 +18,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Wordmark */}
       <div className="px-5 pt-5 pb-4">
         <Link href="/app" className="group inline-block">
-          <span className="font-display text-[19px] font-bold tracking-tight text-text-primary">
+          <span className="font-display text-[22px] font-bold tracking-tight text-text-primary">
             Aistimator
           </span>
-          <div className="tape-rule mt-1 w-20 opacity-50 group-hover:opacity-90 transition-opacity" />
+          <div className="tape-rule mt-1.5 w-24 opacity-50 group-hover:opacity-90 transition-opacity" />
         </Link>
       </div>
 
@@ -50,9 +50,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <form action="/api/auth/signout" method="POST">
           <button
             type="submit"
-            className="flex w-full items-center gap-2.5 rounded-warm-lg px-3 py-2 text-[13.5px] font-medium text-text-muted hover:bg-surface hover:text-text-primary transition-colors"
+            className="flex w-full items-center gap-3 rounded-warm-lg px-3 py-2.5 text-[15px] font-medium text-text-muted hover:bg-surface hover:text-text-primary transition-colors"
           >
-            <SignOutIcon className="h-4 w-4" />
+            <SignOutIcon className="h-5 w-5" />
             Sign out
           </button>
         </form>
@@ -72,7 +72,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Floating panel — desktop fixed, mobile slide-in */}
       <aside
-        className={`fixed inset-y-3 left-3 z-50 w-60 transform transition-transform duration-200 lg:translate-x-0 ${
+        className={`fixed inset-y-3 left-3 z-50 w-72 transform transition-transform duration-200 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'
         }`}
       >
@@ -80,7 +80,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main content */}
-      <div className="lg:pl-[16.5rem]">
+      <div className="lg:pl-[19.5rem]">
         {/* Mobile top bar */}
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border/80 bg-background/90 backdrop-blur-md px-4 lg:hidden">
           <button
@@ -95,7 +95,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <span className="font-display text-lg font-bold tracking-tight text-text-primary">Aistimator</span>
         </header>
 
-        <main className="animate-fade-in-up mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
+        <main className="animate-fade-in-up mx-auto max-w-[1860px] px-4 py-8 sm:px-8 sm:py-10">
           {children}
         </main>
       </div>
@@ -107,8 +107,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
 function NavSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mb-5">
-      <h3 className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-text-muted/80">
+    <div className="mb-6">
+      <h3 className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-text-muted/80">
         {title}
       </h3>
       <div className="space-y-0.5">{children}</div>
@@ -133,13 +133,13 @@ function NavItem({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-2.5 rounded-warm-lg px-3 py-2 text-[13.5px] transition-colors ${
+      className={`flex items-center gap-3 rounded-warm-lg px-3 py-2.5 text-[15px] transition-colors ${
         isActive
           ? 'bg-mint text-primary font-semibold'
           : 'text-text-secondary font-medium hover:bg-surface hover:text-text-primary'
       }`}
     >
-      <Icon className={`h-[18px] w-[18px] flex-shrink-0 ${isActive ? 'text-primary' : 'text-text-muted'}`} />
+      <Icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-text-muted'}`} />
       {label}
     </Link>
   )
