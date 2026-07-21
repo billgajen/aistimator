@@ -7,6 +7,10 @@ import type {
 } from '@estimator/shared'
 import { validateAndNormalizeDraftBulk, callGemini, parseGeminiJson } from '../shared'
 
+// Vercel function budget: this route runs the full AI pipeline synchronously
+// (Cloudflare Queues needs the paid Workers plan - revisit post-launch)
+export const maxDuration = 60
+
 /**
  * POST /api/services/ai-draft/compile (T-104, AD-021/AD-024)
  *

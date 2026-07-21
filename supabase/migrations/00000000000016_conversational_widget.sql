@@ -4,7 +4,7 @@
 -- Widget analytics table for tracking A/B test results
 CREATE TABLE IF NOT EXISTS widget_analytics (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   event TEXT NOT NULL CHECK (event IN ('widget_opened', 'widget_completed', 'widget_abandoned')),
   widget_mode TEXT NOT NULL CHECK (widget_mode IN ('form', 'conversational')),
   page_url TEXT,

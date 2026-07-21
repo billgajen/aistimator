@@ -4,6 +4,10 @@ import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import type { ClarifyQuoteRequest } from '@estimator/shared'
 
+// Vercel function budget: this route runs the full AI pipeline synchronously
+// (Cloudflare Queues needs the paid Workers plan - revisit post-launch)
+export const maxDuration = 60
+
 /**
  * POST /api/public/quotes/:quoteId/clarify
  * Accepts customer answers to clarification questions.

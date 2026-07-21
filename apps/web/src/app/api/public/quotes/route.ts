@@ -6,6 +6,10 @@ import { checkPlanLimit, maybeNotifyLimitReached, recordOverageQuote } from '@/l
 import { validateServiceMatch } from '@/lib/ai/service-matcher'
 import { NextResponse } from 'next/server'
 
+// Vercel function budget: this route runs the full AI pipeline synchronously
+// (Cloudflare Queues needs the paid Workers plan - revisit post-launch)
+export const maxDuration = 60
+
 // Request body types
 interface CustomerInput {
   name: string
