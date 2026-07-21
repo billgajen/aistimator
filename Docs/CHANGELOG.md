@@ -15,6 +15,17 @@
 
 ## Issues & Resolutions
 
+### 2026-07-21: Design System v2 — "The Measured Document" (commit 1aef8e4)
+
+**Context:** user rejected the Editorial Black B&W look ("old Google Bootstrap template") and asked for a billion-dollar-grade redesign: pastel-leaning brand colours, ultra attention to detail, priority on the estimate page, widget and form fields; marketing site to follow separately.
+
+**Direction:** identity grounded in the product's own world — paper, ink, and the measuring tape. Juniper `#205E56` brand; porcelain/mint/mist/butter pastel surfaces; tape `#DCAF3E` reserved exclusively for measurement UI; ink `#1B2823` text. Type: Bricolage Grotesque / Instrument Sans / Spline Sans Mono (all figures tabular via `.figure`). Signature elements in `globals.css`: `.tape-rule` tick dividers, `.grade-seal` A/B/C assay stamp (`--seal-gap` for coloured grounds), `shadow-document`. Tokens are CSS-variable-backed so the dashboard re-skins automatically; the estimate page and embed widget were deep-restyled by hand. The marketing website must build on these same tokens.
+
+**Files:** `apps/web/src/app/{globals.css,layout.tsx}`, `apps/web/tailwind.config.ts`, `apps/web/src/app/q/[quoteId]/page.tsx`, `apps/web/src/app/embed/[tenantKey]/page.tsx`
+
+---
+
+
 ### 2026-07-20: Compiler Silently Discarded Entire Compilations (all 10 gauntlet verticals quoted £50 Grade A)
 
 **What broke:** First full hardcore run: ALL 10 scenarios compiled to an empty pricing model → every quote went out at the £50 normalizer default (S07 £180 via addons), **Grade A "this price is exact"** — a 128-guest wedding for £50. S05 died on repeated compile HTTP 500s.
