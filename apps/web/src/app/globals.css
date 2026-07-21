@@ -2,28 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   "The Measured Document" — design tokens
+   Paper, ink, and the measuring tape. Pastel surfaces, one
+   confident juniper brand hue, butter/tape reserved for
+   everything measurement (takeoff, grades, ranges).
+   ============================================================ */
+
 @layer base {
   :root {
-    --color-background: #FFFFFF;
-    --color-surface: #F4F4F5;
-    --color-text-primary: #09090B;
-    --color-text-secondary: #52525B;
-    --color-text-muted: #A1A1AA;
-    --color-primary: #09090B;
-    --color-primary-hover: #27272A;
-    --color-primary-light: #F4F4F5;
-    --color-secondary: #16A34A;
-    --color-secondary-light: #DCFCE7;
-    --color-tertiary: #D97706;
-    --color-tertiary-light: #FEF3C7;
-    --color-border: #E4E4E7;
-    --color-border-strong: #D4D4D8;
-    --color-danger: #DC2626;
-    --color-danger-light: #FEE2E2;
+    /* Ground */
+    --color-background: #FAF9F6; /* warm porcelain paper */
+    --color-surface: #F2F0EA;    /* deeper paper for cards/wells */
+    --color-mist: #EAEFF5;       /* cool pastel surface */
+    --color-mint: #DFEDE5;       /* brand pastel surface */
+    --color-butter: #F7E9C6;     /* measurement band */
+    --color-tape: #DCAF3E;       /* tape ticks / measurement accent */
 
-    --font-display: var(--font-sora);
-    --font-body: var(--font-sora);
-    --font-mono: var(--font-jetbrains-mono);
+    /* Ink */
+    --color-ink: #1B2823;
+    --color-text-primary: #1B2823;
+    --color-text-secondary: #4F5D57;
+    --color-text-muted: #8A948E;
+
+    /* Brand */
+    --color-primary: #205E56;        /* juniper */
+    --color-primary-hover: #174741;
+    --color-primary-light: #DFEDE5;
+
+    /* Semantic */
+    --color-secondary: #3E7F58;      /* success green, kept close to brand family */
+    --color-secondary-light: #E0F0E4;
+    --color-tertiary: #A5731B;       /* amber ink (warnings), butter's dark twin */
+    --color-tertiary-light: #F7E9C6;
+    --color-danger: #B84A3B;
+    --color-danger-light: #F8E3DD;
+
+    /* Lines */
+    --color-border: #E5E2D8;
+    --color-border-strong: #CFCBBD;
+
+    /* Type */
+    --font-display: var(--font-bricolage);
+    --font-body: var(--font-instrument);
+    --font-mono: var(--font-spline-mono);
   }
 
   body {
@@ -32,6 +54,84 @@
     background-color: var(--color-background);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background: var(--color-butter);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* ------------------------------------------------------------
+     Signature motif: the measuring-tape rule.
+     Fine ticks with a taller tape-coloured tick on a longer beat
+     — used as section dividers on the estimate document. Reads
+     as a ruler, prints like a hairline.
+     ------------------------------------------------------------ */
+  .tape-rule {
+    height: 10px;
+    background-image:
+      repeating-linear-gradient(
+        to right,
+        var(--color-border-strong) 0 1px,
+        transparent 1px 8px
+      ),
+      repeating-linear-gradient(
+        to right,
+        var(--color-tape) 0 1.5px,
+        transparent 1.5px 40px
+      );
+    background-size: 100% 5px, 100% 10px;
+    background-position: bottom left, bottom left;
+    background-repeat: repeat-x;
+  }
+
+  .tape-rule-light {
+    height: 10px;
+    background-image:
+      repeating-linear-gradient(
+        to right,
+        rgba(255, 255, 255, 0.45) 0 1px,
+        transparent 1px 8px
+      ),
+      repeating-linear-gradient(
+        to right,
+        rgba(255, 255, 255, 0.9) 0 1.5px,
+        transparent 1.5px 40px
+      );
+    background-size: 100% 5px, 100% 10px;
+    background-position: bottom left, bottom left;
+    background-repeat: repeat-x;
+  }
+
+  /* The grade seal — a stamped assay mark for A/B/C */
+  .grade-seal {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 74px;
+    height: 74px;
+    border-radius: 9999px;
+    border: 1.5px solid currentColor;
+    box-shadow: inset 0 0 0 3.5px var(--seal-gap, var(--color-background)), inset 0 0 0 5px currentColor;
+    text-align: center;
+    line-height: 1;
+    user-select: none;
+    transform: rotate(-6deg);
+  }
+
+  /* Ledger figures — every money number on the document */
+  .figure {
+    font-family: var(--font-mono), monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
   }
 }
 
@@ -48,7 +148,7 @@
 }
 
 .animate-fade-in-up {
-  animation: fade-in-up 0.25s ease-out;
+  animation: fade-in-up 0.3s ease-out;
 }
 
 /* Staggered animation delays */
@@ -56,3 +156,13 @@
 .animation-delay-200 { animation-delay: 150ms; animation-fill-mode: both; }
 .animation-delay-300 { animation-delay: 225ms; animation-fill-mode: both; }
 .animation-delay-400 { animation-delay: 300ms; animation-fill-mode: both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up,
+  .animation-delay-100,
+  .animation-delay-200,
+  .animation-delay-300,
+  .animation-delay-400 {
+    animation: none;
+  }
+}

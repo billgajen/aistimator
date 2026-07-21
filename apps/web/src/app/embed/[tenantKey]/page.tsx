@@ -682,9 +682,17 @@ export default function EmbedPage({ params }: EmbedPageProps) {
   return (
     <div
       ref={containerRef}
-      className="min-h-full bg-white"
-      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
+      className="min-h-full bg-background font-body"
     >
+      <div className="max-w-xl mx-auto">
+      {/* Widget letterhead */}
+      {displayMode !== 'conversational' && widgetData && step !== 'loading' && step !== 'error' && step !== 'success' && (
+        <div className="px-6 pt-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary mb-0.5">Instant estimate</p>
+          <h2 className="font-display text-lg font-bold text-text-primary leading-tight">{widgetData.tenantName}</h2>
+        </div>
+      )}
+
       {/* Progress indicator — form mode only */}
       {displayMode !== 'conversational' && showProgress && (
         <ProgressIndicator steps={progressSteps} currentStep={currentProgressIndex} />
@@ -780,6 +788,7 @@ export default function EmbedPage({ params }: EmbedPageProps) {
       {step === 'success' && quoteResult && (
         <SuccessState quoteUrl={quoteResult.quoteViewUrl} quoteId={quoteResult.quoteId} />
       )}
+      </div>
     </div>
   )
 }
@@ -788,27 +797,23 @@ export default function EmbedPage({ params }: EmbedPageProps) {
 
 function ProgressIndicator({ steps, currentStep }: { steps: string[]; currentStep: number }) {
   return (
-    <div className="px-6 pt-4 pb-2">
-      <div className="flex items-center justify-between">
+    <div className="px-6 pt-5 pb-3">
+      <div className="flex items-center gap-3">
         {steps.map((label, index) => {
           const isActive = index === currentStep
           const isCompleted = index < currentStep
-
           return (
-            <div key={label} className="flex items-center flex-1">
-              {/* Step circle */}
-              <div className="flex flex-col items-center">
+            <div key={label} className="flex items-center gap-3 flex-1 last:flex-none">
+              <div className="flex items-center gap-2 shrink-0">
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                    isCompleted
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                    isCompleted || isActive
                       ? 'bg-primary text-white'
-                      : isActive
-                        ? 'bg-primary text-white'
-                        : 'bg-gray-200 text-text-muted'
+                      : 'bg-surface border border-border text-text-muted'
                   }`}
                 >
                   {isCompleted ? (
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                       <path
                         fillRule="evenodd"
                         d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -820,21 +825,15 @@ function ProgressIndicator({ steps, currentStep }: { steps: string[]; currentSte
                   )}
                 </div>
                 <span
-                  className={`text-xs mt-1 ${
-                    isActive || isCompleted ? 'text-primary font-medium' : 'text-text-muted'
+                  className={`text-xs font-semibold uppercase tracking-[0.08em] ${
+                    isActive ? 'text-primary' : isCompleted ? 'text-text-secondary' : 'text-text-muted'
                   }`}
                 >
                   {label}
                 </span>
               </div>
-
-              {/* Connector line (not after last step) */}
               {index < steps.length - 1 && (
-                <div
-                  className={`flex-1 h-0.5 mx-2 ${
-                    index < currentStep ? 'bg-primary' : 'bg-gray-200'
-                  }`}
-                />
+                <div className={index < currentStep ? 'flex-1 h-[3px] rounded-full bg-primary/70' : 'flex-1 tape-rule opacity-60'} />
               )}
             </div>
           )
@@ -847,7 +846,7 @@ function ProgressIndicator({ steps, currentStep }: { steps: string[]; currentSte
 function LoadingState() {
   return (
     <div className="flex flex-col items-center justify-center py-12">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
       <p className="text-text-muted text-sm">Loading...</p>
     </div>
   )
@@ -873,7 +872,7 @@ function ErrorState({
         <div className="mb-4">
           <button
             onClick={onSelectSuggested}
-            className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover"
+            className="px-5 py-3 text-sm font-semibold bg-primary text-white rounded-warm-lg hover:bg-primary-hover transition"
           >
             Switch to &quot;{suggestedService.name}&quot; and Submit
           </button>
@@ -882,7 +881,7 @@ function ErrorState({
 
       <button
         onClick={onRetry}
-        className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-gray-50"
+        className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-warm-lg hover:border-border-strong transition"
       >
         Start Over
       </button>
@@ -901,14 +900,14 @@ function ServiceStep({
 }) {
   return (
     <div className="p-6">
-      <h2 className="text-lg font-semibold text-text-primary mb-1">{tenantName}</h2>
+      <h2 className="font-display text-xl font-bold text-text-primary mb-1">{tenantName}</h2>
       <p className="text-sm text-text-muted mb-4">Select a service to get started</p>
       <div className="space-y-2">
         {services.map((service) => (
           <button
             key={service.id}
             onClick={() => onSelect(service.id)}
-            className="w-full text-left px-4 py-3 border border-border rounded-lg hover:border-blue-500 hover:bg-primary-light transition-colors"
+            className="w-full text-left px-5 py-4 text-[15px] font-medium bg-white border border-border rounded-warm-lg hover:border-primary hover:bg-mint transition"
           >
             {service.name}
           </button>
@@ -994,40 +993,41 @@ function DetailsStep({
     onFieldChange(fieldId, newValues)
   }
 
-  const inputErrorClass = 'border-red-300 focus:ring-red-500 focus:border-red-500'
-  const inputNormalClass = 'border-border focus:ring-primary/30 focus:border-primary'
+  const inputErrorClass = 'border-danger/50 bg-danger-light/30 focus:ring-danger/25 focus:border-danger'
+  const inputNormalClass = 'border-border bg-white focus:ring-primary/25 focus:border-primary'
 
   return (
     <div className="p-6">
-      <h3 className="text-lg font-semibold text-text-primary mb-4">Job Details</h3>
+      <h3 className="font-display text-xl font-bold text-text-primary mb-5">Job Details</h3>
 
       <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-text-secondary mb-1">Address</label>
-          <input
-            type="text"
-            value={jobAddress}
-            onChange={(e) => onAddressChange(e.target.value)}
-            placeholder="123 Main Street"
-            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 ${inputNormalClass}`}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-text-secondary mb-1">Postcode / ZIP</label>
-          <input
-            type="text"
-            value={jobPostcode}
-            onChange={(e) => onPostcodeChange(e.target.value)}
-            placeholder="SW1A 1AA"
-            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 ${inputNormalClass}`}
-          />
+        <div className="grid gap-4 sm:grid-cols-[2fr,1fr]">
+          <div>
+            <label className="block text-[13px] font-semibold text-text-primary mb-1.5">Address</label>
+            <input
+              type="text"
+              value={jobAddress}
+              onChange={(e) => onAddressChange(e.target.value)}
+              placeholder="123 Main Street"
+              className={`w-full px-4 py-3 text-[15px] border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${inputNormalClass}`}
+            />
+          </div>
+          <div>
+            <label className="block text-[13px] font-semibold text-text-primary mb-1.5">Postcode</label>
+            <input
+              type="text"
+              value={jobPostcode}
+              onChange={(e) => onPostcodeChange(e.target.value)}
+              placeholder="SW1A 1AA"
+              className={`w-full px-4 py-3 text-[15px] border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${inputNormalClass}`}
+            />
+          </div>
         </div>
 
         {/* Quantity field - shown when measurement model asks for customer quantity */}
         {measurementModel?.type === 'per_unit' && measurementModel.askCustomerForQuantity && (
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label className="block text-[13px] font-semibold text-text-primary mb-1.5">
               {measurementModel.unitLabel || getUnitLabel(measurementModel.unit)}
             </label>
             <input
@@ -1037,7 +1037,7 @@ function DetailsStep({
               value={jobQuantity ?? ''}
               onChange={(e) => onQuantityChange(e.target.value ? Number(e.target.value) : null)}
               placeholder={`Enter ${measurementModel.unit || 'quantity'}`}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 ${inputNormalClass}`}
+              className={`w-full px-4 py-3 text-[15px] border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${inputNormalClass}`}
             />
             <p className="mt-1 text-xs text-text-muted">
               This helps us provide a more accurate estimate
@@ -1046,15 +1046,15 @@ function DetailsStep({
         )}
 
         <div>
-          <label className="block text-sm font-medium text-text-secondary mb-1">
-            Project Description <span className="text-red-500">*</span>
+          <label className="block text-[13px] font-semibold text-text-primary mb-1.5">
+            Project Description <span className="text-danger">*</span>
           </label>
           <textarea
             value={jobDescription}
             onChange={(e) => onDescriptionChange(e.target.value)}
             placeholder="Please describe your project requirements, including any specific needs, timeline, or questions you have..."
             rows={4}
-            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 ${inputNormalClass}`}
+            className={`w-full px-4 py-3 text-[15px] border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${inputNormalClass}`}
           />
           <p className="mt-1 text-xs text-text-muted">
             The more detail you provide, the more accurate your quote will be.
@@ -1067,7 +1067,7 @@ function DetailsStep({
 
           return (
             <div key={field.fieldId}>
-              <label className="block text-sm font-medium text-text-secondary mb-1">
+              <label className="block text-[13px] font-semibold text-text-primary mb-1.5">
                 {field.label}
                 {field.required && <span className="text-red-500 ml-1">*</span>}
               </label>
@@ -1080,7 +1080,7 @@ function DetailsStep({
                   onChange={(e) => onFieldChange(field.fieldId, e.target.value)}
                   onBlur={() => handleFieldBlur(field.fieldId)}
                   placeholder={field.placeholder}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 ${fieldClass}`}
+                  className={`w-full px-4 py-3 text-[15px] border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
                 />
               )}
 
@@ -1092,7 +1092,7 @@ function DetailsStep({
                   onBlur={() => handleFieldBlur(field.fieldId)}
                   placeholder={field.placeholder}
                   rows={3}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 ${fieldClass}`}
+                  className={`w-full px-4 py-3 text-[15px] border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
                 />
               )}
 
@@ -1104,7 +1104,7 @@ function DetailsStep({
                   onChange={(e) => onFieldChange(field.fieldId, e.target.value ? Number(e.target.value) : '')}
                   onBlur={() => handleFieldBlur(field.fieldId)}
                   placeholder={field.placeholder}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 ${fieldClass}`}
+                  className={`w-full px-4 py-3 text-[15px] border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
                 />
               )}
 
@@ -1114,7 +1114,7 @@ function DetailsStep({
                   value={(answers[field.fieldId] as string) || ''}
                   onChange={(e) => onFieldChange(field.fieldId, e.target.value)}
                   onBlur={() => handleFieldBlur(field.fieldId)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 ${fieldClass}`}
+                  className={`w-full px-4 py-3 text-[15px] border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
                 >
                   <option value="">Select...</option>
                   {field.options.map((opt) => (
@@ -1129,14 +1129,14 @@ function DetailsStep({
               {field.type === 'radio' && field.options && (
                 <div className="space-y-2 mt-1">
                   {field.options.map((opt) => (
-                    <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                    <label key={opt.value} className="flex items-center gap-2.5 px-4 py-3 bg-white border border-border rounded-warm-lg cursor-pointer hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-mint transition">
                       <input
                         type="radio"
                         name={field.fieldId}
                         value={opt.value}
                         checked={(answers[field.fieldId] as string) === opt.value}
                         onChange={(e) => onFieldChange(field.fieldId, e.target.value)}
-                        className="w-4 h-4 text-primary border-border focus:ring-primary/30"
+                        className="w-[18px] h-[18px] text-primary border-border-strong focus:ring-primary/25 accent-[#205E56]"
                       />
                       <span className="text-sm text-text-secondary">{opt.label}</span>
                     </label>
@@ -1150,12 +1150,12 @@ function DetailsStep({
                   {field.options.map((opt) => {
                     const currentValues = (answers[field.fieldId] as string[]) || []
                     return (
-                      <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                      <label key={opt.value} className="flex items-center gap-2.5 px-4 py-3 bg-white border border-border rounded-warm-lg cursor-pointer hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-mint transition">
                         <input
                           type="checkbox"
                           checked={currentValues.includes(opt.value)}
                           onChange={(e) => handleCheckboxChange(field.fieldId, opt.value, e.target.checked)}
-                          className="w-4 h-4 rounded border-border text-primary focus:ring-primary/30"
+                          className="w-[18px] h-[18px] rounded border-border-strong text-primary focus:ring-primary/25 accent-[#205E56]"
                         />
                         <span className="text-sm text-text-secondary">{opt.label}</span>
                       </label>
@@ -1166,12 +1166,12 @@ function DetailsStep({
 
               {/* Boolean (single checkbox) */}
               {field.type === 'boolean' && (
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2.5 px-4 py-3 bg-white border border-border rounded-warm-lg cursor-pointer hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-mint transition">
                   <input
                     type="checkbox"
                     checked={(answers[field.fieldId] as boolean) || false}
                     onChange={(e) => onFieldChange(field.fieldId, e.target.checked)}
-                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary/30"
+                    className="w-[18px] h-[18px] rounded border-border-strong text-primary focus:ring-primary/25 accent-[#205E56]"
                   />
                   <span className="text-sm text-text-secondary">{field.helpText || 'Yes'}</span>
                 </label>
@@ -1195,14 +1195,14 @@ function DetailsStep({
         {onBack && (
           <button
             onClick={onBack}
-            className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-gray-50"
+            className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-warm-lg hover:border-border-strong transition"
           >
             Back
           </button>
         )}
         <button
           onClick={handleContinue}
-          className="flex-1 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover"
+          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-white rounded-warm-lg hover:bg-primary-hover active:scale-[0.995] transition"
         >
           Continue
         </button>
@@ -1416,7 +1416,7 @@ function FileUploadStep({
 
   return (
     <div className="p-6">
-      <h3 className="text-lg font-semibold text-text-primary mb-2">Photos & Documents</h3>
+      <h3 className="font-display text-xl font-bold text-text-primary mb-2">Photos & Documents</h3>
       <p className="text-sm text-text-secondary mb-2">
         {minPhotos > 0
           ? `Add at least ${minPhotos} photo${minPhotos > 1 ? 's' : ''} of the job`
@@ -1450,7 +1450,7 @@ function FileUploadStep({
                   className={`w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
                     filled
                       ? 'border-green-300 bg-green-50'
-                      : 'border-dashed border-border hover:border-primary/50 hover:bg-gray-50'
+                      : 'border-dashed border-border-strong hover:border-primary/60 hover:bg-mint/50'
                   }`}
                 >
                   {filled && slotFile ? (
@@ -1461,7 +1461,7 @@ function FileUploadStep({
                       className="w-10 h-10 rounded object-cover flex-shrink-0"
                     />
                   ) : (
-                    <span className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center flex-shrink-0 text-lg">
+                    <span className="w-10 h-10 rounded-warm-lg bg-surface flex items-center justify-center flex-shrink-0 text-lg">
                       📷
                     </span>
                   )}
@@ -1494,7 +1494,7 @@ function FileUploadStep({
         {files.map((file) => (
           <div
             key={file.id}
-            className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden"
+            className="relative aspect-square bg-surface rounded-warm-lg overflow-hidden"
           >
             {file.file.type.startsWith('image/') ? (
               <img
@@ -1532,7 +1532,7 @@ function FileUploadStep({
                 </span>
                 <button
                   onClick={() => handleRemove(file.id)}
-                  className="w-full mb-1 px-1 py-1 bg-white text-gray-900 rounded text-[10px] font-semibold hover:bg-gray-100"
+                  className="w-full mb-1 px-1 py-1 bg-white text-ink rounded text-[10px] font-semibold hover:bg-surface"
                 >
                   Retake
                 </button>
@@ -1559,7 +1559,7 @@ function FileUploadStep({
 
         {/* Add button (shared input also serves the guided slots) */}
         <label
-          className={`aspect-square bg-gray-100 rounded-lg border-2 border-dashed border-border items-center justify-center cursor-pointer hover:bg-gray-50 ${
+          className={`aspect-square bg-surface rounded-warm-lg border-2 border-dashed border-border-strong items-center justify-center cursor-pointer hover:bg-surface ${
             canAddPhotos || canAddDocs ? 'flex' : 'hidden'
           }`}
         >
@@ -1597,14 +1597,14 @@ function FileUploadStep({
       <div className="flex gap-3 mt-6">
         <button
           onClick={onBack}
-          className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-gray-50"
+          className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-warm-lg hover:border-border-strong transition"
         >
           Back
         </button>
         <button
           onClick={onNext}
           disabled={!canContinue}
-          className="flex-1 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-white rounded-warm-lg hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 disabled:cursor-not-allowed transition"
         >
           Continue
         </button>
@@ -1636,43 +1636,43 @@ function ContactStep({
 
   return (
     <div className="p-6">
-      <h3 className="text-lg font-semibold text-text-primary mb-4">Your Contact Details</h3>
+      <h3 className="font-display text-xl font-bold text-text-primary mb-5">Your Contact Details</h3>
 
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-text-secondary mb-1">
-            Name <span className="text-red-500">*</span>
+          <label className="block text-[13px] font-semibold text-text-primary mb-1.5">
+            Name <span className="text-danger">*</span>
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => onNameChange(e.target.value)}
             placeholder="John Smith"
-            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            className="w-full px-4 py-3 text-[15px] bg-white border border-border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-text-secondary mb-1">
-            Email <span className="text-red-500">*</span>
+          <label className="block text-[13px] font-semibold text-text-primary mb-1.5">
+            Email <span className="text-danger">*</span>
           </label>
           <input
             type="email"
             value={email}
             onChange={(e) => onEmailChange(e.target.value)}
             placeholder="john@example.com"
-            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            className="w-full px-4 py-3 text-[15px] bg-white border border-border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-text-secondary mb-1">Phone (optional)</label>
+          <label className="block text-[13px] font-semibold text-text-primary mb-1.5">Phone (optional)</label>
           <input
             type="tel"
             value={phone}
             onChange={(e) => onPhoneChange(e.target.value)}
             placeholder="+44 7700 900000"
-            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            className="w-full px-4 py-3 text-[15px] bg-white border border-border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition"
           />
         </div>
       </div>
@@ -1680,14 +1680,14 @@ function ContactStep({
       <div className="flex gap-3 mt-6">
         <button
           onClick={onBack}
-          className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-gray-50"
+          className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-warm-lg hover:border-border-strong transition"
         >
           Back
         </button>
         <button
           onClick={onSubmit}
           disabled={!isValid}
-          className="flex-1 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-white rounded-warm-lg hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 disabled:cursor-not-allowed transition"
         >
           Get Quote
         </button>
@@ -1699,7 +1699,7 @@ function ContactStep({
 function SubmittingState() {
   return (
     <div className="flex flex-col items-center justify-center py-12">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
       <p className="text-text-muted text-sm">Submitting your request...</p>
     </div>
   )
@@ -1775,9 +1775,9 @@ function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string
         <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <span className="text-2xl">✋</span>
         </div>
-        <h3 className="text-lg font-semibold text-text-primary mb-2">One quick check</h3>
+        <h3 className="font-display text-xl font-bold text-text-primary mb-2">One quick check</h3>
         {rangeDisplay && (
-          <p className="text-2xl font-bold text-text-primary mb-2">{rangeDisplay}</p>
+          <p className="font-display text-2xl font-bold text-text-primary mb-2">{rangeDisplay}</p>
         )}
         <p className="text-sm text-text-secondary mb-6">
           {rangeDisplay
@@ -1788,7 +1788,7 @@ function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string
           href={clarifyUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover"
+          className="inline-block px-6 py-3 font-semibold bg-primary text-white rounded-warm-lg hover:bg-primary-hover transition"
         >
           Confirm Details
         </a>
@@ -1800,11 +1800,11 @@ function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string
   if (liveStatus === 'pending_review' && rangeDisplay) {
     return (
       <div className="text-center py-12 px-6">
-        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 bg-mint rounded-full flex items-center justify-center mx-auto mb-4">
           <span className="text-secondary text-2xl">✓</span>
         </div>
-        <h3 className="text-lg font-semibold text-text-primary mb-2">Your estimated range</h3>
-        <p className="text-2xl font-bold text-text-primary mb-2">{rangeDisplay}</p>
+        <h3 className="font-display text-xl font-bold text-text-primary mb-2">Your estimated range</h3>
+        <p className="font-display text-2xl font-bold text-text-primary mb-2">{rangeDisplay}</p>
         <p className="text-sm text-text-secondary mb-6">
           We&apos;re double-checking the details — your final quote will arrive by email shortly.
         </p>
@@ -1812,7 +1812,7 @@ function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string
           href={quoteUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover"
+          className="inline-block px-6 py-3 font-semibold bg-primary text-white rounded-warm-lg hover:bg-primary-hover transition"
         >
           View Estimate
         </a>
@@ -1824,10 +1824,10 @@ function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string
 
   return (
     <div className="text-center py-12 px-6">
-      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <div className="w-16 h-16 bg-mint rounded-full flex items-center justify-center mx-auto mb-4">
         <span className="text-secondary text-2xl">✓</span>
       </div>
-      <h3 className="text-lg font-semibold text-text-primary mb-2">
+      <h3 className="font-display text-xl font-bold text-text-primary mb-2">
         {isReady ? 'Your quote is ready!' : 'Request Submitted!'}
       </h3>
       <p className="text-sm text-text-secondary mb-6">
@@ -1839,7 +1839,7 @@ function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string
         href={quoteUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-block px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover"
+        className="inline-block px-6 py-3 font-semibold bg-primary text-white rounded-warm-lg hover:bg-primary-hover transition"
       >
         View Your Quote
       </a>

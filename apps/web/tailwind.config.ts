@@ -33,6 +33,11 @@ const config: Config = {
           DEFAULT: 'var(--color-danger)',
           light: 'var(--color-danger-light)',
         },
+        ink: 'var(--color-ink)',
+        mist: 'var(--color-mist)',
+        mint: 'var(--color-mint)',
+        butter: 'var(--color-butter)',
+        tape: 'var(--color-tape)',
       },
       fontFamily: {
         display: ['var(--font-display)', 'system-ui', 'sans-serif'],
@@ -40,15 +45,16 @@ const config: Config = {
         mono: ['var(--font-mono)', 'monospace'],
       },
       borderRadius: {
-        'warm-lg': '0.5rem',
-        'warm-xl': '0.625rem',
-        'warm-2xl': '0.75rem',
+        'warm-lg': '0.75rem',
+        'warm-xl': '1rem',
+        'warm-2xl': '1.25rem',
       },
       boxShadow: {
         'warm': '0 0 0 1px var(--color-border)',
-        'warm-md': '0 1px 3px rgba(0, 0, 0, 0.04), 0 0 0 1px var(--color-border)',
-        'warm-lg': '0 2px 8px rgba(0, 0, 0, 0.06), 0 0 0 1px var(--color-border)',
-        'warm-hover': '0 4px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--color-border)',
+        'warm-md': '0 1px 2px rgba(27, 40, 35, 0.05), 0 2px 8px rgba(27, 40, 35, 0.04), 0 0 0 1px var(--color-border)',
+        'warm-lg': '0 2px 4px rgba(27, 40, 35, 0.05), 0 8px 24px rgba(27, 40, 35, 0.07), 0 0 0 1px var(--color-border)',
+        'warm-hover': '0 4px 8px rgba(27, 40, 35, 0.06), 0 12px 32px rgba(27, 40, 35, 0.10), 0 0 0 1px var(--color-border-strong)',
+        'document': '0 1px 3px rgba(27, 40, 35, 0.06), 0 12px 40px rgba(27, 40, 35, 0.09), 0 32px 80px rgba(27, 40, 35, 0.07)',
       },
       keyframes: {
         'fade-in-up': {
