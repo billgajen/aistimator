@@ -15,6 +15,107 @@
 
 ## Issues & Resolutions
 
+### 2026-07-24: WhatsApp Made Deployable — Missing Migration + Hidden Nav (closes the "coded but impossible to run" gap)
+
+**What was wrong:** T-111/T-112 shipped a complete WhatsApp integration (Cloud API client, webhook with tenant routing, guided-intake state machine, credential setup UI) **against three tables no migration ever created** — `whatsapp_configs`, `whatsapp_conversations`, `whatsapp_messages`. Zero SQL files referenced WhatsApp; every DB call would fail on a fresh database. The setup page also wasn't linked anywhere — reachable only by typing `/app/whatsapp`.
+
+**Fix 1 — migration 25 (`whatsapp.sql`):** creates all three tables with the exact shapes the code inserts (verified by grep of every `.from('whatsapp_*')` call + live smoke-test inserts against local Supabase). Conventions per migration-22 lessons: `tenant_id`/`quote_request_id` are TEXT with no FKs (local TEXT ids vs prod UUIDs), line comments only. `conversation_id` IS a real FK (both new UUID tables). CHECK constraints mirror the shared TS unions (status, intake_state, direction, message_type). RLS: webhook/intake run under service role, but the **config and send routes use the user-scoped client**, so authenticated users get tenant-scoped CRUD on configs and SELECT/INSERT on conversations/messages. `updated_at` triggers reuse `update_updated_at_column()`.
+
+**Fix 2 — nav:** WhatsApp added to the dashboard Configure section (chat-bubble icon) between Widget and Branding.
+
+**Verified:** migrations 23–25 applied to local Supabase via `supabase migration up`; smoke transaction exercised config insert, conversation insert, FK-linked message insert, intake-state update. Typecheck/lint/build green.
+
+**Still requires the user (cannot be done from code):** (1) push migrations 24–25 to prod; (2) set `WHATSAPP_VERIFY_TOKEN`/`WHATSAPP_APP_SECRET`/`WHATSAPP_ENCRYPTION_KEY` in Vercel env; (3) live end-to-end test with real Meta credentials via the guided setup at /app/whatsapp.
+
+**v2 backlog (deliberately not done):** proactive "quote ready" WhatsApp push from the processing pipeline — lower value than it sounds because the intake already sends the tokenized quote link in-chat at confirmation and the hosted page live-updates (T-109 polling). Meta Embedded Signup (one-click connect) — blocked on Meta Business verification, an ops track.
+
+**Files:** `supabase/migrations/00000000000025_whatsapp.sql` (new), `apps/web/src/app/(dashboard)/layout.tsx`
+
+---
+
+### 2026-07-24: Marketing Website — Multi-Page Public Site on the Measured Document System (T-103 done)
+
+**What was missing:** the root `/` was a 26-line placeholder; no pricing, features or legal pages existed anywhere. The v2 strategy reserved T-103 for the speed-to-lead homepage rebuild.
+
+**Built:** five public pages on the design-system tokens, all server components, sharing `components/marketing/{SiteNav,SiteFooter}`:
+- **`/` homepage** — signature element is `MiniEstimate`: a pure-CSS miniature of the actual estimate document (letterhead, tape-rule, dotted-leader ledger, Grade B seal, juniper price panel with mono total + measured range, photos-received chip, "generated in 58s" badge). Sections: split hero, verified speed-to-lead stats band (same sources as /painting), 4-step "Photos in. Quote out." tape timeline, "Your price. Never the AI's." does/never split on mint, measurement-grades showcase (A/B/C seals + butter range bar — the legitimate use of butter/tape), 6-feature grid, pricing teaser, juniper CTA.
+- **`/pricing`** — 3 plan cards matching the seeded `plans` table ($29/200, $79/1,000, $199/3,000 + $0.50/0.40/0.30 overage; features from `features_json`), Growth highlighted with a tape badge, plain-English FAQ. **Prices are static copy — keep in sync with `supabase/seed.sql`** (noted in file).
+- **`/features`** — the product's real pipeline as five numbered stages (Capture → Measure → Price → Deliver → Learn), honest to shipped capabilities only.
+- **`/terms` + `/privacy`** — startup-grade legal, plain language, dated 2026-07-24. **Needs review by a lawyer before serious scale.**
+- **`/painting`** refitted onto the shared nav/footer; stale "Estimator" brand fixed → **Aistimator** (the name used across the app since the design-system commit).
+
+**Verified in browser** (dev server + screenshots): hero artifact, all sections, pricing, features. One fix from review: the sticky nav was translucent (`bg-background/90 backdrop-blur`) and went muddy over juniper bands — now solid.
+
+**Files:** `apps/web/src/components/marketing/{SiteNav,SiteFooter,MiniEstimate}.tsx` (new), `apps/web/src/app/{page,pricing/page,features/page,terms/page,privacy/page}.tsx` (page.tsx rebuilt, rest new), `apps/web/src/app/painting/page.tsx`
+
+---
+
+### 2026-07-24: Quote Lifecycle Completion — Decline, Expiry, Acceptance Notification, Reminders
+
+**What was missing (audit):** customers could accept but not decline; nothing ever flipped quotes to `expired` (status existed, no job set it); accepting sent **no notification to the business** (fatal for a speed-to-lead product); no follow-up reminders.
+
+**Decline:** new `POST /api/public/quotes/[quoteId]/decline` mirroring accept (token-hash validated, expiry-checked, idempotent — 409 on already-declined/accepted, same valid-status list). Optional reason (500 chars) stored in `decline_reason` and included in the business notification email. Hosted quote page gets a deliberately quiet "No longer need this? Decline this estimate" link below the primary actions → inline optional-reason form → declined banner. New `declined` status: migration 24 enum value + badge entries in the customer page and both dashboard quote views.
+
+**Acceptance notification:** accept route now emails `tenants.notification_email` ("X accepted your quote · service · total") with a dashboard link. Email failures never fail the accept/decline (fire-and-forget with logging).
+
+**Expiry + reminders — Vercel Cron:** new `GET /api/cron/lifecycle` (daily 08:00 UTC via `apps/web/vercel.json` crons; auth = `Bearer CRON_SECRET`, **fails closed if unset**). Pass 1 flips quotes in (sent/viewed/feedback_received/revised) with `token_expires_at < now` to `expired`. Pass 2 sends ONE reminder per quote (status sent/viewed, `REMINDER_AFTER_DAYS` default 3 after `sent_at`, batch 50/run): **rotates the token** (raw tokens are never stored — the original email link is superseded; same trade-off as the resend route) and marks `reminder_sent_at` BEFORE sending (at-most-once; a crash loses a reminder rather than duplicating it). Skips the reminder pass when Postmark is unconfigured.
+
+**Migration 24** (`quote_lifecycle.sql`): `ALTER TYPE quote_status ADD VALUE 'declined'` + `declined_at`, `decline_reason`, `reminder_sent_at` columns. Enum value is not used within the migration itself (PG same-transaction restriction).
+
+**Deploy needs:** migration 24 to prod, `CRON_SECRET` in Vercel env (cron activates on next deploy), Postmark token for the emails to actually go out. Decline reason is surfaced via email only for now (not in dashboard quote detail UI).
+
+**Files:** `supabase/migrations/00000000000024_quote_lifecycle.sql` (new), `packages/shared/src/{database.types.ts,api.types.ts}`, `apps/web/src/app/api/public/quotes/[quoteId]/{accept,decline}/route.ts` (decline new), `apps/web/src/app/api/cron/lifecycle/route.ts` (new), `apps/web/src/lib/email-templates.ts` (3 templates), `apps/web/src/app/q/[quoteId]/page.tsx`, dashboard quotes list + detail badges, `apps/web/{vercel.json,.env.example}`
+
+---
+
+### 2026-07-24: Widget Consolidation — Single Implementation, All Modes (AD-024)
+
+**What was wrong (audit findings):** the shipped `public/widget.js` was a stale Preact bundle (built 2026-01-31, source last touched 2026-02-14) with **no build wiring** — inline/floating embeds served an old form with no photo upload, no service-specific fields, no conversational mode. Conversational existed twice (Preact `ConversationalWidget`, never shipped; React `ConversationalChat` in the embed page, reachable only via /demo) with divergent features and styling. `iframe-loader.js` silently dropped `data-display-mode`, so the conversational snippet shown to customers was broken. Dashboard offered no conversational option. Three styling systems, none matching the design system for chat.
+
+**AD-024 — one widget implementation, iframe-mounted everywhere:** every mount mode now renders the hosted embed page (`/embed/[tenantKey]`) in an iframe. `public/widget.js` was rewritten as a small handwritten vanilla loader (no build step → **a stale bundle is structurally impossible**): `data-mode` inline|iframe (iframe-in-container + postMessage auto-resize) or floating (juniper launcher button + slide-over panel, mobile full-screen; `EstimatorWidget.open()/.close()`); `data-display-mode="conversational"` passes `?mode=conversational` through. Supports legacy `data-button-label`. `iframe-loader.js` kept as a deprecated back-compat shim (existing snippets keep working) and now also honours `data-display-mode`. **Deleted the entire Preact implementation** (`packages/widget` — Widget, ConversationalWidget, ab-test.ts and the never-wired A/B assignment logic). Consequences: style isolation for free, conversational available in every mode, **Turnstile now works for all modes** (widget UI always runs on the platform origin), single styling system.
+
+**Also:** conversational chat restyled from hardcoded blue (#3b82f6) inline styles to Measured Document tokens (juniper bubbles, mist assistant bubbles, warm radii, token borders). Dashboard widget page now has a two-axis picker — Placement (inline | floating) × Experience (form | AI chat) — generating correct snippets; "iframe" placement removed as redundant (identical to inline under AD-024). /demo rebuilt on the same two axes; floating preview loads the real production loader.
+
+**⚠️ rollout note:** deleting `packages/widget` was blocked by tooling permissions in-session; if `packages/widget/` still exists, remove it (`git rm -r packages/widget`). Sites embedding the OLD widget.js get the new loader on their next page load — attributes are compatible (`data-mode`, `data-container`, `data-button-label` all honoured); visual change: Preact modal → iframe panel. After this deploys, `TURNSTILE_SECRET_KEY` can be enabled in production (all modes send tokens).
+
+**Files:** `apps/web/public/widget.js` (rewritten), `apps/web/public/iframe-loader.js`, `apps/web/src/app/embed/[tenantKey]/page.tsx` (chat restyle), `apps/web/src/app/(dashboard)/app/widget/WidgetPageClient.tsx`, `apps/web/src/app/demo/page.tsx` (rebuilt), `packages/widget/` (deleted)
+
+---
+
+### 2026-07-24: Turnstile + Honeypot on Quote Submission (anti-abuse layer, part 2 of 2)
+
+**What:** Bot protection on `POST /api/public/quotes`, complementing the same-day rate limiting. Two mechanisms:
+1. **Honeypot** — hidden off-screen `website` field rendered in the iframe embed form and the Preact widget source (`Widget.tsx`). Server rejects any submission with a non-empty value using a deliberately generic `VALIDATION_ERROR`. Always on; zero risk to legit users (old widget bundles simply omit the field, absence passes).
+2. **Cloudflare Turnstile** — `apps/web/src/lib/turnstile.ts` verifies tokens against siteverify. **Enforcement is keyed on `TURNSTILE_SECRET_KEY`**: unset → skipped entirely; set → token mandatory (403 `VERIFICATION_FAILED` on missing/rejected). Cloudflare outages/network errors **fail open** — rejection is fail-closed, infrastructure failure is not.
+
+**Client:** `apps/web/src/components/embed/useTurnstile.ts` — invisible (`appearance: interaction-only`, `execution: execute`) explicit-render integration; `getToken()` promise API used by both the form `handleSubmit` and the conversational chat auto-submit in `embed/[tenantKey]/page.tsx`. Challenge containers stay mounted across step/spinner transitions (chat fetches its token BEFORE swapping to the submitting spinner — the container must be in the DOM). Widget callbacks dispatch through a pending-ref because Turnstile binds callbacks once at render; tokens are single-use so re-submits reset+re-execute.
+
+**⚠️ Deploy constraint:** do NOT set `TURNSTILE_SECRET_KEY` in production until embeds sending tokens are what's actually deployed. The stale `public/widget.js` bundle (inline/floating mounts) sends no token — enabling the secret today would 403 those submissions. Enable after the widget consolidation ticket, or accept iframe-only enforcement. Sitekey must have the platform domain allowed (inline/floating embeds on customer domains will additionally need domain allowlisting or Embedded-widget domain checks relaxed — part of the widget ticket).
+
+**Not covered (deliberate):** widget/chat per-turn Turnstile (UX-hostile; rate limits cover it), uploads/init (rate-limited; assets are orphaned unless a quote references them), WhatsApp intake (doesn't go through the public API; Meta webhook is signature-verified).
+
+**Tests:** 8 unit tests `src/__tests__/turnstile.test.ts` (fail-open unset/outage/HTTP-error, fail-closed missing/rejected, remoteip omission). 24 web + 289 worker passing.
+
+**Files:** `apps/web/src/lib/turnstile.ts` (new), `apps/web/src/components/embed/useTurnstile.ts` (new), `apps/web/src/app/api/public/quotes/route.ts`, `apps/web/src/app/embed/[tenantKey]/page.tsx`, `packages/widget/src/Widget.tsx`, `apps/web/.env.example`
+
+---
+
+### 2026-07-24: Rate Limiting Added to Public Intake Endpoints (closes launch-blocking abuse hole)
+
+**What was wrong:** `POST /api/public/quotes`, `/api/public/uploads/init`, and `/api/public/widget/chat` had **no rate limiting at all**. The only limiter lived in the worker (`apps/worker/src/rate-limiter.ts`) guarding AI processing — but production runs `SYNC_QUOTE_PROCESSING=true` (no queues), so the worker limiter is out of the hot path entirely. Anyone could script unlimited submissions that burn Gemini budget, create DB rows, issue presigned R2 URLs, and consume tenant plan quota.
+
+**Fix:** New `apps/web/src/lib/rate-limit.ts` — Upstash Redis fixed-window limiter (atomic INCR+EXPIRE pipeline, same approach as the worker's) with **per-IP and per-tenant-key** counters per endpoint scope. Defaults: quotes 5/min/IP + 30/min/tenant (runs full AI pipeline), uploads 20/min/IP + 100/min/tenant, chat 15/min/IP + 100/min/tenant. Env-overridable (`RATE_LIMIT_<SCOPE>_{IP,TENANT}`, `RATE_LIMIT_WINDOW_SECONDS` — see `.env.example`). Checks run after basic validation but **before any DB access**; blocked requests get a neutral 429 (`RATE_LIMITED`) with `Retry-After`. IP from first `x-forwarded-for` entry (Vercel) with `x-real-ip` fallback.
+
+**Decision — fail-open:** missing Redis config or Redis errors never block quote requests (consistent with the plan-limits fail-open decision). Rate limiting is a damage limiter, not an availability dependency. **Deploy note: production Vercel env must have `UPSTASH_REDIS_REST_URL`/`TOKEN` set or this ships disabled** (a one-time console warning fires if unset).
+
+**Testing:** web app now has vitest (`apps/web/vitest.config.ts`, mirrors worker config); 16 unit tests in `src/__tests__/rate-limit.test.ts` via an injectable store fake. Root `pnpm test` changed from worker-only to `pnpm -r --if-present test` (runs web + worker; 16 + 289 passing).
+
+**Deliberately out of scope (follow-up tickets):** Turnstile/captcha + honeypot on submission; limits on token-gated public routes (`clarify`, `feedback`, `accept` — lower risk, token-protected); cheap public reads (`widget/config`, `quotes/[quoteId]` GET) left unlimited.
+
+**Files:** `apps/web/src/lib/rate-limit.ts` (new), `apps/web/src/app/api/public/{quotes,uploads/init,widget/chat}/route.ts`, `apps/web/{package.json,vitest.config.ts,.env.example}`, root `package.json`
+
+---
+
 ### 2026-07-21: PRODUCTION DEPLOYED 🚀
 
 **Live:** web `https://estimator-web-phi.vercel.app` (Vercel, SYNC_QUOTE_PROCESSING=true, maxDuration 60s on AI routes) · worker `estimator-worker-production.billgajen.workers.dev` (8 secrets, R2 bound, no queues) · DB Supabase `ygsuzeveesgrafgpkrev` eu-central-1 (23 migrations + seed via management API — old project `iyvpqykjjymtavjkktgo` was paused >90 days, unrestorable) · Stripe TEST mode: meter `estimate_overage`, product + 3 metered prices (50/40/30p) wired into plans, webhook `we_1TvesO3J76egMmNyRb8SSdn4`.
