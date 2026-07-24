@@ -11,19 +11,18 @@ declare global {
       open: () => void
       close: () => void
     }
-    EstimatorIframe?: {
-      init: (config: { tenantKey: string; container: string; serviceId?: string }) => void
-    }
   }
 }
 
-type EmbedMode = 'floating' | 'inline' | 'iframe' | 'conversational'
+type Placement = 'inline' | 'floating'
+type Experience = 'form' | 'conversational'
 
 /**
  * Widget Demo Page
  *
- * A local development page for testing the widget embed.
- * Supports three modes: floating button, inline, and iframe.
+ * A page for testing the widget embed. Mirrors the dashboard's two-axis
+ * configuration: Placement (inline | floating) × Experience (form | chat).
+ * Every mode renders the hosted embed page in an iframe via widget.js.
  */
 export default function DemoPage() {
   return (
@@ -52,7 +51,8 @@ function DemoPageLoading() {
 function DemoPageContent() {
   const searchParams = useSearchParams()
   const [tenantKey, setTenantKey] = useState('')
-  const [mode, setMode] = useState<EmbedMode>('iframe')
+  const [placement, setPlacement] = useState<Placement>('inline')
+  const [experience, setExperience] = useState<Experience>('form')
   const [showDemo, setShowDemo] = useState(false)
 
   // Auto-fill tenant key from URL params
@@ -73,28 +73,10 @@ function DemoPageContent() {
 
   function handleReset() {
     setShowDemo(false)
-    // Remove any existing widget elements
-    const floatingBtn = document.getElementById('estimator-floating-button')
-    const modal = document.getElementById('estimator-modal')
-    const widgetContainer = document.getElementById('widget-container')
-    const iframeContainer = document.getElementById('iframe-container')
-
-    if (floatingBtn) floatingBtn.remove()
-    if (modal) modal.remove()
-    if (widgetContainer) widgetContainer.innerHTML = ''
-    if (iframeContainer) iframeContainer.innerHTML = ''
-
-    // Remove styles
-    const styles = document.getElementById('estimator-widget-styles')
-    if (styles) styles.remove()
-
-    // Reset globals
-    if (typeof window !== 'undefined') {
-      if (window.EstimatorWidget) delete window.EstimatorWidget
-    }
+    removeFloatingWidget()
   }
 
-  const embedCode = useEmbedCode(mode, tenantKey)
+  const embedCode = useEmbedCode(placement, experience, tenantKey)
 
   return (
     <div className="min-h-screen bg-background">
@@ -131,36 +113,40 @@ function DemoPageContent() {
 
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Embed Mode
+                  Placement
                 </label>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3">
                   <ModeOption
-                    mode="iframe"
-                    currentMode={mode}
-                    onSelect={setMode}
-                    title="Iframe"
-                    description="Recommended. Easy to embed, auto-resizes."
-                  />
-                  <ModeOption
-                    mode="floating"
-                    currentMode={mode}
-                    onSelect={setMode}
-                    title="Floating"
-                    description="Shows a button that opens a modal."
-                  />
-                  <ModeOption
-                    mode="inline"
-                    currentMode={mode}
-                    onSelect={setMode}
+                    selected={placement === 'inline'}
+                    onSelect={() => setPlacement('inline')}
                     title="Inline"
-                    description="Renders directly in a container."
+                    description="Embeds on your page, auto-resizes."
                   />
                   <ModeOption
-                    mode="conversational"
-                    currentMode={mode}
-                    onSelect={setMode}
-                    title="Conversational"
-                    description="Chat-style guided experience."
+                    selected={placement === 'floating'}
+                    onSelect={() => setPlacement('floating')}
+                    title="Floating"
+                    description="A launcher button that opens a panel."
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Experience
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <ModeOption
+                    selected={experience === 'form'}
+                    onSelect={() => setExperience('form')}
+                    title="Step-by-step form"
+                    description="Guided multi-step form with photos."
+                  />
+                  <ModeOption
+                    selected={experience === 'conversational'}
+                    onSelect={() => setExperience('conversational')}
+                    title="AI chat"
+                    description="Conversational intake with photo upload."
                   />
                 </div>
               </div>
@@ -213,40 +199,31 @@ function DemoPageContent() {
             </div>
 
             <p className="text-sm text-text-secondary mb-4">
-              Mode: <span className="font-medium">{mode}</span> |
-              Tenant Key: <code className="bg-background px-1 rounded">{tenantKey}</code>
+              Placement: <span className="font-medium">{placement}</span> | Experience:{' '}
+              <span className="font-medium">{experience}</span> | Tenant Key:{' '}
+              <code className="bg-background px-1 rounded">{tenantKey}</code>
             </p>
 
-            {mode === 'iframe' && (
-              <div id="iframe-container" className="border rounded-warm-lg overflow-hidden">
-                <IframeWidget tenantKey={tenantKey} />
+            {placement === 'inline' && (
+              <div className="border rounded-warm-lg overflow-hidden">
+                <IframeWidget
+                  tenantKey={tenantKey}
+                  mode={experience === 'conversational' ? 'conversational' : undefined}
+                />
               </div>
             )}
 
-            {mode === 'conversational' && (
-              <div id="iframe-container" className="border rounded-warm-lg overflow-hidden">
-                <IframeWidget tenantKey={tenantKey} mode="conversational" />
-              </div>
-            )}
-
-            {mode === 'inline' && (
-              <div
-                id="widget-container"
-                className="border-2 border-dashed border-border rounded-warm-lg p-4"
-              >
-                <p className="text-text-muted text-center">Widget will load here</p>
-              </div>
-            )}
-
-            {mode === 'floating' && (
+            {placement === 'floating' && (
               <p className="text-sm text-text-muted">
                 Look for the floating button in the bottom-right corner of the page.
               </p>
             )}
           </div>
 
-          {/* Inject the widget script for non-iframe modes */}
-          {mode !== 'iframe' && mode !== 'conversational' && <WidgetLoader tenantKey={tenantKey} mode={mode} />}
+          {/* The floating mode uses the real production loader */}
+          {placement === 'floating' && (
+            <WidgetLoader tenantKey={tenantKey} experience={experience} />
+          )}
         </div>
       )}
 
@@ -271,26 +248,21 @@ function DemoPageContent() {
 }
 
 function ModeOption({
-  mode,
-  currentMode,
+  selected,
   onSelect,
   title,
   description,
 }: {
-  mode: EmbedMode
-  currentMode: EmbedMode
-  onSelect: (mode: EmbedMode) => void
+  selected: boolean
+  onSelect: () => void
   title: string
   description: string
 }) {
-  const isSelected = mode === currentMode
   return (
     <button
-      onClick={() => onSelect(mode)}
+      onClick={onSelect}
       className={`p-3 rounded-warm-lg border-2 text-left transition-colors ${
-        isSelected
-          ? 'border-primary bg-primary-light'
-          : 'border-border hover:border-border'
+        selected ? 'border-primary bg-primary-light' : 'border-border hover:border-border-strong'
       }`}
     >
       <div className="font-medium text-sm">{title}</div>
@@ -299,69 +271,45 @@ function ModeOption({
   )
 }
 
-function useEmbedCode(mode: EmbedMode, tenantKey: string): string {
+function useEmbedCode(placement: Placement, experience: Experience, tenantKey: string): string {
   const [embedCode, setEmbedCode] = useState('')
 
   useEffect(() => {
     const origin = window.location.origin
     const key = tenantKey || 'YOUR_TENANT_KEY'
+    const displayAttr =
+      experience === 'conversational' ? `\n  data-display-mode="conversational"` : ''
 
     let code = ''
-    switch (mode) {
-      case 'iframe':
-        code = `<!-- Estimator Widget (Iframe) -->
-<div id="estimator-widget"></div>
-<script
-  src="${origin}/iframe-loader.js"
-  data-tenant-key="${key}"
-  data-container="#estimator-widget"
-  async
-></script>`
-        break
-
-      case 'floating':
-        code = `<!-- Estimator Widget (Floating) -->
+    if (placement === 'floating') {
+      code = `<!-- Estimator Widget (Floating) -->
 <script
   src="${origin}/widget.js"
   data-tenant-key="${key}"
   data-mode="floating"
-  data-button-label="Get Quote"
+  data-button-text="Get an instant quote"${displayAttr}
   async
 ></script>`
-        break
-
-      case 'inline':
-        code = `<!-- Estimator Widget (Inline) -->
+    } else {
+      code = `<!-- Estimator Widget (Inline) -->
 <div id="estimator-widget"></div>
 <script
   src="${origin}/widget.js"
   data-tenant-key="${key}"
   data-mode="inline"
-  data-container="#estimator-widget"
+  data-container="#estimator-widget"${displayAttr}
   async
 ></script>`
-        break
-
-      case 'conversational':
-        code = `<!-- Estimator Widget (Conversational) -->
-<div id="estimator-widget"></div>
-<script
-  src="${origin}/iframe-loader.js"
-  data-tenant-key="${key}"
-  data-container="#estimator-widget"
-  data-display-mode="conversational"
-  async
-></script>`
-        break
     }
     setEmbedCode(code)
-  }, [mode, tenantKey])
+  }, [placement, experience, tenantKey])
 
   return embedCode
 }
 
 /**
- * Iframe widget component
+ * Inline preview: renders the embed page directly with resize handling,
+ * exactly what widget.js does in inline mode.
  */
 function IframeWidget({ tenantKey, mode }: { tenantKey: string; mode?: string }) {
   const [height, setHeight] = useState(400)
@@ -389,56 +337,36 @@ function IframeWidget({ tenantKey, mode }: { tenantKey: string; mode?: string })
   )
 }
 
+function removeFloatingWidget() {
+  document.getElementById('estimator-floating-launcher')?.remove()
+  document.getElementById('estimator-floating-overlay')?.remove()
+  document.querySelector('script[src="/widget.js"]')?.remove()
+  if (typeof window !== 'undefined' && window.EstimatorWidget) {
+    delete window.EstimatorWidget
+  }
+}
+
 /**
- * Component to dynamically load the JS widget
+ * Loads the real production widget.js with the chosen attributes.
  */
-function WidgetLoader({ tenantKey, mode }: { tenantKey: string; mode: string }) {
+function WidgetLoader({ tenantKey, experience }: { tenantKey: string; experience: Experience }) {
   useEffect(() => {
-    initWidgetDemo(tenantKey, mode)
+    removeFloatingWidget()
+
+    const script = document.createElement('script')
+    script.src = '/widget.js'
+    script.dataset.tenantKey = tenantKey
+    script.dataset.mode = 'floating'
+    script.dataset.buttonText = 'Get an instant quote'
+    if (experience === 'conversational') {
+      script.dataset.displayMode = 'conversational'
+    }
+    document.body.appendChild(script)
 
     return () => {
-      // Cleanup on unmount
-      const floatingBtn = document.getElementById('estimator-floating-button')
-      const modal = document.getElementById('estimator-modal')
-      const script = document.querySelector('script[src="/widget.js"]')
-      if (floatingBtn) floatingBtn.remove()
-      if (modal) modal.remove()
-      if (script) script.remove()
-      // Reset body scroll if modal was open
-      document.body.style.overflow = ''
+      removeFloatingWidget()
     }
-  }, [tenantKey, mode])
+  }, [tenantKey, experience])
 
   return null
 }
-
-/**
- * Initialize widget for demo
- */
-function initWidgetDemo(tenantKey: string, mode: string) {
-  if (typeof window === 'undefined') return
-
-  // Load the actual widget.js script
-  const existingScript = document.querySelector('script[src="/widget.js"]')
-  if (existingScript) {
-    existingScript.remove()
-  }
-
-  // Clean up any existing widget elements
-  const existingButton = document.getElementById('estimator-floating-button')
-  const existingModal = document.getElementById('estimator-modal')
-  if (existingButton) existingButton.remove()
-  if (existingModal) existingModal.remove()
-
-  // Create and inject the widget script with proper data attributes
-  const script = document.createElement('script')
-  script.src = '/widget.js'
-  script.dataset.tenantKey = tenantKey
-  script.dataset.mode = mode
-  if (mode === 'inline') {
-    script.dataset.container = '#widget-container'
-  }
-  script.dataset.buttonLabel = 'Get Quote'
-  document.body.appendChild(script)
-}
-

@@ -1,6 +1,9 @@
 /**
  * Estimator Widget Iframe Loader
  *
+ * DEPRECATED: kept for existing customer snippets. New embeds should use
+ * widget.js (data-mode="inline"), which supports all mount modes.
+ *
  * A lightweight script (~1KB) that creates and manages an iframe-embedded widget.
  * Handles auto-resizing based on content height.
  *
@@ -56,8 +59,15 @@
 
     // Build iframe URL
     var iframeUrl = WIDGET_ORIGIN + '/embed/' + encodeURIComponent(config.tenantKey);
+    var params = [];
     if (config.serviceId) {
-      iframeUrl += '?serviceId=' + encodeURIComponent(config.serviceId);
+      params.push('serviceId=' + encodeURIComponent(config.serviceId));
+    }
+    if (config.displayMode === 'conversational') {
+      params.push('mode=conversational');
+    }
+    if (params.length > 0) {
+      iframeUrl += '?' + params.join('&');
     }
 
     // Create iframe
@@ -126,7 +136,8 @@
           init({
             tenantKey: tenantKey,
             container: script.getAttribute('data-container') || '#estimator-widget',
-            serviceId: script.getAttribute('data-service-id')
+            serviceId: script.getAttribute('data-service-id'),
+            displayMode: script.getAttribute('data-display-mode')
           });
         }
         break;

@@ -3,6 +3,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { assessImageQuality } from '@/lib/image-quality'
+import { useTurnstile } from '@/components/embed/useTurnstile'
+
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
 
 /**
  * Embedded Widget Page
@@ -169,6 +172,7 @@ function ConversationalChat({
   const [uploadedFiles, setUploadedFiles] = useState<ChatUploadedFile[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { containerRef: turnstileRef, getToken: getTurnstileToken } = useTurnstile(TURNSTILE_SITE_KEY)
 
   // Track which service the conversation has resolved to
   const hasMultipleServices = widgetData.services.length > 1
@@ -308,6 +312,9 @@ function ConversationalChat({
 
       // If conversation is complete, submit the quote
       if (data.isComplete && data.formData) {
+        // Token must be fetched while the chat UI (and its Turnstile
+        // container) is still mounted — the spinner view replaces it
+        const turnstileToken = await getTurnstileToken()
         setSubmitting(true)
         const completedAssetIds = uploadedFiles.filter(f => f.status === 'complete').map(f => f.assetId)
         const quoteRes = await fetch('/api/public/quotes', {
@@ -317,6 +324,7 @@ function ConversationalChat({
             ...data.formData,
             assetIds: completedAssetIds,
             tenantKey,
+            turnstileToken: turnstileToken || undefined,
             source: { type: 'widget', mode: 'conversational' },
           }),
         })
@@ -337,50 +345,42 @@ function ConversationalChat({
 
   if (submitting) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', gap: '12px' }}>
-        <div style={{ width: 32, height: 32, border: '3px solid #e5e7eb', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-        <p style={{ color: '#6b7280', fontSize: '14px' }}>Submitting your quote request...</p>
-        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      <div className="flex flex-col items-center justify-center gap-3 px-6 py-12">
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-border border-t-primary" />
+        <p className="text-sm text-text-secondary">Submitting your quote request...</p>
       </div>
     )
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '500px' }}>
+    <div className="flex h-[500px] flex-col">
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
         {messages.map((msg, i) => (
           <div
             key={i}
-            style={{
-              alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-              maxWidth: '80%',
-            }}
+            className={`max-w-[80%] ${msg.role === 'user' ? 'self-end' : 'self-start'}`}
           >
             {msg.images && msg.images.length > 0 && (
-              <div style={{ display: 'flex', gap: '4px', marginBottom: '4px', justifyContent: 'flex-end' }}>
+              <div className="mb-1 flex justify-end gap-1">
                 {msg.images.map((url, j) => (
-                  <img key={j} src={url} alt="Upload" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: '8px' }} />
+                  <img key={j} src={url} alt="Upload" className="h-20 w-20 rounded-warm-lg object-cover" />
                 ))}
               </div>
             )}
             <div
-              style={{
-                padding: '10px 14px',
-                borderRadius: '12px',
-                fontSize: '14px',
-                lineHeight: '1.4',
-                ...(msg.role === 'user'
-                  ? { background: '#3b82f6', color: 'white', borderBottomRightRadius: '4px' }
-                  : { background: '#f3f4f6', color: '#111827', borderBottomLeftRadius: '4px' }),
-              }}
+              className={`px-3.5 py-2.5 text-sm leading-snug ${
+                msg.role === 'user'
+                  ? 'rounded-warm-lg rounded-br-sm bg-primary text-white'
+                  : 'rounded-warm-lg rounded-bl-sm bg-mist text-text-primary'
+              }`}
             >
               {msg.text}
             </div>
           </div>
         ))}
         {sending && (
-          <div style={{ alignSelf: 'flex-start', padding: '10px 14px', borderRadius: '12px', background: '#f3f4f6', color: '#9ca3af', fontSize: '14px' }}>
+          <div className="self-start rounded-warm-lg rounded-bl-sm bg-mist px-3.5 py-2.5 text-sm text-text-muted">
             Typing...
           </div>
         )}
@@ -389,46 +389,44 @@ function ConversationalChat({
 
       {/* Upload previews */}
       {uploadedFiles.length > 0 && (
-        <div style={{ padding: '8px 16px 0', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div className="flex flex-wrap gap-2 px-4 pt-2">
           {uploadedFiles.map((f, i) => (
-            <div key={i} style={{ position: 'relative', width: 48, height: 48 }}>
-              <img src={f.previewUrl} alt={f.fileName} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: '6px', opacity: f.status === 'uploading' ? 0.5 : 1 }} />
+            <div key={i} className="relative h-12 w-12">
+              <img
+                src={f.previewUrl}
+                alt={f.fileName}
+                className={`h-12 w-12 rounded-lg object-cover ${f.status === 'uploading' ? 'opacity-50' : ''}`}
+              />
               {f.status === 'uploading' && (
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ width: 16, height: 16, border: '2px solid #e5e7eb', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-primary" />
                 </div>
               )}
               {f.status === 'error' && (
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,0.3)', borderRadius: '6px', fontSize: '16px' }}>!</div>
+                <div className="absolute inset-0 flex items-center justify-center rounded-lg text-base" style={{ background: 'rgba(239,68,68,0.3)' }}>!</div>
               )}
             </div>
           ))}
         </div>
       )}
 
+      {/* Turnstile challenge mounts here only if Cloudflare requires interaction */}
+      <div ref={turnstileRef} className="flex justify-center empty:hidden" />
+
       {/* Input */}
-      <div style={{ borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+      <div className="flex items-center gap-2 border-t border-border px-4 py-3">
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
           multiple
           onChange={handleFileSelect}
-          style={{ display: 'none' }}
+          className="hidden"
         />
         <button
           onClick={() => fileInputRef.current?.click()}
           title="Add photos"
-          style={{
-            padding: '8px',
-            background: 'none',
-            border: '1px solid #d1d5db',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '18px',
-            lineHeight: 1,
-            color: '#6b7280',
-          }}
+          className="rounded-warm-lg border border-border p-2 text-lg leading-none text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
         >
           📷
         </button>
@@ -439,33 +437,16 @@ function ConversationalChat({
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
           placeholder="Type your message..."
           disabled={sending}
-          style={{
-            flex: 1,
-            padding: '10px 14px',
-            border: '1px solid #d1d5db',
-            borderRadius: '8px',
-            fontSize: '14px',
-            outline: 'none',
-          }}
+          className="flex-1 rounded-warm-lg border border-border bg-white px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-primary"
         />
         <button
           onClick={handleSend}
           disabled={sending || !input.trim()}
-          style={{
-            padding: '10px 20px',
-            background: sending || !input.trim() ? '#9ca3af' : '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: 600,
-            cursor: sending || !input.trim() ? 'default' : 'pointer',
-          }}
+          className="rounded-warm-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-default disabled:bg-text-muted"
         >
           Send
         </button>
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 }
@@ -497,6 +478,8 @@ export default function EmbedPage({ params }: EmbedPageProps) {
   const [jobDescription, setJobDescription] = useState('')
   const [jobQuantity, setJobQuantity] = useState<number | null>(null)
   const [fieldAnswers, setFieldAnswers] = useState<Record<string, string | number | boolean | string[]>>({})
+  const [honeypot, setHoneypot] = useState('')
+  const { containerRef: turnstileRef, getToken: getTurnstileToken } = useTurnstile(TURNSTILE_SITE_KEY)
 
   // Get selected service data for media config and measurement model
   const selectedServiceData = widgetData?.services.find((s) => s.id === selectedService)
@@ -583,11 +566,14 @@ export default function EmbedPage({ params }: EmbedPageProps) {
     setStep('submitting')
 
     try {
+      const turnstileToken = await getTurnstileToken()
       const response = await fetch('/api/public/quotes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenantKey,
+          turnstileToken: turnstileToken || undefined,
+          website: honeypot || undefined,
           serviceId: selectedService,
           customer: {
             name: customerName,
@@ -788,6 +774,24 @@ export default function EmbedPage({ params }: EmbedPageProps) {
       {step === 'success' && quoteResult && (
         <SuccessState quoteUrl={quoteResult.quoteViewUrl} quoteId={quoteResult.quoteId} />
       )}
+
+      {/* Honeypot — off-screen, never shown to humans */}
+      <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', top: 0, height: 0, overflow: 'hidden' }}>
+        <label>
+          Website
+          <input
+            type="text"
+            name="website"
+            tabIndex={-1}
+            autoComplete="off"
+            value={honeypot}
+            onChange={(e) => setHoneypot(e.target.value)}
+          />
+        </label>
+      </div>
+
+      {/* Turnstile challenge mounts here only if Cloudflare requires interaction */}
+      <div ref={turnstileRef} className="flex justify-center empty:hidden px-6 pb-2" />
       </div>
       <div className="max-w-xl mx-auto mt-4 flex items-center justify-center gap-3">
         <div className="tape-rule w-12 opacity-50" />

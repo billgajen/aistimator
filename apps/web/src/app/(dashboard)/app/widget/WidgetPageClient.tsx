@@ -77,7 +77,8 @@ function generateFieldId(label: string): string {
  * Configure widget form fields and get embed code.
  */
 export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
-  const [embedMode, setEmbedMode] = useState<'iframe' | 'floating' | 'inline'>('iframe')
+  const [embedMode, setEmbedMode] = useState<'inline' | 'floating'>('inline')
+  const [displayMode, setDisplayMode] = useState<'form' | 'conversational'>('form')
   const [embedCode, setEmbedCode] = useState('')
   const [copied, setCopied] = useState(false)
 
@@ -273,43 +274,32 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
   // Generate embed code
   useEffect(() => {
     const origin = window.location.origin
+    const displayAttr =
+      displayMode === 'conversational' ? `\n  data-display-mode="conversational"` : ''
 
     let code = ''
-    switch (embedMode) {
-      case 'iframe':
-        code = `<!-- Estimator Widget (Iframe) -->
-<div id="estimator-widget"></div>
-<script
-  src="${origin}/iframe-loader.js"
-  data-tenant-key="${tenantKey}"
-  data-container="#estimator-widget"
-  async
-></script>`
-        break
-      case 'floating':
-        code = `<!-- Estimator Widget (Floating) -->
+    if (embedMode === 'floating') {
+      code = `<!-- Estimator Widget (Floating) -->
 <script
   src="${origin}/widget.js"
   data-tenant-key="${tenantKey}"
   data-mode="floating"
-  data-button-label="Get Quote"
+  data-button-text="Get an instant quote"${displayAttr}
   async
 ></script>`
-        break
-      case 'inline':
-        code = `<!-- Estimator Widget (Inline) -->
+    } else {
+      code = `<!-- Estimator Widget (Inline) -->
 <div id="estimator-widget"></div>
 <script
   src="${origin}/widget.js"
   data-tenant-key="${tenantKey}"
   data-mode="inline"
-  data-container="#estimator-widget"
+  data-container="#estimator-widget"${displayAttr}
   async
 ></script>`
-        break
     }
     setEmbedCode(code)
-  }, [embedMode, tenantKey])
+  }, [embedMode, displayMode, tenantKey])
 
   function handleCopy() {
     navigator.clipboard.writeText(embedCode)
@@ -666,21 +656,44 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
             <code className="text-sm font-mono text-text-primary">{tenantKey}</code>
           </div>
 
-          {/* Mode selector */}
-          <div className="mt-4 flex gap-2">
-            {(['iframe', 'floating', 'inline'] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setEmbedMode(mode)}
-                className={`rounded-warm-lg px-3 py-1.5 text-sm font-medium capitalize ${
-                  embedMode === mode
-                    ? 'bg-blue-100 text-primary'
-                    : 'bg-background text-text-secondary hover:bg-gray-200'
-                }`}
-              >
-                {mode}
-              </button>
-            ))}
+          {/* Placement selector */}
+          <div className="mt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Placement</p>
+            <div className="mt-1.5 flex gap-2">
+              {(['inline', 'floating'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setEmbedMode(mode)}
+                  className={`rounded-warm-lg px-3 py-1.5 text-sm font-medium capitalize ${
+                    embedMode === mode
+                      ? 'bg-mint text-primary'
+                      : 'bg-background text-text-secondary hover:bg-mist'
+                  }`}
+                >
+                  {mode === 'inline' ? 'Inline (on your page)' : 'Floating button'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Experience selector */}
+          <div className="mt-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Experience</p>
+            <div className="mt-1.5 flex gap-2">
+              {(['form', 'conversational'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setDisplayMode(mode)}
+                  className={`rounded-warm-lg px-3 py-1.5 text-sm font-medium capitalize ${
+                    displayMode === mode
+                      ? 'bg-mint text-primary'
+                      : 'bg-background text-text-secondary hover:bg-mist'
+                  }`}
+                >
+                  {mode === 'form' ? 'Step-by-step form' : 'AI chat (conversational)'}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Code preview */}
