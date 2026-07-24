@@ -21,6 +21,12 @@ export default function QuotePage({ params }: QuotePageProps) {
   const [accepting, setAccepting] = useState(false)
   const [accepted, setAccepted] = useState(false)
 
+  // Decline state
+  const [declining, setDeclining] = useState(false)
+  const [declined, setDeclined] = useState(false)
+  const [declineMode, setDeclineMode] = useState(false)
+  const [declineReason, setDeclineReason] = useState('')
+
   // Feedback state
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const [feedbackMode, setFeedbackMode] = useState<'none' | 'feedback' | 'review'>('none')
@@ -47,6 +53,7 @@ export default function QuotePage({ params }: QuotePageProps) {
 
         setQuote(data)
         setAccepted(data.status === 'accepted' || data.status === 'paid')
+        setDeclined(data.status === 'declined')
       } catch {
         setError('Failed to load quote')
       } finally {
@@ -81,6 +88,34 @@ export default function QuotePage({ params }: QuotePageProps) {
       alert('Failed to accept quote')
     } finally {
       setAccepting(false)
+    }
+  }
+
+  async function handleDecline() {
+    if (!token || declining) return
+
+    setDeclining(true)
+    try {
+      const response = await fetch(`/api/public/quotes/${quoteId}/decline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, reason: declineReason.trim() || undefined }),
+      })
+
+      if (response.ok) {
+        setDeclined(true)
+        setDeclineMode(false)
+        if (quote) {
+          setQuote({ ...quote, status: 'declined' as QuoteStatus })
+        }
+      } else {
+        const data = await response.json()
+        alert(data.error?.message || 'Failed to decline quote')
+      }
+    } catch {
+      alert('Failed to decline quote')
+    } finally {
+      setDeclining(false)
     }
   }
 
@@ -146,7 +181,7 @@ export default function QuotePage({ params }: QuotePageProps) {
 
   const { business, customer, pricing, notes, validUntil, assets, status, actions, crossServicePricing, signalRecommendations, version: quoteVersion, acceptQuoteEnabled, takeoff, reference } = quote
   const showAcceptButton = acceptQuoteEnabled !== false
-  const canSubmitFeedback = ['sent', 'viewed', 'revised'].includes(status) && !feedbackSubmitted && !accepted
+  const canSubmitFeedback = ['sent', 'viewed', 'revised'].includes(status) && !feedbackSubmitted && !accepted && !declined
 
   // T-109 range-first: provisional quotes show an estimated range, not exact pricing
   if (quote.provisional) {
@@ -632,6 +667,47 @@ export default function QuotePage({ params }: QuotePageProps) {
                   </div>
                 </div>
               )}
+
+              {/* Decline — deliberately quiet, below the primary actions */}
+              {!declineMode && (
+                <p className="text-center mt-6">
+                  <button
+                    onClick={() => setDeclineMode(true)}
+                    className="text-xs text-text-muted underline underline-offset-2 hover:text-text-secondary transition"
+                  >
+                    No longer need this? Decline this estimate
+                  </button>
+                </p>
+              )}
+
+              {declineMode && (
+                <div className="mt-6 space-y-3 border border-border rounded-warm-lg p-4 bg-surface">
+                  <p className="text-sm font-semibold text-text-primary">Decline this estimate</p>
+                  <textarea
+                    value={declineReason}
+                    onChange={(e) => setDeclineReason(e.target.value)}
+                    placeholder="Optional: let us know why, it helps us improve"
+                    maxLength={500}
+                    className="w-full px-4 py-3 text-sm border border-border rounded-warm-lg bg-white text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary resize-none transition"
+                    rows={3}
+                  />
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => { setDeclineMode(false); setDeclineReason('') }}
+                      className="flex-1 py-3 px-4 text-sm font-semibold text-text-secondary border border-border rounded-warm-lg hover:bg-white transition"
+                    >
+                      Keep the estimate
+                    </button>
+                    <button
+                      onClick={handleDecline}
+                      disabled={declining}
+                      className="flex-1 py-3 px-4 text-sm font-semibold text-danger border border-danger/30 rounded-warm-lg hover:bg-danger-light disabled:opacity-50 transition"
+                    >
+                      {declining ? 'Declining…' : 'Decline estimate'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -641,6 +717,16 @@ export default function QuotePage({ params }: QuotePageProps) {
               <h3 className="font-display text-lg font-bold text-text-primary mb-1">Message sent</h3>
               <p className="text-sm text-text-secondary">
                 {business.name} will review it and get back to you.
+              </p>
+            </div>
+          )}
+
+          {/* Declined state */}
+          {declined && (
+            <div className="mx-6 sm:mx-10 mb-8 bg-surface border border-border rounded-warm-xl p-6 text-center">
+              <h3 className="font-display text-lg font-bold text-text-primary mb-1">Estimate declined</h3>
+              <p className="text-sm text-text-secondary">
+                No problem — thanks for letting {business.name} know. If anything changes, just get in touch.
               </p>
             </div>
           )}
@@ -818,6 +904,7 @@ function StatusBadge({ status }: { status: QuoteStatus }) {
     feedback_received: { label: 'Feedback received', className: 'bg-butter text-tertiary' },
     revised: { label: 'Updated', className: 'bg-mint text-primary' },
     accepted: { label: 'Accepted', className: 'bg-secondary-light text-secondary' },
+    declined: { label: 'Declined', className: 'bg-surface text-text-muted' },
     paid: { label: 'Paid', className: 'bg-secondary-light text-secondary' },
     expired: { label: 'Expired', className: 'bg-surface text-text-muted' },
     failed: { label: 'Error', className: 'bg-danger-light text-danger' },

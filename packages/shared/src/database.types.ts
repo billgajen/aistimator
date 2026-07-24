@@ -19,6 +19,7 @@ export type QuoteStatus =
   | 'feedback_received'
   | 'revised'
   | 'accepted'
+  | 'declined'
   | 'paid'
   | 'expired'
   | 'failed'
@@ -824,6 +825,12 @@ export interface Quote {
   sent_at: string | null
   viewed_at: string | null
   accepted_at: string | null
+  /** Set when the customer declines via the hosted quote page */
+  declined_at?: string | null
+  /** Optional reason the customer gave when declining */
+  decline_reason?: string | null
+  /** Set once the lifecycle cron has sent the single follow-up reminder */
+  reminder_sent_at?: string | null
   paid_at: string | null
 }
 

@@ -1,7 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
-import type { AcceptQuoteResponse } from '@estimator/shared'
+import { sendEmail, isPostmarkConfigured } from '@/lib/postmark'
+import { generateQuoteAcceptedEmailHtml } from '@/lib/email-templates'
+import type { AcceptQuoteResponse, QuotePricing, TenantBranding } from '@estimator/shared'
 
 /**
  * POST /api/public/quotes/:quoteId/accept
@@ -31,7 +33,12 @@ export async function POST(
     // Fetch quote with token validation
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
-      .select('id, status, quote_token_hash, token_expires_at, accepted_at')
+      .select(`
+        id, status, quote_token_hash, token_expires_at, accepted_at,
+        customer_json, pricing_json,
+        tenants!tenant_id ( id, name, notification_email, branding_json ),
+        services!service_id ( id, name )
+      `)
       .eq('id', quoteId)
       .eq('quote_token_hash', tokenHash)
       .single()
@@ -84,6 +91,45 @@ export async function POST(
         { error: { code: 'UPDATE_FAILED', message: 'Failed to accept quote' } },
         { status: 500 }
       )
+    }
+
+    // Notify the business — never fail the acceptance if email fails
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tenantRaw = quote.tenants as any
+      const tenant = (Array.isArray(tenantRaw) ? tenantRaw[0] : tenantRaw) as {
+        id: string; name: string; notification_email: string | null; branding_json: TenantBranding | null
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const serviceRaw = quote.services as any
+      const service = (Array.isArray(serviceRaw) ? serviceRaw[0] : serviceRaw) as { id: string; name: string }
+      const customer = quote.customer_json as { name: string; email: string }
+      const pricing = quote.pricing_json as QuotePricing | null
+
+      if (tenant?.notification_email && isPostmarkConfigured()) {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+        const totalFormatted = pricing
+          ? new Intl.NumberFormat('en-GB', {
+              style: 'currency',
+              currency: pricing.currency || 'GBP',
+            }).format(pricing.total)
+          : ''
+        const htmlBody = generateQuoteAcceptedEmailHtml({
+          businessName: tenant.name,
+          customerName: customer?.name || 'A customer',
+          serviceName: service?.name || 'your service',
+          totalFormatted,
+          dashboardUrl: `${appUrl}/app/quotes/${quoteId}`,
+          primaryColor: tenant.branding_json?.primaryColor,
+        })
+        await sendEmail({
+          to: tenant.notification_email,
+          subject: `Quote accepted: ${customer?.name || 'Customer'} - ${service?.name || ''}`,
+          htmlBody,
+        })
+      }
+    } catch (emailError) {
+      console.error('[Accept] Failed to send business notification:', emailError)
     }
 
     const response: AcceptQuoteResponse = {

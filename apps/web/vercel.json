@@ -1,3 +1,9 @@
 {
-  "installCommand": "cd ../.. && pnpm install"
+  "installCommand": "cd ../.. && pnpm install",
+  "crons": [
+    {
+      "path": "/api/cron/lifecycle",
+      "schedule": "0 8 * * *"
+    }
+  ]
 }

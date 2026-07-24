@@ -196,6 +196,7 @@ export default function QuotesPage() {
       feedback_received: { label: 'Feedback', className: 'bg-tertiary-light text-tertiary' },
       revised: { label: 'Revised', className: 'bg-primary-light text-primary' },
       accepted: { label: 'Accepted', className: 'bg-secondary-light text-secondary' },
+      declined: { label: 'Declined', className: 'bg-background text-text-muted' },
       paid: { label: 'Paid', className: 'bg-secondary-light text-secondary' },
       expired: { label: 'Expired', className: 'bg-background text-text-muted' },
       failed: { label: 'Failed', className: 'bg-danger-light text-danger' },

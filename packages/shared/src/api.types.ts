@@ -181,6 +181,17 @@ export interface AcceptQuoteResponse {
   acceptedAt: string
 }
 
+export interface DeclineQuoteRequest {
+  token: string
+  /** Optional reason shown to the business (max 500 chars) */
+  reason?: string
+}
+
+export interface DeclineQuoteResponse {
+  status: 'declined'
+  declinedAt: string
+}
+
 // ============================================================================
 // Upload API Types
 // ============================================================================

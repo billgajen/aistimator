@@ -270,3 +270,228 @@ function generateLimitReachedEmailBody(
 </html>
   `.trim()
 }
+
+/**
+ * Quote accepted notification — sent to the business when a customer
+ * accepts a quote on the hosted quote page.
+ */
+export function generateQuoteAcceptedEmailHtml(data: {
+  businessName: string
+  customerName: string
+  serviceName: string
+  totalFormatted: string
+  dashboardUrl: string
+  primaryColor?: string
+}): string {
+  const primaryColor = data.primaryColor || '#205E56'
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quote Accepted</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="padding: 40px;">
+              <div style="margin: 0 0 24px; padding: 8px 16px; display: inline-block; background-color: #dcfce7; border-radius: 6px;">
+                <span style="font-weight: 600; font-size: 14px; color: #166534;">Accepted</span>
+              </div>
+
+              <h1 style="margin: 0 0 8px; font-size: 20px; font-weight: 700; color: #09090b;">
+                ${escapeHtml(data.customerName)} accepted your quote
+              </h1>
+              <p style="margin: 0 0 24px; color: #6b7280; font-size: 14px;">
+                ${escapeHtml(data.serviceName)} &middot; ${escapeHtml(data.totalFormatted)}
+              </p>
+
+              <p style="margin: 0 0 24px; color: #374151; font-size: 14px; line-height: 1.6;">
+                The customer is expecting to hear from you — reaching out quickly keeps the momentum going.
+              </p>
+
+              <table role="presentation" style="width: 100%; margin: 32px 0;">
+                <tr>
+                  <td style="text-align: center;">
+                    <a href="${escapeHtml(data.dashboardUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
+                      View in Dashboard
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+        <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
+          <tr>
+            <td style="text-align: center; color: #9ca3af; font-size: 12px;">
+              Powered by Estimator
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+}
+
+/**
+ * Quote declined notification — sent to the business when a customer
+ * declines a quote on the hosted quote page.
+ */
+export function generateQuoteDeclinedEmailHtml(data: {
+  businessName: string
+  customerName: string
+  serviceName: string
+  reason?: string
+  dashboardUrl: string
+  primaryColor?: string
+}): string {
+  const primaryColor = data.primaryColor || '#205E56'
+
+  const reasonSection = data.reason
+    ? `
+              <div style="margin: 24px 0; padding: 16px; background-color: #fef2f2; border-left: 4px solid #ef4444; border-radius: 0 8px 8px 0;">
+                <p style="margin: 0 0 8px; font-weight: 600; color: #374151; font-size: 14px;">Customer's reason:</p>
+                <p style="margin: 0; color: #374151; font-size: 14px; line-height: 1.5; white-space: pre-wrap;">${escapeHtml(data.reason)}</p>
+              </div>
+    `
+    : ''
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quote Declined</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="padding: 40px;">
+              <div style="margin: 0 0 24px; padding: 8px 16px; display: inline-block; background-color: #fee2e2; border-radius: 6px;">
+                <span style="font-weight: 600; font-size: 14px; color: #991b1b;">Declined</span>
+              </div>
+
+              <h1 style="margin: 0 0 8px; font-size: 20px; font-weight: 700; color: #09090b;">
+                ${escapeHtml(data.customerName)} declined your quote
+              </h1>
+              <p style="margin: 0 0 24px; color: #6b7280; font-size: 14px;">
+                ${escapeHtml(data.serviceName)}
+              </p>
+
+              ${reasonSection}
+
+              <table role="presentation" style="width: 100%; margin: 32px 0;">
+                <tr>
+                  <td style="text-align: center;">
+                    <a href="${escapeHtml(data.dashboardUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
+                      View in Dashboard
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 24px 0 0; color: #6b7280; font-size: 13px; line-height: 1.5;">
+                You can follow up with the customer or revise the quote from your dashboard.
+              </p>
+            </td>
+          </tr>
+        </table>
+        <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
+          <tr>
+            <td style="text-align: center; color: #9ca3af; font-size: 12px;">
+              Powered by Estimator
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+}
+
+/**
+ * Quote reminder — sent to the customer once, a few days after the quote
+ * was sent, if it has not been accepted or declined. The link contains a
+ * freshly rotated token.
+ */
+export function generateQuoteReminderEmailHtml(data: {
+  businessName: string
+  customerName: string
+  serviceName: string
+  totalFormatted: string
+  quoteViewUrl: string
+  primaryColor?: string
+}): string {
+  const primaryColor = data.primaryColor || '#205E56'
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your quote from ${escapeHtml(data.businessName)}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="padding: 40px;">
+              <h1 style="margin: 0 0 8px; font-size: 20px; font-weight: 700; color: #09090b;">
+                Your quote is still ready, ${escapeHtml(data.customerName)}
+              </h1>
+              <p style="margin: 0 0 24px; color: #6b7280; font-size: 14px;">
+                ${escapeHtml(data.businessName)} &middot; ${escapeHtml(data.serviceName)} &middot; ${escapeHtml(data.totalFormatted)}
+              </p>
+
+              <p style="margin: 0 0 24px; color: #374151; font-size: 14px; line-height: 1.6;">
+                Just a gentle reminder that your quote is waiting for you. You can review the full breakdown, ask questions, or accept it online.
+              </p>
+
+              <table role="presentation" style="width: 100%; margin: 32px 0;">
+                <tr>
+                  <td style="text-align: center;">
+                    <a href="${escapeHtml(data.quoteViewUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
+                      View Your Quote
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 24px 0 0; color: #6b7280; font-size: 13px; line-height: 1.5;">
+                If you no longer need this quote, you can decline it from the same page — no hard feelings.
+              </p>
+            </td>
+          </tr>
+        </table>
+        <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
+          <tr>
+            <td style="text-align: center; color: #9ca3af; font-size: 12px;">
+              Powered by Estimator
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+}
