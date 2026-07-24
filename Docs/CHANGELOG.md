@@ -15,6 +15,18 @@
 
 ## Issues & Resolutions
 
+### 2026-07-24: PRODUCTION DEPLOY — all six of today's tickets live
+
+**Shipped:** commits 50ec7f7…08efbf8 deployed to https://estimator-web-phi.vercel.app. Migrations 24+25 applied to prod Supabase via management API (`scripts/deploy-migrations-24-25.sh` — token from keychain, verified 3 whatsapp tables / 3 lifecycle columns / declined enum). `CRON_SECRET` set (daily lifecycle cron now active at 08:00 UTC).
+
+**Deploy lesson:** `openssl rand | vercel env add` stores the trailing newline and the build then FAILS with "CRON_SECRET contains leading or trailing whitespace" — use `printf '%s' "$(openssl rand -hex 32)"`. Also `vercel env add` needs `--sensitive --yes` when piped or the interactive "Mark as sensitive?" prompt silently discards the value. Both fixes are in `scripts/deploy-env.sh`.
+
+**Verified live:** all marketing pages 200, new widget.js loader served, cron 401s without bearer (fails closed as designed), quote API validation + honeypot working.
+
+**Still off in prod (env not set, features fail open/dormant):** Upstash (rate limiting), **Postmark (all emails)**, Turnstile keys, WhatsApp vars, Stripe live keys, custom domain. Ready-to-uncomment commands in `scripts/deploy-env.sh`.
+
+---
+
 ### 2026-07-24: WhatsApp Made Deployable — Missing Migration + Hidden Nav (closes the "coded but impossible to run" gap)
 
 **What was wrong:** T-111/T-112 shipped a complete WhatsApp integration (Cloud API client, webhook with tenant routing, guided-intake state machine, credential setup UI) **against three tables no migration ever created** — `whatsapp_configs`, `whatsapp_conversations`, `whatsapp_messages`. Zero SQL files referenced WhatsApp; every DB call would fail on a fresh database. The setup page also wasn't linked anywhere — reachable only by typing `/app/whatsapp`.
