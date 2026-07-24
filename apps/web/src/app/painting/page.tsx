@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { SiteNav } from '@/components/marketing/SiteNav'
+import { SiteFooter } from '@/components/marketing/SiteFooter'
 
 /**
  * Painting & Decorating landing page (T-114).
@@ -9,7 +11,7 @@ import type { Metadata } from 'next'
  */
 
 export const metadata: Metadata = {
-  title: 'Instant Painting & Decorating Quotes — Estimator',
+  title: 'Instant Painting & Decorating Quotes — Aistimator',
   description:
     'Give customers an instant painting quote from photos — priced by your rates, never AI guesses. On your website and WhatsApp. Set up in 5 minutes.',
 }
@@ -67,28 +69,7 @@ const FEATURES = [
 export default function PaintingLandingPage() {
   return (
     <main className="min-h-screen bg-background">
-      {/* Nav */}
-      <nav className="border-b border-border">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <Link href="/" className="font-display text-lg font-extrabold tracking-tight text-text-primary">
-            Estimator
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="px-3 py-2 text-sm font-semibold text-text-secondary hover:text-text-primary"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/signup"
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
-            >
-              Start free
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <SiteNav />
 
       {/* Hero */}
       <section className="mx-auto max-w-5xl px-6 pb-16 pt-20 text-center">
@@ -220,10 +201,7 @@ export default function PaintingLandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-border py-8 text-center text-xs text-text-muted">
-        Powered by Estimator — instant quotes for service businesses
-      </footer>
+      <SiteFooter />
     </main>
   )
 }
