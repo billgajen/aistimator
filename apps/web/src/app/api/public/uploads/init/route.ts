@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { AssetType } from '@estimator/shared'
 import { generateUploadUrl, isR2Configured } from '@/lib/r2'
+import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
 
 // Request body types
 interface FileInput {
@@ -71,6 +72,15 @@ export async function POST(request: Request) {
         },
         { status: 400 }
       )
+    }
+
+    // Rate limit before creating asset rows or issuing presigned URLs
+    const rate = await checkPublicRateLimit('uploads', {
+      ip: getClientIp(request),
+      tenantKey: body.tenantKey,
+    })
+    if (!rate.allowed) {
+      return rateLimitedResponse(rate)
     }
 
     const supabase = createAdminClient()

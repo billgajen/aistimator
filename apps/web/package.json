@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.975.0",
@@ -15,6 +16,7 @@
     "@estimator/shared": "workspace:*",
     "@supabase/ssr": "^0.4.0",
     "@supabase/supabase-js": "^2.44.0",
+    "@upstash/redis": "^1.36.1",
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
@@ -28,6 +30,7 @@
     "eslint-config-next": "^14.2.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^4.0.18"
   }
 }

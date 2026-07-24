@@ -4,6 +4,8 @@ import { enqueueQuoteJob } from '@/lib/queue'
 import { incrementUsageCounter } from '@/lib/usage'
 import { checkPlanLimit, maybeNotifyLimitReached, recordOverageQuote } from '@/lib/plan-limits'
 import { validateServiceMatch } from '@/lib/ai/service-matcher'
+import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
+import { verifyTurnstileToken } from '@/lib/turnstile'
 import { NextResponse } from 'next/server'
 
 // Vercel function budget: this route runs the full AI pipeline synchronously
@@ -36,6 +38,10 @@ interface CreateQuoteRequest {
   job?: JobInput
   assetIds?: string[]
   source?: SourceInput
+  /** Cloudflare Turnstile token — required when TURNSTILE_SECRET_KEY is set */
+  turnstileToken?: string
+  /** Honeypot — hidden field no human sees; any value means a bot */
+  website?: string
 }
 
 /**
@@ -75,6 +81,41 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: { code: 'VALIDATION_ERROR', message: 'Invalid email format' } },
         { status: 400 }
+      )
+    }
+
+    // Honeypot: the widget renders a hidden "website" field no human can
+    // see or fill. Response is a generic validation error on purpose.
+    if (typeof body.website === 'string' && body.website.trim() !== '') {
+      console.warn('[Quotes] Honeypot tripped — rejecting submission')
+      return NextResponse.json(
+        { error: { code: 'VALIDATION_ERROR', message: 'Invalid submission' } },
+        { status: 400 }
+      )
+    }
+
+    const clientIp = getClientIp(request)
+
+    // Rate limit before any DB access — this route runs the full AI pipeline
+    const rate = await checkPublicRateLimit('quotes', {
+      ip: clientIp,
+      tenantKey: body.tenantKey,
+    })
+    if (!rate.allowed) {
+      return rateLimitedResponse(rate)
+    }
+
+    // Turnstile bot check (no-op until TURNSTILE_SECRET_KEY is configured)
+    const turnstile = await verifyTurnstileToken(body.turnstileToken, clientIp)
+    if (!turnstile.ok) {
+      return NextResponse.json(
+        {
+          error: {
+            code: 'VERIFICATION_FAILED',
+            message: 'Security check failed. Please refresh the page and try again.',
+          },
+        },
+        { status: 403 }
       )
     }
 

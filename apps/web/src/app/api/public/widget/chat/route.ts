@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
 import { NextResponse } from 'next/server'
 
 /**
@@ -59,6 +60,15 @@ export async function POST(request: Request) {
         { error: { code: 'MISSING_MESSAGE', message: 'message is required' } },
         { status: 400 }
       )
+    }
+
+    // Rate limit before any DB access — every turn costs a Gemini call
+    const rate = await checkPublicRateLimit('chat', {
+      ip: getClientIp(request),
+      tenantKey: body.tenantKey,
+    })
+    if (!rate.allowed) {
+      return rateLimitedResponse(rate)
     }
 
     const supabase = createAdminClient()

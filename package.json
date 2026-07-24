@@ -10,7 +10,7 @@
     "build:worker": "pnpm --filter @estimator/worker build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm --filter @estimator/worker test",
+    "test": "pnpm -r --if-present test",
     "test:watch": "pnpm --filter @estimator/worker test:watch",
     "test:coverage": "pnpm --filter @estimator/worker test:coverage",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
