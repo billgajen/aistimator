@@ -1,5 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import { NextResponse } from 'next/server'
+import type { TenantBranding } from '@estimator/shared'
 
 /**
  * GET /api/public/widget/config
@@ -46,7 +48,7 @@ export async function GET(request: Request) {
     // Fetch tenant info
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
-      .select('name')
+      .select('name, branding_json')
       .eq('id', tenantId)
       .single()
 
@@ -166,8 +168,26 @@ export async function GET(request: Request) {
       }
     })
 
+    // Tenant branding for the widget: primary colour + a short-lived logo URL
+    const brandingJson = (tenant.branding_json || {}) as Partial<TenantBranding>
+    let logoUrl: string | null = null
+    if (brandingJson.logoAssetId && isR2Configured()) {
+      const { data: logoAsset } = await supabase
+        .from('assets')
+        .select('r2_key')
+        .eq('id', brandingJson.logoAssetId)
+        .single()
+      if (logoAsset) {
+        logoUrl = await generateDownloadUrl(logoAsset.r2_key)
+      }
+    }
+
     return NextResponse.json({
       tenantName: tenant.name,
+      branding: {
+        primaryColor: brandingJson.primaryColor || null,
+        logoUrl,
+      },
       services: enhancedServices,
       // Keep 'fields' for backwards compatibility (contains global fields only)
       fields: globalFields,

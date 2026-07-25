@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
+import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import type { TenantBranding, TenantTemplate } from '@estimator/shared'
 
 const DEFAULT_BRANDING: TenantBranding = {
@@ -77,11 +78,25 @@ export async function GET() {
       ...(tenant.template_json || {}),
     }
 
+    // Resolve a short-lived viewable URL for the logo, if one is set
+    let logoUrl: string | null = null
+    if (branding.logoAssetId && isR2Configured()) {
+      const { data: logoAsset } = await supabase
+        .from('assets')
+        .select('r2_key')
+        .eq('id', branding.logoAssetId)
+        .single()
+      if (logoAsset) {
+        logoUrl = await generateDownloadUrl(logoAsset.r2_key)
+      }
+    }
+
     return NextResponse.json({
       tenantId: tenant.id,
       tenantName: tenant.name,
       branding,
       template,
+      logoUrl,
     })
   } catch (error) {
     console.error('Branding GET error:', error)

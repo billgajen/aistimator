@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
+import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import type {
   QuoteViewResponse,
   QuoteViewBusiness,
@@ -47,7 +48,8 @@ export async function GET(
         tenants!tenant_id (
           id,
           name,
-          template_json
+          template_json,
+          branding_json
         ),
         services!service_id (
           id,
@@ -112,7 +114,12 @@ export async function GET(
     }
 
     // Build response
-    const tenant = quote.tenants as { id: string; name: string; template_json: Record<string, unknown> | null }
+    const tenant = quote.tenants as {
+      id: string
+      name: string
+      template_json: Record<string, unknown> | null
+      branding_json: { logoAssetId?: string | null; primaryColor?: string; footerNotes?: string | null } | null
+    }
     const pricing = quote.pricing_json as QuotePricing
     const content = quote.content_json as QuoteContent & {
       validityDays?: number
@@ -121,9 +128,23 @@ export async function GET(
     }
     const customer = quote.customer_json as { name: string; email: string }
 
-    // Note: logoUrl will be added when branding is implemented (T-008)
+    // Tenant branding: logo (short-lived signed URL), colour, footer notes
+    const brandingJson = tenant.branding_json || {}
+    let logoUrl: string | undefined
+    if (brandingJson.logoAssetId && isR2Configured()) {
+      const { data: logoAsset } = await supabase
+        .from('assets')
+        .select('r2_key')
+        .eq('id', brandingJson.logoAssetId)
+        .single()
+      if (logoAsset) {
+        logoUrl = await generateDownloadUrl(logoAsset.r2_key)
+      }
+    }
+
     const business: QuoteViewBusiness = {
       name: tenant.name,
+      logoUrl,
     }
 
     const customerView: QuoteViewCustomer = {
@@ -176,6 +197,10 @@ export async function GET(
       documentType: quote.document_type,
       version: quote.version ?? 1,
       business,
+      branding: {
+        primaryColor: brandingJson.primaryColor,
+        footerNotes: brandingJson.footerNotes ?? null,
+      },
       customer: customerView,
       ...(provisional && { provisional }),
       // T-108: surface stored questions so the clarify page can render them

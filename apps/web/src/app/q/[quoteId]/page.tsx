@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { brandStyleVars } from '@/lib/color'
 import type { QuoteViewResponse, QuoteStatus } from '@estimator/shared'
 
 interface QuotePageProps {
@@ -179,7 +180,8 @@ export default function QuotePage({ params }: QuotePageProps) {
     return null
   }
 
-  const { business, customer, pricing, notes, validUntil, assets, status, actions, crossServicePricing, signalRecommendations, version: quoteVersion, acceptQuoteEnabled, takeoff, reference } = quote
+  const { business, branding, customer, pricing, notes, validUntil, assets, status, actions, crossServicePricing, signalRecommendations, version: quoteVersion, acceptQuoteEnabled, takeoff, reference } = quote
+  const brandVars = brandStyleVars(branding?.primaryColor)
   const showAcceptButton = acceptQuoteEnabled !== false
   const canSubmitFeedback = ['sent', 'viewed', 'revised'].includes(status) && !feedbackSubmitted && !accepted && !declined
 
@@ -187,7 +189,7 @@ export default function QuotePage({ params }: QuotePageProps) {
   if (quote.provisional) {
     const { rangeLow, rangeHigh, reason } = quote.provisional
     return (
-      <div className="min-h-screen bg-background py-8 px-4 sm:py-14">
+      <div className="min-h-screen bg-background py-8 px-4 sm:py-14" style={brandVars}>
         <div className="max-w-2xl mx-auto animate-fade-in-up">
           <div className="bg-background rounded-warm-2xl shadow-document overflow-hidden">
             <Letterhead
@@ -243,14 +245,14 @@ export default function QuotePage({ params }: QuotePageProps) {
               </div>
             )}
           </div>
-          <DocumentFooter />
+          <DocumentFooter footerNotes={branding?.footerNotes} />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background py-8 px-4 sm:py-14">
+    <div className="min-h-screen bg-background py-8 px-4 sm:py-14" style={brandVars}>
       <div className="max-w-2xl mx-auto">
         {/* The document */}
         <div className="animate-fade-in-up bg-background rounded-warm-2xl shadow-document overflow-hidden">
@@ -749,7 +751,7 @@ export default function QuotePage({ params }: QuotePageProps) {
           )}
         </div>
 
-        <DocumentFooter />
+        <DocumentFooter footerNotes={branding?.footerNotes} />
       </div>
     </div>
   )
@@ -885,10 +887,17 @@ function Money({ amount, currency, emphasize }: { amount: number; currency: stri
   )
 }
 
-function DocumentFooter() {
+function DocumentFooter({ footerNotes }: { footerNotes?: string | null }) {
   return (
-    <div className="text-center mt-7 text-[11px] text-text-muted">
-      <span className="figure">Prepared with Aistimator</span>
+    <div className="text-center mt-7">
+      {footerNotes && (
+        <p className="mx-auto mb-3 max-w-md whitespace-pre-wrap text-[12px] text-text-secondary">
+          {footerNotes}
+        </p>
+      )}
+      <p className="text-[11px] text-text-muted">
+        <span className="figure">Prepared with Aistimator</span>
+      </p>
     </div>
   )
 }

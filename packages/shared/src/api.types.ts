@@ -113,6 +113,12 @@ export interface QuoteViewBusiness {
   logoUrl?: string
 }
 
+/** Tenant branding surfaced on the hosted quote page */
+export interface QuoteViewBranding {
+  primaryColor?: string
+  footerNotes?: string | null
+}
+
 export interface QuoteViewCustomer {
   name: string
 }
@@ -136,6 +142,7 @@ export interface QuoteViewResponse {
   /** Quote version (incremented on each business edit) */
   version?: number
   business: QuoteViewBusiness
+  branding?: QuoteViewBranding
   customer: QuoteViewCustomer
   pricing: QuotePricing
   /**

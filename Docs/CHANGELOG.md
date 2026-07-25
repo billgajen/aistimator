@@ -15,6 +15,23 @@
 
 ## Issues & Resolutions
 
+### 2026-07-25: Branding Actually Works — logo upload + colours/footer flow to widget, quote page, PDF
+
+**What was broken (user report, confirmed):** the branding page saved `branding_json` but almost nothing consumed it. Logo upload was a "coming soon" stub with no endpoint; the public widget-config API returned zero branding fields (the colour picker affected literally nothing); the public quote API had a "logoUrl will be added when branding is implemented (T-008)" comment; footer notes reached only the PDF. Ironically the PDF route and quote-page letterhead already *rendered* logos — there was just no way to upload one. Only notification emails used the colour.
+
+**Fixes:**
+1. **Logo upload:** new `POST/DELETE /api/tenant/logo` — multipart upload (PNG/JPG/WebP ≤2MB), server-side `uploadToR2`, asset row, merges `logoAssetId` into branding_json. Branding page has real upload/replace/remove UI with preview. Logos are served via short-lived signed URLs generated per API response (no new public route, no public bucket).
+2. **Colour propagation via CSS variables:** new `lib/color.ts` (`brandStyleVars` → `--color-primary` + derived `--color-primary-hover` at 18% darken; strict hex validation so garbage input falls back to juniper). Applied on the embed page root and the hosted quote page root — every `bg-primary`/`text-primary`/`hover:bg-primary-hover` class re-brands automatically, including the conversational chat (its restyle to token classes in AD-024 made this free).
+3. **Widget:** config API now returns `branding: { primaryColor, logoUrl }`; letterhead shows the logo and now also renders in conversational mode (was form-only).
+4. **Quote page:** public quote API returns `business.logoUrl` + `branding { primaryColor, footerNotes }` (shared type `QuoteViewBranding`); footer notes render above "Prepared with Aistimator"; brand vars applied on both the final and provisional (T-109) views.
+5. **PDF:** needed no change — its logo resolution finally has data to work with.
+
+**Design note:** tenant colour intentionally overrides juniper on customer-facing surfaces (widget + quote page); the dashboard and marketing site stay on the design system. Invalid/unset colours = juniper default.
+
+**Files:** `apps/web/src/lib/color.ts` + `api/tenant/logo/route.ts` (new), `api/tenant/branding/route.ts`, `api/public/widget/config/route.ts`, `api/public/quotes/[quoteId]/route.ts`, branding page, embed page, quote page, `packages/shared/src/api.types.ts`
+
+---
+
 ### 2026-07-24: PRODUCTION DEPLOY — all six of today's tickets live
 
 **Shipped:** commits 50ec7f7…08efbf8 deployed to https://estimator-web-phi.vercel.app. Migrations 24+25 applied to prod Supabase via management API (`scripts/deploy-migrations-24-25.sh` — token from keychain, verified 3 whatsapp tables / 3 lifecycle columns / declined enum). `CRON_SECRET` set (daily lifecycle cron now active at 08:00 UTC).

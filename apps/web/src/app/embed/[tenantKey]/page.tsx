@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { assessImageQuality } from '@/lib/image-quality'
+import { brandStyleVars } from '@/lib/color'
 import { useTurnstile } from '@/components/embed/useTurnstile'
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
@@ -57,6 +58,8 @@ interface WidgetField {
 
 interface WidgetData {
   tenantName: string
+  /** Tenant branding — primary colour override + short-lived logo URL */
+  branding?: { primaryColor?: string | null; logoUrl?: string | null }
   services: WidgetService[]
   /** @deprecated Use globalFields instead. Kept for backwards compatibility. */
   fields: WidgetField[]
@@ -669,13 +672,24 @@ export default function EmbedPage({ params }: EmbedPageProps) {
     <div
       ref={containerRef}
       className="min-h-full bg-background font-body p-3 sm:px-6 sm:py-10"
+      style={brandStyleVars(widgetData?.branding?.primaryColor)}
     >
       <div className="max-w-xl mx-auto bg-white rounded-warm-2xl border border-border shadow-warm-lg overflow-hidden pb-2">
-      {/* Widget letterhead */}
-      {displayMode !== 'conversational' && widgetData && step !== 'loading' && step !== 'error' && step !== 'success' && (
-        <div className="px-6 pt-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-tertiary mb-0.5">Instant estimate</p>
-          <h2 className="font-display text-lg font-bold text-text-primary leading-tight">{widgetData.tenantName}</h2>
+      {/* Widget letterhead — shown in both form and conversational modes */}
+      {widgetData && step !== 'loading' && step !== 'error' && step !== 'success' && (
+        <div className="flex items-start justify-between gap-4 px-6 pt-6">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-tertiary mb-0.5">Instant estimate</p>
+            <h2 className="font-display text-lg font-bold text-text-primary leading-tight">{widgetData.tenantName}</h2>
+          </div>
+          {widgetData.branding?.logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element -- signed R2 URL
+            <img
+              src={widgetData.branding.logoUrl}
+              alt=""
+              className="h-9 max-w-[120px] object-contain object-right"
+            />
+          )}
         </div>
       )}
 
