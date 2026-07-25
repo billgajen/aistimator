@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
+import { hasCustomBranding } from '@/lib/plan-features'
 import { NextResponse } from 'next/server'
 import type { TenantBranding } from '@estimator/shared'
 
@@ -182,11 +183,15 @@ export async function GET(request: Request) {
       }
     }
 
+    const whiteLabel = await hasCustomBranding(supabase, tenantId)
+
     return NextResponse.json({
       tenantName: tenant.name,
       branding: {
         primaryColor: brandingJson.primaryColor || null,
         logoUrl,
+        tagline: brandingJson.tagline || null,
+        showPoweredBy: !whiteLabel,
       },
       services: enhancedServices,
       // Keep 'fields' for backwards compatibility (contains global fields only)

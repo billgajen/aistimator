@@ -34,6 +34,12 @@ export interface TenantBranding {
   logoAssetId: string | null
   primaryColor: string
   footerNotes: string | null
+  /** Short strapline shown under the business name (quote, widget, PDF) */
+  tagline?: string | null
+  /** Contact details shown on the quote document and PDF */
+  phone?: string | null
+  email?: string | null
+  website?: string | null
 }
 
 export interface TenantTemplate {

@@ -216,6 +216,19 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
     ? `<img src="${logoUrl}" alt="${escapeHtml(businessName)}" style="max-height: 60px; max-width: 200px;" />`
     : `<h1 style="margin: 0; font-size: 24px; font-weight: 700; color: ${primaryColor};">${escapeHtml(businessName)}</h1>`
 
+  // Identity lines under the logo/name: tagline + contact details
+  const taglineHtml = branding.tagline
+    ? `<p style="margin: 6px 0 0 0; font-size: 12px; color: #4b5563;">${escapeHtml(branding.tagline)}</p>`
+    : ''
+  const contactParts = [branding.phone, branding.email, branding.website].filter(
+    (part): part is string => Boolean(part)
+  )
+  const contactHtml = contactParts.length
+    ? `<p style="margin: 4px 0 0 0; font-size: 11px; color: #6b7280;">${contactParts
+        .map(escapeHtml)
+        .join(' &middot; ')}</p>`
+    : ''
+
   // Full HTML document
   return `
 <!DOCTYPE html>
@@ -244,6 +257,8 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; border-bottom: 2px solid ${primaryColor}; padding-bottom: 20px;">
       <div>
         ${logoHtml}
+        ${taglineHtml}
+        ${contactHtml}
       </div>
       <div style="text-align: right;">
         <p style="margin: 0 0 4px 0; font-size: 12px; color: #6b7280;">Quote Reference</p>

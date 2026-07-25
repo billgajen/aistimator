@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { brandStyleVars, darkenHex, isValidHexColor } from '@/lib/color'
+import { brandStyleVars, darkenHex, isValidHexColor, readableTextOn } from '@/lib/color'
 
 describe('isValidHexColor', () => {
   it('accepts 6-digit hex colours', () => {
@@ -33,7 +33,31 @@ describe('darkenHex', () => {
   })
 })
 
+describe('readableTextOn', () => {
+  it('uses white text on dark brand colours', () => {
+    expect(readableTextOn('#205E56')).toBe('#ffffff') // juniper
+    expect(readableTextOn('#1E3A5F')).toBe('#ffffff') // navy
+    expect(readableTextOn('#000000')).toBe('#ffffff')
+  })
+
+  it('uses ink text on light brand colours (the white-on-pale footgun)', () => {
+    expect(readableTextOn('#F7E9C6')).toBe('#1B2823') // butter
+    expect(readableTextOn('#FFFF00')).toBe('#1B2823') // yellow
+    expect(readableTextOn('#ffffff')).toBe('#1B2823')
+  })
+})
+
 describe('brandStyleVars', () => {
+  it('includes the on-primary text vars', () => {
+    const dark = brandStyleVars('#205E56') as Record<string, string>
+    expect(dark['--color-on-primary']).toBe('#ffffff')
+    expect(dark['--color-on-primary-rgb']).toBe('255 255 255')
+
+    const light = brandStyleVars('#F7E9C6') as Record<string, string>
+    expect(light['--color-on-primary']).toBe('#1B2823')
+    expect(light['--color-on-primary-rgb']).toBe('27 40 35')
+  })
+
   it('produces primary + derived hover variables', () => {
     const vars = brandStyleVars('#2563eb') as Record<string, string>
     expect(vars['--color-primary']).toBe('#2563eb')

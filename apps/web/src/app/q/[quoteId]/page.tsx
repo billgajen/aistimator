@@ -202,13 +202,13 @@ export default function QuotePage({ params }: QuotePageProps) {
             />
 
             {/* Provisional price instrument */}
-            <div className="px-6 sm:px-10 py-10 text-white" style={{ backgroundColor: JUNIPER }}>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60 mb-3">
+            <div className="px-6 sm:px-10 py-10 bg-primary text-on-primary">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-primary/60 mb-3">
                 Estimated range for {customer.name}
               </p>
               <p className="figure text-4xl sm:text-5xl font-medium tracking-tight">
                 <Money amount={rangeLow} currency={pricing.currency} />
-                <span className="text-white/40 mx-2 font-light">—</span>
+                <span className="text-on-primary/40 mx-2 font-light">—</span>
                 <Money amount={rangeHigh} currency={pricing.currency} />
               </p>
 
@@ -216,7 +216,7 @@ export default function QuotePage({ params }: QuotePageProps) {
 
               {reason === 'awaiting_clarification' ? (
                 <div className="mt-6">
-                  <p className="text-sm text-white/80 mb-5 max-w-md">
+                  <p className="text-sm text-on-primary/80 mb-5 max-w-md">
                     Confirm a couple of details and this range becomes your exact price —
                     it takes less than a minute.
                   </p>
@@ -228,7 +228,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                   </a>
                 </div>
               ) : (
-                <p className="mt-6 text-sm text-white/80 max-w-md">
+                <p className="mt-6 text-sm text-on-primary/80 max-w-md">
                   {business.name} is double-checking the details. Your final estimate arrives
                   by email shortly — nothing needed from you.
                 </p>
@@ -245,7 +245,7 @@ export default function QuotePage({ params }: QuotePageProps) {
               </div>
             )}
           </div>
-          <DocumentFooter footerNotes={branding?.footerNotes} />
+          <DocumentFooter footerNotes={branding?.footerNotes} showPoweredBy={branding?.showPoweredBy !== false} />
         </div>
       </div>
     )
@@ -267,17 +267,17 @@ export default function QuotePage({ params }: QuotePageProps) {
           />
 
           {/* ============ The price instrument (signature) ============ */}
-          <div className="px-6 sm:px-10 py-9 text-white" style={{ backgroundColor: JUNIPER }}>
+          <div className="px-6 sm:px-10 py-9 bg-primary text-on-primary">
             <div className="flex items-start justify-between gap-6">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60 mb-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-primary/60 mb-3">
                   Your estimate{pricing.taxAmount > 0 ? ` · incl. ${pricing.taxLabel || 'tax'}` : ''}
                 </p>
                 <p className="figure text-5xl sm:text-6xl font-medium tracking-tight leading-none">
                   <Money amount={pricing.total} currency={pricing.currency} emphasize />
                 </p>
                 {pricing.estimate && (
-                  <p className="mt-4 text-[13px] leading-snug text-white/75 max-w-sm">
+                  <p className="mt-4 text-[13px] leading-snug text-on-primary/75 max-w-sm">
                     {pricing.estimate.description}
                   </p>
                 )}
@@ -286,7 +286,7 @@ export default function QuotePage({ params }: QuotePageProps) {
               {pricing.estimate && (
                 <div
                   className="grade-seal shrink-0"
-                  style={{ color: '#F0DCA0', ['--seal-gap' as never]: JUNIPER }}
+                  style={{ color: '#F0DCA0', ['--seal-gap' as never]: 'var(--color-primary)' }}
                   aria-label={`Estimate grade ${pricing.estimate.grade} — ${pricing.estimate.label}`}
                 >
                   <span className="font-display text-2xl font-bold">{pricing.estimate.grade}</span>
@@ -608,7 +608,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                   <button
                     onClick={handleAccept}
                     disabled={accepting}
-                    className="w-full py-4 px-4 rounded-warm-xl font-display font-bold text-white text-base bg-primary hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    className="w-full py-4 px-4 rounded-warm-xl font-display font-bold text-on-primary text-base bg-primary hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 disabled:cursor-not-allowed transition"
                   >
                     {accepting ? 'Accepting…' : `Accept this estimate — ${formatCurrency(pricing.total, pricing.currency)}`}
                   </button>
@@ -662,7 +662,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                     <button
                       onClick={() => handleFeedback('feedback')}
                       disabled={submittingFeedback || !feedbackText.trim()}
-                      className="flex-1 py-3 px-4 text-sm font-semibold text-white bg-primary rounded-warm-lg hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      className="flex-1 py-3 px-4 text-sm font-semibold text-on-primary bg-primary rounded-warm-lg hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition"
                     >
                       {submittingFeedback ? 'Sending…' : 'Send message'}
                     </button>
@@ -751,7 +751,7 @@ export default function QuotePage({ params }: QuotePageProps) {
           )}
         </div>
 
-        <DocumentFooter footerNotes={branding?.footerNotes} />
+        <DocumentFooter footerNotes={branding?.footerNotes} showPoweredBy={branding?.showPoweredBy !== false} />
       </div>
     </div>
   )
@@ -768,7 +768,14 @@ function Letterhead({
   pdfUrl,
   version,
 }: {
-  business: { name: string; logoUrl?: string | null }
+  business: {
+    name: string
+    logoUrl?: string | null
+    tagline?: string | null
+    phone?: string | null
+    email?: string | null
+    website?: string | null
+  }
   status: QuoteStatus
   reference?: string | null
   customerName: string
@@ -776,6 +783,7 @@ function Letterhead({
   pdfUrl?: string | null
   version?: number
 }) {
+  const contactParts = [business.phone, business.email, business.website].filter(Boolean)
   return (
     <div className="px-6 sm:px-10 pt-8 pb-6">
       <div className="flex items-start justify-between gap-4">
@@ -786,6 +794,14 @@ function Letterhead({
             <h1 className="font-display text-2xl font-bold tracking-tight text-text-primary truncate">
               {business.name}
             </h1>
+          )}
+          {business.tagline && (
+            <p className="mt-1 text-xs text-text-secondary">{business.tagline}</p>
+          )}
+          {contactParts.length > 0 && (
+            <p className="mt-1 text-[11px] text-text-muted">
+              {contactParts.join(' · ')}
+            </p>
           )}
           <p className="mt-1 text-xs text-text-muted">Estimate prepared for {customerName}</p>
         </div>
@@ -844,9 +860,9 @@ function RangeScale({
   const pct = span > 0 ? Math.min(96, Math.max(4, ((value - low) / span) * 100)) : 50
   return (
     <div className="mt-7 max-w-md">
-      <div className="flex justify-between text-[11px] text-white/60 mb-1.5">
+      <div className="flex justify-between text-[11px] text-on-primary/60 mb-1.5">
         <span className="figure">{formatCurrency(low, currency)}</span>
-        <span className="uppercase tracking-[0.14em] font-semibold text-[10px] text-white/50">Measured range</span>
+        <span className="uppercase tracking-[0.14em] font-semibold text-[10px] text-on-primary/50">Measured range</span>
         <span className="figure">{formatCurrency(high, currency)}</span>
       </div>
       <div className="relative h-2.5 rounded-full bg-white/15 overflow-visible">
@@ -880,14 +896,20 @@ function Money({ amount, currency, emphasize }: { amount: number; currency: stri
   const wholeFormatted = Number(whole).toLocaleString()
   return (
     <span className="whitespace-nowrap">
-      <span className={emphasize ? 'text-white/60' : ''}>{symbol}</span>
+      <span className={emphasize ? 'text-on-primary/60' : ''}>{symbol}</span>
       {wholeFormatted}
-      <span className={emphasize ? 'text-[0.55em] align-super text-white/60' : 'text-[0.7em]'}>.{pence}</span>
+      <span className={emphasize ? 'text-[0.55em] align-super text-on-primary/60' : 'text-[0.7em]'}>.{pence}</span>
     </span>
   )
 }
 
-function DocumentFooter({ footerNotes }: { footerNotes?: string | null }) {
+function DocumentFooter({
+  footerNotes,
+  showPoweredBy = true,
+}: {
+  footerNotes?: string | null
+  showPoweredBy?: boolean
+}) {
   return (
     <div className="text-center mt-7">
       {footerNotes && (
@@ -895,9 +917,11 @@ function DocumentFooter({ footerNotes }: { footerNotes?: string | null }) {
           {footerNotes}
         </p>
       )}
-      <p className="text-[11px] text-text-muted">
-        <span className="figure">Prepared with Aistimator</span>
-      </p>
+      {showPoweredBy && (
+        <p className="text-[11px] text-text-muted">
+          <span className="figure">Prepared with Aistimator</span>
+        </p>
+      )}
     </div>
   )
 }

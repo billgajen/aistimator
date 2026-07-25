@@ -15,6 +15,20 @@
 
 ## Issues & Resolutions
 
+### 2026-07-25: Branding v2 — business identity, bulletproof colour, white-label (still one simple page)
+
+**Direction (user):** "simple, not too complicated, but a little more/better." Three additions chosen for value-per-control; explicitly NOT added: font pickers, secondary colours, custom CSS.
+
+1. **Business identity block** — tagline + phone/email/website in `branding_json` (JSONB, no migration; the PUT already spreads new fields). Rendered on quote-page letterhead (tagline + `phone · email · website` line), widget letterhead, and PDF header. A commercial document finally carries contact details.
+2. **Bulletproof colour** — `readableTextOn()` (WCAG relative luminance, threshold 0.45) picks white or ink text for ANY brand colour; new `on-primary` Tailwind token backed by `--color-on-primary-rgb` (RGB triple so `/60`-style opacity modifiers work). All `text-white` on primary surfaces in embed + quote pages swapped to `text-on-primary`. **Found while doing this: the quote price panel was hardcoded `style={{backgroundColor: JUNIPER}}`** — it ignored tenant colour entirely; now `bg-primary` (identical when unbranded), and its grade seal's `--seal-gap` follows `var(--color-primary)`. Dashboard adds 8 curated preset swatches (Juniper/Navy/Forest/Brick/Ocean/Plum/Amber/Charcoal) + custom picker; preview buttons use computed text colour.
+3. **White-label makes the Growth promise real** — pricing page sells "Your branding on every quote" on Growth+, but `custom_branding` in `features_json` gated nothing. New `lib/plan-features.ts hasCustomBranding()` (active/trialing subscription → plan features; fail-safe false). Quote view API + widget config API return `showPoweredBy`; "Prepared with Aistimator" / "Powered by Aistimator" badges hidden for white-label tenants. Branding page notes this under the preview.
+
+**Not done (candidates, deliberately deferred):** logo in email templates (needs a stable public logo route — signed URLs expire; emails cache), per-tenant butter/tape accent (measurement colours stay product-owned by design).
+
+**Files:** `lib/color.ts` (+luminance/on-primary), `lib/plan-features.ts` (new), `tailwind.config.ts` (on-primary token), shared types, quote view + widget config APIs, embed page, quote page (incl. JUNIPER panel fix), `lib/pdf-template.ts`, branding page.
+
+---
+
 ### 2026-07-25: Branding Actually Works — logo upload + colours/footer flow to widget, quote page, PDF
 
 **What was broken (user report, confirmed):** the branding page saved `branding_json` but almost nothing consumed it. Logo upload was a "coming soon" stub with no endpoint; the public widget-config API returned zero branding fields (the colour picker affected literally nothing); the public quote API had a "logoUrl will be added when branding is implemented (T-008)" comment; footer notes reached only the PDF. Ironically the PDF route and quote-page letterhead already *rendered* logos — there was just no way to upload one. Only notification emails used the colour.

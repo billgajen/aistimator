@@ -59,7 +59,12 @@ interface WidgetField {
 interface WidgetData {
   tenantName: string
   /** Tenant branding — primary colour override + short-lived logo URL */
-  branding?: { primaryColor?: string | null; logoUrl?: string | null }
+  branding?: {
+    primaryColor?: string | null
+    logoUrl?: string | null
+    tagline?: string | null
+    showPoweredBy?: boolean
+  }
   services: WidgetService[]
   /** @deprecated Use globalFields instead. Kept for backwards compatibility. */
   fields: WidgetField[]
@@ -374,7 +379,7 @@ function ConversationalChat({
             <div
               className={`px-3.5 py-2.5 text-sm leading-snug ${
                 msg.role === 'user'
-                  ? 'rounded-warm-lg rounded-br-sm bg-primary text-white'
+                  ? 'rounded-warm-lg rounded-br-sm bg-primary text-on-primary'
                   : 'rounded-warm-lg rounded-bl-sm bg-mist text-text-primary'
               }`}
             >
@@ -445,7 +450,7 @@ function ConversationalChat({
         <button
           onClick={handleSend}
           disabled={sending || !input.trim()}
-          className="rounded-warm-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-default disabled:bg-text-muted"
+          className="rounded-warm-lg bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-hover disabled:cursor-default disabled:bg-text-muted"
         >
           Send
         </button>
@@ -681,6 +686,9 @@ export default function EmbedPage({ params }: EmbedPageProps) {
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-tertiary mb-0.5">Instant estimate</p>
             <h2 className="font-display text-lg font-bold text-text-primary leading-tight">{widgetData.tenantName}</h2>
+            {widgetData.branding?.tagline && (
+              <p className="mt-0.5 text-xs text-text-muted">{widgetData.branding.tagline}</p>
+            )}
           </div>
           {widgetData.branding?.logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element -- signed R2 URL
@@ -807,11 +815,13 @@ export default function EmbedPage({ params }: EmbedPageProps) {
       {/* Turnstile challenge mounts here only if Cloudflare requires interaction */}
       <div ref={turnstileRef} className="flex justify-center empty:hidden px-6 pb-2" />
       </div>
-      <div className="max-w-xl mx-auto mt-4 flex items-center justify-center gap-3">
-        <div className="tape-rule w-12 opacity-50" />
-        <span className="figure text-[10px] text-text-muted">Powered by Aistimator</span>
-        <div className="tape-rule w-12 opacity-50" />
-      </div>
+      {widgetData?.branding?.showPoweredBy !== false && (
+        <div className="max-w-xl mx-auto mt-4 flex items-center justify-center gap-3">
+          <div className="tape-rule w-12 opacity-50" />
+          <span className="figure text-[10px] text-text-muted">Powered by Aistimator</span>
+          <div className="tape-rule w-12 opacity-50" />
+        </div>
+      )}
     </div>
   )
 }
@@ -831,9 +841,9 @@ function ProgressIndicator({ steps, currentStep }: { steps: string[]; currentSte
                 <div
                   className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                     isActive
-                      ? 'bg-primary text-white ring-2 ring-tape/50 ring-offset-1'
+                      ? 'bg-primary text-on-primary ring-2 ring-tape/50 ring-offset-1'
                       : isCompleted
-                        ? 'bg-primary text-white'
+                        ? 'bg-primary text-on-primary'
                         : 'bg-surface border border-border text-text-muted'
                   }`}
                 >
@@ -897,7 +907,7 @@ function ErrorState({
         <div className="mb-4">
           <button
             onClick={onSelectSuggested}
-            className="px-5 py-3 text-sm font-semibold bg-primary text-white rounded-warm-lg hover:bg-primary-hover transition"
+            className="px-5 py-3 text-sm font-semibold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover transition"
           >
             Switch to &quot;{suggestedService.name}&quot; and Submit
           </button>
@@ -1227,7 +1237,7 @@ function DetailsStep({
         )}
         <button
           onClick={handleContinue}
-          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-white rounded-warm-lg hover:bg-primary-hover active:scale-[0.995] transition"
+          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover active:scale-[0.995] transition"
         >
           Continue
         </button>
@@ -1629,7 +1639,7 @@ function FileUploadStep({
         <button
           onClick={onNext}
           disabled={!canContinue}
-          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-white rounded-warm-lg hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 disabled:cursor-not-allowed transition"
+          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 disabled:cursor-not-allowed transition"
         >
           Continue
         </button>
@@ -1712,7 +1722,7 @@ function ContactStep({
         <button
           onClick={onSubmit}
           disabled={!isValid}
-          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-white rounded-warm-lg hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 disabled:cursor-not-allowed transition"
+          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 disabled:cursor-not-allowed transition"
         >
           Get Quote
         </button>
@@ -1813,7 +1823,7 @@ function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string
           href={clarifyUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block px-6 py-3 font-semibold bg-primary text-white rounded-warm-lg hover:bg-primary-hover transition"
+          className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover transition"
         >
           Confirm Details
         </a>
@@ -1837,7 +1847,7 @@ function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string
           href={quoteUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block px-6 py-3 font-semibold bg-primary text-white rounded-warm-lg hover:bg-primary-hover transition"
+          className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover transition"
         >
           View Estimate
         </a>
@@ -1864,7 +1874,7 @@ function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string
         href={quoteUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-block px-6 py-3 font-semibold bg-primary text-white rounded-warm-lg hover:bg-primary-hover transition"
+        className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover transition"
       >
         View Your Quote
       </a>

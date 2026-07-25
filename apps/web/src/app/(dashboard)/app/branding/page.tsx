@@ -2,7 +2,24 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { PageHeader } from '@/components/dashboard/EmptyState'
+import { readableTextOn } from '@/lib/color'
 import type { TenantBranding, TenantTemplate } from '@estimator/shared'
+
+/**
+ * Curated brand colours — trade-friendly, all tested against white and ink
+ * text. Custom colours are still allowed via the picker; readable text is
+ * computed automatically either way.
+ */
+const PRESET_COLORS: Array<{ hex: string; name: string }> = [
+  { hex: '#205E56', name: 'Juniper' },
+  { hex: '#1E3A5F', name: 'Navy' },
+  { hex: '#2D5A27', name: 'Forest' },
+  { hex: '#A23B2E', name: 'Brick' },
+  { hex: '#16697A', name: 'Ocean' },
+  { hex: '#5B3758', name: 'Plum' },
+  { hex: '#A5731B', name: 'Amber' },
+  { hex: '#333B41', name: 'Charcoal' },
+]
 
 export const dynamic = 'force-dynamic'
 
@@ -304,6 +321,60 @@ export default function BrandingPage() {
             )}
           </div>
 
+          {/* Business identity */}
+          <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+            <h2 className="text-lg font-medium text-text-primary">Business Details</h2>
+            <p className="mt-1 text-sm text-text-muted">
+              Shown on your quotes and PDFs so customers can reach you
+            </p>
+
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-text-secondary">Tagline</label>
+                <input
+                  type="text"
+                  value={branding.tagline || ''}
+                  maxLength={80}
+                  onChange={(e) => setBranding({ ...branding, tagline: e.target.value || null })}
+                  placeholder="e.g., Family-run decorators since 1998"
+                  className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary">Phone</label>
+                  <input
+                    type="tel"
+                    value={branding.phone || ''}
+                    onChange={(e) => setBranding({ ...branding, phone: e.target.value || null })}
+                    placeholder="+44 7700 900000"
+                    className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary">Email</label>
+                  <input
+                    type="email"
+                    value={branding.email || ''}
+                    onChange={(e) => setBranding({ ...branding, email: e.target.value || null })}
+                    placeholder="hello@yourbusiness.com"
+                    className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary">Website</label>
+                <input
+                  type="text"
+                  value={branding.website || ''}
+                  onChange={(e) => setBranding({ ...branding, website: e.target.value || null })}
+                  placeholder="yourbusiness.com"
+                  className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Colors section */}
           <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
             <h2 className="text-lg font-medium text-text-primary">Brand Colors</h2>
@@ -311,7 +382,23 @@ export default function BrandingPage() {
 
             <div className="mt-4">
               <label className="block text-sm font-medium text-text-secondary">Primary Color</label>
-              <div className="mt-1 flex items-center gap-3">
+              <div className="mt-2 flex flex-wrap gap-2">
+                {PRESET_COLORS.map((preset) => (
+                  <button
+                    key={preset.hex}
+                    type="button"
+                    title={preset.name}
+                    onClick={() => setBranding({ ...branding, primaryColor: preset.hex })}
+                    className={`h-8 w-8 rounded-full transition-transform hover:scale-110 ${
+                      branding.primaryColor.toLowerCase() === preset.hex.toLowerCase()
+                        ? 'ring-2 ring-ink ring-offset-2'
+                        : 'ring-1 ring-border'
+                    }`}
+                    style={{ backgroundColor: preset.hex }}
+                  />
+                ))}
+              </div>
+              <div className="mt-3 flex items-center gap-3">
                 <input
                   type="color"
                   value={branding.primaryColor}
@@ -470,11 +557,19 @@ export default function BrandingPage() {
                     <img src={logoUrl} alt="" className="mb-2 h-10 max-w-[160px] object-contain object-left" />
                   )}
                   <h3 className="text-xl font-bold text-text-primary">{tenantName || 'Your Business'}</h3>
+                  {branding.tagline && (
+                    <p className="text-xs text-text-secondary">{branding.tagline}</p>
+                  )}
+                  {(branding.phone || branding.email || branding.website) && (
+                    <p className="text-[11px] text-text-muted">
+                      {[branding.phone, branding.email, branding.website].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
                   <p className="text-sm text-text-muted">Quote #{MOCK_QUOTE.id.slice(-8)}</p>
                 </div>
                 <div
-                  className="rounded-full px-3 py-1 text-xs font-medium text-white"
-                  style={{ backgroundColor: branding.primaryColor }}
+                  className="rounded-full px-3 py-1 text-xs font-medium"
+                  style={{ backgroundColor: branding.primaryColor, color: readableTextOn(branding.primaryColor) }}
                 >
                   {MOCK_QUOTE.serviceName}
                 </div>
@@ -566,13 +661,21 @@ export default function BrandingPage() {
               {/* Accept button preview */}
               {template.acceptQuoteEnabled !== false && (
                 <button
-                  className="mt-4 w-full rounded-warm-lg py-2 text-sm font-medium text-white"
-                  style={{ backgroundColor: branding.primaryColor }}
+                  className="mt-4 w-full rounded-warm-lg py-2 text-sm font-medium"
+                  style={{ backgroundColor: branding.primaryColor, color: readableTextOn(branding.primaryColor) }}
                 >
                   Accept Quote
                 </button>
               )}
+
+              <p className="mt-4 text-center text-[10px] text-text-muted">
+                Prepared with Aistimator
+              </p>
             </div>
+            <p className="mt-3 text-xs text-text-muted">
+              On Growth and Pro plans the &quot;Prepared with Aistimator&quot; badge is removed
+              automatically — quotes carry only your brand.
+            </p>
           </div>
         </div>
       </div>

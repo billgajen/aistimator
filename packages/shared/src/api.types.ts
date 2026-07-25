@@ -111,12 +111,18 @@ export interface ClarifyQuoteResponse {
 export interface QuoteViewBusiness {
   name: string
   logoUrl?: string
+  tagline?: string | null
+  phone?: string | null
+  email?: string | null
+  website?: string | null
 }
 
 /** Tenant branding surfaced on the hosted quote page */
 export interface QuoteViewBranding {
   primaryColor?: string
   footerNotes?: string | null
+  /** false on white-label plans (custom_branding) — hides the Aistimator badge */
+  showPoweredBy?: boolean
 }
 
 export interface QuoteViewCustomer {

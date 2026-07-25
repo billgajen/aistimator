@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
+import { hasCustomBranding } from '@/lib/plan-features'
 import type {
   QuoteViewResponse,
   QuoteViewBusiness,
@@ -118,7 +119,15 @@ export async function GET(
       id: string
       name: string
       template_json: Record<string, unknown> | null
-      branding_json: { logoAssetId?: string | null; primaryColor?: string; footerNotes?: string | null } | null
+      branding_json: {
+        logoAssetId?: string | null
+        primaryColor?: string
+        footerNotes?: string | null
+        tagline?: string | null
+        phone?: string | null
+        email?: string | null
+        website?: string | null
+      } | null
     }
     const pricing = quote.pricing_json as QuotePricing
     const content = quote.content_json as QuoteContent & {
@@ -145,7 +154,14 @@ export async function GET(
     const business: QuoteViewBusiness = {
       name: tenant.name,
       logoUrl,
+      tagline: brandingJson.tagline ?? null,
+      phone: brandingJson.phone ?? null,
+      email: brandingJson.email ?? null,
+      website: brandingJson.website ?? null,
     }
+
+    // White-label: Growth/Pro (custom_branding) drop the Aistimator badge
+    const whiteLabel = await hasCustomBranding(supabase, tenant.id)
 
     const customerView: QuoteViewCustomer = {
       name: customer.name,
@@ -200,6 +216,7 @@ export async function GET(
       branding: {
         primaryColor: brandingJson.primaryColor,
         footerNotes: brandingJson.footerNotes ?? null,
+        showPoweredBy: !whiteLabel,
       },
       customer: customerView,
       ...(provisional && { provisional }),

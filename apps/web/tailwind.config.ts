@@ -19,6 +19,10 @@ const config: Config = {
           hover: 'var(--color-primary-hover)',
           light: 'var(--color-primary-light)',
         },
+        // Readable text on primary surfaces; white unless a light tenant
+        // brand colour overrides the var (see lib/color.ts). RGB triple so
+        // opacity modifiers (text-on-primary/60) keep working.
+        'on-primary': 'rgb(var(--color-on-primary-rgb, 255 255 255) / <alpha-value>)',
         secondary: {
           DEFAULT: 'var(--color-secondary)',
           light: 'var(--color-secondary-light)',
