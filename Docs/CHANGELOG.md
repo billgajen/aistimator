@@ -15,6 +15,26 @@
 
 ## Issues & Resolutions
 
+### 2026-11-07: T-134 — Subscription-Only USD Plans (AD-026)
+
+**Built:** one plan source `packages/shared/src/plans.ts` (US Starter/Pro/Business with monthly + annual prices, quote limits, channels, features, `overageEnabled: false`, 14-day card-required trial on Pro; legacy plans kept with their limits and overage for existing subscribers; `NO_SUBSCRIPTION_LIMIT` US 10 / GB 50 — no free tier for US). Read by `checkPlanLimit`, `plan-features.ts` (white-label + new `hasPlanFeature`/`hasPlanChannel`), `/api/billing`, the pricing page and the homepage teaser (`lib/plans-view.ts` maps definitions to `PlanInfo`; no number is typed twice). The `plans` table keeps rows only as FK targets (migration 28 adds the US ids, deactivates legacy rows).
+
+**Over-limit = lead, not loss:** with overage off, a request beyond the limit is saved (`pending_review`, `content_json.limitHold`), the customer is told "{business} has your request and will send your estimate shortly" (no billing wording), the business is emailed ("New lead waiting — upgrade to price it"), no AI runs and the usage counter is not incremented. Same path in the widget API and the WhatsApp/SMS intake engine. `POST /api/quotes/[id]/process` + "Price this lead" on the quote page re-check the limit and run the normal pipeline with a fresh token. Dashboard banners (80% / 100%) and the limit email now describe lead capture instead of "paused".
+
+**Stripe:** checkout takes `interval` (monthly/annual), price ids from env `STRIPE_PRICE_<PLAN>_<INTERVAL>_<CURRENCY>`, `payment_method_collection: 'always'`, trial only when the business never had a Stripe subscription. Existing subscribers change plans in the Customer Portal (proration). The webhook maps prices → plans with `planForStripePrice` and **upserts** the subscription.
+
+**Two latent bugs found and fixed:** (1) checkout and the webhook queried `plans.stripe_price_id`, a column no migration ever created — checkout always returned NO_STRIPE_PRICE and the webhook could never bind a plan; (2) the webhook only UPDATED `subscriptions`, but signup never inserts a row — a first paid checkout would have been silently unrecorded.
+
+**Also:** dashboard revenue stat used a hardcoded `$` (T-133 miss) — now the tenant currency.
+
+**Tests:** `plans.test.ts` (single source, annual = 10×, trial, legacy, region allowance, env price mapping both ways, usage levels, Starter #51 not billable, legacy overage still meters) + an intake test proving the held lead is saved, unpriced and not counted. Web 60, worker 321. No gauntlet (owner rule: billing).
+
+**Owner-only:** confirm the prices, create Stripe test products (`apps/web/scripts/stripe-setup-plans.mts`), set the env price ids, enable the Customer Portal with plan switching + proration, then run trial → paid → upgrade → downgrade in test mode.
+
+**Files:** `packages/shared/src/{plans.ts,index.ts,api.types.ts}`, `supabase/migrations/00000000000028_us_plans.sql`, `apps/web/src/lib/{plan-limits.ts,plan-features.ts,plans-view.ts,lead-hold.ts,stripe.ts,email-templates.ts,messaging/intake-engine.ts}`, `apps/web/src/app/api/{public/quotes,billing,billing/checkout,webhooks/stripe,quotes/[quoteId]/process}`, billing/quote/dashboard pages, `apps/web/src/app/{pricing/page.tsx,page.tsx}`, `apps/web/scripts/stripe-setup-plans.mts`, `apps/web/.env.example`
+
+---
+
 ### 2026-11-07: T-136 — SMS Channel (Twilio) on a Channel-Agnostic Intake Engine (AD-027)
 
 **Built:**

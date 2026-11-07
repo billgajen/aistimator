@@ -47,3 +47,17 @@ Code for every item is already built; these are the steps that unlock it.
 - [ ] **Apply migration 27** (`supabase/migrations/00000000000027_sms_channel.sql`) to production.
 - [ ] **Live test from a real phone:** text the number, send a photo by MMS, reply "yes", open the link;
   then text STOP and confirm the dashboard "Text link" refuses to send.
+
+## T-134 — Subscription-only USD plans
+
+- [ ] **Confirm the plan numbers** in `packages/shared/src/plans.ts` (every `TODO-OWNER`): Starter $49/50
+  quotes, Pro $99/200 (14-day trial), Business $199/600, annual = two months free, and the US pre-trial
+  allowance of 10 test quotes (`NO_SUBSCRIPTION_LIMIT.US`).
+- [ ] **Create the Stripe test products and prices:**
+  `cd apps/web && STRIPE_SECRET_KEY=sk_test_... npx tsx scripts/stripe-setup-plans.mts`, then paste the
+  printed `STRIPE_PRICE_*` lines into Vercel env.
+- [ ] **Enable the Stripe Customer Portal** (Settings → Billing → Customer portal): allow switching between
+  the three products, proration on, cancellation at period end.
+- [ ] **Apply migration 28** (`supabase/migrations/00000000000028_us_plans.sql`) to production.
+- [ ] **Run the test-mode journey:** start the Pro trial (test card 4242…), let it convert (or end the
+  trial in the dashboard), upgrade to Business, downgrade to Starter — check `/app/billing` follows each step.

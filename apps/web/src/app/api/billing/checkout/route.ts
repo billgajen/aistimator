@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getPlan, stripePriceIdFor, stripePriceEnvKey, type PlanInterval } from '@estimator/shared'
 import {
   getStripeClient,
   isStripeConfigured,
@@ -77,26 +78,19 @@ export async function POST(request: Request) {
       )
     }
 
-    // Get the plan
-    const { data: plan } = await supabase
-      .from('plans')
-      .select('*')
-      .eq('id', body.planId)
-      .eq('is_active', true)
-      .single()
-
-    if (!plan) {
-      return NextResponse.json(
-        { error: { code: 'PLAN_NOT_FOUND', message: 'Plan not found' } },
-        { status: 404 }
-      )
+    // T-134: plans come from the shared definitions; only offered plans are purchasable
+    const plan = getPlan(body.planId)
+    if (!plan || !plan.offered) {
+      return NextResponse.json({ error: { code: 'PLAN_NOT_FOUND', message: 'Plan not found' } }, { status: 404 })
     }
-
-    // Check if plan has a Stripe price ID
-    const stripePriceId = (plan as { stripe_price_id?: string }).stripe_price_id
+    const interval: PlanInterval = body.interval === 'annual' ? 'annual' : 'monthly'
+    const currency = 'USD'
+    // Stripe price ids are account-specific → env (STRIPE_PRICE_<PLAN>_<INTERVAL>_<CURRENCY>)
+    const stripePriceId = stripePriceIdFor(plan.id, interval, currency, process.env)
     if (!stripePriceId) {
+      console.error(`[Checkout] Missing env ${stripePriceEnvKey(plan.id, interval, currency)}`)
       return NextResponse.json(
-        { error: { code: 'NO_STRIPE_PRICE', message: 'Plan does not have a Stripe price configured' } },
+        { error: { code: 'NO_STRIPE_PRICE', message: 'This plan is not available for checkout yet' } },
         { status: 400 }
       )
     }
@@ -104,7 +98,7 @@ export async function POST(request: Request) {
     // Get or create subscription record to get Stripe customer ID
     const { data: subscription } = await supabase
       .from('subscriptions')
-      .select('stripe_customer_id')
+      .select('stripe_customer_id, stripe_subscription_id, plan_id')
       .eq('tenant_id', tenantId)
       .single()
 
@@ -130,17 +124,20 @@ export async function POST(request: Request) {
     const successUrl = `${appUrl}/app/billing?success=true`
     const cancelUrl = `${appUrl}/app/billing?canceled=true`
 
-    // Create checkout session — attach the metered overage price when the plan
-    // supports per-quote overage billing (T-102)
-    const meteredPriceId = (plan as { stripe_metered_price_id?: string | null })
-      .stripe_metered_price_id
+    // One free trial per business: only when it has never had a Stripe subscription
+    const trialDays = plan.trialDays && !subscription?.stripe_subscription_id ? plan.trialDays : undefined
+    // Metered overage only for plans that opt in (AD-026: offered plans don't)
+    const meteredPriceId = plan.overageEnabled
+      ? process.env[`STRIPE_METERED_PRICE_${plan.id.replace(/^plan_/, '').toUpperCase()}`] || undefined
+      : undefined
     const session = await createCheckoutSession(stripe, {
       customerId,
       priceId: stripePriceId,
       tenantId,
       successUrl,
       cancelUrl,
-      meteredPriceId: meteredPriceId || undefined,
+      meteredPriceId,
+      trialDays,
     })
 
     if (!session.url) {

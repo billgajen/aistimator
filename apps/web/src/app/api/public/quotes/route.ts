@@ -3,6 +3,7 @@ import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { enqueueQuoteJob } from '@/lib/queue'
 import { incrementUsageCounter } from '@/lib/usage'
 import { checkPlanLimit, maybeNotifyLimitReached, recordOverageQuote } from '@/lib/plan-limits'
+import { leadHoldContent, leadHeldMessage, notifyLeadHeld } from '@/lib/lead-hold'
 import { validateServiceMatch } from '@/lib/ai/service-matcher'
 import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
 import { verifyTurnstileToken } from '@/lib/turnstile'
@@ -180,19 +181,12 @@ export async function POST(request: Request) {
     // deliberately neutral: never expose the business's billing state.
     const planLimit = await checkPlanLimit(supabase, tenantId)
     const isOverageQuote = !planLimit.allowed && planLimit.overageAvailable
-    if (!planLimit.allowed && !planLimit.overageAvailable) {
+    // T-134 (AD-026): over the limit with overage off → capture as an unpriced
+    // lead (never lose a submission); no AI runs, the business is told to upgrade
+    const limitHold = !planLimit.allowed && !planLimit.overageAvailable
+    if (limitHold) {
       console.warn(
-        `[Quotes] Plan limit reached for tenant (${planLimit.used}/${planLimit.limit}) — rejecting quote request`
-      )
-      return NextResponse.json(
-        {
-          error: {
-            code: 'PLAN_LIMIT_REACHED',
-            message:
-              'Online quoting is temporarily unavailable. Please contact the business directly to get your quote.',
-          },
-        },
-        { status: 429 }
+        `[Quotes] Plan limit reached for tenant (${planLimit.used}/${planLimit.limit}) — capturing as held lead`
       )
     }
 
@@ -213,7 +207,7 @@ export async function POST(request: Request) {
       (a) => a.fieldId === '_project_description'
     )?.value as string | undefined
 
-    if (serviceMatchMode !== 'off' && projectDescription) {
+    if (!limitHold && serviceMatchMode !== 'off' && projectDescription) {
       // Get all active services for this tenant for suggestions
       const { data: allServices } = await supabase
         .from('services')
@@ -504,14 +498,16 @@ export async function POST(request: Request) {
         },
         document_type: service.document_type_default,
         is_general_inquiry: isGeneralInquiry,
-        content_json: isGeneralInquiry
+        content_json: limitHold
+          ? leadHoldContent(tenant.name)
+          : isGeneralInquiry
           ? {
               title: 'General Inquiry',
               intro: `Thank you for your inquiry. Our team will review your request and get back to you shortly.`,
               scope: projectDescription || 'No description provided',
             }
           : {},
-        status: isGeneralInquiry ? 'sent' : 'queued',
+        status: limitHold ? 'pending_review' : isGeneralInquiry ? 'sent' : 'queued',
         quote_token_hash: hash,
         token_expires_at: tokenExpiry.toISOString(),
       })
@@ -541,7 +537,29 @@ export async function POST(request: Request) {
       }
     }
 
-    // 12. Increment usage counter for estimates_created
+    // 12. Held leads (T-134) are not priced, so they don't consume the plan
+    if (limitHold) {
+      await notifyLeadHeld(supabase, {
+        tenantId,
+        businessName: tenant.name,
+        customerName: body.customer.name,
+        serviceName: service.name,
+        quoteId: quote.id,
+        used: planLimit.used,
+        limit: planLimit.limit,
+      })
+      const appUrlHeld = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      return NextResponse.json({
+        quoteId: quote.id,
+        status: 'held',
+        isGeneralInquiry: false,
+        message: leadHeldMessage(tenant.name),
+        quoteViewUrl: `${appUrlHeld}/q/${quote.id}?token=${token}`,
+        tokenExpiresAt: tokenExpiry.toISOString(),
+      })
+    }
+
+    // 12a. Increment usage counter for estimates_created
     await incrementUsageCounter(supabase, tenantId, 'estimates_created')
 
     // 12b. If this consumed the last quote in the plan, notify the business once (T-101)

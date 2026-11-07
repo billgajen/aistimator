@@ -14,6 +14,10 @@ vi.mock('@/lib/whatsapp', () => ({
 vi.mock('@/lib/r2', () => ({ uploadToR2: vi.fn(async () => undefined), isR2Configured: () => true }))
 vi.mock('@/lib/queue', () => ({ enqueueQuoteJob: vi.fn(async () => undefined) }))
 vi.mock('@/lib/usage', () => ({ incrementUsageCounter: vi.fn(async () => undefined) }))
+vi.mock('@/lib/lead-hold', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>('@/lib/lead-hold')
+  return { ...actual, notifyLeadHeld: vi.fn(async () => undefined) }
+})
 vi.mock('@/lib/plan-limits', () => ({
   checkPlanLimit: vi.fn(async () => ({ allowed: true, overageAvailable: false, used: 0, limit: 50 })),
   maybeNotifyLimitReached: vi.fn(async () => undefined),
@@ -22,6 +26,9 @@ vi.mock('@/lib/plan-limits', () => ({
 
 import { processIntakeMessage, sendIntakeResponse } from '@/lib/whatsapp-intake'
 import { sendTextMessage } from '@/lib/whatsapp'
+import { checkPlanLimit } from '@/lib/plan-limits'
+import { enqueueQuoteJob } from '@/lib/queue'
+import { incrementUsageCounter } from '@/lib/usage'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { WhatsAppConversation, WhatsAppIntakeState, WhatsAppIntakeData } from '@estimator/shared'
 
@@ -181,6 +188,26 @@ describe('WhatsApp intake — replies and transitions are pinned (T-136)', () =>
     expect(y.responseText).toMatch(/^Your quote request has been submitted!\n\nWe're generating your personalized quote now\. You'll receive it at sam@example\.com shortly\.\n\nYou can also view it here:\nhttp.*\/q\/quotes_1\?token=/)
     expect(db.inserted.quote_requests?.[0]?.source_json).toEqual({ type: 'whatsapp' })
     expect(db.updated.some((u) => u.table === 'whatsapp_conversations' && u.values.intake_state === 'processing')).toBe(true)
+  })
+
+  it('T-134: over the limit (overage off) the request is captured as an unpriced lead', async () => {
+    vi.mocked(checkPlanLimit).mockResolvedValueOnce({
+      allowed: false, overageAvailable: false, used: 50, limit: 50, unlimited: false, overagePriceCents: null, stripeCustomerId: null,
+    })
+    vi.mocked(enqueueQuoteJob).mockClear()
+    vi.mocked(incrementUsageCounter).mockClear()
+    const data = {
+      serviceId: 'svc_1', serviceName: 'Exterior Painting', projectDescription: 'Front wall',
+      customerName: 'Sam', customerEmail: 'sam@example.com', customerPhone: '447700900123', jobAddress: 'BS7 8AA',
+    }
+    const r = await run('awaiting_confirmation', 'yes', data)
+    expect(r.success).toBe(true)
+    expect(r.newState).toBe('completed')
+    expect(r.responseText).toBe('Thanks — Brush Co has your request and will send your estimate shortly.')
+    expect(db.inserted.quotes?.[0]).toMatchObject({ status: 'pending_review', content_json: { limitHold: true } })
+    expect(db.inserted.quote_requests?.length).toBe(1) // the lead is saved
+    expect(enqueueQuoteJob).not.toHaveBeenCalled() // not priced
+    expect(incrementUsageCounter).not.toHaveBeenCalled() // doesn't consume the plan
   })
 
   it('sends replies through the WhatsApp Cloud API', async () => {

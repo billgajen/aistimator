@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { offeredPlans, formatMoney } from '@estimator/shared'
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
@@ -100,7 +101,7 @@ export default function HomePage() {
             </Link>
           </div>
           <p className="mt-4 text-xs text-text-muted">
-            50 estimates free · no card required · about 5 minutes to set up
+            {(() => { const t = offeredPlans().find((p) => p.trialDays); return t ? `${t.trialDays}-day free trial on ${t.name}` : 'Subscription only — no commission' })()} · about 5 minutes to set up
           </p>
         </div>
 
@@ -284,11 +285,12 @@ export default function HomePage() {
           Priced like a tool, not a tax.
         </h2>
         <div className="mx-auto mt-12 grid max-w-4xl gap-6 sm:grid-cols-3">
-          {[
-            { name: 'Starter', price: '$29', estimates: '200' },
-            { name: 'Growth', price: '$79', estimates: '1,000', highlight: true },
-            { name: 'Pro', price: '$199', estimates: '3,000' },
-          ].map((plan) => (
+          {offeredPlans().map((def) => ({
+            name: def.name,
+            price: formatMoney((def.monthlyPrice.USD ?? 0) / 100, 'USD', 'en-US', { decimals: 0 }),
+            estimates: def.quoteLimit.toLocaleString('en-US'),
+            highlight: Boolean(def.recommended),
+          })).map((plan) => (
             <div
               key={plan.name}
               className={`rounded-warm-xl p-6 text-center ${
@@ -328,7 +330,7 @@ export default function HomePage() {
             href="/signup"
             className="mt-8 inline-block rounded-lg bg-white px-8 py-3.5 text-sm font-semibold text-primary transition-colors hover:bg-mint"
           >
-            Start free — 50 estimates on us
+            {(() => { const t = offeredPlans().find((p) => p.trialDays); return t ? `Start your ${t.trialDays}-day trial` : 'Get started' })()}
           </Link>
         </div>
       </section>

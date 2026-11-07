@@ -3,9 +3,10 @@ import { getCurrentPeriod } from './usage'
 import { sendEmail, isPostmarkConfigured } from './postmark'
 import { generateLimitReachedEmailHtml } from './email-templates'
 import { getStripeClient, reportOverageMeterEvent, formatPrice } from './stripe'
+import { getPlan, noSubscriptionLimit } from '@estimator/shared'
 
-/** Default monthly estimate limit for tenants without a subscription (trial). Matches /api/billing. */
-export const DEFAULT_TRIAL_LIMIT = 50
+/** Legacy (GB) monthly allowance for tenants without a subscription — kept for callers/tests. */
+export const DEFAULT_TRIAL_LIMIT = noSubscriptionLimit('GB')
 
 export interface PlanLimitStatus {
   /** true while within the plan limit (or unlimited) */
@@ -65,12 +66,10 @@ export async function checkPlanLimit(
   try {
     const period = getCurrentPeriod()
 
-    const [{ data: subscription }, { data: usageCounter }] = await Promise.all([
+    const [{ data: subscription }, { data: usageCounter }, { data: tenant }] = await Promise.all([
       supabase
         .from('subscriptions')
-        .select(
-          'status, stripe_customer_id, plans!plan_id (monthly_estimate_limit, overage_price_cents, stripe_metered_price_id)'
-        )
+        .select('status, plan_id, stripe_customer_id, plans!plan_id (stripe_metered_price_id)')
         .eq('tenant_id', tenantId)
         .single(),
       supabase
@@ -79,21 +78,23 @@ export async function checkPlanLimit(
         .eq('tenant_id', tenantId)
         .eq('period_yyyymm', period)
         .single(),
+      supabase.from('tenants').select('region').eq('id', tenantId).single(),
     ])
 
-    const plan = subscription?.plans as {
-      monthly_estimate_limit: number
-      overage_price_cents?: number | null
-      stripe_metered_price_id?: string | null
-    } | null | undefined
-    const limit = plan?.monthly_estimate_limit ?? DEFAULT_TRIAL_LIMIT
+    // T-134: limits, overage and features come from the plan definitions in
+    // @estimator/shared — never from DB numbers. Stripe's metered price id is
+    // account-specific data and stays on the plans row (T-102).
+    const live = subscription && ['active', 'trialing', 'past_due'].includes(subscription.status as string)
+    const plan = live ? getPlan(subscription.plan_id as string) : null
+    const meteredPriceId = (subscription?.plans as { stripe_metered_price_id?: string | null } | null)
+      ?.stripe_metered_price_id
+    const limit = plan?.quoteLimit ?? noSubscriptionLimit((tenant as { region?: string } | null)?.region)
     const used = usageCounter?.estimates_created ?? 0
 
     return evaluateLimit(used, limit, {
-      priceCents: plan?.overage_price_cents ?? null,
+      priceCents: plan?.overageEnabled ? plan.overagePriceCents ?? null : null,
       // Overage only bills reliably on an active paid subscription — never trial
-      subscriptionActive:
-        subscription?.status === 'active' && Boolean(plan?.stripe_metered_price_id),
+      subscriptionActive: subscription?.status === 'active' && Boolean(meteredPriceId),
       stripeCustomerId: subscription?.stripe_customer_id ?? null,
     })
   } catch (error) {

@@ -19,6 +19,7 @@ import { enqueueQuoteJob } from '../queue'
 import { incrementUsageCounter } from '../usage'
 import { checkPlanLimit, maybeNotifyLimitReached, recordOverageQuote } from '../plan-limits'
 import type { IntakeContext } from './types'
+import { leadHoldContent, leadHeldMessage, notifyLeadHeld } from '../lead-hold'
 
 // Keywords that trigger intake start
 const TRIGGER_KEYWORDS = ['quote', 'estimate', 'price', 'pricing', 'cost', 'how much']
@@ -613,18 +614,10 @@ async function createQuoteFromIntake(
     // Neutral customer-facing message — never expose the business's billing state.
     const planLimit = await checkPlanLimit(supabase, tenantId)
     const isOverageQuote = !planLimit.allowed && planLimit.overageAvailable
-    if (!planLimit.allowed && !planLimit.overageAvailable) {
-      console.warn(
-        `[Intake] Plan limit reached (${planLimit.used}/${planLimit.limit}) — rejecting intake`
-      )
-      return {
-        success: false,
-        error: 'PLAN_LIMIT_REACHED',
-        responseText:
-          'Sorry, instant quoting is temporarily unavailable. Please contact the business directly and they will get you a quote.',
-        newState: 'idle',
-        newData: {},
-      }
+    // T-134 (AD-026): over the limit with overage off → capture as an unpriced lead
+    const limitHold = !planLimit.allowed && !planLimit.overageAvailable
+    if (limitHold) {
+      console.warn(`[Intake] Plan limit reached (${planLimit.used}/${planLimit.limit}) — capturing as held lead`)
     }
 
     // Get tenant details
@@ -702,8 +695,8 @@ async function createQuoteFromIntake(
           breakdown: [],
         },
         document_type: service.document_type_default,
-        content_json: {},
-        status: 'queued',
+        content_json: limitHold ? leadHoldContent(tenant.name) : {},
+        status: limitHold ? 'pending_review' : 'queued',
         quote_token_hash: hash,
         token_expires_at: tokenExpiry.toISOString(),
       })
@@ -730,6 +723,25 @@ async function createQuoteFromIntake(
         intake_state: 'processing',
       })
       .eq('id', conversation.id)
+
+    // T-134: held leads are not priced and don't consume the plan
+    if (limitHold) {
+      await notifyLeadHeld(supabase, {
+        tenantId,
+        businessName: tenant.name,
+        customerName: data.customerName,
+        serviceName: data.serviceName || 'your service',
+        quoteId: quote.id,
+        used: planLimit.used,
+        limit: planLimit.limit,
+      })
+      return {
+        success: true,
+        newState: 'completed',
+        newData: { ...data, _quoteId: quote.id } as unknown as Partial<WhatsAppIntakeData>,
+        responseText: leadHeldMessage(tenant.name),
+      }
+    }
 
     // Increment usage counter
     await incrementUsageCounter(supabase, tenantId, 'estimates_created')

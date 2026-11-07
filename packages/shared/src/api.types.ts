@@ -336,8 +336,18 @@ export interface PlanInfo {
     customBranding: boolean
     prioritySupport: boolean
     apiAccess: boolean
+    /** T-134 */
+    calibrationInsights?: boolean
+    lidarScanning?: boolean
+    multipleUsers?: boolean
   }
   stripePriceId?: string
+  /** T-134: plan definitions in @estimator/shared/plans */
+  tagline?: string
+  annualPriceCents?: number | null
+  trialDays?: number | null
+  channels?: string[]
+  recommended?: boolean
 }
 
 export interface SubscriptionInfo {
@@ -358,6 +368,10 @@ export interface BillingUsage {
   overageUsed?: number
   /** T-102: per-quote overage price on the current plan (null = overage not available) */
   overagePriceCents?: number | null
+  /** T-134: 'ok' < 80% ≤ 'warning' < 100% ≤ 'limit' */
+  level?: 'ok' | 'warning' | 'limit'
+  /** T-134: leads captured but not priced because the limit was reached */
+  heldLeads?: number
 }
 
 export interface BillingResponse {
@@ -368,6 +382,8 @@ export interface BillingResponse {
 
 export interface CreateCheckoutRequest {
   planId: string
+  /** T-134: monthly (default) or annual billing */
+  interval?: 'monthly' | 'annual'
 }
 
 export interface CreateCheckoutResponse {

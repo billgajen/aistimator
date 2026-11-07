@@ -26,6 +26,9 @@ export default function QuoteDetailPage({
   const [resending, setResending] = useState(false)
   // T-136: text the quote link by SMS
   const [texting, setTexting] = useState(false)
+  // T-134: price a lead held by the plan limit
+  const [pricingHeld, setPricingHeld] = useState(false)
+  const [priceResult, setPriceResult] = useState<string | null>(null)
   const [textResult, setTextResult] = useState<string | null>(null)
 
   const fetchQuote = useCallback(async () => {
@@ -65,6 +68,23 @@ export default function QuoteDetailPage({
       alert('Failed to resend quote')
     } finally {
       setResending(false)
+    }
+  }
+
+  const handlePriceHeldLead = async () => {
+    setPricingHeld(true)
+    setPriceResult(null)
+    try {
+      const response = await fetch(`/api/quotes/${quoteId}/process`, { method: 'POST' })
+      const json = await response.json().catch(() => null)
+      if (response.ok) {
+        setPriceResult('Pricing started — this page will update shortly')
+        await fetchQuote()
+      } else {
+        setPriceResult(json?.error?.message || 'Could not price this lead')
+      }
+    } finally {
+      setPricingHeld(false)
     }
   }
 
@@ -202,6 +222,30 @@ export default function QuoteDetailPage({
           {textResult && <span className="self-center text-xs text-text-muted">{textResult}</span>}
         </div>
       </div>
+
+      {/* T-134: lead held because the monthly plan limit was reached */}
+      {(quote.content_json as { limitHold?: boolean } | null)?.limitHold && quote.status === 'pending_review' && (
+        <div className="mb-6 rounded-lg border border-tape/40 bg-butter/40 p-4">
+          <p className="text-sm font-semibold text-text-primary">Lead saved — not priced yet</p>
+          <p className="mt-1 text-sm text-text-secondary">
+            This request arrived after your plan&apos;s monthly limit. The customer was told you&apos;ll send their estimate
+            shortly. Upgrade your plan, then price it here — or contact the customer yourself.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <a href="/app/billing" className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">
+              Upgrade plan
+            </a>
+            <button
+              onClick={handlePriceHeldLead}
+              disabled={pricingHeld}
+              className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-semibold text-text-primary hover:bg-surface disabled:opacity-50"
+            >
+              {pricingHeld ? 'Starting…' : 'Price this lead'}
+            </button>
+            {priceResult && <span className="text-xs text-text-muted">{priceResult}</span>}
+          </div>
+        </div>
+      )}
 
       {/* Pending feedback alert */}
       {pendingFeedback.length > 0 && (

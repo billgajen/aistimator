@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { planForStripePrice } from '@estimator/shared'
 import { getStripeClient } from '@/lib/stripe'
 import { NextResponse } from 'next/server'
 import type Stripe from 'stripe'
@@ -113,18 +114,14 @@ async function handleCheckoutCompleted(
     expand: ['items.data.price.product'],
   })
 
-  // Find the plan by Stripe price ID
-  const priceId = stripeSubscription.items.data[0]?.price.id
-  const { data: plan } = await supabase
-    .from('plans')
-    .select('id')
-    .eq('stripe_price_id', priceId)
-    .single()
-
-  if (!plan) {
-    console.error(`[Stripe Webhook] No plan found for price ID: ${priceId}`)
+  // T-134: plan from the shared definitions via the env price-id map (the
+  // plans table never had a stripe_price_id column — checkout could not bind)
+  const match = findPlanForSubscription(stripeSubscription)
+  if (!match) {
+    console.error('[Stripe Webhook] No plan matches the subscription price IDs (check STRIPE_PRICE_* env)')
     return
   }
+  const plan = match.plan
 
   // Extract period dates (handle different Stripe API versions)
   const subData = stripeSubscription as unknown as {
@@ -133,18 +130,20 @@ async function handleCheckoutCompleted(
     current_period_end: number
   }
 
-  // Update subscription record
-  const { error } = await supabase
-    .from('subscriptions')
-    .update({
+  // Upsert: signup never creates a subscriptions row, so an update-only write
+  // silently recorded nothing for first-time subscribers (found in T-134)
+  const { error } = await supabase.from('subscriptions').upsert(
+    {
+      tenant_id: tenantId,
       plan_id: plan.id,
       stripe_customer_id: session.customer as string,
       stripe_subscription_id: subscriptionId,
       status: mapStripeStatus(subData.status),
       current_period_start: new Date(subData.current_period_start * 1000).toISOString(),
       current_period_end: new Date(subData.current_period_end * 1000).toISOString(),
-    })
-    .eq('tenant_id', tenantId)
+    },
+    { onConflict: 'tenant_id' }
+  )
 
   if (error) {
     console.error('[Stripe Webhook] Failed to update subscription:', error)
@@ -289,13 +288,8 @@ async function updateSubscriptionRecord(
   tenantId: string,
   subscription: Stripe.Subscription
 ) {
-  // Find plan by Stripe price ID
-  const priceId = subscription.items.data[0]?.price.id
-  const { data: plan } = await supabase
-    .from('plans')
-    .select('id')
-    .eq('stripe_price_id', priceId)
-    .single()
+  // T-134: upgrades/downgrades via the Customer Portal change the price → plan
+  const match = findPlanForSubscription(subscription)
 
   // Extract period dates (handle different Stripe API versions)
   const subData = subscription as unknown as {
@@ -307,7 +301,8 @@ async function updateSubscriptionRecord(
   const { error } = await supabase
     .from('subscriptions')
     .update({
-      plan_id: plan?.id || null,
+      // Unknown price (e.g. env not set yet): keep the current plan, still sync status
+      ...(match ? { plan_id: match.plan.id } : {}),
       status: mapStripeStatus(subData.status),
       current_period_start: new Date(subData.current_period_start * 1000).toISOString(),
       current_period_end: new Date(subData.current_period_end * 1000).toISOString(),
@@ -319,6 +314,15 @@ async function updateSubscriptionRecord(
   } else {
     console.log(`[Stripe Webhook] Subscription updated for tenant: ${tenantId}`)
   }
+}
+
+/** The plan for a subscription: first item whose price id is a configured plan price. */
+function findPlanForSubscription(subscription: Stripe.Subscription) {
+  for (const item of subscription.items.data) {
+    const match = planForStripePrice(item.price.id, process.env)
+    if (match) return match
+  }
+  return null
 }
 
 /**
