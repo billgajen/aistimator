@@ -5,7 +5,7 @@
  * mentioned in the customer's description.
  */
 
-import type { GeminiClient } from './gemini'
+import type { AiClient } from './client'
 
 /**
  * Extracted estimate details for a cross-service
@@ -53,7 +53,7 @@ Guidelines:
  * Extract relevant details for a cross-service from the customer's description
  */
 export async function extractCrossServiceDetails(
-  client: GeminiClient,
+  client: AiClient,
   mainServiceName: string,
   crossServiceName: string,
   description: string

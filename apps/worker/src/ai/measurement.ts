@@ -15,7 +15,7 @@
  * converted into the target's unit at the end.
  */
 
-import type { GeminiClient } from './gemini'
+import type { AiClient } from './client'
 import { normalizeUnit, unitKind, fromCanonical, getRegion, type ReferenceObject } from '@estimator/shared'
 
 export interface MeasurementTarget {
@@ -212,7 +212,7 @@ export type RunPass = (passIndex: number) => Promise<PassMeasurement[]>
  * `runPass` is injectable for tests; default performs a real Gemini call.
  */
 export async function measureQuantities(opts: {
-  gemini: GeminiClient | null
+  gemini: AiClient | null
   images: Array<{ mimeType: string; base64: string }>
   targets: MeasurementTarget[]
   passes?: number
@@ -393,7 +393,7 @@ Keep all prose minimal — the numbers and the scope sentence are what matter.`
  * `run` is injectable for tests. Failure returns null — never blocks the quote.
  */
 export async function adjudicateMeasurement(opts: {
-  adjudicator: GeminiClient | null
+  adjudicator: AiClient | null
   images: Array<{ mimeType: string; base64: string }>
   target: MeasurementTarget
   measured: MeasuredQuantity

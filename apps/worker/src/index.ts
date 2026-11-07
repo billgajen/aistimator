@@ -25,6 +25,14 @@ export interface Env {
   UPSTASH_REDIS_URL?: string
   UPSTASH_REDIS_TOKEN?: string
   GEMINI_API_KEY?: string
+  // T-135: Claude adapter (only needed when a task is routed to anthropic:*)
+  ANTHROPIC_API_KEY?: string
+  // T-135: per-task model overrides, e.g. AI_MODEL_ADJUDICATION="anthropic:<model-id>"
+  AI_MODEL_EXTRACTION_PASS?: string
+  AI_MODEL_ADJUDICATION?: string
+  AI_MODEL_WORDING?: string
+  AI_MODEL_IDENTIFICATION?: string
+  AI_MODEL_SERVICE_MATCH?: string
 
   // Measurement Engine (T-117): ensemble pass count for AI-measured quantities
   MEASUREMENT_PASSES?: string

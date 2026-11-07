@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { geminiUrlFor } from '@/lib/ai/models'
 import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
 import { NextResponse } from 'next/server'
 
@@ -10,8 +11,6 @@ import { NextResponse } from 'next/server'
  * natural language. Produces the same CreateQuoteRequest when complete.
  */
 
-const GEMINI_API_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
 
 interface ChatRequestBody {
   tenantKey: string
@@ -304,7 +303,7 @@ ${isStart ? 'This is the start of the conversation. Greet the customer warmly an
       required: ['reply', 'extractedFields', 'isComplete'],
     }
 
-    const geminiResponse = await fetch(`${GEMINI_API_URL}?key=${geminiKey}`, {
+    const geminiResponse = await fetch(`${geminiUrlFor('chat_widget')}?key=${geminiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -11,6 +11,7 @@
  */
 
 import { GeminiClient } from './gemini'
+import type { AiClient } from './client'
 import { QUOTE_CONTENT_SCHEMA } from './schemas'
 import type { ExtractedSignals } from './signals'
 import type { TakeoffEntry } from '@estimator/shared'
@@ -286,7 +287,7 @@ Respond with ONLY the JSON object, no other text.`
  * Generate quote wording using Gemini
  */
 export async function generateWording(
-  client: GeminiClient,
+  client: AiClient,
   context: WordingContext
 ): Promise<QuoteContent> {
   // Build the prompt with context

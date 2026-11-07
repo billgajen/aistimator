@@ -15,6 +15,35 @@
 
 ## Issues & Resolutions
 
+### 2026-11-07: T-135 — AI Model Registry, Provider-Agnostic Clients, Gemini 3 Upgrade
+
+**Why it was urgent:** Google's deprecation notice — "Effective December 1, 2026, all API requests to `gemini-2.5-flash` will automatically route to `gemini-3.5-flash-lite` and be billed at Gemini 3.5 Flash-Lite rates" (aistudio.google.com/docs/deprecations, /docs/models, /docs/pricing, release notes 2026-11-02; `gemini-2.5-pro` reroutes to `gemini-3.8-flash`). The 3.8 Flash migration notes list "removed sampling parameters and prefilled model turns" as breaking changes — our client sent both.
+
+**Built:**
+- **Registry** `packages/shared/src/ai-models.json` (+ typed `ai-models.ts`): task → provider+model for `extraction_pass`, `adjudication`, `compile`, `wording`, `chat_widget`, `service_match`, `identification`; per-model request **capabilities**; a sourced USD/MTok **price table** (with `asOf` and source); a **pinned harness model** for the simulated customer (it must never drift between comparisons). `AI_MODEL_<TASK>` env overrides (`model` or `provider:model`) switch any task without a code change; legacy `ADJUDICATION_MODEL` still honoured. Grep check: no model-name strings in `apps/` or `packages/shared/src` code outside the JSON.
+- **Worker `AiClient` interface** (`ai/client.ts`) — every consumer now types against it; `createAiClient(task, env, meter)` (`ai/factory.ts`). Processor routes vision work (signals, measurement, inventory) to `extraction_pass`, all text work (wording, addons, gate, validator, cross-service, recommendations) to `wording`, the senior model to `adjudication`.
+- **Claude adapter** (`ai/anthropic.ts`, official `@anthropic-ai/sdk`): JSON-schema structured outputs with a Gemini→JSON-Schema translator (`toClaudeJsonSchema`: lowercase types, `nullable`→anyOf null, `additionalProperties:false`, unsupported keywords dropped), server-side refusal `fallbacks: "default"`, refusal/`max_tokens` stop reasons surfaced as errors. Selectable by config (`AI_MODEL_ADJUDICATION=anthropic:<model>`); **not exercised live — no Anthropic key in this environment** (OWNER-TODO).
+- **Per-quote AI cost** in `pricing_trace_json.aiUsage` (calls, input/output tokens incl. Gemini thinking tokens, estimated USD by task+model; unpriced models listed, never guessed).
+- **Web** chat/compile/AI-draft/service-matcher read the registry (`lib/ai/models.ts`); a web task routed to a non-Gemini provider falls back to its default with a warning.
+
+**Root cause found — Gemini 3.x schema-constrained numbers degenerate.** With `response_schema`, `gemini-3.8-flash`, `gemini-3.6-flash` and `gemini-3.5-flash-lite` emit `"widthInRefUnits": 6.000000…` until MAX_TOKENS on the measurement prompt (reproduced in direct probes at temperatures 0.3/0.7/1.0, with real `systemInstruction`, with `response_json_schema`, with integer and string-typed fields — all still degenerate or produce garbage). JSON mode **without** a schema, schema described in the prompt, returns sane numbers 5/6 (the sixth was a markdown fence the parser strips). **Fix (data, not code branching):** per-model capabilities in the registry — Gemini 3.x get `structuredOutput: "prompt"` (schema in prompt, `coerceToSchemaRoot` unwraps an echoed `{"type","properties"}` wrapper and requires the root keys), real `systemInstruction` (no primed model turn), and no sampling params. Unlisted models keep the exact pre-T-135 request shape. MAX_TOKENS on a structured call now throws a clear error instead of a JSON SyntaxError. Live through the real measurement code (S01 photos, 3 passes): **3.8-flash 3/3 valid, 54.1 sqm, cov 0.11**; 3.5-flash-lite 3/3 valid but **172.9 sqm** (≈3× plausible — the Dec-1 auto-route target would have quietly inflated measured jobs); 2.5-flash 2/3 valid, 67.8 sqm.
+
+**Comparison (gauntlet round 1, current vs one newer candidate per task; money = 7 hard-anchored scenarios: S03–S06/S09/S10 truth bands, S08 penny-exact £435.54):**
+
+| Config | Run | Sent | Money | Median latency | Median AI $/quote | Notes |
+|---|---|---|---|---|---|---|
+| Current: 2.5-flash everywhere, adjudication `gemini-pro-latest` | `1e4e34cd` | 9/10 | 5/7 | 47 s | $0.0248 | pro-latest unpriced (no published price); same 5/7 as runs `8e5db672` and July `db8aa9bc` |
+| Candidate: 3.8-flash everywhere (prompt mode), adjudication `gemini-3.1-pro-preview` | `2625e00e` | **10/10** | **6/7** | 66 s | $0.0273 | 1 measurement pass failed (MAX_TOKENS); S01 £1,680.80 Grade B from photos |
+| Diagnostic: 3.8-flash with response schema (pre-fix) | `5366cf4b` | 9/10 | 7/7 | 50 s | $0.0232 | text tasks strong; 4 measurement passes degenerate, S01 aborted at 300 s |
+
+**Chosen defaults:** `gemini-3.8-flash` for all Flash tasks, `gemini-3.1-pro-preview` for adjudication — equal or better accuracy than baseline, and the measurement engine works on a model that will still exist after Dec 1. **Not met:** median latency 66 s vs the 60 s target (baseline 47 s). Candidate follow-up: Gemini 3 `thinking_level` per task (text tasks low). Prices: 3.8 Flash doubles to $1.50/$7.50 on 2027-01-01, 3.1 Pro preview $2/$12.
+
+**Process lessons (cost real runs):** zsh does not word-split `$VAR`, so a whole override list arrived as one model name; an empty bash array under `set -u` killed the worker start silently (config A ran against no worker). The eval driver now refuses to run unless the worker is healthy and every override is bound; and a smoke scenario's `aiUsage.byTask` is read before any full run (owner rule, memory `gauntlet-testing-rule`).
+
+**Files:** `packages/shared/src/{ai-models.json,ai-models.ts,index.ts,database.types.ts}`, `apps/worker/src/ai/{client.ts,factory.ts,anthropic.ts,gemini.ts,index.ts,measurement.ts,wording.ts,signals.ts,cross-service.ts,quote-validator.ts,signal-recommendations.ts,service-draft.ts,service-detection.ts}`, `apps/worker/src/{agents/quality-gate.ts,quote-processor.ts,index.ts}`, `apps/worker/package.json` (+`@anthropic-ai/sdk`), `apps/web/src/lib/ai/{models.ts,service-matcher.ts}`, `apps/web/src/app/api/{public/widget/chat,services/ai-draft/*}`, `scripts/hardcore-test/customer-sim.mjs`, `CLAUDE.md`, `Docs/00-v1-scope.md`, `README.md`, tests `apps/worker/src/__tests__/ai-models.test.ts`
+
+---
+
 ### 2026-11-07: T-133 — Region Layer + US Localisation (AD-025, AD-030)
 
 **What changed:** the product was UK-shaped in code — UK door sizes as constants in the measurement engine ("a UK door is a UK door", T-118), `en-GB` and `£` symbol tables in six formatters, "Postcode" and "VAT" in copy, GBP fallbacks in APIs. Every one of those now comes from **region data**.

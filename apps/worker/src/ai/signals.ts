@@ -7,6 +7,7 @@
  */
 
 import { GeminiClient } from './gemini'
+import type { AiClient } from './client'
 import { EXTRACTED_SIGNALS_SCHEMA } from './schemas'
 import type {
   DetectedItem,
@@ -499,7 +500,7 @@ Respond with ONLY the JSON object, no other text.`
  * The measurement model is the key signal that tells AI what to measure.
  */
 export async function extractSignals(
-  client: GeminiClient,
+  client: AiClient,
   images: Array<{ mimeType: string; base64: string }>,
   context: SignalExtractionContext
 ): Promise<ExtractedSignals> {
@@ -600,7 +601,7 @@ EXAMPLES:
  * matching the service's expectedSignals configuration.
  */
 export async function extractStructuredSignals(
-  client: GeminiClient,
+  client: AiClient,
   images: Array<{ mimeType: string; base64: string }>,
   context: SignalExtractionContext
 ): Promise<{ legacy: ExtractedSignals; structured: ExtractedSignalsV2 }> {
@@ -987,7 +988,7 @@ export interface AddonDetectionResult {
  * against available add-ons, regardless of exact wording.
  */
 export async function detectAddonsFromDescription(
-  client: GeminiClient,
+  client: AiClient,
   serviceName: string,
   customerDescription: string,
   availableAddons: AddonForMatching[]
@@ -1187,7 +1188,7 @@ Respond with ONLY the JSON object, no other text.`
  * The AI adapts its detection based on the service type and catalog provided.
  */
 export async function extractInventoryItems(
-  client: GeminiClient,
+  client: AiClient,
   images: Array<{ mimeType: string; base64: string }>,
   context: InventoryDetectionContext
 ): Promise<DetectedItem[]> {
@@ -1269,7 +1270,7 @@ MATCHING RULES:
  * - "6 foot round" → "Round Table 6ft"
  */
 export async function matchItemsToCatalog(
-  client: GeminiClient,
+  client: AiClient,
   detectedItems: DetectedItem[],
   catalog: ItemCatalogEntry[]
 ): Promise<MatchedItem[]> {

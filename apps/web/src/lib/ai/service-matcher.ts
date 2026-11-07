@@ -1,3 +1,4 @@
+import { geminiUrlFor } from './models'
 /**
  * AI Service Matcher
  *
@@ -18,7 +19,6 @@ interface MatchResult {
   reason: string
 }
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
 
 /**
  * Validate if the project description matches the selected service
@@ -81,7 +81,7 @@ Calibration rules (R2-1b):
 - Reserve confidence >= 0.8 with isMatch: false for cases where you are certain the core need is a different trade.`
 
   try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+    const response = await fetch(`${geminiUrlFor('service_match')}?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

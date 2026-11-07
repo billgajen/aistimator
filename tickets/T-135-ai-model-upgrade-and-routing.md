@@ -25,7 +25,41 @@ Gemini 1.5 Flash.
 - Prompt rewrites beyond what a model change strictly requires.
 
 ## Acceptance criteria
-- [ ] No model name strings outside the registry (grep check)
-- [ ] The model per task can be switched by env without a deploy of code changes
-- [ ] Gauntlet comparison table recorded; chosen defaults are equal or better than baseline on accuracy
-- [ ] Median submission → price stays under 60 s with the chosen defaults
+- [x] No model name strings outside the registry (grep check)
+- [x] The model per task can be switched by env without a deploy of code changes
+- [x] Gauntlet comparison table recorded; chosen defaults are equal or better than baseline on accuracy
+- [ ] Median submission → price stays under 60 s with the chosen defaults — NOT met: 66 s (baseline 47 s); follow-up: per-task thinking level
+
+## Plan
+1. **Registry** `packages/shared/src/ai-models.json` (data) + `ai-models.ts` (typed access):
+   task → `{ provider, model }` defaults, a per-model token price table with source + date,
+   and pinned harness models. `resolveModelRoute(task, env)` honours `AI_MODEL_<TASK>`
+   (`model` or `provider:model`) plus the legacy `ADJUDICATION_MODEL`. `estimateCostUsd()`.
+   Tasks: extraction_pass, adjudication, compile, wording, chat_widget, service_match, identification.
+2. **Worker provider interface** `ai/client.ts`: `AiClient` (text, vision, schema, vision+schema)
+   with a usage meter. `GeminiClient` implements it and reports `usageMetadata`. New
+   `AnthropicClient` (official `@anthropic-ai/sdk`, structured outputs) behind the same interface,
+   selectable by config for adjudication and identification. `createAiClient(task, env, meter)`.
+   Every consumer types against `AiClient`, not `GeminiClient`.
+3. **Processor**: vision work (signals, measurement, inventory) uses the `extraction_pass` client,
+   text work (wording, gate, validator, addons, cross-service, recommendations) uses `wording`,
+   adjudication uses `adjudication`. Per-quote `aiUsage` (calls, tokens, estimated USD by task)
+   stored in the pricing trace.
+4. **Web**: chat route, AI-draft shared caller, service matcher read the registry. Harness
+   `customer-sim.mjs` reads its pinned model from the registry JSON (simulated customer must not
+   change between model comparisons).
+5. **Docs**: CLAUDE.md, 00-v1-scope.md, README point at the registry.
+6. **Evaluate**: gauntlet round 1 per candidate (current 2.5 Flash + pro-latest vs 3.8 Flash,
+   and adjudication candidates), record accuracy / cost / latency in the CHANGELOG, pick defaults.
+   Note: Google reroutes `gemini-2.5-flash` to `gemini-3.5-flash-lite` on 2026-12-01.
+
+## Implementation Summary
+- Registry `packages/shared/src/ai-models.json`: task routes, per-model capabilities, sourced prices,
+  pinned harness model; `AI_MODEL_<TASK>` env overrides.
+- Worker `AiClient` interface + factory; Gemini client honours capabilities; new Claude adapter
+  (official SDK, structured outputs, refusal fallback) behind the same interface.
+- Per-quote AI cost (`pricing_trace_json.aiUsage`).
+- Root-caused Gemini 3 measurement failures (schema-constrained numbers degenerate) and fixed them
+  with prompt-mode structured output as registry data; legacy models unchanged.
+- New defaults: `gemini-3.8-flash` (Flash tasks), `gemini-3.1-pro-preview` (adjudication); comparison in CHANGELOG.
+- Open: latency 66 s median vs 60 s target; Claude adapter untested live (no key).

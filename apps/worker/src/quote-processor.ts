@@ -12,7 +12,6 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
-  createGeminiClient,
   extractSignals,
   extractStructuredSignals,
   getSignalsWithoutImages,
@@ -52,6 +51,9 @@ import { initializeFusionFromStructuredSignals } from './agents/signal-fusion'
 import { evaluateQualityGate } from './agents/quality-gate'
 import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
 import type { QualityGateResult } from '@estimator/shared'
+import { AiUsageMeter } from '@estimator/shared'
+import { createAiClient } from './ai/factory'
+import type { AiClient } from './ai/client'
 import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock } from '@estimator/shared'
 import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor } from './ai/measurement'
 import { buildTakeoff, buildReference } from './takeoff'
@@ -455,7 +457,11 @@ export async function processQuote(
   const imageAssets = triageDecision.photoStrategy.skipVision
     ? []
     : allImageAssets.slice(0, triageDecision.photoStrategy.maxPhotos)
-  const gemini = createGeminiClient(env.GEMINI_API_KEY)
+  // T-135: model per task from the registry (env-overridable); every call's
+  // tokens are metered for the per-quote AI cost estimate in the trace
+  const aiUsage = new AiUsageMeter()
+  const gemini = createAiClient('extraction_pass', env, aiUsage) // vision: signals, measurement, inventory
+  const textAi = createAiClient('wording', env, aiUsage) // text: wording, addons, gate, validator, cross-service
 
   // Extract customer notes for context
   const notesAnswer = quoteRequest.job_answers?.find(
@@ -598,10 +604,9 @@ export async function processQuote(
             console.log(
               `[Processor] Adjudicating ${m.signalKey} (${decision.reason}, provisional ${provisionalValue.toFixed(0)})`
             )
-            const adjudicator = createGeminiClient(env.GEMINI_API_KEY, {
-              // gemini-pro-latest: 2.5-pro is closed to newer API keys (found live)
-              model: env.ADJUDICATION_MODEL || 'gemini-pro-latest',
-            })
+            // T-135: senior model from the registry ('adjudication' route;
+            // ADJUDICATION_MODEL / AI_MODEL_ADJUDICATION override, Claude pluggable)
+            const adjudicator = createAiClient('adjudication', env, aiUsage)
             const target = targets.find((t) => t.signalKey === m.signalKey)!
             const adjudicated = await adjudicateMeasurement({
               adjudicator,
@@ -938,7 +943,7 @@ export async function processQuote(
   let aiAddonDetectionRan = false
 
   // 3.5 AI-powered addon detection from customer description
-  if (gemini && projectDescription && rules.addons && rules.addons.length > 0) {
+  if (textAi && projectDescription && rules.addons && rules.addons.length > 0) {
     console.log('[Processor] Running AI addon detection on customer description')
     try {
       const availableAddons: AddonForMatching[] = rules.addons.map((a) => ({
@@ -948,7 +953,7 @@ export async function processQuote(
       }))
 
       const detectedAddons = await detectAddonsFromDescription(
-        gemini,
+        textAi,
         service.name,
         projectDescription,
         availableAddons
@@ -996,7 +1001,7 @@ export async function processQuote(
   }
 
   // 3.6 AI-powered addon detection from IMAGE-detected conditions
-  if (gemini && signals.detectedConditions && signals.detectedConditions.length > 0 && rules.addons && rules.addons.length > 0) {
+  if (textAi && signals.detectedConditions && signals.detectedConditions.length > 0 && rules.addons && rules.addons.length > 0) {
     console.log('[Processor] Running AI addon detection on image-detected conditions:', signals.detectedConditions)
     try {
       const availableAddons: AddonForMatching[] = rules.addons.map((a) => ({
@@ -1010,7 +1015,7 @@ export async function processQuote(
         .join(', ') + ' detected in photos'
 
       const detectedAddons = await detectAddonsFromDescription(
-        gemini,
+        textAi,
         service.name,
         conditionsText,
         availableAddons
@@ -1339,7 +1344,7 @@ export async function processQuote(
 
   // 3.6 Detect unused signals and generate AI recommendations
   let signalRecommendations: SignalRecommendation[] = []
-  if (structuredSignals && structuredSignals.signals.length > 0 && gemini) {
+  if (structuredSignals && structuredSignals.signals.length > 0 && textAi) {
     // Find signals extracted by AI but not used in pricing
     // Pass form answers and widget fields to filter out numeric signals that customer already provided
     const unusedSignals = findUnusedSignals(
@@ -1354,7 +1359,7 @@ export async function processQuote(
 
       try {
         signalRecommendations = await generateSignalRecommendations(
-          gemini,
+          textAi,
           unusedSignals,
           service.name,
           {
@@ -1436,10 +1441,10 @@ export async function processQuote(
     regionGuidance: regionPromptBlock(regionCtx), // T-133
   }
 
-  if (gemini) {
+  if (textAi) {
     console.log('[Processor] Generating wording with Gemini')
     try {
-      content = await generateWording(gemini, wordingContext)
+      content = await generateWording(textAi, wordingContext)
     } catch (error) {
       console.error('[Processor] Wording generation failed, using fallback:', error)
       content = generateWordingFallback(wordingContext)
@@ -1462,7 +1467,7 @@ export async function processQuote(
   // Skip if triage says no cross-service check needed
   const crossServiceRecommendations = triageDecision.crossServiceCheck
     ? await detectCrossServiceMentionsWithAI(
-        gemini,
+        textAi,
         projectDescription || '',
         service.name,
         quoteData.otherServices || []
@@ -1498,9 +1503,9 @@ export async function processQuote(
 
         // Extract details using AI if Gemini is available
         let crossServiceEstimate: CrossServiceEstimate
-        if (gemini && projectDescription) {
+        if (textAi && projectDescription) {
           crossServiceEstimate = await extractCrossServiceDetails(
-            gemini,
+            textAi,
             service.name,
             rec.serviceName,
             projectDescription
@@ -1582,7 +1587,7 @@ export async function processQuote(
   const validationSettings: ValidationSettings = (tenant as unknown as { validation_settings?: ValidationSettings }).validation_settings
     || getDefaultValidationSettings()
 
-  if (gemini && validationSettings.enabled) {
+  if (textAi && validationSettings.enabled) {
     console.log('[Processor] Running quote validation')
 
     try {
@@ -1616,7 +1621,7 @@ export async function processQuote(
 
       // Run validation
       validationResult = await validateQuote(
-        gemini,
+        textAi,
         quoteForValidation,
         customerRequestContext,
         serviceConfigForValidation,
@@ -1761,7 +1766,7 @@ export async function processQuote(
     )
   }
 
-  if (structuredSignals && gemini) {
+  if (structuredSignals && textAi) {
     try {
       qualityGateResult = await evaluateQualityGate(
         {
@@ -1786,7 +1791,7 @@ export async function processQuote(
             .filter((ws) => !ws.optional && ws.costType !== 'percent' && (ws.defaultCost ?? 0) <= 0)
             .map((ws) => ws.name),
         },
-        gemini
+        textAi
       )
 
       console.log(`[Processor] Quality gate: ${qualityGateResult.action}`)
@@ -1801,7 +1806,7 @@ export async function processQuote(
             quality_gate_json: qualityGateResult,
             // Also store what we have so far (signals, pricing) so re-processing is faster
             signals_json: structuredSignals,
-            pricing_trace_json: pricingTrace,
+            pricing_trace_json: { ...pricingTrace, aiUsage: aiUsage.summary() }, // T-135
             triage_json: triageDecision,
             // T-109 range-first: store provisional pricing + content so the
             // customer sees an estimated range immediately instead of nothing
@@ -1975,7 +1980,7 @@ export async function processQuote(
       // Store full signals for debugging and learning
       signals_json: structuredSignals,
       // Store pricing trace for transparency
-      pricing_trace_json: pricingTrace,
+      pricing_trace_json: { ...pricingTrace, aiUsage: aiUsage.summary() }, // T-135
       // Store triage decision for analytics
       triage_json: triageDecision,
       // Store signal conflicts for auditing (Phase 3: Signal Fusion)
@@ -2260,7 +2265,7 @@ interface SignalExtractionResult {
  * Returns both legacy ExtractedSignals and new ExtractedSignalsV2 for trace support
  */
 async function extractSignalsFromAssets(
-  gemini: ReturnType<typeof createGeminiClient>,
+  gemini: AiClient | null,
   assets: QuoteData['assets'],
   signalContext: SignalExtractionContext,
   env: Env
@@ -2815,7 +2820,7 @@ function detectFormDescriptionConflicts(
  * keyword matching for any services not detected by AI.
  */
 async function detectCrossServiceMentionsWithAI(
-  gemini: ReturnType<typeof createGeminiClient>,
+  gemini: AiClient | null,
   projectDescription: string,
   primaryServiceName: string,
   otherServices: Array<{ id: string; name: string; description?: string; detection_keywords?: string[] }>

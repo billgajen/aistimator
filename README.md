@@ -9,7 +9,7 @@ AI-powered estimate platform that lets businesses embed a quote widget on their 
 - **Database & Auth**: Supabase (Postgres + Auth)
 - **Rate Limiting**: Upstash Redis
 - **File Storage**: Cloudflare R2
-- **AI**: Gemini 1.5 Flash
+- **AI**: model per task from `packages/shared/src/ai-models.json` (Gemini default, Claude adapter; `AI_MODEL_<TASK>` env overrides)
 - **PDF Generation**: DocRaptor
 - **Email**: Postmark
 - **Payments**: Stripe

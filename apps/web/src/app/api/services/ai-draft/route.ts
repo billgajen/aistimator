@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
 import type { ServiceDraftConfig, DocumentType } from '@estimator/shared'
-import { validateAndNormalizeDraft, parseGeminiJson, GEMINI_API_BASE, DEFAULT_MODEL, loadTenantRegionBlock } from './shared'
+import { validateAndNormalizeDraft, parseGeminiJson, loadTenantRegionBlock } from './shared'
+import { geminiUrlFor } from '@/lib/ai/models'
 
 /**
  * POST /api/services/ai-draft
@@ -134,7 +135,7 @@ async function generateServiceDraft(
 ): Promise<ServiceDraftConfig> {
   const prompt = `${regionBlock}\n\n${buildDraftPrompt(request)}`
 
-  const url = `${GEMINI_API_BASE}/${DEFAULT_MODEL}:generateContent?key=${apiKey}`
+  const url = `${geminiUrlFor('compile')}?key=${apiKey}` // T-135 registry
 
   const response = await fetch(url, {
     method: 'POST',

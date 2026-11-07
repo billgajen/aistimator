@@ -4,6 +4,7 @@
  */
 
 import type { ServiceDraftConfig } from '@estimator/shared'
+import { geminiUrlFor } from '@/lib/ai/models'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { extractFormulaIdentifiers, normalizeUnit, regionPromptBlock, resolveRegionContext } from '@estimator/shared'
 
@@ -303,8 +304,6 @@ export function parseGeminiJson<T>(text: string): T {
 /**
  * Gemini API constants
  */
-export const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
-export const DEFAULT_MODEL = 'gemini-2.5-flash'
 
 /**
  * Call Gemini API with system prompt and user prompt
@@ -317,7 +316,8 @@ export async function callGemini(opts: {
   temperature?: number
   maxOutputTokens?: number
 }): Promise<string> {
-  const url = `${GEMINI_API_BASE}/${DEFAULT_MODEL}:generateContent?key=${opts.apiKey}`
+  // T-135: model from the registry ('compile' route covers all config-time drafting)
+  const url = `${geminiUrlFor('compile')}?key=${opts.apiKey}`
 
   const userParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = []
   if (opts.imageParts) {

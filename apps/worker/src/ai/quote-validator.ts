@@ -16,7 +16,7 @@
  * 8. Logic - Form/description consistency
  */
 
-import type { GeminiClient } from './gemini'
+import type { AiClient } from './client'
 import type {
   ValidationResult,
   ValidationIssue,
@@ -333,7 +333,7 @@ const VALIDATION_RESULT_SCHEMA = {
 }
 
 export async function validateQuote(
-  gemini: GeminiClient,
+  gemini: AiClient,
   quote: GeneratedQuoteForValidation,
   customerRequest: CustomerRequestContext,
   serviceConfig: ServiceConfigForValidation,

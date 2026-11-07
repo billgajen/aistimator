@@ -22,3 +22,15 @@ Code for every item is already built; these are the steps that unlock it.
 - [ ] **Check one US PDF and one US email by eye** once DocRaptor and Postmark keys are set
   (`DOCRAPTOR_API_KEY`, `POSTMARK_API_TOKEN` in Vercel env). Expect `$`, "Sales tax" and US date order.
   Code paths: `apps/web/src/lib/pdf-template.ts`, `apps/worker/src/email/index.ts`.
+
+## T-135 — AI model registry + routing
+
+- [ ] **Optional: an Anthropic API key** to try Claude for adjudication or identification. Set
+  `ANTHROPIC_API_KEY` in the worker (`wrangler secret put ANTHROPIC_API_KEY`) and, to switch,
+  `AI_MODEL_ADJUDICATION=anthropic:<model-id>`. The adapter is unit-tested but has never run live.
+- [ ] **Deploy before 1 December 2026.** Google reroutes `gemini-2.5-flash` to `gemini-3.5-flash-lite`
+  that day; the new defaults move every task off 2.5 explicitly. Until this deploys, production runs
+  the old defaults.
+- [ ] **Budget for the January price change.** `gemini-3.8-flash` goes from $0.75/$3.75 to
+  $1.50/$7.50 per 1M tokens on 1 January 2027 (Google pricing page). Update the `prices` block in
+  `packages/shared/src/ai-models.json` then.

@@ -26,6 +26,9 @@ export * from './regions'
 export * from './units'
 export * from './format'
 
+// Re-export the AI model registry (T-135)
+export * from './ai-models'
+
 // ID prefixes for stable, readable IDs
 export const ID_PREFIXES = {
   tenant: 'tnt_',

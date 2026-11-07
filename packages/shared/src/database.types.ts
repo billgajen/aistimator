@@ -1,4 +1,5 @@
 import type { RegionCode, UnitSystem, ReferenceObject } from './regions/types'
+import type { AiUsageSummary } from './ai-models'
 
 /**
  * Database types for the Estimator platform
@@ -800,6 +801,9 @@ export interface PricingTrace {
     taxAmount: number
     total: number
   }
+
+  /** T-135: tokens and estimated AI cost for this quote, by task + model */
+  aiUsage?: AiUsageSummary
 }
 
 export interface Quote {
