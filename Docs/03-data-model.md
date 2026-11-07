@@ -135,3 +135,8 @@ The generated quote record for delivery and tracking.
 ## RLS
 - All tenant tables restricted by `tenant_id` for authenticated users.
 - Public quote view uses a token and only returns specific quote data.
+### SMS channel (T-136, migration 27)
+- sms_configs: tenant_id (unique), phone_number (E.164, unique), messaging_service_sid, is_active, a2p_brand_registered, a2p_campaign_registered
+- sms_conversations: same shape as whatsapp_conversations + consent_notice_sent
+- sms_messages: provider_message_id, direction, message_type, from/to, content, media_url, segments, status (received | sent | test | blocked_opt_out | failed)
+- sms_opt_outs: tenant_id + phone (unique), opted_out, last_keyword — checked before every send; only the customer's START clears it

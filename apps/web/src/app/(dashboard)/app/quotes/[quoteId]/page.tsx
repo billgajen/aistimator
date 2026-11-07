@@ -24,6 +24,9 @@ export default function QuoteDetailPage({
   const [error, setError] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [resending, setResending] = useState(false)
+  // T-136: text the quote link by SMS
+  const [texting, setTexting] = useState(false)
+  const [textResult, setTextResult] = useState<string | null>(null)
 
   const fetchQuote = useCallback(async () => {
     try {
@@ -62,6 +65,29 @@ export default function QuoteDetailPage({
       alert('Failed to resend quote')
     } finally {
       setResending(false)
+    }
+  }
+
+  const handleTextLink = async () => {
+    setTexting(true)
+    setTextResult(null)
+    try {
+      const response = await fetch('/api/sms/send-quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quoteId }),
+      })
+      const json = await response.json().catch(() => null)
+      if (response.ok) {
+        setTextResult(json?.test ? `Recorded (test mode) to ${json.to}` : `Texted to ${json?.to}`)
+        await fetchQuote()
+      } else {
+        setTextResult(json?.error?.message || 'Failed to text the link')
+      }
+    } catch {
+      setTextResult('Failed to text the link')
+    } finally {
+      setTexting(false)
     }
   }
 
@@ -164,6 +190,16 @@ export default function QuoteDetailPage({
               {resending ? 'Sending...' : 'Send'}
             </button>
           )}
+          {['sent', 'viewed', 'feedback_received', 'revised', 'expired'].includes(quote.status) && (
+            <button
+              onClick={handleTextLink}
+              disabled={texting}
+              className="px-4 py-2 text-sm font-semibold text-text-primary bg-background border border-border rounded-lg hover:bg-surface disabled:opacity-50 transition-colors"
+            >
+              {texting ? 'Texting…' : 'Text link'}
+            </button>
+          )}
+          {textResult && <span className="self-center text-xs text-text-muted">{textResult}</span>}
         </div>
       </div>
 

@@ -11,6 +11,7 @@ export const US_REGION: RegionDefinition = {
   locale: 'en-US',
   unitSystem: 'imperial',
   postalCodePattern: '^\\d{5}(-\\d{4})?$',
+  callingCode: '1',
   copy: {
     postalCodeLabel: 'ZIP code',
     postalCodeNoun: 'ZIP code',

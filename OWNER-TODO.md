@@ -34,3 +34,16 @@ Code for every item is already built; these are the steps that unlock it.
 - [ ] **Budget for the January price change.** `gemini-3.8-flash` goes from $0.75/$3.75 to
   $1.50/$7.50 per 1M tokens on 1 January 2027 (Google pricing page). Update the `prices` block in
   `packages/shared/src/ai-models.json` then.
+
+## T-136 — SMS channel (Twilio)
+
+- [ ] **Create the Twilio account** and set `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` in Vercel env
+  (web app). Without both, the platform stays in test mode and never sends a text.
+- [ ] **Buy a US number** for the first beta business and enter it at `/app/sms`.
+- [ ] **Register A2P 10DLC** (brand with legal name + EIN, then a campaign on a Messaging Service) in the
+  Twilio Console, and paste the Messaging Service SID at `/app/sms`. US carriers block unregistered
+  business texting at volume.
+- [ ] **Point the number's "A message comes in" webhook** to `https://<your-domain>/api/sms/webhook` (HTTP POST).
+- [ ] **Apply migration 27** (`supabase/migrations/00000000000027_sms_channel.sql`) to production.
+- [ ] **Live test from a real phone:** text the number, send a photo by MMS, reply "yes", open the link;
+  then text STOP and confirm the dashboard "Text link" refuses to send.

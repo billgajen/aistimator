@@ -15,6 +15,27 @@
 
 ## Issues & Resolutions
 
+### 2026-11-07: T-136 — SMS Channel (Twilio) on a Channel-Agnostic Intake Engine (AD-027)
+
+**Built:**
+- **WhatsApp pinned first:** `__tests__/whatsapp-intake.test.ts` characterises the pre-refactor intake (exact reply texts, transitions, quote creation, Cloud API send). Written and passing against the OLD code, then kept unchanged through the refactor.
+- **Channel abstraction:** the state machine moved to `lib/messaging/intake-engine.ts`, driven by a `ChannelAdapter` (`send`, `downloadMedia`, `emphasize`, `senderNumberNoun`, `conversationTable`). `whatsapp-intake.ts` is now a thin adapter (WhatsApp `*bold*`, "WhatsApp number"); SMS uses plain text and "mobile number". R2 keys and `source_json.type` come from the channel name.
+- **Twilio library** `lib/sms.ts` (no SDK): X-Twilio-Signature HMAC-SHA1 verification (test vector computed independently with openssl), send via REST, MMS download with basic auth, GSM-7/UCS-2 segment counting, STOP/START/HELP keywords (YES re-subscribes only an opted-out number — YES is also the intake's confirm word), opt-out store checked on **every** send (`sendSmsChecked` logs blocked attempts as `blocked_opt_out`), consent line on the first reply of each conversation. **Test mode** (`SMS_TEST_MODE=true` or no Twilio credentials): every outbound text is logged with status `test` and never leaves the platform.
+- **Migration 27** `sms_channel.sql`: `sms_configs` (per-tenant E.164 number, optional Messaging Service SID, 10DLC checklist flags), `sms_conversations` (same shape as WhatsApp + `consent_notice_sent`), `sms_messages` (with billable `segments`), `sms_opt_outs` (unique tenant+phone). RLS on all four; businesses can READ opt-outs but cannot clear them — only the customer's START does.
+- **Webhook** `POST /api/sms/webhook`: 503 if `TWILIO_AUTH_TOKEN` is unset, 401 on missing/invalid signature (fails closed); compliance keywords handled before any intake; MMS items become photo messages; one reply per inbound message (saves segments). Signed URL = `TWILIO_WEBHOOK_BASE_URL` or `NEXT_PUBLIC_APP_URL` + path (tunnels/proxies).
+- **Dashboard:** `/app/sms` (number, Messaging Service SID, A2P 10DLC checklist with Twilio links, webhook URL, outbound segments this month, test-mode banner), "SMS" nav item, "Text link" on the quote detail page → `POST /api/sms/send-quote` (rotates the token like resend; 409 `OPTED_OUT` after STOP).
+- **Region data:** `callingCode` added (US `1`, GB `44`); `normalizePhone` uses it — no US-only phone assumptions.
+
+**Verified live in test mode** (`scripts/hardcore-test/verify-t136.mjs`, 18/18): unsigned and invalid webhooks → 401; text → description prompt with consent line, no asterisks; full intake incl. an MMS photo stored under `sms/…`; "yes" → quote created, priced $150 by the worker, link texted back; STOP → confirmation, dashboard send 409, no replies; START → send 200. The quote was held at `pending_review` because the test photo (a house) doesn't match a water-heater job — the gate behaving correctly; the script approves it before the send checks.
+
+**No gauntlet** (owner rule: SMS plumbing doesn't touch AI/pricing); WhatsApp regression is covered by the pinned tests. Web tests 48 (was 34), worker 321.
+
+**Not done (needs the owner):** a real Twilio account, a US number, A2P 10DLC brand + campaign registration, and a live MMS round trip — see OWNER-TODO.md. Automated 10DLC registration stays out of scope.
+
+**Files:** `supabase/migrations/00000000000027_sms_channel.sql`, `apps/web/src/lib/{sms.ts,sms-intake.ts,auth-tenant.ts,whatsapp-intake.ts,messaging/*}`, `apps/web/src/app/api/sms/{webhook,config,send-quote}/route.ts`, `apps/web/src/app/(dashboard)/{layout.tsx,app/sms/page.tsx,app/quotes/[quoteId]/page.tsx}`, `packages/shared/src/regions/*`, `apps/web/.env.example`, tests `sms.test.ts` + `whatsapp-intake.test.ts`, `scripts/hardcore-test/verify-t136.mjs`
+
+---
+
 ### 2026-11-07: T-135 — AI Model Registry, Provider-Agnostic Clients, Gemini 3 Upgrade
 
 **Why it was urgent:** Google's deprecation notice — "Effective December 1, 2026, all API requests to `gemini-2.5-flash` will automatically route to `gemini-3.5-flash-lite` and be billed at Gemini 3.5 Flash-Lite rates" (aistudio.google.com/docs/deprecations, /docs/models, /docs/pricing, release notes 2026-11-02; `gemini-2.5-pro` reroutes to `gemini-3.8-flash`). The 3.8 Flash migration notes list "removed sampling parameters and prefilled model turns" as breaking changes — our client sent both.

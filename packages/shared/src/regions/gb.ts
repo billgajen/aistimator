@@ -12,6 +12,7 @@ export const GB_REGION: RegionDefinition = {
   locale: 'en-GB',
   unitSystem: 'metric',
   postalCodePattern: '^[A-Z]{1,2}[0-9][0-9A-Z]?\\s?[0-9][A-Z]{2}$',
+  callingCode: '44',
   copy: {
     postalCodeLabel: 'Postcode',
     postalCodeNoun: 'postcode',

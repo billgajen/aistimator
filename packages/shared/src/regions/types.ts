@@ -50,6 +50,8 @@ export interface RegionDefinition {
   unitSystem: UnitSystem
   /** Regex source that validates a postal code (case-insensitive) */
   postalCodePattern: string
+  /** International calling code without "+", e.g. "1" / "44" (T-136 phone normalisation) */
+  callingCode: string
   copy: RegionCopy
   /** Reference object sizes for anchored measurement (metres) */
   referenceObjects: ReferenceObject[]

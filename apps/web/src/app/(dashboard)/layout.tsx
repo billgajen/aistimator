@@ -37,6 +37,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <NavItem href="/app/services" icon={ServicesIcon} label="Services" />
           <NavItem href="/app/widget" icon={WidgetIcon} label="Widget" />
           <NavItem href="/app/whatsapp" icon={WhatsAppIcon} label="WhatsApp" />
+          <NavItem href="/app/sms" icon={SmsIcon} label="SMS" />
           <NavItem href="/app/branding" icon={BrandingIcon} label="Branding" />
         </NavSection>
 
@@ -176,6 +177,14 @@ function WhatsAppIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+    </svg>
+  )
+}
+
+function SmsIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
     </svg>
   )
 }
