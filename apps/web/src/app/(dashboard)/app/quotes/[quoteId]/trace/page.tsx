@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, use } from 'react'
+import { formatMoney } from '@estimator/shared'
 import Link from 'next/link'
 import type { Quote, PricingTrace, PricingTraceStep } from '@estimator/shared'
 
@@ -51,13 +52,13 @@ export default function PricingTracePage({
     fetchQuote()
   }, [quoteId])
 
-  const formatCurrency = (amount: number) => {
-    return `$${amount.toFixed(2)}`
-  }
+  // T-133: was hardcoded "$" — use the quote's own currency
+  const formatCurrency = (amount: number) =>
+    formatMoney(amount, quote?.pricing_json?.currency || 'USD')
 
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return '-'
-    return new Date(dateString).toLocaleString('en-US', {
+    return new Date(dateString).toLocaleString(undefined, {
       dateStyle: 'medium',
       timeStyle: 'short',
     })

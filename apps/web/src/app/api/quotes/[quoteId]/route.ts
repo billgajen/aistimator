@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { formatMoney, resolveRegionContext } from '@estimator/shared'
 import { type NextRequest, NextResponse } from 'next/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import {
@@ -248,13 +249,9 @@ function computeChanges(
   return changes
 }
 
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  GBP: '£', USD: '$', EUR: '€', AUD: 'A$', CAD: 'C$', NZD: 'NZ$',
-}
-
-function formatTotal(pricing: QuotePricing): string {
-  const symbol = CURRENCY_SYMBOLS[pricing.currency] || pricing.currency + ' '
-  return `${symbol}${pricing.total.toFixed(2)}`
+/** T-133: customer-facing total in the tenant's locale */
+function formatTotal(pricing: QuotePricing, locale: string): string {
+  return formatMoney(pricing.total, pricing.currency, locale)
 }
 
 /**
@@ -287,7 +284,7 @@ export async function PATCH(
       .select(`
         *,
         tenants!tenant_id (
-          id, name, currency, tax_enabled, tax_label, tax_rate, branding_json, notification_email
+          id, name, region, currency, tax_enabled, tax_label, tax_rate, branding_json, notification_email
         ),
         services!service_id (
           id, name
@@ -329,7 +326,7 @@ export async function PATCH(
 
     // Server-side tax recalculation
     const tenant = quote.tenants as {
-      id: string; name: string; currency: string
+      id: string; name: string; region?: string | null; currency: string
       tax_enabled: boolean; tax_label: string | null; tax_rate: number
       branding_json: TenantBranding | null; notification_email: string | null
     }
@@ -339,7 +336,7 @@ export async function PATCH(
     pricing.subtotal = pricing.breakdown.reduce((sum, item) => sum + item.amount, 0)
 
     if (tenant.tax_enabled && tenant.tax_rate > 0) {
-      pricing.taxLabel = tenant.tax_label || 'Tax'
+      pricing.taxLabel = resolveRegionContext(tenant).taxLabel // T-133: region default label
       pricing.taxRate = tenant.tax_rate * 100
       pricing.taxAmount = Math.round(pricing.subtotal * tenant.tax_rate * 100) / 100
     } else {
@@ -439,7 +436,7 @@ export async function PATCH(
         businessName: tenant.name,
         serviceName: service.name,
         quoteViewUrl,
-        total: formatTotal(pricing),
+        total: formatTotal(pricing, resolveRegionContext(tenant).locale),
         primaryColor: branding.primaryColor,
       })
 

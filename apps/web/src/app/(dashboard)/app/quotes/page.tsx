@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { formatMoney } from '@estimator/shared'
 import Link from 'next/link'
 import { EmptyState, PageHeader } from '@/components/dashboard/EmptyState'
 import type { QuoteListItem, QuoteStatus } from '@estimator/shared'
@@ -156,21 +157,13 @@ export default function QuotesPage() {
     }
   }
 
-  const formatCurrency = (amount: number, currency: string) => {
-    const symbols: Record<string, string> = {
-      GBP: '\u00a3',
-      USD: '$',
-      EUR: '\u20ac',
-      AUD: 'A$',
-      CAD: 'C$',
-    }
-    const symbol = symbols[currency] || currency + ' '
-    return `${symbol}${amount.toFixed(2)}`
-  }
+  // T-133: Intl formatting for any ISO currency
+  const formatCurrency = (amount: number, currency: string) => formatMoney(amount, currency)
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-'
-    return new Date(dateString).toLocaleDateString('en-GB', {
+    // T-133: dashboard dates follow the viewer's browser locale
+    return new Date(dateString).toLocaleDateString(undefined, {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -179,7 +172,7 @@ export default function QuotesPage() {
 
   const formatTime = (dateString: string | null) => {
     if (!dateString) return ''
-    return new Date(dateString).toLocaleTimeString('en-GB', {
+    return new Date(dateString).toLocaleTimeString(undefined, {
       hour: '2-digit',
       minute: '2-digit',
     })

@@ -10,9 +10,11 @@
 ### tenants
 - id (pk)
 - name
-- currency (ISO code)
+- region (text, 'US' | 'GB'; default 'US' for new tenants, existing tenants backfilled 'GB' — T-133, AD-025)
+- unit_system (text, 'imperial' | 'metric', nullable — null means the region default)
+- currency (ISO code; defaults from region, overridable)
 - tax_enabled (bool)
-- tax_label (text, e.g. VAT, GST, Sales tax)
+- tax_label (text, e.g. VAT, GST, Sales tax; null means the region's label)
 - tax_rate (numeric, 0 to 1)
 - service_area_mode (enum: none, postcode_allowlist, county_state)
 - service_area_values (jsonb)
@@ -27,6 +29,7 @@ Used for embed security.
 - is_active
 
 ### services
+- tax_exempt (bool, default false — T-133: service skips the tenant tax line)
 - id
 - tenant_id
 - name

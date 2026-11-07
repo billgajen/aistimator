@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { formatMoney, resolveRegionContext } from '@estimator/shared'
 import { NextResponse } from 'next/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { sendEmail, isPostmarkConfigured } from '@/lib/postmark'
@@ -72,7 +73,7 @@ export async function GET(request: Request) {
       .from('quotes')
       .select(`
         id, customer_json, pricing_json, sent_at,
-        tenants!tenant_id ( id, name, branding_json ),
+        tenants!tenant_id ( id, name, region, currency, branding_json ),
         services!service_id ( id, name )
       `)
       .in('status', REMINDER_STATUSES)
@@ -98,7 +99,7 @@ export async function GET(request: Request) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tenantRaw = row.tenants as any
         const tenant = (Array.isArray(tenantRaw) ? tenantRaw[0] : tenantRaw) as {
-          id: string; name: string; branding_json: TenantBranding | null
+          id: string; name: string; region?: string | null; currency?: string | null; branding_json: TenantBranding | null
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const serviceRaw = row.services as any
@@ -125,10 +126,11 @@ export async function GET(request: Request) {
         }
 
         const totalFormatted = pricing
-          ? new Intl.NumberFormat('en-GB', {
-              style: 'currency',
-              currency: pricing.currency || 'GBP',
-            }).format(pricing.total)
+          ? (() => {
+              // T-133: tenant region decides locale + currency fallback
+              const regionCtx = resolveRegionContext(tenant ?? {})
+              return formatMoney(pricing.total, pricing.currency || regionCtx.currency, regionCtx.locale)
+            })()
           : ''
 
         const htmlBody = generateQuoteReminderEmailHtml({

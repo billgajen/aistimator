@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
 import type { ServiceDraftConfig, DocumentType } from '@estimator/shared'
-import { validateAndNormalizeDraft, parseGeminiJson, GEMINI_API_BASE, DEFAULT_MODEL } from './shared'
+import { validateAndNormalizeDraft, parseGeminiJson, GEMINI_API_BASE, DEFAULT_MODEL, loadTenantRegionBlock } from './shared'
 
 /**
  * POST /api/services/ai-draft
@@ -107,7 +107,8 @@ export async function POST(request: NextRequest) {
 
     // Generate draft using Gemini
     try {
-      const draft = await generateServiceDraft(apiKey, body)
+      const regionBlock = await loadTenantRegionBlock(supabase, profile.tenant_id)
+      const draft = await generateServiceDraft(apiKey, body, regionBlock)
       return NextResponse.json({ draft })
     } catch (aiError) {
       console.error('[AI Draft] AI generation failed:', aiError)
@@ -128,9 +129,10 @@ export async function POST(request: NextRequest) {
  */
 async function generateServiceDraft(
   apiKey: string,
-  request: DraftRequest
+  request: DraftRequest,
+  regionBlock: string
 ): Promise<ServiceDraftConfig> {
-  const prompt = buildDraftPrompt(request)
+  const prompt = `${regionBlock}\n\n${buildDraftPrompt(request)}`
 
   const url = `${GEMINI_API_BASE}/${DEFAULT_MODEL}:generateContent?key=${apiKey}`
 

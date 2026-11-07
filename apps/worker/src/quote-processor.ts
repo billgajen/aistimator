@@ -52,7 +52,7 @@ import { initializeFusionFromStructuredSignals } from './agents/signal-fusion'
 import { evaluateQualityGate } from './agents/quality-gate'
 import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
 import type { QualityGateResult } from '@estimator/shared'
-import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking, extractFormulaIdentifiers } from '@estimator/shared'
+import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock } from '@estimator/shared'
 import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor } from './ai/measurement'
 import { buildTakeoff, buildReference } from './takeoff'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing, findLookalikeUnconditionedSteps } from './pricing'
@@ -126,6 +126,10 @@ interface QuoteData {
   tenant: {
     id: string
     name: string
+    /** T-133: region code (null only on pre-migration rows → legacy GB) */
+    region?: string | null
+    /** T-133: unit-system override */
+    unit_system?: string | null
     currency: string
     tax_enabled: boolean
     tax_label?: string
@@ -159,6 +163,8 @@ interface QuoteData {
     high_value_threshold?: number | null
     /** AI-generated draft configuration with suggestedFields containing mapsToSignal */
     draft_config?: ServiceDraftConfig | null
+    /** T-133: service is not subject to sales tax / VAT */
+    tax_exempt?: boolean
   }
   /** Other services from this tenant (for cross-service detection) */
   otherServices?: Array<{
@@ -376,6 +382,8 @@ export async function processQuote(
   }
 
   const { quoteRequest, tenant, service, pricingRules, assets } = quoteData
+  // T-133 (AD-025): currency, locale, units, tax label and reference sizes for this tenant
+  const regionCtx = resolveRegionContext(tenant)
 
   // 1.2 Merge clarification answers as customer-provided form answers (T-108).
   // On reprocess after clarification, each answer maps (via its question's
@@ -513,7 +521,8 @@ export async function processQuote(
         return {
           signalKey: step.quantitySource!.signalKey!,
           description: es?.description || `Quantity for "${step.name}"`,
-          unit: step.unitLabel || 'unit',
+          // T-133: the signal's declared unit wins; the step's billing label is the fallback
+          unit: es?.unit || step.unitLabel || 'unit',
         }
       })
       // T-123 Measurement memory: load this business's confirmed-job history
@@ -560,6 +569,11 @@ export async function processQuote(
           targets,
           passes: Number(env.MEASUREMENT_PASSES || 3),
           calibrationHints,
+          // T-133: reference sizes from the tenant's region, pack overrides on top
+          referenceObjects: resolveReferenceObjects(
+            regionCtx.region,
+            service.draft_config?.referenceObjects
+          ),
         })
         for (let m of measured) {
           console.log(
@@ -1133,8 +1147,9 @@ export async function processQuote(
       ss,
       formAnswers,
       {
-        enabled: tenant.tax_enabled,
-        label: tenant.tax_label,
+        // T-133: tax-exempt services skip the tax line; label defaults from region
+        enabled: tenant.tax_enabled && !service.tax_exempt,
+        label: regionCtx.taxLabel,
         // DB stores rate as decimal (0.20 = 20%), pricing engine expects whole number (20 = 20%)
         rate: (tenant.tax_rate || 0) * 100,
       },
@@ -1418,6 +1433,7 @@ export async function processQuote(
     documentType: quoteData.quote.document_type as 'instant_estimate' | 'formal_quote' | 'proposal' | 'sow',
     errorCode, // FIX-6: Pass error code to wording for contextual notes
     learningContext, // Learning context from amendment patterns
+    regionGuidance: regionPromptBlock(regionCtx), // T-133
   }
 
   if (gemini) {
@@ -1507,7 +1523,7 @@ export async function processQuote(
           crossServiceEstimate,
           {
             enabled: tenant.tax_enabled,
-            label: tenant.tax_label,
+            label: regionCtx.taxLabel,
             // DB stores rate as decimal (0.20 = 20%), pricing engine expects whole number (20 = 20%)
             rate: (tenant.tax_rate || 0) * 100,
           },
@@ -2026,6 +2042,7 @@ export async function processQuote(
               total: pricing.total,
               currency: pricing.currency,
             },
+            locale: regionCtx.locale,
             content: {
               scopeSummary: content.scopeSummary,
               validityDays: content.validityDays,
@@ -2078,6 +2095,8 @@ async function loadQuoteData(
       tenants!tenant_id (
         id,
         name,
+        region,
+        unit_system,
         currency,
         tax_enabled,
         tax_label,
@@ -2098,7 +2117,8 @@ async function loadQuoteData(
         low_confidence_mode,
         confidence_threshold,
         high_value_threshold,
-        draft_config
+        draft_config,
+        tax_exempt
       )
     `)
     .eq('id', quoteId)

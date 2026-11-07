@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { formatMoney, resolveRegionContext } from '@estimator/shared'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { sendEmail, isPostmarkConfigured } from '@/lib/postmark'
@@ -36,7 +37,7 @@ export async function POST(
       .select(`
         id, status, quote_token_hash, token_expires_at, accepted_at,
         customer_json, pricing_json,
-        tenants!tenant_id ( id, name, notification_email, branding_json ),
+        tenants!tenant_id ( id, name, region, currency, notification_email, branding_json ),
         services!service_id ( id, name )
       `)
       .eq('id', quoteId)
@@ -98,7 +99,7 @@ export async function POST(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const tenantRaw = quote.tenants as any
       const tenant = (Array.isArray(tenantRaw) ? tenantRaw[0] : tenantRaw) as {
-        id: string; name: string; notification_email: string | null; branding_json: TenantBranding | null
+        id: string; name: string; region?: string | null; currency?: string | null; notification_email: string | null; branding_json: TenantBranding | null
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const serviceRaw = quote.services as any
@@ -109,10 +110,11 @@ export async function POST(
       if (tenant?.notification_email && isPostmarkConfigured()) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
         const totalFormatted = pricing
-          ? new Intl.NumberFormat('en-GB', {
-              style: 'currency',
-              currency: pricing.currency || 'GBP',
-            }).format(pricing.total)
+          ? (() => {
+              // T-133: tenant region decides locale + currency fallback
+              const regionCtx = resolveRegionContext(tenant ?? {})
+              return formatMoney(pricing.total, pricing.currency || regionCtx.currency, regionCtx.locale)
+            })()
           : ''
         const htmlBody = generateQuoteAcceptedEmailHtml({
           businessName: tenant.name,

@@ -12,7 +12,7 @@
  * review), never authoritative pricing.
  */
 
-import type { ServiceDraftConfig, AddonConfig, MultiplierConfig } from '@estimator/shared'
+import type { ServiceDraftConfig, AddonConfig, MultiplierConfig, RegionCode } from '@estimator/shared'
 
 export interface VerticalPackService {
   name: string
@@ -38,5 +38,7 @@ export interface VerticalPack {
   icon: string
   /** Currency the default rates were authored in (display hint only — rates are editable) */
   rateCurrency: string
+  /** T-133: market the pack's units, rates and wording were written for */
+  region: RegionCode
   services: VerticalPackService[]
 }

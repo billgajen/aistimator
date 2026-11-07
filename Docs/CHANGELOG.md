@@ -15,6 +15,34 @@
 
 ## Issues & Resolutions
 
+### 2026-11-07: T-133 — Region Layer + US Localisation (AD-025, AD-030)
+
+**What changed:** the product was UK-shaped in code — UK door sizes as constants in the measurement engine ("a UK door is a UK door", T-118), `en-GB` and `£` symbol tables in six formatters, "Postcode" and "VAT" in copy, GBP fallbacks in APIs. Every one of those now comes from **region data**.
+
+- **Region layer** (`packages/shared/src/regions/{types,us,gb,index}.ts`): currency, locale, unit system, postal label/pattern/examples, tax label, phone example, language variant for AI prompts, and the **reference-object table in metres** (US: 80×36 in doors, 2⅔ in brick course, 4 in siding course, 8×7 ft garage doors, outlet plates…). `resolveRegionContext(tenant)` layers tenant overrides (currency, unit system, tax label) on the region. `resolveReferenceObjects(region, packOverrides)` lets a pack replace or add references by id (`draft_config.referenceObjects`). `regionPromptBlock()` is the one prompt snippet every AI path uses.
+- **Units + formatting** (`packages/shared/src/{units,format}.ts`): length/area/volume conversion with aliases (`sq_ft`, `linear_m`, `m²`…), refusing cross-kind conversion; `formatMoney`/`formatQuantity`/`formatDate`/`currencySymbol` via `Intl` (never throw on a bad code).
+- **Migration 26** (`region_layer.sql`): `tenants.region` (backfilled **GB** for every existing row, default **US** for new ones, CHECK constraint), `tenants.unit_system` (nullable override), `services.tax_exempt`. No new tables → existing RLS covers the columns.
+- **Measurement engine:** `REFERENCE_OBJECTS` constant deleted; the system prompt is built from the tenant's region table. **The table now owns the reference size** — when a pass names a known reference, code substitutes its dimension instead of trusting the size the model reported (AD-024). **Latent bug fixed:** `computeAnchoredValue` treated `sqft` as an area unit but always returned square metres; it now converts the metric area into the target unit. Measurement targets take the expected signal's declared `unit` first.
+- **Worker:** tax label defaults from region (GB tenants with tax on and no label now show "VAT", was "Tax"); `tax_exempt` services skip tax; email money/dates use the region locale; wording prompt receives the region block; engine currency symbols from `Intl`.
+- **Web:** tenant API reads/writes `region` + `unitSystem`; region picker in onboarding (first question — it decides currency, units and which pack is listed first) and settings (choosing a region applies defaults; currency is any ISO code; units overridable). All five AI-draft routes + the compiler receive the region block; the compiler is told to keep the owner's billing unit ("$2.50/sqft" → `sqft`, "per linear foot" → `linear_ft`) and to set `expectedSignals[].unit`, which `normalizeExpectedSignals` now preserves. Public quote API returns `locale`; quote page, PDF, accept/reminder/resend/revised emails format with it. Dashboard money via `Intl`, dashboard dates in the viewer's browser locale (business-facing). Trace page was hardcoded `$` — now the quote's currency. Widget and WhatsApp use the region's postal label; WhatsApp postal-code extraction uses region patterns (tenant's first).
+- **US painting pack** `painting-decorating-us` (USD, rooms + sq ft, stories, US English, sq-ft envelope 100–1,000 per story). Rates are **placeholders marked TODO-OWNER** (OWNER-TODO.md). Packs carry `region`; `listPacks(region)` lists matching packs first. GB pack unchanged apart from `region: 'GB'` and a "(UK)" name suffix.
+
+**AD-030 — units: geometry is metric, prices bind in the step's unit.** Reference tables, anchored geometry and (from T-138) scan dimensions are metric. A quantity is converted ONCE, where measurement emits it, into the unit its signal declares (`wall_area_sqft` → sq ft); from there form answers, envelopes, rates and the takeoff all share that unit, so the pricing engine stays unit-agnostic. Rejected alternative: metric signals everywhere with conversion at every edge (form merge, clarify answers, confirm step, takeoff, measurement memory) — five conversion sites, each a place to double-convert.
+
+**Constraint:** a tenant row with no region is treated as **GB** (`LEGACY_REGION`), never silently US; only pre-migration rows lack one. **Deploy order: migration 26 before web/worker** — the worker selects the new columns.
+
+**Grep check (no reference dimensions in engine code):** `grep -rnE "\b(1\.98|0\.76|0\.075|1\.83|1\.07|2\.032|0\.914)\b|metres: [0-9]" apps/worker/src apps/web/src packages/shared/src` excluding tests and `packages/shared/src/regions/` → one hit, a doc comment in `measurement.ts`. The compiler prompt's "front door (~2m tall)" example was removed too.
+
+**Verified live** (`scripts/hardcore-test/verify-t133.mjs`, 13/13): new signup → region US / USD with no PUT; tax on without a label → "Sales tax"; compiler on "$3.20 per sqft walls, $450 minimum" → per-unit step 3.2/`sqft`, minimum 450, `ai_signal wall_area_sqft` with `unit: sqft`; widget shows "ZIP code"; a photo-measured quote priced in USD with locale en-US, senior adjudication settling the wall at **1,000 sq ft (band 900–1,100)**. That run used the UK S01 photos, so it proves the plumbing, not US accuracy (real US photos are an owner item). Processing took 223 s locally with adjudication — latency is T-135's concern.
+
+**GB regression (gauntlet round 1 vs final baseline `db8aa9bc`):** full run `8e5db672` — S02/S03/S06/S07/S08 identical; S04/S05/S09/S10 differed by known compile/customer-sim variance and returned to baseline (or within its spread) on re-run `557b164a` (S04 £190, S09 £1,072.50, S10 £330, S05 £1,969 vs £1,921 — simulated payslip count). **One real regression found and fixed: S01 £1,694 → £350 twice.** Cause: the new compiler context made Gemini copy rule 3a's example description nearly verbatim ("total exterior masonry area in square metres — …"), dropping the owner's "to be painted"; the senior adjudicator then read "masonry" as the exposed brick plinth only (6.7–12.5 sqm). Proven by running S01 on the stashed pre-T-133 code (£1,680, "masonry area … to be painted"). Fix: rule 3a now requires the description to state the EXACT charged scope in the owner's words ("area TO BE PAINTED … every surface the job covers") — "the description is the measurer's ONLY definition of scope". After: S01 £1,520.40 and £1,106 (Grade B, render measured; July spread £1,078–£1,740). **Lesson:** prompt examples get copied; an example description must model scope, never just a material.
+
+**Tests:** 13 new region/unit/format tests + 4 measurement tests (sqft conversion, region table beats the model's reported size, legacy GB table default, prompt contains the region table). Worker 306, web 34.
+
+**Files:** `packages/shared/src/{regions/*,units.ts,format.ts,index.ts,database.types.ts,api.types.ts}`, `supabase/migrations/00000000000026_region_layer.sql`, `apps/worker/src/{ai/measurement.ts,ai/wording.ts,quote-processor.ts,pricing/rules-engine.ts,email/index.ts}`, `apps/web/src/app/api/{tenant,public/quotes/[quoteId],public/quotes/[quoteId]/accept,quotes/[quoteId],quotes/[quoteId]/resend,quotes/[quoteId]/pdf,cron/lifecycle,public/widget/config,services/ai-draft/*}`, `apps/web/src/lib/{pdf-template.ts,whatsapp-intake.ts,vertical-packs/*}`, settings/onboarding/quotes/trace/services pages, embed + quote pages, `scripts/hardcore-test/{run.mjs,verify-t133.mjs}`, `Docs/03-data-model.md`
+
+---
+
 ### 2026-07-25: Branding v2 — business identity, bulletproof colour, white-label (still one simple page)
 
 **Direction (user):** "simple, not too complicated, but a little more/better." Three additions chosen for value-per-control; explicitly NOT added: font pickers, secondary colours, custom CSS.
@@ -2882,6 +2910,16 @@ if (pricingResult.estimatedTotal <= 0) {
 - Existing services continue to work (legacy fallback)
 - New services must have all quantities linked to publish
 - Standalone pricing page shows redirect message
+
+---
+
+### AD-030: Units — Metric Geometry, Prices Bind in the Step's Unit (T-133)
+
+**Decision:** Reference tables, anchored geometry and scan dimensions are metric (canonical). A measured quantity converts once, at the point measurement emits it, into the unit its expected signal declares. Everything downstream (form answers, envelopes, rates, takeoff) uses that unit; the pricing engine never converts.
+
+**Rationale:** one conversion site instead of five; a US business types and sees sq ft, prices in $/sq ft, and the engine stays unit-agnostic. Region data (AD-025) supplies units, currency, tax wording and reference sizes; engine code holds none of them.
+
+**Implications:** a signal key should name its unit (`wall_area_sqft`); a missing region on a tenant row means legacy GB.
 
 ---
 

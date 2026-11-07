@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
 import type { ServiceDraftConfig } from '@estimator/shared'
-import { validateAndNormalizeDraft, callGemini, parseGeminiJson } from '../shared'
+import { validateAndNormalizeDraft, callGemini, parseGeminiJson, loadTenantRegionBlock } from '../shared'
 
 /**
  * POST /api/services/ai-draft/refine
@@ -100,7 +100,11 @@ export async function POST(request: NextRequest) {
       .map(m => `${m.role === 'user' ? 'Business' : 'Assistant'}: ${m.content}`)
       .join('\n')
 
-    const userPrompt = `Current service configuration:
+    // T-133: region conventions (language variant, currency, units)
+    const regionBlock = await loadTenantRegionBlock(supabase, profile.tenant_id)
+    const userPrompt = `${regionBlock}
+
+Current service configuration:
 \`\`\`json
 ${JSON.stringify(body.currentConfig, null, 2)}
 \`\`\`

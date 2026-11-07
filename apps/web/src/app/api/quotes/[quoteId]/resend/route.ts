@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { formatMoney, getRegion } from '@estimator/shared'
 import { NextResponse } from 'next/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import {
@@ -63,6 +64,7 @@ export async function POST(
         tenants!tenant_id (
           id,
           name,
+          region,
           branding_json,
           template_json
         ),
@@ -118,6 +120,7 @@ export async function POST(
     const tenant = quote.tenants as {
       id: string
       name: string
+      region?: string | null
       branding_json: TenantBranding | null
     }
     const service = quote.services as { id: string; name: string }
@@ -126,19 +129,12 @@ export async function POST(
     const branding = tenant.branding_json || { primaryColor: '#2563eb' }
 
     // Format total
-    const symbols: Record<string, string> = {
-      GBP: '£',
-      USD: '$',
-      EUR: '€',
-      AUD: 'A$',
-      CAD: 'C$',
-      NZD: 'NZ$',
-    }
-    const symbol = symbols[pricing.currency] || pricing.currency + ' '
-    const totalFormatted = `${symbol}${pricing.total.toFixed(2)}`
+    // T-133: tenant locale for the customer email
+    const locale = getRegion(tenant.region).locale
+    const totalFormatted = formatMoney(pricing.total, pricing.currency, locale)
 
     // Calculate validity date
-    const validUntil = tokenExpiry.toLocaleDateString('en-GB', {
+    const validUntil = tokenExpiry.toLocaleDateString(locale, {
       day: 'numeric',
       month: 'long',
       year: 'numeric',

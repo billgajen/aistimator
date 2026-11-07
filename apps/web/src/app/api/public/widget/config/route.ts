@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { getRegion } from '@estimator/shared'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import { hasCustomBranding } from '@/lib/plan-features'
 import { NextResponse } from 'next/server'
@@ -49,7 +50,7 @@ export async function GET(request: Request) {
     // Fetch tenant info
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
-      .select('name, branding_json')
+      .select('name, region, branding_json')
       .eq('id', tenantId)
       .single()
 
@@ -185,8 +186,16 @@ export async function GET(request: Request) {
 
     const whiteLabel = await hasCustomBranding(supabase, tenantId)
 
+    // T-133: customer-facing regional copy (ZIP code vs Postcode) and locale
+    const region = getRegion(tenant.region)
     return NextResponse.json({
       tenantName: tenant.name,
+      region: {
+        code: region.code,
+        locale: region.locale,
+        postalCodeLabel: region.copy.postalCodeLabel,
+        postalCodeExample: region.copy.postalCodeExample,
+      },
       branding: {
         primaryColor: brandingJson.primaryColor || null,
         logoUrl,

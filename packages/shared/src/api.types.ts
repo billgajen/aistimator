@@ -145,6 +145,8 @@ export interface QuoteViewResponse {
   quoteId: string
   status: QuoteStatus
   documentType: DocumentType
+  /** T-133: BCP 47 locale from the tenant's region (money, numbers, dates) */
+  locale?: string
   /** Quote version (incremented on each business edit) */
   version?: number
   business: QuoteViewBusiness

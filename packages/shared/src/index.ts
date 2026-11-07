@@ -21,6 +21,11 @@ export * from './grading'
 // Re-export deterministic quantity formulas (T-125)
 export * from './formula'
 
+// Re-export region layer, units and locale formatting (T-133, AD-025)
+export * from './regions'
+export * from './units'
+export * from './format'
+
 // ID prefixes for stable, readable IDs
 export const ID_PREFIXES = {
   tenant: 'tnt_',

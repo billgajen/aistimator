@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, type KeyboardEvent } from 'react'
+import { currencySymbol as sharedCurrencySymbol, getRegion } from '@estimator/shared'
 import { PageHeader } from '@/components/dashboard/EmptyState'
 import { AIDraftBadge } from '@/components/AIDraftBadge'
 import { WorkStepEditor } from '@/components/WorkStepEditor'
@@ -347,9 +348,9 @@ export default function ServicesPage() {
     fetch('/api/tenant')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        const symbols: Record<string, string> = { GBP: '£', EUR: '€', USD: '$', CAD: '$', AUD: '$', NZD: '$' }
         const currency = data?.tenant?.currency
-        if (currency && symbols[currency]) setCurrencySymbol(symbols[currency])
+        // T-133: Intl symbol for any ISO currency
+        if (currency) setCurrencySymbol(sharedCurrencySymbol(currency, getRegion(data?.tenant?.region).locale))
       })
       .catch(() => {})
   }, [])

@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { resolveRegionContext } from '@estimator/shared'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
@@ -49,6 +50,8 @@ export async function GET(
         tenants!tenant_id (
           id,
           name,
+          region,
+          currency,
           template_json,
           branding_json
         ),
@@ -118,6 +121,8 @@ export async function GET(
     const tenant = quote.tenants as {
       id: string
       name: string
+      region?: string | null
+      currency?: string | null
       template_json: Record<string, unknown> | null
       branding_json: {
         logoAssetId?: string | null
@@ -207,10 +212,13 @@ export async function GET(
       }
     }
 
+    // T-133: locale + currency fallback come from the tenant's region
+    const regionCtx = resolveRegionContext(tenant)
     const response: QuoteViewResponse = {
       quoteId: quote.id,
       status: quote.status,
       documentType: quote.document_type,
+      locale: regionCtx.locale,
       version: quote.version ?? 1,
       business,
       branding: {
@@ -232,7 +240,7 @@ export async function GET(
       pricing: isProvisional
         ? {
             // Exact figures withheld while provisional — range shown instead
-            currency: pricing.currency || 'GBP',
+            currency: pricing.currency || regionCtx.currency,
             subtotal: 0,
             taxAmount: 0,
             total: 0,
@@ -240,7 +248,7 @@ export async function GET(
             notes: pricing.notes || [],
           }
         : {
-            currency: pricing.currency || 'GBP',
+            currency: pricing.currency || regionCtx.currency,
             subtotal: pricing.subtotal || 0,
             taxLabel: pricing.taxLabel,
             taxRate: pricing.taxRate,

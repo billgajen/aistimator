@@ -6,6 +6,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getRegion, listRegions, type RegionDefinition } from '@estimator/shared'
 import type {
   WhatsAppIntakeState,
   WhatsAppIntakeData,
@@ -38,6 +39,29 @@ interface IntakeContext {
   tenantId: string
   conversation: WhatsAppConversation
   message: IncomingMessage
+  /** T-133: tenant region (loaded once per message) — postal wording + formats */
+  region?: RegionDefinition
+}
+
+/** T-133: the tenant's region; a lookup failure falls back to the legacy region */
+async function loadTenantRegion(supabase: SupabaseClient, tenantId: string): Promise<RegionDefinition> {
+  try {
+    const { data } = await supabase.from('tenants').select('region').eq('id', tenantId).single()
+    return getRegion((data as { region?: string | null } | null)?.region)
+  } catch {
+    return getRegion(null)
+  }
+}
+
+/** T-133: find a postal code in free text, trying the tenant's region format first */
+function extractPostalCode(address: string, region: RegionDefinition): string | undefined {
+  const regions = [region, ...listRegions().filter((r) => r.code !== region.code)]
+  for (const r of regions) {
+    const unanchored = r.postalCodePattern.replace(/^\^/, '').replace(/\$$/, '')
+    const match = address.match(new RegExp(`(${unanchored})`, 'i'))
+    if (match?.[1]) return match[1].toUpperCase()
+  }
+  return undefined
 }
 
 interface IntakeResult {
@@ -59,7 +83,10 @@ export function shouldStartIntake(text: string): boolean {
 /**
  * Process an incoming WhatsApp message through the intake flow
  */
-export async function processIntakeMessage(ctx: IntakeContext): Promise<IntakeResult> {
+export async function processIntakeMessage(rawCtx: IntakeContext): Promise<IntakeResult> {
+  const ctx: IntakeContext = rawCtx.region
+    ? rawCtx
+    : { ...rawCtx, region: await loadTenantRegion(rawCtx.supabase, rawCtx.tenantId) }
   const { conversation, message } = ctx
   const currentState = conversation.intake_state || 'idle'
   const currentData = conversation.intake_data || {}
@@ -340,7 +367,7 @@ function handlePhoneInput(
     success: true,
     newState: 'awaiting_address',
     newData: { ...currentData, customerPhone: phone },
-    responseText: `Perfect!\n\nWhat's the address or postcode for the job?`,
+    responseText: `Perfect!\n\nWhat's the address or ${(ctx.region ?? getRegion(null)).copy.postalCodeNoun} for the job?`,
   }
 }
 
@@ -348,7 +375,7 @@ function handlePhoneInput(
  * Handle address/postcode input
  */
 function handleAddressInput(
-  _ctx: IntakeContext,
+  ctx: IntakeContext,
   text: string,
   currentData: WhatsAppIntakeData
 ): IntakeResult {
@@ -357,14 +384,12 @@ function handleAddressInput(
   if (address.length < 3) {
     return {
       success: true,
-      responseText: 'Please enter the job address or postcode.',
+      responseText: `Please enter the job address or ${(ctx.region ?? getRegion(null)).copy.postalCodeNoun}.`,
     }
   }
 
-  // Try to extract postcode (UK format or US ZIP)
-  const postcodeMatch = address.match(/([A-Z]{1,2}[0-9][0-9A-Z]?\s?[0-9][A-Z]{2})/i) ||
-    address.match(/(\d{5}(-\d{4})?)/)
-  const postcode = postcodeMatch?.[1]?.toUpperCase()
+  // T-133: postal code format comes from region data (tenant's region first)
+  const postcode = extractPostalCode(address, ctx.region ?? getRegion(null))
 
   return {
     success: true,

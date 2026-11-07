@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
 import type { ServiceDraftConfig } from '@estimator/shared'
-import { validateAndNormalizeDraftBulk, callGemini, parseGeminiJson } from '../shared'
+import { validateAndNormalizeDraftBulk, callGemini, parseGeminiJson, loadTenantRegionBlock } from '../shared'
 import { fetchWebsiteContent } from '@/lib/website-extract'
 
 /**
@@ -133,7 +133,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const userPrompt = `Website text (${content.pages.length} page${content.pages.length === 1 ? '' : 's'}: ${content.pages.map((p) => p.url).join(', ')}):
+    // T-133: region conventions (language variant, currency, units)
+    const regionBlock = await loadTenantRegionBlock(supabase, profile.tenant_id)
+    const userPrompt = `${regionBlock}
+
+Website text (${content.pages.length} page${content.pages.length === 1 ? '' : 's'}: ${content.pages.map((p) => p.url).join(', ')}):
 
 """
 ${content.combinedText}

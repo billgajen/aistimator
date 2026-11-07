@@ -1,3 +1,5 @@
+import type { RegionCode, UnitSystem, ReferenceObject } from './regions/types'
+
 /**
  * Database types for the Estimator platform
  * These types correspond to the Supabase schema
@@ -53,6 +55,10 @@ export interface TenantTemplate {
 export interface Tenant {
   id: string
   name: string
+  /** T-133 (AD-025): market region — drives currency, units, tax wording, reference sizes */
+  region: RegionCode
+  /** T-133: unit-system override; null = region default */
+  unit_system: UnitSystem | null
   currency: string
   tax_enabled: boolean
   tax_label: string | null
@@ -206,6 +212,12 @@ export interface ExpectedSignalConfig {
   /** Human-readable description of what this signal represents */
   description: string
   /**
+   * T-133: unit of a numeric quantity signal (e.g. 'sqft', 'sqm', 'ft', 'gal').
+   * Measurement geometry runs in metric and converts into this unit; envelope
+   * bounds are expressed in it. Absent = taken from the pricing step's unit label.
+   */
+  unit?: string
+  /**
    * Plausibility envelope (T-116, Measurement Engine M5) for quantity signals:
    * deterministic bounds computed from known facts. Rides expected_signals
    * persistence end-to-end — pack data, never hardcoded.
@@ -258,6 +270,11 @@ export interface ServiceDraftConfig {
   }
   expectedSignals: ExpectedSignalConfig[]
   suggestedFields: SuggestedField[]
+  /**
+   * T-133: pack-level reference-object overrides for anchored measurement.
+   * Entries replace the region's object of the same id (or add new ones).
+   */
+  referenceObjects?: ReferenceObject[]
 }
 
 /**
@@ -317,6 +334,8 @@ export interface Service {
   high_value_threshold?: number | null
   /** Pricing rules (base fee, add-ons, multipliers) - consolidated from standalone pricing table */
   pricing_rules?: PricingRules
+  /** T-133: service is not subject to sales tax / VAT — the tenant tax line is skipped */
+  tax_exempt?: boolean
   created_at: string
   updated_at: string
 }

@@ -4,7 +4,8 @@
  */
 
 import type { ServiceDraftConfig } from '@estimator/shared'
-import { extractFormulaIdentifiers } from '@estimator/shared'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { extractFormulaIdentifiers, normalizeUnit, regionPromptBlock, resolveRegionContext } from '@estimator/shared'
 
 /**
  * Validate and normalize an AI-generated draft config
@@ -230,6 +231,8 @@ interface ExpectedSignalInput {
   type?: string
   possibleValues?: string[]
   description?: string
+  /** T-133: unit of a numeric quantity signal ('sqft', 'sqm', 'ft', 'gal'…) */
+  unit?: string
 }
 
 export function normalizeExpectedSignals(signals: ExpectedSignalInput[]): ServiceDraftConfig['expectedSignals'] {
@@ -242,6 +245,8 @@ export function normalizeExpectedSignals(signals: ExpectedSignalInput[]): Servic
         : 'string',
       possibleValues: signal.type === 'enum' ? signal.possibleValues : undefined,
       description: signal.description || signal.signalKey!,
+      // T-133: keep a recognised unit so measurement converts into it
+      ...(signal.type === 'number' && normalizeUnit(signal.unit) ? { unit: normalizeUnit(signal.unit)! } : {}),
     }))
 }
 
@@ -353,4 +358,31 @@ export async function callGemini(opts: {
   }
 
   return text
+}
+
+/**
+ * T-133: the tenant's region as a prompt block, so every AI-draft path writes
+ * in the right language variant, currency and units. Never throws — a lookup
+ * failure falls back to the legacy region's conventions.
+ */
+export async function loadTenantRegionBlock(
+  supabase: SupabaseClient,
+  tenantId: string
+): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from('tenants')
+      .select('region, currency, unit_system, tax_label')
+      .eq('id', tenantId)
+      .single()
+    const row = (data ?? {}) as {
+      region?: string | null
+      currency?: string | null
+      unit_system?: string | null
+      tax_label?: string | null
+    }
+    return regionPromptBlock(resolveRegionContext(row))
+  } catch {
+    return regionPromptBlock(resolveRegionContext({}))
+  }
 }

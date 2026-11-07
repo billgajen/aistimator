@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { formatMoney } from '@estimator/shared'
 import { useSearchParams } from 'next/navigation'
 import { assessImageQuality } from '@/lib/image-quality'
 import { brandStyleVars } from '@/lib/color'
@@ -58,6 +59,13 @@ interface WidgetField {
 
 interface WidgetData {
   tenantName: string
+  /** T-133: regional copy + locale (absent on older API responses) */
+  region?: {
+    code: string
+    locale: string
+    postalCodeLabel: string
+    postalCodeExample: string
+  }
   /** Tenant branding — primary colour override + short-lived logo URL */
   branding?: {
     primaryColor?: string | null
@@ -754,6 +762,8 @@ export default function EmbedPage({ params }: EmbedPageProps) {
           answers={fieldAnswers}
           jobAddress={jobAddress}
           jobPostcode={jobPostcode}
+          postalCodeLabel={widgetData.region?.postalCodeLabel || 'Postcode'}
+          postalCodeExample={widgetData.region?.postalCodeExample || 'SW1A 1AA'}
           jobDescription={jobDescription}
           jobQuantity={jobQuantity}
           measurementModel={serviceMeasurementModel}
@@ -794,7 +804,7 @@ export default function EmbedPage({ params }: EmbedPageProps) {
       )}
       {displayMode !== 'conversational' && step === 'submitting' && <SubmittingState />}
       {step === 'success' && quoteResult && (
-        <SuccessState quoteUrl={quoteResult.quoteViewUrl} quoteId={quoteResult.quoteId} />
+        <SuccessState quoteUrl={quoteResult.quoteViewUrl} quoteId={quoteResult.quoteId} locale={widgetData?.region?.locale} />
       )}
 
       {/* Honeypot — off-screen, never shown to humans */}
@@ -957,6 +967,8 @@ function DetailsStep({
   answers,
   jobAddress,
   jobPostcode,
+  postalCodeLabel,
+  postalCodeExample,
   jobDescription,
   jobQuantity,
   measurementModel,
@@ -972,6 +984,8 @@ function DetailsStep({
   answers: Record<string, string | number | boolean | string[]>
   jobAddress: string
   jobPostcode: string
+  postalCodeLabel: string
+  postalCodeExample: string
   jobDescription: string
   jobQuantity: number | null
   measurementModel: MeasurementModel | null | undefined
@@ -1048,12 +1062,12 @@ function DetailsStep({
             />
           </div>
           <div>
-            <label className="block text-[13px] font-semibold text-text-primary mb-1.5">Postcode</label>
+            <label className="block text-[13px] font-semibold text-text-primary mb-1.5">{postalCodeLabel}</label>
             <input
               type="text"
               value={jobPostcode}
               onChange={(e) => onPostcodeChange(e.target.value)}
-              placeholder="SW1A 1AA"
+              placeholder={postalCodeExample}
               className={`w-full px-4 py-3 text-[15px] border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${inputNormalClass}`}
             />
           </div>
@@ -1740,7 +1754,15 @@ function SubmittingState() {
   )
 }
 
-function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string }) {
+function SuccessState({
+  quoteUrl,
+  quoteId,
+  locale = 'en-GB',
+}: {
+  quoteUrl: string
+  quoteId: string
+  locale?: string
+}) {
   // T-108: poll quote status while the customer is still here — if the quote
   // needs a quick confirmation, route them to it in-flow instead of waiting
   // for an email they may never open.
@@ -1796,11 +1818,9 @@ function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string
     }
   }, [quoteId, token])
 
-  const currencySymbol = range
-    ? { GBP: '£', USD: '$', EUR: '€', CAD: '$', AUD: '$', NZD: '$' }[range.currency] || range.currency
-    : ''
+  // T-133: Intl formatting in the tenant's locale, whole units for a range
   const rangeDisplay = range
-    ? `${currencySymbol}${range.low.toLocaleString()} – ${currencySymbol}${range.high.toLocaleString()}`
+    ? `${formatMoney(range.low, range.currency, locale, { decimals: 0 })} – ${formatMoney(range.high, range.currency, locale, { decimals: 0 })}`
     : null
 
   // Quote needs a quick confirmation — bring the customer to it now

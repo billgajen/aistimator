@@ -85,6 +85,8 @@ export interface WordingContext {
   errorCode?: string
   /** Learning context from business editing patterns (affects wording, not pricing) */
   learningContext?: string
+  /** T-133: region block (language variant, currency, units, tax/postal wording) */
+  regionGuidance?: string
 }
 
 /**
@@ -383,6 +385,11 @@ export async function generateWording(
   // Learning context from business editing patterns (affects wording only, not pricing per AD-001)
   if (context.learningContext) {
     prompt += `\n\n===== BUSINESS EDITING PATTERNS =====\nThe following patterns were observed from this business's previous edits to similar quotes. Use these to write better wording that matches the business's style and preferences:\n${context.learningContext}\n\nIMPORTANT: These patterns should influence WORDING ONLY (scope descriptions, assumptions, exclusions, notes). They must NOT change any pricing amounts.`
+  }
+
+  // T-133: write in the tenant's language variant and units
+  if (context.regionGuidance) {
+    prompt += `\n\n===== ${context.regionGuidance}\nUse these conventions in every customer-facing sentence. Never convert or restate prices.`
   }
 
   try {

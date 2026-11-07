@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { formatMoney } from '@estimator/shared'
 import Link from 'next/link'
 import type {
   QuoteDetailResponse,
@@ -492,7 +493,8 @@ function QuoteEditorWrapper({
 }
 
 function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-GB', {
+  // T-133: dashboard dates follow the viewer's browser locale
+  return new Date(dateString).toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -500,9 +502,5 @@ function formatDate(dateString: string): string {
 }
 
 function formatCurrency(amount: number, currency: string): string {
-  const symbols: Record<string, string> = {
-    GBP: '\u00a3', USD: '$', EUR: '\u20ac', AUD: 'A$', CAD: 'C$', NZD: 'NZ$',
-  }
-  const symbol = symbols[currency] || currency + ' '
-  return `${symbol}${amount.toFixed(2)}`
+  return formatMoney(amount, currency) // T-133: any ISO currency
 }

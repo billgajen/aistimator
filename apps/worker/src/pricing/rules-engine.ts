@@ -9,6 +9,7 @@
  * IMPORTANT: AI does NOT set prices. All pricing is computed from rules.
  */
 
+import { currencySymbol } from '@estimator/shared'
 import type { ExtractedSignals } from '../ai/signals'
 import type {
   MeasurementModel,
@@ -966,17 +967,11 @@ function formatCurrency(amount: number, currency: string): string {
 }
 
 /**
- * Get currency symbol
+ * Get currency symbol (T-133: from Intl, so any ISO currency works)
  */
 function getCurrencySymbol(currency: string): string {
-  const symbols: Record<string, string> = {
-    GBP: '£',
-    USD: '$',
-    EUR: '€',
-    AUD: 'A$',
-    CAD: 'C$',
-  }
-  return symbols[currency] || currency + ' '
+  const symbol = currencySymbol(currency)
+  return symbol === currency ? `${currency} ` : symbol
 }
 
 /**
@@ -1850,8 +1845,8 @@ export function calculatePricingWithTrace(
       // Build descriptive label showing unit math for per_unit/per_hour steps
       let stepLabel = step.name
       if (stepResult.quantity !== undefined && stepResult.quantity > 1 && stepResult.unitLabel) {
-        const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency
-        stepLabel = `${step.name}  ${currencySymbol}${step.defaultCost} x ${stepResult.quantity}(${stepResult.unitLabel})`
+        const symbol = getCurrencySymbol(currency).trim()
+        stepLabel = `${step.name}  ${symbol}${step.defaultCost} x ${stepResult.quantity}(${stepResult.unitLabel})`
       }
 
       traceSteps.push({
