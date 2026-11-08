@@ -86,12 +86,14 @@ Check that `npx vercel env ls production | grep CLOUDFLARE_WORKER_TOKEN` shows i
 | Variable | Value |
 |---|---|
 | `SMS_TEST_MODE` | `true` until Twilio and A2P 10DLC are ready (texts are logged, never sent) |
-| `POSTMARK_API_TOKEN`, `POSTMARK_FROM_EMAIL` | **Required before step 9.** Customers who close the widget get their estimate only by email |
+| `POSTMARK_API_TOKEN`, `POSTMARK_FROM_EMAIL` | **Required before step 9, on Vercel AND the worker.** The worker sends the "estimate ready" email; the web app sends the others. Customers who close the widget get their estimate only by email. Worker: `(cd apps/worker && printf '%s' 'VALUE' \| npx wrangler secret put NAME --env production)` |
 | `STRIPE_PRICE_US_{STARTER,PRO,BUSINESS}_{MONTHLY,ANNUAL}_USD` | Optional now: test-mode ids from `apps/web/scripts/stripe-setup-plans.mts`. Without them checkout returns `NO_STRIPE_PRICE`, but the pricing page still renders |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | Leave unset (`/api/sms/webhook` returns 503 without them) |
 | `SYNC_QUOTE_PROCESSING` | Leave at `true` for now. Step 9 changes it |
 
-Pattern: `printf '%s' 'VALUE' | npx vercel env add NAME production --sensitive --yes`.
+Vercel pattern: `printf '%s' 'VALUE' | npx vercel env add NAME production --sensitive --yes`.
+
+Checked 2026-11-08 (step 2): neither side has Postmark set, the worker has no `AI_MODEL_*`/`ADJUDICATION_MODEL`, and Vercel has `CLOUDFLARE_WORKER_URL` but no `CLOUDFLARE_WORKER_TOKEN`.
 
 ## 7. Merge `us-launch` into `main` and deploy the web app (still sync)
 
