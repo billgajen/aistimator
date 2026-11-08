@@ -8,7 +8,7 @@
  * - Structured output with JSON schema enforcement
  */
 
-import type { AiClient, UsageSink } from './client'
+import type { AiClient, GenerationOptions, UsageSink } from './client'
 import { parseModelJson } from './client'
 import type { ModelRoute, ThinkingLevel } from '@estimator/shared'
 import { resolveModelRoute, modelCapabilities, type ModelCapabilities } from '@estimator/shared'
@@ -102,7 +102,7 @@ export class GeminiClient implements AiClient {
     images: Array<{ mimeType: string; base64: string }>,
     schema: Record<string, unknown>,
     systemPrompt?: string,
-    options?: { temperature?: number; maxOutputTokens?: number }
+    options?: GenerationOptions
   ): Promise<T> {
     return this.structured<T>(prompt, images, schema, systemPrompt, options)
   }
@@ -112,7 +112,7 @@ export class GeminiClient implements AiClient {
     images: Array<{ mimeType: string; base64: string }>,
     schema: Record<string, unknown>,
     systemPrompt?: string,
-    options?: { temperature?: number; maxOutputTokens?: number }
+    options?: GenerationOptions
   ): Promise<T> {
     if (this.caps.structuredOutput === 'prompt') {
       const text = await this.generate(
@@ -168,7 +168,7 @@ export class GeminiClient implements AiClient {
       responseMimeType: string
       responseSchema?: Record<string, unknown>
     },
-    options?: { temperature?: number; maxOutputTokens?: number }
+    options?: GenerationOptions
   ): Promise<string> {
     const url = `${GEMINI_API_BASE}/${this.model}:generateContent?key=${this.apiKey}`
 
@@ -191,12 +191,14 @@ export class GeminiClient implements AiClient {
       generationConfig,
     }
 
+    const startedAt = Date.now()
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
+      signal: options?.signal,
     })
 
     if (!response.ok) {
@@ -209,7 +211,8 @@ export class GeminiClient implements AiClient {
     if (data.usageMetadata) {
       this.usage?.(
         data.usageMetadata.promptTokenCount ?? 0,
-        (data.usageMetadata.candidatesTokenCount ?? 0) + (data.usageMetadata.thoughtsTokenCount ?? 0)
+        (data.usageMetadata.candidatesTokenCount ?? 0) + (data.usageMetadata.thoughtsTokenCount ?? 0),
+        Date.now() - startedAt
       )
     }
 

@@ -88,6 +88,7 @@ describe('measureQuantities (full ensemble with injected passes)', () => {
       targets: [TARGET],
       passes: 3,
       runPass: async (i) => passResults[i]!,
+      earlyStopCov: 0, // force the full ensemble
     })
 
     expect(results).toHaveLength(1)
@@ -98,6 +99,52 @@ describe('measureQuantities (full ensemble with injected passes)', () => {
     expect(m.confidence).toBeGreaterThanOrEqual(0.8) // tight spread
     expect(m.evidence).toContain('anchored to entry door height')
     expect(m.evidence).toContain('3 independent passes')
+  })
+
+  it('runs passes in parallel and cancels the third when the first two agree', async () => {
+    const started: number[] = []
+    let thirdAborted = false
+    const delays = [10, 20, 500]
+    const values = [60, 61, 200]
+    const t0 = Date.now()
+    const timings: number[] = []
+    const results = await measureQuantities({
+      gemini: null,
+      images: IMAGES,
+      targets: [TARGET],
+      passes: 3,
+      passTimingsMs: timings,
+      runPass: (i, signal) => {
+        started.push(i)
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => resolve([pass({ directValue: values[i] })]), delays[i])
+          signal?.addEventListener('abort', () => {
+            if (i === 2) thirdAborted = true
+            clearTimeout(timer)
+            reject(new Error('aborted'))
+          })
+        })
+      },
+    })
+    expect(started).toEqual([0, 1, 2]) // all launched before any finished
+    expect(Date.now() - t0).toBeLessThan(400) // did not wait for the slow third
+    expect(thirdAborted).toBe(true)
+    expect(results[0]!.passesUsed).toBe(2)
+    expect(results[0]!.value).toBe(60.5)
+    expect(timings).toHaveLength(2)
+  })
+
+  it('waits for the third pass when the first two disagree', async () => {
+    const values = [40, 80, 62]
+    const results = await measureQuantities({
+      gemini: null,
+      images: IMAGES,
+      targets: [TARGET],
+      passes: 3,
+      runPass: (i) => new Promise((resolve) => setTimeout(() => resolve([pass({ directValue: values[i] })]), [5, 10, 30][i])),
+    })
+    expect(results[0]!.passesUsed).toBe(3)
+    expect(results[0]!.value).toBe(62)
   })
 
   it('returns nothing for a target no pass could measure — envelope fallback takes over', async () => {
@@ -160,8 +207,14 @@ describe('T-119: stakes-based adjudication routing', () => {
   })
 
   it('escalates when real money rides on the number', () => {
-    const d = decideAdjudication({ ...base, provisionalValue: 1500 })
+    const d = decideAdjudication({ ...base, provisionalValue: 3000 })
     expect(d).toEqual({ shouldAdjudicate: true, reason: 'high_stakes' })
+  })
+
+  it('does not escalate agreeing passes on a typical-value line (speed, 2026-11-08)', () => {
+    expect(decideAdjudication({ ...base, provisionalValue: 1500 })).toEqual({ shouldAdjudicate: false })
+    // …but disagreement still escalates at any value
+    expect(decideAdjudication({ ...base, cov: 0.3, provisionalValue: 200 }).reason).toBe('high_variance')
   })
 })
 

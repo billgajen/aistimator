@@ -131,6 +131,7 @@ export class AnthropicClient implements AiClient {
 
     // Current Claude models think adaptively and reject sampling params, so
     // `temperature` is intentionally not forwarded.
+    const startedAt = Date.now()
     const response = await this.client.beta.messages.create({
       model: this.model,
       max_tokens: Math.max(this.maxTokens, options?.maxOutputTokens ?? 0),
@@ -141,9 +142,9 @@ export class AnthropicClient implements AiClient {
       ...(schema
         ? { output_config: { format: { type: 'json_schema', schema: toClaudeJsonSchema(schema) } } }
         : {}),
-    })
+    }, options?.signal ? { signal: options.signal } : undefined)
 
-    this.usage?.(response.usage.input_tokens ?? 0, response.usage.output_tokens ?? 0)
+    this.usage?.(response.usage.input_tokens ?? 0, response.usage.output_tokens ?? 0, Date.now() - startedAt)
 
     if (response.stop_reason === 'refusal') {
       throw new Error(`Claude declined the request (${response.stop_details?.category ?? 'no category'})`)

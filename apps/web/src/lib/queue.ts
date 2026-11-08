@@ -94,6 +94,35 @@ export async function enqueueQuoteJob(job: QuoteJobMessage): Promise<void> {
 }
 
 /**
+ * Reprice a quote after its clarification answers, waiting for the result.
+ * The worker's /reprice is deterministic (first-pass signals + the answers,
+ * no AI), so it returns in about a second and the customer sees the final
+ * price straight away. Returns false when the quote must go through the
+ * queue instead: no reprice snapshot (409), worker error, or timeout.
+ */
+export async function repriceQuoteNow(
+  job: QuoteJobMessage,
+  { timeoutMs = 25_000 }: { timeoutMs?: number } = {}
+): Promise<boolean> {
+  const workerUrl = getWorkerUrl()
+  if (!workerUrl) return false
+  try {
+    const response = await fetch(`${workerUrl}/reprice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...workerAuthHeaders() },
+      body: JSON.stringify(job),
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (response.ok) return true
+    console.warn(`[Queue] Reprice not possible (${response.status}), falling back to the queue`)
+    return false
+  } catch (error) {
+    console.error('[Queue] Reprice request failed, falling back to the queue:', error)
+    return false
+  }
+}
+
+/**
  * Check the health of the queue worker
  */
 export async function checkQueueHealth(): Promise<{

@@ -30,6 +30,7 @@ Gemini 1.5 Flash.
 - [x] Gauntlet comparison table recorded; chosen defaults are equal or better than baseline on accuracy
 - [ ] Median submission → price stays under 60 s with the chosen defaults — NOT met: 66 s (baseline 47 s); follow-up: per-task thinking level
   - 2026-11-08: per-task thinking level shipped (text tasks `low`; S08 146 s → 78 s). Photo-measured quotes still 75–150 s, so sync + 60 s can't hold them → queues (T-132) or a higher maxDuration; see DEPLOY.md §0
+  - 2026-11-08 (later): parallel passes + early stop, parallel stages, stakes bar 2500 → S01 photo quotes 29–37 s to first price (was 116–166 s). Disagreeing passes still ~100–150 s (adjudication latency) — owner decision in OWNER-TODO
 
 ## Plan
 1. **Registry** `packages/shared/src/ai-models.json` (data) + `ai-models.ts` (typed access):

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { isSyncProcessing } from '@/lib/queue'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { isSyncProcessing, repriceQuoteNow } from '@/lib/queue'
 import { isQuoteProcessing } from '@estimator/shared'
 
 describe('quote processing mode', () => {
@@ -22,5 +22,35 @@ describe('isQuoteProcessing', () => {
     for (const s of ['sent', 'viewed', 'pending_review', 'awaiting_clarification', 'failed', null, undefined]) {
       expect(isQuoteProcessing(s)).toBe(false)
     }
+  })
+})
+
+describe('repriceQuoteNow', () => {
+  const job = { quoteId: 'qte_1', quoteRequestId: 'qr_1', tenantId: 'tnt_1', timestamp: 1, quoteToken: 'tok' }
+  const env = { ...process.env }
+
+  beforeEach(() => {
+    process.env.CLOUDFLARE_WORKER_URL = 'https://worker.test'
+    process.env.CLOUDFLARE_WORKER_TOKEN = 'secret'
+  })
+  afterEach(() => {
+    process.env = { ...env }
+    vi.unstubAllGlobals()
+  })
+
+  it('posts to /reprice with the bearer token and reports success', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"success":true}', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await repriceQuoteNow(job)).toBe(true)
+    const [url, init] = fetchMock.mock.calls[0]!
+    expect(url).toBe('https://worker.test/reprice')
+    expect(init.headers.Authorization).toBe('Bearer secret')
+  })
+
+  it('falls back (false) on 409 no-snapshot, errors and network failures', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 409 })))
+    expect(await repriceQuoteNow(job)).toBe(false)
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('timeout')))
+    expect(await repriceQuoteNow(job)).toBe(false)
   })
 })

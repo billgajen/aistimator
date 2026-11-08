@@ -15,6 +15,55 @@
 
 ## Issues & Resolutions
 
+### 2026-11-08: Speed — first price under 60 s, confirm reprice in ~0.1 s with no AI; confirmed Grade A (US smoke test)
+
+**Reported (US production smoke test, EST-2026-6468B7):** ~5 min to show the range, minutes again to reprice after confirming 313 sq ft, and Grade B after confirmation.
+
+**Measured, not guessed:** each quote now stores `pricing_trace_json.timings` (wall ms per stage, measurement pass times, queue wait, `repriceOnly`), and `aiUsage.byTask[].totalMs` (AI call time per task). Production log tails have no per-line timestamps, so the stored timings are the only per-stage record. Harness: `npx tsx scripts/hardcore-test/verify-speed.mts [--region GB|US] [--photos 0]`. It reproduces the smoke test: painting pack, S01 house-front photos, then the customer confirms the measured value.
+
+**Before → after (local, queue path, S01 photos, same harness):**
+
+| Stage | GB before | GB after | US before | US after |
+|---|---|---|---|---|
+| Queue wait | 0 s | 0 s | 0 s | 0 s (production: 1–5 s) |
+| Signal extraction | 16.6 s | 13.0 s, in parallel with measurement | 17.9 s | 12.1 s, in parallel |
+| Measurement passes | 43.7 s (14 + 17 + 13, sequential) | 15.2 s (14.7 + 15.2 in parallel, 3rd cancelled) | 67.6 s (24 + 21 + 23) | 24.2 s (15.2 + 24.2, 3rd cancelled) |
+| Adjudication | 39.8 s (`high_stakes`, cov 0.12) | not needed | 60.3 s (`high_stakes`, cov 0.07) | not needed |
+| Add-ons / recommendations / wording | 1.6 / 3.6 / 2.9 s, sequential | 2.0 / 2.5 / 2.8 s, parallel | 1.8 / 6.1 / 3.3 s | 2.1 / 2.7 / 3.2 s, parallel |
+| Validation | 3.9 s | 4.7 s | 4.9 s | 6.2 s |
+| **Submit → price shown** | **116 s** | **29–33 s** (4 runs) | **166 s** | **33–37 s** (3 runs) |
+| **Confirm → final price** | **73 s** (full re-measure) | **0.14 s** | **121 s** (re-measured and re-adjudicated) | **0.17–0.28 s** |
+| AI calls, first pass + reprice | 9 + 8 | 7 + **0** | 9 + 9 | 7 + **0** |
+
+No-photo runs (the quantity is always asked): first price 11–14 s, reprice 113–120 ms, 0 AI calls, Grade A.
+
+**What changed:**
+1. **Measurement passes run in parallel** (`measureQuantities`). When the first two to finish agree within `MEASUREMENT_COV_THRESHOLD` (0.15) on every target, the third is cancelled (`AbortSignal` through `AiClient` → `fetch` / Anthropic SDK). On disagreement the third pass is awaited as before.
+2. **Signal extraction runs in parallel with measurement**, which needs only the photos. Photos are fetched once, in parallel, and reused by inventory detection, which used to re-fetch them.
+3. **Adjudication:** still on disagreement (cov > 0.15) and single-pass evidence at any value. The high-stakes bar goes from 1000 to **2500** (`DEFAULT_ADJUDICATION_VALUE_THRESHOLD`; env `ADJUDICATION_VALUE_THRESHOLD`). At 1000, nearly every exterior painting job was sent to the slowest call in the pipeline even when its passes agreed. Adjudications for several quantities run in parallel.
+4. **Customer-stated quantities are never measured** (`humanStatedQuantityKeys`, conservative: explicit `mapsToSignal`, or the field id is the signal key, with a positive number). T-138 `scanned` quantities slot in here.
+5. **Deterministic reprice after confirmation.** When a quote stops for a question it saves a reprice snapshot in `signals_json._reprice` (legacy signals, matched items, AI add-on ids, recommendations, cross-service pricing, whether validation demanded review, and the first pass's `aiUsage`/timings). On answer, `/clarify` calls the new authenticated worker endpoint `POST /reprice` and waits: answers merge as form answers (AD-002) over the saved signals, the rules engine reprices, the grade is recomputed, the provisional wording is kept. No photos are read and no AI calls are made. A 409 (no snapshot, e.g. quotes saved before this deploy) or any failure → `/trigger` as before. The trace keeps the first pass's `aiUsage`, so the quote's AI cost record survives.
+6. Add-on detection (description only) runs in parallel with the photo work. Recommendations, wording and cross-service detection run in parallel.
+
+**Accuracy evidence for change 3 (no accuracy loss on this data):**
+- **Agreeing passes, no senior review:** GB 52–68 m², US 578–833 sq ft. The same house at about 54–77 m², consistent with the 55–65 m² default-thinking band.
+- **3.1 Pro senior review, run on every job at threshold 1000:** 80–108 s per review. It **over-scoped 3 of 4 times on "front wall only" jobs**: GB 66.5 → 109.8 m² ("included the left side elevation"), US 833 → 1,120 and 711 → 1,325 sq ft ("front and side elevations"). The adjudicator never sees the customer's scope answers (`sides_to_paint = front_only`).
+- **Candidate 3.8 Flash at `high` as adjudicator:** values sane (51.5–70.5 m², 695–745 sq ft) but **45–120 s**, so no speed gain. Registry unchanged.
+
+**Still open: the disagreement path.** When passes disagree (cov > 0.15, as on both production smoke-test quotes), the third pass plus senior review still takes ~100–150 s. One US run: passes 22 / 23 / 31 s, adjudication 103 s, 146 s total. Options (owner decision): an adjudication time cap that falls back to the 3-pass median (the customer is asked to confirm that value anyway); or first give the adjudicator the customer's scope answers (an accuracy fix in its own right), then evaluate a lower thinking level.
+
+**Grade B after confirming (US) — root cause.** Not the trust flag: the production trace shows `step_walls_sqft` `quantityTrusted: true`, so the earlier fix was live. No cost band either. By elimination it is the **R3-1 cap**, the only code that lowers a computed grade. On the reprocess the wording AI saw the confirmed 313 sq ft next to the photo `surface_area` signal (380) and flagged a "quantity concern". R3-1 then capped Grade A to B, after the customer had already answered. That cap isn't persisted or logged in the DB, which is why the earlier fix missed it, and it is nondeterministic (the GB re-test got A). **Fix:** once clarification answers exist, `quantityConcern` is ignored. The reprice path also clears the stored concern and never re-runs wording. Verified: every confirm in the runs above → Grade A.
+
+**Found on the way:** `loadQuoteData` builds an enumerated projection of the quote and silently dropped `signals_json` / `content_json`. The first reprice attempt 409'd on every quote: the T-108 trap again. Both fields are now projected, with a comment.
+
+**Tests:** worker 350 (new: parallel passes + early stop + abort, disagreement waits for the third, stakes bar, `humanStatedQuantityKeys` ×5, reprice snapshot ×4), web 65 (`repriceQuoteNow`: bearer + success, 409/network fallback).
+
+**Files:** `apps/worker/src/{quote-processor.ts,index.ts,stage-timer.ts,quantity-sources.ts,reprice-snapshot.ts}`, `apps/worker/src/ai/{measurement.ts,client.ts,gemini.ts,anthropic.ts}`, `packages/shared/src/ai-models.ts` (call timing), `apps/web/src/lib/queue.ts`, `apps/web/src/app/api/public/quotes/[quoteId]/clarify/route.ts`, `scripts/hardcore-test/verify-speed.mts`, `Docs/01-architecture.md`, tests.
+
+**Relation:** builds on AD-031 (queue). T-119's stakes routing is kept, with a higher bar. R3-1 keeps capping doubts raised before the customer answers. Supersedes the "reprice instantly" backlog item from the GB smoke test.
+
+---
+
 ### 2026-11-08: Production smoke test (GB) + confirmed quantities now reach Grade A
 
 **GB smoke test passed** (production, queue path): `POST /trigger` → queue → consumer (`retry=0/3`), 31.5 m² after adjudication (plausible 28–35), £917, maths correct, customer email delivered. Models recorded in `aiUsage`: `extraction_pass` gemini-3.8-flash ×4, `adjudication` gemini-3.1-pro-preview ×1, `wording` gemini-3.8-flash ×5. No `gemini-2.5-*`. About $0.10 per quote.
@@ -25,7 +74,7 @@
 **Relation:** completes T-120's "A — every driver confirmed by a human" for photo-measured steps. T-128's cap still applies to genuinely untrusted lines. Test: `apps/worker/src/pricing/confirmed-quantity.test.ts`.
 
 **Smoke-test backlog (logged, not built):**
-- **Reprice instantly after confirmation.** It took ~2 min, because the clarify reprocess re-runs the full photo measurement (3 passes + adjudication) and then the form answer overrides the result anyway. Skip re-measuring the quantities the customer has just answered.
+- ~~**Reprice instantly after confirmation.**~~ Done the same day (speed entry above). It took ~2 min, because the clarify reprocess re-runs the full photo measurement (3 passes + adjudication) and then the form answer overrides the result anyway. Skip re-measuring the quantities the customer has just answered.
 - **Internal notes shown to customers:** engine and validation notes reach the customer page. Separate customer notes from business-only ones.
 - **Raw unit labels** (`sqm`, signal-style units) on the customer document. Use human labels (m², per room …).
 - **"Worth considering"** recommendations duplicate items already in the service scope. Filter against `scope_includes`.

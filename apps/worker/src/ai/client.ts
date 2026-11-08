@@ -18,6 +18,8 @@ export interface ImageInput {
 export interface GenerationOptions {
   temperature?: number
   maxOutputTokens?: number
+  /** Cancels an in-flight call (measurement early stop) */
+  signal?: AbortSignal
 }
 
 /** The four call shapes the worker uses. */
@@ -36,10 +38,10 @@ export interface AiClient {
 }
 
 /** Usage reporter handed to clients: task + route are bound at creation. */
-export type UsageSink = (inputTokens: number, outputTokens: number) => void
+export type UsageSink = (inputTokens: number, outputTokens: number, durationMs?: number) => void
 
 export function usageSinkFor(meter: AiUsageMeter | undefined, task: AiTask, route: ModelRoute): UsageSink {
-  return (input, output) => meter?.record(task, route, input, output)
+  return (input, output, durationMs) => meter?.record(task, route, input, output, durationMs)
 }
 
 /**

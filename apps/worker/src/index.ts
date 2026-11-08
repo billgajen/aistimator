@@ -100,7 +100,8 @@ function jsonResponse(body: unknown, status: number): Response {
 async function processQuoteJob(
   job: QuoteJobMessage,
   supabase: ReturnType<typeof getSupabaseClient>,
-  env: Env
+  env: Env,
+  queueWaitMs?: number
 ): Promise<{ success: boolean; error?: string }> {
   const { quoteId, quoteRequestId, quoteToken } = job
 
@@ -108,7 +109,7 @@ async function processQuoteJob(
   await updateQuoteStatus(supabase!, quoteId, 'generating')
 
   // Process the quote using the full pipeline
-  const result = await processQuote(quoteId, quoteRequestId, supabase!, env, quoteToken)
+  const result = await processQuote(quoteId, quoteRequestId, supabase!, env, quoteToken, { queueWaitMs })
 
   return {
     success: result.success,
@@ -186,6 +187,34 @@ export default {
         return jsonResponse({ error: 'Queue send failed' }, 502)
       }
       return jsonResponse({ success: true, message: 'Job enqueued' }, 200)
+    }
+
+    // Reprice after a clarification answer: deterministic (no AI, no photos),
+    // so the web app waits for it instead of queueing. 409 = this quote has no
+    // reprice snapshot (saved before snapshots existed) — queue it instead.
+    if (url.pathname === '/reprice' && request.method === 'POST') {
+      const supabase = getSupabaseClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY)
+      if (!supabase) return jsonResponse({ error: 'Supabase not configured' }, 503)
+      let body: QuoteJobMessage
+      try {
+        body = (await request.json()) as QuoteJobMessage
+      } catch {
+        return jsonResponse({ error: 'Invalid request body' }, 400)
+      }
+      if (!body.quoteId || !body.quoteRequestId) {
+        return jsonResponse({ error: 'Missing required fields: quoteId, quoteRequestId' }, 400)
+      }
+      try {
+        const result = await processQuote(body.quoteId, body.quoteRequestId, supabase, env, body.quoteToken, {
+          repriceOnly: true,
+        })
+        if (result.notRepriceable) return jsonResponse({ success: false, error: result.error }, 409)
+        if (!result.success) return jsonResponse({ success: false, error: result.error }, 500)
+        return jsonResponse({ success: true, total: result.pricing?.total }, 200)
+      } catch (error) {
+        console.error('[Worker] Reprice error:', error instanceof Error ? error.message : error)
+        return jsonResponse({ success: false, error: 'Reprice failed' }, 500)
+      }
     }
 
     // Direct processing endpoint (local dev, and production while SYNC_QUOTE_PROCESSING=true)
@@ -303,7 +332,9 @@ export default {
         }
 
         // Process the quote
-        const result = await processQuoteJob(job, supabase, env)
+        // Enqueue → now; diagnostics only (stored in pricing_trace_json.timings)
+        const queueWaitMs = message.timestamp ? Date.now() - message.timestamp.getTime() : undefined
+        const result = await processQuoteJob(job, supabase, env, queueWaitMs)
 
         if (result.success) {
           message.ack()

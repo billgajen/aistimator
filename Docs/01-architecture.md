@@ -40,14 +40,25 @@
    (`SYNC_QUOTE_PROCESSING=true` instead calls `/process` and waits — local dev default.)
 6) Cloudflare Worker (queue consumer, one quote per invocation, 3 retries then `failed`) runs:
    - fetch submission from Supabase
-   - run vision extraction on images to produce signals JSON (model per task from
-     `packages/shared/src/ai-models.json`)
+   - fetch the photos once, then in parallel: vision extraction to signals JSON (model per
+     task from `packages/shared/src/ai-models.json`) and the measurement passes for
+     photo-measured quantities (passes run together; when the first two agree within the CoV
+     threshold the third is cancelled). Quantities the customer already stated are not measured.
+     Senior adjudication only on disagreement, thin evidence, or a line worth ≥
+     `ADJUDICATION_VALUE_THRESHOLD` (default 2500)
+   - recommendations, wording and cross-service detection run in parallel, then validation
+   - if the quote needs a customer answer, it stops at `awaiting_clarification` with the
+     provisional range and saves a reprice snapshot (first-pass AI outputs in `signals_json._reprice`)
+   - per-stage timings and AI calls per task are stored in `pricing_trace_json.timings` / `.aiUsage`
    - run rules engine using tenant pricing config to compute price and breakdown
    - generate wording (scope summary, notes)
    - generate hosted quote page data
    - send HTML to DocRaptor API, store returned PDF in R2 (optional toggle)
    - send emails via Postmark and mark quote status
 7) Customer receives link to hosted quote page.
+   If a question was asked, the clarify API calls `POST {worker}/reprice` (bearer token) and
+   waits: a deterministic reprice from the snapshot plus the answers, with no AI calls and no
+   photo reads (~0.1–0.3 s). Quotes without a snapshot (409) go through `/trigger` as before.
 8) Customer views, accepts, and optionally pays deposit.
 
 ## Key architecture decisions

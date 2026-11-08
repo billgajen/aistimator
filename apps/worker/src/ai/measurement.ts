@@ -205,7 +205,7 @@ export function computeCalibrationFactor(
   return { factor: Math.round(factor * 100) / 100, sample: ratios.length }
 }
 
-export type RunPass = (passIndex: number) => Promise<PassMeasurement[]>
+export type RunPass = (passIndex: number, signal?: AbortSignal) => Promise<PassMeasurement[]>
 
 /**
  * Run the anchored-takeoff ensemble for the given targets.
@@ -225,6 +225,13 @@ export async function measureQuantities(opts: {
    * keep their exact behaviour.
    */
   referenceObjects?: ReferenceObject[]
+  /** Receives each completed pass's wall time, ms (diagnostics) */
+  passTimingsMs?: number[]
+  /**
+   * Early stop: once two passes agree on every target within this CoV, the
+   * remaining passes are cancelled (same threshold that routes adjudication).
+   */
+  earlyStopCov?: number
 }): Promise<MeasuredQuantity[]> {
   const { gemini, images, targets } = opts
   const referenceTable =
@@ -235,7 +242,7 @@ export async function measureQuantities(opts: {
   const passes = opts.passes ?? 3
   if (targets.length === 0 || images.length === 0) return []
 
-  const defaultRunPass: RunPass = async () => {
+  const defaultRunPass: RunPass = async (_passIndex, signal) => {
     if (!gemini) return []
     const calibrationBlock =
       opts.calibrationHints && opts.calibrationHints.length > 0
@@ -256,43 +263,49 @@ Return one measurement entry per targetKey.`
       // agreement meaningful. Generous token budget: Gemini 2.5 thinking
       // tokens count against maxOutputTokens (truncation = invalid JSON,
       // found live)
-      { temperature: 0.7, maxOutputTokens: 16384 }
+      { temperature: 0.7, maxOutputTokens: 16384, signal }
     )
     return result.measurements || []
   }
 
   const runPass = opts.runPass ?? defaultRunPass
 
-  // Run all passes (sequentially — worker environment, small N)
+  // All passes run in parallel. When the first two to finish agree on every
+  // target, the rest are cancelled: a third pass adds cost and latency but
+  // can't move a median that two agreeing takeoffs already pin down.
+  const earlyStopCov = opts.earlyStopCov ?? 0.15
+  const controllers = Array.from({ length: passes }, () => new AbortController())
   const allPasses: PassMeasurement[][] = []
-  for (let i = 0; i < passes; i++) {
-    try {
-      allPasses.push(await runPass(i))
-    } catch (error) {
-      console.error(`[Measurement] Pass ${i + 1} failed:`, error)
+  await new Promise<void>((resolve) => {
+    let settled = 0
+    let stopped = false
+    for (let i = 0; i < passes; i++) {
+      const t0 = Date.now()
+      runPass(i, controllers[i]!.signal)
+        .then((pass) => {
+          if (stopped) return
+          allPasses.push(pass)
+          opts.passTimingsMs?.push(Date.now() - t0)
+          if (allPasses.length >= 2 && allPasses.length < passes && passesAgree(allPasses, targets, referenceTable, earlyStopCov)) {
+            stopped = true
+            for (const c of controllers) c.abort()
+            console.log(`[Measurement] Early stop: ${allPasses.length} passes agree within CoV ${earlyStopCov}`)
+            resolve()
+          }
+        })
+        .catch((error) => {
+          if (!stopped) console.error(`[Measurement] Pass ${i + 1} failed:`, error)
+        })
+        .finally(() => {
+          settled += 1
+          if (settled === passes) resolve()
+        })
     }
-  }
+  })
 
   const results: MeasuredQuantity[] = []
   for (const target of targets) {
-    const rawPasses: Array<{ value: number; entry: PassMeasurement }> = []
-    const referencesUsed: string[] = []
-
-    for (const pass of allPasses) {
-      const entry = pass.find((m) => m.targetKey === target.signalKey)
-      if (!entry || entry.feasible === false) continue
-      // AD-024: the region table, not the model, owns the reference size.
-      // When the model names a known reference, code supplies its dimension.
-      const known = entry.referenceObject
-        ? referenceTable.find((r) => r.id === entry.referenceObject)
-        : undefined
-      const anchoredEntry = known ? { ...entry, referenceDimensionM: known.metres } : entry
-      const value = computeAnchoredValue(target.unit, anchoredEntry)
-      if (value !== null && value > 0) {
-        rawPasses.push({ value, entry })
-        if (entry.referenceObject) referencesUsed.push(entry.referenceObject)
-      }
-    }
+    const { rawPasses, referencesUsed } = usablePasses(allPasses, target, referenceTable)
 
     if (rawPasses.length === 0) continue // leave to the envelope fallback
 
@@ -334,6 +347,14 @@ export interface AdjudicationResult {
   scopeResolution: string
 }
 
+/**
+ * Provisional line value (currency units) at which agreeing measurements still
+ * get a senior review. Was 1000, which sent almost every exterior painting job
+ * to the slowest call in the pipeline (40–60 s) even when the passes agreed.
+ * Disagreement and single-pass evidence always escalate, whatever the value.
+ */
+export const DEFAULT_ADJUDICATION_VALUE_THRESHOLD = 2500
+
 export interface AdjudicationDecision {
   shouldAdjudicate: boolean
   reason?: 'high_variance' | 'single_pass' | 'high_stakes'
@@ -351,7 +372,7 @@ export function decideAdjudication(opts: {
   valueThreshold?: number
 }): AdjudicationDecision {
   const covThreshold = opts.covThreshold ?? 0.15
-  const valueThreshold = opts.valueThreshold ?? 1000
+  const valueThreshold = opts.valueThreshold ?? DEFAULT_ADJUDICATION_VALUE_THRESHOLD
 
   if (opts.passesUsed < 2) return { shouldAdjudicate: true, reason: 'single_pass' }
   if (opts.cov > covThreshold) return { shouldAdjudicate: true, reason: 'high_variance' }
@@ -456,6 +477,45 @@ Re-examine the photos, resolve the scope, and produce your final measurement.`,
     console.error('[Measurement] Adjudication failed:', error)
     return null
   }
+}
+
+/** Each pass's usable value for one target, anchored to the region's reference sizes. */
+function usablePasses(
+  allPasses: PassMeasurement[][],
+  target: MeasurementTarget,
+  referenceTable: ReferenceObject[]
+): { rawPasses: Array<{ value: number; entry: PassMeasurement }>; referencesUsed: string[] } {
+  const rawPasses: Array<{ value: number; entry: PassMeasurement }> = []
+  const referencesUsed: string[] = []
+  for (const pass of allPasses) {
+    const entry = pass.find((m) => m.targetKey === target.signalKey)
+    if (!entry || entry.feasible === false) continue
+    // AD-024: the region table, not the model, owns the reference size.
+    // When the model names a known reference, code supplies its dimension.
+    const known = entry.referenceObject
+      ? referenceTable.find((r) => r.id === entry.referenceObject)
+      : undefined
+    const anchoredEntry = known ? { ...entry, referenceDimensionM: known.metres } : entry
+    const value = computeAnchoredValue(target.unit, anchoredEntry)
+    if (value !== null && value > 0) {
+      rawPasses.push({ value, entry })
+      if (entry.referenceObject) referencesUsed.push(entry.referenceObject)
+    }
+  }
+  return { rawPasses, referencesUsed }
+}
+
+/** True when every target has ≥2 usable values agreeing within `maxCov`. */
+export function passesAgree(
+  allPasses: PassMeasurement[][],
+  targets: MeasurementTarget[],
+  referenceTable: ReferenceObject[],
+  maxCov: number
+): boolean {
+  return targets.every((target) => {
+    const values = usablePasses(allPasses, target, referenceTable).rawPasses.map((p) => p.value)
+    return values.length >= 2 && computeEnsembleStats(values).cov <= maxCov
+  })
 }
 
 function mostCommon(items: string[]): string {

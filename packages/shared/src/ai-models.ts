@@ -170,6 +170,8 @@ export interface AiUsageEntry {
   outputTokens: number
   /** null when the model has no configured price */
   estimatedCostUsd: number | null
+  /** Summed wall time of this entry's calls (calls may overlap when run in parallel) */
+  totalMs?: number
 }
 
 export interface AiUsageSummary {
@@ -186,7 +188,7 @@ export interface AiUsageSummary {
 export class AiUsageMeter {
   private entries = new Map<string, AiUsageEntry>()
 
-  record(task: AiTask, route: ModelRoute, inputTokens: number, outputTokens: number): void {
+  record(task: AiTask, route: ModelRoute, inputTokens: number, outputTokens: number, durationMs?: number): void {
     const key = `${task}|${route.provider}|${route.model}`
     const existing = this.entries.get(key) ?? {
       task,
@@ -201,6 +203,9 @@ export class AiUsageMeter {
     existing.inputTokens += Math.max(0, inputTokens || 0)
     existing.outputTokens += Math.max(0, outputTokens || 0)
     existing.estimatedCostUsd = estimateCostUsd(route.model, existing.inputTokens, existing.outputTokens)
+    if (durationMs !== undefined && durationMs >= 0) {
+      existing.totalMs = (existing.totalMs ?? 0) + Math.round(durationMs)
+    }
     this.entries.set(key, existing)
   }
 

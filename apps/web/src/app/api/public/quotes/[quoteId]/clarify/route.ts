@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { enqueueQuoteJob } from '@/lib/queue'
+import { enqueueQuoteJob, repriceQuoteNow } from '@/lib/queue'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import type { ClarifyQuoteRequest } from '@estimator/shared'
@@ -141,16 +141,19 @@ export async function POST(
       console.error('[Clarify] Measurement memory capture failed:', memoryError)
     }
 
+    // Reprice straight away (deterministic, ~1 s, no AI). Quotes without a
+    // reprice snapshot go through the queue as before.
     // Bug #11 (found live): status='queued' alone re-queues NOTHING — the job
     // must be dispatched explicitly or answered clarifications sit forever.
+    const job = {
+      quoteId,
+      quoteRequestId: quote.quote_request_id,
+      tenantId: quote.tenant_id,
+      timestamp: Date.now(),
+      quoteToken: body.token,
+    }
     try {
-      await enqueueQuoteJob({
-        quoteId,
-        quoteRequestId: quote.quote_request_id,
-        tenantId: quote.tenant_id,
-        timestamp: Date.now(),
-        quoteToken: body.token,
-      })
+      if (!(await repriceQuoteNow(job))) await enqueueQuoteJob(job)
     } catch (queueError) {
       console.error('[Clarify] Failed to re-enqueue quote for reprocessing:', queueError)
       // Leave status='queued' — visible in the dashboard rather than silently lost

@@ -68,5 +68,9 @@ Code for every item is already built; these are the steps that unlock it.
   (Postmark → Sender Signatures / Domains). Until it's approved, Postmark only delivers to addresses on the
   From domain. The GB smoke test's business notification to a gmail address was rejected. **Do this before beta.**
 - Engineering backlog from the smoke test (not owner work; listed so it isn't lost, details in CHANGELOG
-  2026-11-08): instant reprice after confirmation, internal notes shown to customers, raw unit labels,
+  2026-11-08): internal notes shown to customers, raw unit labels,
   "worth considering" duplicating scope items, clarification page + email styling, "Powered by Estimator" name.
+- [ ] **Decide the disagreement path** (CHANGELOG 2026-11-08 speed entry). When measurement passes disagree, the
+  senior review still takes 80–108 s, so those quotes show their range at ~100–150 s. Options: cap the review time
+  and fall back to the median (the customer confirms it anyway), or first give the reviewer the customer's scope
+  answers (it currently adds side elevations to "front only" jobs) and then try a lower thinking level.

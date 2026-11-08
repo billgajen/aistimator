@@ -55,7 +55,7 @@ import { AiUsageMeter } from '@estimator/shared'
 import { createAiClient } from './ai/factory'
 import type { AiClient } from './ai/client'
 import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock } from '@estimator/shared'
-import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor } from './ai/measurement'
+import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor, DEFAULT_ADJUDICATION_VALUE_THRESHOLD } from './ai/measurement'
 import { buildTakeoff, buildReference } from './takeoff'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing, findLookalikeUnconditionedSteps } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
@@ -63,6 +63,9 @@ import type { CrossServicePricing } from '@estimator/shared'
 import { sendQuoteEmails, isEmailConfigured } from './email'
 import { incrementUsageCounter } from './usage'
 import type { Env } from './index'
+import { StageTimer } from './stage-timer'
+import { humanStatedQuantityKeys } from './quantity-sources'
+import { readRepriceInputs, withRepriceSnapshot } from './reprice-snapshot'
 
 /**
  * Cross-service recommendation
@@ -113,6 +116,9 @@ interface QuoteData {
     clarification_count?: number
     clarification_questions_json?: Array<{ id: string; targetSignalKey: string }> | null
     clarification_answers_json?: Array<{ questionId: string; answer: string }> | null
+    /** First-pass signals (+ reprice snapshot) and provisional content */
+    signals_json?: unknown
+    content_json?: unknown
   }
   quoteRequest: {
     id: string
@@ -192,6 +198,8 @@ interface QuoteData {
 export interface ProcessingResult {
   success: boolean
   error?: string
+  /** `repriceOnly` was requested but the quote has no reprice snapshot */
+  notRepriceable?: boolean
   signals?: ExtractedSignals
   structuredSignals?: ExtractedSignalsV2
   pricing?: PricingResult
@@ -373,12 +381,19 @@ export async function processQuote(
   _quoteRequestId: string, // Used for logging/tracking, actual data loaded from DB
   supabase: SupabaseClient,
   env: Env,
-  quoteToken?: string // Plain text token for email links
+  quoteToken?: string, // Plain text token for email links
+  options: {
+    queueWaitMs?: number
+    /** Only run the deterministic reprice; return `notRepriceable` instead of the full pipeline */
+    repriceOnly?: boolean
+  } = {}
 ): Promise<ProcessingResult> {
   console.log(`[Processor] Starting quote processing: ${quoteId}`)
+  const timer = new StageTimer()
+  timer.queueWaitMs = options.queueWaitMs
 
   // 1. Load all quote data
-  const quoteData = await loadQuoteData(supabase, quoteId)
+  const quoteData = await timer.time('load', () => loadQuoteData(supabase, quoteId))
   if (!quoteData) {
     return { success: false, error: 'Failed to load quote data' }
   }
@@ -413,6 +428,14 @@ export async function processQuote(
         `[Processor] Clarification answer merged: ${question.targetSignalKey} = ${value}`
       )
     }
+  }
+
+  // Reprice after clarification: deterministic, from the first pass's saved
+  // AI outputs (null → full pipeline, e.g. quotes saved before snapshots)
+  const reprice = readRepriceInputs(quoteData.quote)
+  if (reprice) timer.repriceOnly = true
+  else if (options.repriceOnly) {
+    return { success: false, notRepriceable: true, error: 'Quote has no reprice snapshot' }
   }
 
   // 1.5 Triage: classify request complexity and optimize processing
@@ -506,21 +529,59 @@ export async function processQuote(
     expectedSignals: service.expected_signals,
   }
 
-  if (imageAssets.length > 0 && gemini) {
+  // 3.5 (started early) AI add-on detection reads only the description, so it
+  // runs in parallel with the photo work instead of after it
+  const addonRules = pricingRules || getDefaultPricingRules()
+  const descriptionAddonsPromise: Promise<Awaited<ReturnType<typeof detectAddonsFromDescription>> | null> =
+    !reprice && textAi && customerNotes && addonRules.addons && addonRules.addons.length > 0
+      ? timer
+          .time('addons', () =>
+            detectAddonsFromDescription(
+              textAi,
+              service.name,
+              customerNotes,
+              addonRules.addons.map((a) => ({ id: a.id, label: a.label }))
+            )
+          )
+          .catch((error) => {
+            console.error('[Processor] AI addon detection failed:', error)
+            return null
+          })
+      : Promise.resolve(null)
+
+  let fetchedImages: Array<{ mimeType: string; base64: string }> = []
+  if (reprice) {
+    // Reprice after clarification: the customer's answers merge below as form
+    // answers (AD-002) over the first pass's signals and measurements. No
+    // photos are re-read and no AI runs, so the reprice is deterministic.
+    console.log('[Processor] Reprice after clarification: reusing first-pass signals (no AI calls)')
+    signals = reprice.legacySignals
+    structuredSignals = reprice.structuredSignals
+  } else if (imageAssets.length > 0 && gemini) {
     console.log(`[Processor] Extracting signals from ${imageAssets.length} images`)
-    const extractionResult = await extractSignalsFromAssets(gemini, imageAssets, signalContext, env)
-    signals = extractionResult.signals
-    structuredSignals = extractionResult.structuredSignals
+    fetchedImages = await timer.time('images', () => fetchImages(imageAssets, env))
 
     // Measurement Engine M2+M3 (T-117/T-118): for quantities priced from AI
     // signals, replace the single-shot guess with a reference-anchored
     // ensemble. Runs BEFORE form merge (customer answers still win, AD-002)
-    // and BEFORE envelopes (implausible medians still get caught).
+    // and BEFORE envelopes (implausible medians still get caught). It needs
+    // only the photos, so it runs in parallel with signal extraction.
     const measurementSteps = (service.work_steps || pricingRules?.workSteps || []).filter(
       (s) => s.quantitySource?.type === 'ai_signal' && s.quantitySource.signalKey
     )
-    if (measurementSteps.length > 0 && structuredSignals && extractionResult.images?.length) {
-      const targets = measurementSteps.map((step) => {
+    // A quantity the customer already stated is never measured: their number
+    // wins anyway, so measuring it is pure latency and cost
+    const statedKeys = humanStatedQuantityKeys(
+      measurementSteps.map((s) => s.quantitySource!.signalKey!),
+      quoteRequest.job_answers || [],
+      [...(quoteData.widgetFields || []), ...(service.draft_config?.suggestedFields || [])]
+    )
+    if (statedKeys.size > 0) {
+      console.log(`[Processor] Not measuring customer-stated quantities: ${[...statedKeys].join(', ')}`)
+    }
+    const targets = measurementSteps
+      .filter((step) => !statedKeys.has(step.quantitySource!.signalKey!))
+      .map((step) => {
         const es = (service.expected_signals || []).find(
           (e) => e.signalKey === step.quantitySource!.signalKey
         )
@@ -531,6 +592,10 @@ export async function processQuote(
           unit: es?.unit || step.unitLabel || 'unit',
         }
       })
+    const images = fetchedImages
+    const covThreshold = Number(env.MEASUREMENT_COV_THRESHOLD || 0.15)
+
+    const runMeasurement = async () => {
       // T-123 Measurement memory: load this business's confirmed-job history
       // for these signals — used as prompt calibration AND a deterministic
       // correction factor applied by code (AD-024).
@@ -568,27 +633,51 @@ export async function processQuote(
         console.error('[Processor] Measurement memory lookup failed:', memoryError)
       }
 
-      try {
-        const measured = await measureQuantities({
-          gemini,
-          images: extractionResult.images,
-          targets,
-          passes: Number(env.MEASUREMENT_PASSES || 3),
-          calibrationHints,
-          // T-133: reference sizes from the tenant's region, pack overrides on top
-          referenceObjects: resolveReferenceObjects(
-            regionCtx.region,
-            service.draft_config?.referenceObjects
-          ),
-        })
-        for (let m of measured) {
+      const passTimingsMs: number[] = []
+      const measured = await measureQuantities({
+        gemini,
+        images,
+        targets,
+        passes: Number(env.MEASUREMENT_PASSES || 3),
+        calibrationHints,
+        // T-133: reference sizes from the tenant's region, pack overrides on top
+        referenceObjects: resolveReferenceObjects(
+          regionCtx.region,
+          service.draft_config?.referenceObjects
+        ),
+        passTimingsMs,
+        earlyStopCov: covThreshold,
+      })
+      timer.setMeasurementPasses(passTimingsMs)
+      return { measured, calibrationBySignal }
+    }
+
+    const [extractionResult, measurement] = await Promise.all([
+      timer.time('signals', () => extractSignalsFromImages(gemini, images, signalContext)),
+      targets.length > 0 && images.length > 0
+        ? timer.time('measurement', runMeasurement).catch((measureError) => {
+            // Measurement is an accuracy upgrade, never a blocker — the envelope
+            // and clarification guards still protect the quote downstream
+            console.error('[Processor] Measurement ensemble failed:', measureError)
+            return null
+          })
+        : Promise.resolve(null),
+    ])
+    signals = extractionResult.signals
+    structuredSignals = extractionResult.structuredSignals
+
+    if (measurement && structuredSignals) {
+      // T-119 M4: stakes-based adjudication, one senior review per quantity,
+      // all quantities in parallel
+      const finals = await Promise.all(
+        measurement.measured.map(async (measuredQuantity) => {
+          let m = measuredQuantity
           console.log(
             `[Processor] Measured ${m.signalKey} = ${m.value} (cov ${m.cov}, confidence ${m.confidence}, ${m.passesUsed} passes)`
           )
 
-          // T-119 M4: stakes-based adjudication. Escalate to the senior model
-          // when the ensemble disagrees, evidence is thin, or the number is
-          // worth real money (provisional step value ≥ threshold).
+          // Escalate to the senior model when the ensemble disagrees, evidence
+          // is thin, or the number is worth real money (provisional step value ≥ threshold).
           const step = measurementSteps.find(
             (s) => s.quantitySource?.signalKey === m.signalKey
           )
@@ -597,8 +686,8 @@ export async function processQuote(
             cov: m.cov,
             passesUsed: m.passesUsed,
             provisionalValue,
-            covThreshold: Number(env.MEASUREMENT_COV_THRESHOLD || 0.15),
-            valueThreshold: Number(env.ADJUDICATION_VALUE_THRESHOLD || 1000),
+            covThreshold,
+            valueThreshold: Number(env.ADJUDICATION_VALUE_THRESHOLD || DEFAULT_ADJUDICATION_VALUE_THRESHOLD),
           })
           if (decision.shouldAdjudicate) {
             console.log(
@@ -608,12 +697,12 @@ export async function processQuote(
             // ADJUDICATION_MODEL / AI_MODEL_ADJUDICATION override, Claude pluggable)
             const adjudicator = createAiClient('adjudication', env, aiUsage)
             const target = targets.find((t) => t.signalKey === m.signalKey)!
-            const adjudicated = await adjudicateMeasurement({
+            const adjudicated = await timer.time('adjudication', () => adjudicateMeasurement({
               adjudicator,
-              images: extractionResult.images,
+              images,
               target,
               measured: m,
-            })
+            }))
             if (adjudicated) {
               console.log(
                 `[Processor] Adjudicated ${m.signalKey}: ${m.value} -> ${adjudicated.value} (${adjudicated.evidence})`
@@ -623,7 +712,7 @@ export async function processQuote(
           }
 
           // T-123: apply the learned calibration factor deterministically
-          const calibration = calibrationBySignal.get(m.signalKey)
+          const calibration = measurement.calibrationBySignal.get(m.signalKey)
           if (calibration) {
             const corrected = Math.round(m.value * calibration.factor * 10) / 10
             console.log(
@@ -639,31 +728,30 @@ export async function processQuote(
               evidence: `${m.evidence}; calibrated ×${calibration.factor} from ${calibration.sample} confirmed jobs`,
             }
           }
+          return m
+        })
+      )
 
-          const existing = structuredSignals.signals.find((s) => s.key === m.signalKey)
-          if (existing) {
-            existing.value = m.value
-            existing.confidence = m.confidence
-            existing.evidence = m.evidence
-            existing.source = 'vision'
-            existing.quantityBand = m.band
-            existing.basis = m.basis
-          } else {
-            structuredSignals.signals.push({
-              key: m.signalKey,
-              value: m.value,
-              confidence: m.confidence,
-              source: 'vision',
-              evidence: m.evidence,
-              quantityBand: m.band,
-              basis: m.basis,
-            })
-          }
+      for (const m of finals) {
+        const existing = structuredSignals.signals.find((s) => s.key === m.signalKey)
+        if (existing) {
+          existing.value = m.value
+          existing.confidence = m.confidence
+          existing.evidence = m.evidence
+          existing.source = 'vision'
+          existing.quantityBand = m.band
+          existing.basis = m.basis
+        } else {
+          structuredSignals.signals.push({
+            key: m.signalKey,
+            value: m.value,
+            confidence: m.confidence,
+            source: 'vision',
+            evidence: m.evidence,
+            quantityBand: m.band,
+            basis: m.basis,
+          })
         }
-      } catch (measureError) {
-        // Measurement is an accuracy upgrade, never a blocker — the envelope
-        // and clarification guards still protect the quote downstream
-        console.error('[Processor] Measurement ensemble failed:', measureError)
       }
     }
   } else if (imageAssets.length > 0 && !gemini) {
@@ -877,9 +965,9 @@ export async function processQuote(
   }
 
   // 2.5 Extract inventory items if catalog is configured (works for any industry)
-  let matchedItems: MatchedItem[] = []
+  let matchedItems: MatchedItem[] = reprice?.matchedItems ?? []
 
-  if (gemini && pricingRules?.itemCatalog && pricingRules.itemCatalog.length > 0 && imageAssets.length > 0) {
+  if (!reprice && gemini && pricingRules?.itemCatalog && pricingRules.itemCatalog.length > 0 && imageAssets.length > 0) {
     console.log(`[Processor] Extracting inventory items (catalog has ${pricingRules.itemCatalog.length} items)`)
 
     // Build context for AI from service and catalog (works for any industry)
@@ -892,22 +980,12 @@ export async function processQuote(
     }
 
     try {
-      // Fetch images for inventory detection
-      const images: Array<{ mimeType: string; base64: string }> = []
-      for (const asset of imageAssets.slice(0, 5)) {
-        try {
-          const imageData = await fetchImageFromR2(asset.r2_key, asset.content_type, env)
-          if (imageData) {
-            images.push(imageData)
-          }
-        } catch (error) {
-          console.error(`[Processor] Failed to fetch image ${asset.id} for inventory:`, error)
-        }
-      }
+      // Same photos the signal pass fetched (fetched once per quote)
+      const images = fetchedImages
 
       if (images.length > 0) {
         // Step 1: Detect items from images using service context
-        const detectedItems = await extractInventoryItems(gemini, images, inventoryContext)
+        const detectedItems = await timer.time('inventory', () => extractInventoryItems(gemini, images, inventoryContext))
 
         if (detectedItems.length > 0) {
           // Step 2: Match detected items to catalog
@@ -942,22 +1020,22 @@ export async function processQuote(
   const aiDetectedAddonIds = new Set<string>()
   let aiAddonDetectionRan = false
 
-  // 3.5 AI-powered addon detection from customer description
-  if (textAi && projectDescription && rules.addons && rules.addons.length > 0) {
+  // 3.5 AI-powered addon detection from customer description (started above,
+  // in parallel with the photo work)
+  const detectedDescriptionAddons = await descriptionAddonsPromise
+  if (reprice) {
+    // The first pass's add-on decisions stand: re-apply them, no AI
+    aiAddonDetectionRan = reprice.aiAddonDetectionRan
+    for (const addonId of reprice.aiDetectedAddonIds) {
+      if (!formAnswers.some((a) => a.fieldId === addonId && a.value === true)) {
+        formAnswers.push({ fieldId: addonId, value: true })
+      }
+      aiDetectedAddonIds.add(addonId)
+    }
+  } else if (detectedDescriptionAddons && projectDescription && rules.addons && rules.addons.length > 0) {
     console.log('[Processor] Running AI addon detection on customer description')
     try {
-      const availableAddons: AddonForMatching[] = rules.addons.map((a) => ({
-        id: a.id,
-        label: a.label,
-        // description is optional, addon label is used for matching
-      }))
-
-      const detectedAddons = await detectAddonsFromDescription(
-        textAi,
-        service.name,
-        projectDescription,
-        availableAddons
-      )
+      const detectedAddons = detectedDescriptionAddons
       // R2-6: AI detection completed — it is now the authority on which
       // addons the description implies; bare keyword matches must not charge
       aiAddonDetectionRan = true
@@ -1001,7 +1079,7 @@ export async function processQuote(
   }
 
   // 3.6 AI-powered addon detection from IMAGE-detected conditions
-  if (textAi && signals.detectedConditions && signals.detectedConditions.length > 0 && rules.addons && rules.addons.length > 0) {
+  if (!reprice && textAi && signals.detectedConditions && signals.detectedConditions.length > 0 && rules.addons && rules.addons.length > 0) {
     console.log('[Processor] Running AI addon detection on image-detected conditions:', signals.detectedConditions)
     try {
       const availableAddons: AddonForMatching[] = rules.addons.map((a) => ({
@@ -1014,12 +1092,12 @@ export async function processQuote(
         .map((c) => c.replace(/_/g, ' '))
         .join(', ') + ' detected in photos'
 
-      const detectedAddons = await detectAddonsFromDescription(
+      const detectedAddons = await timer.time('addons', () => detectAddonsFromDescription(
         textAi,
         service.name,
         conditionsText,
         availableAddons
-      )
+      ))
 
       // Add detected addons as form answers so they get applied by pricing engine
       for (const detected of detectedAddons) {
@@ -1342,9 +1420,12 @@ export async function processQuote(
     }
   }
 
-  // 3.6 Detect unused signals and generate AI recommendations
-  let signalRecommendations: SignalRecommendation[] = []
-  if (structuredSignals && structuredSignals.signals.length > 0 && textAi) {
+  // 3.6 Detect unused signals and generate AI recommendations. Runs in
+  // parallel with wording and cross-service detection (independent inputs);
+  // awaited before validation, which reviews all three.
+  const recommendationsPromise = (async (): Promise<SignalRecommendation[]> => {
+    if (reprice) return reprice.signalRecommendations
+    if (!structuredSignals || structuredSignals.signals.length === 0 || !textAi) return []
     // Find signals extracted by AI but not used in pricing
     // Pass form answers and widget fields to filter out numeric signals that customer already provided
     const unusedSignals = findUnusedSignals(
@@ -1353,29 +1434,29 @@ export async function processQuote(
       quoteRequest.job_answers || [],
       quoteData.widgetFields || []
     )
-
-    if (unusedSignals.length > 0) {
-      console.log(`[Processor] Found ${unusedSignals.length} unused signals: ${unusedSignals.map(s => s.key).join(', ')}`)
-
-      try {
-        signalRecommendations = await generateSignalRecommendations(
-          textAi,
-          unusedSignals,
-          service.name,
-          {
-            workSteps: service.work_steps,
-            serviceDescription: service.description,
-          }
-        )
-        console.log(`[Processor] Generated ${signalRecommendations.length} signal recommendations`)
-      } catch (error) {
-        console.error('[Processor] Failed to generate signal recommendations:', error)
-        // Continue without recommendations
-      }
-    } else {
+    if (unusedSignals.length === 0) {
       console.log('[Processor] All extracted signals were used in pricing')
+      return []
     }
-  }
+    console.log(`[Processor] Found ${unusedSignals.length} unused signals: ${unusedSignals.map(s => s.key).join(', ')}`)
+    try {
+      const recommendations = await timer.time('recommendations', () => generateSignalRecommendations(
+        textAi,
+        unusedSignals,
+        service.name,
+        {
+          workSteps: service.work_steps,
+          serviceDescription: service.description,
+        }
+      ))
+      console.log(`[Processor] Generated ${recommendations.length} signal recommendations`)
+      return recommendations
+    } catch (error) {
+      console.error('[Processor] Failed to generate signal recommendations:', error)
+      // Continue without recommendations
+      return []
+    }
+  })()
 
   // 4. Generate wording
   let content: QuoteContent
@@ -1441,10 +1522,25 @@ export async function processQuote(
     regionGuidance: regionPromptBlock(regionCtx), // T-133
   }
 
-  if (textAi) {
+  // 4.5 (started early) cross-service detection reads only the description
+  const crossServiceDetectionPromise =
+    !reprice && triageDecision.crossServiceCheck
+      ? timer.time('cross_service', () => detectCrossServiceMentionsWithAI(
+          textAi,
+          projectDescription || '',
+          service.name,
+          quoteData.otherServices || []
+        ))
+      : Promise.resolve([])
+
+  if (reprice) {
+    // The provisional wording shown with the range stands; prices in it come
+    // from the pricing block, which is rebuilt below
+    content = reprice.content
+  } else if (textAi) {
     console.log('[Processor] Generating wording with Gemini')
     try {
-      content = await generateWording(textAi, wordingContext)
+      content = await timer.time('wording', () => generateWording(textAi, wordingContext))
     } catch (error) {
       console.error('[Processor] Wording generation failed, using fallback:', error)
       content = generateWordingFallback(wordingContext)
@@ -1465,20 +1561,14 @@ export async function processQuote(
 
   // 4.5 Detect cross-service mentions and calculate pricing (with AI + keyword fallback)
   // Skip if triage says no cross-service check needed
-  const crossServiceRecommendations = triageDecision.crossServiceCheck
-    ? await detectCrossServiceMentionsWithAI(
-        textAi,
-        projectDescription || '',
-        service.name,
-        quoteData.otherServices || []
-      )
-    : []
+  const crossServiceRecommendations = await crossServiceDetectionPromise
+  let signalRecommendations = await recommendationsPromise
 
-  if (!triageDecision.crossServiceCheck) {
+  if (!reprice && !triageDecision.crossServiceCheck) {
     console.log('[Processor] Cross-service detection skipped by triage')
   }
 
-  const crossServicePricing: CrossServicePricing[] = []
+  const crossServicePricing: CrossServicePricing[] = reprice ? [...reprice.crossServicePricing] : []
 
   if (crossServiceRecommendations.length > 0) {
     console.log(`[Processor] Detected ${crossServiceRecommendations.length} cross-service recommendations`)
@@ -1587,7 +1677,12 @@ export async function processQuote(
   const validationSettings: ValidationSettings = (tenant as unknown as { validation_settings?: ValidationSettings }).validation_settings
     || getDefaultValidationSettings()
 
-  if (textAi && validationSettings.enabled) {
+  // Reprice: the first pass already validated this quote's scope and wording;
+  // only its review demand carries over (no AI on the reprice path)
+  let validationRequiresReview = reprice?.validationRequiresReview ?? false
+  if (validationRequiresReview) finalStatus = 'pending_review'
+
+  if (!reprice && textAi && validationSettings.enabled) {
     console.log('[Processor] Running quote validation')
 
     try {
@@ -1620,13 +1715,13 @@ export async function processQuote(
       }
 
       // Run validation
-      validationResult = await validateQuote(
+      validationResult = await timer.time('validation', () => validateQuote(
         textAi,
         quoteForValidation,
         customerRequestContext,
         serviceConfigForValidation,
         quoteData.widgetFields
-      )
+      ))
 
       console.log(`[Processor] Validation result: ${validationResult.overallStatus}, ${validationResult.issues.length} issues found`)
 
@@ -1640,6 +1735,7 @@ export async function processQuote(
         // Override status if validation requires review
         if (outcomeDecision.statusOverride) {
           finalStatus = outcomeDecision.statusOverride
+          validationRequiresReview = outcomeDecision.statusOverride === 'pending_review'
           console.log(`[Processor] Status overridden by validation: ${finalStatus}`)
         }
 
@@ -1704,8 +1800,11 @@ export async function processQuote(
   // R3-1: the wording layer flagged that photos/description contradict a
   // customer-stated price driver (e.g. 2 hours booked, photos show a 4-hour
   // job). A stated-but-doubted quantity must never carry Grade A "exact".
-  const quantityConcern = (content.quantityConcern || '').trim() || undefined
-  const quantityConcernFieldId = (content.quantityConcernFieldId || '').trim() || undefined
+  // Once the customer has answered the clarification round, a doubt about a
+  // stated quantity is resolved: their confirmed number must not be capped
+  // back to Grade B (production smoke test 2026-11-08, US quote).
+  const quantityConcern = clarAnswers.length > 0 ? undefined : (content.quantityConcern || '').trim() || undefined
+  const quantityConcernFieldId = quantityConcern ? (content.quantityConcernFieldId || '').trim() || undefined : undefined
   if (quantityConcern && pricing.estimate && pricing.estimate.grade === 'A') {
     const capped = computeEstimateGrade([
       { signalKey: 'stated_quantity_concern', basis: 'measured', confidence: 0.7 },
@@ -1768,7 +1867,7 @@ export async function processQuote(
 
   if (structuredSignals && textAi) {
     try {
-      qualityGateResult = await evaluateQualityGate(
+      qualityGateResult = await timer.time('quality_gate', () => evaluateQualityGate(
         {
           structuredSignals,
           fusionResult,
@@ -1792,7 +1891,7 @@ export async function processQuote(
             .map((ws) => ws.name),
         },
         textAi
-      )
+      ))
 
       console.log(`[Processor] Quality gate: ${qualityGateResult.action}`)
 
@@ -1804,9 +1903,20 @@ export async function processQuote(
             status: 'awaiting_clarification',
             clarification_questions_json: qualityGateResult.questions,
             quality_gate_json: qualityGateResult,
-            // Also store what we have so far (signals, pricing) so re-processing is faster
-            signals_json: structuredSignals,
-            pricing_trace_json: { ...pricingTrace, aiUsage: aiUsage.summary() }, // T-135
+            // Signals + the first pass's AI outputs, so the reprice after the
+            // customer's answer is deterministic (no AI, no photos)
+            signals_json: withRepriceSnapshot(structuredSignals, {
+              version: 1,
+              legacySignals: signals,
+              matchedItems,
+              aiDetectedAddonIds: [...aiDetectedAddonIds],
+              aiAddonDetectionRan,
+              signalRecommendations,
+              crossServicePricing,
+              validationRequiresReview,
+              firstPass: { aiUsage: aiUsage.summary(), timings: timer.summary() },
+            }),
+            pricing_trace_json: { ...pricingTrace, aiUsage: aiUsage.summary(), timings: timer.summary() }, // T-135
             triage_json: triageDecision,
             // T-109 range-first: store provisional pricing + content so the
             // customer sees an estimated range immediately instead of nothing
@@ -1979,8 +2089,14 @@ export async function processQuote(
       },
       // Store full signals for debugging and learning
       signals_json: structuredSignals,
-      // Store pricing trace for transparency
-      pricing_trace_json: { ...pricingTrace, aiUsage: aiUsage.summary() }, // T-135
+      // Store pricing trace for transparency. A reprice made no AI calls: the
+      // quote's AI cost is the first pass's (T-135)
+      pricing_trace_json: {
+        ...pricingTrace,
+        aiUsage: reprice?.firstPass?.aiUsage ?? aiUsage.summary(),
+        timings: timer.summary(),
+        ...(reprice?.firstPass && { firstPassTimings: reprice.firstPass.timings }),
+      },
       // Store triage decision for analytics
       triage_json: triageDecision,
       // Store signal conflicts for auditing (Phase 3: Signal Fusion)
@@ -2072,7 +2188,7 @@ export async function processQuote(
     console.log('[Processor] Email not configured, skipping notifications')
   }
 
-  console.log(`[Processor] Quote ${quoteId} processed successfully`)
+  console.log(`[Processor] Quote ${quoteId} processed successfully`, JSON.stringify(timer.summary()))
 
   return {
     success: true,
@@ -2238,6 +2354,10 @@ async function loadQuoteData(
         quote.clarification_questions_json as QuoteData['quote']['clarification_questions_json'],
       clarification_answers_json:
         quote.clarification_answers_json as QuoteData['quote']['clarification_answers_json'],
+      // Reprice snapshot + provisional wording (enumerated projection: a field
+      // left out here is invisible to the processor — the T-108 trap again)
+      signals_json: quote.signals_json,
+      content_json: quote.content_json,
     },
     quoteRequest: quote.quote_requests as unknown as QuoteData['quoteRequest'],
     tenant: quote.tenants as unknown as QuoteData['tenant'],
@@ -2264,31 +2384,33 @@ interface SignalExtractionResult {
  * Extract signals from R2 assets using rich context
  * Returns both legacy ExtractedSignals and new ExtractedSignalsV2 for trace support
  */
-async function extractSignalsFromAssets(
-  gemini: AiClient | null,
+/** Fetch up to 5 photos from R2 in parallel; unreadable ones are skipped. */
+async function fetchImages(
   assets: QuoteData['assets'],
-  signalContext: SignalExtractionContext,
   env: Env
+): Promise<Array<{ mimeType: string; base64: string }>> {
+  const fetched = await Promise.all(
+    assets.slice(0, 5).map(async (asset) => {
+      try {
+        return await fetchImageFromR2(asset.r2_key, asset.content_type, env)
+      } catch (error) {
+        console.error(`[Processor] Failed to fetch image ${asset.id}:`, error)
+        return null
+      }
+    })
+  )
+  return fetched.filter((img): img is { mimeType: string; base64: string } => Boolean(img))
+}
+
+async function extractSignalsFromImages(
+  gemini: AiClient | null,
+  images: Array<{ mimeType: string; base64: string }>,
+  signalContext: SignalExtractionContext
 ): Promise<SignalExtractionResult> {
   if (!gemini) {
     return {
       signals: getSignalsWithoutImages(),
       structuredSignals: getSignalsWithoutImagesV2(),
-    }
-  }
-
-  // Fetch images from R2
-  const images: Array<{ mimeType: string; base64: string }> = []
-
-  for (const asset of assets.slice(0, 5)) {
-    // Limit to 5 images
-    try {
-      const imageData = await fetchImageFromR2(asset.r2_key, asset.content_type, env)
-      if (imageData) {
-        images.push(imageData)
-      }
-    } catch (error) {
-      console.error(`[Processor] Failed to fetch image ${asset.id}:`, error)
     }
   }
 
