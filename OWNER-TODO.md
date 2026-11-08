@@ -61,3 +61,12 @@ Code for every item is already built; these are the steps that unlock it.
 - [ ] **Apply migration 28** (`supabase/migrations/00000000000028_us_plans.sql`) to production.
 - [ ] **Run the test-mode journey:** start the Pro trial (test card 4242…), let it convert (or end the
   trial in the dashboard), upgrade to Business, downgrade to Starter — check `/app/billing` follows each step.
+
+## Production smoke test (2026-11-08)
+
+- [ ] **Postmark: add DKIM and Return-Path DNS records** for the sending domain, then request account approval
+  (Postmark → Sender Signatures / Domains). Until it's approved, Postmark only delivers to addresses on the
+  From domain. The GB smoke test's business notification to a gmail address was rejected. **Do this before beta.**
+- Engineering backlog from the smoke test (not owner work; listed so it isn't lost, details in CHANGELOG
+  2026-11-08): instant reprice after confirmation, internal notes shown to customers, raw unit labels,
+  "worth considering" duplicating scope items, clarification page + email styling, "Powered by Estimator" name.

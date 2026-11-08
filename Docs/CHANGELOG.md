@@ -15,6 +15,26 @@
 
 ## Issues & Resolutions
 
+### 2026-11-08: Production smoke test (GB) + confirmed quantities now reach Grade A
+
+**GB smoke test passed** (production, queue path): `POST /trigger` → queue → consumer (`retry=0/3`), 31.5 m² after adjudication (plausible 28–35), £917, maths correct, customer email delivered. Models recorded in `aiUsage`: `extraction_pass` gemini-3.8-flash ×4, `adjudication` gemini-3.1-pro-preview ×1, `wording` gemini-3.8-flash ×5. No `gemini-2.5-*`. About $0.10 per quote.
+
+**Broke:** the customer confirmed the wall area in the clarification round, but the quote stayed **Grade B "Measured"**, when every driver was confirmed and it should have been A.
+**Root cause:** the rules engine marked every `ai_signal` step `quantityTrusted: false`, even when the signal came from a form or clarification answer (`source: 'form'`, confidence 1). The processor's signal provenance correctly marked `wall_area_sqm` as confirmed. But the T-128 trace check keys entries by **step id** (`step_walls_sqm`), so it didn't see that the signal was already counted and added a second entry with basis `measured`, confidence 0.7. That capped the grade at B.
+**Fix:** `getSignalValue` now reports `customerConfirmed` (same rule as the grade provenance: `source === 'form' || confidence >= 1`), and both `ai_signal` paths (per-unit and hours) trust it. The customer-facing note "quantity from AI signal (lower confidence)" is no longer added for confirmed quantities. Photo-measured quantities are unchanged and still untrusted.
+**Relation:** completes T-120's "A — every driver confirmed by a human" for photo-measured steps. T-128's cap still applies to genuinely untrusted lines. Test: `apps/worker/src/pricing/confirmed-quantity.test.ts`.
+
+**Smoke-test backlog (logged, not built):**
+- **Reprice instantly after confirmation.** It took ~2 min, because the clarify reprocess re-runs the full photo measurement (3 passes + adjudication) and then the form answer overrides the result anyway. Skip re-measuring the quantities the customer has just answered.
+- **Internal notes shown to customers:** engine and validation notes reach the customer page. Separate customer notes from business-only ones.
+- **Raw unit labels** (`sqm`, signal-style units) on the customer document. Use human labels (m², per room …).
+- **"Worth considering"** recommendations duplicate items already in the service scope. Filter against `scope_includes`.
+- **Clarification page + clarification email styling:** bring them onto the Measured Document system.
+- **"Powered by Estimator"** footer still uses the old name. Brand is "Aistimator".
+- **Postmark (owner):** DKIM + Return-Path DNS before beta. The account is still pending approval, so mail only reaches the From domain. The business notification to a gmail address failed. See OWNER-TODO.
+
+---
+
 ### 2026-11-08: Queue processing in production + worker auth + "Preparing your estimate" (AD-031)
 
 **Decision (owner):** Cloudflare Queues over raising `maxDuration`. Photo-measured quotes take 75–150 s (see the thinking-level entry below), and sync processing held the customer's request, and the SMS/WhatsApp webhooks, for the whole pipeline. Owner upgraded to Workers Paid on 2026-11-08.

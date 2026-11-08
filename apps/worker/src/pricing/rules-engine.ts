@@ -1057,12 +1057,18 @@ function getSignalValue(
   signalKey: string,
   structuredSignals: ExtractedSignal[] | undefined,
   legacySignals: ExtractedSignals
-): { value: string | number | boolean | undefined; confidence: number } {
+): { value: string | number | boolean | undefined; confidence: number; customerConfirmed?: boolean } {
   // First check structured signals
   if (structuredSignals) {
     const signal = structuredSignals.find(s => s.key === signalKey)
     if (signal) {
-      return { value: signal.value, confidence: signal.confidence }
+      return {
+        value: signal.value,
+        confidence: signal.confidence,
+        // Same rule as the processor's grade provenance: a form answer or a
+        // clarification answer (confidence 1) is a human-stated quantity.
+        customerConfirmed: signal.source === 'form' || signal.confidence >= 1,
+      }
     }
   }
 
@@ -1504,7 +1510,8 @@ function calculateWorkStepCost(
             if (aiQuantity !== null && aiQuantity > 0) {
               quantity = aiQuantity
               quantitySource = 'ai_signal'
-              quantityTrusted = false  // AI = lower trust, mark in trace
+              // AI = lower trust, unless the customer stated or confirmed it
+              quantityTrusted = signal.customerConfirmed === true
               signalsUsed.push({ key: step.quantitySource.signalKey || 'ai_signal', value: quantity })
             } else {
               console.warn(`[Pricing] "${step.name}": AI signal "${step.quantitySource.signalKey}" not found or invalid, using default quantity 1`)
@@ -1643,7 +1650,7 @@ function calculateWorkStepCost(
             if (aiHours !== null && aiHours > 0) {
               hours = aiHours
               quantitySource = 'ai_signal'
-              quantityTrusted = false
+              quantityTrusted = signal.customerConfirmed === true
               signalsUsed.push({ key: step.quantitySource.signalKey || 'ai_signal', value: hours })
             }
             break
