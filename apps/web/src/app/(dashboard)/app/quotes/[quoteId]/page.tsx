@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { formatMoney } from '@estimator/shared'
 import Link from 'next/link'
 import type {
   QuoteDetailResponse,
@@ -23,6 +24,12 @@ export default function QuoteDetailPage({
   const [error, setError] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [resending, setResending] = useState(false)
+  // T-136: text the quote link by SMS
+  const [texting, setTexting] = useState(false)
+  // T-134: price a lead held by the plan limit
+  const [pricingHeld, setPricingHeld] = useState(false)
+  const [priceResult, setPriceResult] = useState<string | null>(null)
+  const [textResult, setTextResult] = useState<string | null>(null)
 
   const fetchQuote = useCallback(async () => {
     try {
@@ -61,6 +68,46 @@ export default function QuoteDetailPage({
       alert('Failed to resend quote')
     } finally {
       setResending(false)
+    }
+  }
+
+  const handlePriceHeldLead = async () => {
+    setPricingHeld(true)
+    setPriceResult(null)
+    try {
+      const response = await fetch(`/api/quotes/${quoteId}/process`, { method: 'POST' })
+      const json = await response.json().catch(() => null)
+      if (response.ok) {
+        setPriceResult('Pricing started — this page will update shortly')
+        await fetchQuote()
+      } else {
+        setPriceResult(json?.error?.message || 'Could not price this lead')
+      }
+    } finally {
+      setPricingHeld(false)
+    }
+  }
+
+  const handleTextLink = async () => {
+    setTexting(true)
+    setTextResult(null)
+    try {
+      const response = await fetch('/api/sms/send-quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quoteId }),
+      })
+      const json = await response.json().catch(() => null)
+      if (response.ok) {
+        setTextResult(json?.test ? `Recorded (test mode) to ${json.to}` : `Texted to ${json?.to}`)
+        await fetchQuote()
+      } else {
+        setTextResult(json?.error?.message || 'Failed to text the link')
+      }
+    } catch {
+      setTextResult('Failed to text the link')
+    } finally {
+      setTexting(false)
     }
   }
 
@@ -163,8 +210,42 @@ export default function QuoteDetailPage({
               {resending ? 'Sending...' : 'Send'}
             </button>
           )}
+          {['sent', 'viewed', 'feedback_received', 'revised', 'expired'].includes(quote.status) && (
+            <button
+              onClick={handleTextLink}
+              disabled={texting}
+              className="px-4 py-2 text-sm font-semibold text-text-primary bg-background border border-border rounded-lg hover:bg-surface disabled:opacity-50 transition-colors"
+            >
+              {texting ? 'Texting…' : 'Text link'}
+            </button>
+          )}
+          {textResult && <span className="self-center text-xs text-text-muted">{textResult}</span>}
         </div>
       </div>
+
+      {/* T-134: lead held because the monthly plan limit was reached */}
+      {(quote.content_json as { limitHold?: boolean } | null)?.limitHold && quote.status === 'pending_review' && (
+        <div className="mb-6 rounded-lg border border-tape/40 bg-butter/40 p-4">
+          <p className="text-sm font-semibold text-text-primary">Lead saved — not priced yet</p>
+          <p className="mt-1 text-sm text-text-secondary">
+            This request arrived after your plan&apos;s monthly limit. The customer was told you&apos;ll send their estimate
+            shortly. Upgrade your plan, then price it here — or contact the customer yourself.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <a href="/app/billing" className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">
+              Upgrade plan
+            </a>
+            <button
+              onClick={handlePriceHeldLead}
+              disabled={pricingHeld}
+              className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-semibold text-text-primary hover:bg-surface disabled:opacity-50"
+            >
+              {pricingHeld ? 'Starting…' : 'Price this lead'}
+            </button>
+            {priceResult && <span className="text-xs text-text-muted">{priceResult}</span>}
+          </div>
+        </div>
+      )}
 
       {/* Pending feedback alert */}
       {pendingFeedback.length > 0 && (
@@ -492,7 +573,8 @@ function QuoteEditorWrapper({
 }
 
 function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-GB', {
+  // T-133: dashboard dates follow the viewer's browser locale
+  return new Date(dateString).toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -500,9 +582,5 @@ function formatDate(dateString: string): string {
 }
 
 function formatCurrency(amount: number, currency: string): string {
-  const symbols: Record<string, string> = {
-    GBP: '\u00a3', USD: '$', EUR: '\u20ac', AUD: 'A$', CAD: 'C$', NZD: 'NZ$',
-  }
-  const symbol = symbols[currency] || currency + ' '
-  return `${symbol}${amount.toFixed(2)}`
+  return formatMoney(amount, currency) // T-133: any ISO currency
 }

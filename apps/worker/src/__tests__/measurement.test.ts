@@ -11,8 +11,10 @@ import {
   decideAdjudication,
   adjudicateMeasurement,
   computeCalibrationFactor,
+  buildMeasurementSystemPrompt,
   type PassMeasurement,
 } from '../ai/measurement'
+import { US_REGION } from '@estimator/shared'
 
 const TARGET = { signalKey: 'wall_area_sqm', description: 'Paintable wall area', unit: 'sqm' }
 const IMAGES = [{ mimeType: 'image/jpeg', base64: 'x' }]
@@ -252,5 +254,58 @@ describe('T-123: measurement memory calibration', () => {
 
   it('ignores junk examples (zero/negative)', () => {
     expect(computeCalibrationFactor([ex(0, 60), ex(-5, 50), ex(50, 60)])).toBeNull()
+  })
+})
+
+describe('T-133 region-driven measurement', () => {
+  it('converts the anchored metric area into a sqft target', () => {
+    // 4×4 US door heights (2.032 m): 8.128 m × 8.128 m = 66.06 sqm = 711.1 sq ft
+    const value = computeAnchoredValue('sqft', pass({
+      referenceObject: 'entry_door_height',
+      referenceDimensionM: 2.032,
+      widthInRefUnits: 4,
+      heightInRefUnits: 4,
+    }))
+    expect(value).toBe(711.1)
+  })
+
+  it('uses the region table size, not the size the model reported', async () => {
+    const results = await measureQuantities({
+      gemini: null,
+      images: IMAGES,
+      targets: [{ signalKey: 'wall_area_sqft', description: 'Paintable wall area', unit: 'sqft' }],
+      passes: 1,
+      referenceObjects: US_REGION.referenceObjects,
+      runPass: async () => [
+        {
+          targetKey: 'wall_area_sqft',
+          feasible: true,
+          referenceObject: 'entry_door_height',
+          referenceDimensionM: 1.98, // model quoted the UK size — code must ignore it
+          widthInRefUnits: 4,
+          heightInRefUnits: 4,
+        },
+      ],
+    })
+    expect(results[0]?.value).toBe(711.1)
+  })
+
+  it('keeps the legacy GB table when no region table is passed', async () => {
+    const results = await measureQuantities({
+      gemini: null,
+      images: IMAGES,
+      targets: [TARGET],
+      passes: 1,
+      runPass: async () => [
+        pass({ referenceObject: 'entry_door_height', referenceDimensionM: 2.5, widthInRefUnits: 4, heightInRefUnits: 4 }),
+      ],
+    })
+    expect(results[0]?.value).toBe(62.7) // 1.98 m GB door, as before T-133
+  })
+
+  it('puts the region reference table into the system prompt', () => {
+    const prompt = buildMeasurementSystemPrompt(US_REGION.referenceObjects)
+    expect(prompt).toContain('80 in')
+    expect(prompt).toContain('garage_door_height')
   })
 })

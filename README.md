@@ -9,7 +9,7 @@ AI-powered estimate platform that lets businesses embed a quote widget on their 
 - **Database & Auth**: Supabase (Postgres + Auth)
 - **Rate Limiting**: Upstash Redis
 - **File Storage**: Cloudflare R2
-- **AI**: Gemini 1.5 Flash
+- **AI**: model per task from `packages/shared/src/ai-models.json` (Gemini default, Claude adapter; `AI_MODEL_<TASK>` env overrides)
 - **PDF Generation**: DocRaptor
 - **Email**: Postmark
 - **Payments**: Stripe
@@ -163,18 +163,24 @@ pnpm dev:worker
 
 ### Cloudflare Workers (Queue Consumer)
 
+Needs Workers Paid (Queues). One-time: `npx wrangler queues create quote-jobs` and
+`npx wrangler queues create quote-jobs-dlq`.
+
 ```bash
 cd apps/worker
-wrangler deploy
+npx wrangler deploy --env production
 ```
 
-Set secrets via Wrangler:
+Set secrets via Wrangler (`--env production`):
 
 ```bash
-wrangler secret put SUPABASE_SERVICE_KEY
-wrangler secret put UPSTASH_REDIS_TOKEN
-wrangler secret put GEMINI_API_KEY
+npx wrangler secret put SUPABASE_SERVICE_KEY --env production
+npx wrangler secret put UPSTASH_REDIS_TOKEN --env production
+npx wrangler secret put GEMINI_API_KEY --env production
+npx wrangler secret put CLOUDFLARE_WORKER_TOKEN --env production   # same value as the web app's
 ```
+
+Full production procedure: [DEPLOY.md](./DEPLOY.md).
 
 ## Documentation
 

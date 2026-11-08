@@ -1,9 +1,13 @@
 /**
  * AI Module Exports
  *
- * Single provider: Gemini 1.5 Flash for both vision and text generation.
+ * Provider-agnostic AiClient (T-135): the model per task comes from the
+ * shared registry (`@estimator/shared` ai-models), overridable by env.
  */
 
+export type { AiClient, ImageInput, GenerationOptions } from './client'
+export { createAiClient } from './factory'
+export { AnthropicClient, toClaudeJsonSchema } from './anthropic'
 export { GeminiClient, createGeminiClient } from './gemini'
 export type { GeminiConfig, GeminiMessage, GeminiResponse } from './gemini'
 

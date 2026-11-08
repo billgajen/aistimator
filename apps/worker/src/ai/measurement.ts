@@ -9,29 +9,14 @@
  *    confidence, MEASURED (coefficient of variation), never self-reported
  *
  * Runs ONLY for services with ai_signal quantity sources, so most quotes pay
- * nothing extra. Reference dimensions are physical constants (a UK door is a
- * UK door), not business configuration — pack-level overrides can come later.
+ * nothing extra. Reference dimensions are REGION DATA (T-133, AD-025): the
+ * tenant's region supplies the table (a US door is 80 in, a UK door 1.98 m)
+ * and packs can override entries. Geometry is computed in metres and only
+ * converted into the target's unit at the end.
  */
 
-import type { GeminiClient } from './gemini'
-
-/** Known-size reference objects commonly visible in job photos */
-export const REFERENCE_OBJECTS: Array<{
-  id: string
-  label: string
-  dimension: string
-  metres: number
-}> = [
-  { id: 'entry_door_height', label: 'standard entry door height', dimension: 'height', metres: 1.98 },
-  { id: 'entry_door_width', label: 'standard entry door width', dimension: 'width', metres: 0.76 },
-  { id: 'brick_course', label: 'one brick + mortar course', dimension: 'height', metres: 0.075 },
-  { id: 'fence_panel_width', label: 'standard fence panel width', dimension: 'width', metres: 1.83 },
-  { id: 'fence_panel_height', label: 'standard fence panel height', dimension: 'height', metres: 1.8 },
-  { id: 'wheelie_bin', label: 'wheelie bin height', dimension: 'height', metres: 1.07 },
-  { id: 'car_length', label: 'typical car length', dimension: 'length', metres: 4.5 },
-  { id: 'person_height', label: 'adult person height', dimension: 'height', metres: 1.7 },
-  { id: 'window_casement', label: 'typical window casement height', dimension: 'height', metres: 1.05 },
-]
+import type { AiClient } from './client'
+import { normalizeUnit, unitKind, fromCanonical, getRegion, type ReferenceObject } from '@estimator/shared'
 
 export interface MeasurementTarget {
   signalKey: string
@@ -74,14 +59,15 @@ export interface MeasuredQuantity {
   basis: 'measured' | 'adjudicated'
 }
 
-const AREA_UNITS = new Set(['sqm', 'sq_m', 'square_metre', 'square_meter', 'm2', 'sqft', 'sq_ft'])
-
 /**
  * M2 geometry: prefer the anchored computation (reference units × reference
  * size) over the model's direct guess. Pure function — testable.
+ *
+ * The anchored area is computed in square metres (canonical) and converted
+ * into the target unit, so a 'sqft' target receives square feet.
  */
 export function computeAnchoredValue(unit: string, pass: PassMeasurement): number | null {
-  const isArea = AREA_UNITS.has(unit.toLowerCase().replace(/[^a-z0-9_]/g, ''))
+  const isArea = unitKind(unit) === 'area'
 
   if (
     isArea &&
@@ -94,7 +80,9 @@ export function computeAnchoredValue(unit: string, pass: PassMeasurement): numbe
   ) {
     const widthM = pass.widthInRefUnits * pass.referenceDimensionM
     const heightM = pass.heightInRefUnits * pass.referenceDimensionM
-    return Math.round(widthM * heightM * 10) / 10
+    const areaSqm = widthM * heightM
+    const inTarget = fromCanonical(areaSqm, 'area', normalizeUnit(unit) ?? 'sqm') ?? areaSqm
+    return Math.round(inTarget * 10) / 10
   }
 
   if (pass.directValue != null && pass.directValue > 0) {
@@ -138,7 +126,9 @@ export function computeEnsembleStats(values: number[]): {
   }
 }
 
-const MEASUREMENT_SYSTEM_PROMPT = `You are a professional quantity surveyor performing a photo-based takeoff.
+/** System prompt for one measurement pass; the reference table comes from region data. */
+export function buildMeasurementSystemPrompt(referenceObjects: ReferenceObject[]): string {
+  return `You are a professional quantity surveyor performing a photo-based takeoff.
 
 Your discipline: NEVER eyeball absolute sizes. Instead:
 1. Find a REFERENCE OBJECT with a known size in the photos (table provided).
@@ -155,7 +145,8 @@ Your discipline: NEVER eyeball absolute sizes. Instead:
 7. Keep "reasoning" to AT MOST two short sentences — numbers matter, prose does not.
 
 Reference object table (assumed sizes):
-${REFERENCE_OBJECTS.map((r) => `- ${r.id}: ${r.label} ≈ ${r.metres} m (${r.dimension})`).join('\n')}`
+${referenceObjects.map((r) => `- ${r.id}: ${r.label} ≈ ${r.metres} m (${r.dimension})`).join('\n')}`
+}
 
 const MEASUREMENT_SCHEMA: Record<string, unknown> = {
   type: 'object',
@@ -221,15 +212,26 @@ export type RunPass = (passIndex: number) => Promise<PassMeasurement[]>
  * `runPass` is injectable for tests; default performs a real Gemini call.
  */
 export async function measureQuantities(opts: {
-  gemini: GeminiClient | null
+  gemini: AiClient | null
   images: Array<{ mimeType: string; base64: string }>
   targets: MeasurementTarget[]
   passes?: number
   runPass?: RunPass
   /** T-123: calibration lines from this business's confirmed jobs */
   calibrationHints?: string[]
+  /**
+   * T-133: reference objects from the tenant's region (+ pack overrides).
+   * Defaults to the legacy region's table so callers that predate regions
+   * keep their exact behaviour.
+   */
+  referenceObjects?: ReferenceObject[]
 }): Promise<MeasuredQuantity[]> {
   const { gemini, images, targets } = opts
+  const referenceTable =
+    opts.referenceObjects && opts.referenceObjects.length > 0
+      ? opts.referenceObjects
+      : getRegion(null).referenceObjects
+  const systemPrompt = buildMeasurementSystemPrompt(referenceTable)
   const passes = opts.passes ?? 3
   if (targets.length === 0 || images.length === 0) return []
 
@@ -249,7 +251,7 @@ Return one measurement entry per targetKey.`
       prompt,
       images,
       MEASUREMENT_SCHEMA,
-      MEASUREMENT_SYSTEM_PROMPT,
+      systemPrompt,
       // Higher temperature: pass-to-pass variation is what makes ensemble
       // agreement meaningful. Generous token budget: Gemini 2.5 thinking
       // tokens count against maxOutputTokens (truncation = invalid JSON,
@@ -279,7 +281,13 @@ Return one measurement entry per targetKey.`
     for (const pass of allPasses) {
       const entry = pass.find((m) => m.targetKey === target.signalKey)
       if (!entry || entry.feasible === false) continue
-      const value = computeAnchoredValue(target.unit, entry)
+      // AD-024: the region table, not the model, owns the reference size.
+      // When the model names a known reference, code supplies its dimension.
+      const known = entry.referenceObject
+        ? referenceTable.find((r) => r.id === entry.referenceObject)
+        : undefined
+      const anchoredEntry = known ? { ...entry, referenceDimensionM: known.metres } : entry
+      const value = computeAnchoredValue(target.unit, anchoredEntry)
       if (value !== null && value > 0) {
         rawPasses.push({ value, entry })
         if (entry.referenceObject) referencesUsed.push(entry.referenceObject)
@@ -385,7 +393,7 @@ Keep all prose minimal — the numbers and the scope sentence are what matter.`
  * `run` is injectable for tests. Failure returns null — never blocks the quote.
  */
 export async function adjudicateMeasurement(opts: {
-  adjudicator: GeminiClient | null
+  adjudicator: AiClient | null
   images: Array<{ mimeType: string; base64: string }>
   target: MeasurementTarget
   measured: MeasuredQuantity

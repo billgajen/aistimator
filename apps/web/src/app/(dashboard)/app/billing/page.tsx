@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
+import { formatMoney } from '@estimator/shared'
 import { useSearchParams } from 'next/navigation'
 import { PageHeader } from '@/components/dashboard/EmptyState'
 import type { BillingResponse, PlanInfo } from '@estimator/shared'
@@ -31,6 +32,8 @@ function BillingPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
   const [portalLoading, setPortalLoading] = useState(false)
+  // T-134: monthly or annual (two months free)
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   // Check for success/canceled query params
@@ -79,7 +82,7 @@ function BillingPageContent() {
       const response = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ planId, interval: billingInterval }),
       })
 
       if (!response.ok) {
@@ -242,10 +245,13 @@ function BillingPageContent() {
                   </>
                 )}
               </p>
-            ) : (data?.usage.estimatesCreated || 0) >= (data?.usage.planLimit || 50) ? (
+            ) : data?.usage.level === 'limit' ? (
               <p className="mt-2 text-xs text-red-600">
-                Limit reached — new quote requests are paused until you upgrade
+                Limit reached — new requests are saved as leads but not priced
+                {data.usage.heldLeads ? ` (${data.usage.heldLeads} waiting)` : ''}. Upgrade to price them.
               </p>
+            ) : data?.usage.level === 'warning' ? (
+              <p className="mt-2 text-xs text-tertiary">You&apos;ve used 80% or more of this month&apos;s estimates.</p>
             ) : null}
           </div>
           <div>
@@ -279,8 +285,23 @@ function BillingPageContent() {
 
       {/* Available plans */}
       <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
-        <h2 className="text-lg font-medium text-text-primary">Available Plans</h2>
-        <p className="mt-1 text-sm text-text-muted">Choose a plan that fits your needs</p>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-medium text-text-primary">Available Plans</h2>
+            <p className="mt-1 text-sm text-text-muted">Subscription only — no commission, no per-estimate fees</p>
+          </div>
+          <div className="inline-flex rounded-full border border-border bg-background p-1 text-sm">
+            {(['monthly', 'annual'] as const).map((opt) => (
+              <button
+                key={opt}
+                onClick={() => setBillingInterval(opt)}
+                className={`rounded-full px-3 py-1 font-medium ${billingInterval === opt ? 'bg-primary text-on-primary' : 'text-text-secondary'}`}
+              >
+                {opt === 'monthly' ? 'Monthly' : 'Annual · 2 months free'}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {data?.availablePlans.map((plan) => (
@@ -288,9 +309,17 @@ function BillingPageContent() {
               key={plan.id}
               plan={plan}
               isCurrent={currentPlan?.id === plan.id}
-              onSelect={() => handleCheckout(plan.id)}
+              interval={billingInterval}
+              // Existing subscribers change plans in the Stripe portal (proration on);
+              // new subscribers go through checkout (trial where the plan has one)
+              onSelect={() =>
+                data?.subscription.stripeCustomerId &&
+                ['active', 'trialing', 'past_due'].includes(data.subscription.status)
+                  ? handlePortal()
+                  : handleCheckout(plan.id)
+              }
               loading={checkoutLoading === plan.id}
-              disabled={!plan.stripePriceId || currentPlan?.id === plan.id}
+              disabled={currentPlan?.id === plan.id}
             />
           ))}
         </div>
@@ -311,8 +340,10 @@ function PlanCard({
   onSelect,
   loading,
   disabled,
+  interval,
 }: {
   plan: PlanInfo
+  interval: 'monthly' | 'annual'
   isCurrent: boolean
   onSelect: () => void
   loading: boolean
@@ -336,10 +367,15 @@ function PlanCard({
         <h3 className="text-lg font-semibold text-text-primary">{plan.name}</h3>
         <div className="mt-2">
           <span className="text-3xl font-bold text-text-primary">
-            ${(plan.priceCents / 100).toFixed(0)}
+            {interval === 'annual' && plan.annualPriceCents
+              ? formatMoney(plan.annualPriceCents / 100, plan.currency.toUpperCase(), 'en-US', { decimals: 0 })
+              : formatMoney(plan.priceCents / 100, plan.currency.toUpperCase(), 'en-US', { decimals: 0 })}
           </span>
-          <span className="text-text-muted">/mo</span>
+          <span className="text-text-muted">{interval === 'annual' && plan.annualPriceCents ? '/yr' : '/mo'}</span>
         </div>
+        {plan.trialDays ? (
+          <p className="mt-1 text-xs font-medium text-primary">{plan.trialDays}-day free trial</p>
+        ) : null}
         <p className="mt-2 text-sm text-text-muted">
           {plan.monthlyEstimateLimit.toLocaleString()} estimates/month
         </p>
@@ -350,7 +386,11 @@ function PlanCard({
         <FeatureItem included={plan.features.emailNotifications} label="Email notifications" />
         <FeatureItem included={plan.features.customBranding} label="Custom branding" />
         <FeatureItem included={plan.features.prioritySupport} label="Priority support" />
-        <FeatureItem included={plan.features.apiAccess} label="API access" />
+        <FeatureItem included={Boolean(plan.channels?.includes('sms'))} label="Quoting by text (SMS)" />
+        <FeatureItem included={Boolean(plan.channels?.includes('whatsapp'))} label="WhatsApp quoting" />
+        <FeatureItem included={Boolean(plan.channels?.includes('mobile_app'))} label="On-site mobile app" />
+        <FeatureItem included={Boolean(plan.features.calibrationInsights)} label="Accuracy insights" />
+        <FeatureItem included={Boolean(plan.features.lidarScanning)} label="LiDAR scanning" />
       </ul>
 
       <button
@@ -364,7 +404,7 @@ function PlanCard({
               : 'bg-primary text-white hover:bg-primary-hover'
         }`}
       >
-        {loading ? 'Loading...' : isCurrent ? 'Current Plan' : disabled ? 'Not Available' : 'Select Plan'}
+        {loading ? 'Loading...' : isCurrent ? 'Current Plan' : plan.trialDays ? `Start ${plan.trialDays}-day trial` : 'Select Plan'}
       </button>
     </div>
   )

@@ -6,6 +6,7 @@ import type {
   MultiplierConfig,
 } from '@estimator/shared'
 import { validateAndNormalizeDraftBulk, callGemini, parseGeminiJson } from '../shared'
+import { resolveRegionContext, regionPromptBlock } from '@estimator/shared'
 
 // Vercel function budget: this route runs the full AI pipeline synchronously
 // (Cloudflare Queues needs the paid Workers plan - revisit post-launch)
@@ -33,7 +34,8 @@ CORE RULES:
    - Rates ("£12 per sqm", "$50/hour") → costType "per_unit" (or "per_hour") with defaultCost = the rate and a clear unitLabel
 3. QUANTITY SOURCES for per-unit steps — choose by WHO can know the quantity:
    a. PHOTO-MEASURABLE quantities (physical dimensions and visible counts: wall/lawn/patio areas, fence/ridge lengths, window/slate/room counts, tree height class): use { "type": "ai_signal", "signalKey": "<key>" } so the measurement engine measures them from the customer's photos. REQUIRED companions:
-      - a matching expectedSignals entry: { "signalKey": "<key>", "type": "number", "description": "<what to measure, with a visual anchor hint, e.g. 'total exterior masonry area in square metres — use the front door (~2m tall) as a scale reference'>" }
+      - a matching expectedSignals entry: { "signalKey": "<key>", "type": "number", "unit": "<the step's billing unit: sqm, sqft, m, ft…>", "description": "<the EXACT scope being charged, in the owner's own words plus what the job covers (e.g. 'total exterior wall area TO BE PAINTED in square metres — every surface the job covers'), then a scale hint (a door or window)>" }
+        The description is the measurer's ONLY definition of scope: name what is being charged for, never just a material, or the measurer may exclude surfaces the job covers.
       - an OPTIONAL number field in suggestedFields with fieldId EQUAL to the signalKey (required: false, criticalForPricing: false, label ending "— if you know it"): a customer-stated value always overrides the measurement (AD-002)
       - media.minPhotos at least 1, and photoGuidance telling the customer exactly what to photograph for the measurement
    b. CUSTOMER-KNOWLEDGE quantities (guests, transactions, distances, dates, payslips, hours — nothing a photo can show): form_field (required, criticalForPricing: true) via { "type": "form_field", "fieldId": "<fieldId>" }
@@ -206,15 +208,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // T-133: the tenant's region decides currency and units for parsing
+    // ("$2.50/sqft", "per linear foot") and for the wording the compiler writes
+    const { data: tenantRow } = await supabase
+      .from('tenants')
+      .select('region, currency, unit_system, tax_label')
+      .eq('id', profile.tenant_id)
+      .single()
+    const regionCtx = resolveRegionContext({
+      ...(tenantRow ?? {}),
+      currency: body.currency || tenantRow?.currency,
+    })
+
     const contextParts: string[] = []
+    contextParts.push(
+      `${regionPromptBlock(regionCtx)}
+- Keep the OWNER'S billing unit exactly as stated: "$2.50/sqft" → unitLabel "sqft"; "per linear foot" → unitLabel "linear_ft" (measured signal unit "ft"); "per sqm" → unitLabel "sqm". Never convert the owner's rates between units.
+- Name measured signal keys after their unit (e.g. wall_area_sqft, fence_length_ft) and set the expectedSignals "unit" to match the step's unit.
+- Write customer-facing text (labels, scope, photo guidance) in the region's language variant and units.`
+    )
     if (body.serviceName) {
       contextParts.push(`Service: ${body.serviceName}`)
     }
     if (body.serviceDescription) {
       contextParts.push(`Service description: ${body.serviceDescription}`)
-    }
-    if (body.currency) {
-      contextParts.push(`Currency: ${body.currency}`)
     }
     if (body.currentConfig) {
       // Keys deliberately distinct from the response schema — verification found

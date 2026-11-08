@@ -28,12 +28,28 @@ function getWorkerToken(): string | null {
   return process.env.CLOUDFLARE_WORKER_TOKEN || null
 }
 
+/** Bearer header for the worker's job endpoints (the worker rejects requests without it) */
+function workerAuthHeaders(): Record<string, string> {
+  const token = getWorkerToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 /**
- * Enqueue a quote generation job.
- *
- * In development mode (NODE_ENV=development or SYNC_QUOTE_PROCESSING=true),
- * processes the quote directly via /process endpoint.
- * In production, sends to /trigger which queues for async processing.
+ * Sync = the request waits while the worker runs the whole pipeline (/process).
+ * Async = /trigger enqueues and returns at once; the queue consumer prices it.
+ * SYNC_QUOTE_PROCESSING decides when set ("true"/"false"); unset, local dev
+ * is sync and production is async.
+ */
+export function isSyncProcessing(env: Record<string, string | undefined> = process.env): boolean {
+  const flag = env.SYNC_QUOTE_PROCESSING?.trim().toLowerCase()
+  if (flag === 'true') return true
+  if (flag === 'false') return false
+  return env.NODE_ENV === 'development'
+}
+
+/**
+ * Enqueue a quote generation job — direct /process when sync, /trigger
+ * (Cloudflare Queue) when async. See isSyncProcessing.
  */
 export async function enqueueQuoteJob(job: QuoteJobMessage): Promise<void> {
   const workerUrl = getWorkerUrl()
@@ -45,19 +61,13 @@ export async function enqueueQuoteJob(job: QuoteJobMessage): Promise<void> {
     return
   }
 
-  // Use direct processing in development (queues don't work locally)
-  const useDirectProcessing = process.env.NODE_ENV === 'development' || process.env.SYNC_QUOTE_PROCESSING === 'true'
+  const useDirectProcessing = isSyncProcessing()
   const endpoint = useDirectProcessing ? '/process' : '/trigger'
 
   try {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-    }
-
-    // Add auth token if configured
-    const workerToken = getWorkerToken()
-    if (workerToken) {
-      headers['Authorization'] = `Bearer ${workerToken}`
+      ...workerAuthHeaders(),
     }
 
     console.log(`[Queue] Sending job to ${workerUrl}${endpoint}`)
@@ -135,7 +145,7 @@ export async function getQueueStats(
 
     const response = await fetch(url, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...workerAuthHeaders() },
     })
 
     if (!response.ok) {

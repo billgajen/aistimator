@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getStripeClient, getSubscriptionDetails } from '@/lib/stripe'
-import { DEFAULT_TRIAL_LIMIT } from '@/lib/plan-limits'
+import { toPlanInfo } from '@/lib/plans-view'
+import { getPlan, offeredPlans, noSubscriptionLimit, usageLevel } from '@estimator/shared'
 import { NextResponse } from 'next/server'
 import type { BillingResponse, PlanInfo, SubscriptionInfo, BillingUsage } from '@estimator/shared'
 
@@ -63,14 +64,10 @@ export async function GET() {
       .eq('period_yyyymm', currentPeriod)
       .single()
 
-    // Fetch all active plans
-    const { data: plans } = await supabase
-      .from('plans')
-      .select('*')
-      .eq('is_active', true)
-      .order('price_cents', { ascending: true })
+    // T-134: plans come from the shared definitions, not the plans table
+    const { data: tenantRow } = await supabase.from('tenants').select('region, currency').eq('id', tenantId).single()
+    const tenantRegion = (tenantRow as { region?: string } | null)?.region ?? null
 
-    // Build subscription info
     let subscriptionInfo: SubscriptionInfo = {
       status: 'none',
       plan: null,
@@ -79,112 +76,56 @@ export async function GET() {
       stripeCustomerId: null,
     }
 
+    const currentPlan = subscription ? getPlan(subscription.plan_id as string) : null
     if (subscription) {
-      const plan = subscription.plans as unknown as {
-        id: string
-        name: string
-        monthly_estimate_limit: number
-        price_cents: number
-        features_json: {
-          pdf_generation: boolean
-          email_notifications: boolean
-          custom_branding: boolean
-          priority_support: boolean
-          api_access: boolean
-        }
-        stripe_price_id?: string
-      } | null
-
-      // Get additional details from Stripe if available
       let cancelAtPeriodEnd = false
       if (subscription.stripe_subscription_id) {
         const stripe = getStripeClient()
         if (stripe) {
-          const stripeSubscription = await getSubscriptionDetails(
-            stripe,
-            subscription.stripe_subscription_id
-          )
-          if (stripeSubscription) {
-            cancelAtPeriodEnd = stripeSubscription.cancel_at_period_end
-          }
+          const stripeSubscription = await getSubscriptionDetails(stripe, subscription.stripe_subscription_id)
+          if (stripeSubscription) cancelAtPeriodEnd = stripeSubscription.cancel_at_period_end
         }
       }
-
       subscriptionInfo = {
         status: subscription.status as SubscriptionInfo['status'],
-        plan: plan
-          ? {
-              id: plan.id,
-              name: plan.name,
-              monthlyEstimateLimit: plan.monthly_estimate_limit,
-              priceCents: plan.price_cents,
-              currency: 'usd',
-              features: {
-                pdfGeneration: plan.features_json?.pdf_generation ?? true,
-                emailNotifications: plan.features_json?.email_notifications ?? true,
-                customBranding: plan.features_json?.custom_branding ?? false,
-                prioritySupport: plan.features_json?.priority_support ?? false,
-                apiAccess: plan.features_json?.api_access ?? false,
-              },
-              stripePriceId: plan.stripe_price_id,
-            }
-          : null,
+        plan: currentPlan ? toPlanInfo(currentPlan) : null,
         currentPeriodEnd: subscription.current_period_end,
         cancelAtPeriodEnd,
         stripeCustomerId: subscription.stripe_customer_id,
       }
     }
 
-    // Calculate period dates
     const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
-    // T-102: overage details from the current plan (active subscriptions only)
-    const currentPlanOverage =
-      subscription?.status === 'active'
-        ? ((subscription.plans as { overage_price_cents?: number | null } | null)
-            ?.overage_price_cents ?? null)
-        : null
+    const live = subscription && ['active', 'trialing', 'past_due'].includes(subscription.status as string)
     const created = usageCounter?.estimates_created || 0
-    const planLimit = subscriptionInfo.plan?.monthlyEstimateLimit || DEFAULT_TRIAL_LIMIT
+    const planLimit = live && currentPlan ? currentPlan.quoteLimit : noSubscriptionLimit(tenantRegion)
+    const overagePriceCents =
+      subscription?.status === 'active' && currentPlan?.overageEnabled ? currentPlan.overagePriceCents ?? null : null
+
+    // Leads captured over the limit this period (T-134)
+    const { count: heldLeads } = await supabase
+      .from('quotes')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('status', 'pending_review')
+      .gte('created_at', periodStart.toISOString())
+      .contains('content_json', { limitHold: true })
 
     const usage: BillingUsage = {
       estimatesCreated: created,
       estimatesSent: usageCounter?.estimates_sent || 0,
-      planLimit, // Default trial limit
+      planLimit,
       periodStart: periodStart.toISOString(),
       periodEnd: periodEnd.toISOString(),
       overageUsed: planLimit > 0 ? Math.max(0, created - planLimit) : 0,
-      overagePriceCents: currentPlanOverage,
+      overagePriceCents,
+      level: usageLevel(created, planLimit),
+      heldLeads: heldLeads ?? 0,
     }
 
-    // Transform plans to API format
-    const availablePlans: PlanInfo[] = (plans || []).map((p) => {
-      const features = p.features_json as {
-        pdf_generation?: boolean
-        email_notifications?: boolean
-        custom_branding?: boolean
-        priority_support?: boolean
-        api_access?: boolean
-      } | null
-
-      return {
-        id: p.id,
-        name: p.name,
-        monthlyEstimateLimit: p.monthly_estimate_limit,
-        priceCents: p.price_cents,
-        currency: 'usd',
-        overagePriceCents: (p as { overage_price_cents?: number | null }).overage_price_cents ?? null,
-        features: {
-          pdfGeneration: features?.pdf_generation ?? true,
-          emailNotifications: features?.email_notifications ?? true,
-          customBranding: features?.custom_branding ?? false,
-          prioritySupport: features?.priority_support ?? false,
-          apiAccess: features?.api_access ?? false,
-        },
-        stripePriceId: (p as { stripe_price_id?: string }).stripe_price_id,
-      }
-    })
+    const availablePlans: PlanInfo[] = offeredPlans().map((p) => toPlanInfo(p))
 
     const response: BillingResponse = {
       subscription: subscriptionInfo,

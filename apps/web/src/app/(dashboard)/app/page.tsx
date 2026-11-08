@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { formatMoney } from '@estimator/shared'
 import { checkPlanLimit } from '@/lib/plan-limits'
 import { PageHeader } from '@/components/dashboard/EmptyState'
 import Link from 'next/link'
@@ -37,7 +38,7 @@ export default async function DashboardPage() {
   const [{ data: tenant }, planLimit] = await Promise.all([
     supabase
       .from('tenants')
-      .select('name, branding_json')
+      .select('name, branding_json, currency')
       .eq('id', profile.tenant_id)
       .single(),
     checkPlanLimit(supabase, profile.tenant_id),
@@ -173,8 +174,8 @@ export default async function DashboardPage() {
                 Monthly quote limit reached ({planLimit.used}/{planLimit.limit})
               </h2>
               <p className="mt-1 text-sm text-danger">
-                New quote requests from your widget are paused — customers are being asked to contact
-                you directly. Upgrade to resume instant quoting.
+                New requests are still saved as leads, but they aren&apos;t priced — customers are told
+                you&apos;ll send their estimate shortly. Upgrade to price them instantly.
               </p>
             </div>
             <Link
@@ -194,8 +195,8 @@ export default async function DashboardPage() {
                 {usagePercent}% of your monthly quote limit used ({planLimit.used}/{planLimit.limit})
               </h2>
               <p className="mt-1 text-sm text-tertiary">
-                When the limit is reached, new quote requests will be paused until next month. Upgrade
-                now to avoid missing leads.
+                At the limit, new requests are saved as leads but not priced until you upgrade or the
+                month resets. Upgrade now to keep every estimate instant.
               </p>
             </div>
             <Link
@@ -284,7 +285,7 @@ export default async function DashboardPage() {
         <StatCard title="Quotes Sent" value={stats.sent.toString()} />
         <StatCard title="Quotes Viewed" value={stats.viewed.toString()} />
         <StatCard title="Quotes Accepted" value={stats.accepted.toString()} />
-        <StatCard title="Revenue" value={`$${stats.revenue.toLocaleString()}`} />
+        <StatCard title="Revenue" value={formatMoney(stats.revenue, (tenant as { currency?: string } | null)?.currency || 'USD', undefined, { decimals: 0 })} />
       </div>
 
       {/* Quick actions */}

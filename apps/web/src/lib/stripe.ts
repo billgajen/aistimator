@@ -58,6 +58,8 @@ export async function createCheckoutSession(
     cancelUrl: string
     /** Metered overage price to attach (T-102) — no quantity, billed via meter events */
     meteredPriceId?: string
+    /** T-134: free-trial days (card is always collected) */
+    trialDays?: number
   }
 ): Promise<Stripe.Checkout.Session> {
   return stripe.checkout.sessions.create({
@@ -76,7 +78,10 @@ export async function createCheckoutSession(
     metadata: {
       tenant_id: params.tenantId,
     },
+    // T-134: card required even for trials
+    payment_method_collection: 'always',
     subscription_data: {
+      ...(params.trialDays ? { trial_period_days: params.trialDays } : {}),
       metadata: {
         tenant_id: params.tenantId,
       },

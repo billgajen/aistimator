@@ -5,6 +5,7 @@
  * Uses inline styles for consistent rendering across PDF generators.
  */
 
+import { formatMoney } from '@estimator/shared'
 import type {
   QuotePricing,
   QuoteContent,
@@ -27,23 +28,16 @@ export interface QuotePdfData {
   content: QuoteContent
   createdAt: string
   validUntil?: string
+  /** T-133: BCP 47 locale from the tenant's region (money + dates) */
+  locale?: string
 }
 
-function formatCurrency(amount: number, currency: string): string {
-  const symbols: Record<string, string> = {
-    GBP: '£',
-    USD: '$',
-    EUR: '€',
-    AUD: 'A$',
-    CAD: 'C$',
-    NZD: 'NZ$',
-  }
-  const symbol = symbols[currency] || currency + ' '
-  return `${symbol}${amount.toFixed(2)}`
+function formatCurrency(amount: number, currency: string, locale: string): string {
+  return formatMoney(amount, currency, locale)
 }
 
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-GB', {
+function formatDate(dateString: string, locale: string): string {
+  return new Date(dateString).toLocaleDateString(locale, {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -54,6 +48,7 @@ function formatDate(dateString: string): string {
  * Generate HTML for quote PDF
  */
 export function generateQuotePdfHtml(data: QuotePdfData): string {
+  const locale = data.locale || 'en-GB'
   const {
     quoteId,
     businessName,
@@ -96,7 +91,7 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
               ${escapeHtml(item.label)}
             </td>
             <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; text-align: right; color: #111827; font-weight: 500;">
-              ${formatCurrency(item.amount, pricing.currency)}
+              ${formatCurrency(item.amount, pricing.currency, locale)}
             </td>
           </tr>
         `
@@ -124,7 +119,7 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
         <tbody>
           <tr>
             <td style="padding: 8px 0; color: #6b7280;">Subtotal</td>
-            <td style="padding: 8px 0; text-align: right; color: #111827;">${formatCurrency(pricing.subtotal, pricing.currency)}</td>
+            <td style="padding: 8px 0; text-align: right; color: #111827;">${formatCurrency(pricing.subtotal, pricing.currency, locale)}</td>
           </tr>
           ${
             pricing.taxAmount > 0
@@ -133,7 +128,7 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
               <td style="padding: 8px 0; color: #6b7280;">
                 ${pricing.taxLabel || 'Tax'}${pricing.taxRate ? ` (${pricing.taxRate}%)` : ''}
               </td>
-              <td style="padding: 8px 0; text-align: right; color: #111827;">${formatCurrency(pricing.taxAmount, pricing.currency)}</td>
+              <td style="padding: 8px 0; text-align: right; color: #111827;">${formatCurrency(pricing.taxAmount, pricing.currency, locale)}</td>
             </tr>
           `
               : ''
@@ -141,7 +136,7 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
           <tr>
             <td style="padding: 12px 0; font-size: 18px; font-weight: 700; color: #111827; border-top: 2px solid #e5e7eb;">Total</td>
             <td style="padding: 12px 0; text-align: right; font-size: 18px; font-weight: 700; color: ${primaryColor}; border-top: 2px solid #e5e7eb;">
-              ${formatCurrency(pricing.total, pricing.currency)}
+              ${formatCurrency(pricing.total, pricing.currency, locale)}
             </td>
           </tr>
         </tbody>
@@ -263,8 +258,8 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
       <div style="text-align: right;">
         <p style="margin: 0 0 4px 0; font-size: 12px; color: #6b7280;">Quote Reference</p>
         <p style="margin: 0; font-weight: 600; color: #111827;">${escapeHtml(quoteId)}</p>
-        <p style="margin: 8px 0 0 0; font-size: 12px; color: #6b7280;">Date: ${formatDate(createdAt)}</p>
-        ${validUntil ? `<p style="margin: 4px 0 0 0; font-size: 12px; color: #6b7280;">Valid until: ${formatDate(validUntil)}</p>` : ''}
+        <p style="margin: 8px 0 0 0; font-size: 12px; color: #6b7280;">Date: ${formatDate(createdAt, locale)}</p>
+        ${validUntil ? `<p style="margin: 4px 0 0 0; font-size: 12px; color: #6b7280;">Valid until: ${formatDate(validUntil, locale)}</p>` : ''}
       </div>
     </div>
 

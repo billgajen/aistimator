@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getRegion } from '@estimator/shared'
 import { NextResponse } from 'next/server'
 import { generatePdf, isDocRaptorConfigured } from '@/lib/docraptor'
 import { generateQuotePdfHtml, type QuotePdfData } from '@/lib/pdf-template'
@@ -57,6 +58,7 @@ export async function POST(
         tenants!tenant_id (
           id,
           name,
+          region,
           branding_json,
           template_json
         )
@@ -104,6 +106,7 @@ export async function POST(
     const tenant = quote.tenants as {
       id: string
       name: string
+      region?: string | null
       branding_json: TenantBranding | null
       template_json: TenantTemplate | null
     }
@@ -161,6 +164,7 @@ export async function POST(
       content,
       createdAt: quote.created_at,
       validUntil,
+      locale: getRegion(tenant.region).locale, // T-133
     }
 
     // Generate HTML

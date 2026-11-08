@@ -11,6 +11,18 @@ bucket_name = "aistimator-assets"
 [vars]
 ENVIRONMENT = "development"
 
+# Local dev queue (simulated by wrangler dev). The web app only uses it when
+# SYNC_QUOTE_PROCESSING=false is set in apps/web/.env.local.
+[[queues.producers]]
+queue = "quote-jobs-local"
+binding = "QUOTE_JOBS"
+
+[[queues.consumers]]
+queue = "quote-jobs-local"
+max_batch_size = 1
+max_batch_timeout = 1
+max_retries = 3
+
 # Production secrets (set via wrangler secret put):
 # - SUPABASE_URL
 # - SUPABASE_SERVICE_KEY
@@ -20,6 +32,7 @@ ENVIRONMENT = "development"
 # - POSTMARK_API_TOKEN
 # - POSTMARK_FROM_EMAIL
 # - APP_URL (e.g., https://yourdomain.com)
+# - CLOUDFLARE_WORKER_TOKEN (same value as the web app's; required outside local dev)
 #
 # Optional rate limit overrides:
 # - RATE_LIMIT_GLOBAL (default: 100)
@@ -33,17 +46,22 @@ vars = { ENVIRONMENT = "production" }
 binding = "ASSETS"
 bucket_name = "aistimator-assets"
 
-# Note: Queue bindings commented out for initial deployment
-# To enable queues, uncomment below and run: wrangler queues create quote-jobs
-# [[env.production.queues.producers]]
-# queue = "quote-jobs"
-# binding = "QUOTE_JOBS"
-# [[env.production.queues.consumers]]
-# queue = "quote-jobs"
-# max_batch_size = 10
-# max_batch_timeout = 30
-# max_retries = 3
-# dead_letter_queue = "quote-jobs-dlq"
+# Quote jobs queue (Workers Paid). The web app POSTs /trigger, the consumer
+# below runs the pipeline. ONE quote per invocation: a photo-measured quote can
+# take ~2.5 min, so a batch of 10 processed in series would exceed the
+# consumer's wall-time limit. Parallelism comes from consumer concurrency.
+# max_retries must be >= MAX_RETRIES in src/index.ts.
+# One-time setup: npx wrangler queues create quote-jobs && npx wrangler queues create quote-jobs-dlq
+[[env.production.queues.producers]]
+queue = "quote-jobs"
+binding = "QUOTE_JOBS"
+
+[[env.production.queues.consumers]]
+queue = "quote-jobs"
+max_batch_size = 1
+max_batch_timeout = 1
+max_retries = 3
+dead_letter_queue = "quote-jobs-dlq"
 
 # Staging environment
 [env.staging]

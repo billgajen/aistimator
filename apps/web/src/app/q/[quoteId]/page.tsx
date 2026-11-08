@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { brandStyleVars } from '@/lib/color'
 import type { QuoteViewResponse, QuoteStatus } from '@estimator/shared'
+import { formatMoney, formatDate, formatNumber, currencySymbol, unitDisplayLabel, isQuoteProcessing } from '@estimator/shared'
 
 interface QuotePageProps {
   params: { quoteId: string }
@@ -64,6 +65,41 @@ export default function QuotePage({ params }: QuotePageProps) {
 
     fetchQuote()
   }, [quoteId, token])
+
+  // Queue path: the customer can arrive before the worker has priced the quote.
+  // Poll quietly (poll=1 doesn't count as a view); once the status moves on,
+  // load it normally so the real view is recorded.
+  const [slowPreparing, setSlowPreparing] = useState(false)
+  const processing = isQuoteProcessing(quote?.status)
+  useEffect(() => {
+    if (!processing || !token) return
+    let cancelled = false
+    let polls = 0
+    const maxPolls = 150 // ~10 min, then stop and promise the email
+    const interval = setInterval(async () => {
+      polls++
+      if (polls > maxPolls) {
+        clearInterval(interval)
+        if (!cancelled) setSlowPreparing(true)
+        return
+      }
+      try {
+        const poll = await fetch(`/api/public/quotes/${quoteId}?token=${token}&poll=1`)
+        if (!poll.ok) return
+        const polled = (await poll.json()) as QuoteViewResponse
+        if (cancelled || isQuoteProcessing(polled.status)) return
+        clearInterval(interval)
+        const full = await fetch(`/api/public/quotes/${quoteId}?token=${token}`)
+        if (!cancelled && full.ok) setQuote((await full.json()) as QuoteViewResponse)
+      } catch {
+        // best-effort; the next tick retries
+      }
+    }, 4000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [processing, quoteId, token])
 
   async function handleAccept() {
     if (!token || accepting) return
@@ -181,9 +217,53 @@ export default function QuotePage({ params }: QuotePageProps) {
   }
 
   const { business, branding, customer, pricing, notes, validUntil, assets, status, actions, crossServicePricing, signalRecommendations, version: quoteVersion, acceptQuoteEnabled, takeoff, reference } = quote
+  // T-133: tenant locale for money and dates (legacy quotes without one render as before)
+  const locale = quote.locale || 'en-GB'
   const brandVars = brandStyleVars(branding?.primaryColor)
   const showAcceptButton = acceptQuoteEnabled !== false
   const canSubmitFeedback = ['sent', 'viewed', 'revised'].includes(status) && !feedbackSubmitted && !accepted && !declined
+
+  // Not priced yet (queued / generating), or processing failed: no document to show
+  if (processing || status === 'failed') {
+    const failed = status === 'failed'
+    return (
+      <div className="min-h-screen bg-background py-8 px-4 sm:py-14" style={brandVars}>
+        <div className="max-w-2xl mx-auto animate-fade-in-up">
+          <div className="bg-background rounded-warm-2xl shadow-document overflow-hidden">
+            <Letterhead
+              business={business}
+              status={status}
+              reference={reference}
+              customerName={customer.name}
+              locale={locale}
+            />
+            <div className="px-6 sm:px-10 py-10 bg-primary text-on-primary" role="status" aria-live="polite">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-primary/60 mb-3">
+                Estimate for {customer.name}
+              </p>
+              <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">
+                {failed ? `Your request is with ${business.name}` : 'Preparing your estimate'}
+              </h1>
+              <div className={`tape-rule-light mt-8 ${failed || slowPreparing ? '' : 'tape-measuring'}`} aria-hidden="true" />
+              <p className="mt-6 text-sm text-on-primary/80 max-w-md">
+                {failed
+                  ? `${business.name} will send your estimate by email shortly — nothing more needed from you.`
+                  : slowPreparing
+                    ? 'This one is taking longer than usual. We’ll email you the link the moment it’s ready.'
+                    : `${business.name} is pricing your job from the details you sent. This usually takes a minute or two — this page updates by itself.`}
+              </p>
+              {!failed && !slowPreparing && (
+                <p className="mt-2 text-xs text-on-primary/60 max-w-md">
+                  You can close it: we’ll email you the link as soon as it’s ready.
+                </p>
+              )}
+            </div>
+          </div>
+          <DocumentFooter footerNotes={branding?.footerNotes} showPoweredBy={branding?.showPoweredBy !== false} />
+        </div>
+      </div>
+    )
+  }
 
   // T-109 range-first: provisional quotes show an estimated range, not exact pricing
   if (quote.provisional) {
@@ -199,6 +279,7 @@ export default function QuotePage({ params }: QuotePageProps) {
               customerName={customer.name}
               validUntil={validUntil}
               pdfUrl={actions.pdfUrl}
+              locale={locale}
             />
 
             {/* Provisional price instrument */}
@@ -207,9 +288,9 @@ export default function QuotePage({ params }: QuotePageProps) {
                 Estimated range for {customer.name}
               </p>
               <p className="figure text-4xl sm:text-5xl font-medium tracking-tight">
-                <Money amount={rangeLow} currency={pricing.currency} />
+                <Money amount={rangeLow} currency={pricing.currency} locale={locale} />
                 <span className="text-on-primary/40 mx-2 font-light">—</span>
-                <Money amount={rangeHigh} currency={pricing.currency} />
+                <Money amount={rangeHigh} currency={pricing.currency} locale={locale} />
               </p>
 
               <div className="tape-rule-light mt-8" />
@@ -264,6 +345,7 @@ export default function QuotePage({ params }: QuotePageProps) {
             validUntil={validUntil}
             pdfUrl={actions.pdfUrl}
             version={quoteVersion}
+            locale={locale}
           />
 
           {/* ============ The price instrument (signature) ============ */}
@@ -274,7 +356,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                   Your estimate{pricing.taxAmount > 0 ? ` · incl. ${pricing.taxLabel || 'tax'}` : ''}
                 </p>
                 <p className="figure text-5xl sm:text-6xl font-medium tracking-tight leading-none">
-                  <Money amount={pricing.total} currency={pricing.currency} emphasize />
+                  <Money amount={pricing.total} currency={pricing.currency} locale={locale} emphasize />
                 </p>
                 {pricing.estimate && (
                   <p className="mt-4 text-[13px] leading-snug text-on-primary/75 max-w-sm">
@@ -304,6 +386,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                 high={pricing.estimate.rangeHigh}
                 value={pricing.total}
                 currency={pricing.currency}
+                locale={locale}
               />
             )}
 
@@ -334,7 +417,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                         <span className="text-text-primary">{labelMain}</span>
                         <span className="flex-1 border-b border-dotted border-border-strong translate-y-[-3px]" />
                         <span className="figure text-text-primary whitespace-nowrap">
-                          {formatCurrency(item.amount, pricing.currency)}
+                          {formatCurrency(item.amount, pricing.currency, locale)}
                         </span>
                       </div>
                       {labelMath && (
@@ -371,7 +454,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Subtotal</span>
                   <span className="figure text-text-primary">
-                    {formatCurrency(pricing.subtotal, pricing.currency)}
+                    {formatCurrency(pricing.subtotal, pricing.currency, locale)}
                   </span>
                 </div>
 
@@ -382,7 +465,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                       {pricing.taxRate ? ` (${pricing.taxRate}%)` : ''}
                     </span>
                     <span className="figure text-text-primary">
-                      {formatCurrency(pricing.taxAmount, pricing.currency)}
+                      {formatCurrency(pricing.taxAmount, pricing.currency, locale)}
                     </span>
                   </div>
                 )}
@@ -390,7 +473,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                 <div className="flex justify-between items-baseline pt-3 border-t-2 border-ink">
                   <span className="font-display font-bold text-text-primary">Total</span>
                   <span className="figure text-xl font-medium text-text-primary">
-                    {formatCurrency(pricing.total, pricing.currency)}
+                    {formatCurrency(pricing.total, pricing.currency, locale)}
                   </span>
                 </div>
               </div>
@@ -414,14 +497,14 @@ export default function QuotePage({ params }: QuotePageProps) {
                           <span className="font-medium text-text-primary">{entry.item}</span>
                           <span className="flex-1" />
                           <span className="figure text-text-primary whitespace-nowrap">
-                            {formatCurrency(entry.amount, pricing.currency)}
+                            {formatCurrency(entry.amount, pricing.currency, locale)}
                           </span>
                         </div>
                         {entry.quantity !== undefined && (
                           <p className="figure text-xs text-tertiary mt-0.5">
-                            {entry.quantity}{entry.unit ? ` ${entry.unit}` : ''}
+                            {formatNumber(entry.quantity, locale)}{entry.unit ? ` ${unitDisplayLabel(entry.unit)}` : ''}
                             {entry.rate !== undefined &&
-                              ` × ${formatCurrency(entry.rate, pricing.currency)}${entry.unit ? `/${entry.unit}` : ''}`}
+                              ` × ${formatCurrency(entry.rate, pricing.currency, locale)}${entry.unit ? `/${unitDisplayLabel(entry.unit)}` : ''}`}
                           </p>
                         )}
                         <p className="text-xs text-text-muted mt-0.5">{entry.method}</p>
@@ -443,7 +526,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                         <span className="text-text-primary">{addon.label}</span>
                         <span className="flex-1 border-b border-dotted border-primary/25 translate-y-[-3px]" />
                         <span className="figure text-primary whitespace-nowrap">
-                          +{formatCurrency(addon.price, pricing.currency)}
+                          +{formatCurrency(addon.price, pricing.currency, locale)}
                         </span>
                       </div>
                     ))}
@@ -476,7 +559,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                         </div>
                         <span className="figure text-sm text-text-primary whitespace-nowrap">
                           {service.isEstimate ? '~' : ''}
-                          {formatCurrency(service.estimatedTotal, pricing.currency)}
+                          {formatCurrency(service.estimatedTotal, pricing.currency, locale)}
                         </span>
                       </div>
                       {service.extractedDetails && service.extractedDetails.length > 0 && (
@@ -610,7 +693,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                     disabled={accepting}
                     className="w-full py-4 px-4 rounded-warm-xl font-display font-bold text-on-primary text-base bg-primary hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 disabled:cursor-not-allowed transition"
                   >
-                    {accepting ? 'Accepting…' : `Accept this estimate — ${formatCurrency(pricing.total, pricing.currency)}`}
+                    {accepting ? 'Accepting…' : `Accept this estimate — ${formatCurrency(pricing.total, pricing.currency, locale)}`}
                   </button>
                   <p className="text-xs text-text-muted text-center mt-2.5">
                     Accepting tells {business.name} to go ahead. Nothing is charged today.
@@ -767,6 +850,7 @@ function Letterhead({
   validUntil,
   pdfUrl,
   version,
+  locale,
 }: {
   business: {
     name: string
@@ -782,6 +866,7 @@ function Letterhead({
   validUntil?: string | null
   pdfUrl?: string | null
   version?: number
+  locale: string
 }) {
   const contactParts = [business.phone, business.email, business.website].filter(Boolean)
   return (
@@ -830,7 +915,7 @@ function Letterhead({
           )}
           {validUntil && (
             <span className="text-text-muted">
-              Valid until <span className="text-text-secondary">{new Date(validUntil).toLocaleDateString()}</span>
+              Valid until <span className="text-text-secondary">{formatDate(validUntil, locale)}</span>
             </span>
           )}
           {version && version > 1 && (
@@ -850,20 +935,22 @@ function RangeScale({
   high,
   value,
   currency,
+  locale,
 }: {
   low: number
   high: number
   value: number
   currency: string
+  locale: string
 }) {
   const span = high - low
   const pct = span > 0 ? Math.min(96, Math.max(4, ((value - low) / span) * 100)) : 50
   return (
     <div className="mt-7 max-w-md">
       <div className="flex justify-between text-[11px] text-on-primary/60 mb-1.5">
-        <span className="figure">{formatCurrency(low, currency)}</span>
+        <span className="figure">{formatCurrency(low, currency, locale)}</span>
         <span className="uppercase tracking-[0.14em] font-semibold text-[10px] text-on-primary/50">Measured range</span>
-        <span className="figure">{formatCurrency(high, currency)}</span>
+        <span className="figure">{formatCurrency(high, currency, locale)}</span>
       </div>
       <div className="relative h-2.5 rounded-full bg-white/15 overflow-visible">
         <div
@@ -889,11 +976,20 @@ function SectionLabel({ children, tone }: { children: React.ReactNode; tone?: 'b
 }
 
 /** Money with lighter pence — how fine documents set figures. */
-function Money({ amount, currency, emphasize }: { amount: number; currency: string; emphasize?: boolean }) {
-  const symbols: Record<string, string> = { GBP: '£', USD: '$', EUR: '€', AUD: 'A$', CAD: 'C$' }
-  const symbol = symbols[currency] || currency + ' '
+function Money({
+  amount,
+  currency,
+  locale,
+  emphasize,
+}: {
+  amount: number
+  currency: string
+  locale: string
+  emphasize?: boolean
+}) {
+  const symbol = currencySymbol(currency, locale)
   const [whole, pence] = amount.toFixed(2).split('.')
-  const wholeFormatted = Number(whole).toLocaleString()
+  const wholeFormatted = Number(whole).toLocaleString(locale)
   return (
     <span className="whitespace-nowrap">
       <span className={emphasize ? 'text-on-primary/60' : ''}>{symbol}</span>
@@ -928,8 +1024,8 @@ function DocumentFooter({
 
 function StatusBadge({ status }: { status: QuoteStatus }) {
   const statusConfig: Record<QuoteStatus, { label: string; className: string }> = {
-    queued: { label: 'Processing', className: 'bg-butter text-tertiary' },
-    generating: { label: 'Processing', className: 'bg-butter text-tertiary' },
+    queued: { label: 'Preparing', className: 'bg-butter text-tertiary' },
+    generating: { label: 'Preparing', className: 'bg-butter text-tertiary' },
     pending_review: { label: 'Under review', className: 'bg-butter text-tertiary' },
     awaiting_clarification: { label: 'Awaiting info', className: 'bg-butter text-tertiary' },
     sent: { label: 'Ready to review', className: 'bg-mint text-primary' },
@@ -940,7 +1036,8 @@ function StatusBadge({ status }: { status: QuoteStatus }) {
     declined: { label: 'Declined', className: 'bg-surface text-text-muted' },
     paid: { label: 'Paid', className: 'bg-secondary-light text-secondary' },
     expired: { label: 'Expired', className: 'bg-surface text-text-muted' },
-    failed: { label: 'Error', className: 'bg-danger-light text-danger' },
+    // Customer-facing: a failed run is the business's problem, not an error to show
+    failed: { label: 'Received', className: 'bg-surface text-text-muted' },
   }
 
   const config = statusConfig[status] || statusConfig.sent
@@ -960,15 +1057,7 @@ function splitLabelMath(label: string): [string, string | null] {
   return [m[1] ?? label, (m[2] ?? '').replace(/\sx\s/, ' × ').replace(/\(/, ' ').replace(/\)/, '')]
 }
 
-function formatCurrency(amount: number, currency: string): string {
-  const symbols: Record<string, string> = {
-    GBP: '£',
-    USD: '$',
-    EUR: '€',
-    AUD: 'A$',
-    CAD: 'C$',
-  }
-  const symbol = symbols[currency] || currency + ' '
-  const [whole, pence] = amount.toFixed(2).split('.')
-  return `${symbol}${Number(whole).toLocaleString()}.${pence}`
+/** T-133: Intl formatting with the tenant's locale (any ISO currency) */
+function formatCurrency(amount: number, currency: string, locale: string): string {
+  return formatMoney(amount, currency, locale)
 }

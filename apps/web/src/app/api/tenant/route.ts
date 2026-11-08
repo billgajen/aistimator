@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getRegion, isRegionCode, isUnitSystem } from '@estimator/shared'
 import { type NextRequest, NextResponse } from 'next/server'
 import type { ServiceAreaMode, TenantTemplate } from '@estimator/shared'
 
@@ -56,6 +57,9 @@ export async function GET() {
       tenant: {
         id: tenant.id,
         name: tenant.name,
+        // T-133: region + unit-system override (null = region default)
+        region: getRegion(tenant.region).code,
+        unitSystem: tenant.unit_system ?? null,
         currency: tenant.currency,
         taxEnabled: tenant.tax_enabled,
         taxLabel: tenant.tax_label,
@@ -124,6 +128,8 @@ export async function PUT(request: NextRequest) {
     const body = await request.json()
     const {
       name,
+      region,
+      unitSystem,
       currency,
       taxEnabled,
       taxLabel,
@@ -136,6 +142,8 @@ export async function PUT(request: NextRequest) {
       benchmarksOptIn,
     } = body as {
       name?: string
+      region?: string
+      unitSystem?: string | null
       currency?: string
       taxEnabled?: boolean
       taxLabel?: string
@@ -159,6 +167,26 @@ export async function PUT(request: NextRequest) {
         )
       }
       updates.name = name.trim()
+    }
+
+    if (region !== undefined) {
+      if (!isRegionCode(region)) {
+        return NextResponse.json(
+          { error: { code: 'INVALID_INPUT', message: 'Unsupported region' } },
+          { status: 400 }
+        )
+      }
+      updates.region = region
+    }
+
+    if (unitSystem !== undefined) {
+      if (unitSystem !== null && !isUnitSystem(unitSystem)) {
+        return NextResponse.json(
+          { error: { code: 'INVALID_INPUT', message: 'Unit system must be imperial or metric' } },
+          { status: 400 }
+        )
+      }
+      updates.unit_system = unitSystem
     }
 
     if (currency !== undefined) {
@@ -303,6 +331,9 @@ export async function PUT(request: NextRequest) {
       tenant: {
         id: tenant.id,
         name: tenant.name,
+        // T-133: region + unit-system override (null = region default)
+        region: getRegion(tenant.region).code,
+        unitSystem: tenant.unit_system ?? null,
         currency: tenant.currency,
         taxEnabled: tenant.tax_enabled,
         taxLabel: tenant.tax_label,

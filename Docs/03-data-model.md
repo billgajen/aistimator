@@ -10,9 +10,11 @@
 ### tenants
 - id (pk)
 - name
-- currency (ISO code)
+- region (text, 'US' | 'GB'; default 'US' for new tenants, existing tenants backfilled 'GB' — T-133, AD-025)
+- unit_system (text, 'imperial' | 'metric', nullable — null means the region default)
+- currency (ISO code; defaults from region, overridable)
 - tax_enabled (bool)
-- tax_label (text, e.g. VAT, GST, Sales tax)
+- tax_label (text, e.g. VAT, GST, Sales tax; null means the region's label)
 - tax_rate (numeric, 0 to 1)
 - service_area_mode (enum: none, postcode_allowlist, county_state)
 - service_area_values (jsonb)
@@ -27,6 +29,7 @@ Used for embed security.
 - is_active
 
 ### services
+- tax_exempt (bool, default false — T-133: service skips the tenant tax line)
 - id
 - tenant_id
 - name
@@ -132,3 +135,8 @@ The generated quote record for delivery and tracking.
 ## RLS
 - All tenant tables restricted by `tenant_id` for authenticated users.
 - Public quote view uses a token and only returns specific quote data.
+### SMS channel (T-136, migration 27)
+- sms_configs: tenant_id (unique), phone_number (E.164, unique), messaging_service_sid, is_active, a2p_brand_registered, a2p_campaign_registered
+- sms_conversations: same shape as whatsapp_conversations + consent_notice_sent
+- sms_messages: provider_message_id, direction, message_type, from/to, content, media_url, segments, status (received | sent | test | blocked_opt_out | failed)
+- sms_opt_outs: tenant_id + phone (unique), opted_out, last_keyword — checked before every send; only the customer's START clears it

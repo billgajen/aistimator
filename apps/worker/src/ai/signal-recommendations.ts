@@ -9,6 +9,7 @@
  */
 
 import { GeminiClient } from './gemini'
+import type { AiClient } from './client'
 import type { SignalRecommendation, WorkStepConfig } from '@estimator/shared'
 
 /**
@@ -138,7 +139,7 @@ Other guidelines:
  * Generate pricing recommendations for unused signals
  */
 export async function generateSignalRecommendations(
-  client: GeminiClient,
+  client: AiClient,
   unusedSignals: UnusedSignal[],
   serviceName: string,
   context: RecommendationContext

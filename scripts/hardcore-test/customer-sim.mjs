@@ -4,13 +4,20 @@
 // the form doesn't get one (unless the field is required, in which case they
 // give a forced honest guess, like a real person facing a mandatory field).
 
+import { readFileSync } from 'node:fs'
+
+// T-135: the simulated customer's model is PINNED in the registry (harness.customer_sim)
+// so model comparisons change the product's models, never the customer's.
+const REGISTRY = JSON.parse(readFileSync(new URL('../../packages/shared/src/ai-models.json', import.meta.url), 'utf8'))
+const SIM_MODEL = process.env.CUSTOMER_SIM_MODEL || REGISTRY.harness.customer_sim.model
+
 async function callGeminiJson(apiKey, systemPrompt, userPrompt) {
   // up to 3 attempts — malformed/truncated JSON from the model killed S25 live
   let lastErr
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${SIM_MODEL}:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

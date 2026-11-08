@@ -15,6 +15,147 @@
 
 ## Issues & Resolutions
 
+### 2026-11-08: Queue processing in production + worker auth + "Preparing your estimate" (AD-031)
+
+**Decision (owner):** Cloudflare Queues over raising `maxDuration`. Photo-measured quotes take 75–150 s (see the thinking-level entry below), and sync processing held the customer's request, and the SMS/WhatsApp webhooks, for the whole pipeline. Owner upgraded to Workers Paid on 2026-11-08.
+
+**Built:**
+- `wrangler.toml`: production producer + consumer on `quote-jobs` (DLQ `quote-jobs-dlq`), **`max_batch_size = 1`**. The old commented block had 10, which processes ten quotes in series in one invocation and would exceed the consumer's wall time at ~150 s each. Also a simulated local queue (`quote-jobs-local`) so the consumer path can be tested with `wrangler dev`.
+- **Worker auth** (`src/auth.ts`): `/process`, `/trigger` and `/stats` require `Authorization: Bearer CLOUDFLARE_WORKER_TOKEN` (constant-time compare). **Before this, they accepted anyone's request**: any caller could re-run a quote's AI pipeline. Fails closed: a missing secret → 503 outside `ENVIRONMENT=development`. `/health` stays public. The web app already sent the header; `getQueueStats` now does too.
+- **Two latent consumer bugs fixed:** (1) the retry count came from `job.retryCount` in the message body, which never changes. A repeatedly failing quote would dead-letter without ever being marked `failed` and sit at `generating` forever; now it uses `message.attempts`. (2) Provider 429s retried without limit; they now stop at MAX_RETRIES too. `/trigger` returns 400 bad body, 503 queue not bound, 502 send failed (was a 400 for everything).
+- `SYNC_QUOTE_PROCESSING` is an explicit switch (`isSyncProcessing`): `true`/`false` decide, unset = sync in local dev, async in production. Previously local dev could never use the queue.
+- **Customer UI** (`isQuoteProcessing` in shared = `queued`/`generating`):
+  - Widget success screen: "Preparing your estimate" with an animated tape rule (`.tape-measuring`, static under reduced motion). Polls for 5 min (was 60 s), then "Your estimate is ready" / "We have your request" (failed or held for review) / taking-longer-than-usual + email.
+  - Hosted quote page: preparing panel in the document shell, polling every 4 s with `poll=1` (not a view). It loads normally once the status moves on, so the real view is recorded. `failed` shows "Your request is with {business}" instead of an empty document, and the badge says "Received", not a red "Error".
+  - Public quote API no longer stamps `viewed_at` while processing (it would have blocked the later `sent → viewed`).
+  - Clarify now redirects to the quote page after submitting, which shows the preparing state, instead of a static thank-you.
+
+**Verified locally (queue path, token on):** S08 submission 3.3 s (sync 78 s), clarify 0.5 s, the consumer processed both runs, £435.54 exact, 7/7 checks. Unauthenticated `/process` and `/stats` → 401. Screenshots of the widget (preparing/ready/failed, mocked status API) and the quote page (desktop + 390 px, plus a live `queued → sent` swap in 1.8 s with the view recorded only after the swap).
+
+**Deploy constraint:** the new worker rejects job requests without the token, so the token goes to both sides first, then the **web deploys first (still sync)**, then the worker, then `SYNC_QUOTE_PROCESSING=false`. `DEPLOY.md` steps 5–9. Rollback lever: `SYNC_QUOTE_PROCESSING=true` (the new worker still serves `/process`).
+
+**Tests:** worker `worker-entry.test.ts` (12: auth matrix, fail-closed, `/trigger` error codes, consumer ack/retry/final-attempt-fails/429 cap), web `queue.test.ts` (3: sync switch, processing statuses).
+
+**Files:** `apps/worker/{wrangler.toml,src/index.ts,src/auth.ts,.dev.vars.example}`, `apps/web/src/lib/{queue.ts,rate-limit.ts}`, `apps/web/src/app/{embed/[tenantKey]/page.tsx,q/[quoteId]/page.tsx,q/[quoteId]/clarify/page.tsx,api/public/quotes/[quoteId]/route.ts,globals.css}`, `packages/shared/src/{quote-status.ts,index.ts}`, `apps/web/.env.example`, `Docs/01-architecture.md`, `README.md`, `DEPLOY.md`, tests
+
+---
+
+### 2026-11-08: Per-task Gemini thinking level + production deploy prep (T-135 follow-up)
+
+**What broke:** wording on `gemini-3.8-flash` hit MAX_TOKENS on most quotes. Gemini 3 thinking tokens count against `maxOutputTokens` (default 4,096); one S08 wording call used 3,933 thinking tokens for 156 output tokens. The structured call failed, then fell back to a second text call: 57 s of a 146 s submission. Same trap class as the 2.5 thinking truncations (R2-1 matcher, compile 8192→16384).
+
+**Fix (registry data):** optional `thinkingLevel` per task in `ai-models.json` (`wording`, `chat_widget` and `service_match` = `low`) and `thinkingLevels` per model capability. `resolveThinkingLevel(task, model, env)` honours `AI_THINKING_<TASK>` (`low|medium|high|default`) and **drops a level the model doesn't list**. Gemini 2.5 returns HTTP 400 for any `thinkingConfig`, and every 3.x model rejects `minimal` (probed 2026-11-08 for 3.8/3.6/3.5-lite/3.1-lite/3-flash-preview/3.1-pro-preview/4-argon). The worker factory passes the level to `GeminiClient`; web chat, matcher and compile spread `geminiThinkingConfig(task)`. Compile, extraction_pass, adjudication and identification send nothing (model default).
+
+**Measured (local, submission request):** S08 146 s → 78 s, £435.54 unchanged, wording 32 s+25 s → 3.7 s. S01 147 s / 116 s (£2,061.60 / £1,526, Grade B). **Rejected: `low` on extraction_pass + adjudication.** S01 dropped to 35 s, but zero thinking made the three passes agree (cov 0) on 110.9 sqm, about 2× the 55–65 sqm default-thinking runs, and the low-thinking senior accepted it: £3,355 sent. Vision and adjudication thinking is accuracy, not overhead.
+
+**Constraint:** photo-measured quotes still take 75–150 s per request (three sequential ~22 s measurement passes, plus adjudication at 6–53 s). Sync processing behind a 60 s `maxDuration` cannot hold them. Options and the recommendation (Cloudflare Queues, T-132) are in `DEPLOY.md` §0. Also found, not fixed: the worker's `/process` and `/trigger` never check the `CLOUDFLARE_WORKER_TOKEN` bearer the web app sends.
+
+**Deploy prep:** `DEPLOY.md` (migrations 26–28, env, merge, smoke test) and `scripts/deploy-migrations-26-28.sh`. The script refuses to run unless production is at 25 and records history per file, because migration 27 is not re-runnable (verified locally: a re-run fails on `CREATE TRIGGER` and rolls back).
+
+**Tests:** 3 new in `ai-models.test.ts` (registry default + env override + `default` clears; dropped for 2.5 and `minimal`; factory body has `thinkingConfig` only when a level applies). Worker 324, web 60.
+
+**Files:** `packages/shared/src/{ai-models.json,ai-models.ts}`, `apps/worker/src/ai/{client.ts,factory.ts,gemini.ts}`, `apps/worker/src/index.ts`, `apps/web/src/lib/ai/{models.ts,service-matcher.ts}`, `apps/web/src/app/api/{public/widget/chat,services/ai-draft,services/ai-draft/shared.ts}`, `apps/worker/src/__tests__/ai-models.test.ts`, `DEPLOY.md`, `scripts/deploy-migrations-26-28.sh`
+
+---
+
+### 2026-11-07: T-134 — Subscription-Only USD Plans (AD-026)
+
+**Built:** one plan source `packages/shared/src/plans.ts` (US Starter/Pro/Business with monthly + annual prices, quote limits, channels, features, `overageEnabled: false`, 14-day card-required trial on Pro; legacy plans kept with their limits and overage for existing subscribers; `NO_SUBSCRIPTION_LIMIT` US 10 / GB 50 — no free tier for US). Read by `checkPlanLimit`, `plan-features.ts` (white-label + new `hasPlanFeature`/`hasPlanChannel`), `/api/billing`, the pricing page and the homepage teaser (`lib/plans-view.ts` maps definitions to `PlanInfo`; no number is typed twice). The `plans` table keeps rows only as FK targets (migration 28 adds the US ids, deactivates legacy rows).
+
+**Over-limit = lead, not loss:** with overage off, a request beyond the limit is saved (`pending_review`, `content_json.limitHold`), the customer is told "{business} has your request and will send your estimate shortly" (no billing wording), the business is emailed ("New lead waiting — upgrade to price it"), no AI runs and the usage counter is not incremented. Same path in the widget API and the WhatsApp/SMS intake engine. `POST /api/quotes/[id]/process` + "Price this lead" on the quote page re-check the limit and run the normal pipeline with a fresh token. Dashboard banners (80% / 100%) and the limit email now describe lead capture instead of "paused".
+
+**Stripe:** checkout takes `interval` (monthly/annual), price ids from env `STRIPE_PRICE_<PLAN>_<INTERVAL>_<CURRENCY>`, `payment_method_collection: 'always'`, trial only when the business never had a Stripe subscription. Existing subscribers change plans in the Customer Portal (proration). The webhook maps prices → plans with `planForStripePrice` and **upserts** the subscription.
+
+**Two latent bugs found and fixed:** (1) checkout and the webhook queried `plans.stripe_price_id`, a column no migration ever created — checkout always returned NO_STRIPE_PRICE and the webhook could never bind a plan; (2) the webhook only UPDATED `subscriptions`, but signup never inserts a row — a first paid checkout would have been silently unrecorded.
+
+**Also:** dashboard revenue stat used a hardcoded `$` (T-133 miss) — now the tenant currency.
+
+**Tests:** `plans.test.ts` (single source, annual = 10×, trial, legacy, region allowance, env price mapping both ways, usage levels, Starter #51 not billable, legacy overage still meters) + an intake test proving the held lead is saved, unpriced and not counted. Web 60, worker 321. No gauntlet (owner rule: billing).
+
+**Owner-only:** confirm the prices, create Stripe test products (`apps/web/scripts/stripe-setup-plans.mts`), set the env price ids, enable the Customer Portal with plan switching + proration, then run trial → paid → upgrade → downgrade in test mode.
+
+**Files:** `packages/shared/src/{plans.ts,index.ts,api.types.ts}`, `supabase/migrations/00000000000028_us_plans.sql`, `apps/web/src/lib/{plan-limits.ts,plan-features.ts,plans-view.ts,lead-hold.ts,stripe.ts,email-templates.ts,messaging/intake-engine.ts}`, `apps/web/src/app/api/{public/quotes,billing,billing/checkout,webhooks/stripe,quotes/[quoteId]/process}`, billing/quote/dashboard pages, `apps/web/src/app/{pricing/page.tsx,page.tsx}`, `apps/web/scripts/stripe-setup-plans.mts`, `apps/web/.env.example`
+
+---
+
+### 2026-11-07: T-136 — SMS Channel (Twilio) on a Channel-Agnostic Intake Engine (AD-027)
+
+**Built:**
+- **WhatsApp pinned first:** `__tests__/whatsapp-intake.test.ts` characterises the pre-refactor intake (exact reply texts, transitions, quote creation, Cloud API send). Written and passing against the OLD code, then kept unchanged through the refactor.
+- **Channel abstraction:** the state machine moved to `lib/messaging/intake-engine.ts`, driven by a `ChannelAdapter` (`send`, `downloadMedia`, `emphasize`, `senderNumberNoun`, `conversationTable`). `whatsapp-intake.ts` is now a thin adapter (WhatsApp `*bold*`, "WhatsApp number"); SMS uses plain text and "mobile number". R2 keys and `source_json.type` come from the channel name.
+- **Twilio library** `lib/sms.ts` (no SDK): X-Twilio-Signature HMAC-SHA1 verification (test vector computed independently with openssl), send via REST, MMS download with basic auth, GSM-7/UCS-2 segment counting, STOP/START/HELP keywords (YES re-subscribes only an opted-out number — YES is also the intake's confirm word), opt-out store checked on **every** send (`sendSmsChecked` logs blocked attempts as `blocked_opt_out`), consent line on the first reply of each conversation. **Test mode** (`SMS_TEST_MODE=true` or no Twilio credentials): every outbound text is logged with status `test` and never leaves the platform.
+- **Migration 27** `sms_channel.sql`: `sms_configs` (per-tenant E.164 number, optional Messaging Service SID, 10DLC checklist flags), `sms_conversations` (same shape as WhatsApp + `consent_notice_sent`), `sms_messages` (with billable `segments`), `sms_opt_outs` (unique tenant+phone). RLS on all four; businesses can READ opt-outs but cannot clear them — only the customer's START does.
+- **Webhook** `POST /api/sms/webhook`: 503 if `TWILIO_AUTH_TOKEN` is unset, 401 on missing/invalid signature (fails closed); compliance keywords handled before any intake; MMS items become photo messages; one reply per inbound message (saves segments). Signed URL = `TWILIO_WEBHOOK_BASE_URL` or `NEXT_PUBLIC_APP_URL` + path (tunnels/proxies).
+- **Dashboard:** `/app/sms` (number, Messaging Service SID, A2P 10DLC checklist with Twilio links, webhook URL, outbound segments this month, test-mode banner), "SMS" nav item, "Text link" on the quote detail page → `POST /api/sms/send-quote` (rotates the token like resend; 409 `OPTED_OUT` after STOP).
+- **Region data:** `callingCode` added (US `1`, GB `44`); `normalizePhone` uses it — no US-only phone assumptions.
+
+**Verified live in test mode** (`scripts/hardcore-test/verify-t136.mjs`, 18/18): unsigned and invalid webhooks → 401; text → description prompt with consent line, no asterisks; full intake incl. an MMS photo stored under `sms/…`; "yes" → quote created, priced $150 by the worker, link texted back; STOP → confirmation, dashboard send 409, no replies; START → send 200. The quote was held at `pending_review` because the test photo (a house) doesn't match a water-heater job — the gate behaving correctly; the script approves it before the send checks.
+
+**No gauntlet** (owner rule: SMS plumbing doesn't touch AI/pricing); WhatsApp regression is covered by the pinned tests. Web tests 48 (was 34), worker 321.
+
+**Not done (needs the owner):** a real Twilio account, a US number, A2P 10DLC brand + campaign registration, and a live MMS round trip — see OWNER-TODO.md. Automated 10DLC registration stays out of scope.
+
+**Files:** `supabase/migrations/00000000000027_sms_channel.sql`, `apps/web/src/lib/{sms.ts,sms-intake.ts,auth-tenant.ts,whatsapp-intake.ts,messaging/*}`, `apps/web/src/app/api/sms/{webhook,config,send-quote}/route.ts`, `apps/web/src/app/(dashboard)/{layout.tsx,app/sms/page.tsx,app/quotes/[quoteId]/page.tsx}`, `packages/shared/src/regions/*`, `apps/web/.env.example`, tests `sms.test.ts` + `whatsapp-intake.test.ts`, `scripts/hardcore-test/verify-t136.mjs`
+
+---
+
+### 2026-11-07: T-135 — AI Model Registry, Provider-Agnostic Clients, Gemini 3 Upgrade
+
+**Why it was urgent:** Google's deprecation notice — "Effective December 1, 2026, all API requests to `gemini-2.5-flash` will automatically route to `gemini-3.5-flash-lite` and be billed at Gemini 3.5 Flash-Lite rates" (aistudio.google.com/docs/deprecations, /docs/models, /docs/pricing, release notes 2026-11-02; `gemini-2.5-pro` reroutes to `gemini-3.8-flash`). The 3.8 Flash migration notes list "removed sampling parameters and prefilled model turns" as breaking changes — our client sent both.
+
+**Built:**
+- **Registry** `packages/shared/src/ai-models.json` (+ typed `ai-models.ts`): task → provider+model for `extraction_pass`, `adjudication`, `compile`, `wording`, `chat_widget`, `service_match`, `identification`; per-model request **capabilities**; a sourced USD/MTok **price table** (with `asOf` and source); a **pinned harness model** for the simulated customer (it must never drift between comparisons). `AI_MODEL_<TASK>` env overrides (`model` or `provider:model`) switch any task without a code change; legacy `ADJUDICATION_MODEL` still honoured. Grep check: no model-name strings in `apps/` or `packages/shared/src` code outside the JSON.
+- **Worker `AiClient` interface** (`ai/client.ts`) — every consumer now types against it; `createAiClient(task, env, meter)` (`ai/factory.ts`). Processor routes vision work (signals, measurement, inventory) to `extraction_pass`, all text work (wording, addons, gate, validator, cross-service, recommendations) to `wording`, the senior model to `adjudication`.
+- **Claude adapter** (`ai/anthropic.ts`, official `@anthropic-ai/sdk`): JSON-schema structured outputs with a Gemini→JSON-Schema translator (`toClaudeJsonSchema`: lowercase types, `nullable`→anyOf null, `additionalProperties:false`, unsupported keywords dropped), server-side refusal `fallbacks: "default"`, refusal/`max_tokens` stop reasons surfaced as errors. Selectable by config (`AI_MODEL_ADJUDICATION=anthropic:<model>`); **not exercised live — no Anthropic key in this environment** (OWNER-TODO).
+- **Per-quote AI cost** in `pricing_trace_json.aiUsage` (calls, input/output tokens incl. Gemini thinking tokens, estimated USD by task+model; unpriced models listed, never guessed).
+- **Web** chat/compile/AI-draft/service-matcher read the registry (`lib/ai/models.ts`); a web task routed to a non-Gemini provider falls back to its default with a warning.
+
+**Root cause found — Gemini 3.x schema-constrained numbers degenerate.** With `response_schema`, `gemini-3.8-flash`, `gemini-3.6-flash` and `gemini-3.5-flash-lite` emit `"widthInRefUnits": 6.000000…` until MAX_TOKENS on the measurement prompt (reproduced in direct probes at temperatures 0.3/0.7/1.0, with real `systemInstruction`, with `response_json_schema`, with integer and string-typed fields — all still degenerate or produce garbage). JSON mode **without** a schema, schema described in the prompt, returns sane numbers 5/6 (the sixth was a markdown fence the parser strips). **Fix (data, not code branching):** per-model capabilities in the registry — Gemini 3.x get `structuredOutput: "prompt"` (schema in prompt, `coerceToSchemaRoot` unwraps an echoed `{"type","properties"}` wrapper and requires the root keys), real `systemInstruction` (no primed model turn), and no sampling params. Unlisted models keep the exact pre-T-135 request shape. MAX_TOKENS on a structured call now throws a clear error instead of a JSON SyntaxError. Live through the real measurement code (S01 photos, 3 passes): **3.8-flash 3/3 valid, 54.1 sqm, cov 0.11**; 3.5-flash-lite 3/3 valid but **172.9 sqm** (≈3× plausible — the Dec-1 auto-route target would have quietly inflated measured jobs); 2.5-flash 2/3 valid, 67.8 sqm.
+
+**Comparison (gauntlet round 1, current vs one newer candidate per task; money = 7 hard-anchored scenarios: S03–S06/S09/S10 truth bands, S08 penny-exact £435.54):**
+
+| Config | Run | Sent | Money | Median latency | Median AI $/quote | Notes |
+|---|---|---|---|---|---|---|
+| Current: 2.5-flash everywhere, adjudication `gemini-pro-latest` | `1e4e34cd` | 9/10 | 5/7 | 47 s | $0.0248 | pro-latest unpriced (no published price); same 5/7 as runs `8e5db672` and July `db8aa9bc` |
+| Candidate: 3.8-flash everywhere (prompt mode), adjudication `gemini-3.1-pro-preview` | `2625e00e` | **10/10** | **6/7** | 66 s | $0.0273 | 1 measurement pass failed (MAX_TOKENS); S01 £1,680.80 Grade B from photos |
+| Diagnostic: 3.8-flash with response schema (pre-fix) | `5366cf4b` | 9/10 | 7/7 | 50 s | $0.0232 | text tasks strong; 4 measurement passes degenerate, S01 aborted at 300 s |
+
+**Chosen defaults:** `gemini-3.8-flash` for all Flash tasks, `gemini-3.1-pro-preview` for adjudication — equal or better accuracy than baseline, and the measurement engine works on a model that will still exist after Dec 1. **Not met:** median latency 66 s vs the 60 s target (baseline 47 s). Candidate follow-up: Gemini 3 `thinking_level` per task (text tasks low). Prices: 3.8 Flash doubles to $1.50/$7.50 on 2027-01-01, 3.1 Pro preview $2/$12.
+
+**Process lessons (cost real runs):** zsh does not word-split `$VAR`, so a whole override list arrived as one model name; an empty bash array under `set -u` killed the worker start silently (config A ran against no worker). The eval driver now refuses to run unless the worker is healthy and every override is bound; and a smoke scenario's `aiUsage.byTask` is read before any full run (owner rule, memory `gauntlet-testing-rule`).
+
+**Files:** `packages/shared/src/{ai-models.json,ai-models.ts,index.ts,database.types.ts}`, `apps/worker/src/ai/{client.ts,factory.ts,anthropic.ts,gemini.ts,index.ts,measurement.ts,wording.ts,signals.ts,cross-service.ts,quote-validator.ts,signal-recommendations.ts,service-draft.ts,service-detection.ts}`, `apps/worker/src/{agents/quality-gate.ts,quote-processor.ts,index.ts}`, `apps/worker/package.json` (+`@anthropic-ai/sdk`), `apps/web/src/lib/ai/{models.ts,service-matcher.ts}`, `apps/web/src/app/api/{public/widget/chat,services/ai-draft/*}`, `scripts/hardcore-test/customer-sim.mjs`, `CLAUDE.md`, `Docs/00-v1-scope.md`, `README.md`, tests `apps/worker/src/__tests__/ai-models.test.ts`
+
+---
+
+### 2026-11-07: T-133 — Region Layer + US Localisation (AD-025, AD-030)
+
+**What changed:** the product was UK-shaped in code — UK door sizes as constants in the measurement engine ("a UK door is a UK door", T-118), `en-GB` and `£` symbol tables in six formatters, "Postcode" and "VAT" in copy, GBP fallbacks in APIs. Every one of those now comes from **region data**.
+
+- **Region layer** (`packages/shared/src/regions/{types,us,gb,index}.ts`): currency, locale, unit system, postal label/pattern/examples, tax label, phone example, language variant for AI prompts, and the **reference-object table in metres** (US: 80×36 in doors, 2⅔ in brick course, 4 in siding course, 8×7 ft garage doors, outlet plates…). `resolveRegionContext(tenant)` layers tenant overrides (currency, unit system, tax label) on the region. `resolveReferenceObjects(region, packOverrides)` lets a pack replace or add references by id (`draft_config.referenceObjects`). `regionPromptBlock()` is the one prompt snippet every AI path uses.
+- **Units + formatting** (`packages/shared/src/{units,format}.ts`): length/area/volume conversion with aliases (`sq_ft`, `linear_m`, `m²`…), refusing cross-kind conversion; `formatMoney`/`formatQuantity`/`formatDate`/`currencySymbol` via `Intl` (never throw on a bad code).
+- **Migration 26** (`region_layer.sql`): `tenants.region` (backfilled **GB** for every existing row, default **US** for new ones, CHECK constraint), `tenants.unit_system` (nullable override), `services.tax_exempt`. No new tables → existing RLS covers the columns.
+- **Measurement engine:** `REFERENCE_OBJECTS` constant deleted; the system prompt is built from the tenant's region table. **The table now owns the reference size** — when a pass names a known reference, code substitutes its dimension instead of trusting the size the model reported (AD-024). **Latent bug fixed:** `computeAnchoredValue` treated `sqft` as an area unit but always returned square metres; it now converts the metric area into the target unit. Measurement targets take the expected signal's declared `unit` first.
+- **Worker:** tax label defaults from region (GB tenants with tax on and no label now show "VAT", was "Tax"); `tax_exempt` services skip tax; email money/dates use the region locale; wording prompt receives the region block; engine currency symbols from `Intl`.
+- **Web:** tenant API reads/writes `region` + `unitSystem`; region picker in onboarding (first question — it decides currency, units and which pack is listed first) and settings (choosing a region applies defaults; currency is any ISO code; units overridable). All five AI-draft routes + the compiler receive the region block; the compiler is told to keep the owner's billing unit ("$2.50/sqft" → `sqft`, "per linear foot" → `linear_ft`) and to set `expectedSignals[].unit`, which `normalizeExpectedSignals` now preserves. Public quote API returns `locale`; quote page, PDF, accept/reminder/resend/revised emails format with it. Dashboard money via `Intl`, dashboard dates in the viewer's browser locale (business-facing). Trace page was hardcoded `$` — now the quote's currency. Widget and WhatsApp use the region's postal label; WhatsApp postal-code extraction uses region patterns (tenant's first).
+- **US painting pack** `painting-decorating-us` (USD, rooms + sq ft, stories, US English, sq-ft envelope 100–1,000 per story). Rates are **placeholders marked TODO-OWNER** (OWNER-TODO.md). Packs carry `region`; `listPacks(region)` lists matching packs first. GB pack unchanged apart from `region: 'GB'` and a "(UK)" name suffix.
+
+**AD-030 — units: geometry is metric, prices bind in the step's unit.** Reference tables, anchored geometry and (from T-138) scan dimensions are metric. A quantity is converted ONCE, where measurement emits it, into the unit its signal declares (`wall_area_sqft` → sq ft); from there form answers, envelopes, rates and the takeoff all share that unit, so the pricing engine stays unit-agnostic. Rejected alternative: metric signals everywhere with conversion at every edge (form merge, clarify answers, confirm step, takeoff, measurement memory) — five conversion sites, each a place to double-convert.
+
+**Constraint:** a tenant row with no region is treated as **GB** (`LEGACY_REGION`), never silently US; only pre-migration rows lack one. **Deploy order: migration 26 before web/worker** — the worker selects the new columns.
+
+**Grep check (no reference dimensions in engine code):** `grep -rnE "\b(1\.98|0\.76|0\.075|1\.83|1\.07|2\.032|0\.914)\b|metres: [0-9]" apps/worker/src apps/web/src packages/shared/src` excluding tests and `packages/shared/src/regions/` → one hit, a doc comment in `measurement.ts`. The compiler prompt's "front door (~2m tall)" example was removed too.
+
+**Verified live** (`scripts/hardcore-test/verify-t133.mjs`, 13/13): new signup → region US / USD with no PUT; tax on without a label → "Sales tax"; compiler on "$3.20 per sqft walls, $450 minimum" → per-unit step 3.2/`sqft`, minimum 450, `ai_signal wall_area_sqft` with `unit: sqft`; widget shows "ZIP code"; a photo-measured quote priced in USD with locale en-US, senior adjudication settling the wall at **1,000 sq ft (band 900–1,100)**. That run used the UK S01 photos, so it proves the plumbing, not US accuracy (real US photos are an owner item). Processing took 223 s locally with adjudication — latency is T-135's concern.
+
+**GB regression (gauntlet round 1 vs final baseline `db8aa9bc`):** full run `8e5db672` — S02/S03/S06/S07/S08 identical; S04/S05/S09/S10 differed by known compile/customer-sim variance and returned to baseline (or within its spread) on re-run `557b164a` (S04 £190, S09 £1,072.50, S10 £330, S05 £1,969 vs £1,921 — simulated payslip count). **One real regression found and fixed: S01 £1,694 → £350 twice.** Cause: the new compiler context made Gemini copy rule 3a's example description nearly verbatim ("total exterior masonry area in square metres — …"), dropping the owner's "to be painted"; the senior adjudicator then read "masonry" as the exposed brick plinth only (6.7–12.5 sqm). Proven by running S01 on the stashed pre-T-133 code (£1,680, "masonry area … to be painted"). Fix: rule 3a now requires the description to state the EXACT charged scope in the owner's words ("area TO BE PAINTED … every surface the job covers") — "the description is the measurer's ONLY definition of scope". After: S01 £1,520.40 and £1,106 (Grade B, render measured; July spread £1,078–£1,740). **Lesson:** prompt examples get copied; an example description must model scope, never just a material.
+
+**Tests:** 13 new region/unit/format tests + 4 measurement tests (sqft conversion, region table beats the model's reported size, legacy GB table default, prompt contains the region table). Worker 306, web 34.
+
+**Files:** `packages/shared/src/{regions/*,units.ts,format.ts,index.ts,database.types.ts,api.types.ts}`, `supabase/migrations/00000000000026_region_layer.sql`, `apps/worker/src/{ai/measurement.ts,ai/wording.ts,quote-processor.ts,pricing/rules-engine.ts,email/index.ts}`, `apps/web/src/app/api/{tenant,public/quotes/[quoteId],public/quotes/[quoteId]/accept,quotes/[quoteId],quotes/[quoteId]/resend,quotes/[quoteId]/pdf,cron/lifecycle,public/widget/config,services/ai-draft/*}`, `apps/web/src/lib/{pdf-template.ts,whatsapp-intake.ts,vertical-packs/*}`, settings/onboarding/quotes/trace/services pages, embed + quote pages, `scripts/hardcore-test/{run.mjs,verify-t133.mjs}`, `Docs/03-data-model.md`
+
+---
+
 ### 2026-07-25: Branding v2 — business identity, bulletproof colour, white-label (still one simple page)
 
 **Direction (user):** "simple, not too complicated, but a little more/better." Three additions chosen for value-per-control; explicitly NOT added: font pickers, secondary colours, custom CSS.
@@ -2882,6 +3023,22 @@ if (pricingResult.estimatedTotal <= 0) {
 - Existing services continue to work (legacy fallback)
 - New services must have all quantities linked to publish
 - Standalone pricing page shows redirect message
+
+---
+
+### AD-030: Units — Metric Geometry, Prices Bind in the Step's Unit (T-133)
+
+**Decision:** Reference tables, anchored geometry and scan dimensions are metric (canonical). A measured quantity converts once, at the point measurement emits it, into the unit its expected signal declares. Everything downstream (form answers, envelopes, rates, takeoff) uses that unit; the pricing engine never converts.
+
+**Rationale:** one conversion site instead of five; a US business types and sees sq ft, prices in $/sq ft, and the engine stays unit-agnostic. Region data (AD-025) supplies units, currency, tax wording and reference sizes; engine code holds none of them.
+
+**Implications:** a signal key should name its unit (`wall_area_sqft`); a missing region on a tenant row means legacy GB.
+
+---
+
+### AD-031: Quote processing is asynchronous in production (2026-11-08)
+
+**Decision:** production enqueues every quote on Cloudflare Queues (`SYNC_QUOTE_PROCESSING=false`); sync `/process` is for local dev and as a rollback lever only. **Why:** photo-measured quotes take 75–150 s, longer than any request a customer or webhook should hold, and turning thinking down to fit made the measurement wrong (S01 £3,355). **Consequences:** the customer can reach a quote before it is priced, so every customer surface must handle `queued`/`generating` (`isQuoteProcessing`); worker job endpoints are token-authenticated; one quote per consumer invocation. **Rejected:** raising `maxDuration` to 300 s (a spinner for minutes, the webhooks still block, and a 53 s adjudication can still exceed it).
 
 ---
 

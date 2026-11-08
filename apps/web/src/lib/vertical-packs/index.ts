@@ -6,16 +6,23 @@
  * one line here — no engine changes.
  */
 
+import type { RegionCode } from '@estimator/shared'
 import type { VerticalPack } from './types'
 import { paintingPack } from './painting'
+import { paintingPackUS } from './painting-us'
 
 export type { VerticalPack, VerticalPackService } from './types'
 
 /** All available packs. */
-const PACKS: VerticalPack[] = [paintingPack]
+const PACKS: VerticalPack[] = [paintingPackUS, paintingPack]
 
-export function listPacks(): VerticalPack[] {
-  return PACKS
+/**
+ * All packs; when a region is given, that region's packs come first so a US
+ * business sees the US variant at the top (other regions stay available).
+ */
+export function listPacks(region?: RegionCode): VerticalPack[] {
+  if (!region) return PACKS
+  return [...PACKS.filter((p) => p.region === region), ...PACKS.filter((p) => p.region !== region)]
 }
 
 export function getPack(id: string): VerticalPack | undefined {

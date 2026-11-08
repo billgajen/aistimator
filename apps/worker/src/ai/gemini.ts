@@ -1,5 +1,6 @@
 /**
- * Gemini 2.5 Flash Client
+ * Gemini client (implements the provider-agnostic AiClient, T-135).
+ * The model always comes from the registry (`@estimator/shared` ai-models).
  *
  * Handles communication with the Gemini API for:
  * - Vision extraction (signals from images)
@@ -7,10 +8,20 @@
  * - Structured output with JSON schema enforcement
  */
 
+import type { AiClient, UsageSink } from './client'
+import { parseModelJson } from './client'
+import type { ModelRoute, ThinkingLevel } from '@estimator/shared'
+import { resolveModelRoute, modelCapabilities, type ModelCapabilities } from '@estimator/shared'
+
 export interface GeminiConfig {
   apiKey: string
+  /** Registry-resolved model; defaults to the registry's wording route */
   model?: string
   maxTokens?: number
+  /** Registry thinking level for the task; null/absent = model default */
+  thinkingLevel?: ThinkingLevel | null
+  /** T-135: per-quote token accounting */
+  usage?: UsageSink
 }
 
 export interface GeminiMessage {
@@ -30,127 +41,62 @@ export interface GeminiResponse {
   usageMetadata?: {
     promptTokenCount: number
     candidatesTokenCount: number
+    /** Thinking tokens — billed as output */
+    thoughtsTokenCount?: number
     totalTokenCount: number
   }
 }
 
-const DEFAULT_MODEL = 'gemini-2.5-flash'
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 
-export class GeminiClient {
+export class GeminiClient implements AiClient {
   private apiKey: string
   private model: string
   private maxTokens: number
+  private thinkingLevel: ThinkingLevel | null
+  private usage?: UsageSink
+  private caps: ModelCapabilities
+  readonly route: ModelRoute
 
   constructor(config: GeminiConfig) {
     this.apiKey = config.apiKey
-    this.model = config.model || DEFAULT_MODEL
+    this.model = config.model || resolveModelRoute('wording').model
     this.maxTokens = config.maxTokens || 4096
+    this.thinkingLevel = config.thinkingLevel ?? null
+    this.usage = config.usage
+    this.caps = modelCapabilities(this.model)
+    this.route = { provider: 'gemini', model: this.model }
   }
 
-  /**
-   * Generate content with text prompt
-   */
+  /** Generate content with text prompt */
   async generateText(prompt: string, systemPrompt?: string): Promise<string> {
-    const messages: GeminiMessage[] = []
-
-    if (systemPrompt) {
-      messages.push({
-        role: 'user',
-        parts: [{ text: systemPrompt }],
-      })
-      messages.push({
-        role: 'model',
-        parts: [{ text: 'Understood. I will follow these instructions.' }],
-      })
-    }
-
-    messages.push({
-      role: 'user',
-      parts: [{ text: prompt }],
-    })
-
-    return this.generate(messages)
+    return this.generate(this.buildRequest(prompt, [], systemPrompt))
   }
 
-  /**
-   * Generate content with images (vision)
-   */
+  /** Generate content with images (vision) */
   async generateWithImages(
     prompt: string,
     images: Array<{ mimeType: string; base64: string }>,
     systemPrompt?: string
   ): Promise<string> {
-    const messages: GeminiMessage[] = []
-
-    if (systemPrompt) {
-      messages.push({
-        role: 'user',
-        parts: [{ text: systemPrompt }],
-      })
-      messages.push({
-        role: 'model',
-        parts: [{ text: 'Understood. I will follow these instructions.' }],
-      })
-    }
-
-    // Build parts with images and prompt
-    const parts: GeminiMessage['parts'] = images.map((img) => ({
-      inlineData: {
-        mimeType: img.mimeType,
-        data: img.base64,
-      },
-    }))
-    parts.push({ text: prompt })
-
-    messages.push({
-      role: 'user',
-      parts,
-    })
-
-    return this.generate(messages)
+    return this.generate(this.buildRequest(prompt, images, systemPrompt))
   }
 
   /**
-   * Generate structured output with JSON schema enforcement.
-   * Uses Gemini's response_mime_type + response_schema to guarantee valid JSON.
-   * Returns parsed T directly — no markdown stripping needed.
+   * Generate structured output. Models with `structuredOutput: 'schema'`
+   * get the provider-enforced response schema; `'prompt'` models (Gemini 3.x,
+   * whose schema-constrained numbers degenerate) get the schema in the prompt
+   * and code validates the result (T-135).
    */
   async generateWithSchema<T>(
     prompt: string,
     schema: Record<string, unknown>,
     systemPrompt?: string
   ): Promise<T> {
-    const messages: GeminiMessage[] = []
-
-    if (systemPrompt) {
-      messages.push({
-        role: 'user',
-        parts: [{ text: systemPrompt }],
-      })
-      messages.push({
-        role: 'model',
-        parts: [{ text: 'Understood. I will follow these instructions.' }],
-      })
-    }
-
-    messages.push({
-      role: 'user',
-      parts: [{ text: prompt }],
-    })
-
-    const text = await this.generate(messages, {
-      responseMimeType: 'application/json',
-      responseSchema: schema,
-    })
-
-    return JSON.parse(text) as T
+    return this.structured<T>(prompt, [], schema, systemPrompt)
   }
 
-  /**
-   * Generate structured output with images and JSON schema enforcement.
-   * Combines vision analysis with guaranteed JSON structure.
-   */
+  /** Structured output with images (vision + JSON) */
   async generateWithImagesAndSchema<T>(
     prompt: string,
     images: Array<{ mimeType: string; base64: string }>,
@@ -158,52 +104,69 @@ export class GeminiClient {
     systemPrompt?: string,
     options?: { temperature?: number; maxOutputTokens?: number }
   ): Promise<T> {
-    const messages: GeminiMessage[] = []
+    return this.structured<T>(prompt, images, schema, systemPrompt, options)
+  }
 
-    if (systemPrompt) {
-      messages.push({
-        role: 'user',
-        parts: [{ text: systemPrompt }],
-      })
-      messages.push({
-        role: 'model',
-        parts: [{ text: 'Understood. I will follow these instructions.' }],
-      })
+  private async structured<T>(
+    prompt: string,
+    images: Array<{ mimeType: string; base64: string }>,
+    schema: Record<string, unknown>,
+    systemPrompt?: string,
+    options?: { temperature?: number; maxOutputTokens?: number }
+  ): Promise<T> {
+    if (this.caps.structuredOutput === 'prompt') {
+      const text = await this.generate(
+        this.buildRequest(`${prompt}\n\n${schemaInstruction(schema)}`, images, systemPrompt),
+        { responseMimeType: 'application/json' },
+        options
+      )
+      return coerceToSchemaRoot<T>(parseModelJson<unknown>(text), schema)
     }
-
-    const parts: GeminiMessage['parts'] = images.map((img) => ({
-      inlineData: {
-        mimeType: img.mimeType,
-        data: img.base64,
-      },
-    }))
-    parts.push({ text: prompt })
-
-    messages.push({
-      role: 'user',
-      parts,
-    })
-
     const text = await this.generate(
-      messages,
-      {
-        responseMimeType: 'application/json',
-        responseSchema: schema,
-      },
+      this.buildRequest(prompt, images, systemPrompt),
+      { responseMimeType: 'application/json', responseSchema: schema },
       options
     )
-
     return JSON.parse(text) as T
+  }
+
+  /**
+   * Request contents. Legacy models get the system prompt as a primed
+   * user/model turn (pre-T-135 behaviour, unchanged); models that reject
+   * prefilled turns get a real system instruction.
+   */
+  private buildRequest(
+    prompt: string,
+    images: Array<{ mimeType: string; base64: string }>,
+    systemPrompt?: string
+  ): { contents: GeminiMessage[]; systemInstruction?: { parts: Array<{ text: string }> } } {
+    const parts: GeminiMessage['parts'] = images.map((img) => ({
+      inlineData: { mimeType: img.mimeType, data: img.base64 },
+    }))
+    parts.push({ text: prompt })
+    const userTurn: GeminiMessage = { role: 'user', parts }
+
+    if (!systemPrompt) return { contents: [userTurn] }
+    if (this.caps.systemInstruction) {
+      return { contents: [userTurn], systemInstruction: { parts: [{ text: systemPrompt }] } }
+    }
+    return {
+      contents: [
+        { role: 'user', parts: [{ text: systemPrompt }] },
+        { role: 'model', parts: [{ text: 'Understood. I will follow these instructions.' }] },
+        userTurn,
+      ],
+    }
   }
 
   /**
    * Internal generate method
    */
   private async generate(
-    messages: GeminiMessage[],
+    request: { contents: GeminiMessage[]; systemInstruction?: { parts: Array<{ text: string }> } },
     structuredOutput?: {
       responseMimeType: string
-      responseSchema: Record<string, unknown>
+      responseSchema?: Record<string, unknown>
     },
     options?: { temperature?: number; maxOutputTokens?: number }
   ): Promise<string> {
@@ -211,16 +174,20 @@ export class GeminiClient {
 
     const generationConfig: Record<string, unknown> = {
       maxOutputTokens: options?.maxOutputTokens ?? this.maxTokens,
-      temperature: options?.temperature ?? 0.3,
     }
+    // Sampling params only for models that still accept them
+    if (this.caps.sampling) generationConfig.temperature = options?.temperature ?? 0.3
+    // Only levels the model's capabilities list reach here (resolveThinkingLevel)
+    if (this.thinkingLevel) generationConfig.thinkingConfig = { thinkingLevel: this.thinkingLevel }
 
     if (structuredOutput) {
       generationConfig.response_mime_type = structuredOutput.responseMimeType
-      generationConfig.response_schema = structuredOutput.responseSchema
+      if (structuredOutput.responseSchema) generationConfig.response_schema = structuredOutput.responseSchema
     }
 
     const body = {
-      contents: messages,
+      contents: request.contents,
+      ...(request.systemInstruction ? { systemInstruction: request.systemInstruction } : {}),
       generationConfig,
     }
 
@@ -239,6 +206,13 @@ export class GeminiClient {
 
     const data: GeminiResponse = await response.json()
 
+    if (data.usageMetadata) {
+      this.usage?.(
+        data.usageMetadata.promptTokenCount ?? 0,
+        (data.usageMetadata.candidatesTokenCount ?? 0) + (data.usageMetadata.thoughtsTokenCount ?? 0)
+      )
+    }
+
     if (!data.candidates || data.candidates.length === 0) {
       throw new Error('Gemini returned no candidates')
     }
@@ -250,32 +224,42 @@ export class GeminiClient {
     if (candidate.finishReason === 'SAFETY') {
       throw new Error('Gemini blocked response due to safety filters')
     }
+    if (candidate.finishReason === 'MAX_TOKENS' && structuredOutput) {
+      // A truncated JSON body can never parse — fail clearly instead of a SyntaxError
+      throw new Error(`Gemini ${this.model} hit MAX_TOKENS before finishing the JSON response`)
+    }
 
-    const text = candidate.content.parts.map((p) => p.text).join('')
-    return text
+    return candidate.content.parts.map((p) => p.text).join('')
   }
 
   /**
    * Parse JSON from Gemini response, handling markdown code blocks
    */
   static parseJSON<T>(text: string): T {
-    // Remove markdown code blocks if present
-    let cleaned = text.trim()
-    if (cleaned.startsWith('```json')) {
-      cleaned = cleaned.slice(7)
-    } else if (cleaned.startsWith('```')) {
-      cleaned = cleaned.slice(3)
-    }
-    if (cleaned.endsWith('```')) {
-      cleaned = cleaned.slice(0, -3)
-    }
-    cleaned = cleaned.trim()
-
-    // Fix trailing commas before } or ] (common Gemini 2.5 issue)
-    cleaned = cleaned.replace(/,\s*([\]}])/g, '$1')
-
-    return JSON.parse(cleaned) as T
+    return parseModelJson<T>(text)
   }
+}
+
+/** Prompt-mode instruction: the schema the response must satisfy (T-135). */
+export function schemaInstruction(schema: Record<string, unknown>): string {
+  return `Respond with a single JSON object only — no prose, no markdown. It must match this JSON Schema (use plain decimal numbers with at most 2 decimal places):\n${JSON.stringify(schema)}`
+}
+
+/**
+ * Prompt-mode result check (pure, tested): models sometimes echo the schema
+ * wrapper ({"type":"object","properties":{...data...}}) — unwrap it; then
+ * require the schema's root `required` keys so a malformed answer fails
+ * loudly instead of flowing into pricing as empty data.
+ */
+export function coerceToSchemaRoot<T>(value: unknown, schema: Record<string, unknown>): T {
+  const required = Array.isArray(schema.required) ? (schema.required as string[]) : []
+  const hasAll = (v: unknown) =>
+    Boolean(v) && typeof v === 'object' && !Array.isArray(v) && required.every((k) => k in (v as Record<string, unknown>))
+  if (hasAll(value)) return value as T
+  const inner = (value as { properties?: unknown } | null)?.properties
+  if (hasAll(inner)) return inner as T
+  if (required.length === 0 && value && typeof value === 'object') return value as T
+  throw new Error(`Structured response missing required keys: ${required.join(', ')}`)
 }
 
 /**
@@ -283,12 +267,12 @@ export class GeminiClient {
  */
 export function createGeminiClient(
   apiKey: string | undefined,
-  options?: { model?: string; maxTokens?: number }
+  options?: { model?: string; maxTokens?: number; usage?: UsageSink }
 ): GeminiClient | null {
   if (!apiKey) {
     console.warn('[Gemini] API key not configured')
     return null
   }
 
-  return new GeminiClient({ apiKey, model: options?.model, maxTokens: options?.maxTokens })
+  return new GeminiClient({ apiKey, model: options?.model, maxTokens: options?.maxTokens, usage: options?.usage })
 }

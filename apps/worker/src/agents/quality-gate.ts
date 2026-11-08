@@ -10,7 +10,7 @@
  * Capped at 1 clarification round to prevent loops.
  */
 
-import type { GeminiClient } from '../ai/gemini'
+import type { AiClient } from '../ai/client'
 import type { ExtractedSignalsV2, ClarificationQuestion, QualityGateResult } from '@estimator/shared'
 import type { PricingResult } from '../pricing/rules-engine'
 import type { FusedSignals, SignalConflict } from './types'
@@ -95,7 +95,7 @@ const CLARIFICATION_QUESTIONS_SCHEMA: Record<string, unknown> = {
  */
 export async function evaluateQualityGate(
   input: QualityGateInput,
-  gemini: GeminiClient | null
+  gemini: AiClient | null
 ): Promise<QualityGateResult> {
   // Cap at 1 clarification round
   if (input.clarificationCount >= 1) {
@@ -283,7 +283,7 @@ async function generateClarificationQuestions(
   signalsToAsk: Array<{ key: string; reason: string }>,
   serviceName: string,
   structuredSignals: ExtractedSignalsV2,
-  gemini: GeminiClient | null
+  gemini: AiClient | null
 ): Promise<ClarificationQuestion[]> {
   if (signalsToAsk.length === 0) return []
 
@@ -328,7 +328,7 @@ async function generateClarificationQuestions(
 async function generateTextQuestions(
   signalsToAsk: Array<{ key: string; reason: string }>,
   serviceName: string,
-  gemini: GeminiClient | null
+  gemini: AiClient | null
 ): Promise<ClarificationQuestion[]> {
   if (signalsToAsk.length === 0) return []
 

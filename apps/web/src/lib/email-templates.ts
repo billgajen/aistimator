@@ -201,9 +201,27 @@ export function generateLimitReachedEmailHtml(data: {
     ? `<strong>Quoting continues uninterrupted</strong> — extra quotes are now billed at
        <strong>${escapeHtml(data.overagePriceLabel)} each</strong> on your next invoice. Upgrade
        to a bigger plan if you expect this regularly; it usually works out cheaper.`
-    : `<strong>New quote requests from your website are now paused</strong> — customers will be asked to
-       contact you directly instead. Upgrade your plan to resume instant quoting immediately, or wait
-       until your limit resets at the start of next month.`
+    : `<strong>New requests are still saved as leads</strong> in your dashboard, but they are not priced
+       automatically — customers are told you'll send their estimate shortly. Upgrade your plan to price
+       them instantly (held leads can be priced with one click after upgrading), or wait until your
+       limit resets at the start of next month.`
+  return generateLimitReachedEmailBody(data, consequence)
+}
+
+/** T-134: one held lead (over the plan limit) — never lose a customer's submission */
+export function generateLeadHeldEmailHtml(data: {
+  businessName: string
+  customerName: string
+  serviceName: string
+  used: number
+  limit: number
+  billingUrl: string
+  quoteUrl: string
+}): string {
+  const consequence = `<strong>${escapeHtml(data.customerName)}</strong> asked for an estimate for
+     <strong>${escapeHtml(data.serviceName)}</strong>. It is saved as a lead but was not priced because
+     your plan's monthly limit is reached. Upgrade to price it instantly, or reply to the customer
+     yourself: <a href="${escapeHtml(data.quoteUrl)}">open the lead</a>.`
   return generateLimitReachedEmailBody(data, consequence)
 }
 

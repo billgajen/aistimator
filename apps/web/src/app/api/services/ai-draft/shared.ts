@@ -4,7 +4,9 @@
  */
 
 import type { ServiceDraftConfig } from '@estimator/shared'
-import { extractFormulaIdentifiers } from '@estimator/shared'
+import { geminiThinkingConfig, geminiUrlFor } from '@/lib/ai/models'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { extractFormulaIdentifiers, normalizeUnit, regionPromptBlock, resolveRegionContext } from '@estimator/shared'
 
 /**
  * Validate and normalize an AI-generated draft config
@@ -230,6 +232,8 @@ interface ExpectedSignalInput {
   type?: string
   possibleValues?: string[]
   description?: string
+  /** T-133: unit of a numeric quantity signal ('sqft', 'sqm', 'ft', 'gal'…) */
+  unit?: string
 }
 
 export function normalizeExpectedSignals(signals: ExpectedSignalInput[]): ServiceDraftConfig['expectedSignals'] {
@@ -242,6 +246,8 @@ export function normalizeExpectedSignals(signals: ExpectedSignalInput[]): Servic
         : 'string',
       possibleValues: signal.type === 'enum' ? signal.possibleValues : undefined,
       description: signal.description || signal.signalKey!,
+      // T-133: keep a recognised unit so measurement converts into it
+      ...(signal.type === 'number' && normalizeUnit(signal.unit) ? { unit: normalizeUnit(signal.unit)! } : {}),
     }))
 }
 
@@ -298,8 +304,6 @@ export function parseGeminiJson<T>(text: string): T {
 /**
  * Gemini API constants
  */
-export const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
-export const DEFAULT_MODEL = 'gemini-2.5-flash'
 
 /**
  * Call Gemini API with system prompt and user prompt
@@ -312,7 +316,8 @@ export async function callGemini(opts: {
   temperature?: number
   maxOutputTokens?: number
 }): Promise<string> {
-  const url = `${GEMINI_API_BASE}/${DEFAULT_MODEL}:generateContent?key=${opts.apiKey}`
+  // T-135: model from the registry ('compile' route covers all config-time drafting)
+  const url = `${geminiUrlFor('compile')}?key=${opts.apiKey}`
 
   const userParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = []
   if (opts.imageParts) {
@@ -336,6 +341,7 @@ export async function callGemini(opts: {
       generationConfig: {
         temperature: opts.temperature ?? 0.7,
         maxOutputTokens: opts.maxOutputTokens ?? 4096,
+        ...geminiThinkingConfig('compile'),
       },
     }),
   })
@@ -353,4 +359,31 @@ export async function callGemini(opts: {
   }
 
   return text
+}
+
+/**
+ * T-133: the tenant's region as a prompt block, so every AI-draft path writes
+ * in the right language variant, currency and units. Never throws — a lookup
+ * failure falls back to the legacy region's conventions.
+ */
+export async function loadTenantRegionBlock(
+  supabase: SupabaseClient,
+  tenantId: string
+): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from('tenants')
+      .select('region, currency, unit_system, tax_label')
+      .eq('id', tenantId)
+      .single()
+    const row = (data ?? {}) as {
+      region?: string | null
+      currency?: string | null
+      unit_system?: string | null
+      tax_label?: string | null
+    }
+    return regionPromptBlock(resolveRegionContext(row))
+  } catch {
+    return regionPromptBlock(resolveRegionContext({}))
+  }
 }

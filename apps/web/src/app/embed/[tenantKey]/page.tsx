@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { formatMoney } from '@estimator/shared'
 import { useSearchParams } from 'next/navigation'
 import { assessImageQuality } from '@/lib/image-quality'
 import { brandStyleVars } from '@/lib/color'
@@ -58,6 +59,13 @@ interface WidgetField {
 
 interface WidgetData {
   tenantName: string
+  /** T-133: regional copy + locale (absent on older API responses) */
+  region?: {
+    code: string
+    locale: string
+    postalCodeLabel: string
+    postalCodeExample: string
+  }
   /** Tenant branding — primary colour override + short-lived logo URL */
   branding?: {
     primaryColor?: string | null
@@ -754,6 +762,8 @@ export default function EmbedPage({ params }: EmbedPageProps) {
           answers={fieldAnswers}
           jobAddress={jobAddress}
           jobPostcode={jobPostcode}
+          postalCodeLabel={widgetData.region?.postalCodeLabel || 'Postcode'}
+          postalCodeExample={widgetData.region?.postalCodeExample || 'SW1A 1AA'}
           jobDescription={jobDescription}
           jobQuantity={jobQuantity}
           measurementModel={serviceMeasurementModel}
@@ -794,7 +804,7 @@ export default function EmbedPage({ params }: EmbedPageProps) {
       )}
       {displayMode !== 'conversational' && step === 'submitting' && <SubmittingState />}
       {step === 'success' && quoteResult && (
-        <SuccessState quoteUrl={quoteResult.quoteViewUrl} quoteId={quoteResult.quoteId} />
+        <SuccessState quoteUrl={quoteResult.quoteViewUrl} quoteId={quoteResult.quoteId} locale={widgetData?.region?.locale} />
       )}
 
       {/* Honeypot — off-screen, never shown to humans */}
@@ -957,6 +967,8 @@ function DetailsStep({
   answers,
   jobAddress,
   jobPostcode,
+  postalCodeLabel,
+  postalCodeExample,
   jobDescription,
   jobQuantity,
   measurementModel,
@@ -972,6 +984,8 @@ function DetailsStep({
   answers: Record<string, string | number | boolean | string[]>
   jobAddress: string
   jobPostcode: string
+  postalCodeLabel: string
+  postalCodeExample: string
   jobDescription: string
   jobQuantity: number | null
   measurementModel: MeasurementModel | null | undefined
@@ -1048,12 +1062,12 @@ function DetailsStep({
             />
           </div>
           <div>
-            <label className="block text-[13px] font-semibold text-text-primary mb-1.5">Postcode</label>
+            <label className="block text-[13px] font-semibold text-text-primary mb-1.5">{postalCodeLabel}</label>
             <input
               type="text"
               value={jobPostcode}
               onChange={(e) => onPostcodeChange(e.target.value)}
-              placeholder="SW1A 1AA"
+              placeholder={postalCodeExample}
               className={`w-full px-4 py-3 text-[15px] border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${inputNormalClass}`}
             />
           </div>
@@ -1740,7 +1754,15 @@ function SubmittingState() {
   )
 }
 
-function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string }) {
+function SuccessState({
+  quoteUrl,
+  quoteId,
+  locale = 'en-GB',
+}: {
+  quoteUrl: string
+  quoteId: string
+  locale?: string
+}) {
   // T-108: poll quote status while the customer is still here — if the quote
   // needs a quick confirmation, route them to it in-flow instead of waiting
   // for an email they may never open.
@@ -1757,16 +1779,21 @@ function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string
   })()
   const clarifyUrl = token ? `/q/${quoteId}/clarify?token=${token}` : null
 
+  // Queue processing: past the poll window we stop and promise the email instead
+  const [timedOut, setTimedOut] = useState(false)
+
   useEffect(() => {
     if (!token) return
     let cancelled = false
     let polls = 0
-    const maxPolls = 20 // ~60s of polling, then fall back to email
+    // ~5 min — photo-measured quotes can take ~2.5 min on the queue
+    const maxPolls = 100
 
     const interval = setInterval(async () => {
       polls++
       if (polls > maxPolls) {
         clearInterval(interval)
+        if (!cancelled) setTimedOut(true)
         return
       }
       try {
@@ -1781,9 +1808,9 @@ function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string
             currency: data.pricing?.currency || 'GBP',
           })
         }
-        if (['awaiting_clarification', 'pending_review', 'sent', 'viewed'].includes(data.status)) {
+        if (['awaiting_clarification', 'pending_review', 'sent', 'viewed', 'failed'].includes(data.status)) {
           setLiveStatus(data.status)
-          if (data.status === 'sent' || data.status === 'viewed') clearInterval(interval)
+          if (['sent', 'viewed', 'failed'].includes(data.status)) clearInterval(interval)
         }
       } catch {
         // Polling is best-effort; email remains the fallback channel
@@ -1796,11 +1823,9 @@ function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string
     }
   }, [quoteId, token])
 
-  const currencySymbol = range
-    ? { GBP: '£', USD: '$', EUR: '€', CAD: '$', AUD: '$', NZD: '$' }[range.currency] || range.currency
-    : ''
+  // T-133: Intl formatting in the tenant's locale, whole units for a range
   const rangeDisplay = range
-    ? `${currencySymbol}${range.low.toLocaleString()} – ${currencySymbol}${range.high.toLocaleString()}`
+    ? `${formatMoney(range.low, range.currency, locale, { decimals: 0 })} – ${formatMoney(range.high, range.currency, locale, { decimals: 0 })}`
     : null
 
   // Quote needs a quick confirmation — bring the customer to it now
@@ -1857,26 +1882,62 @@ function SuccessState({ quoteUrl, quoteId }: { quoteUrl: string; quoteId: string
 
   const isReady = liveStatus === 'sent' || liveStatus === 'viewed'
 
-  return (
-    <div className="text-center py-12 px-6">
-      <div className="w-16 h-16 bg-mint rounded-full flex items-center justify-center mx-auto mb-4">
-        <span className="text-secondary text-2xl">✓</span>
+  if (isReady) {
+    return (
+      <div className="text-center py-12 px-6 animate-fade-in-up">
+        <div className="w-16 h-16 bg-mint rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-secondary text-2xl">✓</span>
+        </div>
+        <h3 className="font-display text-xl font-bold text-text-primary mb-2">Your estimate is ready</h3>
+        <p className="text-sm text-text-secondary mb-6">Your personalised estimate has been prepared — take a look.</p>
+        <a
+          href={quoteUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover transition"
+        >
+          View Your Estimate
+        </a>
       </div>
-      <h3 className="font-display text-xl font-bold text-text-primary mb-2">
-        {isReady ? 'Your quote is ready!' : 'Request Submitted!'}
-      </h3>
-      <p className="text-sm text-text-secondary mb-6">
-        {isReady
-          ? 'Your personalised quote has been prepared — take a look.'
-          : "We're preparing your quote. You'll receive it shortly."}
+    )
+  }
+
+  // Failed, held for the business (no range to show) or unusually slow —
+  // the request is safe; email is the channel now
+  if (liveStatus === 'failed' || liveStatus === 'pending_review' || timedOut) {
+    return (
+      <div className="text-center py-12 px-6">
+        <div className="w-16 h-16 bg-mint rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-secondary text-2xl">✓</span>
+        </div>
+        <h3 className="font-display text-xl font-bold text-text-primary mb-2">We have your request</h3>
+        <p className="text-sm text-text-secondary">
+          {liveStatus === 'pending_review'
+            ? 'The business is checking the details and will email your estimate shortly.'
+            : liveStatus === 'failed'
+              ? 'The business will send your estimate by email shortly — nothing more needed from you.'
+              : 'This one is taking longer than usual. We’ll email you the link the moment it’s ready.'}
+        </p>
+      </div>
+    )
+  }
+
+  // Queued / generating: the worker is pricing it now
+  return (
+    <div className="text-center py-12 px-6" role="status" aria-live="polite">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted mb-3">Request received</p>
+      <h3 className="font-display text-xl font-bold text-text-primary">Preparing your estimate</h3>
+      <div className="tape-rule tape-measuring w-48 mx-auto my-6" aria-hidden="true" />
+      <p className="text-sm text-text-secondary mb-6 max-w-xs mx-auto">
+        This usually takes a minute or two. Keep this open — or we’ll email you the link when it’s ready.
       </p>
       <a
         href={quoteUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover transition"
+        className="text-sm font-semibold text-primary underline underline-offset-4 hover:text-primary-hover"
       >
-        View Your Quote
+        Open the estimate page
       </a>
     </div>
   )

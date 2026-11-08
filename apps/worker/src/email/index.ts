@@ -4,6 +4,7 @@
  * Handles sending quote notification emails to customers and businesses.
  */
 
+import { formatMoney } from '@estimator/shared'
 import { sendEmail, type PostmarkConfig } from './postmark'
 import {
   customerQuoteEmail,
@@ -42,6 +43,8 @@ export interface QuoteEmailData {
     total: number
     currency: string
   }
+  /** T-133: BCP 47 locale from the tenant's region (money + date formatting) */
+  locale?: string
   content?: {
     scopeSummary?: string
     validityDays?: number
@@ -60,26 +63,10 @@ export interface SendQuoteEmailsResult {
 }
 
 /**
- * Format currency for display
+ * Format date for display (T-133: locale from the tenant's region)
  */
-function formatCurrency(amount: number, currency: string): string {
-  const symbols: Record<string, string> = {
-    GBP: '£',
-    USD: '$',
-    EUR: '€',
-    AUD: 'A$',
-    CAD: 'C$',
-    NZD: 'NZ$',
-  }
-  const symbol = symbols[currency] || currency + ' '
-  return `${symbol}${amount.toFixed(2)}`
-}
-
-/**
- * Format date for display
- */
-function formatDate(date: Date): string {
-  return date.toLocaleDateString('en-GB', {
+function formatLongDate(date: Date, locale: string): string {
+  return date.toLocaleDateString(locale, {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -102,14 +89,15 @@ export async function sendQuoteEmails(
   const quoteViewUrl = `${config.appUrl}/q/${data.quoteId}?token=${data.quoteToken}`
   const dashboardUrl = `${config.appUrl}/app/quotes/${data.quoteId}`
 
-  const totalFormatted = formatCurrency(data.pricing.total, data.pricing.currency)
+  const locale = data.locale || 'en-GB'
+  const totalFormatted = formatMoney(data.pricing.total, data.pricing.currency, locale)
 
   // Calculate validity date
   let validUntil: string | undefined
   if (data.content?.validityDays) {
     const validDate = new Date()
     validDate.setDate(validDate.getDate() + data.content.validityDays)
-    validUntil = formatDate(validDate)
+    validUntil = formatLongDate(validDate, locale)
   }
 
   // Send customer email

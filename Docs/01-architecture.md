@@ -33,12 +33,17 @@
 2) Widget collects answers plus photos and documents.
 3) Widget uploads files to Vercel API, receives file ids.
 4) Widget submits quote request payload to Vercel API.
-5) Vercel API stores submission and enqueues job to Cloudflare Queue.
-6) Cloudflare Worker (queue consumer) runs:
+5) Vercel API stores submission and enqueues the job: `POST {worker}/trigger` with
+   `Authorization: Bearer CLOUDFLARE_WORKER_TOKEN` (the worker rejects job requests without it).
+   The request returns with status `queued`; the widget and the hosted quote page show
+   "Preparing your estimate" and poll until the quote settles.
+   (`SYNC_QUOTE_PROCESSING=true` instead calls `/process` and waits — local dev default.)
+6) Cloudflare Worker (queue consumer, one quote per invocation, 3 retries then `failed`) runs:
    - fetch submission from Supabase
-   - run Gemini 1.5 Flash vision extraction on images to produce signals JSON
+   - run vision extraction on images to produce signals JSON (model per task from
+     `packages/shared/src/ai-models.json`)
    - run rules engine using tenant pricing config to compute price and breakdown
-   - generate wording (scope summary, notes) via Gemini 1.5 Flash
+   - generate wording (scope summary, notes)
    - generate hosted quote page data
    - send HTML to DocRaptor API, store returned PDF in R2 (optional toggle)
    - send emails via Postmark and mark quote status

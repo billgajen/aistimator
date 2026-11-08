@@ -14,6 +14,7 @@
  */
 
 import { GeminiClient } from './gemini'
+import type { AiClient } from './client'
 import type {
   ServiceDraftConfig,
   WorkStepConfig,
@@ -162,7 +163,7 @@ Respond with ONLY the JSON object, no other text.`
  * Generate AI draft configuration for a service
  */
 export async function generateServiceDraft(
-  client: GeminiClient,
+  client: AiClient,
   request: ServiceDraftRequest
 ): Promise<ServiceDraftConfig> {
   console.log(`[ServiceDraft] Generating draft for "${request.serviceName}"`)

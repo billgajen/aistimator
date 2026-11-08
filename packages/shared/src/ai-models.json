@@ -1,0 +1,189 @@
+{
+  "_comment": "T-135 model registry: the ONLY place model names live. Override any task at runtime with AI_MODEL_<TASK> (e.g. AI_MODEL_ADJUDICATION=anthropic:claude-opus-5-5). Prices are USD per 1M tokens, copied from the providers' published pages on the asOf date; update them here, never in code. `thinkingLevel` on a task is sent only to models whose capabilities list it (override with AI_THINKING_<TASK>=low|medium|high|default). `models` holds per-model request capabilities; a model not listed keeps the legacy request shape (response schema, system prompt as a primed turn, temperature).",
+  "tasks": {
+    "extraction_pass": {
+      "provider": "gemini",
+      "model": "gemini-3.8-flash"
+    },
+    "adjudication": {
+      "provider": "gemini",
+      "model": "gemini-3.1-pro-preview"
+    },
+    "compile": {
+      "provider": "gemini",
+      "model": "gemini-3.8-flash"
+    },
+    "wording": {
+      "provider": "gemini",
+      "model": "gemini-3.8-flash",
+      "thinkingLevel": "low"
+    },
+    "chat_widget": {
+      "provider": "gemini",
+      "model": "gemini-3.8-flash",
+      "thinkingLevel": "low"
+    },
+    "service_match": {
+      "provider": "gemini",
+      "model": "gemini-3.8-flash",
+      "thinkingLevel": "low"
+    },
+    "identification": {
+      "provider": "gemini",
+      "model": "gemini-3.8-flash"
+    }
+  },
+  "harness": {
+    "customer_sim": {
+      "provider": "gemini",
+      "model": "gemini-2.5-flash"
+    }
+  },
+  "models": {
+    "gemini-3.8-flash": {
+      "structuredOutput": "prompt",
+      "systemInstruction": true,
+      "sampling": false,
+      "note": "Gemini 3.x: schema-constrained numbers degenerate (repeating digits to MAX_TOKENS, verified 2026-11-07); sampling params and prefilled model turns removed per Google's 3.8 Flash migration notes; thinkingLevel low/medium/high accepted, minimal rejected (probed 2026-11-08)",
+      "thinkingLevels": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "gemini-3.6-flash": {
+      "structuredOutput": "prompt",
+      "systemInstruction": true,
+      "sampling": false,
+      "note": "Gemini 3.x: schema-constrained numbers degenerate (repeating digits to MAX_TOKENS, verified 2026-11-07); sampling params and prefilled model turns removed per Google's 3.8 Flash migration notes; thinkingLevel low/medium/high accepted, minimal rejected (probed 2026-11-08)",
+      "thinkingLevels": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "gemini-3.5-flash-lite": {
+      "structuredOutput": "prompt",
+      "systemInstruction": true,
+      "sampling": false,
+      "note": "Gemini 3.x: schema-constrained numbers degenerate (repeating digits to MAX_TOKENS, verified 2026-11-07); sampling params and prefilled model turns removed per Google's 3.8 Flash migration notes; thinkingLevel low/medium/high accepted, minimal rejected (probed 2026-11-08)",
+      "thinkingLevels": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "gemini-3.1-flash-lite": {
+      "structuredOutput": "prompt",
+      "systemInstruction": true,
+      "sampling": false,
+      "note": "Gemini 3.x: schema-constrained numbers degenerate (repeating digits to MAX_TOKENS, verified 2026-11-07); sampling params and prefilled model turns removed per Google's 3.8 Flash migration notes; thinkingLevel low/medium/high accepted, minimal rejected (probed 2026-11-08)",
+      "thinkingLevels": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "gemini-3-flash-preview": {
+      "structuredOutput": "prompt",
+      "systemInstruction": true,
+      "sampling": false,
+      "note": "Gemini 3.x: schema-constrained numbers degenerate (repeating digits to MAX_TOKENS, verified 2026-11-07); sampling params and prefilled model turns removed per Google's 3.8 Flash migration notes; thinkingLevel low/medium/high accepted, minimal rejected (probed 2026-11-08)",
+      "thinkingLevels": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "gemini-3.1-pro-preview": {
+      "structuredOutput": "prompt",
+      "systemInstruction": true,
+      "sampling": false,
+      "note": "Gemini 3.x: schema-constrained numbers degenerate (repeating digits to MAX_TOKENS, verified 2026-11-07); sampling params and prefilled model turns removed per Google's 3.8 Flash migration notes; thinkingLevel low/medium/high accepted, minimal rejected (probed 2026-11-08)",
+      "thinkingLevels": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "gemini-4-argon": {
+      "structuredOutput": "prompt",
+      "systemInstruction": true,
+      "sampling": false,
+      "note": "Gemini 3.x: schema-constrained numbers degenerate (repeating digits to MAX_TOKENS, verified 2026-11-07); sampling params and prefilled model turns removed per Google's 3.8 Flash migration notes; thinkingLevel low/medium/high accepted, minimal rejected (probed 2026-11-08)",
+      "thinkingLevels": [
+        "low",
+        "medium",
+        "high"
+      ]
+    }
+  },
+  "prices": {
+    "gemini-2.5-flash": {
+      "inputPerMTok": 0.3,
+      "outputPerMTok": 2.5,
+      "asOf": "2026-11-07",
+      "source": "aistudio.google.com/docs/pricing (paid, standard). Deprecated: routes to gemini-3.5-flash-lite from 2026-12-01"
+    },
+    "gemini-2.5-pro": {
+      "inputPerMTok": 1.25,
+      "outputPerMTok": 10,
+      "asOf": "2026-11-07",
+      "source": "aistudio.google.com/docs/pricing (<=200k tier). Deprecated: routes to gemini-3.8-flash from 2026-12-01"
+    },
+    "gemini-3.1-pro-preview": {
+      "inputPerMTok": 2,
+      "outputPerMTok": 12,
+      "asOf": "2026-11-07",
+      "source": "aistudio.google.com/docs/pricing (<=200k tier)"
+    },
+    "gemini-3.6-flash": {
+      "inputPerMTok": 0.75,
+      "outputPerMTok": 3.75,
+      "asOf": "2026-11-07",
+      "source": "aistudio.google.com/docs/pricing — introductory to 2026-12-31, then 1.50 / 7.50"
+    },
+    "gemini-3.8-flash": {
+      "inputPerMTok": 0.75,
+      "outputPerMTok": 3.75,
+      "asOf": "2026-11-07",
+      "source": "aistudio.google.com/docs/pricing — introductory to 2026-12-31, then 1.50 / 7.50"
+    },
+    "gemini-3.5-flash-lite": {
+      "inputPerMTok": 0.3,
+      "outputPerMTok": 2.5,
+      "asOf": "2026-11-07",
+      "source": "aistudio.google.com/docs/pricing"
+    },
+    "gemini-3.1-flash-lite": {
+      "inputPerMTok": 0.25,
+      "outputPerMTok": 1.5,
+      "asOf": "2026-11-07",
+      "source": "aistudio.google.com/docs/pricing"
+    },
+    "gemini-4-argon": {
+      "inputPerMTok": 2,
+      "outputPerMTok": 10,
+      "asOf": "2026-11-07",
+      "source": "aistudio.google.com/docs/pricing — introductory to 2026-11-30, then 4.00 / 20.00"
+    },
+    "claude-opus-5-5": {
+      "inputPerMTok": 4,
+      "outputPerMTok": 20,
+      "asOf": "2026-09-25",
+      "source": "Anthropic API pricing (claude-api skill model table)"
+    },
+    "claude-sonnet-5-5": {
+      "inputPerMTok": 2,
+      "outputPerMTok": 10,
+      "asOf": "2026-09-25",
+      "source": "Anthropic API pricing (claude-api skill model table)"
+    },
+    "claude-haiku-4-5": {
+      "inputPerMTok": 1,
+      "outputPerMTok": 5,
+      "asOf": "2026-09-25",
+      "source": "Anthropic API pricing (claude-api skill model table)"
+    }
+  }
+}

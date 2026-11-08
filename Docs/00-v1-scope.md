@@ -14,7 +14,7 @@ Ship a compact SaaS that a business can:
 - Upstash Redis (rate limiting)
 - Supabase (auth + database)
 - Cloudflare R2 (file storage)
-- Gemini 1.5 Flash (AI vision + wording)
+- AI vision + wording via the model registry (`packages/shared/src/ai-models.json`, T-135)
 - DocRaptor (PDF generation)
 - Postmark (email)
 - Stripe (payments)

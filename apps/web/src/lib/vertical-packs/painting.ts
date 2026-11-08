@@ -18,11 +18,12 @@ import type { VerticalPack } from './types'
 
 export const paintingPack: VerticalPack = {
   id: 'painting-decorating',
-  name: 'Painting & Decorating',
+  name: 'Painting & Decorating (UK)',
   description:
     'Interior & exterior painting plus wallpapering — priced per room and per square metre, with photo-based prep detection.',
   icon: '🎨',
   rateCurrency: 'GBP',
+  region: 'GB',
   services: [
     // ────────────────────────────────────────────────────────────────────
     // Interior painting — per-room pricing, customer-answerable quantities

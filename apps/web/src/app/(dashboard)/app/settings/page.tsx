@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { PageHeader } from '@/components/dashboard/EmptyState'
-import type { ServiceAreaMode } from '@estimator/shared'
+import type { ServiceAreaMode, RegionCode, UnitSystem } from '@estimator/shared'
+import { getRegion, listRegions } from '@estimator/shared'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,6 +40,8 @@ interface TenantTemplate {
 interface TenantSettings {
   id: string
   name: string
+  region: RegionCode
+  unitSystem: UnitSystem | null
   currency: string
   taxEnabled: boolean
   taxLabel: string | null
@@ -66,6 +69,8 @@ export default function SettingsPage() {
   // Form state
   const [name, setName] = useState('')
   const [currency, setCurrency] = useState('USD')
+  const [region, setRegion] = useState<RegionCode>('US')
+  const [unitSystem, setUnitSystem] = useState<UnitSystem | null>(null)
   const [taxEnabled, setTaxEnabled] = useState(false)
   const [taxLabel, setTaxLabel] = useState('')
   const [taxRatePercent, setTaxRatePercent] = useState('0')
@@ -100,6 +105,8 @@ export default function SettingsPage() {
       // Populate form
       setName(tenant.name)
       setCurrency(tenant.currency)
+      setRegion(tenant.region)
+      setUnitSystem(tenant.unitSystem)
       setTaxEnabled(tenant.taxEnabled)
       setTaxLabel(tenant.taxLabel || '')
       setTaxRatePercent(((tenant.taxRate || 0) * 100).toString())
@@ -143,7 +150,10 @@ export default function SettingsPage() {
       let updates: Record<string, unknown> = {}
 
       if (section === 'business') {
-        updates = { name, currency }
+        if (!/^[A-Za-z]{3}$/.test(currency.trim())) {
+          throw new Error('Currency must be a 3-letter ISO code, e.g. USD')
+        }
+        updates = { name, region, unitSystem, currency: currency.trim().toUpperCase() }
       } else if (section === 'tax') {
         updates = {
           taxEnabled,
@@ -283,17 +293,61 @@ export default function SettingsPage() {
               <p className="mt-1 text-xs text-text-muted">Email is managed through your account</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-secondary">Currency</label>
+              <label className="block text-sm font-medium text-text-secondary">Region</label>
               <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
+                value={region}
+                onChange={(e) => {
+                  // Choosing a region applies its defaults; each stays overridable
+                  const next = getRegion(e.target.value)
+                  setRegion(next.code)
+                  setCurrency(next.currency)
+                  setUnitSystem(null)
+                }}
                 className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
+                {listRegions().map((r) => (
+                  <option key={r.code} value={r.code}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-text-muted">
+                Sets currency, units, tax wording and {getRegion(region).copy.postalCodeLabel} format on your estimates
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text-secondary">Currency</label>
+              <input
+                type="text"
+                list="currency-options"
+                value={currency}
+                maxLength={3}
+                onChange={(e) => setCurrency(e.target.value.toUpperCase())}
+                className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 uppercase focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              <datalist id="currency-options">
                 {CURRENCIES.map((c) => (
                   <option key={c.code} value={c.code}>
                     {c.label}
                   </option>
                 ))}
+              </datalist>
+              <p className="mt-1 text-xs text-text-muted">Any 3-letter ISO currency code</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text-secondary">Units</label>
+              <select
+                value={unitSystem ?? ''}
+                onChange={(e) =>
+                  setUnitSystem(e.target.value === '' ? null : (e.target.value as UnitSystem))
+                }
+                className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="">
+                  Region default ({getRegion(region).unitSystem === 'imperial' ? 'feet, sq ft' : 'metres, sqm'})
+                </option>
+                <option value="imperial">Imperial (feet, sq ft, gallons)</option>
+                <option value="metric">Metric (metres, sqm, litres)</option>
               </select>
             </div>
           </div>
@@ -334,7 +388,7 @@ export default function SettingsPage() {
                   type="text"
                   value={taxLabel}
                   onChange={(e) => setTaxLabel(e.target.value)}
-                  placeholder="e.g., VAT, GST, Sales Tax"
+                  placeholder={`${getRegion(region).copy.taxLabel} (region default)`}
                   className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
                 <p className="mt-1 text-xs text-text-muted">

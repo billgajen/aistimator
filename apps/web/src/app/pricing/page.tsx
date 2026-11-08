@@ -2,43 +2,37 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
+import { offeredPlans, formatMoney, type PlanDefinition, type PlanChannel } from '@estimator/shared'
 
 export const metadata: Metadata = {
   title: 'Pricing — Aistimator',
   description:
-    'Simple monthly plans for service businesses. Start free with 50 estimates — no card required. Every plan includes the widget, WhatsApp, hosted quote pages and PDFs.',
+    'Simple monthly plans for service businesses. Instant estimates on your website, by text and on site — in your own prices.',
 }
 
-// Keep in sync with the seeded `plans` table (supabase/seed.sql).
-const PLANS = [
-  {
-    name: 'Starter',
-    price: '$29',
-    estimates: '200',
-    overage: '$0.50',
-    tagline: 'For getting off voicemail',
-    features: ['Website widget & AI chat', 'WhatsApp quoting', 'Hosted quote pages & PDFs', 'Email notifications'],
-    highlight: false,
-  },
-  {
-    name: 'Growth',
-    price: '$79',
-    estimates: '1,000',
-    overage: '$0.40',
-    tagline: 'For a steady pipeline',
-    features: ['Everything in Starter', 'Your branding on every quote', 'Lower overage rate'],
-    highlight: true,
-  },
-  {
-    name: 'Pro',
-    price: '$199',
-    estimates: '3,000',
-    overage: '$0.30',
-    tagline: 'For serious volume',
-    features: ['Everything in Growth', 'Priority support', 'API access', 'Lowest overage rate'],
-    highlight: false,
-  },
-]
+// T-134: every number on this page comes from the plan definitions
+// (packages/shared/src/plans.ts) — nothing is duplicated here.
+const OFFERED = offeredPlans()
+const TRIAL_PLAN = OFFERED.find((p) => p.trialDays)
+
+const CHANNEL_LABEL: Record<PlanChannel, string> = {
+  widget: 'Website widget & AI chat',
+  sms: 'Quoting by text (SMS)',
+  whatsapp: 'WhatsApp quoting',
+  mobile_app: 'On-site app for your phone',
+}
+
+function planBullets(plan: PlanDefinition): string[] {
+  const bullets = [...plan.channels.map((c) => CHANNEL_LABEL[c]), 'Hosted estimate pages & PDFs']
+  if (plan.features.custom_branding) bullets.push('Your branding on every estimate')
+  if (plan.features.calibration_insights) bullets.push('Accuracy insights from finished jobs')
+  if (plan.features.lidar_scanning) bullets.push('LiDAR room scanning for exact prices')
+  if (plan.features.multiple_users) bullets.push('Multiple team members')
+  if (plan.features.priority_support) bullets.push('Priority support')
+  return bullets
+}
+
+const dollars = (cents: number) => formatMoney(cents / 100, 'USD', 'en-US', { decimals: cents % 100 === 0 ? 0 : 2 })
 
 const FAQS = [
   {
@@ -47,15 +41,21 @@ const FAQS = [
   },
   {
     q: 'What happens when I hit my monthly limit?',
-    a: 'On a paid plan, extra estimates simply continue at your plan’s per-estimate overage rate, metered on your monthly bill. You’ll see usage warnings in your dashboard well before that.',
+    a: 'You never lose a customer. New requests are saved as leads and the customer is told you’ll send their estimate shortly; you can upgrade and price them with one click. There are no surprise per-estimate charges. You’ll see a warning in your dashboard at 80%.',
   },
   {
     q: 'Does the AI decide my prices?',
     a: 'No — this is the one rule we never break. The AI measures the job; the price is calculated from rates you configure. You can review every quote before it sends if you want to.',
   },
   {
-    q: 'How does the free start work?',
-    a: 'Your first 50 estimates are free, no card required. Pick a plan whenever you’re ready — your setup and quote history carry straight over.',
+    q: 'How does the free trial work?',
+    a: TRIAL_PLAN
+      ? `${TRIAL_PLAN.name} comes with a ${TRIAL_PLAN.trialDays}-day free trial. A card is required to start; you won’t be charged until the trial ends, and you can cancel before then.`
+      : 'Pick a plan when you’re ready — your setup and quote history carry straight over.',
+  },
+  {
+    q: 'Is there annual billing?',
+    a: 'Yes — pay yearly and get two months free.',
   },
   {
     q: 'Can I cancel anytime?',
@@ -73,19 +73,32 @@ export default function PricingPage() {
           One missed job pays for the year.
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg text-text-secondary">
-          Every plan includes everything — the widget, WhatsApp, quote pages, PDFs. Plans differ
-          only in how many estimates you send.
+          Instant estimates in your own prices — on your website, by text, and on site. Subscription only:
+          no commission, no per-lead fees.
         </p>
-        <p className="mt-3 text-sm text-text-muted">
-          Start free with 50 estimates. No card required.
-        </p>
+        {TRIAL_PLAN && (
+          <p className="mt-3 text-sm text-text-muted">
+            {TRIAL_PLAN.trialDays}-day free trial on {TRIAL_PLAN.name}. Pay yearly, get two months free.
+          </p>
+        )}
       </section>
 
       <section className="mx-auto max-w-6xl px-6 py-12">
         <div className="grid gap-6 lg:grid-cols-3">
-          {PLANS.map((plan) => (
+          {OFFERED.map((def) => {
+            const plan = {
+              name: def.name,
+              tagline: def.tagline,
+              price: dollars(def.monthlyPrice.USD ?? 0),
+              estimates: def.quoteLimit.toLocaleString('en-US'),
+              features: planBullets(def),
+              highlight: Boolean(def.recommended),
+              cta: def.trialDays ? `Start ${def.trialDays}-day trial` : `Choose ${def.name}`,
+              annual: def.annualPrice?.USD ? dollars(def.annualPrice.USD) : null,
+            }
+            return (
             <div
-              key={plan.name}
+              key={def.id}
               className={`relative flex flex-col rounded-warm-2xl p-8 ${
                 plan.highlight
                   ? 'bg-primary text-white shadow-warm-lg'
@@ -113,9 +126,11 @@ export default function PricingPage() {
               <p className={`mt-5 text-sm ${plan.highlight ? 'text-white/90' : 'text-text-primary'}`}>
                 <span className="figure font-medium">{plan.estimates}</span> estimates a month
               </p>
-              <p className={`mt-1 text-xs ${plan.highlight ? 'text-white/60' : 'text-text-muted'}`}>
-                then <span className="figure">{plan.overage}</span> per extra estimate
-              </p>
+              {plan.annual && (
+                <p className={`mt-1 text-xs ${plan.highlight ? 'text-white/60' : 'text-text-muted'}`}>
+                  or <span className="figure">{plan.annual}</span> a year (two months free)
+                </p>
+              )}
               <ul className={`mt-5 flex-1 space-y-2.5 text-sm ${plan.highlight ? 'text-white/85' : 'text-text-secondary'}`}>
                 {plan.features.map((feature) => (
                   <li key={feature} className="flex gap-2">
@@ -125,20 +140,21 @@ export default function PricingPage() {
                 ))}
               </ul>
               <Link
-                href="/signup"
+                href={`/signup?plan=${def.id}`}
                 className={`mt-8 rounded-lg py-3 text-center text-sm font-semibold transition-colors ${
                   plan.highlight
                     ? 'bg-white text-primary hover:bg-mint'
                     : 'bg-primary text-white hover:bg-primary-hover'
                 }`}
               >
-                Start free
+                {plan.cta}
               </Link>
             </div>
-          ))}
+            )
+          })}
         </div>
         <p className="mt-8 text-center text-xs text-text-muted">
-          Prices exclude tax. Overage is metered monthly on paid plans only.
+          Prices in USD, excluding sales tax. Change or cancel your plan anytime from billing.
         </p>
       </section>
 
@@ -170,7 +186,7 @@ export default function PricingPage() {
           href="/signup"
           className="mt-6 inline-block rounded-lg bg-primary px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
         >
-          Start free
+          {TRIAL_PLAN ? `Start your ${TRIAL_PLAN.trialDays}-day trial` : 'Get started'}
         </Link>
       </section>
 

@@ -14,6 +14,7 @@
  */
 
 import { GeminiClient } from './gemini'
+import type { AiClient } from './client'
 
 // ============================================================================
 // AD-014: LOCATION CONTEXT CONFLICT DETECTION
@@ -133,7 +134,7 @@ export interface DetectedServiceResult {
  * - "can you fix the broken fence too" → matches "Fence Repair" service
  */
 export async function detectServicesFromDescription(
-  client: GeminiClient,
+  client: AiClient,
   primaryServiceName: string,
   description: string,
   availableServices: ServiceForMatching[]

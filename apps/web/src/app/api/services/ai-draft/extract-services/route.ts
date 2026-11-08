@@ -1,7 +1,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
 import type { ServiceDraftConfig } from '@estimator/shared'
-import { validateAndNormalizeDraftBulk, callGemini, parseGeminiJson } from '../shared'
+import { validateAndNormalizeDraftBulk, callGemini, parseGeminiJson, loadTenantRegionBlock } from '../shared'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 
 /**
@@ -110,7 +110,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const userPrompt = `Analyze this pricing document and extract ALL service categories with their line items.
+    // T-133: region conventions (language variant, currency, units)
+    const regionBlock = await loadTenantRegionBlock(supabase, profile.tenant_id)
+    const userPrompt = `${regionBlock}
+
+Analyze this pricing document and extract ALL service categories with their line items.
 
 Each section/heading in the document = one service.
 Each line item under that section = one workStep within that service.

@@ -9,7 +9,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import type { ServiceDraftConfig, AddonConfig, MultiplierConfig } from '@estimator/shared'
+import type { ServiceDraftConfig, AddonConfig, MultiplierConfig, RegionCode } from '@estimator/shared'
+import { getRegion, listRegions, currencySymbol as symbolFor } from '@estimator/shared'
 import { describePricingRules } from '@/lib/pricing-describe'
 import { listPacks, getPack } from '@/lib/vertical-packs'
 
@@ -17,6 +18,8 @@ interface OnboardingFlowProps {
   businessName: string
   tenantKey: string
   appOrigin: string
+  /** T-133: tenant region (US for new signups, GB for legacy tenants) */
+  initialRegion: RegionCode
   initialCurrency: string
   initialTaxEnabled: boolean
   /** DB decimal rate (0.2 = 20%) or null */
@@ -34,15 +37,6 @@ interface DraftService {
   selected: boolean
 }
 
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  USD: '$',
-  GBP: '£',
-  EUR: '€',
-  CAD: '$',
-  AUD: '$',
-  NZD: '$',
-}
-
 function isUnpriced(svc: DraftService): boolean {
   return svc.draft.pricing.workSteps.length === 0 && svc.draft.pricing.baseFee === 0
 }
@@ -51,6 +45,7 @@ export function OnboardingFlow({
   businessName,
   tenantKey,
   appOrigin,
+  initialRegion,
   initialCurrency,
   initialTaxEnabled,
   initialTaxRate,
@@ -62,8 +57,11 @@ export function OnboardingFlow({
   const [sourceMode, setSourceMode] = useState<'website' | 'describe' | 'template'>('website')
   const [websiteUrl, setWebsiteUrl] = useState('')
   const [businessDescription, setBusinessDescription] = useState('')
-  // T-113: vertical pack templates
-  const availablePacks = listPacks()
+  // T-133: region first — it decides currency, units and which packs fit
+  const [region, setRegion] = useState<RegionCode>(initialRegion)
+  const regionDef = getRegion(region)
+  // T-113: vertical pack templates (this region's packs listed first)
+  const availablePacks = listPacks(region)
   const [selectedPackId, setSelectedPackId] = useState<string | null>(null)
 
   // Extracted services
@@ -84,7 +82,7 @@ export function OnboardingFlow({
   // Basics
   const [currency, setCurrency] = useState(initialCurrency || 'USD')
   const [taxEnabled, setTaxEnabled] = useState(initialTaxEnabled)
-  const [taxLabel, setTaxLabel] = useState(initialCurrency === 'GBP' ? 'VAT' : 'Tax')
+  const [taxLabel, setTaxLabel] = useState(getRegion(initialRegion).copy.taxLabel)
   const [taxRatePct, setTaxRatePct] = useState(
     initialTaxRate !== null ? Math.round(initialTaxRate * 100) : 20
   )
@@ -93,7 +91,16 @@ export function OnboardingFlow({
   // Creation
   const [createdCount, setCreatedCount] = useState(0)
 
-  const currencySymbol = CURRENCY_SYMBOLS[currency] || '$'
+  const currencySymbol = symbolFor(currency, regionDef.locale)
+
+  /** T-133: choosing a region applies its defaults (all still editable) */
+  const handleRegionChange = (code: string) => {
+    const next = getRegion(code)
+    setRegion(next.code)
+    setCurrency(next.currency)
+    setTaxLabel(next.copy.taxLabel)
+    setSelectedPackId(null)
+  }
 
   /** T-113: apply a vertical pack — no network, no AI, instant */
   const handleApplyPack = () => {
@@ -242,6 +249,7 @@ export function OnboardingFlow({
         method: 'PUT', // the tenant route exports PUT (verified: PATCH 405s)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          region,
           currency,
           taxEnabled,
           ...(taxEnabled && { taxLabel, taxRate: Math.min(100, Math.max(0, taxRatePct)) / 100 }),
@@ -350,8 +358,24 @@ export function OnboardingFlow({
           <h1 className="font-display text-3xl font-extrabold tracking-tight text-text-primary">
             Let&apos;s get {businessName} quoting in minutes
           </h1>
-          <p className="mt-2 text-text-secondary">
-            First: where should we learn about your services?
+          <div className="mt-5 max-w-xs">
+            <label className="mb-1 block text-sm font-medium text-text-secondary">
+              Where is your business?
+            </label>
+            <select
+              value={region}
+              onChange={(e) => handleRegionChange(e.target.value)}
+              className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              {listRegions().map((r) => (
+                <option key={r.code} value={r.code}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="mt-4 text-text-secondary">
+            Next: where should we learn about your services?
           </p>
 
           <div className={`mt-6 grid gap-3 ${availablePacks.length > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
@@ -714,7 +738,7 @@ export function OnboardingFlow({
                   className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
                 />
                 <span className="text-sm font-medium text-text-primary">
-                  Add tax to quotes (VAT, GST, sales tax)
+                  Add {regionDef.copy.taxLabel.toLowerCase()} to estimates
                 </span>
               </label>
               {taxEnabled && (
@@ -725,7 +749,7 @@ export function OnboardingFlow({
                       type="text"
                       value={taxLabel}
                       onChange={(e) => setTaxLabel(e.target.value)}
-                      placeholder="VAT"
+                      placeholder={regionDef.copy.taxLabel}
                       className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                   </div>
@@ -752,7 +776,7 @@ export function OnboardingFlow({
                 type="text"
                 value={serviceArea}
                 onChange={(e) => setServiceArea(e.target.value)}
-                placeholder="Postcodes or ZIP prefixes, comma-separated — e.g. SW1, SW2, SE1"
+                placeholder={`${regionDef.copy.postalCodeLabel}s or prefixes, comma-separated — e.g. ${regionDef.copy.postalPrefixExample}`}
                 className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               <p className="mt-1 text-xs text-text-muted">

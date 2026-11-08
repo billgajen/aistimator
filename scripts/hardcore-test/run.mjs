@@ -59,7 +59,15 @@ async function runScenario(scenario) {
 
     expectOk('tenant settings', await http('PUT', `${cfg.appUrl}/api/tenant`, {
       headers: authed,
-      body: { currency: 'GBP', taxEnabled: false, serviceAreaMode: 'none', serviceAreaValues: [] },
+      // T-133: new signups default to region US; rounds 1–2 are GB businesses,
+      // so they pin GB explicitly (scenario.region/currency override for US sets)
+      body: {
+        region: scenario.region || 'GB',
+        currency: scenario.currency || 'GBP',
+        taxEnabled: false,
+        serviceAreaMode: 'none',
+        serviceAreaValues: [],
+      },
     }))
 
     // 2. Public widget key (no API exists — direct insert, same shape the dashboard uses)
@@ -75,7 +83,7 @@ async function runScenario(scenario) {
       for (let attempt = 1; ; attempt++) {
         const res = await http('POST', `${cfg.appUrl}/api/services/ai-draft/compile`, {
           headers: authed,
-          body: { description, serviceName: scenario.service, currency: 'GBP' },
+          body: { description, serviceName: scenario.service, currency: scenario.currency || 'GBP' },
           timeoutMs: 180_000,
         })
         if (res.ok) return res.json

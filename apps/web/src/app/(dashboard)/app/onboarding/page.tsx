@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
+import { getRegion } from '@estimator/shared'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +34,7 @@ export default async function OnboardingPage() {
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('name, currency, tax_enabled, tax_rate')
+    .select('name, region, currency, tax_enabled, tax_rate')
     .eq('id', profile.tenant_id)
     .single()
 
@@ -72,6 +73,7 @@ export default async function OnboardingPage() {
         businessName={tenant?.name || 'your business'}
         tenantKey={tenantKey}
         appOrigin={appOrigin}
+        initialRegion={getRegion(tenant?.region).code}
         initialCurrency={tenant?.currency || 'USD'}
         initialTaxEnabled={tenant?.tax_enabled ?? false}
         initialTaxRate={tenant?.tax_rate ?? null}

@@ -10,10 +10,14 @@ import { createRateLimiter } from './rate-limiter'
 import type { RateLimiter } from './rate-limiter'
 import { getSupabaseClient, updateQuoteStatus } from './supabase'
 import { processQuote } from './quote-processor'
+import { authorizeJobRequest } from './auth'
 
 export interface Env {
-  // Queue bindings
-  QUOTE_JOBS: Queue
+  // Queue binding (production only — see wrangler.toml)
+  QUOTE_JOBS?: Queue
+
+  // Shared secret the web app sends as a Bearer token to /process, /trigger, /stats
+  CLOUDFLARE_WORKER_TOKEN?: string
 
   // R2 bucket for assets
   ASSETS?: R2Bucket
@@ -25,6 +29,18 @@ export interface Env {
   UPSTASH_REDIS_URL?: string
   UPSTASH_REDIS_TOKEN?: string
   GEMINI_API_KEY?: string
+  // T-135: Claude adapter (only needed when a task is routed to anthropic:*)
+  ANTHROPIC_API_KEY?: string
+  // T-135: per-task model overrides, e.g. AI_MODEL_ADJUDICATION="anthropic:<model-id>"
+  AI_MODEL_EXTRACTION_PASS?: string
+  AI_MODEL_ADJUDICATION?: string
+  AI_MODEL_WORDING?: string
+  AI_MODEL_IDENTIFICATION?: string
+  AI_MODEL_SERVICE_MATCH?: string
+  // Per-task Gemini 3 thinking level override: low | medium | high | default
+  AI_THINKING_EXTRACTION_PASS?: string
+  AI_THINKING_ADJUDICATION?: string
+  AI_THINKING_WORDING?: string
 
   // Measurement Engine (T-117): ensemble pass count for AI-measured quantities
   MEASUREMENT_PASSES?: string
@@ -55,12 +71,12 @@ export interface QuoteJobMessage {
   quoteRequestId: string
   tenantId: string
   timestamp: number
-  retryCount?: number
   /** Plain text token for quote view URL (needed for email links) */
   quoteToken?: string
 }
 
-// Maximum retries before marking as failed
+// Maximum retries before marking as failed. Must not exceed `max_retries` in
+// wrangler.toml, or the queue dead-letters the message before we mark it failed.
 const MAX_RETRIES = 3
 
 // Base delay for exponential backoff (seconds)
@@ -72,6 +88,10 @@ const BASE_DELAY_SECONDS = 30
 function getBackoffDelay(retryCount: number): number {
   // Exponential backoff: 30s, 60s, 120s
   return BASE_DELAY_SECONDS * Math.pow(2, retryCount)
+}
+
+function jsonResponse(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
 /**
@@ -119,6 +139,10 @@ export default {
       )
     }
 
+    // Everything below drives jobs or exposes stats — token required
+    const denied = authorizeJobRequest(request, env)
+    if (denied) return denied
+
     // Rate limit stats endpoint (for monitoring)
     if (url.pathname === '/stats' && request.method === 'GET') {
       const rateLimiter = createRateLimiter(env.UPSTASH_REDIS_URL, env.UPSTASH_REDIS_TOKEN)
@@ -137,36 +161,34 @@ export default {
       })
     }
 
-    // Manual job trigger endpoint (for testing)
+    // Enqueue endpoint — the web app's production path (SYNC_QUOTE_PROCESSING=false)
     if (url.pathname === '/trigger' && request.method === 'POST') {
+      let body: QuoteJobMessage
       try {
-        const body = (await request.json()) as QuoteJobMessage
-
-        if (!body.quoteId || !body.quoteRequestId || !body.tenantId) {
-          return new Response(
-            JSON.stringify({ error: 'Missing required fields: quoteId, quoteRequestId, tenantId' }),
-            {
-              status: 400,
-              headers: { 'Content-Type': 'application/json' },
-            }
-          )
-        }
-
-        // Enqueue the job
-        await env.QUOTE_JOBS.send(body)
-
-        return new Response(JSON.stringify({ success: true, message: 'Job enqueued' }), {
-          headers: { 'Content-Type': 'application/json' },
-        })
+        body = (await request.json()) as QuoteJobMessage
       } catch {
-        return new Response(JSON.stringify({ error: 'Invalid request body' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        })
+        return jsonResponse({ error: 'Invalid request body' }, 400)
       }
+
+      if (!body.quoteId || !body.quoteRequestId || !body.tenantId) {
+        return jsonResponse({ error: 'Missing required fields: quoteId, quoteRequestId, tenantId' }, 400)
+      }
+
+      if (!env.QUOTE_JOBS) {
+        console.error('[Worker] /trigger called but the QUOTE_JOBS queue is not bound')
+        return jsonResponse({ error: 'Queue not configured' }, 503)
+      }
+
+      try {
+        await env.QUOTE_JOBS.send(body)
+      } catch (error) {
+        console.error('[Worker] Queue send failed:', error instanceof Error ? error.message : error)
+        return jsonResponse({ error: 'Queue send failed' }, 502)
+      }
+      return jsonResponse({ success: true, message: 'Job enqueued' }, 200)
     }
 
-    // Direct processing endpoint (for development - bypasses queue)
+    // Direct processing endpoint (local dev, and production while SYNC_QUOTE_PROCESSING=true)
     if (url.pathname === '/process' && request.method === 'POST') {
       const supabase = getSupabaseClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY)
       if (!supabase) {
@@ -251,7 +273,8 @@ export default {
 
     for (const message of batch.messages) {
       const job = message.body
-      const retryCount = job.retryCount || 0
+      // Cloudflare counts deliveries (first = 1); the message body never changes
+      const retryCount = message.attempts - 1
 
       console.log(
         `[Worker] Processing job: quoteId=${job.quoteId}, retry=${retryCount}/${MAX_RETRIES}`
@@ -316,7 +339,7 @@ export default {
           errorMessage.includes('rate limit') ||
           errorMessage.includes('quota')
 
-        if (isRateLimitError) {
+        if (isRateLimitError && retryCount < MAX_RETRIES) {
           // Longer delay for API rate limits
           console.log(`[Worker] API rate limit hit, retrying in 60s`)
           message.retry({ delaySeconds: 60 })

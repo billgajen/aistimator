@@ -17,7 +17,7 @@ You are building a SaaS platform that lets businesses embed an estimate widget o
 - DB and Auth: Supabase Postgres + Supabase Auth
 - Payments: Stripe
 - Email: Postmark
-- AI: Gemini 1.5 Flash (vision extraction + wording)
+- AI: models per task come from the registry `packages/shared/src/ai-models.json` (Gemini by default, Claude pluggable; override with `AI_MODEL_<TASK>`). Never hardcode a model name.
 - PDF: DocRaptor API (external service)
 - WhatsApp (later): WhatsApp Business Platform (Cloud API)
 
