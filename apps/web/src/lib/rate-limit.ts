@@ -4,7 +4,7 @@
  * Protects unauthenticated intake endpoints (/api/public/quotes, uploads/init,
  * widget/chat) with per-IP and per-tenant-key counters. These run BEFORE any
  * DB writes or AI calls — the worker's rate limiter only guards AI processing
- * and is bypassed entirely when SYNC_QUOTE_PROCESSING=true.
+ * and only applies on the queue path (SYNC_QUOTE_PROCESSING=false).
  *
  * Fail-open by design (same decision as plan-limits): missing Redis config or
  * Redis errors must never block legitimate quote requests.

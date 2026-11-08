@@ -1,4 +1,4 @@
-import { geminiUrlFor } from './models'
+import { geminiThinkingConfig, geminiUrlFor } from './models'
 /**
  * AI Service Matcher
  *
@@ -93,6 +93,7 @@ Calibration rules (R2-1b):
           maxOutputTokens: 2048,
           temperature: 0.1, // Low temperature for consistent results
           responseMimeType: 'application/json',
+          ...geminiThinkingConfig('service_match'),
         },
       }),
     })

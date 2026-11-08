@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
 import type { ServiceDraftConfig, DocumentType } from '@estimator/shared'
 import { validateAndNormalizeDraft, parseGeminiJson, loadTenantRegionBlock } from './shared'
-import { geminiUrlFor } from '@/lib/ai/models'
+import { geminiThinkingConfig, geminiUrlFor } from '@/lib/ai/models'
 
 /**
  * POST /api/services/ai-draft
@@ -153,6 +153,7 @@ async function generateServiceDraft(
       generationConfig: {
         temperature: 0.7,
         maxOutputTokens: 4096,
+        ...geminiThinkingConfig('compile'),
       },
     }),
   })

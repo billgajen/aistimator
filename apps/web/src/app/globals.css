@@ -158,7 +158,18 @@
 .animation-delay-300 { animation-delay: 225ms; animation-fill-mode: both; }
 .animation-delay-400 { animation-delay: 300ms; animation-fill-mode: both; }
 
+/* "Measuring" — the tape rule drawn past a fixed point while an estimate is
+   being prepared. Shifts by one 40px tape beat so the loop is seamless. */
+@keyframes tape-measuring {
+  from { background-position: 0 100%, 0 100%; }
+  to { background-position: 40px 100%, 40px 100%; }
+}
+.tape-measuring {
+  animation: tape-measuring 1.2s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .tape-measuring,
   .animate-fade-in-up,
   .animation-delay-100,
   .animation-delay-200,

@@ -32,6 +32,11 @@ export interface ModelRoute {
   model: string
 }
 
+/** Gemini 3.x thinking depth. Thinking tokens count against maxOutputTokens and dominate latency. */
+export type ThinkingLevel = 'low' | 'medium' | 'high'
+
+const THINKING_LEVELS: ThinkingLevel[] = ['low', 'medium', 'high']
+
 export interface ModelPrice {
   inputPerMTok: number
   outputPerMTok: number
@@ -48,12 +53,23 @@ export interface ModelCapabilities {
   systemInstruction: boolean
   /** Model accepts sampling parameters such as temperature */
   sampling: boolean
+  /** Thinking levels the model accepts; empty = never send one (Gemini 2.5 rejects the field) */
+  thinkingLevels: ThinkingLevel[]
 }
 
 /** Legacy request shape — what every model got before T-135 */
-const LEGACY_CAPABILITIES: ModelCapabilities = { structuredOutput: 'schema', systemInstruction: false, sampling: true }
+const LEGACY_CAPABILITIES: ModelCapabilities = {
+  structuredOutput: 'schema',
+  systemInstruction: false,
+  sampling: true,
+  thinkingLevels: [],
+}
 
 const MODEL_CAPS = (registry as { models?: Record<string, Partial<ModelCapabilities>> }).models ?? {}
+
+function isThinkingLevel(value: string): value is ThinkingLevel {
+  return (THINKING_LEVELS as string[]).includes(value)
+}
 
 /** Request capabilities for a model (registry data; unlisted models keep the legacy shape). */
 export function modelCapabilities(model: string): ModelCapabilities {
@@ -63,10 +79,16 @@ export function modelCapabilities(model: string): ModelCapabilities {
     structuredOutput: caps.structuredOutput === 'prompt' ? 'prompt' : 'schema',
     systemInstruction: caps.systemInstruction === true,
     sampling: caps.sampling !== false,
+    thinkingLevels: (caps.thinkingLevels ?? []).filter(isThinkingLevel),
   }
 }
 
-const DEFAULTS = registry.tasks as Record<AiTask, ModelRoute>
+type TaskEntry = ModelRoute & { thinkingLevel?: string }
+
+const TASKS = registry.tasks as Record<AiTask, TaskEntry>
+const DEFAULTS: Record<AiTask, ModelRoute> = Object.fromEntries(
+  AI_TASKS.map((task) => [task, { provider: TASKS[task].provider, model: TASKS[task].model }])
+) as Record<AiTask, ModelRoute>
 const PRICES = registry.prices as Record<string, ModelPrice>
 
 /** Legacy env names still honoured so existing deployments keep their routing */
@@ -106,6 +128,19 @@ export function resolveModelRoute(task: AiTask, env: EnvLike = {}): ModelRoute {
     if (parsed) return parsed
   }
   return fallback
+}
+
+/**
+ * Thinking level to send for a task on a given model, or null to send none.
+ * `AI_THINKING_<TASK>` overrides the registry ("default" clears it). A level
+ * the model does not accept is dropped, so re-routing a task to a model
+ * without thinking levels (e.g. by AI_MODEL_<TASK>) never breaks the request.
+ */
+export function resolveThinkingLevel(task: AiTask, model: string, env: EnvLike = {}): ThinkingLevel | null {
+  const override = env[`AI_THINKING_${task.toUpperCase()}`]?.trim().toLowerCase()
+  const level = override || TASKS[task].thinkingLevel
+  if (!level || !isThinkingLevel(level)) return null
+  return modelCapabilities(model).thinkingLevels.includes(level) ? level : null
 }
 
 /** Pinned model for test tooling (the simulated customer must not drift between comparisons). */

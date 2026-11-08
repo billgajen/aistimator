@@ -10,7 +10,7 @@
 
 import type { AiClient, UsageSink } from './client'
 import { parseModelJson } from './client'
-import type { ModelRoute } from '@estimator/shared'
+import type { ModelRoute, ThinkingLevel } from '@estimator/shared'
 import { resolveModelRoute, modelCapabilities, type ModelCapabilities } from '@estimator/shared'
 
 export interface GeminiConfig {
@@ -18,6 +18,8 @@ export interface GeminiConfig {
   /** Registry-resolved model; defaults to the registry's wording route */
   model?: string
   maxTokens?: number
+  /** Registry thinking level for the task; null/absent = model default */
+  thinkingLevel?: ThinkingLevel | null
   /** T-135: per-quote token accounting */
   usage?: UsageSink
 }
@@ -51,6 +53,7 @@ export class GeminiClient implements AiClient {
   private apiKey: string
   private model: string
   private maxTokens: number
+  private thinkingLevel: ThinkingLevel | null
   private usage?: UsageSink
   private caps: ModelCapabilities
   readonly route: ModelRoute
@@ -59,6 +62,7 @@ export class GeminiClient implements AiClient {
     this.apiKey = config.apiKey
     this.model = config.model || resolveModelRoute('wording').model
     this.maxTokens = config.maxTokens || 4096
+    this.thinkingLevel = config.thinkingLevel ?? null
     this.usage = config.usage
     this.caps = modelCapabilities(this.model)
     this.route = { provider: 'gemini', model: this.model }
@@ -173,6 +177,8 @@ export class GeminiClient implements AiClient {
     }
     // Sampling params only for models that still accept them
     if (this.caps.sampling) generationConfig.temperature = options?.temperature ?? 0.3
+    // Only levels the model's capabilities list reach here (resolveThinkingLevel)
+    if (this.thinkingLevel) generationConfig.thinkingConfig = { thinkingLevel: this.thinkingLevel }
 
     if (structuredOutput) {
       generationConfig.response_mime_type = structuredOutput.responseMimeType

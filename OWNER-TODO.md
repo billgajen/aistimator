@@ -28,7 +28,7 @@ Code for every item is already built; these are the steps that unlock it.
 - [ ] **Optional: an Anthropic API key** to try Claude for adjudication or identification. Set
   `ANTHROPIC_API_KEY` in the worker (`wrangler secret put ANTHROPIC_API_KEY`) and, to switch,
   `AI_MODEL_ADJUDICATION=anthropic:<model-id>`. The adapter is unit-tested but has never run live.
-- [ ] **Deploy before 1 December 2026.** Google reroutes `gemini-2.5-flash` to `gemini-3.5-flash-lite`
+- [ ] **Deploy before 1 December 2026** — follow `DEPLOY.md` step by step (Queues chosen; Workers Paid done 2026-11-08). Google reroutes `gemini-2.5-flash` to `gemini-3.5-flash-lite`
   that day; the new defaults move every task off 2.5 explicitly. Until this deploys, production runs
   the old defaults.
 - [ ] **Budget for the January price change.** `gemini-3.8-flash` goes from $0.75/$3.75 to

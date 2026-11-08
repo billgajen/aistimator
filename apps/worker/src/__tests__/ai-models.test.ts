@@ -117,15 +117,54 @@ describe('Claude schema translation (T-135)', () => {
 })
 
 import { vi } from 'vitest'
-import { modelCapabilities } from '@estimator/shared'
+import { modelCapabilities, resolveThinkingLevel } from '@estimator/shared'
 import { GeminiClient, coerceToSchemaRoot, schemaInstruction } from '../ai/gemini'
 
 describe('per-model request capabilities (T-135)', () => {
   it('keeps the legacy request shape for unlisted models', () => {
-    expect(modelCapabilities('some-unlisted-model')).toEqual({ structuredOutput: 'schema', systemInstruction: false, sampling: true })
+    expect(modelCapabilities('some-unlisted-model')).toEqual({
+      structuredOutput: 'schema',
+      systemInstruction: false,
+      sampling: true,
+      thinkingLevels: [],
+    })
   })
   it('switches Gemini 3.x to prompt-described JSON, real system instruction, no sampling', () => {
-    expect(modelCapabilities('gemini-3.8-flash')).toEqual({ structuredOutput: 'prompt', systemInstruction: true, sampling: false })
+    expect(modelCapabilities('gemini-3.8-flash')).toEqual({
+      structuredOutput: 'prompt',
+      systemInstruction: true,
+      sampling: false,
+      thinkingLevels: ['low', 'medium', 'high'],
+    })
+  })
+})
+
+describe('per-task thinking level', () => {
+  const flash = resolveModelRoute('wording').model
+
+  it('comes from the registry and is env-overridable', () => {
+    expect(resolveThinkingLevel('wording', flash)).toBe('low')
+    expect(resolveThinkingLevel('wording', flash, { AI_THINKING_WORDING: 'HIGH' })).toBe('high')
+    expect(resolveThinkingLevel('wording', flash, { AI_THINKING_WORDING: 'default' })).toBeNull()
+    expect(resolveThinkingLevel('adjudication', resolveModelRoute('adjudication').model)).toBeNull()
+  })
+
+  it('is dropped for models that do not accept it (Gemini 2.5 returns 400)', () => {
+    expect(resolveThinkingLevel('wording', 'gemini-2.5-flash')).toBeNull()
+    expect(resolveThinkingLevel('wording', flash, { AI_THINKING_WORDING: 'minimal' })).toBeNull()
+  })
+
+  it('the factory sends thinkingConfig only when a level applies', async () => {
+    const bodies: Array<{ generationConfig: Record<string, unknown> }> = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      bodies.push(JSON.parse(String((init as RequestInit).body)))
+      return new Response(JSON.stringify({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: 'ok' }], role: 'model' } }] }))
+    })
+    await createAiClient('wording', { GEMINI_API_KEY: 'k' })!.generateText('p')
+    await createAiClient('adjudication', { GEMINI_API_KEY: 'k' })!.generateText('p')
+    await createAiClient('wording', { GEMINI_API_KEY: 'k', AI_MODEL_WORDING: 'gemini-2.5-flash' } as object)!.generateText('p')
+    expect(bodies.map((b) => b.generationConfig.thinkingConfig)).toEqual([{ thinkingLevel: 'low' }, undefined, undefined])
+    vi.restoreAllMocks()
   })
 })
 

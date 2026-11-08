@@ -4,7 +4,7 @@
  */
 
 import type { ServiceDraftConfig } from '@estimator/shared'
-import { geminiUrlFor } from '@/lib/ai/models'
+import { geminiThinkingConfig, geminiUrlFor } from '@/lib/ai/models'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { extractFormulaIdentifiers, normalizeUnit, regionPromptBlock, resolveRegionContext } from '@estimator/shared'
 
@@ -341,6 +341,7 @@ export async function callGemini(opts: {
       generationConfig: {
         temperature: opts.temperature ?? 0.7,
         maxOutputTokens: opts.maxOutputTokens ?? 4096,
+        ...geminiThinkingConfig('compile'),
       },
     }),
   })

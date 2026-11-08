@@ -22,6 +22,11 @@ code work is checks and guards.
 ## Out of scope
 - Any pricing, AI or UX change.
 
+## Progress
+- 2026-11-08: async processing built and verified locally (queue bindings, one quote per invocation,
+  retry fix, token auth on worker job endpoints, preparing state in widget + quote page). Production
+  rollout is in `DEPLOY.md`. The live criterion below is ticked after the smoke test.
+
 ## Acceptance criteria
 - [ ] Missing env vars produce a clear startup error naming each one
 - [ ] A live quote submission is processed via the queue (not sync) and emails the customer and the business

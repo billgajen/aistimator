@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { brandStyleVars } from '@/lib/color'
 import type { QuoteViewResponse, QuoteStatus } from '@estimator/shared'
-import { formatMoney, formatDate, formatNumber, currencySymbol, unitDisplayLabel } from '@estimator/shared'
+import { formatMoney, formatDate, formatNumber, currencySymbol, unitDisplayLabel, isQuoteProcessing } from '@estimator/shared'
 
 interface QuotePageProps {
   params: { quoteId: string }
@@ -65,6 +65,41 @@ export default function QuotePage({ params }: QuotePageProps) {
 
     fetchQuote()
   }, [quoteId, token])
+
+  // Queue path: the customer can arrive before the worker has priced the quote.
+  // Poll quietly (poll=1 doesn't count as a view); once the status moves on,
+  // load it normally so the real view is recorded.
+  const [slowPreparing, setSlowPreparing] = useState(false)
+  const processing = isQuoteProcessing(quote?.status)
+  useEffect(() => {
+    if (!processing || !token) return
+    let cancelled = false
+    let polls = 0
+    const maxPolls = 150 // ~10 min, then stop and promise the email
+    const interval = setInterval(async () => {
+      polls++
+      if (polls > maxPolls) {
+        clearInterval(interval)
+        if (!cancelled) setSlowPreparing(true)
+        return
+      }
+      try {
+        const poll = await fetch(`/api/public/quotes/${quoteId}?token=${token}&poll=1`)
+        if (!poll.ok) return
+        const polled = (await poll.json()) as QuoteViewResponse
+        if (cancelled || isQuoteProcessing(polled.status)) return
+        clearInterval(interval)
+        const full = await fetch(`/api/public/quotes/${quoteId}?token=${token}`)
+        if (!cancelled && full.ok) setQuote((await full.json()) as QuoteViewResponse)
+      } catch {
+        // best-effort; the next tick retries
+      }
+    }, 4000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [processing, quoteId, token])
 
   async function handleAccept() {
     if (!token || accepting) return
@@ -187,6 +222,48 @@ export default function QuotePage({ params }: QuotePageProps) {
   const brandVars = brandStyleVars(branding?.primaryColor)
   const showAcceptButton = acceptQuoteEnabled !== false
   const canSubmitFeedback = ['sent', 'viewed', 'revised'].includes(status) && !feedbackSubmitted && !accepted && !declined
+
+  // Not priced yet (queued / generating), or processing failed: no document to show
+  if (processing || status === 'failed') {
+    const failed = status === 'failed'
+    return (
+      <div className="min-h-screen bg-background py-8 px-4 sm:py-14" style={brandVars}>
+        <div className="max-w-2xl mx-auto animate-fade-in-up">
+          <div className="bg-background rounded-warm-2xl shadow-document overflow-hidden">
+            <Letterhead
+              business={business}
+              status={status}
+              reference={reference}
+              customerName={customer.name}
+              locale={locale}
+            />
+            <div className="px-6 sm:px-10 py-10 bg-primary text-on-primary" role="status" aria-live="polite">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-primary/60 mb-3">
+                Estimate for {customer.name}
+              </p>
+              <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">
+                {failed ? `Your request is with ${business.name}` : 'Preparing your estimate'}
+              </h1>
+              <div className={`tape-rule-light mt-8 ${failed || slowPreparing ? '' : 'tape-measuring'}`} aria-hidden="true" />
+              <p className="mt-6 text-sm text-on-primary/80 max-w-md">
+                {failed
+                  ? `${business.name} will send your estimate by email shortly — nothing more needed from you.`
+                  : slowPreparing
+                    ? 'This one is taking longer than usual. We’ll email you the link the moment it’s ready.'
+                    : `${business.name} is pricing your job from the details you sent. This usually takes a minute or two — this page updates by itself.`}
+              </p>
+              {!failed && !slowPreparing && (
+                <p className="mt-2 text-xs text-on-primary/60 max-w-md">
+                  You can close it: we’ll email you the link as soon as it’s ready.
+                </p>
+              )}
+            </div>
+          </div>
+          <DocumentFooter footerNotes={branding?.footerNotes} showPoweredBy={branding?.showPoweredBy !== false} />
+        </div>
+      </div>
+    )
+  }
 
   // T-109 range-first: provisional quotes show an estimated range, not exact pricing
   if (quote.provisional) {
@@ -947,8 +1024,8 @@ function DocumentFooter({
 
 function StatusBadge({ status }: { status: QuoteStatus }) {
   const statusConfig: Record<QuoteStatus, { label: string; className: string }> = {
-    queued: { label: 'Processing', className: 'bg-butter text-tertiary' },
-    generating: { label: 'Processing', className: 'bg-butter text-tertiary' },
+    queued: { label: 'Preparing', className: 'bg-butter text-tertiary' },
+    generating: { label: 'Preparing', className: 'bg-butter text-tertiary' },
     pending_review: { label: 'Under review', className: 'bg-butter text-tertiary' },
     awaiting_clarification: { label: 'Awaiting info', className: 'bg-butter text-tertiary' },
     sent: { label: 'Ready to review', className: 'bg-mint text-primary' },
@@ -959,7 +1036,8 @@ function StatusBadge({ status }: { status: QuoteStatus }) {
     declined: { label: 'Declined', className: 'bg-surface text-text-muted' },
     paid: { label: 'Paid', className: 'bg-secondary-light text-secondary' },
     expired: { label: 'Expired', className: 'bg-surface text-text-muted' },
-    failed: { label: 'Error', className: 'bg-danger-light text-danger' },
+    // Customer-facing: a failed run is the business's problem, not an error to show
+    failed: { label: 'Received', className: 'bg-surface text-text-muted' },
   }
 
   const config = statusConfig[status] || statusConfig.sent

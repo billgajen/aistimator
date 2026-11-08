@@ -15,6 +15,10 @@ GEMINI_API_KEY=your-gemini-api-key
 # Environment
 ENVIRONMENT=development
 
+# Bearer token for /process, /trigger, /stats (must match the web app's CLOUDFLARE_WORKER_TOKEN).
+# Optional in local dev only; production refuses every job request without it.
+# CLOUDFLARE_WORKER_TOKEN=
+
 # Rate limit overrides (optional)
 # RATE_LIMIT_GLOBAL=100
 # RATE_LIMIT_TENANT=10

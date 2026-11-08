@@ -7,7 +7,7 @@
 
 import type { AiTask, AiUsageMeter } from '@estimator/shared'
 import type { AiClient, AiEnv } from './client'
-import { routeFor, usageSinkFor } from './client'
+import { routeFor, thinkingFor, usageSinkFor } from './client'
 import { GeminiClient } from './gemini'
 import { AnthropicClient } from './anthropic'
 
@@ -32,5 +32,11 @@ export function createAiClient(
     console.warn('[AI] GEMINI_API_KEY not configured')
     return null
   }
-  return new GeminiClient({ apiKey: env.GEMINI_API_KEY, model: route.model, maxTokens: options?.maxTokens, usage })
+  return new GeminiClient({
+    apiKey: env.GEMINI_API_KEY,
+    model: route.model,
+    maxTokens: options?.maxTokens,
+    thinkingLevel: thinkingFor(task, route.model, env),
+    usage,
+  })
 }

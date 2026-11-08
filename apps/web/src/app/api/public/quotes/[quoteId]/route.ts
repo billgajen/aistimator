@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { resolveRegionContext } from '@estimator/shared'
+import { isQuoteProcessing, resolveRegionContext } from '@estimator/shared'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
@@ -87,7 +87,9 @@ export async function GET(
     // Skip when this is a background status poll (T-108) — the widget polls
     // after submission and must not count as the customer viewing the quote.
     const isStatusPoll = url.searchParams.get('poll') === '1'
-    if (!quote.viewed_at && !isStatusPoll) {
+    // Queue path: opening the page before the worker has priced the quote is
+    // not a view of the estimate (it would also block the later sent → viewed).
+    if (!quote.viewed_at && !isStatusPoll && !isQuoteProcessing(quote.status)) {
       await supabase
         .from('quotes')
         .update({

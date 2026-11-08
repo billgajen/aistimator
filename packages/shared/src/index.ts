@@ -32,6 +32,9 @@ export * from './ai-models'
 // Re-export plan definitions (T-134)
 export * from './plans'
 
+// Quote status groups (queue processing)
+export * from './quote-status'
+
 // ID prefixes for stable, readable IDs
 export const ID_PREFIXES = {
   tenant: 'tnt_',

@@ -7,8 +7,8 @@
  * model per task is switched by env (`AI_MODEL_<TASK>`) with no code change.
  */
 
-import type { AiTask, AiUsageMeter, ModelRoute } from '@estimator/shared'
-import { resolveModelRoute } from '@estimator/shared'
+import type { AiTask, AiUsageMeter, ModelRoute, ThinkingLevel } from '@estimator/shared'
+import { resolveModelRoute, resolveThinkingLevel } from '@estimator/shared'
 
 export interface ImageInput {
   mimeType: string
@@ -70,4 +70,9 @@ export function stringEnv(env: object): Record<string, string | undefined> {
 /** Resolve the route for a task with this env's overrides. */
 export function routeFor(task: AiTask, env: object): ModelRoute {
   return resolveModelRoute(task, stringEnv(env))
+}
+
+/** Registry thinking level for a task on its routed model (env-overridable). */
+export function thinkingFor(task: AiTask, model: string, env: object): ThinkingLevel | null {
+  return resolveThinkingLevel(task, model, stringEnv(env))
 }

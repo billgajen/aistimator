@@ -93,6 +93,12 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
         return
       }
 
+      // The re-price runs on the queue: the quote page shows "Preparing your
+      // estimate" and fills in when it's ready (the thank-you is the fallback)
+      if (token) {
+        window.location.replace(`/q/${quoteId}?token=${encodeURIComponent(token)}`)
+        return
+      }
       setSubmitted(true)
     } catch {
       setError('Failed to submit answers')

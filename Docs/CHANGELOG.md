@@ -15,6 +15,49 @@
 
 ## Issues & Resolutions
 
+### 2026-11-08: Queue processing in production + worker auth + "Preparing your estimate" (AD-031)
+
+**Decision (owner):** Cloudflare Queues over raising `maxDuration`. Photo-measured quotes take 75–150 s (see the thinking-level entry below), and sync processing held the customer's request, and the SMS/WhatsApp webhooks, for the whole pipeline. Owner upgraded to Workers Paid on 2026-11-08.
+
+**Built:**
+- `wrangler.toml`: production producer + consumer on `quote-jobs` (DLQ `quote-jobs-dlq`), **`max_batch_size = 1`**. The old commented block had 10, which processes ten quotes in series in one invocation and would exceed the consumer's wall time at ~150 s each. Also a simulated local queue (`quote-jobs-local`) so the consumer path can be tested with `wrangler dev`.
+- **Worker auth** (`src/auth.ts`): `/process`, `/trigger` and `/stats` require `Authorization: Bearer CLOUDFLARE_WORKER_TOKEN` (constant-time compare). **Before this, they accepted anyone's request**: any caller could re-run a quote's AI pipeline. Fails closed: a missing secret → 503 outside `ENVIRONMENT=development`. `/health` stays public. The web app already sent the header; `getQueueStats` now does too.
+- **Two latent consumer bugs fixed:** (1) the retry count came from `job.retryCount` in the message body, which never changes. A repeatedly failing quote would dead-letter without ever being marked `failed` and sit at `generating` forever; now it uses `message.attempts`. (2) Provider 429s retried without limit; they now stop at MAX_RETRIES too. `/trigger` returns 400 bad body, 503 queue not bound, 502 send failed (was a 400 for everything).
+- `SYNC_QUOTE_PROCESSING` is an explicit switch (`isSyncProcessing`): `true`/`false` decide, unset = sync in local dev, async in production. Previously local dev could never use the queue.
+- **Customer UI** (`isQuoteProcessing` in shared = `queued`/`generating`):
+  - Widget success screen: "Preparing your estimate" with an animated tape rule (`.tape-measuring`, static under reduced motion). Polls for 5 min (was 60 s), then "Your estimate is ready" / "We have your request" (failed or held for review) / taking-longer-than-usual + email.
+  - Hosted quote page: preparing panel in the document shell, polling every 4 s with `poll=1` (not a view). It loads normally once the status moves on, so the real view is recorded. `failed` shows "Your request is with {business}" instead of an empty document, and the badge says "Received", not a red "Error".
+  - Public quote API no longer stamps `viewed_at` while processing (it would have blocked the later `sent → viewed`).
+  - Clarify now redirects to the quote page after submitting, which shows the preparing state, instead of a static thank-you.
+
+**Verified locally (queue path, token on):** S08 submission 3.3 s (sync 78 s), clarify 0.5 s, the consumer processed both runs, £435.54 exact, 7/7 checks. Unauthenticated `/process` and `/stats` → 401. Screenshots of the widget (preparing/ready/failed, mocked status API) and the quote page (desktop + 390 px, plus a live `queued → sent` swap in 1.8 s with the view recorded only after the swap).
+
+**Deploy constraint:** the new worker rejects job requests without the token, so the token goes to both sides first, then the **web deploys first (still sync)**, then the worker, then `SYNC_QUOTE_PROCESSING=false`. `DEPLOY.md` steps 5–9. Rollback lever: `SYNC_QUOTE_PROCESSING=true` (the new worker still serves `/process`).
+
+**Tests:** worker `worker-entry.test.ts` (12: auth matrix, fail-closed, `/trigger` error codes, consumer ack/retry/final-attempt-fails/429 cap), web `queue.test.ts` (3: sync switch, processing statuses).
+
+**Files:** `apps/worker/{wrangler.toml,src/index.ts,src/auth.ts,.dev.vars.example}`, `apps/web/src/lib/{queue.ts,rate-limit.ts}`, `apps/web/src/app/{embed/[tenantKey]/page.tsx,q/[quoteId]/page.tsx,q/[quoteId]/clarify/page.tsx,api/public/quotes/[quoteId]/route.ts,globals.css}`, `packages/shared/src/{quote-status.ts,index.ts}`, `apps/web/.env.example`, `Docs/01-architecture.md`, `README.md`, `DEPLOY.md`, tests
+
+---
+
+### 2026-11-08: Per-task Gemini thinking level + production deploy prep (T-135 follow-up)
+
+**What broke:** wording on `gemini-3.8-flash` hit MAX_TOKENS on most quotes. Gemini 3 thinking tokens count against `maxOutputTokens` (default 4,096); one S08 wording call used 3,933 thinking tokens for 156 output tokens. The structured call failed, then fell back to a second text call: 57 s of a 146 s submission. Same trap class as the 2.5 thinking truncations (R2-1 matcher, compile 8192→16384).
+
+**Fix (registry data):** optional `thinkingLevel` per task in `ai-models.json` (`wording`, `chat_widget` and `service_match` = `low`) and `thinkingLevels` per model capability. `resolveThinkingLevel(task, model, env)` honours `AI_THINKING_<TASK>` (`low|medium|high|default`) and **drops a level the model doesn't list**. Gemini 2.5 returns HTTP 400 for any `thinkingConfig`, and every 3.x model rejects `minimal` (probed 2026-11-08 for 3.8/3.6/3.5-lite/3.1-lite/3-flash-preview/3.1-pro-preview/4-argon). The worker factory passes the level to `GeminiClient`; web chat, matcher and compile spread `geminiThinkingConfig(task)`. Compile, extraction_pass, adjudication and identification send nothing (model default).
+
+**Measured (local, submission request):** S08 146 s → 78 s, £435.54 unchanged, wording 32 s+25 s → 3.7 s. S01 147 s / 116 s (£2,061.60 / £1,526, Grade B). **Rejected: `low` on extraction_pass + adjudication.** S01 dropped to 35 s, but zero thinking made the three passes agree (cov 0) on 110.9 sqm, about 2× the 55–65 sqm default-thinking runs, and the low-thinking senior accepted it: £3,355 sent. Vision and adjudication thinking is accuracy, not overhead.
+
+**Constraint:** photo-measured quotes still take 75–150 s per request (three sequential ~22 s measurement passes, plus adjudication at 6–53 s). Sync processing behind a 60 s `maxDuration` cannot hold them. Options and the recommendation (Cloudflare Queues, T-132) are in `DEPLOY.md` §0. Also found, not fixed: the worker's `/process` and `/trigger` never check the `CLOUDFLARE_WORKER_TOKEN` bearer the web app sends.
+
+**Deploy prep:** `DEPLOY.md` (migrations 26–28, env, merge, smoke test) and `scripts/deploy-migrations-26-28.sh`. The script refuses to run unless production is at 25 and records history per file, because migration 27 is not re-runnable (verified locally: a re-run fails on `CREATE TRIGGER` and rolls back).
+
+**Tests:** 3 new in `ai-models.test.ts` (registry default + env override + `default` clears; dropped for 2.5 and `minimal`; factory body has `thinkingConfig` only when a level applies). Worker 324, web 60.
+
+**Files:** `packages/shared/src/{ai-models.json,ai-models.ts}`, `apps/worker/src/ai/{client.ts,factory.ts,gemini.ts}`, `apps/worker/src/index.ts`, `apps/web/src/lib/ai/{models.ts,service-matcher.ts}`, `apps/web/src/app/api/{public/widget/chat,services/ai-draft,services/ai-draft/shared.ts}`, `apps/worker/src/__tests__/ai-models.test.ts`, `DEPLOY.md`, `scripts/deploy-migrations-26-28.sh`
+
+---
+
 ### 2026-11-07: T-134 — Subscription-Only USD Plans (AD-026)
 
 **Built:** one plan source `packages/shared/src/plans.ts` (US Starter/Pro/Business with monthly + annual prices, quote limits, channels, features, `overageEnabled: false`, 14-day card-required trial on Pro; legacy plans kept with their limits and overage for existing subscribers; `NO_SUBSCRIPTION_LIMIT` US 10 / GB 50 — no free tier for US). Read by `checkPlanLimit`, `plan-features.ts` (white-label + new `hasPlanFeature`/`hasPlanChannel`), `/api/billing`, the pricing page and the homepage teaser (`lib/plans-view.ts` maps definitions to `PlanInfo`; no number is typed twice). The `plans` table keeps rows only as FK targets (migration 28 adds the US ids, deactivates legacy rows).
@@ -2990,6 +3033,12 @@ if (pricingResult.estimatedTotal <= 0) {
 **Rationale:** one conversion site instead of five; a US business types and sees sq ft, prices in $/sq ft, and the engine stays unit-agnostic. Region data (AD-025) supplies units, currency, tax wording and reference sizes; engine code holds none of them.
 
 **Implications:** a signal key should name its unit (`wall_area_sqft`); a missing region on a tenant row means legacy GB.
+
+---
+
+### AD-031: Quote processing is asynchronous in production (2026-11-08)
+
+**Decision:** production enqueues every quote on Cloudflare Queues (`SYNC_QUOTE_PROCESSING=false`); sync `/process` is for local dev and as a rollback lever only. **Why:** photo-measured quotes take 75–150 s, longer than any request a customer or webhook should hold, and turning thinking down to fit made the measurement wrong (S01 £3,355). **Consequences:** the customer can reach a quote before it is priced, so every customer surface must handle `queued`/`generating` (`isQuoteProcessing`); worker job endpoints are token-authenticated; one quote per consumer invocation. **Rejected:** raising `maxDuration` to 300 s (a spinner for minutes, the webhooks still block, and a 53 s adjudication can still exceed it).
 
 ---
 

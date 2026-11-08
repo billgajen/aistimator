@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { geminiUrlFor } from '@/lib/ai/models'
+import { geminiThinkingConfig, geminiUrlFor } from '@/lib/ai/models'
 import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
 import { NextResponse } from 'next/server'
 
@@ -314,6 +314,7 @@ ${isStart ? 'This is the start of the conversation. Greet the customer warmly an
           temperature: 0.7,
           response_mime_type: 'application/json',
           response_schema: responseSchema,
+          ...geminiThinkingConfig('chat_widget'),
         },
       }),
     })
