@@ -15,6 +15,31 @@
 
 ## Issues & Resolutions
 
+### 2026-11-09: T-146 — Business review by default; no confidence language for customers
+
+**Owner decision (before the HVAC re-test):** quotes wait for the business to approve them, and the customer never sees grades or certainty words.
+
+**Built:**
+1. **Review by default (AD-034).** New `services.auto_send` (migration 30, default **false**, existing services included). The worker (`quote-processor.ts` 4.9) holds any quote that would have gone out (`sent` → `pending_review`) unless the service has auto-send on. Clarification rounds and the AI quality gate still run first. The business gets a **"Review and approve: {customer} - {service}"** email (`sendReviewRequestEmail`) with the price or measured range and, when a check held it, the reason. Quotes the business created in its own app don't email it. Before T-146, a `pending_review` quote emailed nobody.
+2. **One-tap approval:** `POST /api/quotes/:id/approve` (`lib/quote-approval.ts`; dashboard cookie or app Bearer). It only accepts priced `pending_review` quotes, and a status guard in the UPDATE stops a double tap sending twice. It sets `approved_at`/`approved_by`, issues a fresh link for the "Your quote from …" email, and **keeps the customer's existing link valid** via `quotes.previous_token_hash`, accepted by every public token route (`quoteTokenFilter`). Before this, approving rotated the token and broke the open widget/quote page. Dashboard: **Approve & send** button, "Awaiting your approval" status. Mobile app: the same button on the quote screen. Editing then "Save & Send" also counts as approval, and a held quote's first send now emails the first-quote template, not "Updated quote".
+3. **Customer-facing: exactly two states.** The public quote API never returns `pricing.estimate` (the type is now `Omit<QuotePricing,'estimate'>`). It returns `review: {state: 'estimate'|'quote'}`, plus `estimateRange` (unlabelled) for an unreviewed estimate with uncertain quantities. The quote page shows "This is an estimate based on your photos and details. {business} will review and confirm it." or "Reviewed and confirmed by {business}." The A/B/C seal, the "Measured range" label and "this range becomes your exact price" are gone. While held, the page and widget say "Your estimate is being prepared. {business} will review and send it shortly", with the range **only if the engine measured one**. The old ±12% band around a flat price was invented, and the live check caught a $1,400 flat quote showing "$1,230–$1,570".
+4. **Takeoff in plain words:** `TakeoffEntry.method` is now "From your photos", "From your answers", "3 ton — from the air conditioner's rating plate" or "From the on-site room scan" (`takeoff.ts plainSource`). The technical audit (passes, spread, decoded model number) moved to `evidence`, which the public API strips and the business keeps.
+5. **Generated text:** the engine note "quantity from AI signal (lower confidence)" became "estimated from your photos and details". The legacy-config advice note and "requires business owner review" went to logs (the page shows the state). The wording prompt forbids "exact", "firm", "preliminary", "guaranteed", grades, confidence and AI.
+6. **Business-only grade panel** on the dashboard quote page: grade, label, description, internal range, and the hold reason.
+7. **Guard:** `shared/customer-language.ts` (`findConfidenceLanguage`, `findConfidenceLanguageInPayload`: banned words, grade labels, a `grade` key, "confidence"). The gauntlet now fails any public payload that trips it and reads grades from the dashboard API. Gauntlet services set `autoSend: true`, because it measures pricing. A unit test scans the customer-facing source files.
+8. **Flat-rate grade cap fix (follow-up to the AC test fix):** `priceDependsOnJobFacts` also takes the service's work steps. A step chosen by a form answer (`when`) or an identified value (`triggerSignal`) is a job fact even though its trace line carries no signals. Without this, a garage door picked by "Door size" would have been capped at B whenever a site visit was suggested.
+
+**Verified:** `verify-t146.mts` 20/20 live:
+- Default service holds the quote, and the customer sees "being prepared" with no number for the flat price.
+- Internal grade A at $1,400.
+- A rival business gets 404; approval works and a second tap gets 400.
+- The pre-approval link still opens, showing "quote" at $1,400 with no range and no grade.
+- An auto-send service goes straight out as an "estimate".
+- Bearer (app) approval works, and the setting can be turned on later.
+
+Unit tests: worker 428, web +10 (source scan, payload guard, approval rules, token filter).
+Targeted gauntlet (round 3: S31 AC plate, S37 exterior painting from photos, S38 compiled HVAC): 3/3 inside their bands, no warnings, every public payload clean. Takeoff reads "646.2 sqft — From your photos" and "3 ton AC system — Selected for 3 ton, as you confirmed". The range is unlabelled. Lint, typecheck and web and worker builds all pass.
+
 ### 2026-11-09: Production AC test: flat-rate "Grade A exact", dropped draft add-ons, ICP-style plate codes
 
 **What broke (production quote qte_b92180ec, demo tenant):** an AI-drafted "Central AC Replacement" (not the HVAC pack) went out at $4,550, labelled **"Grade A, this price is exact"**. The price was five fixed amounts that ignored tonnage, efficiency and the attic location, and the assessment itself said a site visit was needed. The AI draft also had a $450 attic surcharge, which never reached the saved service.
@@ -3357,6 +3382,10 @@ if (pricingResult.estimatedTotal <= 0) {
 ### AD-033: The business app authenticates with the Supabase access token as a bearer (T-137)
 
 **Decision:** the server Supabase client accepts `Authorization: Bearer <access token>` in place of the session cookie, bound to that user, so the mobile app reuses every dashboard API under the same RLS. Only user tokens (JWT role `authenticated`) are honoured. New `/api/app/*` routes exist only where the app needs something the dashboard doesn't have (bootstrap, on-site create without bot checks, a compact quote view, business answers). **Rejected:** a separate API-key scheme (a second auth system to secure), and minting cookies on the device (fragile, and couples the app to @supabase/ssr's cookie format).
+
+### AD-034: The business reviews by default; grades are business-only (T-146)
+
+**Decision:** a quote reaches the customer only after the business approves it, unless the service opts in to "Send automatically without review". The customer sees exactly two states, an **Estimate** (unreviewed) and a **Quote** ("Reviewed and confirmed by {business}"), and never a grade, a grade label, or the words "exact", "firm" or "preliminary". Uncertain quantities show as an unlabelled range. Grades and confidence stay in `pricing_json`, on the dashboard and in the accuracy tracking. **Why:** the honest promise is the business's confirmation, not the model's self-assessed precision ("Grade A, exact" on a flat $4,550 AC replacement). **Rules that follow:** the public quote API is the only customer data path, so it strips `estimate` and takeoff `evidence`. `shared/customer-language.ts` is the guard the gauntlet runs on every public payload. Approval keeps the customer's existing link valid (`previous_token_hash`) instead of rotating it away.
 
 ---
 

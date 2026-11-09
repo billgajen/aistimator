@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { quoteTokenFilter } from '@/lib/tokens'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
@@ -33,7 +34,7 @@ export async function GET(
       .from('quotes')
       .select('id, quote_token_hash, token_expires_at, pdf_asset_id')
       .eq('id', quoteId)
-      .eq('quote_token_hash', tokenHash)
+      .or(quoteTokenFilter(tokenHash))
       .single()
 
     if (quoteError || !quote) {

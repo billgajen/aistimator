@@ -40,6 +40,8 @@ interface ServiceFormData {
   name: string
   description: string
   documentTypeDefault: DocumentType
+  /** T-146: send quotes without business review (default off) */
+  autoSend: boolean
   scopeIncludes: string[]
   scopeExcludes: string[]
   defaultAssumptions: string[]
@@ -58,6 +60,7 @@ const defaultFormData: ServiceFormData = {
   name: '',
   description: '',
   documentTypeDefault: 'instant_estimate',
+  autoSend: false,
   scopeIncludes: [],
   scopeExcludes: [],
   defaultAssumptions: [],
@@ -408,6 +411,7 @@ export default function ServicesPage() {
       name: service.name,
       description: service.description || '',
       documentTypeDefault: service.document_type_default,
+      autoSend: service.auto_send === true,
       scopeIncludes: service.scope_includes || [],
       scopeExcludes: service.scope_excludes || [],
       defaultAssumptions: service.default_assumptions || [],
@@ -810,6 +814,7 @@ export default function ServicesPage() {
             name: formData.name,
             description: formData.description || null,
             documentTypeDefault: formData.documentTypeDefault,
+            autoSend: formData.autoSend,
             scopeIncludes: formData.scopeIncludes,
             scopeExcludes: formData.scopeExcludes,
             defaultAssumptions: formData.defaultAssumptions,
@@ -837,6 +842,7 @@ export default function ServicesPage() {
             name: formData.name,
             description: formData.description || null,
             documentTypeDefault: formData.documentTypeDefault,
+            autoSend: formData.autoSend,
             scopeIncludes: formData.scopeIncludes,
             scopeExcludes: formData.scopeExcludes,
             defaultAssumptions: formData.defaultAssumptions,
@@ -1224,6 +1230,23 @@ export default function ServicesPage() {
                         ))}
                       </select>
                     </div>
+
+                    {/* T-146: review by default; opt in to sending straight away */}
+                    <label className="flex items-start gap-3 rounded-lg border border-border bg-background p-3.5">
+                      <input
+                        type="checkbox"
+                        checked={formData.autoSend}
+                        onChange={(e) => setFormData({ ...formData, autoSend: e.target.checked })}
+                        className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
+                      />
+                      <span>
+                        <span className="block text-sm font-medium text-text-primary">Send automatically without review</span>
+                        <span className="mt-0.5 block text-xs text-text-muted">
+                          Off: each new quote waits for you to review and approve it, and the customer sees
+                          &ldquo;Your estimate is being prepared&rdquo;. On: quotes go to the customer straight away.
+                        </span>
+                      </span>
+                    </label>
 
                     {/* AI Draft Generation Indicator */}
                     {draftError && (

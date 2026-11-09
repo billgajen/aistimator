@@ -240,6 +240,7 @@ Guidelines:
   - If customer specified a large area, don't assume "standard room size"
   - If customer indicated special requirements, acknowledge them rather than assuming standard work
 - notes can include recommendations, next steps, or things to consider
+- NEVER describe how certain the price is: do not use the words "exact", "firm", "preliminary" or "guaranteed", and do not mention grades, confidence, accuracy or AI. The business reviews and confirms the price; describe the work, not the precision of the number.
 - validityDays is typically 30 for most quotes
 
 ===== CRITICAL - SCOPE MUST MATCH CUSTOMER INTENT =====

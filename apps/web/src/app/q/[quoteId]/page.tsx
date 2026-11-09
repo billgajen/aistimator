@@ -216,7 +216,9 @@ export default function QuotePage({ params }: QuotePageProps) {
     return null
   }
 
-  const { business, branding, customer, pricing, notes, validUntil, assets, status, actions, crossServicePricing, signalRecommendations, version: quoteVersion, acceptQuoteEnabled, takeoff, reference } = quote
+  const { business, branding, customer, pricing, notes, validUntil, assets, status, actions, crossServicePricing, signalRecommendations, version: quoteVersion, acceptQuoteEnabled, takeoff, reference, review, estimateRange } = quote
+  // T-146: exactly two customer states — an unreviewed Estimate or a reviewed Quote
+  const isReviewedQuote = review?.state === 'quote'
   // T-133: tenant locale for money and dates (legacy quotes without one render as before)
   const locale = quote.locale || 'en-GB'
   const brandVars = brandStyleVars(branding?.primaryColor)
@@ -224,7 +226,9 @@ export default function QuotePage({ params }: QuotePageProps) {
   const canSubmitFeedback = ['sent', 'viewed', 'revised'].includes(status) && !feedbackSubmitted && !accepted && !declined
 
   // Not priced yet (queued / generating), or processing failed: no document to show
-  if (processing || status === 'failed') {
+  // T-146: held for the business with no price to show yet — same holding screen
+  const awaitingBusiness = status === 'pending_review' && !quote.provisional
+  if (processing || status === 'failed' || awaitingBusiness) {
     const failed = status === 'failed'
     return (
       <div className="min-h-screen bg-background py-8 px-4 sm:py-14" style={brandVars}>
@@ -242,11 +246,13 @@ export default function QuotePage({ params }: QuotePageProps) {
                 Estimate for {customer.name}
               </p>
               <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">
-                {failed ? `Your request is with ${business.name}` : 'Preparing your estimate'}
+                {failed ? `Your request is with ${business.name}` : awaitingBusiness ? 'Your estimate is being prepared' : 'Preparing your estimate'}
               </h1>
-              <div className={`tape-rule-light mt-8 ${failed || slowPreparing ? '' : 'tape-measuring'}`} aria-hidden="true" />
+              <div className={`tape-rule-light mt-8 ${failed || slowPreparing || awaitingBusiness ? '' : 'tape-measuring'}`} aria-hidden="true" />
               <p className="mt-6 text-sm text-on-primary/80 max-w-md">
-                {failed
+                {awaitingBusiness
+                  ? `${business.name} will review and send it shortly.`
+                  : failed
                   ? `${business.name} will send your estimate by email shortly — nothing more needed from you.`
                   : slowPreparing
                     ? 'This one is taking longer than usual. We’ll email you the link the moment it’s ready.'
@@ -285,7 +291,7 @@ export default function QuotePage({ params }: QuotePageProps) {
             {/* Provisional price instrument */}
             <div className="px-6 sm:px-10 py-10 bg-primary text-on-primary">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-primary/60 mb-3">
-                Estimated range for {customer.name}
+                {reason === 'pending_review' ? 'Your estimate is being prepared' : `Estimate for ${customer.name}`}
               </p>
               <p className="figure text-4xl sm:text-5xl font-medium tracking-tight">
                 <Money amount={rangeLow} currency={pricing.currency} locale={locale} />
@@ -298,8 +304,7 @@ export default function QuotePage({ params }: QuotePageProps) {
               {reason === 'awaiting_clarification' ? (
                 <div className="mt-6">
                   <p className="text-sm text-on-primary/80 mb-5 max-w-md">
-                    Confirm a couple of details and this range becomes your exact price —
-                    it takes less than a minute.
+                    Confirm a couple of details so we can price it for your job. It takes less than a minute.
                   </p>
                   <a
                     href={`/q/${quoteId}/clarify?token=${token}`}
@@ -310,8 +315,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                 </div>
               ) : (
                 <p className="mt-6 text-sm text-on-primary/80 max-w-md">
-                  {business.name} is double-checking the details. Your final estimate arrives
-                  by email shortly — nothing needed from you.
+                  Your estimate is being prepared. {business.name} will review and send it shortly.
                 </p>
               )}
             </div>
@@ -353,37 +357,24 @@ export default function QuotePage({ params }: QuotePageProps) {
             <div className="flex items-start justify-between gap-6">
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-primary/60 mb-3">
-                  Your estimate{pricing.taxAmount > 0 ? ` · incl. ${pricing.taxLabel || 'tax'}` : ''}
+                  {isReviewedQuote ? 'Your quote' : 'Your estimate'}{pricing.taxAmount > 0 ? ` · incl. ${pricing.taxLabel || 'tax'}` : ''}
                 </p>
                 <p className="figure text-5xl sm:text-6xl font-medium tracking-tight leading-none">
                   <Money amount={pricing.total} currency={pricing.currency} locale={locale} emphasize />
                 </p>
-                {pricing.estimate && (
-                  <p className="mt-4 text-[13px] leading-snug text-on-primary/75 max-w-sm">
-                    {pricing.estimate.description}
-                  </p>
-                )}
+                <p className="mt-4 text-[13px] leading-snug text-on-primary/75 max-w-sm">
+                  {isReviewedQuote
+                    ? `Reviewed and confirmed by ${business.name}.`
+                    : `This is an estimate based on your photos and details. ${business.name} will review and confirm it.`}
+                </p>
               </div>
-
-              {pricing.estimate && (
-                <div
-                  className="grade-seal shrink-0"
-                  style={{ color: '#F0DCA0', ['--seal-gap' as never]: 'var(--color-primary)' }}
-                  aria-label={`Estimate grade ${pricing.estimate.grade} — ${pricing.estimate.label}`}
-                >
-                  <span className="font-display text-2xl font-bold">{pricing.estimate.grade}</span>
-                  <span className="mt-1 text-[7.5px] font-semibold uppercase tracking-[0.14em]">
-                    {pricing.estimate.label}
-                  </span>
-                </div>
-              )}
             </div>
 
-            {/* Measured range scale */}
-            {pricing.estimate?.rangeLow !== undefined && pricing.estimate?.rangeHigh !== undefined && (
+            {/* Price range for uncertain quantities — no label */}
+            {estimateRange && (
               <RangeScale
-                low={pricing.estimate.rangeLow}
-                high={pricing.estimate.rangeHigh}
+                low={estimateRange.low}
+                high={estimateRange.high}
                 value={pricing.total}
                 currency={pricing.currency}
                 locale={locale}
@@ -949,7 +940,7 @@ function RangeScale({
     <div className="mt-7 max-w-md">
       <div className="flex justify-between text-[11px] text-on-primary/60 mb-1.5">
         <span className="figure">{formatCurrency(low, currency, locale)}</span>
-        <span className="uppercase tracking-[0.14em] font-semibold text-[10px] text-on-primary/50">Measured range</span>
+        <span aria-hidden="true" />
         <span className="figure">{formatCurrency(high, currency, locale)}</span>
       </div>
       <div className="relative h-2.5 rounded-full bg-white/15 overflow-visible">

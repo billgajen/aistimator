@@ -110,6 +110,14 @@ describe('flat-rate grade cap', () => {
     expect(capFlatRateGrade(A, { priceDependsOnJobFacts: true, siteVisitRecommended: true }).grade).toBe('A')
   })
 
+  it('a step chosen by a form answer or identified value is a job fact (no signals in its trace)', () => {
+    const trace = [fixed('door_removal'), fixed('door_single')]
+    expect(priceDependsOnJobFacts(trace)).toBe(false)
+    expect(priceDependsOnJobFacts(trace, [{ id: 'door_single', when: { fieldId: 'door_size', operator: 'equals', equals: 'Single' } }])).toBe(true)
+    expect(priceDependsOnJobFacts(trace, [{ id: 'door_single', triggerSignal: 'door_size' }])).toBe(true)
+    expect(priceDependsOnJobFacts(trace, [{ id: 'door_removal' }, { id: 'door_single' }])).toBe(false)
+  })
+
   it('a constant-quantity step tagged "constant" is still a fixed amount', () => {
     expect(priceDependsOnJobFacts([{ type: 'work_step', quantitySource: 'constant', signalsUsed: [{ key: 'constant' }] }])).toBe(false)
   })

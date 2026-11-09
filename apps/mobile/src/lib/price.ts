@@ -18,7 +18,7 @@ const STATUS_LABEL: Record<string, string> = {
   queued: 'Pricing',
   generating: 'Pricing',
   awaiting_clarification: 'Needs a confirmation',
-  pending_review: 'Held for your review',
+  pending_review: 'Waiting for your approval',
   sent: 'Sent to customer',
   viewed: 'Viewed by customer',
   accepted: 'Accepted',

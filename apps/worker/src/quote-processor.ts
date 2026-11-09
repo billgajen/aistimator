@@ -63,7 +63,7 @@ import { buildTakeoff, buildReference } from './takeoff'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing, findLookalikeUnconditionedSteps } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@estimator/shared'
-import { sendQuoteEmails, isEmailConfigured } from './email'
+import { sendQuoteEmails, sendReviewRequestEmail, isEmailConfigured } from './email'
 import { incrementUsageCounter } from './usage'
 import type { Env } from './index'
 import { StageTimer } from './stage-timer'
@@ -174,6 +174,8 @@ interface QuoteData {
     confidence_threshold?: number
     /** High value threshold for triggering fallback */
     high_value_threshold?: number | null
+    /** T-146: send without business review (default false) */
+    auto_send?: boolean
     /** AI-generated draft configuration with suggestedFields containing mapsToSignal */
     draft_config?: ServiceDraftConfig | null
     /** T-133: service is not subject to sales tax / VAT */
@@ -333,7 +335,7 @@ function evaluateFallback(
     case 'require_review':
       // Set to pending_review status - business owner must approve
       statusOverride = 'pending_review'
-      additionalNotes.push('This estimate requires business owner review before sending.')
+      // (T-146: no customer note — the review state is shown by the page itself)
       break
 
     case 'recommend_site_visit':
@@ -2011,7 +2013,7 @@ export async function processQuote(
   // shown as "Grade A, this price is exact").
   if (pricing.estimate && pricing.estimate.grade === 'A') {
     const flatCapped = capFlatRateGrade(pricing.estimate, {
-      priceDependsOnJobFacts: priceDependsOnJobFacts(pricingTrace.trace),
+      priceDependsOnJobFacts: priceDependsOnJobFacts(pricingTrace.trace, rulesWithWorkSteps.workSteps || []),
       siteVisitRecommended: Boolean(signals.siteVisitRecommended),
     })
     if (flatCapped.grade !== pricing.estimate.grade) {
@@ -2247,6 +2249,17 @@ export async function processQuote(
     }
   }
 
+  // 4.9 T-146: business review by default. A quote that would go straight to
+  // the customer waits for the business to approve it unless the service is
+  // set to "Send automatically without review". Clarification rounds and the
+  // AI quality gate still run first; this only changes the final step.
+  let awaitingBusinessReview = false
+  if (finalStatus === 'sent' && service.auto_send !== true) {
+    finalStatus = 'pending_review'
+    awaitingBusinessReview = true
+    console.log('[Processor] T-146: held for business review (service is not set to send automatically)')
+  }
+
   // 5. Update quote record with signals and pricing trace
   const { error: updateError } = await supabase
     .from('quotes')
@@ -2358,9 +2371,48 @@ export async function processQuote(
   // 6. Increment usage counter for estimates_sent
   await incrementUsageCounter(supabase, quoteData.quote.tenant_id, 'estimates_sent')
 
-  // 7. Send notification emails (skip if pending review)
+  // 7. Send notification emails. Pending review: only the business hears,
+  // with a link to review and approve; the customer email goes on approval.
+  // A quote the business created in its own app needs no email to itself.
   if (finalStatus === 'pending_review') {
-    console.log('[Processor] Quote pending review - emails will be sent after approval')
+    console.log('[Processor] Quote pending review - customer email will be sent after approval')
+    if (
+      quoteRequest.source_json?.type !== 'app' &&
+      isEmailConfigured(env.POSTMARK_API_TOKEN, env.POSTMARK_FROM_EMAIL)
+    ) {
+      const range = pricing.estimate?.rangeLow !== undefined && pricing.estimate?.rangeHigh !== undefined
+        ? { low: pricing.estimate.rangeLow, high: pricing.estimate.rangeHigh }
+        : undefined
+      try {
+        const result = await sendReviewRequestEmail(
+          {
+            postmarkApiToken: env.POSTMARK_API_TOKEN!,
+            fromEmail: env.POSTMARK_FROM_EMAIL!,
+            fromName: 'Aistimator',
+            appUrl: env.APP_URL || 'http://localhost:3000',
+          },
+          {
+            quoteId,
+            ownerEmail: quoteData.businessOwnerEmail || env.POSTMARK_FROM_EMAIL!,
+            businessName: tenant.name,
+            customerName: quoteRequest.customer_name,
+            customerEmail: quoteRequest.customer_email,
+            customerPhone: quoteRequest.customer_phone,
+            serviceName: service.name,
+            jobAddress: quoteRequest.job_address,
+            total: pricing.total,
+            range,
+            currency: pricing.currency,
+            locale: regionCtx.locale,
+            reason: awaitingBusinessReview ? undefined : qualityGateResult?.reason,
+            primaryColor: tenant.branding_json?.primaryColor,
+          }
+        )
+        if (!result.success) console.error('[Processor] Review request email failed:', result.error)
+      } catch (emailError) {
+        console.error('[Processor] Review request email error:', emailError)
+      }
+    }
   } else if (isEmailConfigured(env.POSTMARK_API_TOKEN, env.POSTMARK_FROM_EMAIL)) {
     const businessOwnerEmail = quoteData.businessOwnerEmail || env.POSTMARK_FROM_EMAIL!
 
@@ -2474,7 +2526,8 @@ async function loadQuoteData(
         confidence_threshold,
         high_value_threshold,
         draft_config,
-        tax_exempt
+        tax_exempt,
+        auto_send
       )
     `)
     .eq('id', quoteId)

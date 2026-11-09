@@ -17,6 +17,8 @@ export * from './envelopes'
 
 // Re-export estimate grading + VOI (T-120/T-121, Measurement Engine)
 export * from './grading'
+// T-146: customer-facing language guard (no grades / certainty words)
+export * from './customer-language'
 export * from './identification'
 export * from './room-scan'
 export * from './accuracy'

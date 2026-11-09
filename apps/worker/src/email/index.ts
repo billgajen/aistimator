@@ -165,6 +165,66 @@ export async function sendQuoteEmails(
   }
 }
 
+export interface ReviewRequestEmailData {
+  quoteId: string
+  ownerEmail: string
+  businessName: string
+  customerName: string
+  customerEmail: string
+  customerPhone?: string
+  serviceName: string
+  jobAddress?: string
+  total: number
+  /** Present when uncertain quantities give a price range */
+  range?: { low: number; high: number }
+  currency: string
+  locale?: string
+  /** Why a check held it (quality gate / send-guard); absent for the default review */
+  reason?: string
+  primaryColor?: string
+}
+
+/**
+ * T-146: tell the business a quote is waiting for its approval. The customer
+ * hears nothing until the business approves (the web app sends that email).
+ */
+export async function sendReviewRequestEmail(
+  config: EmailConfig,
+  data: ReviewRequestEmailData
+): Promise<{ success: boolean; error?: string }> {
+  const locale = data.locale || 'en-GB'
+  const money = (n: number) => formatMoney(n, data.currency, locale)
+  const total = data.range && data.range.high > data.range.low
+    ? `${money(data.range.low)} – ${money(data.range.high)}`
+    : money(data.total)
+  const html = businessNotificationEmail({
+    businessName: data.businessName,
+    customerName: data.customerName,
+    customerEmail: data.customerEmail,
+    customerPhone: data.customerPhone,
+    serviceName: data.serviceName,
+    jobAddress: data.jobAddress,
+    quoteId: data.quoteId,
+    dashboardUrl: `${config.appUrl}/app/quotes/${data.quoteId}`,
+    total,
+    currency: data.currency,
+    primaryColor: data.primaryColor,
+    awaitingReview: true,
+    reviewReason: data.reason,
+  })
+  const result = await sendEmail(
+    { apiToken: config.postmarkApiToken, fromEmail: config.fromEmail, fromName: config.fromName || data.businessName },
+    {
+      to: data.ownerEmail,
+      subject: `Review and approve: ${data.customerName} - ${data.serviceName}`,
+      htmlBody: html,
+      tag: 'quote-review-request',
+    }
+  )
+  console.log(`[Email] Review request ${result.success ? 'sent' : 'failed'}: ${data.ownerEmail}`)
+  return { success: result.success, error: result.error }
+}
+
 /**
  * Check if email is configured
  */

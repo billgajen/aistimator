@@ -135,7 +135,8 @@ describe('grade and takeoff', () => {
     const trace = { trace: [{ type: 'work_step', id: 'rooms', description: 'Rooms', amount: 750, signalsUsed: [{ key: 'room_count', value: 2 }], quantitySource: 'form_field' }] } as unknown as Parameters<typeof buildTakeoff>[0]['trace']
     const workSteps = [{ id: 'rooms', name: 'Rooms', description: '', costType: 'per_unit' as const, defaultCost: 375, optional: false, quantitySource: { type: 'form_field' as const, fieldId: 'room_count' } }]
     const scanned = buildTakeoff({ trace, structuredSignals: null, workSteps, scanned: { fieldIds: new Set(['room_count']), evidence: 'Scanned on site with LiDAR: 2 rooms' } })
-    expect(scanned[0]!.method).toBe('Scanned on site with LiDAR: 2 rooms')
+    expect(scanned[0]!.method).toBe('From the on-site room scan')
+    expect(scanned[0]!.evidence).toBe('Scanned on site with LiDAR: 2 rooms')
     expect(buildTakeoff({ trace, structuredSignals: null, workSteps })[0]!.method).toBe('Quantity provided by you')
   })
 })

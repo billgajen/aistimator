@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { quoteTokenFilter } from '@/lib/tokens'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
@@ -50,7 +51,7 @@ export async function GET(
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
       .select('id, quote_request_id')
-      .eq('quote_token_hash', tokenHash)
+      .or(quoteTokenFilter(tokenHash))
       .eq('quote_request_id', asset.quote_request_id)
       .single()
 

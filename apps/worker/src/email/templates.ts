@@ -29,6 +29,10 @@ export interface BusinessEmailData {
   total: string
   currency: string
   primaryColor?: string
+  /** T-146: the quote is waiting for the business to approve it */
+  awaitingReview?: boolean
+  /** T-146: why it was held, when a check (not the default review) held it */
+  reviewReason?: string
 }
 
 /**
@@ -157,7 +161,8 @@ export function businessNotificationEmail(data: BusinessEmailData): string {
 
   const content = `
     <div style="margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid #e5e7eb;">
-      <p style="margin: 0; font-size: 14px; color: #6b7280;">New Quote Generated</p>
+      <p style="margin: 0; font-size: 14px; color: #6b7280;">${data.awaitingReview ? 'Estimate ready for your review' : 'New Quote Generated'}</p>
+      ${data.reviewReason ? `<p style="margin: 8px 0 0; font-size: 13px; color: #92400e;">${escapeHtml(data.reviewReason)}</p>` : ''}
       <h1 style="margin: 8px 0 0; font-size: 24px; font-weight: 700; color: #111827;">
         ${escapeHtml(data.customerName)}
       </h1>
@@ -198,14 +203,16 @@ export function businessNotificationEmail(data: BusinessEmailData): string {
       <tr>
         <td style="text-align: center;">
           <a href="${escapeHtml(data.dashboardUrl)}" style="display: inline-block; padding: 14px 28px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;">
-            View in Dashboard
+            ${data.awaitingReview ? 'Review and approve' : 'View in Dashboard'}
           </a>
         </td>
       </tr>
     </table>
 
     <p style="margin: 24px 0 0; color: #6b7280; font-size: 12px; text-align: center;">
-      The customer has been sent their quote automatically.
+      ${data.awaitingReview
+        ? 'The customer has not been sent anything yet. Review it, edit if needed, and approve to send it.'
+        : 'The customer has been sent their quote automatically.'}
     </p>
   `
 

@@ -3,8 +3,10 @@
  *
  * Turns the pricing trace + measurement evidence into the customer-facing
  * takeoff table — every priced line with HOW its quantity was established.
- * This is the "shows its work" layer: the senior surveyor's audit note and
- * the ensemble evidence face the customer. Pure functions, fully testable.
+ * T-146: `method` is plain words for the customer ("From your photos",
+ * "From the air conditioner's rating plate"); the technical evidence (passes,
+ * spread, decoded model number) goes in `evidence`, which only the business
+ * sees. Pure functions, fully testable.
  */
 
 import type {
@@ -21,6 +23,28 @@ import type {
 export function buildReference(quoteId: string, year: number): string {
   const tail = quoteId.replace(/^qte_/, '').slice(-6).toUpperCase()
   return `EST-${year}-${tail}`
+}
+
+type Signal = ExtractedSignalsV2['signals'][number]
+
+const PLAIN = {
+  photos: 'From your photos',
+  answers: 'From your answers',
+  scan: 'From the on-site room scan',
+  details: 'Estimated from your details',
+} as const
+
+/** The plain-words source of a signal-derived quantity or selection (T-146). */
+export function plainSource(signal: Signal | undefined): string {
+  if (!signal) return PLAIN.photos
+  if (signal.source === 'form' || signal.confidence >= 1) return PLAIN.answers
+  if (signal.basis === 'identified') {
+    // identification evidence: 'Read from the X's rating plate (photo 1): "…" → 3 ton'
+    const where = /^Read from (.+?)(?: \(photo \d+\))?:/.exec(signal.evidence || '')?.[1]
+    return where ? `From ${where}` : PLAIN.photos
+  }
+  if (signal.basis === 'envelope') return PLAIN.details
+  return PLAIN.photos
 }
 
 /**
@@ -58,11 +82,16 @@ export function buildTakeoff(opts: {
         )?.value as number | undefined
 
         let method: string
+        let evidence: string | undefined
         switch (step.quantitySource) {
           case 'form_field': {
             const fieldId = config?.quantitySource?.fieldId
-            method =
-              fieldId && opts.scanned?.fieldIds.has(fieldId) ? opts.scanned.evidence : 'Quantity provided by you'
+            if (fieldId && opts.scanned?.fieldIds.has(fieldId)) {
+              method = PLAIN.scan
+              evidence = opts.scanned.evidence
+            } else {
+              method = 'Quantity provided by you'
+            }
             break
           }
           case 'constant':
@@ -73,7 +102,8 @@ export function buildTakeoff(opts: {
             const signal = signalKey
               ? structuredSignals?.signals.find((s) => s.key === signalKey)
               : undefined
-            method = signal?.evidence || 'Measured from your photos'
+            method = plainSource(signal)
+            evidence = signal?.evidence
             break
           }
           case 'derived':
@@ -82,7 +112,7 @@ export function buildTakeoff(opts: {
             break
           case 'legacy_fallback':
           case 'derived_unresolved':
-            method = 'Estimated — to be confirmed'
+            method = PLAIN.details
             break
           default:
             method = 'Fixed price'
@@ -91,10 +121,11 @@ export function buildTakeoff(opts: {
         // T-139: a line chosen by WHAT the equipment is shows how that was known
         if (config?.triggerSignal && step.quantitySource !== 'ai_signal') {
           const trigger = structuredSignals?.signals.find((s) => s.key === config.triggerSignal)
-          if (trigger?.basis === 'identified' && trigger.evidence) {
-            method = trigger.evidence
-          } else if (trigger?.source === 'form') {
+          if (trigger?.source === 'form' || (trigger && trigger.confidence >= 1)) {
             method = `Selected for ${trigger.value}, as you confirmed`
+          } else if (trigger?.basis === 'identified') {
+            method = `${trigger.value} — ${plainSource(trigger).replace(/^From/, 'from')}`
+            evidence = trigger.evidence
           }
         }
 
@@ -108,6 +139,7 @@ export function buildTakeoff(opts: {
             }),
           amount: step.amount,
           method,
+          ...(evidence && { evidence }),
         })
         break
       }

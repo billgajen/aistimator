@@ -137,7 +137,10 @@ export async function POST(request: NextRequest) {
       draftConfig,
       suggestedFields,
       pricingRules,  // BUG-003 FIX: Extract pricingRules from request body
+      autoSend,
     } = body as {
+      /** T-146: send quotes without business review (default false) */
+      autoSend?: boolean
       name: string
       description?: string | null
       documentTypeDefault?: DocumentType
@@ -195,6 +198,7 @@ export async function POST(request: NextRequest) {
         description: description || null,
         active: true,
         document_type_default: documentTypeDefault || 'instant_estimate',
+        auto_send: autoSend === true,
         scope_includes: scopeIncludes || [],
         scope_excludes: scopeExcludes || [],
         default_assumptions: defaultAssumptions || [],

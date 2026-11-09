@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { quoteTokenFilter } from '@/lib/tokens'
 import { isQuoteProcessing, resolveRegionContext } from '@estimator/shared'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
@@ -65,7 +66,7 @@ export async function GET(
         )
       `)
       .eq('id', quoteId)
-      .eq('quote_token_hash', tokenHash)
+      .or(quoteTokenFilter(tokenHash))
       .single()
 
     if (quoteError || !quote) {
@@ -201,18 +202,48 @@ export async function GET(
     const isProvisional =
       quote.status === 'awaiting_clarification' || quote.status === 'pending_review'
     let provisional: QuoteViewResponse['provisional']
-    if (isProvisional && (pricing.total || 0) > 0) {
-      const storedRange = (pricing as { range?: { low?: number; high?: number } }).range
+    const storedRange = (pricing as { range?: { low?: number; high?: number } }).range
+    const measuredLow = storedRange?.low ?? pricing.estimate?.rangeLow
+    const measuredHigh = storedRange?.high ?? pricing.estimate?.rangeHigh
+    const hasMeasuredRange = measuredLow !== undefined && measuredHigh !== undefined && measuredHigh > measuredLow
+    // T-146: while the business reviews, show the instant range only if the
+    // engine measured one — never a made-up ±12% around a flat price.
+    const showRange = quote.status === 'awaiting_clarification' || hasMeasuredRange
+    if (isProvisional && (pricing.total || 0) > 0 && showRange) {
       const total = pricing.total || 0
-      // Prefer the engine's confidence-based range; fall back to ±12%, rounded to 10s
-      const low = storedRange?.low ?? Math.floor((total * 0.88) / 10) * 10
-      const high = storedRange?.high ?? Math.ceil((total * 1.12) / 10) * 10
+      // Prefer the engine's measured range; fall back to ±12%, rounded to 10s
+      const low = measuredLow ?? Math.floor((total * 0.88) / 10) * 10
+      const high = measuredHigh ?? Math.ceil((total * 1.12) / 10) * 10
       provisional = {
         rangeLow: low,
         rangeHigh: high,
         reason: quote.status as 'awaiting_clarification' | 'pending_review',
       }
     }
+
+    // T-146: the customer sees exactly two states. "quote" once the business
+    // approved it; otherwise an "estimate". Grades/confidence never leave the
+    // server. An unreviewed estimate with uncertain quantities shows its range,
+    // unlabelled; once the business confirms it, the price is the price.
+    const approvedAt = (quote as { approved_at?: string | null }).approved_at ?? null
+    const review: QuoteViewResponse['review'] = approvedAt
+      ? { state: 'quote', approvedAt }
+      : { state: 'estimate' }
+    const est = pricing.estimate
+    const estimateRange =
+      !isProvisional && !approvedAt && est && est.grade !== 'A' &&
+      est.rangeLow !== undefined && est.rangeHigh !== undefined && est.rangeHigh > est.rangeLow
+        ? { low: est.rangeLow, high: est.rangeHigh }
+        : undefined
+    // Takeoff for the customer: plain-words method only (technical evidence is business-only)
+    const customerTakeoff = (content.takeoff || []).map((row) => ({
+      item: row.item,
+      ...(row.quantity !== undefined && { quantity: row.quantity }),
+      ...(row.unit !== undefined && { unit: row.unit }),
+      ...(row.rate !== undefined && { rate: row.rate }),
+      amount: row.amount,
+      method: row.method,
+    }))
 
     // T-133: locale + currency fallback come from the tenant's region
     const regionCtx = resolveRegionContext(tenant)
@@ -229,6 +260,8 @@ export async function GET(
         showPoweredBy: !whiteLabel,
       },
       customer: customerView,
+      review,
+      ...(estimateRange && { estimateRange }),
       ...(provisional && { provisional }),
       // T-108: surface stored questions so the clarify page can render them
       // (previously never returned — the clarify page could not load questions)
@@ -237,7 +270,7 @@ export async function GET(
           clarificationQuestions: quote.clarification_questions_json,
         }),
       // T-122: takeoff (withheld while provisional — exact amounts) + reference
-      ...(!isProvisional && content.takeoff?.length && { takeoff: content.takeoff }),
+      ...(!isProvisional && customerTakeoff.length > 0 && { takeoff: customerTakeoff }),
       ...(content.reference && { reference: content.reference }),
       pricing: isProvisional
         ? {
@@ -261,8 +294,7 @@ export async function GET(
             ...(pricing.availableAddons && pricing.availableAddons.length > 0 && {
               availableAddons: pricing.availableAddons,
             }),
-            // T-120: declared estimate grade + interval
-            ...(pricing.estimate && { estimate: pricing.estimate }),
+            // T-146: no `estimate` (grade/label/description) — business-only
           },
       breakdown: isProvisional ? [] : pricing.breakdown || [],
       notes: {

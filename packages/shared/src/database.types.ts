@@ -351,6 +351,8 @@ export interface Service {
   pricing_rules?: PricingRules
   /** T-133: service is not subject to sales tax / VAT — the tenant tax line is skipped */
   tax_exempt?: boolean
+  /** T-146: send quotes to the customer without business review (default false = review first) */
+  auto_send?: boolean
   created_at: string
   updated_at: string
 }
@@ -621,8 +623,13 @@ export interface TakeoffEntry {
   unit?: string
   rate?: number
   amount: number
-  /** How the quantity/price was established — measurement evidence, "Provided by you", etc. */
+  /** How the quantity/price was established, in plain words for the customer: "From your photos" */
   method: string
+  /**
+   * T-146: the technical evidence behind `method` (passes, spread, decoded
+   * model number). Business-facing only; the public quote API strips it.
+   */
+  evidence?: string
 }
 
 export interface QuoteContent {
@@ -874,6 +881,11 @@ export interface Quote {
   decline_reason?: string | null
   /** Set once the lifecycle cron has sent the single follow-up reminder */
   reminder_sent_at?: string | null
+  /** T-146: when the business approved / confirmed the quote ("Quote" vs "Estimate" for the customer) */
+  approved_at?: string | null
+  approved_by?: string | null
+  /** T-146: the pre-approval customer link, still accepted after approval */
+  previous_token_hash?: string | null
   paid_at: string | null
 }
 

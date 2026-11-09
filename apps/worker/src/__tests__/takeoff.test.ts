@@ -91,8 +91,10 @@ describe('buildTakeoff', () => {
     expect(walls.unit).toBe('sqm')
     expect(walls.rate).toBe(18)
     // The senior audit note faces the customer
-    expect(walls.method).toContain('Senior review')
-    expect(walls.method).toContain('garage')
+    // T-146: the customer reads the plain source; the audit note is business-only
+    expect(walls.method).toBe('From your photos')
+    expect(walls.evidence).toContain('Senior review')
+    expect(walls.evidence).toContain('garage')
 
     expect(entries[2]!.quantity).toBeUndefined() // fixed step — no quantity line
   })
@@ -123,5 +125,28 @@ describe('buildTakeoff', () => {
       workSteps: WORK_STEPS,
     })
     expect(entries).toHaveLength(0)
+  })
+})
+
+describe('T-146: takeoff methods are plain words, never confidence language', () => {
+  it('plainSource maps each basis to a plain source', async () => {
+    const { plainSource } = await import('../takeoff')
+    const { findConfidenceLanguage } = await import('@estimator/shared')
+    const sig = (over: Record<string, unknown>) =>
+      ({ key: 'k', value: 1, confidence: 0.8, source: 'vision', evidence: 'Measured across 5 independent passes (spread ±8%)', ...over }) as never
+    const cases: Array<[unknown, string]> = [
+      [sig({ basis: 'measured' }), 'From your photos'],
+      [sig({ basis: 'adjudicated' }), 'From your photos'],
+      [sig({ basis: 'envelope' }), 'Estimated from your details'],
+      [sig({ source: 'form', confidence: 1 }), 'From your answers'],
+      [sig({ basis: 'identified', evidence: 'Read from the air conditioner\'s rating plate (photo 1): "NAC236AKA1" → 3 ton' }), 'From the air conditioner\'s rating plate'],
+      [sig({ basis: 'identified', evidence: 'Not readable on the plate; estimated from the photos' }), 'From your photos'],
+      [undefined, 'From your photos'],
+    ]
+    for (const [signal, expected] of cases) {
+      const method = plainSource(signal as never)
+      expect(method).toBe(expected)
+      expect(findConfidenceLanguage(method)).toEqual([])
+    }
   })
 })

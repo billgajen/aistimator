@@ -57,6 +57,21 @@ export default function QuoteDetail() {
     }
   }
 
+  // T-146: one tap sends a quote that is waiting for the business's approval
+  async function approve() {
+    if (!quote) return
+    setBusy(true)
+    setError(null)
+    try {
+      await api.approveQuote(quote.id)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not approve the quote')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function saveInvoice() {
     const amount = parseMoneyInput(invoice)
     if (!quote || amount === null) return
@@ -152,6 +167,14 @@ export default function QuoteDetail() {
                 <Text style={styles.lineAmount}>{formatMoney(t.amount, currency)}</Text>
               </View>
             ))}
+          </Card>
+        ) : null}
+
+        {quote.status === 'pending_review' && (quote.pricing?.total ?? 0) > 0 ? (
+          <Card>
+            <Label>Waiting for your approval</Label>
+            <Muted>The customer sees “Your estimate is being prepared” until you approve it.</Muted>
+            <Button title="Approve & send" onPress={approve} busy={busy} />
           </Card>
         ) : null}
 

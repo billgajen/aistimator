@@ -5,6 +5,7 @@ import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import {
   sendEmail,
   isPostmarkConfigured,
+  generateCustomerEmailHtml,
 } from '@/lib/postmark'
 import { generateRevisedQuoteEmailHtml } from '@/lib/email-templates'
 import type {
@@ -147,6 +148,7 @@ export async function GET(
         pricing_trace_json: quote.pricing_trace_json,
         triage_json: quote.triage_json,
         quality_gate_json: quote.quality_gate_json,
+        approved_at: quote.approved_at ?? null,
       },
       service: quote.service,
       amendments,
@@ -378,9 +380,15 @@ export async function PATCH(
     if (body.sendToCustomer) {
       const { token, hash } = generateQuoteToken()
       const tokenExpiry = getTokenExpiry(30)
+      // T-146: sending after editing IS the business's review — the customer
+      // sees "Quote — reviewed and confirmed". The link the customer already
+      // holds stays valid alongside the new one.
+      updatePayload.previous_token_hash = quote.quote_token_hash
       updatePayload.quote_token_hash = hash
       updatePayload.token_expires_at = tokenExpiry.toISOString()
       updatePayload.sent_at = now
+      updatePayload.approved_at = now
+      updatePayload.approved_by = auth.userId
 
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
       quoteViewUrl = `${appUrl}/q/${quoteId}?token=${token}`
@@ -427,7 +435,26 @@ export async function PATCH(
     }
 
     // Send revised email to customer if requested
-    if (body.sendToCustomer && quoteViewUrl && isPostmarkConfigured()) {
+    // T-146: a held quote's first send is the customer's FIRST quote, not an update
+    const firstSend = !['sent', 'viewed', 'feedback_received', 'revised'].includes(quote.status)
+    if (body.sendToCustomer && quoteViewUrl && isPostmarkConfigured() && firstSend) {
+      const customer = quote.customer_json as { name: string; email: string }
+      const locale = resolveRegionContext(tenant).locale
+      const emailResult = await sendEmail({
+        to: customer.email,
+        subject: `Your quote from ${tenant.name}`,
+        htmlBody: generateCustomerEmailHtml({
+          customerName: customer.name,
+          businessName: tenant.name,
+          serviceName: service.name,
+          quoteViewUrl,
+          total: formatTotal(pricing, locale),
+          primaryColor: tenant.branding_json?.primaryColor,
+        }),
+        tag: 'quote-approved',
+      })
+      if (!emailResult.success) console.error('Failed to send quote email:', emailResult.error)
+    } else if (body.sendToCustomer && quoteViewUrl && isPostmarkConfigured()) {
       const customer = quote.customer_json as { name: string; email: string }
       const branding = tenant.branding_json || { primaryColor: '#2563eb' }
 

@@ -804,7 +804,7 @@ export default function EmbedPage({ params }: EmbedPageProps) {
       )}
       {displayMode !== 'conversational' && step === 'submitting' && <SubmittingState />}
       {step === 'success' && quoteResult && (
-        <SuccessState quoteUrl={quoteResult.quoteViewUrl} quoteId={quoteResult.quoteId} locale={widgetData?.region?.locale} />
+        <SuccessState quoteUrl={quoteResult.quoteViewUrl} quoteId={quoteResult.quoteId} locale={widgetData?.region?.locale} businessName={widgetData?.tenantName || 'The business'} />
       )}
 
       {/* Honeypot — off-screen, never shown to humans */}
@@ -1758,10 +1758,13 @@ function SuccessState({
   quoteUrl,
   quoteId,
   locale = 'en-GB',
+  businessName,
 }: {
   quoteUrl: string
   quoteId: string
   locale?: string
+  /** T-146: "{business} will review and send it shortly" */
+  businessName: string
 }) {
   // T-108: poll quote status while the customer is still here — if the quote
   // needs a quick confirmation, route them to it in-flow instead of waiting
@@ -1841,7 +1844,7 @@ function SuccessState({
         )}
         <p className="text-sm text-text-secondary mb-6">
           {rangeDisplay
-            ? 'That’s our estimated range — confirm a couple of details to get your exact quote in seconds.'
+            ? 'That’s our estimated range. Confirm a couple of details so we can price it for your job.'
             : 'We’ve analysed your request — just confirm a couple of details and your quote will be ready in seconds.'}
         </p>
         <a
@@ -1863,10 +1866,10 @@ function SuccessState({
         <div className="w-16 h-16 bg-mint rounded-full flex items-center justify-center mx-auto mb-4">
           <span className="text-secondary text-2xl">✓</span>
         </div>
-        <h3 className="font-display text-xl font-bold text-text-primary mb-2">Your estimated range</h3>
+        <h3 className="font-display text-xl font-bold text-text-primary mb-2">Your estimate is being prepared</h3>
         <p className="font-display text-2xl font-bold text-text-primary mb-2">{rangeDisplay}</p>
         <p className="text-sm text-text-secondary mb-6">
-          We&apos;re double-checking the details — your final quote will arrive by email shortly.
+          {businessName} will review and send it shortly.
         </p>
         <a
           href={quoteUrl}
@@ -1913,7 +1916,7 @@ function SuccessState({
         <h3 className="font-display text-xl font-bold text-text-primary mb-2">We have your request</h3>
         <p className="text-sm text-text-secondary">
           {liveStatus === 'pending_review'
-            ? 'The business is checking the details and will email your estimate shortly.'
+            ? `Your estimate is being prepared. ${businessName} will review and send it shortly.`
             : liveStatus === 'failed'
               ? 'The business will send your estimate by email shortly — nothing more needed from you.'
               : 'This one is taking longer than usual. We’ll email you the link the moment it’s ready.'}

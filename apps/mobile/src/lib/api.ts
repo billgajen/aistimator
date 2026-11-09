@@ -114,6 +114,10 @@ export function createApi(opts: {
         body: JSON.stringify({ answers, ...(quoteToken && { quoteToken }) }),
       }),
 
+    /** T-146: approve a quote awaiting review — the customer gets it */
+    approveQuote: (quoteId: string) =>
+      request<{ status: 'sent'; emailed: boolean }>(`/api/quotes/${encodeURIComponent(quoteId)}/approve`, { method: 'POST' }),
+
     /** T-143: what the job was finally invoiced at (null clears it) */
     recordFinalInvoice: (quoteId: string, amount: number | null, note?: string) =>
       request<{ finalInvoiceAmount: number | null; finalInvoiceRecordedAt: string | null }>(

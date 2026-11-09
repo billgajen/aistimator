@@ -72,6 +72,28 @@ export default function QuoteDetailPage({
     }
   }
 
+  // T-146: one-tap approval of a quote awaiting review
+  const [approving, setApproving] = useState(false)
+  const [approveResult, setApproveResult] = useState<string | null>(null)
+  const handleApprove = async () => {
+    setApproving(true)
+    setApproveResult(null)
+    try {
+      const response = await fetch(`/api/quotes/${quoteId}/approve`, { method: 'POST' })
+      const json = await response.json().catch(() => null)
+      if (response.ok) {
+        setApproveResult(json?.emailed ? 'Sent to the customer' : 'Approved. No email went out (no customer email or email not set up); use Text link or copy the link.')
+        await fetchQuote()
+      } else {
+        setApproveResult(json?.error?.message || 'Could not approve this quote')
+      }
+    } catch {
+      setApproveResult('Could not approve this quote')
+    } finally {
+      setApproving(false)
+    }
+  }
+
   const handlePriceHeldLead = async () => {
     setPricingHeld(true)
     setPriceResult(null)
@@ -150,6 +172,9 @@ export default function QuoteDetailPage({
   const pendingFeedback = feedback.filter((f) => f.status === 'pending')
   const canEdit = !['accepted', 'paid', 'generating', 'queued', 'failed'].includes(quote.status)
   const canSend = !['generating', 'queued', 'failed'].includes(quote.status)
+  // T-146: a priced quote waiting for the business; held leads are priced first
+  const awaitingApproval =
+    quote.status === 'pending_review' && !(content as { limitHold?: boolean } | null)?.limitHold && (pricing?.total ?? 0) > 0
 
   if (editMode) {
     // Dynamic import to keep initial bundle small
@@ -202,7 +227,16 @@ export default function QuoteDetailPage({
               Edit
             </button>
           )}
-          {canSend && (
+          {awaitingApproval && (
+            <button
+              onClick={handleApprove}
+              disabled={approving}
+              className="px-4 py-2 text-sm font-semibold text-white bg-primary rounded-lg hover:bg-primary-hover disabled:opacity-50 transition-colors"
+            >
+              {approving ? 'Sending…' : 'Approve & send'}
+            </button>
+          )}
+          {canSend && !awaitingApproval && (
             <button
               onClick={handleResend}
               disabled={resending}
@@ -221,6 +255,7 @@ export default function QuoteDetailPage({
             </button>
           )}
           {textResult && <span className="self-center text-xs text-text-muted">{textResult}</span>}
+          {approveResult && <span className="self-center text-xs text-text-muted">{approveResult}</span>}
         </div>
       </div>
 
@@ -298,6 +333,9 @@ export default function QuoteDetailPage({
           <p className="text-sm text-text-secondary">{content.scopeSummary}</p>
         </Section>
       )}
+
+      {/* T-146: grade and confidence are business-only — the customer never sees them */}
+      {pricing.estimate && <EstimateGradePanel estimate={pricing.estimate} currency={pricing.currency} gate={quote.quality_gate_json as { action?: string; reason?: string } | null} awaitingApproval={awaitingApproval} />}
 
       {/* Pricing */}
       <Section title="Pricing">
@@ -487,7 +525,7 @@ function StatusBadge({ status }: { status: QuoteStatus }) {
   const config: Record<QuoteStatus, { label: string; className: string }> = {
     queued: { label: 'Queued', className: 'bg-background text-text-secondary' },
     generating: { label: 'Processing', className: 'bg-tertiary-light text-tertiary' },
-    pending_review: { label: 'Review Required', className: 'bg-tertiary-light text-tertiary' },
+    pending_review: { label: 'Awaiting your approval', className: 'bg-tertiary-light text-tertiary' },
     awaiting_clarification: { label: 'Awaiting Info', className: 'bg-tertiary-light text-tertiary' },
     sent: { label: 'Sent', className: 'bg-primary-light text-primary' },
     viewed: { label: 'Viewed', className: 'bg-primary-light text-primary' },
@@ -596,4 +634,49 @@ function formatDate(dateString: string): string {
 
 function formatCurrency(amount: number, currency: string): string {
   return formatMoney(amount, currency) // T-133: any ISO currency
+}
+
+/**
+ * T-146: the internal estimate grade, shown only to the business. The
+ * customer sees an "Estimate" or a "Quote" and, for uncertain quantities, a
+ * range with no label.
+ */
+function EstimateGradePanel({
+  estimate,
+  currency,
+  gate,
+  awaitingApproval,
+}: {
+  estimate: NonNullable<QuotePricing['estimate']>
+  currency: string
+  gate: { action?: string; reason?: string } | null | undefined
+  awaitingApproval: boolean
+}) {
+  const tone =
+    estimate.grade === 'A' ? 'border-primary/20 bg-mint' : estimate.grade === 'B' ? 'border-tape/40 bg-butter/40' : 'border-danger/30 bg-danger-light'
+  return (
+    <div className={`mb-6 rounded-lg border p-4 ${tone}`}>
+      <div className="flex items-start gap-4">
+        <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-full border-2 border-current text-primary">
+          <span className="font-display text-lg font-bold leading-none">{estimate.grade}</span>
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-text-primary">
+            Grade {estimate.grade} · {estimate.label}
+            <span className="ml-2 text-xs font-normal text-text-muted">Only visible to you</span>
+          </p>
+          <p className="mt-0.5 text-sm text-text-secondary">{estimate.description}</p>
+          {estimate.rangeLow !== undefined && estimate.rangeHigh !== undefined && estimate.rangeHigh > estimate.rangeLow && (
+            <p className="mt-1 text-xs text-text-muted">
+              Range {formatCurrency(estimate.rangeLow, currency)} – {formatCurrency(estimate.rangeHigh, currency)}
+              {awaitingApproval ? ' (the customer sees this range until you approve)' : ''}
+            </p>
+          )}
+          {gate?.action === 'require_review' && gate.reason && (
+            <p className="mt-1 text-xs text-tertiary">Held because: {gate.reason}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }

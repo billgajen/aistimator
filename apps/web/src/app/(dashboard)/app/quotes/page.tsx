@@ -182,7 +182,7 @@ export default function QuotesPage() {
     const config: Record<QuoteStatus, { label: string; className: string }> = {
       queued: { label: 'Queued', className: 'bg-background text-text-secondary' },
       generating: { label: 'Processing', className: 'bg-tertiary-light text-tertiary' },
-      pending_review: { label: 'Review Required', className: 'bg-tertiary-light text-tertiary' },
+      pending_review: { label: 'Awaiting your approval', className: 'bg-tertiary-light text-tertiary' },
       awaiting_clarification: { label: 'Awaiting Info', className: 'bg-tertiary-light text-tertiary' },
       sent: { label: 'Sent', className: 'bg-primary-light text-primary' },
       viewed: { label: 'Viewed', className: 'bg-primary-light text-primary' },
@@ -241,7 +241,7 @@ export default function QuotesPage() {
           <option value="">All statuses</option>
           <option value="queued">Queued</option>
           <option value="generating">Processing</option>
-          <option value="pending_review">Review Required</option>
+          <option value="pending_review">Awaiting your approval</option>
           <option value="sent">Sent</option>
           <option value="viewed">Viewed</option>
           <option value="accepted">Accepted</option>

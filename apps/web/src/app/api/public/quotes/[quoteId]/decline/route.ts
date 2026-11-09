@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { quoteTokenFilter } from '@/lib/tokens'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { sendEmail, isPostmarkConfigured } from '@/lib/postmark'
@@ -43,7 +44,7 @@ export async function POST(
         services!service_id ( id, name )
       `)
       .eq('id', quoteId)
-      .eq('quote_token_hash', tokenHash)
+      .or(quoteTokenFilter(tokenHash))
       .single()
 
     if (quoteError || !quote) {

@@ -92,6 +92,9 @@ Code for every item is already built; these are the steps that unlock it.
      pack. Today the draft prices a replacement as fixed amounts and leaves "ac_tonnage" as an unused signal, so a 2-ton
      and a 5-ton system cost the same. When the service is identify-and-replace, the draft should produce one step per
      size (`triggerSignal` on the identified value) and an `identify` spec, with the rates marked for owner review.
+  7. **Review notifications by SMS and push (T-146 follow-up).** "Awaiting your approval" alerts go by email only. SMS
+     needs a business mobile number setting (`sms_configs` is the customer-facing number). Push needs
+     `expo-notifications`, device tokens and an Apple push key in the mobile app.
 - [x] **Disagreement path decided 2026-11-09:** both. The reviewer gets the scope answers and a 30 s cap (CHANGELOG 2026-11-09).
 
 ## T-139 — Identification signals (nameplate reading)
@@ -150,4 +153,15 @@ Code for every item is already built; these are the steps that unlock it.
   and set `NEXT_PUBLIC_META_PIXEL_ID`, `META_PIXEL_ID` and `META_CAPI_ACCESS_TOKEN` in Vercel. Then test with
   `META_TEST_EVENT_CODE` (Events Manager → Test events): sign up once and check that CompleteRegistration arrives from both
   Browser and Server, deduplicated. Remove the test code afterwards.
+
+## T-146 — Business review by default
+
+- [ ] **Deploy in order:** `bash scripts/deploy-migration-30.sh` FIRST (the worker reads `services.auto_send`), then the
+  worker, then the web app.
+- [ ] **Know what changes on deploy:** every service, existing ones included, starts holding new quotes for your
+  approval. Customers see "Your estimate is being prepared". You get a "Review and approve" email, then tap
+  **Approve & send** on the quote (dashboard or app). To keep a service sending instantly, edit it → Basic →
+  **Send automatically without review**.
+- [ ] **Old verify scripts:** `verify-t137.mts` / `verify-t138.mts` expect app quotes to end at `sent`. Under review-by-default
+  they end at `pending_review` until approved. They're historical ticket checks; re-baseline only if you rerun them.
 

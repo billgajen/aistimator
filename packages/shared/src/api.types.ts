@@ -152,7 +152,8 @@ export interface QuoteViewResponse {
   business: QuoteViewBusiness
   branding?: QuoteViewBranding
   customer: QuoteViewCustomer
-  pricing: QuotePricing
+  /** T-146: never carries `estimate` (grade/label/confidence are business-only) */
+  pricing: Omit<QuotePricing, 'estimate'>
   /**
    * T-109 range-first: present when the quote is not yet final
    * (awaiting_clarification / pending_review). Exact pricing is withheld and
@@ -163,6 +164,15 @@ export interface QuoteViewResponse {
     rangeHigh: number
     reason: 'awaiting_clarification' | 'pending_review'
   }
+  /**
+   * T-146: the customer-facing state. 'estimate' = not yet reviewed by the
+   * business ("This is an estimate based on your photos and details"),
+   * 'quote' = approved ("Reviewed and confirmed by {business}"). Grades and
+   * confidence never reach the customer (they stay in pricing_json).
+   */
+  review: { state: 'estimate' | 'quote'; approvedAt?: string }
+  /** T-146: a price range for uncertain quantities on an unreviewed estimate. No label. */
+  estimateRange?: { low: number; high: number }
   /** Questions to answer when status is awaiting_clarification (T-108) */
   clarificationQuestions?: ClarificationQuestion[]
   /** T-122: quantity takeoff with measurement methods */
@@ -476,6 +486,8 @@ export interface QuoteDetailResponse {
     pricing_trace_json?: unknown
     triage_json?: unknown
     quality_gate_json?: unknown
+    /** T-146: when the business approved it */
+    approved_at?: string | null
   }
   service: {
     id: string

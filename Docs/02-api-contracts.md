@@ -103,6 +103,21 @@ Response:
   }
 }
 
+T-146 additions to this response:
+	•	`review`: `{ "state": "estimate" }` until the business approves, then `{ "state": "quote", "approvedAt": "…" }`. The page reads "This is an estimate based on your photos and details. {business} will review and confirm it." or "Reviewed and confirmed by {business}."
+	•	`estimateRange`: `{ "low", "high" }` only on an unreviewed estimate with uncertain quantities. No label.
+	•	`provisional` while `pending_review`: only when the engine measured a range. A flat price shows no number until it is approved.
+	•	`pricing` NEVER carries `estimate` (grade/label/description), and `takeoff[]` rows carry no `evidence`. Both are business-only (`GET /api/quotes/:id`).
+	•	The token may be the current link or the one issued before approval (`quotes.previous_token_hash`). The same applies to accept, decline, feedback, pdf and asset routes.
+
+POST /api/quotes/:quoteId/approve (T-146, dashboard cookie or app Bearer)
+The business approves a quote awaiting its review. The quote is marked approved (`approved_at`/`approved_by`) and sent, and the customer is emailed a fresh link. The link they already hold keeps working.
+200: `{ "status": "sent", "emailed": true|false, "emailError?" }`
+400 `INVALID_STATUS` (not `pending_review`), 400 `NOT_PRICED` (lead held at the plan limit, price it first), 409 `ALREADY_SENT` (a second tap), 404 for another tenant's quote.
+`PATCH /api/quotes/:id` with `sendToCustomer: true` also counts as approval. A held quote's first send emails "Your quote from …", not "Updated quote".
+
+Services: `POST /api/services` and `PATCH /api/services/:id` accept `autoSend: boolean` ("Send automatically without review", default false). With it off, the worker holds every quote that would have been sent (`pending_review`) and emails the business "Review and approve: …". Quotes created in the business's own app send no such email.
+
 POST /api/public/quotes/:quoteId/accept
 
 Marks quote accepted.

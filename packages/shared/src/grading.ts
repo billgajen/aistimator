@@ -87,11 +87,20 @@ export function computeEstimateGrade(quantities: QuantityProvenance[]): Estimate
  * every line is a fixed amount that would be charged on any job.
  */
 export function priceDependsOnJobFacts(
-  trace: Array<{ type: string; signalsUsed?: Array<{ key: string }>; quantitySource?: string }>
+  trace: Array<{ type: string; id?: string; signalsUsed?: Array<{ key: string }>; quantitySource?: string }>,
+  /**
+   * The service's work steps. A priced step chosen by a form answer (`when`)
+   * or an identified value (`triggerSignal`) depends on a job fact even
+   * though its trace line carries no signals (live T-146 check: a garage door
+   * picked by "Door size").
+   */
+  workSteps: Array<{ id: string; when?: unknown; triggerSignal?: string }> = []
 ): boolean {
+  const conditional = new Set(workSteps.filter((w) => w.when || w.triggerSignal).map((w) => w.id))
   return trace.some((t) => {
     if (t.type === 'addon' || t.type === 'multiplier' || t.type === 'inventory' || t.type === 'measurement') return true
     if (t.type !== 'work_step') return false
+    if (t.id && conditional.has(t.id)) return true
     if (t.quantitySource && t.quantitySource !== 'constant') return true
     return (t.signalsUsed ?? []).some((u) => u.key !== 'constant')
   })

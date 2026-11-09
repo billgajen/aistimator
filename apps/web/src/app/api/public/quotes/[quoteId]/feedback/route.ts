@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { quoteTokenFilter } from '@/lib/tokens'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import {
@@ -60,7 +61,7 @@ export async function POST(
         )
       `)
       .eq('id', quoteId)
-      .eq('quote_token_hash', tokenHash)
+      .or(quoteTokenFilter(tokenHash))
       .single()
 
     if (quoteError || !quote) {

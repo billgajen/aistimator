@@ -327,7 +327,9 @@ describe('takeoff shows how a selected line was identified', () => {
 
   it('identified → the label evidence', () => {
     const entries = buildTakeoff({ trace, workSteps: steps, structuredSignals: signalsWith({ key: 'unit_size', value: 'Large', confidence: 0.9, source: 'vision', basis: 'identified', evidence: 'Read from the plate: "AB48" → Large' }) })
-    expect(entries[0]!.method).toBe('Read from the plate: "AB48" → Large')
+    // T-146: plain words for the customer; the decoded transcription stays internal
+    expect(entries[0]!.method).toBe('Large — from the plate')
+    expect(entries[0]!.evidence).toBe('Read from the plate: "AB48" → Large')
   })
 
   it('confirmed by the customer → says so', () => {

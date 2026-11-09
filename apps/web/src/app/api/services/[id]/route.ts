@@ -129,6 +129,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       description,
       active,
       documentTypeDefault,
+      autoSend,
       scopeIncludes,
       scopeExcludes,
       defaultAssumptions,
@@ -142,6 +143,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       description?: string | null
       active?: boolean
       documentTypeDefault?: DocumentType
+      /** T-146: send quotes without business review */
+      autoSend?: boolean
       scopeIncludes?: string[]
       scopeExcludes?: string[]
       defaultAssumptions?: string[]
@@ -185,6 +188,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     if (active !== undefined) {
       updates.active = Boolean(active)
+    }
+    if (typeof autoSend === 'boolean') {
+      updates.auto_send = autoSend
     }
     if (documentTypeDefault !== undefined) {
       updates.document_type_default = documentTypeDefault

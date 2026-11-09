@@ -1,0 +1,119 @@
+/**
+ * T-146: business approval of a held quote — one tap from the dashboard or
+ * the mobile app sends it to the customer.
+ *
+ * - Only `pending_review` quotes with a price can be approved (a lead held at
+ *   the plan limit has no price yet; it is priced from the dashboard first).
+ * - Marks it approved (`approved_at`/`approved_by`): the customer page then
+ *   reads "Quote — Reviewed and confirmed by {business}".
+ * - Issues a fresh link for the email, and keeps the link the customer
+ *   already holds valid (`previous_token_hash`) instead of breaking it.
+ * - The status guard in the UPDATE makes a double tap send once.
+ */
+
+import { formatMoney, getRegion } from '@estimator/shared'
+import type { QuotePricing, TenantBranding } from '@estimator/shared'
+import type { createClient } from '@/lib/supabase/server'
+import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
+import { sendEmail, isPostmarkConfigured, generateCustomerEmailHtml } from '@/lib/postmark'
+
+type Supabase = Awaited<ReturnType<typeof createClient>>
+
+export type ApproveResult =
+  | { ok: true; status: 'sent'; quoteViewUrl: string; emailed: boolean; emailError?: string }
+  | { ok: false; httpStatus: number; code: string; message: string }
+
+/** Pure: can this quote be approved, and if not, why (for tests and the UI). */
+export function approvalBlocker(quote: {
+  status: string
+  pricing_json: { total?: number } | null
+  content_json: { limitHold?: boolean } | null
+}): { code: string; message: string } | null {
+  if (quote.status !== 'pending_review') {
+    return { code: 'INVALID_STATUS', message: `Only quotes awaiting your approval can be approved (this one is '${quote.status}')` }
+  }
+  if (quote.content_json?.limitHold || !((quote.pricing_json?.total ?? 0) > 0)) {
+    return { code: 'NOT_PRICED', message: 'This quote has no price yet. Price it first.' }
+  }
+  return null
+}
+
+export async function approveQuote(opts: {
+  supabase: Supabase
+  quoteId: string
+  tenantId: string
+  userId: string
+}): Promise<ApproveResult> {
+  const { supabase, quoteId, tenantId, userId } = opts
+
+  const { data: quote, error } = await supabase
+    .from('quotes')
+    .select(
+      `id, status, quote_token_hash, pricing_json, content_json, customer_json,
+       tenants!tenant_id ( id, name, region, branding_json ),
+       services!service_id ( id, name )`
+    )
+    .eq('id', quoteId)
+    .eq('tenant_id', tenantId)
+    .single()
+  if (error || !quote) return { ok: false, httpStatus: 404, code: 'NOT_FOUND', message: 'Quote not found' }
+
+  const blocker = approvalBlocker(quote as never)
+  if (blocker) return { ok: false, httpStatus: 400, ...blocker }
+
+  const { token, hash } = generateQuoteToken()
+  const expiry = getTokenExpiry(30)
+  const now = new Date().toISOString()
+  const { data: updated, error: updateError } = await supabase
+    .from('quotes')
+    .update({
+      status: 'sent',
+      sent_at: now,
+      approved_at: now,
+      approved_by: userId,
+      previous_token_hash: quote.quote_token_hash,
+      quote_token_hash: hash,
+      token_expires_at: expiry.toISOString(),
+    })
+    .eq('id', quoteId)
+    .eq('tenant_id', tenantId)
+    .eq('status', 'pending_review') // a second tap finds nothing to update
+    .select('id')
+  if (updateError) {
+    console.error('[Approve] update failed:', updateError.message)
+    return { ok: false, httpStatus: 500, code: 'DB_ERROR', message: 'Failed to approve quote' }
+  }
+  if (!updated || updated.length === 0) {
+    return { ok: false, httpStatus: 409, code: 'ALREADY_SENT', message: 'This quote was already approved' }
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const quoteViewUrl = `${appUrl}/q/${quoteId}?token=${token}`
+
+  const tenant = quote.tenants as unknown as { name: string; region?: string | null; branding_json: TenantBranding | null }
+  const service = quote.services as unknown as { name: string }
+  const customer = quote.customer_json as { name: string; email?: string | null }
+  const pricing = quote.pricing_json as QuotePricing
+
+  if (!customer?.email || !isPostmarkConfigured()) {
+    return { ok: true, status: 'sent', quoteViewUrl, emailed: false }
+  }
+  const locale = getRegion(tenant.region).locale
+  const htmlBody = generateCustomerEmailHtml({
+    customerName: customer.name,
+    businessName: tenant.name,
+    serviceName: service.name,
+    quoteViewUrl,
+    total: formatMoney(pricing.total, pricing.currency, locale),
+    validUntil: expiry.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' }),
+    primaryColor: tenant.branding_json?.primaryColor,
+  })
+  const emailResult = await sendEmail({
+    to: customer.email,
+    subject: `Your quote from ${tenant.name}`,
+    htmlBody,
+    tag: 'quote-approved',
+  })
+  if (!emailResult.success) console.error('[Approve] customer email failed:', emailResult.error)
+  return { ok: true, status: 'sent', quoteViewUrl, emailed: emailResult.success, emailError: emailResult.error }
+}

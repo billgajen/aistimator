@@ -3,13 +3,27 @@
 // Deep verification (penny recompute vs config, takeoff sanity) happens in
 // the manual analysis pass over the dumped JSON.
 
+import { findConfidenceLanguageInPayload } from '../../packages/shared/src/customer-language.ts'
+
 const near = (a, b, eps = 0.01) => Math.abs(a - b) <= eps
 
 function breakdownLabels(quote) {
   return (quote?.pricing?.breakdown || []).map((l) => `${l.label}`.toLowerCase())
 }
 
-export function commonChecks(scenario, quote) {
+/**
+ * T-146: nothing customer-facing carries a grade, a grade label or the words
+ * "exact", "firm" or "preliminary". `quote` is the PUBLIC payload — exactly
+ * what the quote page and the widget render.
+ */
+export function customerLanguageCheck(quote) {
+  const problems = findConfidenceLanguageInPayload(quote ?? {})
+  return problems.length === 0
+    ? { level: 'pass', name: 'customer-facing payload has no grades or certainty words', detail: '' }
+    : { level: 'fail', name: 'customer-facing payload shows grades or certainty words', detail: problems.slice(0, 5).join(' | ') }
+}
+
+export function commonChecks(scenario, quote, internalEstimate) {
   const out = []
   const add = (level, name, detail) => out.push({ level, name, detail })
 
@@ -31,10 +45,16 @@ export function commonChecks(scenario, quote) {
     add('fail', 'final quote has no pricing breakdown', JSON.stringify(p).slice(0, 200))
   }
 
-  const grade = p?.estimate?.grade
+  // T-146: every customer-facing payload, whatever its status
+  out.push(customerLanguageCheck(quote))
+
+  // The grade is internal (dashboard API); the customer payload must not carry it
+  const grade = internalEstimate?.grade
   if (['sent', 'viewed'].includes(status)) {
-    if (['A', 'B', 'C'].includes(grade)) add('pass', 'estimate grade present', `grade=${grade} range=${p.estimate.rangeLow}-${p.estimate.rangeHigh}`)
-    else add('fail', 'estimate grade missing on final quote', JSON.stringify(p?.estimate))
+    if (['A', 'B', 'C'].includes(grade)) add('pass', 'estimate grade present (internal)', `grade=${grade} range=${internalEstimate.rangeLow}-${internalEstimate.rangeHigh}`)
+    else add('fail', 'estimate grade missing on final quote (internal)', JSON.stringify(internalEstimate))
+    if (quote?.review?.state === 'estimate' || quote?.review?.state === 'quote') add('pass', 'customer review state present', quote.review.state)
+    else add('fail', 'customer review state missing', JSON.stringify(quote?.review))
     if (typeof quote.reference === 'string' && /^EST-\d{4}-/.test(quote.reference)) add('pass', 'reference number present', quote.reference)
     else add('warn', 'reference missing/odd', String(quote.reference))
     if (scenario.expect.needsPhotos) {

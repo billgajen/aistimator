@@ -30,3 +30,14 @@ export function getTokenExpiry(days: number = 30): Date {
   expiry.setDate(expiry.getDate() + days)
   return expiry
 }
+
+/**
+ * T-146: PostgREST filter matching a quote by its current link OR the link
+ * issued before the business approved it (quotes.previous_token_hash), so the
+ * link the customer already holds keeps working after approval.
+ * Only ever called with a sha256 hex digest; anything else matches nothing.
+ */
+export function quoteTokenFilter(tokenHash: string): string {
+  const safe = /^[0-9a-f]{64}$/.test(tokenHash) ? tokenHash : '0'.repeat(64)
+  return `quote_token_hash.eq.${safe},previous_token_hash.eq.${safe}`
+}

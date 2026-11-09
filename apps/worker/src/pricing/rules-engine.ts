@@ -1889,10 +1889,12 @@ export function calculatePricingWithTrace(
       stepAmountsById.set(step.id, stepResult.cost)
 
       // Add note if using legacy fallback (no explicit quantitySource)
+      // T-146: notes reach the customer, so no configuration advice and no
+      // confidence language; the trace keeps quantitySource for the business
       if (stepResult.quantitySource === 'legacy_fallback') {
-        notes.push(`"${step.name}" uses legacy quantity estimation - consider configuring explicit quantity source`)
+        console.log(`[Pricing] "${step.name}" uses legacy quantity estimation (no explicit quantity source configured)`)
       } else if (stepResult.quantitySource === 'ai_signal' && !stepResult.quantityTrusted) {
-        notes.push(`"${step.name}" quantity from AI signal (lower confidence)`)
+        notes.push(`"${step.name}" quantity estimated from your photos and details`)
       }
     }
 

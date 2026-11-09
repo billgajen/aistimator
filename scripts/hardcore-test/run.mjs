@@ -18,8 +18,9 @@ const onlyArg = args.find((a) => a.startsWith('--only'))
 const only = onlyArg ? (onlyArg.includes('=') ? onlyArg.split('=')[1] : args[args.indexOf(onlyArg) + 1]).split(',') : null
 const skipClarify = args.includes('--skip-clarify')
 const round2 = args.includes('--round2')
-// --round3: the US launch trades (scenarios3.mjs + requests3.json). Run with
-// `npx tsx` — pack scenarios import the TypeScript packs.
+// --round3: the US launch trades (scenarios3.mjs + requests3.json).
+// Run EVERY round with `npx tsx`: pack scenarios import the TypeScript packs,
+// and checks.mjs imports the shared customer-language guard (T-146).
 const round3 = args.includes('--round3')
 
 const cfg = loadEnv()
@@ -165,6 +166,9 @@ async function runScenario(scenario) {
           workSteps: pricing.workSteps || [],
         },
         draftConfig: draft,
+        // T-146: the gauntlet measures pricing end to end, so quotes go out
+        // without the (default) business review; verify-t146.mts covers review.
+        autoSend: true,
       },
     }))
     const serviceId = svcRes.service.id
@@ -260,16 +264,18 @@ async function runScenario(scenario) {
     // 11. Internal detail (signals, pricing trace, quality gate) for deep verification
     const detailRes = await http('GET', `${cfg.appUrl}/api/quotes/${quoteId}`, { headers: authed })
     if (detailRes.ok) saveJson(dir, 'quote-detail-internal.json', detailRes.json)
+    // T-146: the grade is business-only — read it from the dashboard API, not the customer payload
+    const internalEstimate = detailRes.ok ? detailRes.json?.quote?.pricing_json?.estimate ?? null : null
 
     // 12. Checks
     result.finalStatus = quote.status
     result.total = quote?.pricing?.total ?? null
-    result.grade = quote?.pricing?.estimate?.grade ?? null
-    result.range = quote?.pricing?.estimate ? [quote.pricing.estimate.rangeLow, quote.pricing.estimate.rangeHigh] : null
+    result.grade = internalEstimate?.grade ?? null
+    result.range = internalEstimate ? [internalEstimate.rangeLow, internalEstimate.rangeHigh] : null
     result.provisional = quote?.provisional ?? null
     result.reference = quote?.reference ?? null
     result.checks = [
-      ...commonChecks(scenario, quote),
+      ...commonChecks(scenario, quote, internalEstimate),
       ...scenarioChecks(scenario, quote, { clarificationLog }),
     ]
   } catch (err) {
