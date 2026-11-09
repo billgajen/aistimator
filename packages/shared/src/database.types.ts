@@ -1,6 +1,7 @@
 import type { RegionCode, UnitSystem, ReferenceObject } from './regions/types'
 import type { AiUsageSummary } from './ai-models'
 import type { IdentificationSpec } from './identification'
+import type { ScanSpec } from './room-scan'
 
 /**
  * Database types for the Estimator platform
@@ -239,6 +240,11 @@ export interface ExpectedSignalConfig {
    * data, never hardcoded.
    */
   identify?: IdentificationSpec
+  /**
+   * T-138 (AD-028): this quantity can come from the business's on-site LiDAR
+   * room scan (geometry computed by code, converted into `unit`). Pack data.
+   */
+  scan?: ScanSpec
 }
 
 /**
@@ -656,7 +662,7 @@ export interface ExtractedSignal {
    */
   quantityBand?: { low: number; high: number }
   /** T-120: how this quantity was established — drives the estimate grade */
-  basis?: 'confirmed' | 'measured' | 'adjudicated' | 'envelope' | 'identified'
+  basis?: 'confirmed' | 'measured' | 'adjudicated' | 'envelope' | 'identified' | 'scanned'
 }
 
 /**

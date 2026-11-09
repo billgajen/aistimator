@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import type { AppCreateQuoteRequest } from '@estimator/shared'
+import { parseRoomScan, scanAnswers, ROOM_SCAN_FIELD, type AppCreateQuoteRequest, type ExpectedSignalConfig, type ServiceDraftConfig } from '@estimator/shared'
 import { requireTenant } from '@/lib/auth-tenant'
 import { createAdminClient } from '@/lib/supabase/server'
 import { createQuoteSubmission } from '@/lib/quote-intake'
@@ -35,13 +35,45 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid email format' } }, { status: 400 })
   }
 
+  // T-138: an on-site LiDAR scan. Validated here (untrusted input); the
+  // quantities it maps are filled as answers so the form's required fields
+  // pass, and the raw scan rides along for the worker's audit line
+  let job = body.job
+  if (body.scan !== undefined) {
+    const parsed = parseRoomScan(body.scan)
+    if (!parsed.ok) {
+      return NextResponse.json({ error: { code: 'INVALID_SCAN', message: parsed.error } }, { status: 400 })
+    }
+    const { data: service } = await auth.supabase
+      .from('services')
+      .select('expected_signals, draft_config')
+      .eq('id', body.serviceId)
+      .eq('tenant_id', auth.tenantId)
+      .single()
+    const answers = [...(job?.answers || [])]
+    const filled = scanAnswers({
+      scan: parsed.scan,
+      expectedSignals: ((service?.expected_signals as ExpectedSignalConfig[] | null) || []),
+      fields: ((service?.draft_config as ServiceDraftConfig | null)?.suggestedFields || []),
+      existingAnswers: answers,
+    })
+    job = {
+      ...job,
+      answers: [
+        ...answers,
+        ...filled,
+        { fieldId: ROOM_SCAN_FIELD, value: parsed.scan as unknown as string },
+      ],
+    }
+  }
+
   // Tenant ownership is proven by the session; the intake runs with the
   // admin client exactly as the widget route does (it writes several tables)
   const result = await createQuoteSubmission(createAdminClient(), {
     tenantId: auth.tenantId,
     serviceId: body.serviceId,
     customer: { name: body.customer.name.trim(), email: body.customer.email.trim(), ...(body.customer.phone && { phone: body.customer.phone }) },
-    job: body.job,
+    job,
     assetIds: body.assetIds,
     source: { type: 'app', userId: auth.userId },
     skipServiceMatch: true,

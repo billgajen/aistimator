@@ -54,7 +54,7 @@ final invoice.
 | T-135 | AI model upgrade + config-driven model routing | AI |
 | T-136 | SMS channel (Twilio) | Channel |
 | T-137 | Business mobile app (Expo) — on-site quoting — **built 2026-11-09** (API live-verified; on-device run pending) | App |
-| T-138 | LiDAR room scan (RoomPlan) → `scanned` quantities | App + engine |
+| T-138 | LiDAR room scan (RoomPlan) → `scanned` quantities — **built 2026-11-09** (engine live-verified; native module needs a device build) | App + engine |
 | T-139 | Identification signals (nameplate reading) — **built 2026-11-09** (AD-032; real-nameplate accuracy proven in T-140/T-142) | Engine |
 | T-140 | Packs: HVAC replacement + water heaters — **built 2026-11-09** (placeholder rates) | Packs |
 | T-141 | Packs: plumbing fixtures, electrical, garage doors — **built 2026-11-09** (placeholder rates; gauntlet 10/10) | Packs |

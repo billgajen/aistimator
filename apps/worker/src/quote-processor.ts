@@ -54,7 +54,7 @@ import type { QualityGateResult, ClarificationQuestion } from '@estimator/shared
 import { AiUsageMeter } from '@estimator/shared'
 import { createAiClient } from './ai/factory'
 import type { AiClient } from './ai/client'
-import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue } from '@estimator/shared'
+import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue, parseRoomScan, scanAnswers, scanEvidence, summarizeRoomScan, ROOM_SCAN_FIELD } from '@estimator/shared'
 import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor, DEFAULT_ADJUDICATION_VALUE_THRESHOLD, DEFAULT_ADJUDICATION_TIMEOUT_MS } from './ai/measurement'
 import { formatScopeAnswers } from './ai/scope-answers'
 import { identificationTargets, identifyFromLabels, applyIdentifications, weakenUnreadGuesses, pricingReferencedKeys, checkIdentifications, identificationProvenance, identificationQuestion, DEFAULT_IDENTIFICATION_TIMEOUT_MS, type IdentificationOutcome } from './ai/identification'
@@ -132,6 +132,8 @@ interface QuoteData {
     job_quantity?: number
     job_answers: Array<{ fieldId: string; value: string | number | boolean | string[] }>
     asset_ids?: string[]
+    /** Where the request came from ({ type: 'widget' | 'app' | … }) */
+    source_json?: { type?: string } | null
   }
   tenant: {
     id: string
@@ -403,6 +405,50 @@ export async function processQuote(
   const { quoteRequest, tenant, service, pricingRules, assets } = quoteData
   // T-133 (AD-025): currency, locale, units, tax label and reference sizes for this tenant
   const regionCtx = resolveRegionContext(tenant)
+
+  // 1.1 T-138 (AD-028): LiDAR room scan taken on site by the business. Code
+  // turns the geometry into the quantities the pack maps (scanAnswers); they
+  // merge as answers, so they count as confirmed and are never re-measured.
+  // Honoured only on quotes the business app created: a website customer
+  // can't claim "scanned on site". The raw scan never reaches a prompt.
+  const scannedFieldIds = new Set<string>()
+  let scanEvidenceText: string | null = null
+  {
+    const rawScanIndex = (quoteRequest.job_answers || []).findIndex((a) => a.fieldId === ROOM_SCAN_FIELD)
+    if (rawScanIndex >= 0) {
+      const rawScan = (quoteRequest.job_answers[rawScanIndex] as { value: unknown }).value
+      quoteRequest.job_answers = quoteRequest.job_answers.filter((_, i) => i !== rawScanIndex)
+      const parsedScan = quoteRequest.source_json?.type === 'app' ? parseRoomScan(rawScan) : null
+      if (!parsedScan) {
+        console.warn('[Processor] Room scan ignored: not an app-created quote')
+      } else if (!parsedScan.ok) {
+        console.warn(`[Processor] Room scan ignored: ${parsedScan.error}`)
+      } else {
+        // Every quantity the scan can give (ignoring what's answered), then:
+        // unanswered → fill; answered with the scan's own value (the app route
+        // pre-fills for validation) → credit the scan; a different typed
+        // value → the person wins and the line isn't called scanned
+        const filled = scanAnswers({
+          scan: parsedScan.scan,
+          expectedSignals: service.expected_signals || [],
+          fields: [...(quoteData.widgetFields || []), ...(service.draft_config?.suggestedFields || [])],
+          existingAnswers: [],
+        })
+        for (const answer of filled) {
+          const existing = quoteRequest.job_answers.find((a) => a.fieldId === answer.fieldId)
+          if (!existing || existing.value === '' || existing.value === null) {
+            quoteRequest.job_answers = quoteRequest.job_answers.filter((a) => a.fieldId !== answer.fieldId)
+            quoteRequest.job_answers.push(answer)
+            scannedFieldIds.add(answer.fieldId)
+          } else if (Number(String(existing.value).replace(/,/g, '')) === answer.value) {
+            scannedFieldIds.add(answer.fieldId)
+          }
+        }
+        scanEvidenceText = scanEvidence(summarizeRoomScan(parsedScan.scan), parsedScan.scan.device)
+        console.log(`[Processor] Room scan: ${[...scannedFieldIds].join(', ') || 'no mapped quantities'}`)
+      }
+    }
+  }
 
   // 1.2 Merge clarification answers as customer-provided form answers (T-108).
   // On reprocess after clarification, each answer maps (via its question's
@@ -925,17 +971,21 @@ export async function processQuote(
       if (value === null) continue
 
       // Customer-facing (it becomes the takeoff "method" line): never a raw signal key
-      const formEvidence = clarifiedFieldIds.has(answer.fieldId)
-        ? 'Confirmed by the customer'
-        : field?.label
-          ? `Customer-provided: ${field.label}`
-          : 'Customer-provided'
+      const scanned = scannedFieldIds.has(answer.fieldId) && scanEvidenceText !== null
+      const formEvidence = scanned
+        ? scanEvidenceText!
+        : clarifiedFieldIds.has(answer.fieldId)
+          ? 'Confirmed by the customer'
+          : field?.label
+            ? `Customer-provided: ${field.label}`
+            : 'Customer-provided'
       const formSignal = {
         key: signalKey,
         value,
         confidence: 1.0,
         source: 'form' as const,
         evidence: formEvidence,
+        ...(scanned && { basis: 'scanned' as const }),
       }
 
       // Check if we already have this signal
@@ -1669,6 +1719,7 @@ export async function processQuote(
     trace: pricingTrace,
     structuredSignals,
     workSteps: rulesWithWorkSteps.workSteps || [],
+    ...(scanEvidenceText && { scanned: { fieldIds: scannedFieldIds, evidence: scanEvidenceText } }),
   })
   content.reference = buildReference(quoteId, new Date().getFullYear())
 

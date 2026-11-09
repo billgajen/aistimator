@@ -15,6 +15,28 @@
 
 ## Issues & Resolutions
 
+### 2026-11-09: T-138 — LiDAR room scan (RoomPlan) → `scanned` quantities (AD-028)
+
+**Built:**
+- **Shared geometry** (`packages/shared/src/room-scan.ts`, pure): `parseRoomScan` (untrusted input: version, ≤40 rooms, ≤40 walls/≤60 openings per room, every dimension positive and ≤60 m, polygon points sanitised), `summarizeRoomScan` (gross and net wall area = walls − doors/windows/openings, floor area by shoelace polygon with a width × length fallback when the polygon is degenerate, perimeter, door/window counts), `scanMeasureValue` (converts once into the signal's unit, AD-030), `scanAnswers` (pack mapping → answers), `scanEvidence`.
+- **Pack data:** `ExpectedSignalConfig.scan = { measure }` with generic geometry measures (`room_count`, `wall_area_net`, `wall_area_gross`, `floor_area`, `ceiling_area`, `perimeter`, `door_count`, `window_count`). Painting packs (GB and US) interior `room_count` → `room_count`.
+- **Engine:** basis `scanned` on signals and in grading: ranks with `confirmed`, Grade A eligible. The processor reads the reserved `_room_scan` answer, **honoured only when `source_json.type === 'app'`**, so a website customer can't claim "scanned on site". It strips the raw scan from the answers before anything else (no prompt ever sees it), fills mapped answers (scanned quantities are never photo-measured: they are answers, see `humanStatedQuantityKeys`), and credits the scan on answers that already carry the scan's value. A different value typed on site wins and isn't called scanned. Form signals get `basis: 'scanned'` and the evidence "Scanned on site with LiDAR (device): N rooms"; the takeoff cites it on form-field lines.
+- **App route:** `POST /api/app/quotes` takes `scan`, validates it (400 `INVALID_SCAN`), and pre-fills the mapped answers so the form's required fields pass. The raw scan is stored with the request for audit (no migration: reserved answer id).
+- **App:** local Expo module `apps/mobile/modules/room-scan` (Swift, RoomPlan): `isSupported()` and `scanRoom()` present RoomPlan's capture UI full screen with Done/Cancel and return one room's walls, openings and floors in metres. RoomPlan is weak-linked, so the app runs on iOS < 16 and on non-LiDAR iPhones. The JS bridge (`requireOptionalNativeModule`) reports unsupported in Expo Go and on Android, and the option is hidden there. New-quote screen: "Scan a room" / "Scan another room" when the service has scan signals, a live summary (rooms, m² walls, m² floor), and fields pre-filled from the scan (editable).
+
+**Bug found by the live check:** the app route pre-fills `room_count` from the scan (for validation), so the worker saw it as already answered and didn't credit the scan ("Quantity provided by you"). Fixed with the value-match rule above.
+
+**Verified live (local, `scripts/hardcore-test/verify-t138.mts`, synthetic RoomPlan-shaped scan, US interior painting): 5/5.** Three scanned rooms, room count left blank → room_count 3, $75 + 3 × $375 = **$1,200, Grade A**, takeoff "Scanned on site with LiDAR (iPhone 15 Pro): 3 rooms"; raw scan stored; invalid scan → 400; **the same scan through the public widget route is ignored** (typed 1 room → $450, no scan claim). Targeted gauntlet (owner rule, quantities changed): S01 sent, all 6 checks pass, £1,949.60 Grade B (60.7 m² measured, two passes agreeing, £28/m² + £250 scaffold; this morning's milestone run took 44 m² from the simulated customer's answer).
+- Unit: 18 worker tests (shoelace, net walls, unit conversion incl. wrong-kind unit, parser rejections ×7, caps, mapping, never overwriting a typed value, evidence, Grade A, takeoff ×2, degenerate-polygon fallback). Mobile: tsc, eslint, iOS bundle export, and **Expo autolinking resolves the `RoomScan` pod and `RoomScanModule`**.
+
+**Not verified (needs Xcode and a LiDAR iPhone):** compiling the Swift module and a real scan. In particular, which local axes RoomPlan's floor `polygonCorners` use (hence the width × length fallback), and real-room accuracy against a tape measure. See OWNER-TODO.
+
+**Files:** `packages/shared/src/{room-scan.ts,database.types.ts,grading.ts,index.ts,api.types.ts}`, `apps/worker/src/{quote-processor.ts,takeoff.ts}`, `apps/web/src/app/api/app/quotes/route.ts`, `apps/web/src/lib/vertical-packs/{painting.ts,painting-us.ts}`, `apps/mobile/modules/room-scan/**`, `apps/mobile/{app/new.tsx,src/lib/api.ts}`, `scripts/hardcore-test/verify-t138.mts`, tests.
+
+**Relation:** AD-028 (owner). Slots into the 2026-11-08 "customer-stated quantities are never measured" path, as that entry anticipated. Grade semantics extend T-120.
+
+---
+
 ### 2026-11-09: T-137 — Business mobile app (Expo): on-site quoting (AD-027 channel 3, AD-033)
 
 **Built:**

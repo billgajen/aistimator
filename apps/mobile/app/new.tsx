@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
-import type { AppBootstrapResponse } from '@estimator/shared'
+import { formatNumber, scanAnswers, summarizeRoomScan, type AppBootstrapResponse, type RoomScanPayload, type RoomScanRoom } from '@estimator/shared'
+import { isRoomScanSupported, scanRoom } from '../modules/room-scan'
 import { useApi } from '../src/lib/api-context'
 import { fieldsForService, type PhotoFile, type WidgetConfigResponse } from '../src/lib/api'
 import { missingRequired, optionLabel, optionValue, toSubmissionAnswers, visibleFields, type RawAnswers } from '../src/lib/answers'
@@ -26,6 +27,9 @@ export default function NewQuote() {
   const [description, setDescription] = useState('')
   const [raw, setRaw] = useState<RawAnswers>({})
   const [shots, setShots] = useState<Shot[]>([])
+  // T-138: rooms scanned with LiDAR on this quote
+  const [rooms, setRooms] = useState<RoomScanRoom[]>([])
+  const scanSupported = useMemo(() => isRoomScanSupported(), [])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -44,6 +48,23 @@ export default function NewQuote() {
   const service = widget?.services.find((s) => s.id === serviceId)
   const fields = useMemo(() => (widget && serviceId ? visibleFields(fieldsForService(widget, serviceId)) : []), [widget, serviceId])
   const angles = service?.mediaConfig.requiredAngles ?? []
+  const scanSignals = (service?.expectedSignals ?? []).filter((s) => s.scan)
+  const scan: RoomScanPayload | null = rooms.length > 0 ? { version: 1, rooms, device: Platform.OS === 'ios' ? 'iPhone (LiDAR)' : undefined } : null
+  // What the scan fills (the server recomputes; this is the on-screen preview)
+  const scanFilled = scan
+    ? scanAnswers({ scan, expectedSignals: scanSignals, fields: fields.map((f) => ({ fieldId: f.fieldId })), existingAnswers: [] })
+    : []
+  const effectiveRaw: RawAnswers = { ...Object.fromEntries(scanFilled.map((a) => [a.fieldId, String(a.value)])), ...raw }
+
+  async function addScannedRoom() {
+    try {
+      const room = await scanRoom()
+      setRooms((prev) => [...prev, { ...room, name: `Room ${prev.length + 1}` }])
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Scan failed'
+      if (!/cancel/i.test(message)) setError(message)
+    }
+  }
 
   async function takePhoto(angleId: string | null) {
     const permission = await ImagePicker.requestCameraPermissionsAsync()
@@ -70,7 +91,7 @@ export default function NewQuote() {
     return [...byAngle, ...shots.filter((s) => !s.angleId)]
   }, [angles, shots])
 
-  const missing = missingRequired(fields, raw)
+  const missing = missingRequired(fields, effectiveRaw)
   const minPhotos = service?.mediaConfig.minPhotos ?? 0
   const canSubmit =
     Boolean(serviceId && customer.name.trim() && customer.email.trim()) && missing.length === 0 && orderedShots.length >= minPhotos
@@ -87,9 +108,11 @@ export default function NewQuote() {
         job: {
           ...(address.trim() && { address: address.trim() }),
           ...(postcode.trim() && { postcodeOrZip: postcode.trim() }),
+          // Typed values only: the server fills scanned quantities itself
           answers: toSubmissionAnswers(fields, raw, description),
         },
         assetIds,
+        ...(scan && { scan }),
       })
       await saveQuoteToken(created.quoteId, created.quoteViewUrl)
       router.replace(`/quote/${created.quoteId}`)
@@ -143,6 +166,23 @@ export default function NewQuote() {
               <Button title="Add another photo" variant="secondary" onPress={() => takePhoto(null)} />
             </Card>
 
+            {scanSupported && scanSignals.length > 0 ? (
+              <Card>
+                <Label>Room scan (LiDAR)</Label>
+                <Muted>Walk each room with the camera. Scanned quantities are exact, so the quote can be Grade A.</Muted>
+                {scan ? (
+                  <Text style={styles.scanSummary}>
+                    {(() => {
+                      const s = summarizeRoomScan(scan)
+                      return `${s.rooms} room${s.rooms === 1 ? '' : 's'} · ${formatNumber(s.wallAreaNetSqm)} m² walls · ${formatNumber(s.floorAreaSqm)} m² floor`
+                    })()}
+                  </Text>
+                ) : null}
+                <Button title={rooms.length ? 'Scan another room' : 'Scan a room'} variant="secondary" onPress={addScannedRoom} />
+                {rooms.length > 0 ? <Button title="Clear scans" variant="secondary" onPress={() => setRooms([])} /> : null}
+              </Card>
+            ) : null}
+
             <Card>
               <Field label="What's the job?" value={description} onChangeText={setDescription} multiline style={{ minHeight: 80 }} />
               {fields.map((field) =>
@@ -161,7 +201,7 @@ export default function NewQuote() {
                     key={field.fieldId}
                     label={field.label}
                     help={field.helpText}
-                    value={typeof raw[field.fieldId] === 'string' ? (raw[field.fieldId] as string) : ''}
+                    value={typeof effectiveRaw[field.fieldId] === 'string' ? (effectiveRaw[field.fieldId] as string) : ''}
                     onChangeText={(v) => setRaw((r) => ({ ...r, [field.fieldId]: v }))}
                     keyboardType={field.type === 'number' ? 'decimal-pad' : 'default'}
                   />
@@ -185,4 +225,5 @@ const styles = StyleSheet.create({
   thumbEmpty: { backgroundColor: colors.mist, borderWidth: 1, borderColor: colors.line, borderStyle: 'dashed' },
   angleLabel: { color: colors.ink, fontWeight: '600' },
   link: { color: colors.brand, fontWeight: '600', marginTop: 2 },
+  scanSummary: { color: colors.ink, fontVariant: ['tabular-nums'], marginTop: space.sm, backgroundColor: colors.butter, padding: space.sm, borderRadius: radius.md },
 })

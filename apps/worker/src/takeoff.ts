@@ -31,6 +31,8 @@ export function buildTakeoff(opts: {
   trace: PricingTrace
   structuredSignals: ExtractedSignalsV2 | null
   workSteps: WorkStepConfig[]
+  /** T-138: form fields filled by an on-site LiDAR scan, with the audit line */
+  scanned?: { fieldIds: Set<string>; evidence: string }
 }): TakeoffEntry[] {
   const { trace, structuredSignals, workSteps } = opts
   const entries: TakeoffEntry[] = []
@@ -57,9 +59,12 @@ export function buildTakeoff(opts: {
 
         let method: string
         switch (step.quantitySource) {
-          case 'form_field':
-            method = 'Quantity provided by you'
+          case 'form_field': {
+            const fieldId = config?.quantitySource?.fieldId
+            method =
+              fieldId && opts.scanned?.fieldIds.has(fieldId) ? opts.scanned.evidence : 'Quantity provided by you'
             break
+          }
           case 'constant':
             method = 'Fixed quantity'
             break

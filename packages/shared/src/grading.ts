@@ -12,7 +12,8 @@
  *                  agreement, or equipment identified from a nameplate (T-139)
  *                  but not yet confirmed. Tight range.
  *   A — Confirmed: every driver quantity stated or confirmed by a human
- *                  (customer answer or business edit). Exact price.
+ *                  (customer answer or business edit) or scanned on site
+ *                  with LiDAR (T-138). Exact price.
  */
 
 export type EstimateGrade = 'A' | 'B' | 'C'
@@ -29,7 +30,7 @@ export interface QuantityProvenance {
    * 'identified' (T-139, AD-029): what the equipment IS was read from a label
    * or nameplate. Ranks like measured (Grade B) until a human confirms it.
    */
-  basis: 'confirmed' | 'measured' | 'adjudicated' | 'envelope' | 'defaulted' | 'identified'
+  basis: 'confirmed' | 'measured' | 'adjudicated' | 'envelope' | 'defaulted' | 'identified' | 'scanned'
   confidence: number
 }
 
@@ -67,7 +68,8 @@ export function computeEstimateGrade(quantities: QuantityProvenance[]): Estimate
   let grade: EstimateGrade = 'A'
 
   for (const q of quantities) {
-    if (q.basis === 'confirmed') continue
+    // T-138 (AD-028): a LiDAR scan taken on site is measured ground truth
+    if (q.basis === 'confirmed' || q.basis === 'scanned') continue
     if (q.basis === 'envelope' || q.basis === 'defaulted' || q.confidence < GRADE_B_MIN_CONFIDENCE) {
       grade = 'C'
       break

@@ -15,6 +15,7 @@ import type {
   CreateQuoteResponse,
   QuotesListResponse,
 } from '@estimator/shared'
+import type { ScanMeasure } from '@estimator/shared'
 import type { AppField } from './answers'
 
 export interface ApiErrorBody {
@@ -35,6 +36,8 @@ export class ApiError extends Error {
 export interface WidgetConfigService {
   id: string
   name: string
+  /** Pack signal specs (T-138: which quantities a room scan can fill) */
+  expectedSignals?: Array<{ signalKey: string; unit?: string; scan?: { measure: ScanMeasure } }>
   mediaConfig: {
     minPhotos: number
     maxPhotos: number

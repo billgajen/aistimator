@@ -524,6 +524,8 @@ export interface AppCreateQuoteRequest {
   customer: CustomerInput
   job?: Omit<JobInput, 'quantity'>
   assetIds?: string[]
+  /** T-138: LiDAR room scan (RoomScanPayload), validated server-side */
+  scan?: unknown
 }
 
 export interface AppQuoteView {

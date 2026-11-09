@@ -105,3 +105,11 @@ Code for every item is already built; these are the steps that unlock it.
   development build, not Expo Go, because it adds native code.
 - [ ] The app needs the business's widget site set up (it reuses the widget's form). Without one it says so.
 
+## T-138 — LiDAR room scan
+
+- [ ] **Development build on a LiDAR iPhone** (12 Pro or later Pro model): install Xcode, then
+  `cd apps/mobile && npx expo run:ios --device` (or `npx eas build --profile development --platform ios`).
+  Expo Go can't load the native RoomPlan module; the app hides the scan button there.
+- [ ] **Accuracy check:** scan 2–3 real rooms, tape-measure them, and send me the numbers. I need to confirm the floor
+  outline axes (the server falls back to width × length if they're wrong) and the net wall area.
+

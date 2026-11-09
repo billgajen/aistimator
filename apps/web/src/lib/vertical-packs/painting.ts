@@ -119,6 +119,8 @@ export const paintingPack: VerticalPack = {
             signalKey: 'room_count',
             type: 'number',
             description: 'Number of rooms to be painted',
+            // T-138: an on-site LiDAR scan fills the room count exactly
+            scan: { measure: 'room_count' },
           },
           {
             signalKey: 'wall_condition',
