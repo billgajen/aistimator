@@ -84,6 +84,10 @@ Code for every item is already built; these are the steps that unlock it.
      and an optional "Test with a photo" upload.
   4. **Painting accuracy: fix the photo scale.** Ask the customer for one known measurement (e.g. house width) and use it
      as the measurement anchor, so the wall area doesn't hinge on the door-size assumption.
+  5. **"Add service" has no template picker.** Pack templates (`lib/vertical-packs/`) only appear in onboarding
+     (`OnboardingFlow.tsx`), so an existing business can't add one later (e.g. an HVAC company adding water heaters).
+     Let "Add service" start from any pack template, with the pack's signal specs, questions and `TODO-OWNER` rates
+     to review, the same as onboarding.
 - [x] **Disagreement path decided 2026-11-09:** both. The reviewer gets the scope answers and a 30 s cap (CHANGELOG 2026-11-09).
 
 ## T-139 — Identification signals (nameplate reading)
