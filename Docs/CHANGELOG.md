@@ -15,6 +15,19 @@
 
 ## Issues & Resolutions
 
+### 2026-11-09: Production AC test: flat-rate "Grade A exact", dropped draft add-ons, ICP-style plate codes
+
+**What broke (production quote qte_b92180ec, demo tenant):** an AI-drafted "Central AC Replacement" (not the HVAC pack) went out at $4,550, labelled **"Grade A, this price is exact"**. The price was five fixed amounts that ignored tonnage, efficiency and the attic location, and the assessment itself said a site visit was needed. The AI draft also had a $450 attic surcharge, which never reached the saved service.
+
+**Root causes and fixes:**
+1. **Grade A only required that nothing was uncertain, not that anything was confirmed.** A price with no driver quantities graded A by default (`computeEstimateGrade([])`). New in `shared/grading.ts`: `priceDependsOnJobFacts(trace)` (any add-on, multiplier, inventory/measurement line, non-constant quantity, or triggered step) and `capFlatRateGrade()`. The worker caps **A → B "Provisional"** when the price is all fixed amounts **and** a site visit is recommended. The description reads "Standard price from the business’s rates. A site visit confirms the details…", not "measured from your photos". A flat-rate job with no site visit needed keeps A (the price really is the price). Applied after the R3-1 cap in `quote-processor.ts`.
+2. **Applying an AI draft dropped its add-ons.** The services page copied only `workSteps` from `draft.pricing`. Now `lib/draft-addons.ts` `draftAddonsToConfig` maps `{name, price}` → `{id, label, price}` into the Add-ons list, where the owner reviews them. No trigger keywords are invented, so nothing auto-charges on mention (R2-6 unchanged). The draft's `baseFee` and `minimumCharge` are still **not** applied: the work steps already make up the price, and here the AI's $4,800 "base fee" would have doubled it.
+3. **The HVAC pack couldn't decode ICP/Carrier/Rheem model numbers, and could misread a serial.** The real plate (NAC236AKA1) writes the size after a series digit ("2 36"), and the old rule only looked for "036", so no match. Worse, a transcribed serial "L0018 65769" would have decoded "018" as **1.5 ton**. The rules in `hvac-us.ts` now match only inside a model-number-shaped token (2+ letters first), plus a new ICP/Carrier/Rheem rule `[A-Z]{2,}\d{1,2}(18…60)[A-Z]` (NAC236AKA1, 24ACC636A003, RA1436AJ1NA → 3 ton). Services that already exist keep their copied rules. New tenants get these.
+
+**Verified:** worker tests 426 (+5 grade-cap cases), web 129 (+2 draft add-ons, +5 plate/serial decodes; the old "RA1436AJ1NA can't be decoded" expectation was wrong, since it's a 3-ton unit). Typecheck, lint, web and worker builds all pass. The decode rules were tested against the real production plate's model and serial text.
+
+**Backlog (OWNER-TODO):** AI-drafted equipment services should price by capacity tiers bound to the identified size, like the HVAC pack. And "Add service from template".
+
 ### 2026-11-09: T-144 — US marketing site, per-trade landing pages, Meta Pixel + Conversions API
 
 **Built:**

@@ -82,6 +82,44 @@ export function computeEstimateGrade(quantities: QuantityProvenance[]): Estimate
 }
 
 /**
+ * Does any line of the price depend on a fact about THIS job (a quantity, a
+ * triggered step, a selected add-on, a multiplier, a measurement)? False when
+ * every line is a fixed amount that would be charged on any job.
+ */
+export function priceDependsOnJobFacts(
+  trace: Array<{ type: string; signalsUsed?: Array<{ key: string }>; quantitySource?: string }>
+): boolean {
+  return trace.some((t) => {
+    if (t.type === 'addon' || t.type === 'multiplier' || t.type === 'inventory' || t.type === 'measurement') return true
+    if (t.type !== 'work_step') return false
+    if (t.quantitySource && t.quantitySource !== 'constant') return true
+    return (t.signalsUsed ?? []).some((u) => u.key !== 'constant')
+  })
+}
+
+/** Grade B shown when a flat-rate price still needs a site visit (not "measured from photos") */
+export const FLAT_RATE_SITE_VISIT_GRADE: EstimateGradeResult = {
+  grade: 'B',
+  label: 'Provisional',
+  description:
+    'Standard price from the business’s rates. A site visit confirms the details before work starts, so the final price may change.',
+}
+
+/**
+ * Grade A means the price-driving facts were confirmed. A price made only of
+ * fixed amounts confirms nothing about the job, so when the assessment says a
+ * site visit is still needed it cannot claim "exact": cap at B. A flat-rate
+ * job with no site visit needed keeps A (the price really is the price).
+ */
+export function capFlatRateGrade(
+  current: EstimateGradeResult,
+  opts: { priceDependsOnJobFacts: boolean; siteVisitRecommended: boolean }
+): EstimateGradeResult {
+  if (current.grade !== 'A' || opts.priceDependsOnJobFacts || !opts.siteVisitRecommended) return current
+  return FLAT_RATE_SITE_VISIT_GRADE
+}
+
+/**
  * T-121 (M7) — value-of-information: is this quantity's uncertainty worth a
  * customer question? Ask when the money at stake clears the bar, not when an
  * abstract confidence threshold trips.

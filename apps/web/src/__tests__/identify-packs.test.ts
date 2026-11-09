@@ -81,12 +81,23 @@ describe('HVAC decode rules', () => {
     ['GSZ140601', '5 ton'],
     ['MODEL 25HCE430A003 NOMINAL 2.5 TONS', '2.5 ton'],
     ['M/N XR13 1.5 TON', '1.5 ton'],
+    // ICP/Carrier/Rheem: size after a series/SEER digit (production plate 2026-11-09)
+    ['NAC236AKA1', '3 ton'],
+    ['MODEL NO. NAC236AKA1', '3 ton'],
+    ['24ACC636A003', '3 ton'],
+    ['RA1436AJ1NA', '3 ton'],
   ])('%s → %s', (text, expected) => {
     expect(decode('ac_tonnage', text)).toBe(expected)
   })
 
+  it('a serial number is never decoded as a size', () => {
+    // "L0018" contains "018" (1.5 ton) — it must not win over the model number
+    expect(decode('ac_tonnage', 'NAC236AKA1 SERIAL L0018 65769')).toBe('3 ton')
+    expect(decode('ac_tonnage', 'SERIAL NO. L0018 65769')).toBeUndefined()
+  })
+
   it('a model number without a known code decodes to nothing (customer is asked)', () => {
-    expect(decode('ac_tonnage', 'RA1436AJ1NA')).toBeUndefined()
+    expect(decode('ac_tonnage', 'N4A3T')).toBeUndefined()
   })
 
   it.each([

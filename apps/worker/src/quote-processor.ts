@@ -54,7 +54,7 @@ import type { QualityGateResult, ClarificationQuestion } from '@estimator/shared
 import { AiUsageMeter } from '@estimator/shared'
 import { createAiClient } from './ai/factory'
 import type { AiClient } from './ai/client'
-import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue, parseRoomScan, scanAnswers, scanEvidence, summarizeRoomScan, ROOM_SCAN_FIELD } from '@estimator/shared'
+import { computeEnvelope, enforceEnvelope, computeEstimateGrade, capFlatRateGrade, priceDependsOnJobFacts, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue, parseRoomScan, scanAnswers, scanEvidence, summarizeRoomScan, ROOM_SCAN_FIELD } from '@estimator/shared'
 import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor, DEFAULT_ADJUDICATION_VALUE_THRESHOLD, DEFAULT_ADJUDICATION_TIMEOUT_MS } from './ai/measurement'
 import { formatScopeAnswers } from './ai/scope-answers'
 import { fieldOptions, snapToOption, answersOutsideOptions, type OptionField } from './answer-options'
@@ -2003,6 +2003,21 @@ export async function processQuote(
       description: capped.description,
     }
     console.log(`[Processor] R3-1: grade capped to ${capped.grade} — ${quantityConcern}`)
+  }
+
+  // Grade A requires confirmed price-driving facts. An all-fixed-amount price
+  // confirms nothing about this job, so with a site visit still recommended it
+  // is capped at B (production test 2026-11-09: flat $4,550 AC replacement
+  // shown as "Grade A, this price is exact").
+  if (pricing.estimate && pricing.estimate.grade === 'A') {
+    const flatCapped = capFlatRateGrade(pricing.estimate, {
+      priceDependsOnJobFacts: priceDependsOnJobFacts(pricingTrace.trace),
+      siteVisitRecommended: Boolean(signals.siteVisitRecommended),
+    })
+    if (flatCapped.grade !== pricing.estimate.grade) {
+      pricing.estimate = { ...pricing.estimate, ...flatCapped }
+      console.log('[Processor] Flat-rate price with a site visit recommended: grade capped to B')
+    }
   }
 
   if (missingQuantitySignals.length > 0) {

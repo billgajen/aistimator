@@ -9,6 +9,7 @@ import { SuggestedFieldEditor } from '@/components/SuggestedFieldEditor'
 import { BulkServiceUpload } from '@/components/services/BulkServiceUpload'
 import { AIDraftRefinementPanel } from '@/components/services/AIDraftRefinementPanel'
 import { PricingComposer } from '@/components/services/PricingComposer'
+import { draftAddonsToConfig } from '@/lib/draft-addons'
 import type {
   Service,
   DocumentType,
@@ -486,6 +487,10 @@ export default function ServicesPage() {
           requiredAngles: draft.media.requiredAngles,
         },
         workSteps: draft.pricing.workSteps,
+        // The draft's add-ons used to be dropped here, so a drafted "Attic
+        // access surcharge" never reached the saved service (production test
+        // 2026-11-09). They land in the Add-ons list for the owner to review.
+        addons: draftAddonsToConfig(draft.pricing.addOns, generateAddonId),
         expectedSignals: draft.expectedSignals,
         suggestedFields: draft.suggestedFields,
       }))

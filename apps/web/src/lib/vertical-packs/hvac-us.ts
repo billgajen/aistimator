@@ -8,7 +8,8 @@
  * TODO-OWNER: every rate is a PLACEHOLDER for the business to review at
  * onboarding — not researched price data (OWNER-TODO.md, T-140).
  * TODO-OWNER: the decode rules cover the common patterns (a printed nominal
- * tonnage, or a three-digit BTU code such as "036" in the model number) and
+ * tonnage, a three-digit BTU code such as "036" in the model number, or the
+ * ICP/Carrier/Rheem form where the size follows a series digit, "NAC236") and
  * must be checked against real plates before this pack is promoted. When no
  * rule matches, the model's reading is used only if it is an allowed value,
  * and the customer is asked to confirm whenever the size moves the price.
@@ -50,7 +51,12 @@ function tonnageSignal(signalKey: string, unit: string): ExpectedSignalConfig {
       transcribe: 'the model number (M/N or MODEL) exactly, plus any line that states a nominal tonnage (the plate is the data label on the side of the outdoor unit)',
       decode: [
         { pattern: '(\\d(?:\\.\\d)?)\\s*-?\\s*TONS?\\b', map: PRINTED_TONS, label: 'nominal tonnage printed on the plate' },
-        { pattern: '0(18|24|30|36|42|48|60)', map: BTU_CODE_TO_TONNAGE, label: 'BTU code in the model number' },
+        // Size codes are read only inside a model-number-shaped token (2+ letters,
+        // then letters/digits), never a serial such as "L0018 65769" (→ 1.5 ton).
+        // Goodman/Trane/Lennox style: "GSX140361", "4TTR4036", "XC21-036"
+        { pattern: '[A-Z]{2}[A-Z0-9-]*?0(18|24|30|36|42|48|60)', map: BTU_CODE_TO_TONNAGE, label: 'BTU code in the model number' },
+        // ICP/Carrier/Rheem style, size after a series or SEER digit: "NAC236AKA1", "24ACC636A003", "RA1436AJ1NA"
+        { pattern: '[A-Z]{2,}\\d{1,2}(18|24|30|36|42|48|60)[A-Z]', map: BTU_CODE_TO_TONNAGE, label: 'size code in the model number' },
       ],
     },
   }

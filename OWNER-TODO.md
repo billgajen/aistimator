@@ -87,7 +87,11 @@ Code for every item is already built; these are the steps that unlock it.
   5. **"Add service" has no template picker.** Pack templates (`lib/vertical-packs/`) only appear in onboarding
      (`OnboardingFlow.tsx`), so an existing business can't add one later (e.g. an HVAC company adding water heaters).
      Let "Add service" start from any pack template, with the pack's signal specs, questions and `TODO-OWNER` rates
-     to review, the same as onboarding.
+     to review, the same as onboarding. (Owner confirmed 2026-11-09 after the production AC test: "Add service from template".)
+  6. **AI-drafted equipment services should price by capacity tiers bound to the identified size**, like the HVAC
+     pack. Today the draft prices a replacement as fixed amounts and leaves "ac_tonnage" as an unused signal, so a 2-ton
+     and a 5-ton system cost the same. When the service is identify-and-replace, the draft should produce one step per
+     size (`triggerSignal` on the identified value) and an `identify` spec, with the rates marked for owner review.
 - [x] **Disagreement path decided 2026-11-09:** both. The reviewer gets the scope answers and a 30 s cap (CHANGELOG 2026-11-09).
 
 ## T-139 — Identification signals (nameplate reading)
@@ -104,8 +108,8 @@ Code for every item is already built; these are the steps that unlock it.
   attic ×1.12–1.2).
 - [ ] **Check the decode rules against real plates** (same photo folder as T-139 above). The rules read a printed tonnage,
   a "0xx" BTU code in the model number, the furnace INPUT line, the capacity line and the fuel wording. Brands whose
-  model numbers don't carry a "0xx" code (some Carrier and Rheem formats) fall back to the model's reading plus a customer
-  confirmation. Tell me which brands your customers have most, and I'll add their schemes.
+  model numbers carry neither a "0xx" code nor the ICP/Carrier/Rheem "series digit + size" form (NAC236, added
+  2026-11-09 from a real plate) fall back to the model's reading plus a customer confirmation. Tell me which brands your customers have most, and I'll add their schemes.
 
 ## T-141 — Plumbing, electrical, garage door packs
 

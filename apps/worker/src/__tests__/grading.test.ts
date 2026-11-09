@@ -6,6 +6,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeEstimateGrade,
+  capFlatRateGrade,
+  priceDependsOnJobFacts,
   isQuestionWorthAsking,
   type QuantityProvenance,
 } from '@estimator/shared'
@@ -77,5 +79,43 @@ describe('isQuestionWorthAsking (M7 — ask where the money is)', () => {
   it('small jobs still ask when the relative stake is real', () => {
     const voi = isQuestionWorthAsking({ priceAtLow: 160, priceAtHigh: 260, bestTotal: 210 })
     expect(voi.ask).toBe(true) // bar = max(75, 21) = 75; spread 100
+  })
+})
+
+// Production test 2026-11-09: an AI-drafted AC replacement priced as five
+// fixed amounts went out "Grade A, this price is exact" while the assessment
+// said a site visit was needed. Grade A requires confirmed price drivers.
+describe('flat-rate grade cap', () => {
+  const fixed = (id: string) => ({ type: 'work_step', id, signalsUsed: [], quantitySource: 'constant' })
+  const A = computeEstimateGrade([])
+
+  it('all-fixed price + site visit recommended → B "Provisional"', () => {
+    const trace = [fixed('demo'), fixed('coil'), fixed('condenser')]
+    expect(priceDependsOnJobFacts(trace)).toBe(false)
+    const r = capFlatRateGrade(A, { priceDependsOnJobFacts: false, siteVisitRecommended: true })
+    expect(r.grade).toBe('B')
+    expect(r.label).toBe('Provisional')
+    expect(r.description).not.toMatch(/exact|measured/i)
+  })
+
+  it('all-fixed price with no site visit needed keeps A (flat rate is the price)', () => {
+    expect(capFlatRateGrade(A, { priceDependsOnJobFacts: false, siteVisitRecommended: false }).grade).toBe('A')
+  })
+
+  it('a price driven by job facts is graded by provenance, not capped here', () => {
+    const triggered = { type: 'work_step', id: 'ac_3_ton', signalsUsed: [{ key: 'ac_tonnage' }] }
+    expect(priceDependsOnJobFacts([fixed('permit'), triggered])).toBe(true)
+    expect(priceDependsOnJobFacts([fixed('permit'), { type: 'multiplier', signalsUsed: [] }])).toBe(true)
+    expect(priceDependsOnJobFacts([{ type: 'work_step', quantitySource: 'form_field', signalsUsed: [] }])).toBe(true)
+    expect(capFlatRateGrade(A, { priceDependsOnJobFacts: true, siteVisitRecommended: true }).grade).toBe('A')
+  })
+
+  it('a constant-quantity step tagged "constant" is still a fixed amount', () => {
+    expect(priceDependsOnJobFacts([{ type: 'work_step', quantitySource: 'constant', signalsUsed: [{ key: 'constant' }] }])).toBe(false)
+  })
+
+  it('never upgrades a lower grade', () => {
+    const C = computeEstimateGrade([{ signalKey: 'x', basis: 'envelope', confidence: 0.3 }])
+    expect(capFlatRateGrade(C, { priceDependsOnJobFacts: false, siteVisitRecommended: true }).grade).toBe('C')
   })
 })
