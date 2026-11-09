@@ -120,3 +120,12 @@ Code for every item is already built; these are the steps that unlock it.
 - [ ] During beta, ask each business to record the final invoice on finished jobs (quote page → Final invoice). The Analytics
   "Estimate accuracy" panel is the beta success metric (median error < 10%, ≥ 80% within ±10%).
 
+## T-144 — US marketing + Meta
+
+- [ ] **Read the six trade pages** (`/trades`, and `/painting`) and adjust any claim you don't want to make. Copy lives in
+  `apps/web/src/lib/marketing/trades.ts`.
+- [ ] **When you're ready to advertise** (Docs/09: after 10–20 paying US businesses): create the Pixel in Meta Events Manager
+  and set `NEXT_PUBLIC_META_PIXEL_ID`, `META_PIXEL_ID` and `META_CAPI_ACCESS_TOKEN` in Vercel. Then test with
+  `META_TEST_EVENT_CODE` (Events Manager → Test events): sign up once and check that CompleteRegistration arrives from both
+  Browser and Server, deduplicated. Remove the test code afterwards.
+

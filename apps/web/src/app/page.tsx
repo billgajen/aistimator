@@ -8,14 +8,14 @@ import { MiniEstimate } from '@/components/marketing/MiniEstimate'
 export const metadata: Metadata = {
   title: 'Aistimator — instant quotes for service businesses',
   description:
-    'Customers send photos from your website or WhatsApp. Aistimator measures the job and prices it from your rates — a professional quote in about 60 seconds.',
+    'Customers send photos from your website or by text. Aistimator measures the job and prices it from your rates — a professional quote in about 60 seconds.',
 }
 
 const STEPS = [
   {
     number: '01',
     title: 'Customer sends photos',
-    text: 'From the widget on your website or over WhatsApp. Guided capture asks for exactly the shots the job needs.',
+    text: 'From the widget on your website or by text message. Guided capture asks for exactly the shots the job needs.',
   },
   {
     number: '02',
@@ -40,8 +40,8 @@ const FEATURES = [
     text: 'A guided step-by-step form or an AI chat that feels like texting — inline on your page or behind a floating button.',
   },
   {
-    title: 'WhatsApp quoting',
-    text: 'Customers message your number, answer a few questions, send photos. The quote link lands right in the chat.',
+    title: 'Text-message quoting',
+    text: 'Customers text your number, answer a few questions, send photos. The quote link comes straight back by text (WhatsApp too).',
   },
   {
     title: 'Guided photo capture',
@@ -80,7 +80,7 @@ export default function HomePage() {
             <span className="text-primary">Be first.</span>
           </h1>
           <p className="mt-6 max-w-lg text-lg text-text-secondary">
-            Customers send photos from your website or WhatsApp. Aistimator measures the job and
+            Customers send photos from your website or by text. Aistimator measures the job and
             prices it from your rates —{' '}
             <span className="font-semibold text-text-primary">
               a professional quote in about 60 seconds.
@@ -178,7 +178,7 @@ export default function HomePage() {
               <p className="mt-5 max-w-md text-text-secondary">
                 You describe your pricing in plain English —{' '}
                 <span className="font-medium text-text-primary">
-                  &quot;£220 per room, heavy prep adds £80&quot;
+                  &quot;$375 per room, heavy prep adds $250&quot;
                 </span>{' '}
                 — and it becomes your pricing engine. Every quote is calculated from those rates,
                 every time, with the working shown.
@@ -236,7 +236,7 @@ export default function HomePage() {
             <div className="mx-auto mt-8 max-w-sm rounded-warm-xl bg-butter p-5">
               <div className="flex items-baseline justify-between text-xs text-text-secondary">
                 <span>Measured range</span>
-                <span className="figure text-text-primary">£1,180 – £1,340</span>
+                <span className="figure text-text-primary">$3,150 – $3,560</span>
               </div>
               <div className="relative mt-3 h-1.5 rounded-full bg-white/60">
                 <div className="absolute inset-y-0 left-[20%] right-[25%] rounded-full bg-tape" />

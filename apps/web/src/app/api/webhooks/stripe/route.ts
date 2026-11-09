@@ -3,6 +3,7 @@ import { planForStripePrice } from '@estimator/shared'
 import { getStripeClient } from '@/lib/stripe'
 import { NextResponse } from 'next/server'
 import type Stripe from 'stripe'
+import { sendMetaEvent } from '@/lib/meta-capi'
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
 
@@ -49,6 +50,13 @@ export async function POST(request: Request) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
         await handleCheckoutCompleted(supabase, stripe, session)
+        // T-144: server-side Subscribe for the ad funnel (no-op unless Meta is configured)
+        await sendMetaEvent({
+          eventName: session.status === 'complete' && session.amount_total === 0 ? 'StartTrial' : 'Subscribe',
+          eventId: session.id,
+          email: session.customer_details?.email ?? null,
+          ...(session.amount_total !== null && session.currency && { value: session.amount_total / 100, currency: session.currency }),
+        })
         break
       }
 

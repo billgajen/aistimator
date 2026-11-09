@@ -15,6 +15,23 @@
 
 ## Issues & Resolutions
 
+### 2026-11-09: T-144 — US marketing site, per-trade landing pages, Meta Pixel + Conversions API
+
+**Built:**
+- **Trade landing pages** from one template and one data file (`lib/marketing/trades.ts` → `components/marketing/TradeLanding.tsx`): `/trades/hvac`, `/trades/water-heaters`, `/trades/plumbing`, `/trades/electrical`, `/trades/garage-doors`, plus `/painting` (now US copy; `/trades/painting` redirects there) and a `/trades` index. Static, with per-trade titles and descriptions. Copy follows Docs/09's honest accuracy promise: photos → range, nameplate → firm price, LiDAR → exact. Example prices are the business's own rates in plain English. Only the speed-to-lead stats that already carry sources are reused. Nav: "Trades"; footer lists all six.
+- **US localisation** of the home page, features page and hero mini-estimate: $ and sq ft, sales tax instead of VAT, "by text" (SMS) alongside WhatsApp, a US example business. The example arithmetic is consistent ($3,090 + 8.25% = $3,344.93). The pricing page was already USD from `plans.ts` (T-134).
+- **Meta Pixel** (`components/marketing/MetaPixel.tsx`): rendered only by `SiteNav` (marketing pages) and the signup page, **never** the dashboard, the widget or a customer's quote page. Off without `NEXT_PUBLIC_META_PIXEL_ID`, and off when the browser sends **Global Privacy Control**. PageView on load.
+- **Conversions API** (`lib/meta-capi.ts`): `CompleteRegistration` on signup (browser Pixel + server event via `POST /api/marketing/event`: whitelisted event, rate-limited 5/min/IP, same `event_id` for deduplication, `_fbp`/`_fbc` cookies forwarded) and `Subscribe` (or `StartTrial` for a $0 checkout) from the Stripe `checkout.session.completed` webhook, with value and currency, `event_id` = the checkout session id. Email SHA-256 hashed after Meta's normalisation, never logged. 4 s timeout, and it never throws, so marketing can't break signup or billing. Off until `META_PIXEL_ID` + `META_CAPI_ACCESS_TOKEN` are set (`.env.example`). `META_TEST_EVENT_CODE` for Events Manager testing.
+- **Privacy policy** updated: the old line "the marketing site sets no tracking cookies" would have become false. It now describes the Pixel/CAPI scope, hashing and the GPC opt-out.
+
+**Verified:** every marketing route returns 200 (`/trades/painting` → 307 to `/painting`, unknown trade → 404). Playwright screenshots of `/trades/hvac` (desktop and 390 px), `/` and `/trades`: no horizontal overflow, Measured Document styling. Screenshotting also caught leftover UK copy (hero "WhatsApp", "84 m²", a UK business name) and a lowercased "hvac template", all fixed. Web tests 122 (+6: hashing never sends a raw email, payload shape, value/currency, no-op when unconfigured, endpoint URL, network failure doesn't throw, cookie parsing, trade content integrity incl. no £). No gauntlet (owner rule: T-144).
+
+**Not verified:** a live event reaching Meta (no Pixel id or token here). Use Events Manager → Test events with `META_TEST_EVENT_CODE` (OWNER-TODO). Docs/09: no Meta ad spend before 10–20 paying US businesses. The tracking is ready; the spend is the owner's call.
+
+**Files:** `apps/web/src/lib/{meta-capi.ts,marketing/trades.ts,rate-limit.ts}`, `apps/web/src/components/marketing/{MetaPixel,TradeLanding,SiteNav,SiteFooter,MiniEstimate}.tsx`, `apps/web/src/app/{trades/page.tsx,trades/[trade]/page.tsx,painting/page.tsx,page.tsx,features/page.tsx,privacy/page.tsx,(auth)/signup/page.tsx,api/marketing/event/route.ts,api/webhooks/stripe/route.ts}`, `apps/web/.env.example`, tests.
+
+---
+
 ### 2026-11-09: T-143 — Beta instrumentation: final invoice + estimate accuracy
 
 **Built:**

@@ -23,7 +23,12 @@ export function SiteFooter() {
             <ul className="mt-3 space-y-2 text-sm">
               <li><Link href="/features" className="text-text-secondary transition-colors hover:text-text-primary">Features</Link></li>
               <li><Link href="/pricing" className="text-text-secondary transition-colors hover:text-text-primary">Pricing</Link></li>
-              <li><Link href="/painting" className="text-text-secondary transition-colors hover:text-text-primary">For painters</Link></li>
+              <li><Link href="/trades/hvac" className="text-text-secondary transition-colors hover:text-text-primary">HVAC</Link></li>
+              <li><Link href="/trades/water-heaters" className="text-text-secondary transition-colors hover:text-text-primary">Water heaters</Link></li>
+              <li><Link href="/trades/plumbing" className="text-text-secondary transition-colors hover:text-text-primary">Plumbing</Link></li>
+              <li><Link href="/trades/electrical" className="text-text-secondary transition-colors hover:text-text-primary">Electrical</Link></li>
+              <li><Link href="/trades/garage-doors" className="text-text-secondary transition-colors hover:text-text-primary">Garage doors</Link></li>
+              <li><Link href="/painting" className="text-text-secondary transition-colors hover:text-text-primary">Painting</Link></li>
               <li><Link href="/demo" className="text-text-secondary transition-colors hover:text-text-primary">Widget demo</Link></li>
             </ul>
           </div>

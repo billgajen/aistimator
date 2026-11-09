@@ -13,7 +13,7 @@ export function MiniEstimate() {
       <div className="absolute -left-3 -top-5 z-10 rotate-[-2deg] rounded-warm-lg border border-border bg-white px-3.5 py-2.5 shadow-warm-lg sm:-left-8">
         <p className="text-[11px] font-semibold text-text-primary">4 photos received</p>
         <p className="figure mt-0.5 text-[11px] text-text-secondary">
-          walls measured: 84 m<sup>2</sup> · confirmed
+          walls measured: 904 sq ft · confirmed
         </p>
       </div>
 
@@ -26,7 +26,7 @@ export function MiniEstimate() {
               Estimate
             </p>
             <p className="font-display text-base font-bold leading-tight text-text-primary">
-              Harborne Decorators
+              Sunbelt Painting Co
             </p>
             <p className="figure mt-0.5 text-[11px] text-text-muted">EST-2026-8841</p>
           </div>
@@ -51,9 +51,9 @@ export function MiniEstimate() {
         {/* Ledger */}
         <div className="mt-4 space-y-2.5 text-[13px]">
           {[
-            ['Exterior walls — 2 coats, 84 m²', '£862.40'],
-            ['Prep: rub down & spot-prime', '£209.20'],
-            ['High-access rear gable', '£180.00'],
+            ['Exterior walls — 2 coats, 904 sq ft', '$2,260.00'],
+            ['Prep: scrape, caulk & spot-prime', '$480.00'],
+            ['Ladders & staging, rear gable', '$350.00'],
           ].map(([label, amount]) => (
             <div key={label} className="flex items-baseline gap-2">
               <span className="text-text-secondary">{label}</span>
@@ -66,15 +66,15 @@ export function MiniEstimate() {
         {/* Price panel */}
         <div className="mt-5 rounded-warm-xl bg-primary p-5 text-white">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/60">
-            Total inc. VAT
+            Total inc. sales tax
           </p>
           <p className="figure mt-1 text-4xl font-medium leading-none">
-            £1,251<sup className="text-lg align-super">.60</sup>
+            $3,344<sup className="text-lg align-super">.93</sup>
           </p>
           <div className="tape-rule-light mt-4" />
           <div className="mt-3 flex items-baseline justify-between text-[11px]">
             <span className="text-white/70">Measured range</span>
-            <span className="figure text-white/90">£1,180 – £1,340</span>
+            <span className="figure text-white/90">$3,150 – $3,560</span>
           </div>
         </div>
 

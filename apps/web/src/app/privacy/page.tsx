@@ -34,7 +34,7 @@ const SECTIONS = [
   },
   {
     title: '7. Cookies',
-    body: 'The marketing site sets no tracking cookies. The dashboard uses strictly necessary cookies for login sessions. Anti-bot verification on quote submission may set a cookie from Cloudflare Turnstile solely to distinguish humans from bots.',
+    body: 'On our own marketing pages (not the dashboard, and never on the quote pages and widgets our customers send to their customers) we may use the Meta Pixel and Meta Conversions API to measure our advertising; this sets Meta cookies, and the email you sign up with is sent to Meta only as a one-way hash. If your browser sends a Global Privacy Control signal, the Pixel is not loaded. The dashboard uses strictly necessary cookies for login sessions. Anti-bot verification on quote submission may set a cookie from Cloudflare Turnstile solely to distinguish humans from bots.',
   },
   {
     title: '8. Contact',

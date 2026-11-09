@@ -13,7 +13,7 @@
 import { Redis } from '@upstash/redis'
 import { NextResponse } from 'next/server'
 
-export type RateLimitScope = 'quotes' | 'uploads' | 'chat'
+export type RateLimitScope = 'quotes' | 'uploads' | 'chat' | 'marketing'
 
 export interface ScopeLimits {
   /** Max requests per window from a single IP */
@@ -44,6 +44,8 @@ const DEFAULT_LIMITS: Record<RateLimitScope, ScopeLimits> = {
   uploads: { ipLimit: 20, tenantLimit: 100, windowSeconds: 60 },
   // Each turn is a Gemini call
   chat: { ipLimit: 15, tenantLimit: 100, windowSeconds: 60 },
+  // T-144: Conversions API relay (signup events) — a person signs up once
+  marketing: { ipLimit: 5, tenantLimit: 1000, windowSeconds: 60 },
 }
 
 function envInt(name: string, fallback: number): number {

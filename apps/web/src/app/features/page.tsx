@@ -19,11 +19,11 @@ const STAGES = [
     number: '01',
     name: 'Capture',
     headline: 'Meet the customer where they already are.',
-    body: 'Your website gets an embeddable widget — a guided step-by-step form or an AI chat that feels like texting, inline on the page or behind a floating button. WhatsApp customers just message your number. Either way, guided photo capture asks for exactly the shots the job needs — every room from the doorway, every elevation ground-to-roof — with quality checks that catch blurry or dark photos before they waste anyone’s time.',
+    body: 'Your website gets an embeddable widget — a guided step-by-step form or an AI chat that feels like texting, inline on the page or behind a floating button. Customers who’d rather text just message your number (SMS or WhatsApp). Either way, guided photo capture asks for exactly the shots the job needs — every room from the doorway, every elevation ground-to-roof — with quality checks that catch blurry or dark photos before they waste anyone’s time.',
     details: [
       'Step-by-step form or conversational AI chat',
       'Floating button or inline embed — one script tag',
-      'WhatsApp intake with photos, in the chat',
+      'Text-message intake with photos (SMS and WhatsApp)',
       'Per-service photo checklists with quality checks',
     ],
   },
@@ -43,7 +43,7 @@ const STAGES = [
     number: '03',
     name: 'Price',
     headline: 'Plain English in. Your rates out. Every time.',
-    body: 'You describe your pricing the way you’d tell an apprentice: “£220 per room, heavy prep adds £80, minimum job £350.” That becomes your pricing engine — deterministic, auditable, yours. The AI extracts quantities and drafts wording, but the arithmetic is done by code from your configuration. Change a rate by typing a sentence; the next quote uses it.',
+    body: 'You describe your pricing the way you’d tell an apprentice: “$375 per room, heavy prep adds $250, minimum job $400.” That becomes your pricing engine — deterministic, auditable, yours. The AI extracts quantities and drafts wording, but the arithmetic is done by code from your configuration. Change a rate by typing a sentence; the next quote uses it.',
     details: [
       'Plain-language pricing setup — no formulas to learn',
       'Deterministic engine: same inputs, same price',

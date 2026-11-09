@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { MetaPixel } from './MetaPixel'
 
 /**
  * Marketing site navigation — shared across all public pages.
@@ -6,6 +7,8 @@ import Link from 'next/link'
 export function SiteNav() {
   return (
     <nav className="sticky top-0 z-40 border-b border-border bg-background">
+      {/* T-144: marketing pages only (SiteNav is never rendered in the app or on quote pages) */}
+      <MetaPixel />
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link
           href="/"
@@ -21,8 +24,8 @@ export function SiteNav() {
           <Link href="/pricing" className="text-sm font-medium text-text-secondary transition-colors hover:text-text-primary">
             Pricing
           </Link>
-          <Link href="/painting" className="text-sm font-medium text-text-secondary transition-colors hover:text-text-primary">
-            For painters
+          <Link href="/trades" className="text-sm font-medium text-text-secondary transition-colors hover:text-text-primary">
+            Trades
           </Link>
         </div>
 

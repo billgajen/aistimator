@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
+import { MetaPixel, trackMeta } from '@/components/marketing/MetaPixel'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -35,6 +36,16 @@ export default function SignupPage() {
         setError(signUpError.message)
         return
       }
+
+      // T-144: one CompleteRegistration, sent by the Pixel and the
+      // Conversions API with the same id (Meta deduplicates). No-op unless configured.
+      const eventId = crypto.randomUUID().replace(/-/g, '')
+      trackMeta('CompleteRegistration', {}, eventId)
+      fetch('/api/marketing/event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventName: 'CompleteRegistration', eventId, email, pageUrl: window.location.href }),
+      }).catch(() => undefined)
 
       // Show success message - user needs to verify email
       setSuccess(true)
@@ -71,6 +82,7 @@ export default function SignupPage() {
 
   return (
     <>
+      <MetaPixel />
       <h1 className="mb-6 text-center font-display text-xl font-bold text-text-primary">Create your account</h1>
 
       <form onSubmit={handleSignup} className="space-y-4">
