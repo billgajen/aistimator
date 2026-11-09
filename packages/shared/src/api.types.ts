@@ -69,7 +69,7 @@ export interface JobInput {
 }
 
 export interface SourceInput {
-  type: 'widget' | 'whatsapp' | 'api'
+  type: 'widget' | 'whatsapp' | 'api' | 'app'
   pageUrl?: string
   userAgent?: string
 }
@@ -505,4 +505,47 @@ export interface AnalyzeLearningResponse {
   success: boolean
   patternsFound: number
   message: string
+}
+
+// ============================================================================
+// Business mobile app API (T-137) — bearer-authenticated, /api/app/*
+// ============================================================================
+
+export interface AppBootstrapResponse {
+  tenantName: string
+  /** The tenant's widget key: the app uses the widget's public form and upload endpoints */
+  tenantKey: string
+  currency: string
+  region: { code: string; locale: string; postalCodeLabel: string }
+}
+
+export interface AppCreateQuoteRequest {
+  serviceId: string
+  customer: CustomerInput
+  job?: Omit<JobInput, 'quantity'>
+  assetIds?: string[]
+}
+
+export interface AppQuoteView {
+  id: string
+  status: QuoteStatus
+  businessName: string
+  serviceName: string
+  customerName: string
+  createdAt: string
+  pricing: {
+    total: number
+    currency: string
+    estimate?: { grade: 'A' | 'B' | 'C'; label: string; description: string; rangeLow?: number; rangeHigh?: number }
+  }
+  takeoff: Array<{ item: string; amount: number; method: string; quantity?: number; unit?: string }>
+  /** Open confirmation questions (status awaiting_clarification) */
+  questions: Array<{
+    id: string
+    question: string
+    type?: 'confirm_value' | 'text'
+    aiValue?: string | number
+    evidence?: string
+    options?: string[]
+  }>
 }

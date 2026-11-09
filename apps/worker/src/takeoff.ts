@@ -71,7 +71,12 @@ export function buildTakeoff(opts: {
             method = signal?.evidence || 'Measured from your photos'
             break
           }
+          case 'derived':
+            // T-137 live run: a run-length line said "Fixed price"
+            method = 'Calculated from your answers'
+            break
           case 'legacy_fallback':
+          case 'derived_unresolved':
             method = 'Estimated — to be confirmed'
             break
           default:

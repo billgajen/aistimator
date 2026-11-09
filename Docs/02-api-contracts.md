@@ -4,7 +4,7 @@
 - Base prefix: `/api`
 - Hosting: All API routes run on Vercel (Next.js API routes), except the queue consumer which runs on Cloudflare Workers
 - JSON only. `Content-Type: application/json`
-- Auth (dashboard APIs): `Authorization: Bearer <supabase_jwt>`
+- Auth (dashboard APIs): Supabase session cookie, or `Authorization: Bearer <supabase access token>` (T-137: the business app). A bearer is accepted only when its JWT role is `authenticated`; service-role/anon keys are ignored. Row-level security applies either way.
 - Public widget APIs: `tenantKey` (public) + server-side domain allowlist checks
 - Standard error envelope (example):
 ```json
@@ -278,3 +278,28 @@ Request:
 Response:
 
 { "ok": true }
+
+⸻
+
+Business app APIs (T-137)
+
+Auth: `Authorization: Bearer <signed-in user's Supabase access token>`. Every dashboard API (e.g. `GET /api/quotes`) also accepts it.
+The app uses the widget's public `GET /api/public/widget/config?tenantKey=` and `POST /api/public/uploads/init` with the tenant key from bootstrap.
+
+GET /api/app/bootstrap
+200: `{ "tenantName": "…", "tenantKey": "tkey_…", "currency": "USD", "region": { "code": "US", "locale": "en-US", "postalCodeLabel": "ZIP code" } }`
+409 `NO_SITE` when the tenant has no active widget site (the app uses the widget's form).
+
+POST /api/app/quotes
+Request: `{ "serviceId", "customer": { "name", "email", "phone?" }, "job?": { "address?", "postcodeOrZip?", "answers": [{ "fieldId", "value" }] }, "assetIds?": [] }`
+Same intake as `POST /api/public/quotes` (field and photo validation, plan limits, queue), without bot checks or the AI service match. `source_json = { "type": "app", "userId" }`.
+200: `{ "quoteId", "status": "queued", "quoteViewUrl", "tokenExpiresAt" }`. The app keeps `quoteViewUrl` (and its token) on the device.
+
+GET /api/app/quotes/:quoteId
+200 `AppQuoteView`: `{ id, status, businessName, serviceName, customerName, createdAt, pricing: { total, currency, estimate? }, takeoff: [], questions: [] }`. `questions` is non-empty only while `awaiting_clarification`. 404 for another tenant's quote.
+
+POST /api/app/quotes/:quoteId/answers
+Request: `{ "answers": [{ "questionId", "answer" }], "quoteToken?": "…" }`
+The business confirms on site: answers merge as confirmed form answers and the quote reprices deterministically (same path as the customer's clarify). `quoteToken` is forwarded to the worker only when it matches the stored hash (needed to email the customer their link). Measurement examples are recorded (T-123).
+400 `INVALID_STATUS` unless `awaiting_clarification`; 404 for another tenant's quote.
+

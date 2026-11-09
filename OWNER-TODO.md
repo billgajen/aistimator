@@ -95,3 +95,13 @@ Code for every item is already built; these are the steps that unlock it.
   e.g. 200 A panel $2,600, EV install $1,150 + $18/ft past 25 ft, toilet $325 + $275 supplied, double door $1,950.
 - [ ] **One real panel-label photo** (inside the door, or the main breaker) to check the amperage reading, same folder as T-139.
 
+## T-137 — Business mobile app
+
+- [ ] **Try it on your iPhone** (no Xcode needed): install **Expo Go** from the App Store, then on the Mac
+  `cd apps/mobile && cp .env.example .env` (fill `EXPO_PUBLIC_API_URL` with the Mac's LAN address, e.g.
+  `http://192.168.1.20:3000`, and the Supabase URL/anon key) and run `npx expo start`; scan the QR code.
+  Check: sign in, new quote with camera photos, price appears, confirm a question, share the link.
+- [ ] **Apple Developer account** ($99/yr) and an EAS project (`npx eas init`) before TestFlight. T-138 (LiDAR) needs a
+  development build, not Expo Go, because it adds native code.
+- [ ] The app needs the business's widget site set up (it reuses the widget's form). Without one it says so.
+

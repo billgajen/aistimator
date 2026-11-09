@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Aistimator",
+    "slug": "aistimator",
+    "scheme": "aistimator",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.aistimator.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Take photos of the job so it can be priced.",
+        "NSPhotoLibraryUsageDescription": "Choose photos of the job so it can be priced."
+      }
+    },
+    "android": {
+      "package": "com.aistimator.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Take photos of the job so it can be priced."
+        }
+      ],
+      "expo-status-bar"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

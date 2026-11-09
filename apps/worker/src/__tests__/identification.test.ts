@@ -334,4 +334,16 @@ describe('takeoff shows how a selected line was identified', () => {
     const entries = buildTakeoff({ trace, workSteps: steps, structuredSignals: signalsWith({ key: 'unit_size', value: 'Large', confidence: 1, source: 'form' }) })
     expect(entries[0]!.method).toBe('Selected for Large, as you confirmed')
   })
+
+  it('a derived quantity line says it was calculated, not fixed', () => {
+    const derivedTrace = {
+      trace: [{ type: 'work_step', id: 'run', description: 'Run', amount: 630, signalsUsed: [{ key: 'run_length_ft', value: 35 }], quantitySource: 'derived' }],
+    } as unknown as Parameters<typeof buildTakeoff>[0]['trace']
+    const entries = buildTakeoff({
+      trace: derivedTrace,
+      workSteps: [{ id: 'run', name: 'Run', description: '', costType: 'per_unit', defaultCost: 18, optional: false, quantitySource: { type: 'derived', formula: 'max(0, run_length_ft - 25)' } }],
+      structuredSignals: null,
+    })
+    expect(entries[0]!.method).toBe('Calculated from your answers')
+  })
 })

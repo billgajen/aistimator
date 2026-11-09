@@ -15,6 +15,30 @@
 
 ## Issues & Resolutions
 
+### 2026-11-09: T-137 — Business mobile app (Expo): on-site quoting (AD-027 channel 3, AD-033)
+
+**Built:**
+- **`apps/mobile`** (Expo SDK 58, React Native 0.88, expo-router): sign in with the business account (session in the iOS keychain via expo-secure-store) → **Quotes** list → **New on-site quote**: pick the service, customer and job details, the service's own form fields (same config the widget renders), and guided photos per `requiredAngles` (camera, retake; guided angles are uploaded first because triage reads only the first few photos) → **Quote**: polls while pricing, shows the price instrument (range while provisional, exact once confirmed), grade, takeoff with methods, and the **open confirmation questions, answered on site** → reprice → share the customer link (native share sheet). Measured Document palette; no UI kit dependency.
+- **Bearer auth on the web API (AD-033):** `lib/supabase/server.ts` `createClient()` accepts `Authorization: Bearer <access token>`, bound to that user. Every existing dashboard API works for the app unchanged, under the same RLS. Only JWTs with role `authenticated` are accepted, so a leaked service-role/anon key sent as a bearer is ignored (falls back to cookie auth → 401).
+- **New routes:** `GET /api/app/bootstrap`, `POST /api/app/quotes`, `GET /api/app/quotes/:id`, `POST /api/app/quotes/:id/answers` (contracts in `Docs/02-api-contracts.md`). Shared types `AppBootstrapResponse`, `AppCreateQuoteRequest`, `AppQuoteView` in `api.types.ts`; source type `'app'`.
+- **Refactor (behaviour-preserving):** the public quote route's intake (service and field/photo validation, plan limits and held leads, records, token, usage, queue) moved verbatim into `lib/quote-intake.ts` `createQuoteSubmission()`. A `respond()` shim with `NextResponse.json`'s call shape keeps the moved code identical. The widget route keeps tenant-key, honeypot, rate-limit and Turnstile checks; the app route takes the tenant from the session, skips bot checks and the AI service match (the business chose the service). Measurement memory capture is shared between the customer's clarify and the app's answers (`lib/measurement-memory.ts`).
+- **Takeoff:** derived-quantity lines said "Fixed price" (EV extra run). They now say "Calculated from your answers"; unresolved formulas say "Estimated — to be confirmed".
+
+**Monorepo trap found and fixed:** installing the app put `@types/react@19` into pnpm's hoisted fallback. Next 14's `types/index.d.ts` references `react/experimental` from its own folder, which resolved to 19, so the web typecheck failed ("'react' has no exported member 'use'"). Fix: `pnpm.packageExtensions` gives `next@14` a peer on `@types/react`, so pnpm links the web app's own 18.3. Remove it when web moves to React 19.
+
+**Verified:**
+- Live, local stack (`scripts/hardcore-test/verify-t137.mts`, driving the app's own `src/lib/api.ts` client with a real Supabase sign-in and bearer, no cookies): **11/11**. Bearer on an existing dashboard API; service-role key as bearer → 401; no auth → 401; bootstrap; on-site EV-charger quote with a panel-label photo → priced in 17 s, Grade B, confirmation question; **another business gets 404 reading and answering it**; business confirms on site → sent, Grade A, $2,880, reprice in 58 ms; takeoff returned.
+- Regression of the refactored widget intake: `verify-t141.mts` 5/5 exact through `/api/public/quotes`.
+- App: `tsc` (strict), eslint, 11 unit tests (answers typing/validation, price headline, API client: bearer only on business calls, error surfacing, signed-out refusal, ordered uploads, token forwarding), and **`expo export --platform ios` bundles** (3.1 MB Hermes). All repo gates green (web 116, worker 388, mobile 11; web and worker builds).
+
+**Not verified (no device or Xcode here):** running the app on an iPhone: camera, keychain, screens, navigation. See OWNER-TODO (Expo Go or a development build).
+
+**Files:** `apps/mobile/**`, `apps/web/src/lib/{supabase/server.ts,quote-intake.ts,measurement-memory.ts}`, `apps/web/src/app/api/app/**`, `apps/web/src/app/api/public/quotes/{route.ts,[quoteId]/clarify/route.ts}`, `apps/worker/src/takeoff.ts`, `packages/shared/src/api.types.ts`, `package.json` (packageExtensions), `scripts/hardcore-test/verify-t137.mts`, `Docs/02-api-contracts.md`, tests.
+
+**Relation:** T-138 adds the LiDAR room scan to this app (`scanned` quantities slot into `humanStatedQuantityKeys`).
+
+---
+
 ### 2026-11-09: T-141 — Packs: plumbing fixtures, electrical, garage doors (US) + milestone gauntlet
 
 **Built (pure data):**
@@ -3238,6 +3262,12 @@ if (pricingResult.estimatedTotal <= 0) {
 ### AD-032: Identification — the model transcribes, the pack decodes (T-139)
 
 **Decision:** equipment identity (capacity, fuel, size class) is established by a vision call that TRANSCRIBES label text verbatim, and by pack-supplied decode rules that turn the transcription into the value. The model's own reading is a fallback, accepted only when it is one of the signal's allowed values. An identified value grades like a measured one (B) until a human confirms it; appearance alone never identifies (an unreadable label weakens any guess to Grade C and asks). **Why:** AD-024 for labels: reading characters is what vision is good at, while decoding a manufacturer's model-number scheme is a deterministic lookup that belongs in data. **Rejected:** asking the model for the final value directly (it would silently "decode" schemes it half-knows), and per-trade decoding code in the engine (anti-hardcoding).
+
+---
+
+### AD-033: The business app authenticates with the Supabase access token as a bearer (T-137)
+
+**Decision:** the server Supabase client accepts `Authorization: Bearer <access token>` in place of the session cookie, bound to that user, so the mobile app reuses every dashboard API under the same RLS. Only user tokens (JWT role `authenticated`) are honoured. New `/api/app/*` routes exist only where the app needs something the dashboard doesn't have (bootstrap, on-site create without bot checks, a compact quote view, business answers). **Rejected:** a separate API-key scheme (a second auth system to secure), and minting cookies on the device (fragile, and couples the app to @supabase/ssr's cookie format).
 
 ---
 
