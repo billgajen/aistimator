@@ -19,6 +19,7 @@ export * from './envelopes'
 export * from './grading'
 export * from './identification'
 export * from './room-scan'
+export * from './accuracy'
 
 // Re-export deterministic quantity formulas (T-125)
 export * from './formula'

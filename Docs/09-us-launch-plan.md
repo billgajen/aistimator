@@ -59,7 +59,7 @@ final invoice.
 | T-140 | Packs: HVAC replacement + water heaters — **built 2026-11-09** (placeholder rates) | Packs |
 | T-141 | Packs: plumbing fixtures, electrical, garage doors — **built 2026-11-09** (placeholder rates; gauntlet 10/10) | Packs |
 | T-142 | US gauntlet (round 3) — **done 2026-11-09** (12/12 in band after the R3-2 fix) | Testing |
-| T-143 | Beta instrumentation: final invoice + accuracy dashboard | Product |
+| T-143 | Beta instrumentation: final invoice + accuracy dashboard — **built 2026-11-09** (migration 29) | Product |
 | T-144 | US marketing site, per-trade landing pages, Meta Pixel + CAPI | Growth |
 
 ## Not doing in this phase

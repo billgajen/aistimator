@@ -468,6 +468,10 @@ export interface QuoteDetailResponse {
     viewed_at: string | null
     accepted_at: string | null
     paid_at: string | null
+    /** T-143: what the business finally invoiced (null until recorded) */
+    final_invoice_amount?: number | string | null
+    final_invoice_recorded_at?: string | null
+    final_invoice_note?: string | null
     signals_json?: unknown
     pricing_trace_json?: unknown
     triage_json?: unknown

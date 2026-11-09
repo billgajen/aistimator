@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
-import { formatMoney, type AppQuoteView } from '@estimator/shared'
+import { formatMoney, parseMoneyInput, type AppQuoteView } from '@estimator/shared'
 import { useApi } from '../../src/lib/api-context'
 import { headlinePrice, isPricing, statusLabel } from '../../src/lib/price'
 import { loadQuoteToken } from '../../src/lib/quote-tokens'
@@ -13,6 +13,8 @@ export default function QuoteDetail() {
   const api = useApi()
   const [quote, setQuote] = useState<AppQuoteView | null>(null)
   const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [invoice, setInvoice] = useState('')
+  const [invoiceSaved, setInvoiceSaved] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -50,6 +52,22 @@ export default function QuoteDetail() {
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save the answers')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function saveInvoice() {
+    const amount = parseMoneyInput(invoice)
+    if (!quote || amount === null) return
+    setBusy(true)
+    setError(null)
+    try {
+      const saved = await api.recordFinalInvoice(quote.id, amount)
+      setInvoiceSaved(saved.finalInvoiceAmount)
+      setInvoice('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save the invoice')
     } finally {
       setBusy(false)
     }
@@ -139,6 +157,16 @@ export default function QuoteDetail() {
 
         {!isPricing(quote.status) && quote.status !== 'awaiting_clarification' ? (
           <Button title="Share quote link" variant="secondary" onPress={share} />
+        ) : null}
+
+        {['accepted', 'paid', 'sent', 'viewed'].includes(quote.status) ? (
+          <Card>
+            <Label>Final invoice</Label>
+            <Muted>What you finally charged. It measures how close your estimates are.</Muted>
+            {invoiceSaved !== null ? <Text style={styles.lineItem}>Saved: {formatMoney(invoiceSaved, currency)}</Text> : null}
+            <Field label={`Invoiced amount (${currency})`} value={invoice} onChangeText={setInvoice} keyboardType="decimal-pad" />
+            <Button title="Save final invoice" onPress={saveInvoice} busy={busy} disabled={parseMoneyInput(invoice) === null} />
+          </Card>
         ) : null}
       </ScrollView>
     </Screen>

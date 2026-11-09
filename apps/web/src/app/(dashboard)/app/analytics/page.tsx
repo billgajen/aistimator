@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { PageHeader } from '@/components/dashboard/EmptyState'
 import type { AnalyticsResponse, ServiceCalibration, ServiceBenchmark } from '@estimator/shared'
+import { AccuracyPanel } from '@/components/analytics/AccuracyPanel'
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsResponse | null>(null)
@@ -167,6 +168,9 @@ export default function AnalyticsPage() {
           </p>
         </div>
       </div>
+
+      {/* T-143: estimate accuracy against final invoices */}
+      <AccuracyPanel />
 
       {/* Pricing Insights (T-110): outcome calibration suggestions */}
       {calibration && calibration.some((s) => s.suggestions.length > 0) && (

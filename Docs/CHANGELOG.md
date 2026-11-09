@@ -15,6 +15,22 @@
 
 ## Issues & Resolutions
 
+### 2026-11-09: T-143 — Beta instrumentation: final invoice + estimate accuracy
+
+**Built:**
+- **Migration 29** (`supabase/migrations/00000000000029_final_invoice.sql`, additive, re-runnable): `quotes.final_invoice_amount` (≥ 0), `final_invoice_recorded_at`, `final_invoice_note` (≤ 500 chars), plus a partial index for the report. Existing quote RLS ("users can update own quotes") already covers it.
+- `PUT /api/quotes/:id/final-invoice`: `{ amount, note? }`. `amount` takes a number or a typed money string ("$1,470.00", via `parseMoneyInput`); `null` clears it. Tenant-scoped; works with the dashboard cookie and the app bearer (AD-033).
+- `GET /api/analytics/accuracy` → `computeAccuracy` (`packages/shared/src/accuracy.ts`, pure): per service and per estimate grade, the count, **median |invoiced − quoted| / quoted**, **share within ±10%**, and median signed bias (positive = quotes run low), against the Docs/09 targets (median < 10%, ≥ 80% within ±10%: the add-a-trade rule).
+- Dashboard: a **Final invoice** card on the quote page (sent/viewed/accepted/paid/expired/declined) showing the ±% against the quote, and an **Estimate accuracy** panel on Analytics (overall / by service / by grade, on-target figures in brand colour). Business app: "Save final invoice" on the quote screen.
+
+**Verified live (`scripts/hardcore-test/verify-t143.mts`): 9/9.** Two garage-door quotes ($1,400, $2,100) invoiced at +5% (bearer) and −20% (cookie) → report: 2 invoiced, median 12.5%, 50% within ±10%, bias −7.5%, grouped under the service and Grade A. Nonsense amount → 400, a rival business → 404 and an empty report, `null` clears. Unit: 10 (stats, empty input, money parsing ×8). No gauntlet (owner rule: T-143). The dashboard card and panel were typechecked and linted but not screenshotted.
+
+**Deploy:** apply migration 29 before deploying the web app (the routes select the new columns). Listed in OWNER-TODO.
+
+**Files:** `supabase/migrations/00000000000029_final_invoice.sql`, `packages/shared/src/{accuracy.ts,index.ts,api.types.ts}`, `apps/web/src/app/api/{quotes/[quoteId]/final-invoice,analytics/accuracy}/route.ts`, `apps/web/src/components/analytics/{FinalInvoiceCard,AccuracyPanel}.tsx`, `apps/web/src/app/(dashboard)/app/{quotes/[quoteId],analytics}/page.tsx`, `apps/mobile/{app/quote/[id].tsx,src/lib/api.ts}`, `scripts/hardcore-test/verify-t143.mts`, tests.
+
+---
+
 ### 2026-11-09: T-142 — US gauntlet (round 3) + R3-2 fix: option answers can't silently drop the price
 
 **Round 3 built:** `scripts/hardcore-test/scenarios3.mjs` + blind-authored `requests3.json` (a separate agent saw only name, service and tagline). Twelve US businesses across the six launch trades: six onboarded from the T-140/T-141 packs (nameplate identification on the AC, furnace, water heater and panel), six from plain-language USD pricing through the compiler. The runner gained `--round3` (run with `npx tsx`, since pack scenarios import the TypeScript packs), a pack onboarding path identical to OnboardingFlow, per-scenario photo selection, and currency-aware reports.

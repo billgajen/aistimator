@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { formatMoney } from '@estimator/shared'
 import Link from 'next/link'
+import { FinalInvoiceCard } from '@/components/analytics/FinalInvoiceCard'
 import type {
   QuoteDetailResponse,
   QuoteStatus,
@@ -335,6 +336,18 @@ export default function QuoteDetailPage({
           </div>
         </div>
       </Section>
+
+      {/* T-143: final invoice (accuracy ground truth) */}
+      {['sent', 'viewed', 'accepted', 'paid', 'expired', 'declined'].includes(quote.status) && (
+        <FinalInvoiceCard
+          quoteId={quote.id}
+          currency={pricing.currency}
+          quotedTotal={pricing.total}
+          initialAmount={quote.final_invoice_amount != null ? Number(quote.final_invoice_amount) : null}
+          initialNote={quote.final_invoice_note ?? null}
+          recordedAt={quote.final_invoice_recorded_at ?? null}
+        />
+      )}
 
       {/* Assumptions */}
       {content.assumptions && content.assumptions.length > 0 && (

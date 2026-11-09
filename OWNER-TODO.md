@@ -113,3 +113,10 @@ Code for every item is already built; these are the steps that unlock it.
 - [ ] **Accuracy check:** scan 2–3 real rooms, tape-measure them, and send me the numbers. I need to confirm the floor
   outline axes (the server falls back to width × length if they're wrong) and the net wall area.
 
+## T-143 — Final invoice + accuracy
+
+- [ ] **Apply migration 29** (`supabase/migrations/00000000000029_final_invoice.sql`) to production **before** deploying the web
+  app. Additive and re-runnable.
+- [ ] During beta, ask each business to record the final invoice on finished jobs (quote page → Final invoice). The Analytics
+  "Estimate accuracy" panel is the beta success metric (median error < 10%, ≥ 80% within ±10%).
+

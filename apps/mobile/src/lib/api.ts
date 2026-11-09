@@ -114,6 +114,13 @@ export function createApi(opts: {
         body: JSON.stringify({ answers, ...(quoteToken && { quoteToken }) }),
       }),
 
+    /** T-143: what the job was finally invoiced at (null clears it) */
+    recordFinalInvoice: (quoteId: string, amount: number | null, note?: string) =>
+      request<{ finalInvoiceAmount: number | null; finalInvoiceRecordedAt: string | null }>(
+        `/api/quotes/${encodeURIComponent(quoteId)}/final-invoice`,
+        { method: 'PUT', body: JSON.stringify({ amount, ...(note && { note }) }) }
+      ),
+
     /** Signed-URL upload through the widget's public flow; returns asset ids in order. */
     async uploadPhotos(tenantKey: string, files: PhotoFile[]): Promise<string[]> {
       if (files.length === 0) return []
