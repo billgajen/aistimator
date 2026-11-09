@@ -15,6 +15,39 @@
 
 ## Issues & Resolutions
 
+### 2026-11-09: Senior review gets the customer's scope answers + 30 s cap; no raw signal keys in the takeoff
+
+**Owner decision (2026-11-09):** both options from the speed entry below: give the reviewer the scope answers AND cap its time.
+
+**1. Reviewer sees the customer's answers.** `formatScopeAnswers` (`apps/worker/src/ai/scope-answers.ts`, pure) turns `job_answers` into lines labelled with the business's own question and option labels (widget fields, then draft suggested fields), plus the customer's description (clipped to 600 chars). Internal `_` fields are skipped. `adjudicateMeasurement` adds them to the prompt, and the system prompt gains rule 5: the customer's answers define the scope, so measure only what they asked for. Nothing is trade-specific; the text comes from the business's configuration. The junior passes are unchanged (they were not the ones over-scoping).
+
+**2. 30 s cap.** `DEFAULT_ADJUDICATION_TIMEOUT_MS = 30000` (env `ADJUDICATION_TIMEOUT_MS`, `0` = no cap). The review gets an `AbortSignal`; past the cap the call is aborted, `adjudicateMeasurement` returns null and the pass median stands, as on any review failure. The customer is asked to confirm that value anyway.
+
+**Measured (local, queue path, S01 photos, `ADJUDICATION_VALUE_THRESHOLD=1` to force a review on every run, `verify-speed.mts`):**
+
+| Run | Review | Value | First price | Confirmed |
+|---|---|---|---|---|
+| GB, cap 30 s | cut at 30.0 s → median | 59.8 m² | 61 s | A |
+| US, cap 30 s | cut at 30.0 s → median | 757 sq ft | 60 s | A |
+| GB, no cap | 26.7 s | 59.6 → **55 m²**, "limited to the front elevation" | 62 s | A |
+| US, no cap | 18.3 s | 709 → **710 sq ft**, "front elevation" | 50 s | A |
+
+Before: 3 of 4 reviews on the same "front wall only" job added side elevations (66.5 → 109.8 m²; 833 → 1,120 and 711 → 1,325 sq ft), at 80–108 s each. Now 0 of 2, at 18–27 s. Small sample; T-142 covers it at scale. The forced reviews are worst case: in production a review runs only on disagreement, single-pass evidence or lines ≥ 2500.
+
+**Known gap:** a review aborted by the cap is not recorded in `aiUsage` (the meter records completed calls), so the per-quote AI cost understates those quotes by one partial call.
+
+**3. Raw signal key on the customer's document (found reviewing the owner's production test quote EST-2026-5D6EBD).** The takeoff line said "Customer-provided: wall_area_sqm". Clarification answers are merged with the signal key as their field id, so they have no form label, and the evidence fell back to the id. Now: "Confirmed by the customer" for clarification answers, else the field's label ("Customer-provided: <label>"), else plain "Customer-provided". Before, a pack tenant's confirmed quantity read "Customer-provided: Wall area in square feet — if you know it".
+
+**Also seen on that quote, logged with the smoke-test backlog below (not built):** the breakdown label "Exterior walls  £18 x 34.6(Sqm)" (double space, raw unit; the page's `splitLabelMath` hides most of it, but the PDF/email may not); a "Potential Render Crack Repairs" recommendation duplicating crack filling the scope summary already includes; the exclusion "Roofline replacement (fascias/soffits replaced, not painted)" reads contradictory.
+
+**Tests:** worker 357 (new: scope block present/absent, abort signal passed, timeout aborts and returns null, in-cap review used; `formatScopeAnswers` ×3).
+
+**Files:** `apps/worker/src/ai/{measurement.ts,scope-answers.ts}`, `apps/worker/src/quote-processor.ts`, `apps/worker/src/index.ts` (env type), `Docs/01-architecture.md`, tests.
+
+**Relation:** closes the "disagreement path" item left open by the 2026-11-08 speed entry. T-119 stakes routing unchanged.
+
+---
+
 ### 2026-11-08: Speed — first price under 60 s, confirm reprice in ~0.1 s with no AI; confirmed Grade A (US smoke test)
 
 **Reported (US production smoke test, EST-2026-6468B7):** ~5 min to show the range, minutes again to reprice after confirming 313 sq ft, and Grade B after confirmation.

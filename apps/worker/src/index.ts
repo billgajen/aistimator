@@ -47,6 +47,8 @@ export interface Env {
   // Measurement Engine (T-119): adjudication routing
   ADJUDICATION_MODEL?: string
   ADJUDICATION_VALUE_THRESHOLD?: string
+  /** Senior review wall-time cap, ms (default 30000; 0 = no cap) */
+  ADJUDICATION_TIMEOUT_MS?: string
   MEASUREMENT_COV_THRESHOLD?: string
 
   // Email (Postmark)

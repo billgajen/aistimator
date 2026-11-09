@@ -407,22 +407,42 @@ Protocol:
    (what the value could plausibly be given what the photos show).
 4. scopeResolution: ONE sentence stating what you included/excluded and why
    the juniors differed. This appears in the audit trail.
+5. When the customer's answers about the job are given, THEY define the scope.
+   Measure only what the customer asked for, even if more is visible in the
+   photos (e.g. other elevations or rooms they did not ask about).
 Keep all prose minimal — the numbers and the scope sentence are what matter.`
 
 /**
+ * Wall-time cap on one senior review. Reviews took 80–108 s on the
+ * disagreement path; past the cap the quote falls back to the pass median,
+ * which the customer is asked to confirm anyway. Env: ADJUDICATION_TIMEOUT_MS.
+ */
+export const DEFAULT_ADJUDICATION_TIMEOUT_MS = 30_000
+
+/**
  * Run senior-model adjudication over disagreeing/thin/high-stakes measurements.
- * `run` is injectable for tests. Failure returns null — never blocks the quote.
+ * `run` is injectable for tests. Failure or timeout returns null, so the
+ * caller keeps the ensemble median — never blocks the quote.
  */
 export async function adjudicateMeasurement(opts: {
   adjudicator: AiClient | null
   images: Array<{ mimeType: string; base64: string }>
   target: MeasurementTarget
   measured: MeasuredQuantity
-  run?: () => Promise<AdjudicationResult>
+  /** The customer's answers, one line each (formatScopeAnswers) */
+  customerScope?: string[]
+  /** Abort and fall back after this many ms (default 30 s; 0 = no cap) */
+  timeoutMs?: number
+  run?: (signal: AbortSignal) => Promise<AdjudicationResult>
 }): Promise<MeasuredQuantity | null> {
   const { adjudicator, images, target, measured } = opts
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_ADJUDICATION_TIMEOUT_MS
+  const scopeBlock =
+    opts.customerScope && opts.customerScope.length > 0
+      ? `\n\nThe customer's answers about this job (they define the scope):\n${opts.customerScope.join('\n')}`
+      : ''
 
-  const defaultRun = async (): Promise<AdjudicationResult> => {
+  const defaultRun = async (signal: AbortSignal): Promise<AdjudicationResult> => {
     if (!adjudicator) throw new Error('No adjudicator model configured')
     const passSummaries = measured.rawPasses
       .map(
@@ -439,19 +459,33 @@ export async function adjudicateMeasurement(opts: {
       `Target: "${target.signalKey}" (unit: ${target.unit}) — ${target.description}
 
 Junior takeoffs to review:
-${passSummaries}
+${passSummaries}${scopeBlock}
 
 Re-examine the photos, resolve the scope, and produce your final measurement.`,
       images,
       ADJUDICATION_SCHEMA,
       ADJUDICATION_SYSTEM_PROMPT,
-      { temperature: 0.2, maxOutputTokens: 16384 }
+      { temperature: 0.2, maxOutputTokens: 16384, signal }
     )
   }
 
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
   try {
     const run = opts.run ?? defaultRun
-    const result = await run()
+    const pending = run(controller.signal)
+    const result =
+      timeoutMs > 0
+        ? await Promise.race([
+            pending,
+            new Promise<never>((_, reject) => {
+              timer = setTimeout(() => {
+                controller.abort()
+                reject(new AdjudicationTimeoutError(timeoutMs))
+              }, timeoutMs)
+            }),
+          ])
+        : await pending
     if (!Number.isFinite(result.finalValue) || result.finalValue <= 0) return null
 
     // Measured semantics preserved: confidence derives from the adjudicator's
@@ -474,8 +508,21 @@ Re-examine the photos, resolve the scope, and produce your final measurement.`,
       basis: 'adjudicated',
     }
   } catch (error) {
-    console.error('[Measurement] Adjudication failed:', error)
+    if (error instanceof AdjudicationTimeoutError) {
+      console.warn(`[Measurement] Adjudication of ${target.signalKey} exceeded ${timeoutMs} ms; keeping the pass median`)
+    } else {
+      console.error('[Measurement] Adjudication failed:', error)
+    }
     return null
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+export class AdjudicationTimeoutError extends Error {
+  constructor(public readonly timeoutMs: number) {
+    super(`Adjudication timed out after ${timeoutMs} ms`)
+    this.name = 'AdjudicationTimeoutError'
   }
 }
 

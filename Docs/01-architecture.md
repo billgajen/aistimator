@@ -45,7 +45,9 @@
      photo-measured quantities (passes run together; when the first two agree within the CoV
      threshold the third is cancelled). Quantities the customer already stated are not measured.
      Senior adjudication only on disagreement, thin evidence, or a line worth ≥
-     `ADJUDICATION_VALUE_THRESHOLD` (default 2500)
+     `ADJUDICATION_VALUE_THRESHOLD` (default 2500). The reviewer is given the customer's
+     answers (they define the scope) and is capped at `ADJUDICATION_TIMEOUT_MS` (default 30 s);
+     past the cap the pass median stands and the customer is asked to confirm it
    - recommendations, wording and cross-service detection run in parallel, then validation
    - if the quote needs a customer answer, it stops at `awaiting_clarification` with the
      provisional range and saves a reprice snapshot (first-pass AI outputs in `signals_json._reprice`)

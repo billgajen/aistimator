@@ -15,6 +15,7 @@ import {
   type PassMeasurement,
 } from '../ai/measurement'
 import { US_REGION } from '@estimator/shared'
+import type { AiClient } from '../ai/client'
 
 const TARGET = { signalKey: 'wall_area_sqm', description: 'Paintable wall area', unit: 'sqm' }
 const IMAGES = [{ mimeType: 'image/jpeg', base64: 'x' }]
@@ -277,6 +278,73 @@ describe('T-119: adjudicateMeasurement', () => {
       run: async () => ({ finalValue: 0, lowValue: 0, highValue: 0, scopeResolution: 'n/a' }),
     })
     expect(result).toBeNull()
+  })
+
+  it('gives the reviewer the customer scope answers and passes an abort signal', async () => {
+    let seenPrompt = ''
+    let seenSignal: AbortSignal | undefined
+    const adjudicator = {
+      generateWithImagesAndSchema: async (prompt: string, _i: unknown, _s: unknown, _sys?: string, options?: { signal?: AbortSignal }) => {
+        seenPrompt = prompt
+        seenSignal = options?.signal
+        return { finalValue: 30, lowValue: 28, highValue: 33, scopeResolution: 'front only' }
+      },
+    } as unknown as AiClient
+    const result = await adjudicateMeasurement({
+      adjudicator,
+      images: IMAGES,
+      target: TARGET,
+      measured,
+      customerScope: ['- Which walls?: Front only'],
+    })
+    expect(result!.value).toBe(30)
+    expect(seenPrompt).toContain("customer's answers about this job")
+    expect(seenPrompt).toContain('- Which walls?: Front only')
+    expect(seenSignal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('omits the scope block when there are no answers', async () => {
+    let seenPrompt = ''
+    const adjudicator = {
+      generateWithImagesAndSchema: async (prompt: string) => {
+        seenPrompt = prompt
+        return { finalValue: 30, lowValue: 28, highValue: 33, scopeResolution: 'x' }
+      },
+    } as unknown as AiClient
+    await adjudicateMeasurement({ adjudicator, images: IMAGES, target: TARGET, measured, customerScope: [] })
+    expect(seenPrompt).not.toContain("customer's answers")
+  })
+
+  it('times out: aborts the call and returns null so the pass median stands', async () => {
+    let aborted = false
+    const started = Date.now()
+    const result = await adjudicateMeasurement({
+      adjudicator: null,
+      images: IMAGES,
+      target: TARGET,
+      measured,
+      timeoutMs: 20,
+      run: (signal) =>
+        new Promise((resolve) => {
+          signal.addEventListener('abort', () => { aborted = true })
+          setTimeout(() => resolve({ finalValue: 99, lowValue: 90, highValue: 110, scopeResolution: 'late' }), 500)
+        }),
+    })
+    expect(result).toBeNull()
+    expect(aborted).toBe(true)
+    expect(Date.now() - started).toBeLessThan(400)
+  })
+
+  it('a review that finishes inside the cap is used', async () => {
+    const result = await adjudicateMeasurement({
+      adjudicator: null,
+      images: IMAGES,
+      target: TARGET,
+      measured,
+      timeoutMs: 200,
+      run: async () => ({ finalValue: 40, lowValue: 38, highValue: 42, scopeResolution: 'ok' }),
+    })
+    expect(result!.value).toBe(40)
   })
 })
 

@@ -70,7 +70,4 @@ Code for every item is already built; these are the steps that unlock it.
 - Engineering backlog from the smoke test (not owner work; listed so it isn't lost, details in CHANGELOG
   2026-11-08): internal notes shown to customers, raw unit labels,
   "worth considering" duplicating scope items, clarification page + email styling, "Powered by Estimator" name.
-- [ ] **Decide the disagreement path** (CHANGELOG 2026-11-08 speed entry). When measurement passes disagree, the
-  senior review still takes 80–108 s, so those quotes show their range at ~100–150 s. Options: cap the review time
-  and fall back to the median (the customer confirms it anyway), or first give the reviewer the customer's scope
-  answers (it currently adds side elevations to "front only" jobs) and then try a lower thinking level.
+- [x] **Disagreement path decided 2026-11-09:** both. The reviewer gets the scope answers and a 30 s cap (CHANGELOG 2026-11-09).

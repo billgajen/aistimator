@@ -55,7 +55,8 @@ import { AiUsageMeter } from '@estimator/shared'
 import { createAiClient } from './ai/factory'
 import type { AiClient } from './ai/client'
 import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock } from '@estimator/shared'
-import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor, DEFAULT_ADJUDICATION_VALUE_THRESHOLD } from './ai/measurement'
+import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor, DEFAULT_ADJUDICATION_VALUE_THRESHOLD, DEFAULT_ADJUDICATION_TIMEOUT_MS } from './ai/measurement'
+import { formatScopeAnswers } from './ai/scope-answers'
 import { buildTakeoff, buildReference } from './takeoff'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing, findLookalikeUnconditionedSteps } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
@@ -409,6 +410,9 @@ export async function processQuote(
   // Previously answers were stored but never read — reprocessing ignored them.
   const clarQuestions = quoteData.quote.clarification_questions_json || []
   const clarAnswers = quoteData.quote.clarification_answers_json || []
+  // Field ids that came from the clarification round. They are signal keys,
+  // not form fields, so they have no label to show the customer.
+  const clarifiedFieldIds = new Set<string>()
   if (clarAnswers.length > 0 && clarQuestions.length > 0) {
     const questionById = new Map(clarQuestions.map((q) => [q.id, q]))
     for (const answer of clarAnswers) {
@@ -424,6 +428,7 @@ export async function processQuote(
         (a) => a.fieldId !== question.targetSignalKey
       )
       quoteRequest.job_answers.push({ fieldId: question.targetSignalKey, value })
+      clarifiedFieldIds.add(question.targetSignalKey)
       console.log(
         `[Processor] Clarification answer merged: ${question.targetSignalKey} = ${value}`
       )
@@ -668,7 +673,14 @@ export async function processQuote(
 
     if (measurement && structuredSignals) {
       // T-119 M4: stakes-based adjudication, one senior review per quantity,
-      // all quantities in parallel
+      // all quantities in parallel. The reviewer sees the customer's answers
+      // (they define the scope) and is capped in time; past the cap the pass
+      // median stands and the customer confirms it in the clarification round.
+      const customerScope = formatScopeAnswers(quoteRequest.job_answers || [], [
+        ...(quoteData.widgetFields || []),
+        ...(service.draft_config?.suggestedFields || []),
+      ])
+      const adjudicationTimeoutMs = Number(env.ADJUDICATION_TIMEOUT_MS ?? DEFAULT_ADJUDICATION_TIMEOUT_MS)
       const finals = await Promise.all(
         measurement.measured.map(async (measuredQuantity) => {
           let m = measuredQuantity
@@ -702,6 +714,8 @@ export async function processQuote(
               images,
               target,
               measured: m,
+              customerScope,
+              timeoutMs: Number.isFinite(adjudicationTimeoutMs) ? adjudicationTimeoutMs : DEFAULT_ADJUDICATION_TIMEOUT_MS,
             }))
             if (adjudicated) {
               console.log(
@@ -876,12 +890,18 @@ export async function processQuote(
 
       if (value === null) continue
 
+      // Customer-facing (it becomes the takeoff "method" line): never a raw signal key
+      const formEvidence = clarifiedFieldIds.has(answer.fieldId)
+        ? 'Confirmed by the customer'
+        : field?.label
+          ? `Customer-provided: ${field.label}`
+          : 'Customer-provided'
       const formSignal = {
         key: signalKey,
         value,
         confidence: 1.0,
         source: 'form' as const,
-        evidence: `Customer-provided: ${field?.label || answer.fieldId}`
+        evidence: formEvidence,
       }
 
       // Check if we already have this signal
@@ -897,7 +917,7 @@ export async function processQuote(
           fusionRecorder.recordFormOverride(
             signalKey,
             value,
-            `Customer-provided: ${field?.label || answer.fieldId}`,
+            formEvidence,
             existingSignal
           )
           structuredSignals.signals[existingSignalIndex] = formSignal
@@ -906,7 +926,7 @@ export async function processQuote(
         }
       } else {
         // Add new form signal
-        fusionRecorder.recordNewFormSignal(signalKey, value, `Customer-provided: ${field?.label || answer.fieldId}`)
+        fusionRecorder.recordNewFormSignal(signalKey, value, formEvidence)
         structuredSignals.signals.push(formSignal)
         console.log(`[Processor] Added form signal: ${signalKey} = ${value}`)
       }
