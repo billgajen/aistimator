@@ -196,6 +196,51 @@ plausibly (a confused pensioner forced through an ice-sculpture form picks
 −£35.20 contract line), tier splits and thresholds all penny-exact; no price
 was ever AI-invented.
 
+## Round 3 — US launch trades (T-142, 2026-11-09)
+
+`npx tsx scripts/hardcore-test/run.mjs --round3` (scenarios3.mjs + requests3.json). Twelve US businesses: S31–S36 onboard from
+the T-140/T-141 **packs** (the only path with nameplate identification; synthetic plate renders for AC, furnace, water heater and
+panel), S37–S42 from the owner's **plain-language USD pricing** via the compiler. Requests were authored blind by a separate
+agent (business name, service and tagline only); the customer simulator answers the form and clarification questions.
+
+**First run `fbe6d937`: 11/12 in band, one wrong-money quote SENT.**
+- **R3-2 (fixed): S39 sent at $95, Grade A.** The customer described "40 gallons" but picked the closest select option
+  (50 gallon electric). The R3-1 doubt check then asked a **free-text** question about a **select** field, the prose answer
+  ("pretty sure it's 40 gallons…") **replaced** the selection, no priced option matched, and only the $95 permit line
+  survived. The "no work steps applied" guard didn't fire because one line priced. **Fix** (`apps/worker/src/answer-options.ts`):
+  a clarification answer to an option field snaps to the option it names (value or label, case/punctuation-blind); if it
+  names none, the original answer is kept and the quote is **held for review**. A structural send-guard holds any quote
+  whose option-field answer isn't one of its options. Doubt questions about an option field now offer the options.
+  Verified by replaying the exact failing answer through `/clarify` → `pending_review`, $1,595 kept, reason given.
+
+**Re-run `d000e87a` (with the fix): 12/12 sent, all inside their bands, 0 warnings, 0 failed checks.**
+
+| # | Path | Total | Grade | How it was priced |
+|---|---|---|---|---|
+| S31 AC | pack + plate | $6,104 | A | plate "GSX140361KB" → 3 ton, confirmed; $450 + $5,000, attic ×1.12 |
+| S32 furnace | pack + plate | $3,900 | A | INPUT 80,000 → confirmed |
+| S33 water heater | pack + plate | $2,150 | B | 50 gal confirmed; fuel identified (gap below the VOI bar, not asked) |
+| S34 fixtures | pack | $2,170 | A | 2 toilets, 1 faucet, 1 disposal, supplied, + $95 trip |
+| S35 EV charger | pack + plate | $1,800 | A | plate read 100 A; **customer said 200 A**, and their answer wins (no load management) |
+| S36 garage door | pack | $2,520 | A | double, insulated |
+| S37 exterior paint | compiler + photos | $2,758.45 | B | measured; photos showed two storeys vs "one story", so the doubt check asked, customer: single |
+| S38 AC | compiler | $6,000 | A | 3 ton + removal (first run $6,600 incl. attic; simulator variance) |
+| S39 water heater | compiler | $1,595 | A | 50 gal electric + permit |
+| S40 panel | compiler | $2,900 | A | 100 A service (no 60 A line) |
+| S41 springs | compiler | $250 | A | single spring |
+| S42 fixtures | compiler | $564 | A | toilet $300 + bathroom faucet $185 + $79 trip (under $500, not waived) |
+
+**Round 1 (GB) regression with the fix, run `0eab7250`:** 9/10 sent and identical to this morning's milestone run, or within
+known measurement/simulator variance (S01 £2,204.40 Grade B from photos, S09 £1,252.50). **S06 is now held for review**: the
+doubt check asked about the kitchen select field, and round 1's scripted clarify answer is prose ("No kitchen at all — bare
+marquee in a field…") that names no option. So the original selection is kept and the business reviews it, instead of a
+guess being priced. This is the new guard doing its job. Harness note: round-1 `clarify-hint` answers ignore offered options;
+a real customer now picks one on the clarify page.
+
+**Observations (not defects):** S35 shows the designed precedence: a customer's correction beats the label. In a real
+business that disagreement is worth surfacing to the business (logged as a v2 idea: flag "customer contradicted the
+nameplate"). Plates are synthetic; real-plate accuracy is still open (OWNER-TODO T-139/T-140).
+
 ## Harness notes
 
 Per-scenario artifacts (compile, service, widget config, submission, public

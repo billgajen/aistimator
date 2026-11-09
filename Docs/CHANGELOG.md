@@ -15,6 +15,27 @@
 
 ## Issues & Resolutions
 
+### 2026-11-09: T-142 — US gauntlet (round 3) + R3-2 fix: option answers can't silently drop the price
+
+**Round 3 built:** `scripts/hardcore-test/scenarios3.mjs` + blind-authored `requests3.json` (a separate agent saw only name, service and tagline). Twelve US businesses across the six launch trades: six onboarded from the T-140/T-141 packs (nameplate identification on the AC, furnace, water heater and panel), six from plain-language USD pricing through the compiler. The runner gained `--round3` (run with `npx tsx`, since pack scenarios import the TypeScript packs), a pack onboarding path identical to OnboardingFlow, per-scenario photo selection, and currency-aware reports.
+
+**R3-2 (found, fixed): S39 SENT at $95, Grade A.** Chain: customer described 40 gal but picked the closest option (50 gal electric) → the R3-1 doubt check asked a free-text question about a select field → the prose answer replaced the selection → no priced option matched → only the $95 permit priced → "no work steps applied" didn't fire (one line priced). Fix (`apps/worker/src/answer-options.ts`, generic):
+1. A clarification answer to an option field snaps to the option it names (value or label, case/punctuation-blind). If it names none, the original answer is kept and the quote is held.
+2. A structural send-guard holds any quote whose option-field answer isn't one of the field's options ("The answer to "<label>" doesn't match any option the price is set up for").
+3. R3-1 doubt questions about an option field now carry the field's options, so the clarify page shows choices instead of a text box.
+
+Replay of the exact failing answer through `/clarify` → `pending_review`, $1,595 kept, reason given.
+
+**Results:** round 3 re-run `d000e87a`: **12/12 sent, all inside their hand-derived bands, 0 warnings, 0 failed checks** (table in `Docs/08`). Round 1 GB regression `0eab7250`: 9/10 identical to this morning's milestone or within known variance. S06 is held for review by guard 2, because the harness's scripted prose answer names no option (correct, and safer than a guess).
+
+**Tests:** worker 411 (+5: option snapping by value/label, prose → none, suggested-field fallback, answers outside options, doubt question offers options).
+
+**Files:** `apps/worker/src/{answer-options.ts,quote-processor.ts}`, `apps/worker/src/agents/quality-gate.ts`, `scripts/hardcore-test/{run.mjs,checks.mjs,scenarios3.mjs,requests3.json}`, `Docs/08-hardcore-test-findings.md`, tests.
+
+**Relation:** closes the gap R3-1 opened (doubt questions on choice fields). Joins the T-126/R2-3/R2-7/T-139 send-guards: a wrong-money quote must land in review, never with the customer.
+
+---
+
 ### 2026-11-09: T-138 — LiDAR room scan (RoomPlan) → `scanned` quantities (AD-028)
 
 **Built:**

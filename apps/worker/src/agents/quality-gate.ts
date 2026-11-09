@@ -54,7 +54,7 @@ export interface QualityGateInput {
    * contradicted by the photos/description. Ask the customer to confirm the
    * quantity (answer merges back as a form answer via the fieldId).
    */
-  quantityConcern?: { reason: string; fieldId?: string }
+  quantityConcern?: { reason: string; fieldId?: string; options?: string[] }
   /** T-126 send-guard: how many work steps the config defines */
   workStepsConfigured?: number
   /** T-126 send-guard: how many work-step lines actually priced */
@@ -158,6 +158,7 @@ export async function evaluateQualityGate(
         key: input.quantityConcern.fieldId || 'stated_quantity',
         reason: input.quantityConcern.reason,
         direct: true,
+        options: input.quantityConcern.options,
       }]
     : []
   // T-139: identification questions arrive ready-made (deterministic)
@@ -319,10 +320,12 @@ async function generateClarificationQuestions(
     }
     // R3-1: direct entries already carry the exact customer-facing question
     if ((s as { direct?: boolean }).direct) {
+      const options = (s as { options?: string[] }).options
       confirmQuestions.push({
         id: `cq_${Date.now()}_d${confirmQuestions.length}`,
         targetSignalKey: s.key,
         question: `${s.reason} What should we allow for?`,
+        ...(options && options.length > 0 && { options }),
       })
       continue
     }

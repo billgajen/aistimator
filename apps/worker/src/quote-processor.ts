@@ -57,6 +57,7 @@ import type { AiClient } from './ai/client'
 import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue, parseRoomScan, scanAnswers, scanEvidence, summarizeRoomScan, ROOM_SCAN_FIELD } from '@estimator/shared'
 import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor, DEFAULT_ADJUDICATION_VALUE_THRESHOLD, DEFAULT_ADJUDICATION_TIMEOUT_MS } from './ai/measurement'
 import { formatScopeAnswers } from './ai/scope-answers'
+import { fieldOptions, snapToOption, answersOutsideOptions, type OptionField } from './answer-options'
 import { identificationTargets, identifyFromLabels, applyIdentifications, weakenUnreadGuesses, pricingReferencedKeys, checkIdentifications, identificationProvenance, identificationQuestion, DEFAULT_IDENTIFICATION_TIMEOUT_MS, type IdentificationOutcome } from './ai/identification'
 import { buildTakeoff, buildReference } from './takeoff'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing, findLookalikeUnconditionedSteps } from './pricing'
@@ -460,6 +461,7 @@ export async function processQuote(
   // Field ids that came from the clarification round. They are signal keys,
   // not form fields, so they have no label to show the customer.
   const clarifiedFieldIds = new Set<string>()
+  const unmatchedClarifications: string[] = []
   if (clarAnswers.length > 0 && clarQuestions.length > 0) {
     const questionById = new Map(clarQuestions.map((q) => [q.id, q]))
     for (const answer of clarAnswers) {
@@ -475,6 +477,27 @@ export async function processQuote(
         (es) => es.signalKey === question.targetSignalKey && es.identify && es.possibleValues?.length
       )
       if (idSignal) value = matchPossibleValue(value, idSignal.possibleValues) ?? value
+      // US gauntlet S39: an answer to an OPTION field must be one of its
+      // options. Prose ("pretty sure it's 40 gallons") replaced a select
+      // value, matched no priced option and the quote sent at $95. Snap to
+      // the option it names; if it names none, keep the original answer and
+      // hold the quote for the business
+      const options = fieldOptions(
+        question.targetSignalKey,
+        quoteData.widgetFields as OptionField[] | undefined,
+        service.draft_config?.suggestedFields as OptionField[] | undefined
+      )
+      if (options.length > 0) {
+        const snapped = snapToOption(value, options)
+        if (snapped === null) {
+          const fieldLabel = [...((quoteData.widgetFields as OptionField[] | undefined) || []), ...((service.draft_config?.suggestedFields as OptionField[] | undefined) || [])]
+            .find((f) => f.fieldId === question.targetSignalKey)?.label
+          unmatchedClarifications.push(fieldLabel || question.targetSignalKey)
+          console.log(`[Processor] Clarification answer for ${question.targetSignalKey} matches no option; keeping the original answer`)
+          continue
+        }
+        value = snapped
+      }
       quoteRequest.job_answers = quoteRequest.job_answers || []
       // Clarification is the customer's most recent statement — replace any prior answer for the same key
       quoteRequest.job_answers = quoteRequest.job_answers.filter(
@@ -2046,7 +2069,18 @@ export async function processQuote(
           identificationQuestions,
           // R3-1: stated-quantity doubt from the wording layer
           quantityConcern: quantityConcern
-            ? { reason: quantityConcern, fieldId: quantityConcernFieldId }
+            ? {
+                reason: quantityConcern,
+                fieldId: quantityConcernFieldId,
+                // An option field is answered by picking an option, not prose
+                ...(quantityConcernFieldId && {
+                  options: fieldOptions(
+                    quantityConcernFieldId,
+                    quoteData.widgetFields as OptionField[] | undefined,
+                    service.draft_config?.suggestedFields as OptionField[] | undefined
+                  ).map((o) => o.label),
+                }),
+              }
             : undefined,
           // T-126 send-guard inputs
           workStepsConfigured: rulesWithWorkSteps.workSteps?.length ?? 0,
@@ -2124,6 +2158,18 @@ export async function processQuote(
       guardReason = 'Pricing calculated to £0 or below — nothing could be priced from the configuration'
     } else if (stepsConfigured > 0 && stepLinesPriced === 0) {
       guardReason = `None of the ${stepsConfigured} configured work steps applied — conditional charges may have failed to bind`
+    } else if (unmatchedClarifications.length > 0 || answersOutsideOptions(
+      quoteRequest.job_answers || [],
+      quoteData.widgetFields as OptionField[] | undefined,
+      service.draft_config?.suggestedFields as OptionField[] | undefined
+    ).length > 0) {
+      // US gauntlet S39: a choice the price depends on isn't one of its options
+      const outside = answersOutsideOptions(
+        quoteRequest.job_answers || [],
+        quoteData.widgetFields as OptionField[] | undefined,
+        service.draft_config?.suggestedFields as OptionField[] | undefined
+      )
+      guardReason = `The answer to ${[...new Set([...unmatchedClarifications, ...outside])].map((f) => `"${f}"`).join(', ')} doesn't match any option the price is set up for; check what the customer needs`
     } else if (identificationChecks.some((c) => c.state === 'unknown')) {
       // T-139: the price depends on what the equipment is and nobody could
       // say (label unreadable, answer not one of the options) — the right

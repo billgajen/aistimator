@@ -18,6 +18,9 @@ const onlyArg = args.find((a) => a.startsWith('--only'))
 const only = onlyArg ? (onlyArg.includes('=') ? onlyArg.split('=')[1] : args[args.indexOf(onlyArg) + 1]).split(',') : null
 const skipClarify = args.includes('--skip-clarify')
 const round2 = args.includes('--round2')
+// --round3: the US launch trades (scenarios3.mjs + requests3.json). Run with
+// `npx tsx` — pack scenarios import the TypeScript packs.
+const round3 = args.includes('--round3')
 
 const cfg = loadEnv()
 const sb = makeSupabase(cfg)
@@ -31,7 +34,7 @@ const log = (s, msg) => console.log(`[${new Date().toISOString().slice(11, 19)}]
 
 async function runScenario(scenario) {
   const dir = path.join(outRoot, scenario.id)
-  const result = { id: scenario.id, business: scenario.business, steps: {}, checks: [], error: null }
+  const result = { id: scenario.id, business: scenario.business, currency: scenario.currency || 'GBP', steps: {}, checks: [], error: null }
   try {
     // 1. Owner account + tenant (cookie-authed session for dashboard APIs)
     const email = `owner+${scenario.slug}-${runId}@hardcore.test`
@@ -95,7 +98,18 @@ async function runScenario(scenario) {
         throw new Error(`compile failed (HTTP ${res.status}): ${JSON.stringify(res.json).slice(0, 300)}`)
       }
     }
-    let compile = await compileOnce(scenario.pricingPlainLanguage)
+    // Round 3 pack scenarios: onboarding's "Start from a template" path — the
+    // pack service exactly as OnboardingFlow applies it, no compiler
+    let compile
+    if (scenario.pack) {
+      const mod = await import(`../../apps/web/src/lib/vertical-packs/${scenario.pack.file}.ts`)
+      const svc = mod[scenario.pack.export].services.find((x) => x.name === scenario.pack.service)
+      if (!svc) throw new Error(`pack ${scenario.pack.file} has no service "${scenario.pack.service}"`)
+      compile = { updatedConfig: svc.draft, addons: svc.addons || [], multipliers: svc.multipliers || [], ambiguities: [] }
+      result.steps.pack = `${scenario.pack.file} / ${svc.name}`
+    } else {
+      compile = await compileOnce(scenario.pricingPlainLanguage)
+    }
     saveJson(dir, 'compile.json', compile)
     const compiledEmpty = (c) =>
       !(c.updatedConfig?.pricing?.workSteps?.length) && !(c.addons?.length) &&
@@ -118,7 +132,8 @@ async function runScenario(scenario) {
     const pricing = draft.pricing || {}
 
     // 4. Assets first (so minPhotos can be capped at what actually exists)
-    const collected = collectAssets(scenario.assetsDir, scratch)
+    const collected = scenario.assetsDir ? collectAssets(scenario.assetsDir, scratch) : { files: [], skipped: [] }
+    if (Array.isArray(scenario.assetFiles)) collected.files = collected.files.filter((f) => scenario.assetFiles.includes(f.fileName))
     result.steps.assets = { used: collected.files.map((f) => f.fileName), skipped: collected.skipped }
     const draftMin = media.minPhotos ?? 0
     const minPhotos = Math.min(draftMin, collected.files.length)
@@ -274,8 +289,9 @@ function writeReport(results) {
   for (const r of results) {
     const c = { pass: 0, warn: 0, fail: 0 }
     for (const ch of r.checks) c[ch.level] = (c[ch.level] || 0) + 1
-    const range = r.range && r.range[0] != null ? `£${r.range[0]}–£${r.range[1]}` : (r.provisional ? `~£${r.provisional.rangeLow}–£${r.provisional.rangeHigh}` : '—')
-    lines.push(`| ${r.id} | ${r.business} | ${r.finalStatus || 'ERROR'} | ${r.total != null && r.total > 0 ? '£' + r.total : '—'} | ${r.grade || '—'} | ${range} | ✅${c.pass} ⚠️${c.warn} ❌${c.fail} | ${r.steps?.quoteViewUrl || '—'} |`)
+    const c$ = r.currency === 'USD' ? '$' : '£'
+    const range = r.range && r.range[0] != null ? `${c$}${r.range[0]}–${c$}${r.range[1]}` : (r.provisional ? `~${c$}${r.provisional.rangeLow}–${c$}${r.provisional.rangeHigh}` : '—')
+    lines.push(`| ${r.id} | ${r.business} | ${r.finalStatus || 'ERROR'} | ${r.total != null && r.total > 0 ? c$ + r.total : '—'} | ${r.grade || '—'} | ${range} | ✅${c.pass} ⚠️${c.warn} ❌${c.fail} | ${r.steps?.quoteViewUrl || '—'} |`)
   }
   lines.push('', '## Check details', '')
   for (const r of results) {
@@ -304,6 +320,25 @@ if (round2) {
       ...b,
       sim: true,
       expect: { needsPhotos: false },
+      request: r.request,
+      persona: r.persona,
+      customer: { name: r.customerName, email: r.email, postcode: r.postcode },
+    }
+  })
+}
+
+if (round3) {
+  const { businesses } = await import('./scenarios3.mjs')
+  const requests = JSON.parse(readFileSync(path.join(ROOT, 'scripts/hardcore-test/requests3.json'), 'utf8'))
+  allScenarios = businesses.map((b) => {
+    const r = requests[b.id]
+    if (!r) throw new Error(`requests3.json is missing ${b.id}`)
+    return {
+      ...b,
+      region: 'US',
+      currency: 'USD',
+      sim: true,
+      expect: { needsPhotos: false, approxTotalRange: b.band },
       request: r.request,
       persona: r.persona,
       customer: { name: r.customerName, email: r.email, postcode: r.postcode },

@@ -1,0 +1,86 @@
+{
+  "S31": {
+    "request": "Our AC quit on us Sunday and it's 94 in the house. The outside unit hums but the fan won't spin and the guy who came out said the compressor is shot and it's not worth fixing since the system is from 2009. 1-story, about 1,800 sq ft in south Austin, air handler is up in the attic. Looking to just replace the whole thing, how soon can y'all get out here?",
+    "persona": "Software project manager, 41, owns a 1,800 sq ft single-story ranch built in 1998. Knows: system installed 2009, air handler in attic, outdoor condenser on side yard, a tech already diagnosed a failed compressor. Thinks it's a 3 ton unit but isn't sure. Doesn't know SEER ratings or refrigerant type. Wants it done this week, open to a heat pump if someone explains it.",
+    "customerName": "Marcus Delgado",
+    "email": "marcus.delgado@example.com",
+    "postcode": "78745"
+  },
+  "S32": {
+    "request": "Hi there, our furnace is about 22 years old and the last two winters we've had a guy out three times for the igniter and the inducer motor. He told us the heat exchanger has a crack and red tagged it. It's in the basement next to the water heater. We'd like a quote for a new gas furnace, ideally a high efficiency one. Two story house in Roseville, built in the 70s.",
+    "persona": "Retired schoolteacher, 67, careful and polite. Knows: gas furnace in unfinished basement, about 22 years old, red-tagged for cracked heat exchanger, house is ~2,200 sq ft two-story built 1974, has central AC coil on top of furnace. Doesn't know BTU size (thinks 'around 100,000'). Has an old chimney vent; doesn't know a high-efficiency unit needs PVC venting.",
+    "customerName": "Linda Johansson",
+    "email": "linda.johansson@example.com",
+    "postcode": "55113"
+  },
+  "S33": {
+    "request": "water heater leaking from the bottom, theres a puddle in the garage. its a 50 gallon gas I think, says Rheem on it. need it replaced asap",
+    "persona": "Young dad, 33, works in warehouse logistics, short on time and terse. Knows: tank is in the garage, Rheem brand, about 12 years old, natural gas, leaking from the bottom; read '50' on the label. Has shut the water off at the tank. Doesn't know if it needs an expansion tank or what code requires.",
+    "customerName": "Tyler Brooks",
+    "email": "tbrooks88@example.com",
+    "postcode": "37211"
+  },
+  "S34": {
+    "request": "Hello! We're doing a little refresh before my in-laws visit for Thanksgiving. I'd like to replace both toilets (upstairs bathroom and the downstairs half bath) and the kitchen faucet, which drips no matter what. Also our garbage disposal has been making a grinding noise and smells awful, so that might as well go too. I've already bought the kitchen faucet at Home Depot (a Moen pull-down) but haven't picked toilets yet.",
+    "persona": "Marketing manager, 38, organized and chatty. Knows: 2 toilets (one upstairs full bath, one downstairs half bath), 1 kitchen faucet already purchased (Moen pull-down, in the box), 1 garbage disposal under kitchen sink, unknown brand/HP. House built 2004. Needs toilets supplied by the plumber, standard white, comfort height. Wants it done before Nov 20.",
+    "customerName": "Priya Raman",
+    "email": "priya.raman@example.com",
+    "postcode": "80122"
+  },
+  "S35": {
+    "request": "Just picked up a Tesla Model Y and need a charger put in the garage. My panel is on the outside wall of the garage so hopefully it's an easy run? I haven't bought a charger yet, open to recommendations. House was built in 2015.",
+    "persona": "Nurse, 45, first EV owner. Knows: attached 2-car garage, main panel is on the exterior wall of the garage (charger would go on the inside of that same wall, ~5 ft away), house built 2015, panel is 200 amp. Doesn't own a charger yet; leaning toward Tesla Wall Connector. Doesn't know if the panel has open breaker slots. Not in an HOA.",
+    "customerName": "Danielle Okafor",
+    "email": "danielle.okafor@example.com",
+    "postcode": "85044"
+  },
+  "S36": {
+    "request": "Looking to replace our old wooden garage door, it's warped and the paint is peeling off. It's a double door, I measured roughly 16 wide and 7 tall. Would like something insulated since the garage is under our bedroom. Maybe with windows on top? Also the opener is like 20 yrs old if that matters.",
+    "persona": "Accountant, 52, moderately handy. Knows: one double garage door, measured ~16 ft x 7 ft, current door is wood and warped, garage is attached with a bedroom above, opener is ~20 years old (chain drive, brand Genie) and he'd consider replacing it. Wants insulated steel, white, with a row of windows. Doesn't know R-values or spring type.",
+    "customerName": "Robert Chen",
+    "email": "rob.chen@example.com",
+    "postcode": "63021"
+  },
+  "S37": {
+    "request": "We'd like a quote to paint the outside of our house. It's a one story stucco with wood trim and fascia, about 2,000 sq ft I think. The stucco has some hairline cracks and the trim on the west side is really sun-faded and peeling. We're thinking a warm white with dark bronze trim. Nothing urgent, sometime in the next month or two would be great.",
+    "persona": "Couple in their late 50s; she handles the house projects. Knows: single-story stucco home, roughly 2,000 sq ft living space, built 1996, wood trim/fascia with peeling on the west side, a few hairline stucco cracks, 2 exterior doors and a 2-car garage door to paint. Last painted about 12 years ago. Doesn't know linear feet of trim or paint products. Flexible timing.",
+    "customerName": "Sandra Whitfield",
+    "email": "sandra.whitfield@example.com",
+    "postcode": "85718"
+  },
+  "S38": {
+    "request": "ok so our ac has been blowing warm air on and off all summer and we've had it recharged twice already, the tech said its R-22 and they don't make it anymore so its time to replace. 2 story house in Katy, theres two units, one for upstairs and one for down. Do I have to replace both?? Also do yall do financing because that's a big hit right now",
+    "persona": "Stay-at-home mom of three, 36, budget conscious. Knows: two-story house ~2,800 sq ft, two separate AC systems (upstairs air handler in attic, downstairs in a hall closet), both from around 2006, both R-22; only the downstairs one is failing. Doesn't know tonnage. Interested in financing and wants to know whether replacing one or both makes sense.",
+    "customerName": "Brittany Nguyen",
+    "email": "brittany.nguyen@example.com",
+    "postcode": "77494"
+  },
+  "S39": {
+    "request": "No hot water since this morning. Electric water heater in the hall closet, pretty sure its 40 gallons. I flipped the breaker a couple times and nothing. It's probably 15 yrs old so I just want it replaced today if possible. I'm in Decatur.",
+    "persona": "Freelance graphic designer, 29, rents-to-own a small 1950s bungalow. Knows: electric tank in an interior hall closet, label says 40 gal, about 15 years old, no leak, breaker reset didn't help. Doesn't know wattage or whether there's a drain pan. Wants same-day if at all possible; works from home so available all day.",
+    "customerName": "Jamal Washington",
+    "email": "jamal.w@example.com",
+    "postcode": "30030"
+  },
+  "S40": {
+    "request": "Hi, we're buying an EV next year and probably adding a hot tub, and our electrician friend said our 100 amp panel won't cut it. It's an old Federal Pacific panel in the basement and our home inspector flagged it too. House is from 1962. Can you quote upgrading to 200 amp? Not sure if the meter or the line from the street needs to change too.",
+    "persona": "Couple in early 40s, he is an engineer and fairly informed. Knows: 100A Federal Pacific Stab-Lok panel in the basement, house built 1962, overhead service drop from the pole, meter on outside wall right behind the panel, about 24 circuits all full. Wants 200A. Doesn't know if Xcel needs to replace the drop or whether permits are included. No aluminum wiring that he's aware of.",
+    "customerName": "Kevin and Erin Matthews",
+    "email": "kevin.matthews@example.com",
+    "postcode": "80220"
+  },
+  "S41": {
+    "request": "Spring snapped with a loud BANG and now the garage door won't open, my car is stuck inside. Need someone today please!!!",
+    "persona": "Real estate agent, 47, impatient and needs her car for showings. Knows: single-car garage door (~9 ft wide), one big spring above the door is broken in two, the opener just strains. Door is about 10 years old, steel, not insulated. Doesn't know torsion vs extension or how many springs there should be. Wants it fixed today, will pay extra.",
+    "customerName": "Rachel Goldberg",
+    "email": "rachel.goldberg@example.com",
+    "postcode": "28205"
+  },
+  "S42": {
+    "request": "Hey, I bought a new bathroom faucet and a new toilet off Amazon and frankly I'm not confident doing it myself lol. Its the main bathroom, single hole faucet replacing an old 3 hole one so might need a cover plate? The old toilet just needs to be hauled away. Weekends work best for me.",
+    "persona": "Grad student/young professional, 27, first-time homeowner of a 1980s condo. Knows: 1 bathroom faucet (single-hole, already bought) replacing a 4-inch centerset; 1 toilet (already bought, two-piece) replacing the old one, which he wants removed. Doesn't know if shutoff valves are in good shape or if the faucet came with a deck plate. Second floor unit, has a parking spot.",
+    "customerName": "Diego Ramirez",
+    "email": "diego.ramirez@example.com",
+    "postcode": "97214"
+  }
+}

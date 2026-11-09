@@ -52,11 +52,12 @@ export function scenarioChecks(scenario, quote, detail) {
   const labels = breakdownLabels(quote)
   const allText = JSON.stringify(quote ?? {}).toLowerCase()
   const e = scenario.expect
+  const cur = scenario.currency === 'USD' ? '$' : '£'
 
   if (e.approxTotalRange && total != null && total > 0) {
     const [lo, hi] = e.approxTotalRange
-    if (total >= lo && total <= hi) add('pass', `total within expected band £${lo}–£${hi}`, `£${total}`)
-    else add('warn', `total outside expected band £${lo}–£${hi}`, `£${total}`)
+    if (total >= lo && total <= hi) add('pass', `total within expected band ${cur}${lo}–${cur}${hi}`, `${cur}${total}`)
+    else add('warn', `total outside expected band ${cur}${lo}–${cur}${hi}`, `${cur}${total}`)
   }
   if (e.minTotal && total != null && total > 0) {
     if (total >= e.minTotal) add('pass', `total >= hand-computed floor £${e.minTotal}`, `£${total}`)
