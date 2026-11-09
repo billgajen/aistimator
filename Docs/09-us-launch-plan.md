@@ -55,7 +55,7 @@ final invoice.
 | T-136 | SMS channel (Twilio) | Channel |
 | T-137 | Business mobile app (Expo) — on-site quoting | App |
 | T-138 | LiDAR room scan (RoomPlan) → `scanned` quantities | App + engine |
-| T-139 | Identification signals (nameplate reading) | Engine |
+| T-139 | Identification signals (nameplate reading) — **built 2026-11-09** (AD-032; real-nameplate accuracy proven in T-140/T-142) | Engine |
 | T-140 | Packs: HVAC replacement + water heaters | Packs |
 | T-141 | Packs: plumbing fixtures, electrical, garage doors | Packs |
 | T-142 | US gauntlet (round 3) | Testing |

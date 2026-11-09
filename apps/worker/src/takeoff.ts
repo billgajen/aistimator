@@ -78,6 +78,16 @@ export function buildTakeoff(opts: {
             method = 'Fixed price'
         }
 
+        // T-139: a line chosen by WHAT the equipment is shows how that was known
+        if (config?.triggerSignal && step.quantitySource !== 'ai_signal') {
+          const trigger = structuredSignals?.signals.find((s) => s.key === config.triggerSignal)
+          if (trigger?.basis === 'identified' && trigger.evidence) {
+            method = trigger.evidence
+          } else if (trigger?.source === 'form') {
+            method = `Selected for ${trigger.value}, as you confirmed`
+          }
+        }
+
         entries.push({
           item: config?.name || step.description,
           ...(quantityValue !== undefined &&

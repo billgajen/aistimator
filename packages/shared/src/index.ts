@@ -17,6 +17,7 @@ export * from './envelopes'
 
 // Re-export estimate grading + VOI (T-120/T-121, Measurement Engine)
 export * from './grading'
+export * from './identification'
 
 // Re-export deterministic quantity formulas (T-125)
 export * from './formula'

@@ -48,6 +48,10 @@
      `ADJUDICATION_VALUE_THRESHOLD` (default 2500). The reviewer is given the customer's
      answers (they define the scope) and is capped at `ADJUDICATION_TIMEOUT_MS` (default 30 s);
      past the cap the pass median stands and the customer is asked to confirm it
+   - T-139: for expected signals with an `identify` spec, a label-reading call (task
+     `identification`, 25 s cap) runs alongside; it transcribes nameplates and the pack's decode
+     rules produce the value (AD-032). Identified values select steps via `triggerSignal`; they
+     grade B until confirmed, and unknown ones are asked (with the allowed values as options)
    - recommendations, wording and cross-service detection run in parallel, then validation
    - if the quote needs a customer answer, it stops at `awaiting_clarification` with the
      provisional range and saves a reprice snapshot (first-pass AI outputs in `signals_json._reprice`)

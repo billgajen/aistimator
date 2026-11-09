@@ -15,6 +15,46 @@
 
 ## Issues & Resolutions
 
+### 2026-11-09: T-139 — Identification signals (nameplate reading, AD-029, AD-032)
+
+**What it does.** For identify-and-replace trades the price depends on WHAT the equipment is, not its size. An expected signal can now carry an `identify` spec (pack data): where the value is printed (`readFrom`), what to transcribe, and `decode` rules (regex → code → `map` table or numeric `scale`). A new vision call (registry task `identification`, `apps/worker/src/ai/identification.ts`) transcribes each label verbatim. **Code** decodes the transcription (`resolveIdentification` in `packages/shared/src/identification.ts`). The model's own reading is used only when no rule matches, and only if it is an allowed value.
+
+**Flow:**
+- Runs in parallel with signal extraction and measurement, and only for services with an `identify` signal (others pay nothing). 25 s cap (`IDENTIFICATION_TIMEOUT_MS`); past it, nothing was read and the customer is asked.
+- An identified value replaces a general vision guess of the same key (basis `identified`, confidence 0.9 decoded / 0.75 read), never a customer answer. When the label is unreadable, an appearance-only guess is kept but weakened to 0.4 (AD-029: identification needs a label).
+- Pricing reads identified values through ordinary step triggers (`triggerSignal` + `triggerCondition`). Trigger comparison now matches by meaning: `"3"` equals `3`, `"natural gas"` equals `"Natural gas"`, and numeric operators accept numeric strings (`evaluateTriggerCondition`).
+- **Grade:** only identifications the pricing actually reads count (`pricingReferencedKeys`: triggers, quantity sources, formula identifiers). Identified-but-unconfirmed ranks like measured (B); weak or unknown → C; customer-confirmed → A.
+- **Questions (built by code, no AI):** identified → one-tap `confirm_value` ("Size of the existing unit: we read Medium from the unit's rating plate. Is that right?") with the label evidence and the allowed values as corrections. Asked only when the allowed values move the price past the VOI bar. Unknown or weak → a direct question with the options that says where the value is printed. The clarify page's "No, let me correct it" now offers the options instead of a text box when there are options. Answers snap onto the allowed value they name.
+- **Provisional range:** while the equipment is unknown or weak, the range spans every allowed value. Before, the blurred-label quote showed $300, the only line that didn't depend on the size.
+- **Send-guard:** if after the clarification round an identification the price depends on is still unknown (e.g. an answer outside the options), the quote is held for business review instead of sending without its main line.
+- **Takeoff:** a line selected by an identified value cites the label ("Read from the unit's rating plate (photo 1): "AB36-120X" → Medium (size digits in the model number)"), or "Selected for Medium, as you confirmed".
+
+**Also fixed (found in the live run):** the quality gate asked customers to confirm a low-confidence signal whose value was literally "unknown" ("we estimated condition rating: unknown. Is that right?"), using one of the two question slots. It now skips "unknown" values.
+
+**Verified live (local, queue path, `scripts/hardcore-test/verify-t139.mts`, synthetic test service + synthetic rendered labels in `test-assets/hardcore2/T139-labels/`, model gemini-3.8-flash):**
+
+| Label photo | Read | First price | Question | After answer |
+|---|---|---|---|---|
+| sharp | "AB36-120X" → Medium (decoded), 6.0 s | 20.0 s, Grade B, $3,200 | confirm Medium | $3,200 Grade A, sent |
+| blurred | nothing (legible=false), 2.7 s | 20.8 s, Grade C, range $2,300–$4,100 | "Size of the existing unit? It is usually printed on…" + options | "large" → Large, $4,100 Grade A, sent |
+
+The first blurred run (before the cap) spent 44.6 s on the unreadable photo: 58 s to first price, for the same outcome.
+
+**Not proven yet:** accuracy on REAL nameplates (glare, angle, worn plates, real model-number schemes). The renders only prove the plumbing. Real photos belong to T-140 (the HVAC / water-heater packs bring the real decode tables) and T-142. Listed in OWNER-TODO.
+
+**Known gaps (logged, not built):**
+- Triage analyses at most 2 photos for "simple" requests and 5 otherwise. A nameplate photo beyond that is never read. Packs should put the nameplate first in `requiredAngles` (T-140).
+- After the customer confirms, first-pass photo notes still say "Data label is unreadable… a clearer photo is required" on a now-confirmed quote. Same family as the smoke-test backlog item "internal notes shown to customers".
+- After confirmation, the takeoff loses the label evidence ("Selected for Medium, as you confirmed"), because the form signal replaces the identified one.
+
+**Tests:** worker 387 (+30: decode map/scale/first-match/malformed pattern, value snapping, resolve precedence and clipping, targets/prompt, failure/timeout/no-photo paths, apply never overrides a form answer, weak guesses, referenced keys, states, grades, both question shapes, prebuilt gate questions, the "unknown" skip, takeoff method ×2, tolerant triggers ×3).
+
+**Files:** `packages/shared/src/{identification.ts,database.types.ts,grading.ts,index.ts}`, `apps/worker/src/ai/identification.ts`, `apps/worker/src/{quote-processor.ts,takeoff.ts,index.ts}`, `apps/worker/src/agents/quality-gate.ts`, `apps/worker/src/pricing/rules-engine.ts`, `apps/web/src/app/q/[quoteId]/clarify/page.tsx`, `scripts/hardcore-test/verify-t139.mts`, `Docs/{01-architecture.md,09-us-launch-plan.md}`, tests.
+
+**Relation:** AD-029 (owner) → AD-032 (below). Grade semantics extend T-120/T-128. Questions follow T-108's deterministic `confirm_value` pattern and T-121's VOI bar. The reprice path (2026-11-08) needs no change: identified values live in the saved signals.
+
+---
+
 ### 2026-11-09: Senior review gets the customer's scope answers + 30 s cap; no raw signal keys in the takeoff
 
 **Owner decision (2026-11-09):** both options from the speed entry below: give the reviewer the scope answers AND cap its time.
@@ -3141,6 +3181,12 @@ if (pricingResult.estimatedTotal <= 0) {
 ### AD-031: Quote processing is asynchronous in production (2026-11-08)
 
 **Decision:** production enqueues every quote on Cloudflare Queues (`SYNC_QUOTE_PROCESSING=false`); sync `/process` is for local dev and as a rollback lever only. **Why:** photo-measured quotes take 75–150 s, longer than any request a customer or webhook should hold, and turning thinking down to fit made the measurement wrong (S01 £3,355). **Consequences:** the customer can reach a quote before it is priced, so every customer surface must handle `queued`/`generating` (`isQuoteProcessing`); worker job endpoints are token-authenticated; one quote per consumer invocation. **Rejected:** raising `maxDuration` to 300 s (a spinner for minutes, the webhooks still block, and a 53 s adjudication can still exceed it).
+
+---
+
+### AD-032: Identification — the model transcribes, the pack decodes (T-139)
+
+**Decision:** equipment identity (capacity, fuel, size class) is established by a vision call that TRANSCRIBES label text verbatim, and by pack-supplied decode rules that turn the transcription into the value. The model's own reading is a fallback, accepted only when it is one of the signal's allowed values. An identified value grades like a measured one (B) until a human confirms it; appearance alone never identifies (an unreadable label weakens any guess to Grade C and asks). **Why:** AD-024 for labels: reading characters is what vision is good at, while decoding a manufacturer's model-number scheme is a deterministic lookup that belongs in data. **Rejected:** asking the model for the final value directly (it would silently "decode" schemes it half-knows), and per-trade decoding code in the engine (anti-hardcoding).
 
 ---
 

@@ -71,3 +71,11 @@ Code for every item is already built; these are the steps that unlock it.
   2026-11-08): internal notes shown to customers, raw unit labels,
   "worth considering" duplicating scope items, clarification page + email styling, "Powered by Estimator" name.
 - [x] **Disagreement path decided 2026-11-09:** both. The reviewer gets the scope answers and a 30 s cap (CHANGELOG 2026-11-09).
+
+## T-139 — Identification signals (nameplate reading)
+
+- [ ] **Real nameplate photos** for the accuracy check: 5–10 photos of real equipment rating plates
+  (AC condensers, furnaces, water heaters; some sharp, some angled/glared/worn) into a new gitignored folder
+  `test-assets/hardcore2/T140-nameplates/`, with the true capacity/fuel for each in a `truth.json` next to
+  them. The engine is built and verified only on synthetic renders; T-140 brings the real decode tables.
+

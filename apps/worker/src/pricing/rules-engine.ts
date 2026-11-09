@@ -1202,23 +1202,40 @@ function evaluateTriggerCondition(
   value: string | number | boolean,
   conditionValue: string | number | boolean | undefined
 ): boolean {
+  // T-139: identified values and customer answers arrive as numbers or
+  // strings ("3" / 3, "Natural gas" / "natural gas"); compare them by meaning
+  const num = (v: unknown): number | null => {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null
+    if (typeof v === 'string' && /^\s*-?\d+(\.\d+)?\s*$/.test(v)) return Number(v)
+    return null
+  }
+  const same = (a: unknown, b: unknown): boolean => {
+    if (a === b) return true
+    const na = num(a)
+    const nb = num(b)
+    if (na !== null && nb !== null) return na === nb
+    if (typeof a === 'string' && typeof b === 'string') return a.trim().toLowerCase() === b.trim().toLowerCase()
+    return false
+  }
+  const nv = num(value)
+  const nc = num(conditionValue)
   switch (operator) {
     case 'exists':
       return value !== undefined && value !== null
     case 'not_exists':
       return value === undefined || value === null
     case 'equals':
-      return value === conditionValue
+      return same(value, conditionValue)
     case 'not_equals':
-      return value !== conditionValue
+      return !same(value, conditionValue)
     case 'gt':
-      return typeof value === 'number' && typeof conditionValue === 'number' && value > conditionValue
+      return nv !== null && nc !== null && nv > nc
     case 'gte':
-      return typeof value === 'number' && typeof conditionValue === 'number' && value >= conditionValue
+      return nv !== null && nc !== null && nv >= nc
     case 'lt':
-      return typeof value === 'number' && typeof conditionValue === 'number' && value < conditionValue
+      return nv !== null && nc !== null && nv < nc
     case 'lte':
-      return typeof value === 'number' && typeof conditionValue === 'number' && value <= conditionValue
+      return nv !== null && nc !== null && nv <= nc
     case 'contains':
       return typeof value === 'string' && typeof conditionValue === 'string' && value.toLowerCase().includes(conditionValue.toLowerCase())
     default:

@@ -44,6 +44,12 @@ export interface QualityGateInput {
    */
   defaultedQuantitySteps?: Array<{ askKey: string; stepName: string }>
   /**
+   * T-139 (AD-029): questions about identified equipment, built by code
+   * (one-tap confirmation of a label reading, or where to find the value).
+   * They take precedence over AI-written questions for the same key.
+   */
+  identificationQuestions?: ClarificationQuestion[]
+  /**
    * R3-1: the wording layer concluded a customer-STATED price driver is
    * contradicted by the photos/description. Ask the customer to confirm the
    * quantity (answer merges back as a form answer via the fieldId).
@@ -154,7 +160,18 @@ export async function evaluateQualityGate(
         direct: true,
       }]
     : []
-  const structural = [...missing, ...concern.filter((c) => !missing.some((m) => m.key === c.key)), ...defaulted]
+  // T-139: identification questions arrive ready-made (deterministic)
+  const identification = (input.identificationQuestions || []).map((q) => ({
+    key: q.targetSignalKey,
+    reason: q.question,
+    prebuilt: q,
+  }))
+  const structural = [
+    ...missing,
+    ...identification.filter((q) => !missing.some((m) => m.key === q.key)),
+    ...concern.filter((c) => !missing.some((m) => m.key === c.key)),
+    ...defaulted,
+  ]
   const signalsNeedingClarification = [
     ...structural,
     ...identified.filter((s) => !structural.some((m) => m.key === s.key)),
@@ -245,6 +262,10 @@ function identifySignalsForClarification(
   // Low-confidence signals
   for (const key of lowConfSignals) {
     const signal = structuredSignals.signals.find(s => s.key === key)
+    // An 'unknown' value is the extractor saying it couldn't tell: asking the
+    // customer to confirm "unknown" wastes one of the two question slots
+    // (T-139 live run: "we estimated condition rating: unknown. Is that right?")
+    if (signal && String(signal.value).trim().toLowerCase() === 'unknown') continue
     if (signal && signal.confidence < 0.5) {
       signalsToAsk.push({
         key,
@@ -291,6 +312,11 @@ async function generateClarificationQuestions(
   const needsAiQuestion: Array<{ key: string; reason: string }> = []
 
   for (const s of signalsToAsk) {
+    const prebuilt = (s as { prebuilt?: ClarificationQuestion }).prebuilt
+    if (prebuilt) {
+      confirmQuestions.push(prebuilt)
+      continue
+    }
     // R3-1: direct entries already carry the exact customer-facing question
     if ((s as { direct?: boolean }).direct) {
       confirmQuestions.push({

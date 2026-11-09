@@ -196,14 +196,33 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
                       </button>
                     </div>
                     {answers[q.id] !== undefined && answers[q.id] !== String(q.aiValue) && (
-                      <input
-                        type="text"
-                        placeholder="Enter the correct value..."
-                        value={answers[q.id] || ''}
-                        onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
-                        autoFocus
-                        className="w-full px-3 py-2 border border-zinc-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
-                      />
+                      q.options && q.options.length > 0 ? (
+                        /* T-139: identified equipment — corrections come from the allowed values */
+                        <div className="space-y-2 pt-1">
+                          {q.options.filter((option) => option !== String(q.aiValue)).map((option) => (
+                            <label key={option} className="flex items-center gap-3 cursor-pointer">
+                              <input
+                                type="radio"
+                                name={q.id}
+                                value={option}
+                                checked={answers[q.id] === option}
+                                onChange={() => setAnswers(prev => ({ ...prev, [q.id]: option }))}
+                                className="w-4 h-4 text-zinc-900 border-zinc-300"
+                              />
+                              <span className="text-sm text-zinc-700">{option}</span>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <input
+                          type="text"
+                          placeholder="Enter the correct value..."
+                          value={answers[q.id] || ''}
+                          onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                          autoFocus
+                          className="w-full px-3 py-2 border border-zinc-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                        />
+                      )
                     )}
                   </div>
                 ) : q.options && q.options.length > 0 ? (

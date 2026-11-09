@@ -9,7 +9,8 @@
  *   C — Concept:   a driver quantity came from the plausibility envelope or
  *                  carries low measured confidence. Wide honest range.
  *   B — Measured:  all driver quantities measured/adjudicated with acceptable
- *                  agreement. Tight range.
+ *                  agreement, or equipment identified from a nameplate (T-139)
+ *                  but not yet confirmed. Tight range.
  *   A — Confirmed: every driver quantity stated or confirmed by a human
  *                  (customer answer or business edit). Exact price.
  */
@@ -24,7 +25,11 @@ export interface QuantityProvenance {
    * fallback) — the line's price is structurally unreliable, not merely
    * uncertain. Caps the grade at C like an envelope-derived quantity.
    */
-  basis: 'confirmed' | 'measured' | 'adjudicated' | 'envelope' | 'defaulted'
+  /**
+   * 'identified' (T-139, AD-029): what the equipment IS was read from a label
+   * or nameplate. Ranks like measured (Grade B) until a human confirms it.
+   */
+  basis: 'confirmed' | 'measured' | 'adjudicated' | 'envelope' | 'defaulted' | 'identified'
   confidence: number
 }
 
@@ -67,7 +72,7 @@ export function computeEstimateGrade(quantities: QuantityProvenance[]): Estimate
       grade = 'C'
       break
     }
-    // measured / adjudicated with acceptable confidence
+    // measured / adjudicated / identified with acceptable confidence
     if (grade === 'A') grade = 'B'
   }
 

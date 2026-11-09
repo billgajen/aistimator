@@ -1,5 +1,6 @@
 import type { RegionCode, UnitSystem, ReferenceObject } from './regions/types'
 import type { AiUsageSummary } from './ai-models'
+import type { IdentificationSpec } from './identification'
 
 /**
  * Database types for the Estimator platform
@@ -231,6 +232,13 @@ export interface ExpectedSignalConfig {
     absoluteMin: number
     absoluteMax: number
   }
+  /**
+   * T-139 (AD-029): this signal is IDENTIFIED from a label or nameplate
+   * (capacity, fuel, model) rather than measured. Vision transcribes the
+   * label verbatim; the pack's decode rules turn it into the value. Pack
+   * data, never hardcoded.
+   */
+  identify?: IdentificationSpec
 }
 
 /**
@@ -648,7 +656,7 @@ export interface ExtractedSignal {
    */
   quantityBand?: { low: number; high: number }
   /** T-120: how this quantity was established — drives the estimate grade */
-  basis?: 'confirmed' | 'measured' | 'adjudicated' | 'envelope'
+  basis?: 'confirmed' | 'measured' | 'adjudicated' | 'envelope' | 'identified'
 }
 
 /**

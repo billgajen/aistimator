@@ -49,6 +49,8 @@ export interface Env {
   ADJUDICATION_VALUE_THRESHOLD?: string
   /** Senior review wall-time cap, ms (default 30000; 0 = no cap) */
   ADJUDICATION_TIMEOUT_MS?: string
+  /** T-139 label-read wall-time cap, ms (default 25000; 0 = no cap) */
+  IDENTIFICATION_TIMEOUT_MS?: string
   MEASUREMENT_COV_THRESHOLD?: string
 
   // Email (Postmark)

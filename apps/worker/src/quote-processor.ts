@@ -50,13 +50,14 @@ import { classify as triageClassify, queryPreviousQuoteCount } from './agents/tr
 import { initializeFusionFromStructuredSignals } from './agents/signal-fusion'
 import { evaluateQualityGate } from './agents/quality-gate'
 import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
-import type { QualityGateResult } from '@estimator/shared'
+import type { QualityGateResult, ClarificationQuestion } from '@estimator/shared'
 import { AiUsageMeter } from '@estimator/shared'
 import { createAiClient } from './ai/factory'
 import type { AiClient } from './ai/client'
-import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock } from '@estimator/shared'
+import { computeEnvelope, enforceEnvelope, computeEstimateGrade, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue } from '@estimator/shared'
 import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor, DEFAULT_ADJUDICATION_VALUE_THRESHOLD, DEFAULT_ADJUDICATION_TIMEOUT_MS } from './ai/measurement'
 import { formatScopeAnswers } from './ai/scope-answers'
+import { identificationTargets, identifyFromLabels, applyIdentifications, weakenUnreadGuesses, pricingReferencedKeys, checkIdentifications, identificationProvenance, identificationQuestion, DEFAULT_IDENTIFICATION_TIMEOUT_MS, type IdentificationOutcome } from './ai/identification'
 import { buildTakeoff, buildReference } from './takeoff'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing, findLookalikeUnconditionedSteps } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
@@ -421,7 +422,13 @@ export async function processQuote(
       if (!question?.targetSignalKey || raw === '') continue
       // Numeric answers become numbers (comma-separator aware — see "1,500" lesson)
       const numeric = raw.replace(/,(?=\d{3}\b)/g, '')
-      const value: string | number = /^\d+(\.\d+)?$/.test(numeric) ? parseFloat(numeric) : raw
+      let value: string | number = /^\d+(\.\d+)?$/.test(numeric) ? parseFloat(numeric) : raw
+      // T-139: an answer about identified equipment snaps onto the allowed
+      // value it names ("natural gas" → "Natural gas") so step triggers match
+      const idSignal = (service.expected_signals || []).find(
+        (es) => es.signalKey === question.targetSignalKey && es.identify && es.possibleValues?.length
+      )
+      if (idSignal) value = matchPossibleValue(value, idSignal.possibleValues) ?? value
       quoteRequest.job_answers = quoteRequest.job_answers || []
       // Clarification is the customer's most recent statement — replace any prior answer for the same key
       quoteRequest.job_answers = quoteRequest.job_answers.filter(
@@ -657,7 +664,22 @@ export async function processQuote(
       return { measured, calibrationBySignal }
     }
 
-    const [extractionResult, measurement] = await Promise.all([
+    // T-139 (AD-029): equipment identified from labels and nameplates, for
+    // expected signals that carry an identify spec (pack data)
+    const idTargets = identificationTargets(service.expected_signals)
+    const runIdentification = (): Promise<IdentificationOutcome> =>
+      idTargets.length > 0 && images.length > 0
+        ? timer.time('identification', () =>
+            identifyFromLabels({
+              ai: createAiClient('identification', env, aiUsage),
+              images,
+              targets: idTargets,
+              timeoutMs: Number(env.IDENTIFICATION_TIMEOUT_MS ?? DEFAULT_IDENTIFICATION_TIMEOUT_MS) || 0,
+            })
+          )
+        : Promise.resolve({ resolved: [], readings: [] })
+
+    const [extractionResult, measurement, identification] = await Promise.all([
       timer.time('signals', () => extractSignalsFromImages(gemini, images, signalContext)),
       targets.length > 0 && images.length > 0
         ? timer.time('measurement', runMeasurement).catch((measureError) => {
@@ -667,9 +689,21 @@ export async function processQuote(
             return null
           })
         : Promise.resolve(null),
+      runIdentification(),
     ])
     signals = extractionResult.signals
     structuredSignals = extractionResult.structuredSignals
+
+    if (structuredSignals && idTargets.length > 0) {
+      applyIdentifications(structuredSignals.signals, identification.resolved)
+      const weakened = weakenUnreadGuesses(structuredSignals.signals, idTargets, identification.resolved)
+      for (const id of identification.resolved) {
+        console.log(`[Processor] Identified ${id.signalKey} = ${id.value} (${id.method}, confidence ${id.confidence})`)
+      }
+      if (weakened.length > 0) console.log(`[Processor] Label not readable, guess kept as weak: ${weakened.join(', ')}`)
+      const unread = idTargets.filter((t) => !identification.resolved.some((r) => r.signalKey === t.signalKey))
+      if (unread.length > 0) console.log(`[Processor] Not identified from labels: ${unread.map((t) => t.signalKey).join(', ')}`)
+    }
 
     if (measurement && structuredSignals) {
       // T-119 M4: stakes-based adjudication, one senior review per quantity,
@@ -1283,6 +1317,51 @@ export async function processQuote(
     console.log(`[Processor] Pricing trace has ${pricingTrace.trace.length} steps`)
   }
 
+  // T-139: state of every identification the price depends on
+  const identificationChecks = structuredSignals
+    ? checkIdentifications(
+        identificationTargets(service.expected_signals),
+        pricingReferencedKeys(rulesWithWorkSteps.workSteps, extractFormulaIdentifiers),
+        structuredSignals.signals
+      )
+    : []
+  const identificationQuestions: ClarificationQuestion[] = []
+  // Unknown or weakly-guessed equipment: the provisional range spans every
+  // allowed value (otherwise the customer sees only the lines that don't
+  // depend on it, e.g. $300 of a $2,300–$4,100 job)
+  const identificationSpread = { low: 0, high: 0 }
+  for (const check of identificationChecks) {
+    if (check.state === 'confirmed') continue
+    let ask = check.state !== 'identified'
+    if (check.target.possibleValues && check.target.possibleValues.length > 1 && structuredSignals) {
+      // VOI: price every allowed value; ask only if the choice moves real money
+      const totals = check.target.possibleValues.map(
+        (v) =>
+          priceWithSignals({
+            ...structuredSignals,
+            signals: [
+              ...structuredSignals.signals.filter((s) => s.key !== check.target.signalKey),
+              { key: check.target.signalKey, value: v, confidence: 1, source: 'inferred' as const },
+            ],
+          }).result.total
+      )
+      if (check.state !== 'identified') {
+        identificationSpread.low += Math.min(...totals) - pricing.total
+        identificationSpread.high += Math.max(...totals) - pricing.total
+      }
+      ask = ask || isQuestionWorthAsking({
+        priceAtLow: Math.min(...totals),
+        priceAtHigh: Math.max(...totals),
+        bestTotal: pricing.total,
+      }).ask
+    }
+    console.log(`[Processor] Identification ${check.target.signalKey}: ${check.state}${ask ? ' — asking' : ''}`)
+    if (ask) {
+      const question = identificationQuestion(check, identificationQuestions.length)
+      if (question) identificationQuestions.push(question)
+    }
+  }
+
   // T-120 (M6): interval pricing + declared estimate grade.
   // T-121 (M7): value-of-information — ask about a quantity only when its
   // uncertainty moves real money, not when an abstract threshold trips.
@@ -1301,7 +1380,8 @@ export async function processQuote(
             | 'measured'
             | 'adjudicated'
             | 'envelope'
-            | 'defaulted',
+            | 'defaulted'
+            | 'identified',
           confidence: s.confidence,
           band: confirmed ? undefined : s.quantityBand,
           stepName: step.name,
@@ -1347,6 +1427,14 @@ export async function processQuote(
         seenKeys.add(rateKey)
         provenance.push({ signalKey: rateKey, basis: 'measured', confidence: 0.7, band: undefined, stepName: bandStep.name })
       }
+    }
+
+    // T-139 (AD-029): equipment the price depends on, identified from labels.
+    // Identified-but-unconfirmed ranks like measured (B); weak or unknown → C.
+    for (const check of identificationChecks) {
+      if (seenKeys.has(check.target.signalKey)) continue
+      seenKeys.add(check.target.signalKey)
+      provenance.push({ ...identificationProvenance(check), band: undefined, stepName: check.target.description })
     }
 
     const gradeResult = computeEstimateGrade(provenance)
@@ -1397,6 +1485,11 @@ export async function processQuote(
     if (costBandSpread.low > 0 || costBandSpread.high > 0) {
       rangeLow = Math.max(0, Math.round(((rangeLow ?? pricing.total) - costBandSpread.low) * 100) / 100)
       rangeHigh = Math.round(((rangeHigh ?? pricing.total) + costBandSpread.high) * 100) / 100
+    }
+    // T-139: unidentified equipment widens it across the allowed values
+    if (identificationSpread.low !== 0 || identificationSpread.high !== 0) {
+      rangeLow = Math.max(0, Math.round(((rangeLow ?? pricing.total) + identificationSpread.low) * 100) / 100)
+      rangeHigh = Math.round(((rangeHigh ?? pricing.total) + identificationSpread.high) * 100) / 100
     }
 
     pricing.estimate = {
@@ -1898,6 +1991,8 @@ export async function processQuote(
           missingQuantitySignals,
           // T-127: placeholder ×1 quantities that must be clarified in-flow
           defaultedQuantitySteps,
+          // T-139: equipment identification to confirm or ask (built by code)
+          identificationQuestions,
           // R3-1: stated-quantity doubt from the wording layer
           quantityConcern: quantityConcern
             ? { reason: quantityConcern, fieldId: quantityConcernFieldId }
@@ -1978,6 +2073,14 @@ export async function processQuote(
       guardReason = 'Pricing calculated to £0 or below — nothing could be priced from the configuration'
     } else if (stepsConfigured > 0 && stepLinesPriced === 0) {
       guardReason = `None of the ${stepsConfigured} configured work steps applied — conditional charges may have failed to bind`
+    } else if (identificationChecks.some((c) => c.state === 'unknown')) {
+      // T-139: the price depends on what the equipment is and nobody could
+      // say (label unreadable, answer not one of the options) — the right
+      // line may be missing entirely
+      guardReason = `Could not identify ${identificationChecks
+        .filter((c) => c.state === 'unknown')
+        .map((c) => `"${c.target.description}"`)
+        .join(', ')}, which decides the price`
     } else {
       // R2-3: a mandatory £0-cost step = the compiler could not establish the
       // primary price (block packages, from-prices) — surcharges must not
