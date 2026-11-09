@@ -89,3 +89,9 @@ Code for every item is already built; these are the steps that unlock it.
   model numbers don't carry a "0xx" code (some Carrier and Rheem formats) fall back to the model's reading plus a customer
   confirmation. Tell me which brands your customers have most, and I'll add their schemes.
 
+## T-141 — Plumbing, electrical, garage door packs
+
+- [ ] **Review the rates** in `apps/web/src/lib/vertical-packs/{plumbing-us,electrical-us,garage-doors-us}.ts` (all `TODO-OWNER`),
+  e.g. 200 A panel $2,600, EV install $1,150 + $18/ft past 25 ft, toilet $325 + $275 supplied, double door $1,950.
+- [ ] **One real panel-label photo** (inside the door, or the main breaker) to check the amperage reading, same folder as T-139.
+

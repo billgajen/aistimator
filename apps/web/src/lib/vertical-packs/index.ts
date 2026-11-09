@@ -12,11 +12,22 @@ import { paintingPack } from './painting'
 import { paintingPackUS } from './painting-us'
 import { hvacPackUS } from './hvac-us'
 import { waterHeaterPackUS } from './water-heater-us'
+import { electricalPackUS } from './electrical-us'
+import { plumbingPackUS } from './plumbing-us'
+import { garageDoorsPackUS } from './garage-doors-us'
 
 export type { VerticalPack, VerticalPackService } from './types'
 
 /** All available packs. */
-const PACKS: VerticalPack[] = [paintingPackUS, hvacPackUS, waterHeaterPackUS, paintingPack]
+const PACKS: VerticalPack[] = [
+  paintingPackUS,
+  hvacPackUS,
+  waterHeaterPackUS,
+  plumbingPackUS,
+  electricalPackUS,
+  garageDoorsPackUS,
+  paintingPack,
+]
 
 /**
  * All packs; when a region is given, that region's packs come first so a US

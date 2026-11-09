@@ -8,9 +8,10 @@ import { describe, it, expect } from 'vitest'
 import { resolveIdentification, type ExpectedSignalConfig } from '@estimator/shared'
 import { hvacPackUS } from '@/lib/vertical-packs/hvac-us'
 import { waterHeaterPackUS } from '@/lib/vertical-packs/water-heater-us'
+import { electricalPackUS } from '@/lib/vertical-packs/electrical-us'
 import { listPacks } from '@/lib/vertical-packs'
 
-const packs = [hvacPackUS, waterHeaterPackUS]
+const packs = [hvacPackUS, waterHeaterPackUS, electricalPackUS]
 
 function signal(key: string): ExpectedSignalConfig {
   for (const pack of packs)
@@ -44,15 +45,21 @@ describe('identify packs: data integrity', () => {
           expect(es?.identify, `${step.id} triggers on an identified signal`).toBeTruthy()
           expect(es!.possibleValues).toContain(step.triggerCondition?.value)
         }
-        // Every allowed value selects exactly one priced step per signal
+        // Size-priced packs: every allowed value selects exactly one priced
+        // step (a missing one = equipment the pack can't price). Modifier
+        // signals (electrical: only some panel ratings add work): at most one.
+        const sizePriced = pack.id === hvacPackUS.id || pack.id === waterHeaterPackUS.id
         for (const es of svc.draft.expectedSignals.filter((s) => s.identify)) {
           for (const value of es.possibleValues || []) {
             const selected = steps.filter((s) => s.triggerSignal === es.signalKey && s.triggerCondition?.value === value)
-            expect(selected.length, `${es.signalKey}=${value}`).toBe(1)
+            if (sizePriced) expect(selected.length, `${es.signalKey}=${value}`).toBe(1)
+            else expect(selected.length, `${es.signalKey}=${value}`).toBeLessThanOrEqual(1)
           }
         }
         // The plate/label is the first guided photo (triage reads only the first few)
-        expect(svc.draft.media.requiredAngles?.[0]?.id).toMatch(/rating_(plate|label)/)
+        if (svc.draft.expectedSignals.some((s) => s.identify)) {
+          expect(svc.draft.media.requiredAngles?.[0]?.id).toMatch(/rating_(plate|label)/)
+        }
         expect(pack.region).toBe('US')
       })
     }
@@ -112,5 +119,19 @@ describe('water heater decode rules', () => {
     ['VOLTS 240 WATTS 4500', 'Electric'],
   ])('fuel %s → %s', (text, expected) => {
     expect(decode('water_heater_fuel', text)).toBe(expected)
+  })
+})
+
+describe('electrical decode rules', () => {
+  it.each([
+    ['MAIN BREAKER 100 A', '100 A'],
+    ['RATED 200 AMPS 120/240 VAC', '200 A'],
+    ['SERVICE ENTRANCE 60A', '60 A'],
+    ['150 AMP', '150 A'],
+  ])('%s → %s', (text, expected) => {
+    expect(decode('panel_amps', text)).toBe(expected)
+  })
+  it('a branch breaker rating alone (e.g. 20 A) is not a panel rating', () => {
+    expect(decode('panel_amps', '20 A 15 A 30 A')).toBeUndefined()
   })
 })

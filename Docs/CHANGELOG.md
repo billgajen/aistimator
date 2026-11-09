@@ -15,6 +15,28 @@
 
 ## Issues & Resolutions
 
+### 2026-11-09: T-141 — Packs: plumbing fixtures, electrical, garage doors (US) + milestone gauntlet
+
+**Built (pure data):**
+- `electrical-us.ts`: **Panel upgrade** (to 200 A; a service entrance and meter base line when the existing panel is 60 A) and **EV charger installation** (install incl. first 25 ft, extra run per foot via the derived formula `max(0, run_length_ft - 25)`, charger supplied when asked, load management on a 100 A panel, service-upgrade allowance on 60 A). The existing panel rating is **identified** from the panel label or main breaker (AD-032). Decode: a rating line ("RATED 100 AMPS", "MAIN BREAKER 100 A") first, then any 60/100/125/150/200 A. Branch breakers (15/20/30 A) are ignored.
+- `plumbing-us.ts`: **Fixture replacement** price list: toilets, faucets and disposals per fixture, plus a supply line per fixture when the business supplies it. T-131 catalogue semantics: a blank count means none.
+- `garage-doors-us.ts`: **Door replacement** (single/double, style multipliers ×1.2 insulated, ×1.6 composite) and **torsion spring replacement** (one or two springs). Door size, style and spring count are customer knowledge, so they are form answers; photos are optional.
+- All rates `TODO-OWNER`.
+
+**Bugs found by the live check (fixed before commit):**
+1. The plumbing counts were marked `criticalForPricing`, and the public API **requires** critical fields. A customer replacing only toilets got "Missing critical fields: How many garbage disposals to replace?". Catalogue counts are now optional, and `pack-integrity.test.ts` enforces that a `missingMeansZero` field is never critical.
+2. The garage services required a photo although their price comes only from the form. Photos are now optional (`minPhotos: 0`).
+
+**Verified live (local, queue path, `scripts/hardcore-test/verify-t141.mts`, services created as onboarding does): 5/5 exact.** EV charger $2,880 (panel "RATED 100 AMPS MAX." → 100 A, Grade B → confirm → A), panel upgrade $2,600 (B → A), fixtures $1,745 (A), double insulated door $2,520 (A), spring pair $375 (A). 9–27 s to first price.
+
+**Milestone gauntlet (owner rule: full run at the end of T-141), round 1, run `7805cdd4`, vs the T-135 baseline `2625e00e`: 10/10 sent, 0 failed checks.** S03 £4,520, S04 £190, S06 £12,068, S07 £1,750, S08 £435.54 penny-exact, S10 £330: identical to the baseline. S02 £832.50 (baseline £765; £832.50 is the T-125 hand-checked figure). S01 £1,482 Grade B, range £1,314–£1,594 (baseline £1,680.80; inside the known £1,078–£1,740 measurement spread). S05 £1,982, inside its £1,900–£2,600 band. It is now Grade **C** because the simulated customer answered the hours question vaguely, so the tidy-up line is a defaulted placeholder; that is the honest T-128 grade. S09 £1,132.50, the same warning as the baseline. S08 is Grade A (was B). No regression from today's changes (scope-aware senior review, identification, tolerant triggers, recompile spec carry-over).
+
+**Tests:** web 113 (+22: pack integrity over **every** pack, i.e. referenced fields exist, condition values are options, formula identifiers resolve, catalogue fields not critical; electrical decode ×5).
+
+**Files:** `apps/web/src/lib/vertical-packs/{electrical-us.ts,plumbing-us.ts,garage-doors-us.ts,index.ts}`, `scripts/hardcore-test/verify-t141.mts`, tests.
+
+---
+
 ### 2026-11-09: T-140 — Packs: HVAC replacement + water heaters (US)
 
 **Built (pure data, no engine changes beyond one decode-rule field):**
