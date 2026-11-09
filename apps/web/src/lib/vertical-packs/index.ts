@@ -10,11 +10,13 @@ import type { RegionCode } from '@estimator/shared'
 import type { VerticalPack } from './types'
 import { paintingPack } from './painting'
 import { paintingPackUS } from './painting-us'
+import { hvacPackUS } from './hvac-us'
+import { waterHeaterPackUS } from './water-heater-us'
 
 export type { VerticalPack, VerticalPackService } from './types'
 
 /** All available packs. */
-const PACKS: VerticalPack[] = [paintingPackUS, paintingPack]
+const PACKS: VerticalPack[] = [paintingPackUS, hvacPackUS, waterHeaterPackUS, paintingPack]
 
 /**
  * All packs; when a region is given, that region's packs come first so a US

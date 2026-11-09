@@ -15,6 +15,35 @@
 
 ## Issues & Resolutions
 
+### 2026-11-09: T-140 — Packs: HVAC replacement + water heaters (US)
+
+**Built (pure data, no engine changes beyond one decode-rule field):**
+- `apps/web/src/lib/vertical-packs/hvac-us.ts`: **Central AC**, **Heat Pump** and **Gas Furnace** replacement. The price is set by the size on the rating plate: one optional fixed-price step per size (seven tonnages 1.5–5 ton; five furnace inputs 40,000–120,000 BTU/hr), each selected by `triggerSignal` on the identified value, plus a mandatory removal/disposal line. Tonnage decode: a printed nominal tonnage ("2.5 TONS") first, then the three-digit BTU code in the model number ("…036…" → 3 ton). Furnace: the INPUT BTU/HR line. Attic and crawl-space installs carry access multipliers. Like-for-like only; upsizing is out of scope (needs a load calculation on site).
+- `apps/web/src/lib/vertical-packs/water-heater-us.ts`: **Water Heater Replacement**. Tank by capacity (30/40/50/75 gal, from the printed capacity line) plus connection by fuel (natural gas / propane from the gas-type line, electric from 208/240 V or element wattage). The fuel rule ignores a gas power-vent's 120 V line. Expansion tank, drain pan and seismic straps are add-ons; an attic install is a multiplier.
+- In every service the rating plate is the **first** guided photo, because triage reads only the first 2–5 photos.
+- Shared: decode rules can return a constant (`value`), used for the fuel wording. Value matching no longer drops the decimal point ("1.5" ≠ "15"), but still ignores spaces, underscores, hyphens and thousands commas.
+- **Recompile safety:** a plain-language pricing recompile used to rebuild `expectedSignals` through `normalizeExpectedSignals`, which drops `identify` and `envelope`. One pricing edit would have silently switched off nameplate reading. `carryOverSignalSpecs` (`ai-draft/shared.ts`, used by the compile route) restores them, and enum options, for every signal key that survives. Envelopes were also being lost this way since T-116.
+
+**Rates and decode tables are placeholders** (`TODO-OWNER` on every number and rule). See OWNER-TODO.
+
+**Verified live (local, queue path, `scripts/hardcore-test/verify-t140.mts`; services created exactly as onboarding does; synthetic rendered plates in `test-assets/hardcore2/T140-labels/`):**
+
+| Service | Plate | Identified | First price | After confirm |
+|---|---|---|---|---|
+| Central AC | "MODEL NO. GSX140361KB" | 3 ton (BTU code) | 27 s, B, $5,450 | $5,450 A |
+| Gas furnace | "INPUT BTU/HR 80,000" | 80,000 | 28 s, B, $3,900 | $3,900 A |
+| Water heater | "CAPACITY 50 U.S. GAL" / "FOR USE WITH NATURAL GAS ONLY" | 50 gal + Natural gas (one call) | 22 s, B, $2,150 | $2,150 **B** |
+
+3/3 exact. The water heater stays B by design: only capacity was asked, because the fuel options differ by at most $200, under the VOI bar ($215 = 10% of the total), so the fuel stays "identified, not confirmed". The questions read clumsily ("…from the air conditioner's rating plate (the data label on the side of the outdoor unit)"), so the where-to-look detail moved from `readFrom` into the transcription instruction.
+
+**Tests:** web 91 (+26: pack integrity, i.e. unique ids, ≤10 steps, every trigger value is an allowed value and every allowed value selects exactly one step, plate first; typical-format decode cases for tonnage ×6, unknown code, furnace ×3, capacity ×3, fuel ×5, 120 V guard; `carryOverSignalSpecs` ×2).
+
+**Files:** `apps/web/src/lib/vertical-packs/{hvac-us.ts,water-heater-us.ts,index.ts}`, `apps/web/src/app/api/services/ai-draft/{shared.ts,compile/route.ts}`, `packages/shared/src/identification.ts`, `scripts/hardcore-test/verify-t140.mts`, tests.
+
+**Relation:** first consumers of T-139/AD-032. Plumbing, electrical and garage doors follow in T-141, then the full gauntlet.
+
+---
+
 ### 2026-11-09: T-139 — Identification signals (nameplate reading, AD-029, AD-032)
 
 **What it does.** For identify-and-replace trades the price depends on WHAT the equipment is, not its size. An expected signal can now carry an `identify` spec (pack data): where the value is printed (`readFrom`), what to transcribe, and `decode` rules (regex → code → `map` table or numeric `scale`). A new vision call (registry task `identification`, `apps/worker/src/ai/identification.ts`) transcribes each label verbatim. **Code** decodes the transcription (`resolveIdentification` in `packages/shared/src/identification.ts`). The model's own reading is used only when no rule matches, and only if it is an allowed value.

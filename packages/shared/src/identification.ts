@@ -24,6 +24,8 @@ export interface IdentificationDecodeRule {
   scale?: number
   /** Round a scaled value to this many decimals (default 2) */
   decimals?: number
+  /** Constant result when the pattern matches (e.g. "NAT GAS" or "NG" → "Natural gas") */
+  value?: string | number
   /** Short audit label, e.g. "capacity digits in the model number" */
   label?: string
 }
@@ -70,7 +72,9 @@ export const IDENTIFICATION_READ_CONFIDENCE = 0.75
 
 const MAX_TRANSCRIPTION_CHARS = 80
 
-const normaliseKey = (v: string) => v.toLowerCase().replace(/[\s_\-.]+/g, '')
+// Spaces, underscores, hyphens and thousands commas don't change meaning;
+// a decimal point does ("1.5" is not "15")
+const normaliseKey = (v: string) => v.toLowerCase().replace(/[\s_\-,]+/g, '')
 
 /**
  * Snap a value onto the signal's allowed values (case/space/underscore-blind).
@@ -99,6 +103,7 @@ export function decodeTranscription(
     }
     const match = re.exec(transcribed)
     if (!match) continue
+    if (rule.value !== undefined) return { value: rule.value, rule, code: match[0] }
     const code = match[rule.group ?? 1]
     if (code === undefined) continue
 

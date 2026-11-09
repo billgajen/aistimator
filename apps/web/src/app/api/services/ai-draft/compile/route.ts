@@ -5,7 +5,7 @@ import type {
   AddonConfig,
   MultiplierConfig,
 } from '@estimator/shared'
-import { validateAndNormalizeDraftBulk, callGemini, parseGeminiJson } from '../shared'
+import { validateAndNormalizeDraftBulk, carryOverSignalSpecs, callGemini, parseGeminiJson } from '../shared'
 import { resolveRegionContext, regionPromptBlock } from '@estimator/shared'
 
 // Vercel function budget: this route runs the full AI pipeline synchronously
@@ -315,7 +315,11 @@ Compile this into the pricing configuration. Remember: never invent numbers — 
       ...updatedDraft,
     }
     // Bulk limits (10 steps/fields) — pasted price lists often have many lines
-    const updatedConfig = validateAndNormalizeDraftBulk(merged)
+    const normalized = validateAndNormalizeDraftBulk(merged)
+    const updatedConfig = {
+      ...normalized,
+      expectedSignals: carryOverSignalSpecs(body.currentConfig?.expectedSignals, normalized.expectedSignals),
+    }
 
     return NextResponse.json({
       updatedConfig,

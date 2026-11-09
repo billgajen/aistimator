@@ -251,6 +251,29 @@ export function normalizeExpectedSignals(signals: ExpectedSignalInput[]): Servic
     }))
 }
 
+/**
+ * Pack-authored signal specs the AI never writes (T-116 envelopes, T-139
+ * identification) survive a recompile: when a signal key is kept, its spec
+ * is carried over from the current config. Without this, one plain-language
+ * pricing edit silently switched off nameplate reading and envelopes.
+ */
+export function carryOverSignalSpecs(
+  previous: ServiceDraftConfig['expectedSignals'] | undefined,
+  next: ServiceDraftConfig['expectedSignals']
+): ServiceDraftConfig['expectedSignals'] {
+  if (!previous || previous.length === 0) return next
+  return next.map((signal) => {
+    const before = previous.find((p) => p.signalKey === signal.signalKey)
+    if (!before) return signal
+    return {
+      ...signal,
+      ...(before.identify && !signal.identify && { identify: before.identify }),
+      ...(before.envelope && !signal.envelope && { envelope: before.envelope }),
+      ...(signal.type === 'enum' && !signal.possibleValues?.length && before.possibleValues?.length && { possibleValues: before.possibleValues }),
+    }
+  })
+}
+
 interface SuggestedFieldInput {
   label?: string
   fieldId?: string

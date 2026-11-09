@@ -79,3 +79,13 @@ Code for every item is already built; these are the steps that unlock it.
   `test-assets/hardcore2/T140-nameplates/`, with the true capacity/fuel for each in a `truth.json` next to
   them. The engine is built and verified only on synthetic renders; T-140 brings the real decode tables.
 
+## T-140 — HVAC + water heater packs
+
+- [ ] **Review the rates** in `apps/web/src/lib/vertical-packs/hvac-us.ts` and `water-heater-us.ts`: every number marked
+  `TODO-OWNER` is a placeholder (e.g. 3-ton AC system $5,000 + $450 removal; 50 gal tank $1,450 + $450 gas connection;
+  attic ×1.12–1.2).
+- [ ] **Check the decode rules against real plates** (same photo folder as T-139 above). The rules read a printed tonnage,
+  a "0xx" BTU code in the model number, the furnace INPUT line, the capacity line and the fuel wording. Brands whose
+  model numbers don't carry a "0xx" code (some Carrier and Rheem formats) fall back to the model's reading plus a customer
+  confirmation. Tell me which brands your customers have most, and I'll add their schemes.
+
