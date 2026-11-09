@@ -70,6 +70,20 @@ Code for every item is already built; these are the steps that unlock it.
 - Engineering backlog from the smoke test (not owner work; listed so it isn't lost, details in CHANGELOG
   2026-11-08): internal notes shown to customers, raw unit labels,
   "worth considering" duplicating scope items, clarification page + email styling, "Powered by Estimator" name.
+- **Product backlog, added 2026-11-09 (not built; owner-requested, park until scheduled):**
+  1. **Document types are cosmetic.** Instant Estimate / Formal Quote / Proposal / Statement of Work change only the
+     AI wording tone; price, layout, PDF and title are identical. Give each a real format: Proposal (phases, timeline,
+     options), SOW (deliverables, milestones, terms), Formal Quote (full terms and an acceptance block). Until then,
+     consider hiding Proposal and SOW from the selector.
+  2. **Model comparison for service setup.** Compare `gemini-3.8-flash` vs `gemini-3.1-pro-preview` on the compile and
+     service-setup scenarios (AI draft, refine, website extract). Switch only if Pro is clearly better (owner rule: current
+     vs one candidate).
+  3. **"Test & Publish" preview prices photo-measured quantities at 1** (e.g. 1 m² walls → $18 + minimum top-up), which
+     looks broken. Pre-fill a typical value from the pack's plausibility envelope (editable, labelled "from photos —
+     sample"), show low / typical / high prices, add a per-quantity source switch (Photos only / Ask customer / Both),
+     and an optional "Test with a photo" upload.
+  4. **Painting accuracy: fix the photo scale.** Ask the customer for one known measurement (e.g. house width) and use it
+     as the measurement anchor, so the wall area doesn't hinge on the door-size assumption.
 - [x] **Disagreement path decided 2026-11-09:** both. The reviewer gets the scope answers and a 30 s cap (CHANGELOG 2026-11-09).
 
 ## T-139 — Identification signals (nameplate reading)
