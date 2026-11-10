@@ -149,6 +149,12 @@ export async function GET(
         triage_json: quote.triage_json,
         quality_gate_json: quote.quality_gate_json,
         approved_at: quote.approved_at ?? null,
+        // This response enumerates fields: a column left out here is invisible
+        // to the dashboard quote page. T-147's review_hold and T-150's is_test
+        // were missing until T-151 added acceptance_json.
+        review_hold: ((quote as { review_hold?: string | null }).review_hold ?? null) as 'shown' | 'held' | 'check' | null,
+        is_test: (quote as { is_test?: boolean }).is_test === true,
+        acceptance_json: ((quote as { acceptance_json?: unknown }).acceptance_json ?? null) as QuoteDetailResponse['quote']['acceptance_json'],
       },
       service: quote.service,
       amendments,
@@ -437,7 +443,9 @@ export async function PATCH(
     // Send revised email to customer if requested
     // T-146: a held quote's first send is the customer's FIRST quote, not an update
     const firstSend = !['sent', 'viewed', 'feedback_received', 'revised'].includes(quote.status)
-    if (body.sendToCustomer && quoteViewUrl && isPostmarkConfigured() && firstSend) {
+    // T-151: a phone-only customer has no email address to send to
+    const customerEmail = (quote.customer_json as { email?: string | null } | null)?.email
+    if (body.sendToCustomer && quoteViewUrl && isPostmarkConfigured() && firstSend && customerEmail) {
       const customer = quote.customer_json as { name: string; email: string }
       const locale = resolveRegionContext(tenant).locale
       const emailResult = await sendEmail({
@@ -454,7 +462,7 @@ export async function PATCH(
         tag: 'quote-approved',
       })
       if (!emailResult.success) console.error('Failed to send quote email:', emailResult.error)
-    } else if (body.sendToCustomer && quoteViewUrl && isPostmarkConfigured()) {
+    } else if (body.sendToCustomer && quoteViewUrl && isPostmarkConfigured() && customerEmail) {
       const customer = quote.customer_json as { name: string; email: string }
       const branding = tenant.branding_json || { primaryColor: '#2563eb' }
 

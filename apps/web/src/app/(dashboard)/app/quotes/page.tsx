@@ -1,5 +1,6 @@
 'use client'
 
+import { UnfinishedLeads, UnfinishedBadge } from '@/components/quotes/UnfinishedLeads'
 import { useEffect, useState, useCallback } from 'react'
 import { formatMoney } from '@estimator/shared'
 import Link from 'next/link'
@@ -11,11 +12,24 @@ export default function QuotesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<QuoteStatus | ''>('')
+  // T-151: 'unfinished' shows requests that were started but never submitted
+  const [statusFilter, setStatusFilter] = useState<QuoteStatus | '' | 'unfinished'>('')
+  const [unfinishedCount, setUnfinishedCount] = useState(0)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('filter') === 'unfinished') setStatusFilter('unfinished')
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/leads?days=30')
+      .then((res) => (res.ok ? res.json() : { items: [] }))
+      .then((json: { items?: unknown[] }) => setUnfinishedCount(json.items?.length ?? 0))
+      .catch(() => undefined)
+  }, [])
 
   const fetchQuotes = useCallback(async (cursor?: string | null, append = false) => {
     try {
@@ -27,7 +41,7 @@ export default function QuotesPage() {
 
       const params = new URLSearchParams()
       if (search) params.set('search', search)
-      if (statusFilter) params.set('status', statusFilter)
+      if (statusFilter && statusFilter !== 'unfinished') params.set('status', statusFilter)
       if (cursor) params.set('cursor', cursor)
 
       const response = await fetch(`/api/quotes?${params.toString()}`)
@@ -236,7 +250,7 @@ export default function QuotesPage() {
         <select
           className="rounded-warm-lg border border-border bg-surface px-4 py-2 text-sm text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as QuoteStatus | '')}
+          onChange={(e) => setStatusFilter(e.target.value as QuoteStatus | '' | 'unfinished')}
         >
           <option value="">All statuses</option>
           <option value="queued">Queued</option>
@@ -248,9 +262,26 @@ export default function QuotesPage() {
           <option value="paid">Paid</option>
           <option value="expired">Expired</option>
           <option value="failed">Failed</option>
+          <option value="unfinished">Started, didn&apos;t finish</option>
         </select>
       </div>
 
+      {/* T-151: a nudge towards unfinished requests on the "All" view */}
+      {!statusFilter && unfinishedCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setStatusFilter('unfinished')}
+          className="mb-6 flex w-full items-center justify-between gap-3 rounded-warm-lg border border-tape/40 bg-butter px-4 py-3 text-left text-sm text-text-primary hover:border-tape"
+          data-testid="unfinished-strip"
+        >
+          <span>
+            <UnfinishedBadge /> <span className="ml-2">{unfinishedCount} {unfinishedCount === 1 ? 'person' : 'people'} started a request but didn&apos;t finish</span>
+          </span>
+          <span className="font-semibold text-primary">View</span>
+        </button>
+      )}
+
+      {statusFilter === 'unfinished' ? <UnfinishedLeads /> : (<>
       {/* Error state */}
       {error && (
         <div className="mb-6 rounded-warm-lg bg-danger-light border border-danger/20 p-4 text-danger">
@@ -449,6 +480,7 @@ export default function QuotesPage() {
           )}
         </>
       )}
+      </>)}
     </div>
   )
 }

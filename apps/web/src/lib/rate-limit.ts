@@ -13,7 +13,7 @@
 import { Redis } from '@upstash/redis'
 import { NextResponse } from 'next/server'
 
-export type RateLimitScope = 'quotes' | 'uploads' | 'chat' | 'marketing' | 'quote_page'
+export type RateLimitScope = 'quotes' | 'uploads' | 'chat' | 'marketing' | 'quote_page' | 'leads'
 
 export interface ScopeLimits {
   /** Max requests per window from a single IP */
@@ -48,6 +48,8 @@ const DEFAULT_LIMITS: Record<RateLimitScope, ScopeLimits> = {
   marketing: { ipLimit: 5, tenantLimit: 1000, windowSeconds: 60 },
   // T-149: the hosted quote page /quote/{slug} (a page view: two DB reads)
   quote_page: { ipLimit: 60, tenantLimit: 2000, windowSeconds: 60 },
+  // T-151: unfinished requests (contact step + progress updates): DB writes only
+  leads: { ipLimit: 20, tenantLimit: 300, windowSeconds: 60 },
 }
 
 function envInt(name: string, fallback: number): number {

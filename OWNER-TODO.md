@@ -234,3 +234,20 @@ Code for every item is already built; these are the steps that unlock it.
 - [ ] **Not checked live:** the verification email's redirect (no email locally). Everything after sign-in was
   driven in a browser.
 
+## T-151 — Customer flow: contact first, unfinished requests, next step after accept
+
+- [ ] **Deploy in order:** `bash scripts/deploy-migration-34.sh` FIRST (the web app writes `request_leads` and reads
+  `tenants.contact_requirement`; without them the widget's contact step and every submission fail), then the
+  **worker** (phone-only customers have no email: it must skip the customer email), then the web app.
+- [ ] **Know what changes on deploy:** every widget (quote link and installed embeds) asks for contact details right
+  after the service, then the questions, photos, and ZIP + description last. The address moved to accept. Default
+  contact rule: email required, phone optional. Change it in Settings → Customer contact details.
+- [ ] **Unfinished requests:** someone who gives their details and leaves shows up under Quotes → "Started, didn't
+  finish", with call and email buttons, and as a 7-day count on the dashboard home. Nothing is sent to them
+  automatically (out of scope). They don't count toward your plan.
+- [ ] **Accepting now asks** when suits the customer, the job address and a phone number, and the acceptance email
+  includes them. Quote pages already open before the deploy still accept the old way.
+- [ ] **Phone-only customers** (if you choose "Phone required"): they get no email; their link is on screen, and
+  "Resend" says to text it instead.
+- [x] **Regression set (owner decision 2026-11-10):** only `verify-t146` … `verify-t151` are run from now on. The older scripts (t127–t143) are historical ticket checks, out of date since T-146, and are not fixed or re-baselined.
+

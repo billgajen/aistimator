@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { sendEmail, isPostmarkConfigured } from '@/lib/postmark'
 import { generateQuoteAcceptedEmailHtml } from '@/lib/email-templates'
+import { checkAcceptance, timingLabel, type AcceptanceDetails } from '@/lib/acceptance'
 import type { AcceptQuoteResponse, QuotePricing, TenantBranding } from '@estimator/shared'
 
 /**
@@ -77,6 +78,21 @@ export async function POST(
       )
     }
 
+    // T-151: the next step — when suits them, the job address and a phone
+    // number. The quote page always sends these; a page opened before this
+    // change accepts without them, as before.
+    let acceptance: AcceptanceDetails | null = null
+    if (body.details !== undefined) {
+      const check = checkAcceptance(body.details ?? {})
+      if (!check.ok) {
+        return NextResponse.json(
+          { error: { code: 'VALIDATION_ERROR', message: Object.values(check.errors)[0] ?? 'Check your details', fields: check.errors } },
+          { status: 400 }
+        )
+      }
+      acceptance = check.value
+    }
+
     // Update quote status to accepted
     const acceptedAt = new Date().toISOString()
     const { error: updateError } = await supabase
@@ -84,6 +100,7 @@ export async function POST(
       .update({
         status: 'accepted',
         accepted_at: acceptedAt,
+        ...(acceptance && { acceptance_json: acceptance }),
       })
       .eq('id', quoteId)
 
@@ -124,6 +141,14 @@ export async function POST(
           totalFormatted,
           dashboardUrl: `${appUrl}/app/quotes/${quoteId}`,
           primaryColor: tenant.branding_json?.primaryColor,
+          ...(acceptance && {
+            nextStep: {
+              timing: timingLabel(acceptance.timing),
+              timingNote: acceptance.timingNote,
+              address: acceptance.address,
+              phone: acceptance.phone,
+            },
+          }),
         })
         await sendEmail({
           to: tenant.notification_email,

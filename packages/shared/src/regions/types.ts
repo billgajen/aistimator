@@ -35,6 +35,8 @@ export interface RegionCopy {
   taxLabel: string
   /** Example phone number shown as a placeholder */
   phoneExample: string
+  /** T-151: one short format hint under the phone field */
+  phoneHint: string
   /** Spelling/variant instruction handed to AI wording prompts */
   languageVariant: string
   /** T-149: what customers ask a trade for, with its article: "an estimate" / "a quote" */

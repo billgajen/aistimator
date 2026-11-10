@@ -85,6 +85,14 @@ tagline, colour and the white-label "Powered by" rule. Unknown or inactive → p
 - Communication via postMessage for resize and events.
 
 ## Widget UX requirements
+- T-151 order (form and chat, quote link and embed): service → contact ("Where should we send your estimate?",
+  name + email/phone per the business's setting, region phone example and hint, one privacy line) → the service's
+  own questions → photos → last step (ZIP or postcode, and a description that is optional when the service has
+  questions) → submit. The request is saved as soon as the contact step is done ("Started, didn't finish" on the
+  quotes list until submitted). The full address is asked on accept.
+- Quote page: Accept asks "When suits you?" (as soon as possible / within two weeks / flexible + note), the job
+  address and a phone number, then accepts. Ask a question and the quiet Decline link stay; no "Send for review";
+  errors are shown in the page (no browser alerts).
 - Minimal steps, 3 to 8 questions typical
 - Photo and document upload
 - Progress indicator

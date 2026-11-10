@@ -125,6 +125,13 @@ export async function POST(
     }
     const service = quote.services as { id: string; name: string }
     const customer = quote.customer_json as { name: string; email: string }
+    // T-151: a phone-only customer can't be emailed; texting the link still works
+    if (!customer?.email) {
+      return NextResponse.json(
+        { error: { code: 'NO_EMAIL', message: 'This customer gave a phone number only. Text them the link instead.' } },
+        { status: 400 }
+      )
+    }
     const pricing = quote.pricing_json as QuotePricing
     const branding = tenant.branding_json || { primaryColor: '#2563eb' }
 

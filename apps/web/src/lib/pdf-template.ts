@@ -269,7 +269,7 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
         Prepared For
       </h2>
       <p style="margin: 0; font-weight: 600; color: #111827;">${escapeHtml(customer.name)}</p>
-      <p style="margin: 4px 0 0 0; color: #6b7280;">${escapeHtml(customer.email)}</p>
+      ${customer.email ? `<p style="margin: 4px 0 0 0; color: #6b7280;">${escapeHtml(customer.email)}</p>` : ''}
       ${customer.phone ? `<p style="margin: 4px 0 0 0; color: #6b7280;">${escapeHtml(customer.phone)}</p>` : ''}
     </div>
 

@@ -50,7 +50,7 @@ export async function GET(request: Request) {
     // Fetch tenant info
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
-      .select('name, region, branding_json')
+      .select('name, region, branding_json, contact_requirement')
       .eq('id', tenantId)
       .single()
 
@@ -195,7 +195,12 @@ export async function GET(request: Request) {
         locale: region.locale,
         postalCodeLabel: region.copy.postalCodeLabel,
         postalCodeExample: region.copy.postalCodeExample,
+        // T-151: phone wording from the region, never a hardcoded example
+        phoneExample: region.copy.phoneExample,
+        phoneHint: region.copy.phoneHint,
       },
+      // T-151: which contact details this business requires
+      contactRequirement: (tenant as { contact_requirement?: string }).contact_requirement ?? 'email',
       branding: {
         primaryColor: brandingJson.primaryColor || null,
         logoUrl,

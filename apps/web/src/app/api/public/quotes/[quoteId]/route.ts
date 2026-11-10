@@ -147,7 +147,7 @@ export async function GET(
       crossServicePricing?: CrossServicePricing[]
       signalRecommendations?: SignalRecommendation[]
     }
-    const customer = quote.customer_json as { name: string; email: string }
+    const customer = quote.customer_json as { name: string; email?: string | null; phone?: string | null }
 
     // Tenant branding: logo (short-lived signed URL), colour, footer notes
     const brandingJson = tenant.branding_json || {}
@@ -177,6 +177,7 @@ export async function GET(
 
     const customerView: QuoteViewCustomer = {
       name: customer.name,
+      phone: customer.phone ?? null,
     }
 
     // Calculate validity date

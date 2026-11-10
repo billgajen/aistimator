@@ -1,5 +1,7 @@
 'use client'
 
+import { AcceptanceCard } from '@/components/quotes/AcceptanceCard'
+import type { AcceptanceDetails } from '@/lib/acceptance'
 import { useEffect, useState, useCallback } from 'react'
 import { formatMoney } from '@estimator/shared'
 import Link from 'next/link'
@@ -172,6 +174,8 @@ export default function QuoteDetailPage({
   const pendingFeedback = feedback.filter((f) => f.status === 'pending')
   const canEdit = !['accepted', 'paid', 'generating', 'queued', 'failed'].includes(quote.status)
   const canSend = !['generating', 'queued', 'failed'].includes(quote.status)
+  // T-151: what the customer told the business when accepting
+  const acceptance = (quote as unknown as { acceptance_json?: AcceptanceDetails | null }).acceptance_json ?? null
   // T-146: a priced quote waiting for the business; held leads are priced first
   const awaitingApproval =
     quote.status === 'pending_review' && !(content as { limitHold?: boolean } | null)?.limitHold && (pricing?.total ?? 0) > 0
@@ -296,6 +300,9 @@ export default function QuoteDetailPage({
           </div>
         </div>
       )}
+
+      {/* T-151: what the customer told you when accepting */}
+      {acceptance && <AcceptanceCard details={acceptance} />}
 
       {/* Pending feedback alert */}
       {pendingFeedback.length > 0 && (

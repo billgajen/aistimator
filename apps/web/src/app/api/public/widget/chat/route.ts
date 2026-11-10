@@ -1,3 +1,5 @@
+import { checkContact, contactRequirementOf, usableContact } from '@/lib/contact-rules'
+import { getRegion } from '@estimator/shared'
 import { createAdminClient } from '@/lib/supabase/server'
 import { geminiThinkingConfig, geminiUrlFor } from '@/lib/ai/models'
 import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
@@ -33,7 +35,7 @@ interface ChatAPIResponse {
   isComplete: boolean
   formData?: {
     serviceId: string
-    customer: { name: string; email: string; phone?: string }
+    customer: { name: string; email?: string; phone?: string }
     job: {
       address?: string
       postcodeOrZip?: string
@@ -98,9 +100,14 @@ export async function POST(request: Request) {
     // Load tenant info
     const { data: tenant } = await supabase
       .from('tenants')
-      .select('name')
+      .select('name, region, contact_requirement')
       .eq('id', tenantId)
       .single()
+    // T-151: which contact details this business requires, and the region's wording
+    const contactRule = contactRequirementOf(tenant?.contact_requirement)
+    const regionCopy = getRegion(tenant?.region).copy
+    const emailLine = contactRule === 'phone' ? 'Customer email (optional)' : 'Customer email (REQUIRED)'
+    const phoneLine = contactRule === 'email' ? 'Customer phone (optional)' : 'Customer phone (REQUIRED)'
 
     // Load active services
     const { data: services } = await supabase
@@ -209,11 +216,14 @@ AVAILABLE SERVICES:
 ${serviceList}
 ${selectedService ? `\nSELECTED SERVICE: ${selectedService.name} (ID: ${selectedService.id})` : '\nNo service selected yet — help the customer choose one. As soon as you identify which service they want, set extractedFields.serviceId to the exact service ID shown above (e.g., svc_xxx). Do NOT wait until the end — set it on the SAME turn you identify the service.'}
 
-INFORMATION TO COLLECT:
-1. Customer name (REQUIRED)
-2. Customer email (REQUIRED)
-3. Customer phone (optional)
-${!selectedService ? '4. Which service they need (REQUIRED)\n' : ''}${fieldDescriptions ? `\nSERVICE-SPECIFIC FIELDS TO ASK ABOUT:\n${fieldDescriptions}` : ''}
+INFORMATION TO COLLECT, IN THIS ORDER (T-151: contact details come straight after the service):
+${!selectedService ? '1. Which service they need (REQUIRED)\n' : ''}2. Customer name (REQUIRED)
+3. ${emailLine}
+4. ${phoneLine}
+5. The service-specific questions below
+6. Photos, if they have any (optional; they can attach them with the camera button)
+7. Their ${regionCopy.postalCodeNoun} and anything else about the job, last${fieldDescriptions ? '. The free-text description is optional for this service' : ' (a short description of the job is REQUIRED for this service)'}
+${fieldDescriptions ? `\nSERVICE-SPECIFIC FIELDS TO ASK ABOUT:\n${fieldDescriptions}` : ''}
 
 ${collectedLines.length > 0 ? `ALREADY COLLECTED FROM PREVIOUS MESSAGES:\n${collectedLines.join('\n')}\n\nInclude these in your extractedFields/fieldAnswers output. If the customer corrects any, use the new value.\n` : ''}
 ${missingRequired.length > 0 ? `STILL NEEDED (ask about these):\n${missingRequired.map(f => `  - ${f}`).join('\n')}\n` : ''}
@@ -221,7 +231,7 @@ ${missingRequired.length > 0 ? `STILL NEEDED (ask about these):\n${missingRequir
 COMPLETION RULES:
 - Set isComplete to true ONLY when you have ALL of the following:
   * Customer name
-  * Customer email
+  * ${contactRule === 'both' ? 'Customer email AND phone' : contactRule === 'phone' ? 'Customer phone' : 'Customer email'}${fieldDescriptions ? '' : '\n  * A short description of the job (fieldId "_project_description")'}
   ${selectedService ? '' : '* Service selection'}
   ${requiredFields.length > 0 ? `* ALL required service fields: ${requiredFields.join(', ')}` : ''}
 - If you are still missing ANY required field, set isComplete to false and ask for it
@@ -239,7 +249,7 @@ CONVERSATION RULES:
 - IMPORTANT: Only ask questions relevant to the SELECTED service. Never ask about other services' fields.
 - When a service is identified, IMMEDIATELY set extractedFields.serviceId to its ID. Do not delay this.
 
-${isStart ? 'This is the start of the conversation. Greet the customer warmly and ask about their project first, then collect the specific fields one by one.' : ''}`
+${isStart ? 'This is the start of the conversation. Greet the customer warmly, confirm the service, then ask for their name and contact details before anything else, then the specific fields one by one.' : ''}`
 
     // Build conversation messages for Gemini
     const geminiMessages: Array<{ role: string; parts: Array<{ text: string }> }> = []
@@ -297,7 +307,7 @@ ${isStart ? 'This is the start of the conversation. Greet the customer warmly an
         },
         isComplete: {
           type: 'BOOLEAN',
-          description: 'True only when ALL required information has been collected: customer name, email, and service selection at minimum.',
+          description: 'True only when ALL required information has been collected: the service, the customer name and the required contact details at minimum.',
         },
       },
       required: ['reply', 'extractedFields', 'isComplete'],
@@ -375,7 +385,13 @@ ${isStart ? 'This is the start of the conversation. Greet the customer warmly an
       const completedFields = parsed.extractedFields || {}
       const resolvedServiceId = (completedFields.serviceId as string) || body.serviceId
 
-      if (resolvedServiceId && completedFields.customerName && completedFields.customerEmail) {
+      // The model may fill an optional field with filler ("not provided"); drop it
+      const chatContact = usableContact(
+        { name: completedFields.customerName as string, email: completedFields.customerEmail as string, phone: completedFields.customerPhone as string },
+        contactRule
+      )
+      const contactOk = checkContact(chatContact, contactRule).ok
+      if (resolvedServiceId && contactOk) {
         // Merge accumulated fieldAnswers from previous turns with new ones
         const answerMap = new Map<string, string>()
         // Previous accumulated answers
@@ -396,16 +412,18 @@ ${isStart ? 'This is the start of the conversation. Greet the customer warmly an
 
         // Verify all required fields are present
         const hasAllRequired = requiredFieldIds.every(fid => answerMap.has(fid))
-        if (!hasAllRequired && requiredFieldIds.length > 0) {
+        // T-151: a service with no questions of its own needs a description
+        const missingDescription = !fieldDescriptions && !(answerMap.get('_project_description') || '').trim()
+        if ((!hasAllRequired && requiredFieldIds.length > 0) || missingDescription) {
           // Missing required service fields — not actually complete
           result.isComplete = false
         } else {
           result.formData = {
             serviceId: resolvedServiceId,
             customer: {
-              name: completedFields.customerName as string,
-              email: completedFields.customerEmail as string,
-              phone: completedFields.customerPhone as string | undefined,
+              name: chatContact.name,
+              email: chatContact.email || undefined,
+              phone: chatContact.phone || undefined,
             },
             job: {
               address: completedFields.address as string | undefined,

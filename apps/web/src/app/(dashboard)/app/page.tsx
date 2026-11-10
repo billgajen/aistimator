@@ -45,6 +45,14 @@ export default async function DashboardPage() {
     checkPlanLimit(supabase, profile.tenant_id),
   ])
 
+  // T-151: unfinished requests from the last 7 days (own tenant; RLS + explicit filter)
+  const { count: unfinishedCount } = await supabase
+    .from('request_leads')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', profile.tenant_id)
+    .is('completed_at', null)
+    .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+
   const usagePercent = planLimit.unlimited
     ? 0
     : Math.min(100, Math.round((planLimit.used / planLimit.limit) * 100))
@@ -284,6 +292,21 @@ export default async function DashboardPage() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* T-151: people who started a request but didn't finish (last 7 days) */}
+      {(unfinishedCount ?? 0) > 0 && (
+        <Link
+          href="/app/quotes?filter=unfinished"
+          className="mb-6 flex items-center justify-between gap-3 rounded-warm-lg border border-tape/40 bg-butter px-5 py-4 text-sm text-text-primary hover:border-tape"
+          data-testid="unfinished-count"
+        >
+          <span>
+            <span className="figure text-lg font-bold">{unfinishedCount}</span>{' '}
+            {(unfinishedCount ?? 0) === 1 ? 'person' : 'people'} started a request in the last 7 days but didn&apos;t finish. A quick call often wins the job.
+          </span>
+          <span className="shrink-0 font-semibold text-primary">See who</span>
+        </Link>
       )}
 
       {/* Stats grid */}

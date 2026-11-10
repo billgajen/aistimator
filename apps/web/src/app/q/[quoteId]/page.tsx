@@ -1,5 +1,6 @@
 'use client'
 
+import { AcceptDetailsForm } from '@/components/quote/AcceptDetailsForm'
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { brandStyleVars } from '@/lib/color'
@@ -29,9 +30,14 @@ export default function QuotePage({ params }: QuotePageProps) {
   const [declineMode, setDeclineMode] = useState(false)
   const [declineReason, setDeclineReason] = useState('')
 
+  // T-151: Accept opens the next-step questions; errors show in the page, never alert()
+  const [acceptMode, setAcceptMode] = useState(false)
+  const [acceptErrors, setAcceptErrors] = useState<Partial<Record<string, string>>>({})
+  const [actionError, setActionError] = useState<string | null>(null)
+
   // Feedback state
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
-  const [feedbackMode, setFeedbackMode] = useState<'none' | 'feedback' | 'review'>('none')
+  const [feedbackMode, setFeedbackMode] = useState<'none' | 'feedback'>('none')
   const [feedbackText, setFeedbackText] = useState('')
   const [submittingFeedback, setSubmittingFeedback] = useState(false)
 
@@ -130,28 +136,32 @@ export default function QuotePage({ params }: QuotePageProps) {
     }
   }, [awaitingConfirmation, quoteId, token])
 
-  async function handleAccept() {
+  async function handleAccept(details: { timing: string; timingNote: string; address: string; phone: string }) {
     if (!token || accepting) return
 
     setAccepting(true)
+    setActionError(null)
+    setAcceptErrors({})
     try {
       const response = await fetch(`/api/public/quotes/${quoteId}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token, details }),
       })
 
       if (response.ok) {
         setAccepted(true)
+        setAcceptMode(false)
         if (quote) {
           setQuote({ ...quote, status: 'accepted' as QuoteStatus })
         }
       } else {
-        const data = await response.json()
-        alert(data.error?.message || 'Failed to accept quote')
+        const data = await response.json().catch(() => null)
+        if (data?.error?.fields) setAcceptErrors(data.error.fields)
+        setActionError(data?.error?.message || 'We couldn’t accept this just now. Please try again.')
       }
     } catch {
-      alert('Failed to accept quote')
+      setActionError('We couldn’t reach the server. Check your connection and try again.')
     } finally {
       setAccepting(false)
     }
@@ -175,29 +185,29 @@ export default function QuotePage({ params }: QuotePageProps) {
           setQuote({ ...quote, status: 'declined' as QuoteStatus })
         }
       } else {
-        const data = await response.json()
-        alert(data.error?.message || 'Failed to decline quote')
+        const data = await response.json().catch(() => null)
+        setActionError(data?.error?.message || 'We couldn’t send that just now. Please try again.')
       }
     } catch {
-      alert('Failed to decline quote')
+      setActionError('We couldn’t reach the server. Check your connection and try again.')
     } finally {
       setDeclining(false)
     }
   }
 
-  const handleFeedback = useCallback(async (type: 'feedback' | 'approval_request') => {
-    if (!token || submittingFeedback) return
-    if (type === 'feedback' && !feedbackText.trim()) return
+  const handleFeedback = useCallback(async () => {
+    if (!token || submittingFeedback || !feedbackText.trim()) return
 
     setSubmittingFeedback(true)
+    setActionError(null)
     try {
       const response = await fetch(`/api/public/quotes/${quoteId}/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token,
-          feedbackType: type,
-          feedbackText: type === 'feedback' ? feedbackText.trim() : undefined,
+          feedbackType: 'feedback',
+          feedbackText: feedbackText.trim(),
         }),
       })
 
@@ -208,11 +218,11 @@ export default function QuotePage({ params }: QuotePageProps) {
           setQuote({ ...quote, status: 'feedback_received' as QuoteStatus })
         }
       } else {
-        const data = await response.json()
-        alert(data.error?.message || 'Failed to submit feedback')
+        const data = await response.json().catch(() => null)
+        setActionError(data?.error?.message || 'We couldn’t send your message just now. Please try again.')
       }
     } catch {
-      alert('Failed to submit feedback')
+      setActionError('We couldn’t reach the server. Check your connection and try again.')
     } finally {
       setSubmittingFeedback(false)
     }
@@ -715,10 +725,30 @@ export default function QuotePage({ params }: QuotePageProps) {
                   You can accept once {business.name} confirms this estimate.
                 </p>
               )}
-              {showAcceptButton && !confirmationPending && (
+              {actionError && (
+                <p role="alert" className="mb-5 rounded-warm-lg border border-danger/30 bg-danger-light px-4 py-3 text-sm text-danger" data-testid="action-error">
+                  {actionError}
+                </p>
+              )}
+              {showAcceptButton && !confirmationPending && acceptMode && (
+                <div className="mb-6">
+                  <AcceptDetailsForm
+                    businessName={business.name}
+                    initialPhone={customer.phone || ''}
+                    submitting={accepting}
+                    serverErrors={acceptErrors}
+                    onCancel={() => {
+                      setAcceptMode(false)
+                      setActionError(null)
+                    }}
+                    onConfirm={handleAccept}
+                  />
+                </div>
+              )}
+              {showAcceptButton && !confirmationPending && !acceptMode && (
                 <>
                   <button
-                    onClick={handleAccept}
+                    onClick={() => setAcceptMode(true)}
                     disabled={accepting}
                     className="w-full py-4 px-4 rounded-warm-xl font-display font-bold text-on-primary text-base bg-primary hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 disabled:cursor-not-allowed transition"
                   >
@@ -738,15 +768,6 @@ export default function QuotePage({ params }: QuotePageProps) {
 
               {feedbackMode === 'none' && (
                 <div className="flex gap-3">
-                  {!confirmationPending && (
-                    <button
-                      onClick={() => handleFeedback('approval_request')}
-                      disabled={submittingFeedback}
-                      className="flex-1 py-3 px-4 text-sm font-semibold text-text-primary bg-surface border border-border rounded-warm-lg hover:border-border-strong transition disabled:opacity-50"
-                    >
-                      {submittingFeedback ? 'Sending…' : 'Send for review'}
-                    </button>
-                  )}
                   <button
                     onClick={() => setFeedbackMode('feedback')}
                     className="flex-1 py-3 px-4 text-sm font-semibold text-text-primary bg-surface border border-border rounded-warm-lg hover:border-border-strong transition"
@@ -774,7 +795,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                       Cancel
                     </button>
                     <button
-                      onClick={() => handleFeedback('feedback')}
+                      onClick={handleFeedback}
                       disabled={submittingFeedback || !feedbackText.trim()}
                       className="flex-1 py-3 px-4 text-sm font-semibold text-on-primary bg-primary rounded-warm-lg hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition"
                     >

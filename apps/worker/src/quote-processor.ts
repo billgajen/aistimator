@@ -129,7 +129,8 @@ interface QuoteData {
   quoteRequest: {
     id: string
     customer_name: string
-    customer_email: string
+    /** T-151: null when the business requires a phone number instead */
+    customer_email: string | null
     customer_phone?: string
     job_address?: string
     job_postcode?: string
@@ -538,16 +539,15 @@ export async function processQuote(
     (ws: WorkStepConfig) => ws.quantitySource?.type === 'ai_signal'
   ).length
 
-  const previousQuoteCount = await queryPreviousQuoteCount(
-    supabase,
-    quoteRequest.customer_email,
-    tenant.id
-  )
+  // T-151: a phone-only request has no email to look up
+  const previousQuoteCount = quoteRequest.customer_email
+    ? await queryPreviousQuoteCount(supabase, quoteRequest.customer_email, tenant.id)
+    : 0
 
   const triageInput: TriageInput = {
     photoCount: imageAssetCount,
     description: descriptionText,
-    customerEmail: quoteRequest.customer_email,
+    customerEmail: quoteRequest.customer_email ?? '',
     tenantId: tenant.id,
     tenantServiceCount: (quoteData.otherServices?.length ?? 0) + 1,
     hasOtherServices: (quoteData.otherServices?.length ?? 0) > 0,
@@ -2495,7 +2495,7 @@ export async function processQuote(
             ownerEmail: quoteData.businessOwnerEmail || env.POSTMARK_FROM_EMAIL!,
             businessName: tenant.name,
             customerName: quoteRequest.customer_name,
-            customerEmail: quoteRequest.customer_email,
+            customerEmail: quoteRequest.customer_email ?? '',
             customerPhone: quoteRequest.customer_phone,
             serviceName: service.name,
             jobAddress: quoteRequest.job_address,
@@ -2531,7 +2531,7 @@ export async function processQuote(
             quoteToken,
             customer: {
               name: quoteRequest.customer_name,
-              email: quoteRequest.customer_email,
+              email: quoteRequest.customer_email ?? '',
               phone: quoteRequest.customer_phone,
             },
             business: {

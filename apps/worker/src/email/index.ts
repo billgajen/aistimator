@@ -114,13 +114,16 @@ export async function sendQuoteEmails(
   }
 
   const customerHtml = customerQuoteEmail(customerEmailData)
-  const customerResult = await sendEmail(postmarkConfig, {
-    to: data.customer.email,
-    subject: `Your quote from ${data.business.name}`,
-    htmlBody: customerHtml,
-    tag: 'quote-customer',
-    replyTo: data.business.ownerEmail,
-  })
+  // T-151: a phone-only customer has no email address; the business is still told
+  const customerResult = data.customer.email
+    ? await sendEmail(postmarkConfig, {
+        to: data.customer.email,
+        subject: `Your quote from ${data.business.name}`,
+        htmlBody: customerHtml,
+        tag: 'quote-customer',
+        replyTo: data.business.ownerEmail,
+      })
+    : { success: false, error: 'No customer email (phone only)' }
 
   console.log(
     `[Email] Customer email ${customerResult.success ? 'sent' : 'failed'}: ${data.customer.email}`

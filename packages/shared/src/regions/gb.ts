@@ -20,6 +20,7 @@ export const GB_REGION: RegionDefinition = {
     postalPrefixExample: 'SW1, SW2, SE1',
     taxLabel: 'VAT',
     phoneExample: '07700 900123',
+    phoneHint: 'A mobile or landline number.',
     languageVariant: 'British English (UK spelling: colour, centre)',
     requestNoun: 'a quote',
   },

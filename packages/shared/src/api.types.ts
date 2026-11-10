@@ -127,6 +127,8 @@ export interface QuoteViewBranding {
 
 export interface QuoteViewCustomer {
   name: string
+  /** T-151: the customer's own phone (the link holder typed it), to confirm on accept */
+  phone?: string | null
 }
 
 export interface QuoteViewAsset {
@@ -203,6 +205,13 @@ export interface QuoteViewResponse {
 
 export interface AcceptQuoteRequest {
   token: string
+  /** T-151: when suits the customer, the job address and a phone number */
+  details?: {
+    timing: 'asap' | 'two_weeks' | 'flexible'
+    timingNote?: string | null
+    address: string
+    phone: string
+  }
 }
 
 export interface AcceptQuoteResponse {
@@ -496,6 +505,18 @@ export interface QuoteDetailResponse {
     quality_gate_json?: unknown
     /** T-146: when the business approved it */
     approved_at?: string | null
+    /** T-147: why a pending_review quote awaits the business: shown | held | check */
+    review_hold?: 'shown' | 'held' | 'check' | null
+    /** T-150: the owner's test request from setup */
+    is_test?: boolean
+    /** T-151: timing, job address and phone the customer gave when accepting */
+    acceptance_json?: {
+      timing: 'asap' | 'two_weeks' | 'flexible'
+      timingNote: string | null
+      address: string
+      phone: string
+      submittedAt: string
+    } | null
   }
   service: {
     id: string

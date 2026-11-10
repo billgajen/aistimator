@@ -1,3 +1,4 @@
+import { CONTACT_REQUIREMENTS, type ContactRequirement } from '@/lib/contact-rules'
 import { getPack } from '@/lib/vertical-packs'
 import { createClient } from '@/lib/supabase/server'
 import { getRegion, isRegionCode, isUnitSystem } from '@estimator/shared'
@@ -69,6 +70,8 @@ export async function GET() {
         serviceAreaValues: tenant.service_area_values || [],
         notificationEmail: tenant.notification_email,
         defaultTermsText: tenant.default_terms_text,
+        // T-151: which contact details customers must give
+        contactRequirement: tenant.contact_requirement ?? 'email',
         templateJson: tenant.template_json || {
           showLineItems: true,
           includeAssumptions: true,
@@ -143,7 +146,10 @@ export async function PUT(request: NextRequest) {
       benchmarksOptIn,
       trade,
       tradeOther,
+      contactRequirement,
     } = body as {
+      /** T-151: 'email' | 'phone' | 'both' — which contact details customers must give */
+      contactRequirement?: string
       /** T-150: setup answer — a vertical pack id, or 'other' */
       trade?: string | null
       /** T-150: the business's own words when trade is 'other' */
@@ -273,6 +279,17 @@ export async function PUT(request: NextRequest) {
       updates.default_terms_text = defaultTermsText ? defaultTermsText.trim() : null
     }
 
+    // T-151: at least one way to reach the customer is always required
+    if (contactRequirement !== undefined) {
+      if (!CONTACT_REQUIREMENTS.includes(contactRequirement as ContactRequirement)) {
+        return NextResponse.json(
+          { error: { code: 'INVALID_INPUT', message: 'contactRequirement must be email, phone or both' } },
+          { status: 400 }
+        )
+      }
+      updates.contact_requirement = contactRequirement
+    }
+
     // T-150: "What kind of work do you do?" — a known pack, or 'other' + free text
     if (trade !== undefined) {
       if (trade !== null && trade !== 'other' && !getPack(trade)) {
@@ -362,6 +379,8 @@ export async function PUT(request: NextRequest) {
         serviceAreaValues: tenant.service_area_values || [],
         notificationEmail: tenant.notification_email,
         defaultTermsText: tenant.default_terms_text,
+        // T-151: which contact details customers must give
+        contactRequirement: tenant.contact_requirement ?? 'email',
         templateJson: tenant.template_json || {
           showLineItems: true,
           includeAssumptions: true,

@@ -15,6 +15,66 @@
 
 ## Issues & Resolutions
 
+### 2026-11-10: T-151 — Customer flow: contact first, unfinished requests, a next step after accept
+
+**Problem:** the widget asked for address, ZIP and a required description first and contact details last, so anyone who left part-way was lost to the business. After accepting, the customer was only told the business "will be in touch".
+
+**Built:**
+1. **Migration 34** (additive, re-runnable):
+   - `tenants.contact_requirement` (`email` default | `phone` | `both`);
+   - `quote_requests.customer_email` nullable (phone-only requests);
+   - `quotes.acceptance_json`;
+   - `request_leads`: tenant, service, contact, progress, answers, ZIP, photos, a hashed lead token, `quote_id`/`completed_at`. RLS: tenants read their own; writes go through the service role.
+2. **Contact rules** (`lib/contact-rules.ts`, pure): a name is always required; email and phone follow the business's setting, and at least one is always required. The widget, `POST /api/public/leads`, `POST /api/public/quotes` (replacing "name and email are required") and the chat completion check all use them. Values are stored as typed. The region gives the phone example and a new `RegionCopy.phoneHint`; the hardcoded UK example is gone. Settings has "Customer contact details".
+3. **Widget order** (form and chat, quote link and embed): service → contact ("Where should we send your estimate?", privacy line with the business name) → the service's own questions (with the quantity) → photos → last step (ZIP and a description). New step files are in `components/embed/steps/` (the questions step is the old details step, moved unchanged), so the widget lost ~340 lines.
+   - The address moved to accept.
+   - The description is required only when the service asks no questions, in the widget and the public API (`requireDescriptionWithoutQuestions`; WhatsApp/SMS don't set it).
+   - Chat mode's prompt follows the same order and the business's contact rule. Optional fields the model fills with filler are dropped (`usableContact`).
+   - Chat now also passes the setup test token, which it didn't before (T-150 gap).
+4. **Unfinished requests** (`lib/request-leads.ts`, `useUnfinishedLead`):
+   - Saved the moment the contact step is done (`POST /api/public/leads`: new `leads` rate-limit scope, Turnstile, honeypot; no AI, no usage; never in test mode). Updated per step (`PATCH`, token-only, progress never goes back).
+   - Closed on submit, by the lead token or, when a reload lost it, by the same customer's email or phone and service within 24 h. No duplicates.
+   - Dashboard: "Started, didn't finish" filter and badge on Quotes, with how far they got and tap-to-call and tap-to-email (`GET /api/leads`), a strip on the "All" view, and a 7-day count on the home page.
+5. **Accept:** tapping Accept asks "When suits you?" (as soon as possible / within two weeks / flexible, plus a note), the job address and a phone number (prefilled from the request), then accepts in one request (`lib/acceptance.ts`).
+   - Saved as `quotes.acceptance_json`, shown on the dashboard quote page (`AcceptanceCard`), and included in the business's acceptance email.
+   - A page opened before the deploy still accepts without details.
+6. **Quote page:** "Send for review" is removed, and every `alert()` is replaced by an in-page message. Ask a question and the quiet Decline link stay.
+7. **Phone-only customers:**
+   - The worker skips the customer email when there's no address, and the business email omits it.
+   - The approve, edit-and-send and reminder paths already guard or now do; resend returns 400 `NO_EMAIL`.
+   - The success screen stops promising an email, and the PDF omits the empty line.
+
+**Found while verifying:** the dashboard quote API builds its response field by field (the same projection trap as the worker in T-150). It dropped T-147's `review_hold` and T-150's `is_test`. So the "customer can already see this" note always showed the hidden wording, and the "Test" badge never showed on the quote page; only the list badge, which a different API serves, worked. All three fields are now returned with T-151's `acceptance_json`.
+
+**Verified:**
+- `verify-t151.mts` 35/35 live:
+  - contact setting: default, invalid, then email-only, phone-only (stored with a null email and priced normally) and both;
+  - description: optional with questions, required without;
+  - leads: honeypot, invalid contact, save with no quote or usage, token-only updates, rival key 404, the business's list with progress, rival can't see it, home count;
+  - submit closes the lead (no duplicate), and a lost-token lead is closed by the same customer;
+  - test mode creates no lead, and a forged token gets 403;
+  - accept refused without details and not accepted; with details saved and returned to the dashboard; rival 404.
+- Playwright 17/17 on a 390 px phone:
+  - the quote link and the embed both go service → contact;
+  - region phone placeholder, hint and privacy line;
+  - a customer leaving after contact appears as unfinished with `tel:` and `mailto:`;
+  - a full request goes questions → photos → last step (no address field);
+  - accept refuses without details, accepts with them, and the dashboard card shows them;
+  - no "Send for review";
+  - chat asks for name and email first and saves the lead once given;
+  - Settings shows the choice; no browser dialog anywhere.
+
+  Two harness slips, both mine, were fixed during the runs: a "reply arrived" check that matched the page footer, and re-using a tenant from an earlier run.
+- Regression set: verify-t146/t147/t148/t149/t150 20/20, 33/33, 29/29, 35/35, 27/27.
+- Unit tests: web 225 (+22: contact rules for each setting, phone shapes, chat filler, description rule, region phone copy, lead progress and answer cleaning, lead closing limited to own tenant + token + open + 24 h, accept checks, acceptance email, no `alert()`/"Send for review", widget order); worker 465 (+2: phone-only sends only the business email). Lint, typecheck, web and worker builds pass.
+
+**Older verify scripts (not part of the regression set from now on, owner decision):**
+- Pass: t133, t139, t140, t141, t143.
+- Fail on T-146 expectations: t127 and t128 priced correctly (£1,700, £85) but expect `sent` or a public grade; t137 expects `sent`; t138 checks takeoff evidence, now business-only.
+- t136 (SMS) failed its MMS and confirmation steps. SMS intake shares no code this ticket touched and no SMS or WhatsApp file changed. Not investigated further.
+
+**Files:** `supabase/migrations/00000000000034_customer_flow.sql`, `scripts/deploy-migration-34.sh`, `apps/web/src/lib/{contact-rules,request-leads,acceptance,rate-limit,quote-intake,email-templates,pdf-template}.ts`, `apps/web/src/components/embed/{EstimateWidget.tsx,useUnfinishedLead.ts,steps/*}`, `apps/web/src/components/quote/AcceptDetailsForm.tsx`, `apps/web/src/components/quotes/{UnfinishedLeads,AcceptanceCard}.tsx`, `apps/web/src/components/settings/CustomerContactSettings.tsx`, `apps/web/src/app/api/public/{leads,quotes,widget/chat,widget/config}`, `apps/web/src/app/api/public/quotes/[quoteId]/{route,accept/route}.ts`, `apps/web/src/app/api/{leads,tenant,quotes/[quoteId],quotes/[quoteId]/resend}/route.ts`, `apps/web/src/app/q/[quoteId]/page.tsx`, `apps/web/src/app/(dashboard)/app/{page,quotes/page,quotes/[quoteId]/page,settings/page}.tsx`, `apps/worker/src/{quote-processor.ts,email/index.ts,email/templates.ts}`, `packages/shared/src/{api.types.ts,regions/*}`, `scripts/hardcore-test/verify-t151.mts`, tests.
+
 ### 2026-11-10: T-150 — Setup that shows the business its prices and ends with a real test quote
 
 **Problem:** a business picking a trade template went pick template → tick services → tax → done. It never saw a price, the template rates were placeholders, and nothing ended in a real quote.
@@ -3570,6 +3630,10 @@ if (pricingResult.estimatedTotal <= 0) {
 ### AD-037: Setup ends with the business's own prices and a real test quote; test requests are server-issued (T-150)
 
 **Decision:** guided setup always passes through "Check your prices" before anything is created, and ends with the owner submitting a request on their own quote page and approving it. The price list is a view over the existing pricing config, never a store of its own. A request is a test only when it carries an HMAC token the server issued to the signed-in owner for that tenant; the flag lives on `quotes.is_test`, set at creation, and every usage counter checks it. **Why:** template rates are placeholders, and a business that never sees its numbers sends wrong prices; the first quote should prove the whole loop on both sides. A client-settable flag would be a free-quotes switch. **Rejected:** a separate "setup prices" table (a second source of truth); a test flag in `source_json` (clients write it); a test mode on the public widget without a token; unlimited test requests (a shared test link would be uncounted quoting).
+
+### AD-038: Contact comes first, and a started request is the business's lead (T-151)
+
+**Decision:** the widget asks for contact details straight after the service, and the request is saved as an unfinished lead (`request_leads`) the moment they are given. It becomes the normal quote on submit and the lead is closed, so there's no duplicate. Leads live in their own table, not as a quote status: they never run AI, never count toward usage, and stay out of the quote pipeline, billing and analytics. Which contact details are required is the business's setting, never hardcoded. The full address is asked on accept, when the customer has a reason to give it. **Why:** a customer who leaves half-way is still a lead the business can call. **Rejected:** an `unfinished` quote status (every status switch, count and analytics query would have to learn it), saving leads from the first keystroke (consent and privacy), and creating leads for the owner's setup tests.
 
 ---
 

@@ -19,6 +19,7 @@ export const US_REGION: RegionDefinition = {
     postalPrefixExample: '10001, 10002, 112',
     taxLabel: 'Sales tax',
     phoneExample: '(555) 123-4567',
+    phoneHint: 'Include your area code.',
     languageVariant: 'US English (US spelling: color, center; say "estimate" and "ZIP code")',
     requestNoun: 'an estimate',
   },

@@ -9,6 +9,7 @@
  * caller-supplied `source`.
  */
 
+import { descriptionRequired } from '@/lib/contact-rules'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { enqueueQuoteJob } from '@/lib/queue'
 import { incrementUsageCounter } from '@/lib/usage'
@@ -19,7 +20,8 @@ import type { createAdminClient } from '@/lib/supabase/server'
 
 export interface CustomerInput {
   name: string
-  email: string
+  /** T-151: optional when the business requires a phone number instead */
+  email?: string
   phone?: string
 }
 
@@ -44,6 +46,11 @@ export interface QuoteIntakeInput {
    * server-issued token). Not limited by the plan and never counted.
    */
   isTest?: boolean
+  /**
+   * T-151 (public widget only): when the service asks no questions of its
+   * own, the free-text description is required. WhatsApp/SMS don't set it.
+   */
+  requireDescriptionWithoutQuestions?: boolean
 }
 
 export interface QuoteIntakeResult {
@@ -294,6 +301,27 @@ export async function createQuoteSubmission(
                 : `Missing required fields: ${allMissing.join(', ')}`,
           },
         },
+        { status: 400 }
+      )
+    }
+  }
+
+  // 6a. T-151: a service with no questions of its own needs the free-text
+  // description (the business has nothing else to go on); with questions it
+  // is optional. Counted from the same rows the widget shows.
+  if (input.requireDescriptionWithoutQuestions && !isGeneralInquiry && !limitHold) {
+    const questionIds = new Set<string>()
+    for (const row of widgetConfigRows || []) {
+      const fields = (row.config_json as { fields?: WidgetField[] } | null)?.fields || []
+      for (const f of fields) {
+        if (row.service_id === null ? !f.serviceId || f.serviceId === input.serviceId : row.service_id === input.serviceId) {
+          questionIds.add(f.fieldId)
+        }
+      }
+    }
+    if (descriptionRequired(questionIds.size) && !(projectDescription || '').trim()) {
+      return respond(
+        { error: { code: 'VALIDATION_ERROR', message: 'Please describe the job.' } },
         { status: 400 }
       )
     }

@@ -22,6 +22,7 @@ export interface CustomerEmailData {
 export interface BusinessEmailData {
   businessName: string
   customerName: string
+  /** T-151: empty when the customer gave a phone number only */
   customerEmail: string
   customerPhone?: string
   serviceName: string
@@ -193,11 +194,11 @@ export function businessNotificationEmail(data: BusinessEmailData): string {
     <div style="margin-bottom: 24px; padding: 16px; background-color: #f9fafb; border-radius: 8px;">
       <p style="margin: 0; font-weight: 600; color: #374151; font-size: 14px;">Customer Details</p>
       <p style="margin: 8px 0 0; color: #6b7280; font-size: 14px;">${escapeHtml(data.customerName)}</p>
-      <p style="margin: 4px 0 0; color: #6b7280; font-size: 14px;">
+      ${data.customerEmail ? `<p style="margin: 4px 0 0; color: #6b7280; font-size: 14px;">
         <a href="mailto:${escapeHtml(data.customerEmail)}" style="color: ${primaryColor}; text-decoration: none;">
           ${escapeHtml(data.customerEmail)}
         </a>
-      </p>
+      </p>` : ''}
       ${phoneSection}
       ${addressSection}
     </div>

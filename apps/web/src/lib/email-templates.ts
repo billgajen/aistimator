@@ -300,8 +300,20 @@ export function generateQuoteAcceptedEmailHtml(data: {
   totalFormatted: string
   dashboardUrl: string
   primaryColor?: string
+  /** T-151: what the customer told you when accepting */
+  nextStep?: { timing: string; timingNote?: string | null; address: string; phone: string }
 }): string {
   const primaryColor = data.primaryColor || '#205E56'
+  const row = (label: string, value: string) =>
+    `<tr><td style="padding: 6px 0; color: #6b7280; font-size: 14px; width: 120px; vertical-align: top;">${escapeHtml(label)}</td><td style="padding: 6px 0; color: #111827; font-size: 14px;">${escapeHtml(value)}</td></tr>`
+  const nextStepSection = data.nextStep
+    ? `<table role="presentation" style="width: 100%; margin: 0 0 24px; padding: 16px; background-color: #f9fafb; border-radius: 8px;">
+        ${row('When suits them', data.nextStep.timing)}
+        ${data.nextStep.timingNote ? row('Their note', data.nextStep.timingNote) : ''}
+        ${row('Job address', data.nextStep.address)}
+        ${row('Phone', data.nextStep.phone)}
+      </table>`
+    : ''
 
   return `
 <!DOCTYPE html>
@@ -329,6 +341,7 @@ export function generateQuoteAcceptedEmailHtml(data: {
                 ${escapeHtml(data.serviceName)} &middot; ${escapeHtml(data.totalFormatted)}
               </p>
 
+              ${nextStepSection}
               <p style="margin: 0 0 24px; color: #374151; font-size: 14px; line-height: 1.6;">
                 The customer is expecting to hear from you — reaching out quickly keeps the momentum going.
               </p>

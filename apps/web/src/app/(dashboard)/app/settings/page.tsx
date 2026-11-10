@@ -1,5 +1,7 @@
 'use client'
 
+import { CustomerContactSettings } from '@/components/settings/CustomerContactSettings'
+import { contactRequirementOf } from '@/lib/contact-rules'
 import { useState, useEffect, useCallback } from 'react'
 import { PageHeader } from '@/components/dashboard/EmptyState'
 import type { ServiceAreaMode, RegionCode, UnitSystem } from '@estimator/shared'
@@ -578,6 +580,13 @@ export default function SettingsPage() {
             </button>
           </div>
         </div>
+
+        {/* T-151: which contact details customers must give */}
+        {settings && (
+          <CustomerContactSettings
+            initial={contactRequirementOf((settings as { contactRequirement?: string }).contactRequirement)}
+          />
+        )}
 
         {/* Notifications */}
         <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
