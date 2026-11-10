@@ -62,6 +62,10 @@
 
 **Not verified:** the email-verification redirect itself (no email locally; it needs the Supabase redirect URL allowlisted, see OWNER-TODO). No gauntlet: no pricing or AI change.
 
+**Before deploying:** verify-t149's checklist check opened `/app` as a business with no services, which T-150 now sends to setup (307). The check runs as the business with a service now (one-line script fix, no app change). verify-t146/t147/t148/t149/t150: 20/20, 33/33, 29/29, 35/35, 27/27.
+
+**Deployed 2026-11-10 14:03 UTC** (commit `9c6c445`): migration 33 (`latest 00000000000033`, the five new columns present), then worker version `373bb704-2989-4bc1-84ff-199375ae0c96`, then web (Vercel, Ready). Live checks: worker `/health` 200; `/quote/<real slug>` 200 and an existing `/embed/<tenantKey>` 200; a forged test token on the page shows no test banner, and on submit (with `source.test: true` too) gets 403 `TEST_LINK_INVALID` with no quote created (4 before, 4 after); the public quote API 404 for a bad token. A request with no test token was not sent to production (it would create a real, counted quote); that case is covered by verify-t150.
+
 **Files:** `supabase/migrations/00000000000033_setup_test_quote.sql`, `scripts/deploy-migration-33.sh`, `apps/web/src/lib/{price-list,onboarding-service,test-quote-token,test-quotes,signup-choices}.ts`, `apps/web/src/components/onboarding/{OnboardingFlow,TradeStep,CheckPricesStep,TestQuoteStep}.tsx`, `apps/web/src/app/api/onboarding/{test-link,test-quote,skip}/route.ts`, `apps/web/src/app/api/{tenant,billing,quotes,public/quotes}/route.ts`, `apps/web/src/lib/quote-intake.ts`, `apps/web/src/app/quote/[slug]/page.tsx`, `apps/web/src/components/embed/EstimateWidget.tsx`, `apps/web/src/app/(auth)/signup/page.tsx`, `apps/web/src/app/auth/callback/route.ts`, `apps/web/src/app/(dashboard)/app/{page.tsx,onboarding/page.tsx,billing/page.tsx,quotes/page.tsx,quotes/[quoteId]/page.tsx}`, `apps/worker/src/quote-processor.ts`, `packages/shared/src/{api.types,database.types}.ts`, `apps/web/vitest.config.ts`, `scripts/hardcore-test/verify-t150.mts`, tests.
 
 ### 2026-11-10: T-149 — Quote link and QR code as the main way to go live

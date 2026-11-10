@@ -217,9 +217,9 @@ Code for every item is already built; these are the steps that unlock it.
 
 ## T-150 — Setup that shows prices and ends with a test quote
 
-- [ ] **Deploy in order:** `bash scripts/deploy-migration-33.sh` FIRST (the web app writes `quotes.is_test` on every
+- [x] **Deploy in order:** `bash scripts/deploy-migration-33.sh` FIRST (the web app writes `quotes.is_test` on every
   new quote and reads the new tenant columns), then the **worker** (it stops counting test requests as sent), then
-  the web app.
+  the web app. Done 2026-11-10 14:03 UTC: migration 33, worker `373bb704`, web (commit `9c6c445`).
 - [ ] **Supabase redirect URL:** signup now asks the verification email to return to
   `https://estimator-web-phi.vercel.app/auth/callback?next=/app`. Add `https://estimator-web-phi.vercel.app/**` to
   Supabase → Authentication → URL Configuration → Redirect URLs (and your custom domain later). Until it's there,
