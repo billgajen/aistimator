@@ -2,7 +2,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
-import { offeredPlans, formatMoney, type PlanDefinition, type PlanChannel } from '@estimator/shared'
+import { offeredPlans, formatMoney, freeOfferLabel, FREE_ALLOWANCE, type PlanDefinition, type PlanChannel } from '@estimator/shared'
 
 export const metadata: Metadata = {
   title: 'Pricing — Aistimator',
@@ -14,6 +14,8 @@ export const metadata: Metadata = {
 // (packages/shared/src/plans.ts) — nothing is duplicated here.
 const OFFERED = offeredPlans()
 const TRIAL_PLAN = OFFERED.find((p) => p.trialDays)
+// T-152: the free allowance for new businesses — counted in total, never resets
+const FREE_QUOTES = FREE_ALLOWANCE.US!.quotes
 
 const CHANNEL_LABEL: Record<PlanChannel, string> = {
   widget: 'Website widget & AI chat',
@@ -35,6 +37,10 @@ function planBullets(plan: PlanDefinition): string[] {
 const dollars = (cents: number) => formatMoney(cents / 100, 'USD', 'en-US', { decimals: cents % 100 === 0 ? 0 : 2 })
 
 const FAQS = [
+  {
+    q: 'Can I try it for free?',
+    a: `Yes. Every new business gets ${FREE_QUOTES} priced quotes free, with no card. They don’t reset each month: it’s ${FREE_QUOTES} in total, so you can try it properly with real customers. Test quotes from setup and requests a customer didn’t finish don’t count. After that, new requests are still saved as leads until you pick a plan.`,
+  },
   {
     q: 'What counts as an estimate?',
     a: 'One customer enquiry that produces a quote — however many photos, questions or revisions it takes. Failed or spam submissions don’t count.',
@@ -76,11 +82,18 @@ export default function PricingPage() {
           Instant estimates in your own prices — on your website, by text, and on site. Subscription only:
           no commission, no per-lead fees.
         </p>
-        {TRIAL_PLAN && (
-          <p className="mt-3 text-sm text-text-muted">
-            {TRIAL_PLAN.trialDays}-day free trial on {TRIAL_PLAN.name}. Pay yearly, get two months free.
-          </p>
-        )}
+        <p className="mt-5">
+          <Link
+            href="/signup"
+            className="inline-flex items-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            {freeOfferLabel()}
+          </Link>
+        </p>
+        <p className="mt-3 text-sm text-text-muted">
+          {FREE_QUOTES} priced quotes in total, then pick a plan.
+          {TRIAL_PLAN ? ` ${TRIAL_PLAN.trialDays}-day free trial on ${TRIAL_PLAN.name}.` : ''} Pay yearly, get two months free.
+        </p>
       </section>
 
       <section className="mx-auto max-w-6xl px-6 py-12">

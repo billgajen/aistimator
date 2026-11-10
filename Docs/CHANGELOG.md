@@ -15,6 +15,92 @@
 
 ## Issues & Resolutions
 
+### 2026-11-10: T-152 — Simpler dashboard: waiting work first, five menu items, free allowance fixed
+
+**Problem:** the dashboard had ten menu items, three of them channels a business can't set up alone. Home led with stats and repeated shortcuts, not the work waiting for the owner. The free allowance reset every month, so a small business never had to pay.
+
+**Built:**
+1. **Menu: Home, Quotes, Prices, Share, Settings** (desktop and phone).
+   - "Services" became **Prices**: same page, moved to `/app/prices`.
+   - **Settings** is one area with tabs (Business · Branding · Billing · Notifications), each an existing page: `/app/settings`, `/app/settings/branding`, `/app/settings/billing`, and `/app/settings/notifications` (split out of the old settings page, same field and API).
+   - Old URLs redirect in `next.config.js` (307, query kept): `/app/services`, `/app/branding`, `/app/billing`. Stripe checkout and portal return to the new billing URL.
+   - Analytics opens from "See all numbers" on Home; `/app/analytics` still loads.
+   - SMS has no menu item; its page and behaviour are unchanged.
+2. **WhatsApp moved into Share** as "Use it on WhatsApp" (`components/share/UseItOnWhatsApp.tsx`, texts in `lib/share-texts.ts`):
+   - "Send on WhatsApp" (`wa.me/?text=` with the quote link; counts as sharing for the checklist);
+   - greeting, away and quick-reply texts for the WhatsApp Business app, each with the link and two lines on where to paste it;
+   - "Connect your WhatsApp number for full in-chat quoting (advanced)" → the unchanged `/app/whatsapp`.
+   No "coming soon" wording.
+3. **Home, top to bottom:**
+   - "Waiting for you": priced quotes awaiting approval, not tests, not held leads, newest first. Each shows customer, service and price, with Approve & send (the existing approve API). Errors such as `WORDING_NEEDS_EDIT` show in place with an Open link. Hidden when empty.
+   - The T-151 7-day unfinished count.
+   - The usage banner.
+   - The setup checklist (`lib/setup-checklist.ts`) until done: Add a service · Check your prices · Share your quote link · First real request received.
+   - Four 30-day numbers (`lib/home-numbers.ts`): requests, estimates sent, accepted, value accepted.
+   - Quick Actions and the old AI-setup hero are gone.
+   - **Check your prices** ticks on `tenants.prices_checked_at` (**migration 35**), stamped only by setup's "These are my prices" or saving a service on Prices (`PUT /api/tenant {pricesChecked: true}`).
+   - **First real request** excludes setup tests and quotes the business made in its own app (the source lives on `quote_requests`).
+   - **Branding** left the checklist. Its tick, now on the Branding tab, was wrong: `logoAssetId !== null` was true whenever the key was missing. `hasCustomBranding` needs a real logo id or a colour other than the default.
+4. **Free allowance: 10 priced quotes in total** (`FREE_ALLOWANCE` in `plans.ts`: US `{10, total}`, legacy GB `{50, month}`).
+   - `checkPlanLimit` and `/api/billing` read every month's `usage_counters` row (`usedForAllowance`) and sum them for a `total` allowance.
+   - Subscribed tenants still count this month against their plan.
+   - Tests and unfinished requests never increment the counters, as before. Over the allowance → the T-134 lead hold.
+   - The limit and lead-held emails, Home banners and billing page say "free quotes" and drop "resets next month" for the free allowance.
+   - Pricing page: an offer button and an FAQ "Can I try it for free?". Every "Start free" now reads **"Try it free: 10 quotes, no card"** (`freeOfferLabel()`).
+5. **Setup:** an optional logo on the basics step. `components/settings/LogoUpload.tsx` is pulled out of Branding (same `/api/tenant/logo`) and used by both.
+6. **Clean-up:**
+   - Branding placeholders come from the region (`RegionCopy.emailExample` / `websiteExample` and the existing `phoneExample`; the hardcoded `+44 7700 900000` is gone). `GET /api/tenant/branding` returns `region`.
+   - `PRODUCT_NAME` and `DEFAULT_PRIMARY_COLOR` live in `packages/shared/src/brand.ts`. "Powered by Estimator" in every web and worker email, the auth pages, the embed snippet comment, the demo page, the quote page badge and the widget footer now come from `PRODUCT_NAME`.
+
+**Found while verifying:**
+- The first draft of Home filtered quotes on `source_json`, a column that lives on `quote_requests`. Both Home queries failed silently, showing zero numbers and an unticked "first real request". They now use an inner join with an OR filter on the request. A unit test pins the shape.
+- On a 390 px phone, the longer offer button pushed "Log in" onto two lines in the marketing nav. Both are compact on phones now.
+- Analytics' usage tile read the legacy `plans.monthly_estimate_limit` with a GB fallback, so a free US business saw "x / 50" for this month. It now uses the same `checkPlanLimit` as enforcement and billing ("Free quotes, counted in total").
+
+**Verified:**
+- `verify-t152.mts` 66/66 live:
+  - menu: five links, no Analytics/WhatsApp/SMS/Branding/Billing items;
+  - redirects: 307 for the three old URLs (query kept) and `/app/widget` → Share;
+  - pages: ten load (Prices, the four Settings tabs, Analytics, WhatsApp, SMS, Share, Quotes); the WhatsApp page is as before;
+  - Share: wa.me with the slug link; the three texts with the link and paste steps; the advanced link; no "coming soon";
+  - checklist: a service alone doesn't tick prices; confirming and copying tick; a setup test isn't a real request;
+  - allowance:
+    - 8 seeded last month, then quotes 9 and 10 priced this month;
+    - the 11th held as a lead and not counted;
+    - a setup test at the limit is priced and not counted;
+    - an unfinished request doesn't count;
+    - billing shows 10/10 `total` with 1 lead waiting;
+    - Analytics shows the same 10/10 in total;
+    - "Price this lead" is refused (402);
+    - legacy GB is 50 a month (last month's 50 don't count);
+    - a subscribed Starter is priced as before;
+  - Home: the waiting quote shows customer, service and price ($1,400.00) above the numbers; leads and tests aren't in it; the numbers are 3/1/0/$0; a rival sees nothing and gets 404 on approve; approving sends it and empties the section;
+  - Branding tab tick only after a real colour; branding API returns the region;
+  - public pages: pricing offer and FAQ; no "Start free" on the home page; the login page shows the product name.
+- Playwright 26/26 on a 390 px phone:
+  - Home leads with "Waiting for you" (no sideways scroll); the phone menu has five items;
+  - Approve & send from Home sends it, and the section is gone after reload;
+  - Share: the wa.me link, Copy puts the greeting on the clipboard, the advanced link opens `/app/whatsapp`;
+  - old URLs: Branding lands on Settings → Branding with the US phone placeholder; Billing lands on Settings → Billing, which shows "Free quotes used"; Services lands on Prices;
+  - Notifications saves;
+  - pricing and home pages have no sideways scroll;
+  - setup with and without a logo both finish; the logo is saved, and "These are my prices" stamps the check.
+- Regression set: verify-t146/t147/t148/t149/t150/t151 20/20, 33/33, 29/29, 35/35, 27/27, 35/35.
+- Unit tests: web 253 (+28):
+  - allowance: US total, GB month, sums across months, quote 11 held next month, subscribed unchanged, tests and leads never counted, email wording, Analytics on the same check;
+  - pricing, FAQ, billing and every CTA wording;
+  - checklist ticks and the branding check;
+  - waiting filter and order; the 30-day numbers;
+  - Home order, menu labels, redirects and pages, Settings tabs, Stripe return URLs;
+  - WhatsApp texts (link, steps, no banned words), wa.me encoding, no "coming soon";
+  - region placeholders, no leftover product name, setup logo.
+
+  Worker 465, mobile 11. Lint, typecheck, web and worker builds pass.
+
+**Not changed:** the WhatsApp and SMS pages and their behaviour; the mobile app API (`/api/app/*`); plan limits for subscribed tenants; Analytics' metrics (only its usage tile now reads `checkPlanLimit`, since it showed "x / 50 this month" to a free US business).
+
+**Files:** `supabase/migrations/00000000000035_dashboard_checklist.sql`, `scripts/deploy-migration-35.sh`, `apps/web/next.config.js`, `packages/shared/src/{plans,brand,index,api.types,database.types}.ts`, `packages/shared/src/regions/{types,us,gb}.ts`, `apps/web/src/lib/{plan-limits,setup-checklist,home-numbers,share-texts,lead-hold,email-templates,postmark,embed-snippet,quote-intake,messaging/intake-engine}.ts`, `apps/web/src/app/(dashboard)/{layout.tsx,app/page.tsx,app/prices/page.tsx,app/settings/{layout,page,branding/page,billing/page,notifications/page}.tsx}`, `apps/web/src/components/{home/WaitingForYou,share/UseItOnWhatsApp,share/SharePageClient,settings/{SettingsTabs,NotificationsSettings,LogoUpload},onboarding/OnboardingFlow,marketing/*}.tsx`, `apps/web/src/app/api/{tenant,tenant/branding,billing,billing/checkout,billing/portal,analytics}/route.ts`, `apps/web/src/app/(dashboard)/app/analytics/page.tsx`, `apps/web/src/app/{page,pricing/page,features/page,layout,(auth)/layout,demo/page,q/[quoteId]/page}.tsx`, `apps/worker/src/email/templates.ts`, `scripts/hardcore-test/verify-t152.mts`, tests.
+
 ### 2026-11-10: T-151 — Customer flow: contact first, unfinished requests, a next step after accept
 
 **Problem:** the widget asked for address, ZIP and a required description first and contact details last, so anyone who left part-way was lost to the business. After accepting, the customer was only told the business "will be in touch".
@@ -3636,6 +3722,12 @@ if (pricingResult.estimatedTotal <= 0) {
 ### AD-038: Contact comes first, and a started request is the business's lead (T-151)
 
 **Decision:** the widget asks for contact details straight after the service, and the request is saved as an unfinished lead (`request_leads`) the moment they are given. It becomes the normal quote on submit and the lead is closed, so there's no duplicate. Leads live in their own table, not as a quote status: they never run AI, never count toward usage, and stay out of the quote pipeline, billing and analytics. Which contact details are required is the business's setting, never hardcoded. The full address is asked on accept, when the customer has a reason to give it. **Why:** a customer who leaves half-way is still a lead the business can call. **Rejected:** an `unfinished` quote status (every status switch, count and analytics query would have to learn it), saving leads from the first keystroke (consent and privacy), and creating leads for the owner's setup tests.
+
+---
+
+### AD-039: Home is the work waiting; the free allowance is in total (T-152)
+
+**Decision:** the dashboard has five menu items (Home, Quotes, Prices, Share, Settings). Home leads with quotes waiting for approval, then unfinished requests, then a setup checklist whose every step ticks only on a real action (never on a row existing), then four 30-day numbers. WhatsApp quoting without setup lives on Share (wa.me plus WhatsApp Business texts), and full in-chat WhatsApp stays an advanced page. The free allowance for a business without a plan is counted across all months (`FREE_ALLOWANCE` per region, `per: 'total' | 'month'`) by summing the existing usage counters, so there's no new counter to keep in step. **Why:** an owner opens the app to act on work; a monthly free allowance meant a small business never had to pay. **Rejected:** a separate lifetime counter column (a second source of truth for usage), hiding WhatsApp as "coming soon" (it already works through the quote link), and ticking "Check your prices" whenever a service exists (it would tick together with "Add a service" and mean nothing).
 
 ---
 

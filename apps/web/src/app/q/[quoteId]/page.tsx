@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { brandStyleVars } from '@/lib/color'
 import type { QuoteViewResponse, QuoteStatus } from '@estimator/shared'
-import { formatMoney, formatDate, formatNumber, currencySymbol, unitDisplayLabel, isQuoteProcessing } from '@estimator/shared'
+import { formatMoney, formatDate, formatNumber, currencySymbol, unitDisplayLabel, isQuoteProcessing, PRODUCT_NAME } from '@estimator/shared'
 
 interface QuotePageProps {
   params: { quoteId: string }
@@ -1067,7 +1067,7 @@ function DocumentFooter({
       )}
       {showPoweredBy && (
         <p className="text-[11px] text-text-muted">
-          <span className="figure">Prepared with Aistimator</span>
+          <span className="figure">Prepared with {PRODUCT_NAME}</span>
         </p>
       )}
     </div>

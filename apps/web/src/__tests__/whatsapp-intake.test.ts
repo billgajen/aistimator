@@ -192,7 +192,7 @@ describe('WhatsApp intake — replies and transitions are pinned (T-136)', () =>
 
   it('T-134: over the limit (overage off) the request is captured as an unpriced lead', async () => {
     vi.mocked(checkPlanLimit).mockResolvedValueOnce({
-      allowed: false, overageAvailable: false, used: 50, limit: 50, unlimited: false, overagePriceCents: null, stripeCustomerId: null,
+      allowed: false, overageAvailable: false, used: 50, limit: 50, unlimited: false, per: 'month', overagePriceCents: null, stripeCustomerId: null,
     })
     vi.mocked(enqueueQuoteJob).mockClear()
     vi.mocked(incrementUsageCounter).mockClear()

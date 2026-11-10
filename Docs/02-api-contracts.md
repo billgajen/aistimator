@@ -194,6 +194,13 @@ Response:
 
 { "ok": true }
 
+T-152 simpler dashboard:
+	•	`PUT /api/tenant` accepts `pricesChecked: true` (the business confirmed its prices: setup's "These are my prices", or saving a service on Prices). It stamps `tenants.prices_checked_at`, which ticks "Check your prices" on Home. Nothing else sets it.
+	•	`GET /api/billing` `usage.per`: `month` (a live plan, or the legacy GB 50 a month) or `total` (the free allowance: 10 priced quotes in total, never resets). With `total`, `estimatesCreated` is the sum over every month and `heldLeads` counts all held leads, not just this month's. Other fields unchanged.
+	•	The plan limit (`checkPlanLimit`, used by `POST /api/public/quotes`, the WhatsApp/SMS intake and `POST /api/quotes/:id/process`) reads the same rule; its result carries `per`. Tests (T-150) and unfinished requests (T-151) still never increment the counters. Over the allowance → the T-134 lead hold.
+	•	`GET /api/tenant/branding` also returns `region` (for the Branding placeholders).
+	•	Dashboard URLs: `/app/services` → `/app/prices`, `/app/branding` → `/app/settings/branding`, `/app/billing` → `/app/settings/billing` (307, query kept). Stripe checkout and portal now return to `/app/settings/billing`. The mobile app API (`/api/app/*`) is unchanged.
+
 T-151 customer flow:
 	•	Contact rules (`lib/contact-rules.ts`, per business `tenants.contact_requirement`: `email` (default; phone optional) | `phone` (email optional) | `both`). A name is always required. Enforced by `POST /api/public/leads`, `POST /api/public/quotes` (replaces the old "name and email are required"; 400 `VALIDATION_ERROR` with `fields`) and the chat completion check. `PUT /api/tenant` accepts `contactRequirement`; `GET /api/tenant` returns it. `GET /api/public/widget/config` returns `contactRequirement` and `region.phoneExample` / `region.phoneHint`.
 	•	`POST /api/public/leads` `{ tenantKey, serviceId, customer{name,email?,phone?}, turnstileToken?, website?, testToken?, source? }` → `{ leadId, leadToken }`: an unfinished request, saved when the contact step is done. Rate limit scope `leads` (20/min/IP, 300/min/tenant), Turnstile and honeypot as for submission. No AI, no usage. A valid `testToken` → `{ skipped: true }` and no row; an invalid one → 403.

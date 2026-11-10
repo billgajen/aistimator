@@ -21,6 +21,7 @@ import { isUnpriced, servicePayload, type DraftService } from '@/lib/onboarding-
 import { TradeStep } from './TradeStep'
 import { CheckPricesStep } from './CheckPricesStep'
 import { TestQuoteStep } from './TestQuoteStep'
+import { LogoUpload } from '@/components/settings/LogoUpload'
 
 interface OnboardingFlowProps {
   businessName: string
@@ -91,6 +92,9 @@ export function OnboardingFlow({
     initialTaxRate !== null ? Math.round(initialTaxRate * 100) : 20
   )
   const [serviceArea, setServiceArea] = useState('')
+  // T-152: optional logo, uploaded straight away (the Branding upload)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [logoError, setLogoError] = useState<string | null>(null)
 
   // Creation
   const [createdCount, setCreatedCount] = useState(0)
@@ -136,7 +140,7 @@ export function OnboardingFlow({
   /** T-150: set up by hand instead; the dashboard stops sending them here */
   const handleSkip = async () => {
     await fetch('/api/onboarding/skip', { method: 'POST' }).catch(() => undefined)
-    router.push('/app/services')
+    router.push('/app/prices')
   }
 
   /** T-113: apply a vertical pack — no network, no AI, instant */
@@ -294,6 +298,8 @@ export function OnboardingFlow({
           ...(taxEnabled && { taxLabel, taxRate: Math.min(100, Math.max(0, taxRatePct)) / 100 }),
           serviceAreaMode: areaValues.length > 0 ? 'postcode_allowlist' : 'none',
           serviceAreaValues: areaValues,
+          // T-152: they pressed "These are my prices" to get here
+          pricesChecked: true,
         }),
       })
       if (!tenantRes.ok) {
@@ -749,6 +755,22 @@ export function OnboardingFlow({
               <p className="mt-1 text-xs text-text-muted">
                 Leave blank to accept quote requests from anywhere
               </p>
+            </div>
+
+            {/* T-152: optional, skippable */}
+            <div data-testid="setup-logo">
+              <span className="mb-1 block text-sm font-medium text-text-secondary">
+                Your logo <span className="font-normal text-text-muted">(optional)</span>
+              </span>
+              <p className="text-xs text-text-muted">
+                Shown on your quote page and estimates. You can skip this and add it later in Settings → Branding.
+              </p>
+              <LogoUpload logoUrl={logoUrl} onChange={(_, url) => setLogoUrl(url)} onError={setLogoError} />
+              {logoError && (
+                <p className="mt-2 text-sm text-danger" role="alert">
+                  {logoError}
+                </p>
+              )}
             </div>
           </div>
 

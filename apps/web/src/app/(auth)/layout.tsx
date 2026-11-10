@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
+import { PRODUCT_NAME } from '@estimator/shared'
 
 // Force dynamic rendering for auth pages
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Estimator - Auth',
+  title: `${PRODUCT_NAME} - Auth`,
 }
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
@@ -13,7 +14,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="w-full max-w-md">
         {/* Brand mark */}
         <div className="mb-8 text-center">
-          <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary">Estimator</h2>
+          <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary">{PRODUCT_NAME}</h2>
           <p className="mt-2 text-sm font-medium text-text-secondary">AI-powered estimates for your business</p>
         </div>
         {/* Auth card */}

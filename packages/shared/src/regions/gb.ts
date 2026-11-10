@@ -21,6 +21,8 @@ export const GB_REGION: RegionDefinition = {
     taxLabel: 'VAT',
     phoneExample: '07700 900123',
     phoneHint: 'A mobile or landline number.',
+    emailExample: 'hello@yourbusiness.co.uk',
+    websiteExample: 'yourbusiness.co.uk',
     languageVariant: 'British English (UK spelling: colour, centre)',
     requestNoun: 'a quote',
   },

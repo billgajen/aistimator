@@ -3,6 +3,7 @@
  *
  * Used for resending quote emails from the dashboard.
  */
+import { PRODUCT_NAME } from '@estimator/shared'
 
 const POSTMARK_API_URL = 'https://api.postmarkapp.com/email'
 
@@ -185,7 +186,7 @@ export function generateCustomerEmailHtml(data: {
         <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
           <tr>
             <td style="text-align: center; color: #9ca3af; font-size: 12px;">
-              Powered by Estimator
+              Powered by ${PRODUCT_NAME}
             </td>
           </tr>
         </table>

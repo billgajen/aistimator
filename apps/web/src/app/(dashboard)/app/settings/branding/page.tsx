@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { PageHeader } from '@/components/dashboard/EmptyState'
 import { readableTextOn } from '@/lib/color'
+import { LogoUpload } from '@/components/settings/LogoUpload'
 import type { TenantBranding, TenantTemplate } from '@estimator/shared'
+import { DEFAULT_PRIMARY_COLOR, getRegion, PRODUCT_NAME } from '@estimator/shared'
 
 /**
  * Curated brand colours — trade-friendly, all tested against white and ink
@@ -25,7 +26,7 @@ export const dynamic = 'force-dynamic'
 
 const DEFAULT_BRANDING: TenantBranding = {
   logoAssetId: null,
-  primaryColor: '#2563eb',
+  primaryColor: DEFAULT_PRIMARY_COLOR,
   footerNotes: null,
 }
 
@@ -84,11 +85,13 @@ export default function BrandingPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [tenantName, setTenantName] = useState('')
+  // T-152: placeholders follow the business's region (no hardcoded number)
+  const [region, setRegion] = useState<string | null>(null)
+  const regionCopy = getRegion(region).copy
 
   // Branding state
   const [branding, setBranding] = useState<TenantBranding>(DEFAULT_BRANDING)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
-  const [uploadingLogo, setUploadingLogo] = useState(false)
 
   // Template state
   const [template, setTemplate] = useState<TenantTemplate>(DEFAULT_TEMPLATE)
@@ -105,6 +108,7 @@ export default function BrandingPage() {
       }
 
       setTenantName(data.tenantName || '')
+      setRegion(data.region ?? null)
       setBranding(data.branding || DEFAULT_BRANDING)
       setTemplate(data.template || DEFAULT_TEMPLATE)
       setLogoUrl(data.logoUrl || null)
@@ -148,48 +152,6 @@ export default function BrandingPage() {
     }
   }
 
-  const handleLogoUpload = async (file: File) => {
-    if (file.size > 2 * 1024 * 1024) {
-      setError('Logo must be 2MB or smaller')
-      return
-    }
-    setUploadingLogo(true)
-    setError(null)
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await fetch('/api/tenant/logo', { method: 'POST', body: formData })
-      const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.error?.message || 'Failed to upload logo')
-      }
-      setLogoUrl(data.logoUrl)
-      setBranding((prev) => ({ ...prev, logoAssetId: data.logoAssetId }))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload logo')
-    } finally {
-      setUploadingLogo(false)
-    }
-  }
-
-  const handleLogoRemove = async () => {
-    setUploadingLogo(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/tenant/logo', { method: 'DELETE' })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error?.message || 'Failed to remove logo')
-      }
-      setLogoUrl(null)
-      setBranding((prev) => ({ ...prev, logoAssetId: null }))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove logo')
-    } finally {
-      setUploadingLogo(false)
-    }
-  }
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -200,7 +162,6 @@ export default function BrandingPage() {
   if (loading) {
     return (
       <div>
-        <PageHeader title="Branding" description="Customize how your quotes look to customers" />
         <div className="flex min-h-[400px] items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
         </div>
@@ -210,7 +171,6 @@ export default function BrandingPage() {
 
   return (
     <div>
-      <PageHeader title="Branding" description="Customize how your quotes look to customers" />
 
       {/* Success message */}
       {success && (
@@ -261,64 +221,14 @@ export default function BrandingPage() {
             <h2 className="text-lg font-medium text-text-primary">Logo</h2>
             <p className="mt-1 text-sm text-text-muted">Your logo appears on quotes and the widget</p>
 
-            {logoUrl ? (
-              <div className="mt-4 flex items-center gap-4 rounded-warm-lg border border-border bg-background p-4">
-                {/* eslint-disable-next-line @next/next/no-img-element -- signed R2 URL */}
-                <img src={logoUrl} alt="Your logo" className="h-16 max-w-[200px] object-contain" />
-                <div className="ml-auto flex gap-2">
-                  <label className="cursor-pointer rounded-warm-lg border border-border px-3 py-2 text-sm font-medium text-text-secondary hover:bg-surface">
-                    Replace
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      className="hidden"
-                      disabled={uploadingLogo}
-                      onChange={(e) => e.target.files?.[0] && handleLogoUpload(e.target.files[0])}
-                    />
-                  </label>
-                  <button
-                    onClick={handleLogoRemove}
-                    disabled={uploadingLogo}
-                    className="rounded-warm-lg border border-danger/30 px-3 py-2 text-sm font-medium text-danger hover:bg-danger-light disabled:opacity-50"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <label className="mt-4 flex h-32 cursor-pointer items-center justify-center rounded-warm-lg border-2 border-dashed border-border bg-background transition-colors hover:border-border-strong">
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className="hidden"
-                  disabled={uploadingLogo}
-                  onChange={(e) => e.target.files?.[0] && handleLogoUpload(e.target.files[0])}
-                />
-                <div className="text-center">
-                  {uploadingLogo ? (
-                    <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                  ) : (
-                    <svg
-                      className="mx-auto h-8 w-8 text-text-muted"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                  )}
-                  <p className="mt-2 text-sm font-medium text-text-secondary">
-                    {uploadingLogo ? 'Uploading…' : 'Click to upload your logo'}
-                  </p>
-                  <p className="text-xs text-text-muted">PNG, JPG or WebP up to 2MB</p>
-                </div>
-              </label>
-            )}
+            <LogoUpload
+              logoUrl={logoUrl}
+              onError={setError}
+              onChange={(assetId, url) => {
+                setLogoUrl(url)
+                setBranding((prev) => ({ ...prev, logoAssetId: assetId }))
+              }}
+            />
           </div>
 
           {/* Business identity */}
@@ -336,7 +246,7 @@ export default function BrandingPage() {
                   value={branding.tagline || ''}
                   maxLength={80}
                   onChange={(e) => setBranding({ ...branding, tagline: e.target.value || null })}
-                  placeholder="e.g., Family-run decorators since 1998"
+                  placeholder="e.g., Family-run since 1998"
                   className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
@@ -347,7 +257,7 @@ export default function BrandingPage() {
                     type="tel"
                     value={branding.phone || ''}
                     onChange={(e) => setBranding({ ...branding, phone: e.target.value || null })}
-                    placeholder="+44 7700 900000"
+                    placeholder={regionCopy.phoneExample}
                     className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                 </div>
@@ -357,7 +267,7 @@ export default function BrandingPage() {
                     type="email"
                     value={branding.email || ''}
                     onChange={(e) => setBranding({ ...branding, email: e.target.value || null })}
-                    placeholder="hello@yourbusiness.com"
+                    placeholder={regionCopy.emailExample}
                     className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                 </div>
@@ -368,7 +278,7 @@ export default function BrandingPage() {
                   type="text"
                   value={branding.website || ''}
                   onChange={(e) => setBranding({ ...branding, website: e.target.value || null })}
-                  placeholder="yourbusiness.com"
+                  placeholder={regionCopy.websiteExample}
                   className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
@@ -669,11 +579,11 @@ export default function BrandingPage() {
               )}
 
               <p className="mt-4 text-center text-[10px] text-text-muted">
-                Prepared with Aistimator
+                Prepared with {PRODUCT_NAME}
               </p>
             </div>
             <p className="mt-3 text-xs text-text-muted">
-              On Growth and Pro plans the &quot;Prepared with Aistimator&quot; badge is removed
+              On Growth and Pro plans the &quot;Prepared with {PRODUCT_NAME}&quot; badge is removed
               automatically — quotes carry only your brand.
             </p>
           </div>

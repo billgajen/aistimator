@@ -16,21 +16,41 @@ Routes:
 - /legal/terms
 - /help (docs embedded here)
 
+Free offer (T-152): every "Start free" now reads "Try it free: 10 quotes, no card" (`freeOfferLabel()` from
+`packages/shared/src/plans.ts`). The free allowance is 10 priced quotes **in total** (it never resets); the pricing
+FAQ ("Can I try it for free?") and the billing page say the same.
+
 ### 2) Dashboard (authenticated)
+Menu (T-152), desktop and phone: **Home, Quotes, Prices, Share, Settings**.
 Routes:
-- /app
+- /app (Home)
 - /app/onboarding (T-150: where a new business with no services lands)
-- /app/services
-- /app/pricing
-- /app/share (T-149; /app/widget redirects here)
-- /app/branding
 - /app/quotes
-- /app/analytics
-- /app/billing
-- /app/settings
+- /app/prices (was /app/services, which redirects here)
+- /app/share (T-149; /app/widget redirects here)
+- /app/settings (one area with tabs: Business · Branding · Billing · Notifications)
+  - /app/settings/branding (was /app/branding, which redirects here)
+  - /app/settings/billing (was /app/billing, which redirects here)
+  - /app/settings/notifications
+- /app/analytics (no menu item; "See all numbers" on Home)
+- /app/whatsapp, /app/sms (no menu item; reachable by URL, behaviour unchanged; WhatsApp is reached from Share)
+
+Home, top to bottom (T-152):
+1. "Waiting for you": quotes awaiting approval (priced, not a test, not a held lead), newest first, each with
+   customer, service, price and Approve & send. Hidden when empty.
+2. "Started, didn't finish": the 7-day count (T-151). Hidden when zero.
+3. Plan usage banner at 80% / at the limit (the free allowance says "free quotes", not "monthly").
+4. Setup checklist until complete: Add a service · Check your prices · Share your quote link · First real request
+   received. Each ticks only on a real action (`lib/setup-checklist.ts`). Branding is not a step; the Branding tab
+   shows a tick when a logo or a non-default colour is really set.
+5. Four numbers for the last 30 days: requests, estimates sent, accepted, value accepted. "See all numbers" → Analytics.
+
+Share (T-149 + T-152): quote link · QR code · where to put it · **Use it on WhatsApp** ("Send on WhatsApp" via
+wa.me with the link; greeting, away and quick-reply texts for the WhatsApp Business app with where to paste them;
+"Connect your WhatsApp number for full in-chat quoting (advanced)" → /app/whatsapp) · embed code · Advanced.
 
 Key screens:
-- Onboarding checklist with test mode
+- Home setup checklist (T-152) and the guided test in setup (T-150)
 - Pricing rules editor
 - Service area restrictions editor (postcode or zip, county or state)
 - Share: quote link, QR code, ready-made share texts, embed code, form fields (Advanced)
@@ -58,7 +78,8 @@ business with no services to setup until it has one or presses "Skip". Steps:
 3. "Check your prices" (every path): each priced item, extras, adjustments ("Attic: +12%"), minimum charge and base
    fee, all editable in place; template rates carry "These are typical starting prices. Change them to yours.";
    "These are my prices" to continue; "Describe a change in plain English" per service. No engine terms.
-4. Basics (currency, tax, service area), then the services are created.
+4. Basics (currency, tax, service area, and an optional logo, T-152: the same upload as Settings → Branding),
+   then the services are created.
 5. Guided test: "Try it as your customer" opens /quote/[slug] in test mode; the estimate appears inline with
    "Approve & send"; then the quote link with Copy and "Go to dashboard". Test requests aren't counted.
 

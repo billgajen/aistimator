@@ -252,3 +252,20 @@ Code for every item is already built; these are the steps that unlock it.
   "Resend" says to text it instead.
 - [x] **Regression set (owner decision 2026-11-10):** only `verify-t146` … `verify-t151` are run from now on. The older scripts (t127–t143) are historical ticket checks, out of date since T-146, and are not fixed or re-baselined.
 
+
+## T-152 — Simpler dashboard: waiting work first, five menu items, free allowance fixed
+
+- [ ] **Deploy in order:** `bash scripts/deploy-migration-35.sh` FIRST (Home reads `tenants.prices_checked_at`; without it
+  the home page query fails), then the **worker** (only its email footer reads the product name now), then the web app.
+- [ ] **Confirm the free allowance:** `FREE_ALLOWANCE` in `packages/shared/src/plans.ts` (`TODO-OWNER`): US 10 priced
+  quotes **in total**, never resetting; legacy GB tenants keep 50 a month. Subscribed tenants are unchanged. A US
+  business that already used quotes in earlier months now counts them all; if it has 10 or more, its next request
+  is held as a lead until it picks a plan.
+- [ ] **Know what changes on deploy:** the menu is Home, Quotes, Prices, Share, Settings. Old links still work
+  (`/app/services`, `/app/branding`, `/app/billing` redirect). Analytics opens from "See all numbers" on Home.
+  SMS has no menu item; its page and behaviour are unchanged at `/app/sms`. WhatsApp moved into Share ("Use it on
+  WhatsApp"), and the full WhatsApp setup page is unchanged at `/app/whatsapp`.
+- [ ] **Stripe:** checkout and the Customer Portal now return to `/app/settings/billing`. Nothing to change in Stripe;
+  the old `/app/billing` return URL also still redirects.
+- [ ] **Existing businesses** see "Check your prices" unticked until they confirm (save a service on Prices).
+  It never ticks on its own.

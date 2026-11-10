@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { offeredPlans, formatMoney } from '@estimator/shared'
+import { offeredPlans, formatMoney, freeOfferLabel, FREE_ALLOWANCE } from '@estimator/shared'
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
@@ -91,7 +91,7 @@ export default function HomePage() {
               href="/signup"
               className="rounded-lg bg-primary px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
             >
-              Start free
+              {freeOfferLabel()}
             </Link>
             <Link
               href="/demo"
@@ -101,7 +101,8 @@ export default function HomePage() {
             </Link>
           </div>
           <p className="mt-4 text-xs text-text-muted">
-            {(() => { const t = offeredPlans().find((p) => p.trialDays); return t ? `${t.trialDays}-day free trial on ${t.name}` : 'Subscription only — no commission' })()} · about 5 minutes to set up
+            {/* T-152: the free allowance is in total, not per month */}
+            {FREE_ALLOWANCE.US!.quotes} priced quotes free in total, no card · about 5 minutes to set up
           </p>
         </div>
 

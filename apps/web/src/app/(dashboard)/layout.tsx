@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useState } from 'react'
+import { PRODUCT_NAME } from '@estimator/shared'
 
 /**
  * Dashboard shell — "the studio desk", panel edition.
@@ -19,32 +20,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="px-5 pt-5 pb-4">
         <Link href="/app" className="group inline-block">
           <span className="font-display text-[22px] font-bold tracking-tight text-text-primary">
-            Aistimator
+            {PRODUCT_NAME}
           </span>
           <div className="tape-rule mt-1.5 w-24 opacity-50 group-hover:opacity-90 transition-opacity" />
         </Link>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3">
-        <NavSection title="Work">
-          <NavItem href="/app" icon={HomeIcon} label="Home" exact />
-          <NavItem href="/app/quotes" icon={QuotesIcon} label="Quotes" />
-          <NavItem href="/app/analytics" icon={AnalyticsIcon} label="Analytics" />
-        </NavSection>
-
-        <NavSection title="Configure">
-          <NavItem href="/app/services" icon={ServicesIcon} label="Services" />
-          <NavItem href="/app/share" icon={ShareIcon} label="Share" />
-          <NavItem href="/app/whatsapp" icon={WhatsAppIcon} label="WhatsApp" />
-          <NavItem href="/app/sms" icon={SmsIcon} label="SMS" />
-          <NavItem href="/app/branding" icon={BrandingIcon} label="Branding" />
-        </NavSection>
-
-        <NavSection title="Account">
-          <NavItem href="/app/billing" icon={BillingIcon} label="Billing" />
-          <NavItem href="/app/settings" icon={SettingsIcon} label="Settings" />
-        </NavSection>
+      {/* Navigation — T-152: five items. Analytics opens from Home ("See all
+          numbers"); SMS and WhatsApp pages stay reachable by URL (WhatsApp is
+          on Share). */}
+      <nav className="flex-1 overflow-y-auto px-3" aria-label="Main">
+        <div className="space-y-0.5">
+          {NAV_ITEMS.map((item) => (
+            <NavItem key={item.href} {...item} />
+          ))}
+        </div>
       </nav>
 
       {/* Sign out */}
@@ -94,7 +84,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h16" />
             </svg>
           </button>
-          <span className="font-display text-lg font-bold tracking-tight text-text-primary">Aistimator</span>
+          <span className="font-display text-lg font-bold tracking-tight text-text-primary">{PRODUCT_NAME}</span>
         </header>
 
         <main className="animate-fade-in-up mx-auto max-w-[1860px] px-4 py-8 sm:px-8 sm:py-10">
@@ -107,16 +97,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
 // Navigation components
 
-function NavSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-6">
-      <h3 className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-text-muted/80">
-        {title}
-      </h3>
-      <div className="space-y-0.5">{children}</div>
-    </div>
-  )
-}
+const NAV_ITEMS: Array<{ href: string; label: string; icon: React.ComponentType<{ className?: string }>; exact?: boolean }> = [
+  { href: '/app', label: 'Home', icon: HomeIcon, exact: true },
+  { href: '/app/quotes', label: 'Quotes', icon: QuotesIcon },
+  { href: '/app/prices', label: 'Prices', icon: PricesIcon },
+  { href: '/app/share', label: 'Share', icon: ShareIcon },
+  { href: '/app/settings', label: 'Settings', icon: SettingsIcon },
+]
 
 function NavItem({
   href,
@@ -130,7 +117,7 @@ function NavItem({
   exact?: boolean
 }) {
   const pathname = usePathname()
-  const isActive = exact ? pathname === href : pathname.startsWith(href)
+  const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)
 
   return (
     <Link
@@ -157,10 +144,11 @@ function HomeIcon({ className }: { className?: string }) {
   )
 }
 
-function ServicesIcon({ className }: { className?: string }) {
+function PricesIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 6h.008v.008H6V6z" />
     </svg>
   )
 }
@@ -173,50 +161,10 @@ function ShareIcon({ className }: { className?: string }) {
   )
 }
 
-function WhatsAppIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-    </svg>
-  )
-}
-
-function SmsIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-    </svg>
-  )
-}
-
-function BrandingIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-    </svg>
-  )
-}
-
 function QuotesIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-    </svg>
-  )
-}
-
-function AnalyticsIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-    </svg>
-  )
-}
-
-function BillingIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
     </svg>
   )
 }

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { DEFAULT_TRIAL_LIMIT } from '@/lib/plan-limits'
+import { checkPlanLimit } from '@/lib/plan-limits'
+import { getPlan } from '@estimator/shared'
 import type { AnalyticsResponse, AnalyticsMetrics, UsageData } from '@estimator/shared'
 
 /**
@@ -92,31 +93,22 @@ export async function GET() {
       .eq('period_yyyymm', currentPeriod)
       .single()
 
-    // Fetch subscription and plan info
-    const { data: subscription } = await supabase
-      .from('subscriptions')
-      .select(`
-        plan_id,
-        plans!plan_id (
-          name,
-          monthly_estimate_limit
-        )
-      `)
-      .eq('tenant_id', tenantId)
-      .eq('status', 'active')
-      .single()
-
-    // Extract plan info (Supabase returns single relation as object)
-    const plan = subscription?.plans as unknown as { name: string; monthly_estimate_limit: number } | null
+    // T-152: the same limit and count as enforcement and billing (the free
+    // allowance counts every month; plans count this month)
+    const [{ data: subscription }, limit] = await Promise.all([
+      supabase.from('subscriptions').select('plan_id, status').eq('tenant_id', tenantId).single(),
+      checkPlanLimit(supabase, tenantId),
+    ])
+    const live = subscription && ['active', 'trialing', 'past_due'].includes(subscription.status as string)
+    const plan = live ? getPlan(subscription.plan_id as string) : null
 
     const usage: UsageData = {
       periodYYYYMM: currentPeriod,
-      estimatesCreated: usageCounter?.estimates_created || 0,
+      estimatesCreated: limit.used,
       estimatesSent: usageCounter?.estimates_sent || 0,
-      // Same no-subscription default as enforcement + billing (verification
-      // finding: analytics showed 200 while quote creation blocked at 50)
-      planLimit: plan?.monthly_estimate_limit || DEFAULT_TRIAL_LIMIT,
-      planName: plan?.name || 'Free trial',
+      planLimit: limit.unlimited ? 0 : limit.limit,
+      planName: plan?.name || 'Free',
+      per: limit.per,
     }
 
     const response: AnalyticsResponse = {

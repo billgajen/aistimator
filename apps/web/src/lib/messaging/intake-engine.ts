@@ -734,6 +734,7 @@ async function createQuoteFromIntake(
         quoteId: quote.id,
         used: planLimit.used,
         limit: planLimit.limit,
+        per: planLimit.per,
       })
       return {
         success: true,

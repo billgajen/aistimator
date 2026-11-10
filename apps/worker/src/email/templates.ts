@@ -4,6 +4,7 @@
  * HTML email templates for quote notifications.
  * Uses inline styles for maximum email client compatibility.
  */
+import { PRODUCT_NAME } from '@estimator/shared'
 
 export interface CustomerEmailData {
   customerName: string
@@ -64,7 +65,7 @@ function emailWrapper(content: string, _primaryColor: string = '#2563eb'): strin
         <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
           <tr>
             <td style="text-align: center; color: #9ca3af; font-size: 12px;">
-              Powered by Estimator
+              Powered by ${PRODUCT_NAME}
             </td>
           </tr>
         </table>

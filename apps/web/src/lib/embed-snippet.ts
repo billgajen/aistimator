@@ -2,6 +2,7 @@
  * The widget.js embed snippet (AD-024 loader) — pure. Shared by the Share
  * page and the setup flow's last step.
  */
+import { PRODUCT_NAME } from '@estimator/shared'
 
 /** The widget.js snippet for a placement and experience (AD-024 loader). */
 export function embedSnippet(opts: {
@@ -12,7 +13,7 @@ export function embedSnippet(opts: {
 }): string {
   const displayAttr = opts.experience === 'conversational' ? `\n  data-display-mode="conversational"` : ''
   if (opts.placement === 'floating') {
-    return `<!-- Estimator Widget (Floating) -->
+    return `<!-- ${PRODUCT_NAME} Widget (Floating) -->
 <script
   src="${opts.appOrigin}/widget.js"
   data-tenant-key="${opts.tenantKey}"
@@ -21,7 +22,7 @@ export function embedSnippet(opts: {
   async
 ></script>`
   }
-  return `<!-- Estimator Widget (Inline) -->
+  return `<!-- ${PRODUCT_NAME} Widget (Inline) -->
 <div id="estimator-widget"></div>
 <script
   src="${opts.appOrigin}/widget.js"

@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { getStripeClient, getSubscriptionDetails } from '@/lib/stripe'
 import { toPlanInfo } from '@/lib/plans-view'
-import { getPlan, offeredPlans, noSubscriptionLimit, usageLevel } from '@estimator/shared'
+import { getPlan, offeredPlans, freeAllowance, usageLevel } from '@estimator/shared'
+import { usedForAllowance } from '@/lib/plan-limits'
 import { NextResponse } from 'next/server'
 import type { BillingResponse, PlanInfo, SubscriptionInfo, BillingUsage } from '@estimator/shared'
 
@@ -56,13 +57,12 @@ export async function GET() {
       .eq('tenant_id', tenantId)
       .single()
 
-    // Fetch usage counter
-    const { data: usageCounter } = await supabase
+    // Usage counters, every month (T-152: the free allowance counts all of them)
+    const { data: usageRows } = await supabase
       .from('usage_counters')
-      .select('estimates_created, estimates_sent')
+      .select('period_yyyymm, estimates_created, estimates_sent')
       .eq('tenant_id', tenantId)
-      .eq('period_yyyymm', currentPeriod)
-      .single()
+    const usageCounter = (usageRows ?? []).find((r) => r.period_yyyymm === currentPeriod) ?? null
 
     // T-134: plans come from the shared definitions, not the plans table
     const { data: tenantRow } = await supabase.from('tenants').select('region, currency, selected_plan').eq('id', tenantId).single()
@@ -99,19 +99,24 @@ export async function GET() {
     const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
     const live = subscription && ['active', 'trialing', 'past_due'].includes(subscription.status as string)
-    const created = usageCounter?.estimates_created || 0
-    const planLimit = live && currentPlan ? currentPlan.quoteLimit : noSubscriptionLimit(tenantRegion)
+    // T-152: a live plan counts this month; without one, the free allowance
+    // (US: 10 in total, never resets; legacy GB: 50 a month)
+    const allowance = live && currentPlan ? null : freeAllowance(tenantRegion)
+    const per = allowance?.per ?? 'month'
+    const created = usedForAllowance(usageRows, per, currentPeriod)
+    const planLimit = allowance ? allowance.quotes : currentPlan!.quoteLimit
     const overagePriceCents =
       subscription?.status === 'active' && currentPlan?.overageEnabled ? currentPlan.overagePriceCents ?? null : null
 
-    // Leads captured over the limit this period (T-134)
-    const { count: heldLeads } = await supabase
+    // Leads captured over the limit this period (T-134), or ever for the free allowance (T-152)
+    let heldQuery = supabase
       .from('quotes')
       .select('id', { count: 'exact', head: true })
       .eq('tenant_id', tenantId)
       .eq('status', 'pending_review')
-      .gte('created_at', periodStart.toISOString())
       .contains('content_json', { limitHold: true })
+    if (per === 'month') heldQuery = heldQuery.gte('created_at', periodStart.toISOString())
+    const { count: heldLeads } = await heldQuery
 
     const usage: BillingUsage = {
       estimatesCreated: created,
@@ -123,6 +128,7 @@ export async function GET() {
       overagePriceCents,
       level: usageLevel(created, planLimit),
       heldLeads: heldLeads ?? 0,
+      per,
     }
 
     const availablePlans: PlanInfo[] = offeredPlans().map((p) => toPlanInfo(p))

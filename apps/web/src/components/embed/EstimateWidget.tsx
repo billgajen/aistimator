@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { formatMoney } from '@estimator/shared'
+import { formatMoney, PRODUCT_NAME } from '@estimator/shared'
 import { useSearchParams } from 'next/navigation'
 import { assessImageQuality } from '@/lib/image-quality'
 import { brandStyleVars } from '@/lib/color'
@@ -871,7 +871,7 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken }: Estimat
       {widgetData?.branding?.showPoweredBy !== false && (
         <div className="max-w-xl mx-auto mt-4 flex items-center justify-center gap-3">
           <div className="tape-rule w-12 opacity-50" />
-          <span className="figure text-[10px] text-text-muted">Powered by Aistimator</span>
+          <span className="figure text-[10px] text-text-muted">Powered by {PRODUCT_NAME}</span>
           <div className="tape-rule w-12 opacity-50" />
         </div>
       )}

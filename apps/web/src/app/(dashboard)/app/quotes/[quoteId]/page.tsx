@@ -286,7 +286,7 @@ export default function QuoteDetailPage({
             shortly. Upgrade your plan, then price it here — or contact the customer yourself.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <a href="/app/billing" className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">
+            <a href="/app/settings/billing" className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">
               Upgrade plan
             </a>
             <button

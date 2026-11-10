@@ -20,6 +20,8 @@ export const US_REGION: RegionDefinition = {
     taxLabel: 'Sales tax',
     phoneExample: '(555) 123-4567',
     phoneHint: 'Include your area code.',
+    emailExample: 'hello@yourbusiness.com',
+    websiteExample: 'yourbusiness.com',
     languageVariant: 'US English (US spelling: color, center; say "estimate" and "ZIP code")',
     requestNoun: 'an estimate',
   },

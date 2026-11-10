@@ -26,7 +26,7 @@ export function leadHoldContent(businessName: string): Record<string, unknown> {
 /** Email the business about a held lead. Never throws — capture must not depend on email. */
 export async function notifyLeadHeld(
   supabase: SupabaseClient,
-  opts: { tenantId: string; businessName: string; customerName: string; serviceName: string; quoteId: string; used: number; limit: number }
+  opts: { tenantId: string; businessName: string; customerName: string; serviceName: string; quoteId: string; used: number; limit: number; per?: 'month' | 'total' }
 ): Promise<void> {
   try {
     if (!isPostmarkConfigured()) return
@@ -46,15 +46,16 @@ export async function notifyLeadHeld(
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
     await sendEmail({
       to,
-      subject: `New lead waiting: ${opts.customerName} — upgrade to price it instantly`,
+      subject: `New lead waiting: ${opts.customerName} — ${opts.per === 'total' ? 'pick a plan' : 'upgrade'} to price it instantly`,
       htmlBody: generateLeadHeldEmailHtml({
         businessName: opts.businessName,
         customerName: opts.customerName,
         serviceName: opts.serviceName,
         used: opts.used,
         limit: opts.limit,
-        billingUrl: `${appUrl}/app/billing`,
+        billingUrl: `${appUrl}/app/settings/billing`,
         quoteUrl: `${appUrl}/app/quotes/${opts.quoteId}`,
+        per: opts.per,
       }),
       tag: 'lead-held',
     })

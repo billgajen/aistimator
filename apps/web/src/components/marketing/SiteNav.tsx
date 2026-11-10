@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { MetaPixel } from './MetaPixel'
+import { freeOfferLabel } from '@estimator/shared'
 
 /**
  * Marketing site navigation — shared across all public pages.
@@ -9,7 +10,7 @@ export function SiteNav() {
     <nav className="sticky top-0 z-40 border-b border-border bg-background">
       {/* T-144: marketing pages only (SiteNav is never rendered in the app or on quote pages) */}
       <MetaPixel />
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-4 sm:px-6">
         <Link
           href="/"
           className="font-display text-lg font-extrabold tracking-tight text-text-primary"
@@ -29,18 +30,18 @@ export function SiteNav() {
           </Link>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-3">
           <Link
             href="/login"
-            className="px-3 py-2 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary"
+            className="whitespace-nowrap px-2 py-2 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary sm:px-3"
           >
             Log in
           </Link>
           <Link
             href="/signup"
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+            className="max-w-[9.5rem] rounded-lg bg-primary px-3 py-1.5 text-center text-[13px] font-semibold leading-tight text-white transition-colors hover:bg-primary-hover sm:max-w-none sm:px-4 sm:py-2 sm:text-sm"
           >
-            Start free
+            {freeOfferLabel()}
           </Link>
         </div>
       </div>

@@ -346,7 +346,7 @@ function TagInput({
 }
 
 /**
- * Services Page
+ * Prices page (T-152: was "Services", /app/services redirects here)
  *
  * Manage the services offered by the tenant.
  */
@@ -883,6 +883,13 @@ export default function ServicesPage() {
 
         setServices((prev) => [data.service, ...prev])
       }
+      // T-152: saving a service's prices here is the business checking them
+      // (the "Check your prices" setup step on Home)
+      void fetch('/api/tenant', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pricesChecked: true }),
+      }).catch(() => undefined)
       closeModal()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save service')
@@ -934,8 +941,8 @@ export default function ServicesPage() {
   return (
     <div>
       <PageHeader
-        title="Services"
-        description="Define the services you offer to customers"
+        title="Prices"
+        description="Your services and what you charge for each"
         actions={
           <div className="flex items-center gap-3">
             <button

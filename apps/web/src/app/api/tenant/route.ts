@@ -147,7 +147,10 @@ export async function PUT(request: NextRequest) {
       trade,
       tradeOther,
       contactRequirement,
+      pricesChecked,
     } = body as {
+      /** T-152: the business confirmed its prices (setup or the Prices page) */
+      pricesChecked?: boolean
       /** T-151: 'email' | 'phone' | 'both' — which contact details customers must give */
       contactRequirement?: string
       /** T-150: setup answer — a vertical pack id, or 'other' */
@@ -280,6 +283,11 @@ export async function PUT(request: NextRequest) {
     }
 
     // T-151: at least one way to reach the customer is always required
+    // T-152: only ever true from the business's own action; stamps the time
+    if (pricesChecked === true) {
+      updates.prices_checked_at = new Date().toISOString()
+    }
+
     if (contactRequirement !== undefined) {
       if (!CONTACT_REQUIREMENTS.includes(contactRequirement as ContactRequirement)) {
         return NextResponse.json(

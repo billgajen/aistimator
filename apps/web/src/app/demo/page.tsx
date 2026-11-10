@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { PRODUCT_NAME } from '@estimator/shared'
 
 // Extend Window interface for the widget
 declare global {
@@ -38,7 +39,7 @@ function DemoPageLoading() {
       <div className="bg-surface shadow-warm">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <h1 className="text-2xl font-bold text-text-primary">Widget Demo</h1>
-          <p className="text-text-secondary mt-1">Test the Estimator widget embed</p>
+          <p className="text-text-secondary mt-1">Test the {PRODUCT_NAME} widget embed</p>
         </div>
       </div>
       <div className="flex items-center justify-center py-12">
@@ -84,7 +85,7 @@ function DemoPageContent() {
       <div className="bg-surface shadow-warm">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <h1 className="text-2xl font-bold text-text-primary">Widget Demo</h1>
-          <p className="text-text-secondary mt-1">Test the Estimator widget embed</p>
+          <p className="text-text-secondary mt-1">Test the {PRODUCT_NAME} widget embed</p>
         </div>
       </div>
 
@@ -282,7 +283,7 @@ function useEmbedCode(placement: Placement, experience: Experience, tenantKey: s
 
     let code = ''
     if (placement === 'floating') {
-      code = `<!-- Estimator Widget (Floating) -->
+      code = `<!-- ${PRODUCT_NAME} Widget (Floating) -->
 <script
   src="${origin}/widget.js"
   data-tenant-key="${key}"
@@ -291,7 +292,7 @@ function useEmbedCode(placement: Placement, experience: Experience, tenantKey: s
   async
 ></script>`
     } else {
-      code = `<!-- Estimator Widget (Inline) -->
+      code = `<!-- ${PRODUCT_NAME} Widget (Inline) -->
 <div id="estimator-widget"></div>
 <script
   src="${origin}/widget.js"

@@ -3,7 +3,6 @@
 import { CustomerContactSettings } from '@/components/settings/CustomerContactSettings'
 import { contactRequirementOf } from '@/lib/contact-rules'
 import { useState, useEffect, useCallback } from 'react'
-import { PageHeader } from '@/components/dashboard/EmptyState'
 import type { ServiceAreaMode, RegionCode, UnitSystem } from '@estimator/shared'
 import { getRegion, listRegions } from '@estimator/shared'
 
@@ -56,9 +55,8 @@ interface TenantSettings {
 }
 
 /**
- * Settings Page
- *
- * Manage account and tenant settings.
+ * Settings → Business (T-152: the first tab of the Settings area).
+ * Notifications moved to its own tab (/app/settings/notifications).
  */
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -86,8 +84,6 @@ export default function SettingsPage() {
   const [validityDays, setValidityDays] = useState('30')
   const [defaultTermsText, setDefaultTermsText] = useState('')
 
-  // Notifications state
-  const [notificationEmail, setNotificationEmail] = useState('')
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -127,9 +123,6 @@ export default function SettingsPage() {
       setIncludeExclusions(template.includeExclusions)
       setValidityDays(template.validityDays.toString())
       setDefaultTermsText(tenant.defaultTermsText || '')
-
-      // Notifications
-      setNotificationEmail(tenant.notificationEmail || '')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch settings')
     } finally {
@@ -142,7 +135,7 @@ export default function SettingsPage() {
   }, [fetchSettings])
 
   const handleSave = async (
-    section: 'business' | 'tax' | 'serviceArea' | 'quoteTemplate' | 'notifications'
+    section: 'business' | 'tax' | 'serviceArea' | 'quoteTemplate'
   ) => {
     setSaving(true)
     setError(null)
@@ -181,10 +174,6 @@ export default function SettingsPage() {
           },
           defaultTermsText: defaultTermsText || null,
         }
-      } else if (section === 'notifications') {
-        updates = {
-          notificationEmail: notificationEmail || null,
-        }
       }
 
       const res = await fetch('/api/tenant', {
@@ -212,7 +201,6 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div>
-        <PageHeader title="Settings" description="Manage your account and business settings" />
         <div className="flex min-h-[400px] items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
         </div>
@@ -222,7 +210,6 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <PageHeader title="Settings" description="Manage your account and business settings" />
 
       {/* Success message */}
       {success && (
@@ -587,39 +574,6 @@ export default function SettingsPage() {
             initial={contactRequirementOf((settings as { contactRequirement?: string }).contactRequirement)}
           />
         )}
-
-        {/* Notifications */}
-        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
-          <h2 className="text-lg font-medium text-text-primary">Notifications</h2>
-          <p className="mt-1 text-sm text-text-muted">Configure how you receive quote notifications</p>
-
-          <div className="mt-6">
-            <label className="block text-sm font-medium text-text-secondary">
-              Notification Email (Override)
-            </label>
-            <input
-              type="email"
-              value={notificationEmail}
-              onChange={(e) => setNotificationEmail(e.target.value)}
-              placeholder={userEmail || 'Leave empty to use account email'}
-              className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-            <p className="mt-1 text-xs text-text-muted">
-              Quote notifications will be sent to this email instead of your account email. Leave
-              empty to use your account email ({userEmail}).
-            </p>
-          </div>
-
-          <div className="mt-6 flex justify-end">
-            <button
-              onClick={() => handleSave('notifications')}
-              disabled={saving}
-              className="inline-flex items-center rounded-warm-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
-            >
-              {saving ? 'Saving...' : 'Save Notifications'}
-            </button>
-          </div>
-        </div>
 
         {/* Account Info (read-only) */}
         <div className="rounded-warm-lg bg-background p-6">

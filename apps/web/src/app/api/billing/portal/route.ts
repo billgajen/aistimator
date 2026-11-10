@@ -65,7 +65,7 @@ export async function POST() {
 
     // Build return URL
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const returnUrl = `${appUrl}/app/billing`
+    const returnUrl = `${appUrl}/app/settings/billing`
 
     // Create portal session
     const session = await createPortalSession(stripe, subscription.stripe_customer_id, returnUrl)

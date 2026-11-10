@@ -67,3 +67,61 @@ export function webPersonMailto(opts: { businessName: string; link: string; embe
   ].join('\r\n')
   return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 }
+
+/** T-152: a ready text for the WhatsApp Business app, with where to paste it. */
+export interface WhatsAppText {
+  id: 'greeting' | 'away' | 'quick_reply'
+  label: string
+  /** Two lines: where it lives in the app, then what to do there */
+  steps: [string, string]
+  text: string
+}
+
+/**
+ * T-152: "Use it on WhatsApp" on Share — texts for the free WhatsApp Business
+ * app, each carrying the business's own quote link. Pure.
+ */
+export function buildWhatsAppTexts(opts: { businessName: string; link: string; region?: string | null }): WhatsAppText[] {
+  const { businessName, link } = opts
+  const noun = getRegion(opts.region).copy.requestNoun
+  return [
+    {
+      id: 'greeting',
+      label: 'Greeting message',
+      steps: [
+        'In WhatsApp Business: Settings → Business tools → Greeting message.',
+        'Turn on "Send greeting message", tap Message, paste this and save.',
+      ],
+      text: `Hi, thanks for messaging ${businessName}! For ${noun}, send a few details and photos of your job here: ${link}`,
+    },
+    {
+      id: 'away',
+      label: 'Away message',
+      steps: [
+        'In WhatsApp Business: Settings → Business tools → Away message.',
+        'Turn on "Send away message", tap Message, paste this, then pick when it sends.',
+      ],
+      text: `Thanks for your message. We're away right now and will reply as soon as we can. To get ${noun} in the meantime, send a few details and photos here: ${link}`,
+    },
+    {
+      id: 'quick_reply',
+      label: 'Quick reply',
+      steps: [
+        'In WhatsApp Business: Settings → Business tools → Quick replies → +.',
+        'Paste this as the message and give it a shortcut such as /quote. In a chat, type / to send it.',
+      ],
+      text: `You can get ${noun} by sending a few details and photos of the job here: ${link}`,
+    },
+  ]
+}
+
+/** T-152: the message "Send on WhatsApp" opens with — the business picks the chat. */
+export function whatsAppSendMessage(opts: { businessName: string; link: string; region?: string | null }): string {
+  const noun = getRegion(opts.region).copy.requestNoun
+  return `Here's where you can get ${noun} from ${opts.businessName}: ${opts.link}`
+}
+
+/** T-152: WhatsApp's own share link (opens the app, or WhatsApp Web, with the text ready). */
+export function whatsAppShareUrl(text: string): string {
+  return `https://wa.me/?text=${encodeURIComponent(text)}`
+}

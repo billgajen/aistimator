@@ -2,6 +2,7 @@
  * Additional email templates for the quote editing and feedback flow.
  * Supplements the existing templates in postmark.ts.
  */
+import { PRODUCT_NAME } from '@estimator/shared'
 
 function escapeHtml(text: string): string {
   const htmlEntities: Record<string, string> = {
@@ -87,7 +88,7 @@ export function generateRevisedQuoteEmailHtml(data: {
         <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
           <tr>
             <td style="text-align: center; color: #9ca3af; font-size: 12px;">
-              Powered by Estimator
+              Powered by ${PRODUCT_NAME}
             </td>
           </tr>
         </table>
@@ -172,7 +173,7 @@ export function generateFeedbackNotificationEmailHtml(data: {
         <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
           <tr>
             <td style="text-align: center; color: #9ca3af; font-size: 12px;">
-              Powered by Estimator
+              Powered by ${PRODUCT_NAME}
             </td>
           </tr>
         </table>
@@ -196,6 +197,8 @@ export function generateLimitReachedEmailHtml(data: {
   billingUrl: string
   /** T-102: when set, quoting continues as metered overage at this price */
   overagePriceLabel?: string
+  /** T-152: 'total' = the free allowance (never resets); default 'month' */
+  per?: 'month' | 'total'
 }): string {
   const consequence = data.overagePriceLabel
     ? `<strong>Quoting continues uninterrupted</strong> — extra quotes are now billed at
@@ -203,8 +206,9 @@ export function generateLimitReachedEmailHtml(data: {
        to a bigger plan if you expect this regularly; it usually works out cheaper.`
     : `<strong>New requests are still saved as leads</strong> in your dashboard, but they are not priced
        automatically — customers are told you'll send their estimate shortly. Upgrade your plan to price
-       them instantly (held leads can be priced with one click after upgrading), or wait until your
-       limit resets at the start of next month.`
+       them instantly (held leads can be priced with one click after upgrading)${
+         data.per === 'total' ? '.' : ', or wait until your limit resets at the start of next month.'
+       }`
   return generateLimitReachedEmailBody(data, consequence)
 }
 
@@ -217,16 +221,18 @@ export function generateLeadHeldEmailHtml(data: {
   limit: number
   billingUrl: string
   quoteUrl: string
+  /** T-152: 'total' = the free allowance (never resets); default 'month' */
+  per?: 'month' | 'total'
 }): string {
   const consequence = `<strong>${escapeHtml(data.customerName)}</strong> asked for an estimate for
      <strong>${escapeHtml(data.serviceName)}</strong>. It is saved as a lead but was not priced because
-     your plan's monthly limit is reached. Upgrade to price it instantly, or reply to the customer
+     ${data.per === 'total' ? 'your free quotes are used up' : "your plan's monthly limit is reached"}. Upgrade to price it instantly, or reply to the customer
      yourself: <a href="${escapeHtml(data.quoteUrl)}">open the lead</a>.`
   return generateLimitReachedEmailBody(data, consequence)
 }
 
 function generateLimitReachedEmailBody(
-  data: { businessName: string; used: number; limit: number; billingUrl: string },
+  data: { businessName: string; used: number; limit: number; billingUrl: string; per?: 'month' | 'total' },
   consequenceHtml: string
 ): string {
   return `
@@ -235,7 +241,7 @@ function generateLimitReachedEmailBody(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Monthly Quote Limit Reached</title>
+  <title>${data.per === 'total' ? 'Free quotes used' : 'Monthly Quote Limit Reached'}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -245,14 +251,18 @@ function generateLimitReachedEmailBody(
           <tr>
             <td style="padding: 40px;">
               <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: #dc2626;">
-                Monthly quote limit reached
+                ${data.per === 'total' ? 'Your free quotes are used' : 'Monthly quote limit reached'}
               </h1>
               <p style="margin: 0 0 32px; color: #6b7280; font-size: 14px;">
                 ${escapeHtml(data.businessName)}
               </p>
 
               <p style="margin: 0 0 16px; color: #374151; font-size: 16px; line-height: 1.5;">
-                You've used <strong>${data.used} of ${data.limit}</strong> quotes on your current plan this month.
+                ${
+                  data.per === 'total'
+                    ? `You've used <strong>${data.used} of ${data.limit}</strong> free quotes. Pick a plan to keep pricing every request instantly.`
+                    : `You've used <strong>${data.used} of ${data.limit}</strong> quotes on your current plan this month.`
+                }
               </p>
               <p style="margin: 0 0 24px; color: #374151; font-size: 16px; line-height: 1.5;">
                 ${consequenceHtml}
@@ -277,7 +287,7 @@ function generateLimitReachedEmailBody(
         <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
           <tr>
             <td style="text-align: center; color: #9ca3af; font-size: 12px;">
-              Powered by Estimator
+              Powered by ${PRODUCT_NAME}
             </td>
           </tr>
         </table>
@@ -361,7 +371,7 @@ export function generateQuoteAcceptedEmailHtml(data: {
         <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
           <tr>
             <td style="text-align: center; color: #9ca3af; font-size: 12px;">
-              Powered by Estimator
+              Powered by ${PRODUCT_NAME}
             </td>
           </tr>
         </table>
@@ -443,7 +453,7 @@ export function generateQuoteDeclinedEmailHtml(data: {
         <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
           <tr>
             <td style="text-align: center; color: #9ca3af; font-size: 12px;">
-              Powered by Estimator
+              Powered by ${PRODUCT_NAME}
             </td>
           </tr>
         </table>
@@ -515,7 +525,7 @@ export function generateQuoteReminderEmailHtml(data: {
         <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
           <tr>
             <td style="text-align: center; color: #9ca3af; font-size: 12px;">
-              Powered by Estimator
+              Powered by ${PRODUCT_NAME}
             </td>
           </tr>
         </table>

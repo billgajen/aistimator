@@ -7,6 +7,7 @@ import { quoteLinkUrl } from '@/lib/quote-link-url'
 import { QuoteLinkCard } from './QuoteLinkCard'
 import { QrCode } from './QrCode'
 import { WhereToPutIt } from './WhereToPutIt'
+import { UseItOnWhatsApp } from './UseItOnWhatsApp'
 import { EmbedCodeCard } from './EmbedCodeCard'
 import { FormFieldsBuilder } from './FormFieldsBuilder'
 
@@ -43,6 +44,9 @@ export function SharePageClient(props: {
       </section>
 
       <WhereToPutIt texts={buildShareTexts({ businessName: props.businessName, link, region: props.region })} />
+
+      {/* T-152: WhatsApp lives here now (the full in-chat setup stays at /app/whatsapp) */}
+      <UseItOnWhatsApp businessName={props.businessName} link={link} region={props.region} />
 
       <EmbedCodeCard
         appOrigin={props.appOrigin}

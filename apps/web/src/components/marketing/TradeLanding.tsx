@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { TradePage } from '@/lib/marketing/trades'
 import { SiteNav } from './SiteNav'
 import { SiteFooter } from './SiteFooter'
+import { freeOfferLabel } from '@estimator/shared'
 
 /**
  * One landing page per launch trade (T-144), rendered from lib/marketing/trades.ts.
@@ -23,7 +24,7 @@ export function TradeLanding({ trade }: { trade: TradePage }) {
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-4">
           <Link href="/signup" className="rounded-lg bg-primary px-8 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover">
-            Start free — set up in minutes
+            {freeOfferLabel()}
           </Link>
           <Link href="/demo" className="rounded-lg border border-border bg-surface px-8 py-3 text-sm font-semibold text-text-primary transition-colors hover:border-border-strong">
             Try the live demo

@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from 'react'
 import { formatMoney } from '@estimator/shared'
 import { useSearchParams } from 'next/navigation'
-import { PageHeader } from '@/components/dashboard/EmptyState'
 import type { BillingResponse, PlanInfo } from '@estimator/shared'
 
 export default function BillingPage() {
@@ -17,7 +16,6 @@ export default function BillingPage() {
 function BillingPageLoading() {
   return (
     <div>
-      <PageHeader title="Billing" description="Manage your subscription and payment methods" />
       <div className="flex items-center justify-center py-12">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
       </div>
@@ -41,10 +39,10 @@ function BillingPageContent() {
     if (searchParams.get('success') === 'true') {
       setToast({ message: 'Subscription updated successfully!', type: 'success' })
       // Remove query params
-      window.history.replaceState({}, '', '/app/billing')
+      window.history.replaceState({}, '', '/app/settings/billing')
     } else if (searchParams.get('canceled') === 'true') {
       setToast({ message: 'Checkout was canceled', type: 'error' })
-      window.history.replaceState({}, '', '/app/billing')
+      window.history.replaceState({}, '', '/app/settings/billing')
     }
   }, [searchParams])
 
@@ -154,6 +152,9 @@ function BillingPageContent() {
     )
   }
 
+  // T-152: without a plan, the free allowance counts every month (never resets)
+  const freeTotal = data?.usage.per === 'total'
+
   const usagePercentage = data
     ? Math.min(100, Math.round((data.usage.estimatesCreated / data.usage.planLimit) * 100))
     : 0
@@ -161,7 +162,6 @@ function BillingPageContent() {
   if (loading) {
     return (
       <div>
-        <PageHeader title="Billing" description="Manage your subscription and payment methods" />
         <div className="flex items-center justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
         </div>
@@ -172,7 +172,6 @@ function BillingPageContent() {
   if (error) {
     return (
       <div>
-        <PageHeader title="Billing" description="Manage your subscription and payment methods" />
         <div className="rounded-warm-lg bg-danger-light p-4 text-danger">{error}</div>
       </div>
     )
@@ -183,7 +182,6 @@ function BillingPageContent() {
 
   return (
     <div>
-      <PageHeader title="Billing" description="Manage your subscription and payment methods" />
 
       {/* Toast notification */}
       {toast && (
@@ -202,7 +200,7 @@ function BillingPageContent() {
           <div>
             <h2 className="text-lg font-medium text-text-primary">Current Plan</h2>
             <p className="mt-1 text-sm text-text-muted">
-              {currentPlan ? currentPlan.name : 'Free'} plan
+              {currentPlan ? `${currentPlan.name} plan` : freeTotal ? `Free: ${data?.usage.planLimit ?? 0} priced quotes in total, no card` : 'Free plan'}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -221,8 +219,8 @@ function BillingPageContent() {
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           <div>
-            <p className="text-sm text-text-muted">Quotes this month</p>
-            <p className="mt-1 text-2xl font-bold text-text-primary">
+            <p className="text-sm text-text-muted">{freeTotal ? 'Free quotes used' : 'Quotes this month'}</p>
+            <p className="mt-1 text-2xl font-bold text-text-primary" data-testid="usage-count">
               {data?.usage.estimatesCreated || 0} / {data?.usage.planLimit || 50}
             </p>
             <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-200">
@@ -247,11 +245,17 @@ function BillingPageContent() {
               </p>
             ) : data?.usage.level === 'limit' ? (
               <p className="mt-2 text-xs text-red-600">
-                Limit reached — new requests are saved as leads but not priced
-                {data.usage.heldLeads ? ` (${data.usage.heldLeads} waiting)` : ''}. Upgrade to price them.
+                {freeTotal ? 'Free quotes used' : 'Limit reached'} — new requests are saved as leads but not priced
+                {data.usage.heldLeads ? ` (${data.usage.heldLeads} waiting)` : ''}. {freeTotal ? 'Pick a plan' : 'Upgrade'} to price them.
               </p>
             ) : data?.usage.level === 'warning' ? (
-              <p className="mt-2 text-xs text-tertiary">You&apos;ve used 80% or more of this month&apos;s estimates.</p>
+              <p className="mt-2 text-xs text-tertiary">
+                {freeTotal ? 'You’ve used most of your free quotes.' : 'You’ve used 80% or more of this month’s estimates.'}
+              </p>
+            ) : freeTotal ? (
+              <p className="mt-2 text-xs text-text-muted">
+                Free quotes don’t reset each month. Tests from setup and unfinished requests don’t count.
+              </p>
             ) : null}
           </div>
           <div>

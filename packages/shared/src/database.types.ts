@@ -87,6 +87,8 @@ export interface Tenant {
   selected_plan?: string | null
   /** T-150: the business skipped guided setup */
   onboarding_skipped_at?: string | null
+  /** T-152: when the business confirmed its prices (setup or the Prices page) */
+  prices_checked_at?: string | null
   created_at: string
   updated_at: string
 }

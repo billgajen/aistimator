@@ -336,6 +336,8 @@ export interface UsageData {
   estimatesSent: number
   planLimit: number
   planName: string
+  /** T-152: 'total' = the free allowance (estimatesCreated counts every month) */
+  per?: 'month' | 'total'
 }
 
 export interface AnalyticsResponse {
@@ -397,6 +399,8 @@ export interface BillingUsage {
   level?: 'ok' | 'warning' | 'limit'
   /** T-134: leads captured but not priced because the limit was reached */
   heldLeads?: number
+  /** T-152: 'total' = the free allowance (counted across all months, never resets) */
+  per?: 'month' | 'total'
 }
 
 export interface BillingResponse {

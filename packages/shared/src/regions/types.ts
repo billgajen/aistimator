@@ -37,6 +37,9 @@ export interface RegionCopy {
   phoneExample: string
   /** T-151: one short format hint under the phone field */
   phoneHint: string
+  /** T-152: example business email and website shown as placeholders */
+  emailExample: string
+  websiteExample: string
   /** Spelling/variant instruction handed to AI wording prompts */
   languageVariant: string
   /** T-149: what customers ask a trade for, with its article: "an estimate" / "a quote" */

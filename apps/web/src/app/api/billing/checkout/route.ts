@@ -121,8 +121,8 @@ export async function POST(request: Request) {
 
     // Build URLs
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const successUrl = `${appUrl}/app/billing?success=true`
-    const cancelUrl = `${appUrl}/app/billing?canceled=true`
+    const successUrl = `${appUrl}/app/settings/billing?success=true`
+    const cancelUrl = `${appUrl}/app/settings/billing?canceled=true`
 
     // One free trial per business: only when it has never had a Stripe subscription
     const trialDays = plan.trialDays && !subscription?.stripe_subscription_id ? plan.trialDays : undefined

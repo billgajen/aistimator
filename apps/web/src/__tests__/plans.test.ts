@@ -10,6 +10,7 @@ import {
   usageLevel,
 } from '@estimator/shared'
 import { checkPlanLimit } from '@/lib/plan-limits'
+import { getCurrentPeriod } from '@/lib/usage'
 import { toPlanInfo } from '@/lib/plans-view'
 import { leadHoldContent, leadHeldMessage } from '@/lib/lead-hold'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -65,7 +66,8 @@ describe('limit enforcement reads the config (T-134)', () => {
   function db(sub: Record<string, unknown> | null, used: number, region = 'US') {
     const rows: Record<string, unknown> = {
       subscriptions: sub,
-      usage_counters: { estimates_created: used },
+      // T-152: checkPlanLimit reads every month's counter row
+      usage_counters: [{ period_yyyymm: getCurrentPeriod(), estimates_created: used }],
       tenants: { region },
     }
     return {
@@ -74,6 +76,7 @@ describe('limit enforcement reads the config (T-134)', () => {
           select: () => api,
           eq: () => api,
           single: async () => ({ data: rows[table] ?? null }),
+          then: (resolve: (v: { data: unknown }) => void) => resolve({ data: rows[table] ?? null }),
         }
         return api
       },

@@ -1,6 +1,9 @@
 import { syncSelectedPlan } from '@/lib/signup-choices'
 import { createClient } from '@/lib/supabase/server'
-import { formatMoney } from '@estimator/shared'
+import { formatMoney, getRegion } from '@estimator/shared'
+import { buildChecklist } from '@/lib/setup-checklist'
+import { homeNumbers, waitingForApproval, HOME_WINDOW_DAYS, type HomeQuoteRow } from '@/lib/home-numbers'
+import { WaitingForYou, type WaitingQuote } from '@/components/home/WaitingForYou'
 import { checkPlanLimit } from '@/lib/plan-limits'
 import { PageHeader } from '@/components/dashboard/EmptyState'
 import Link from 'next/link'
@@ -9,9 +12,9 @@ import { redirect } from 'next/navigation'
 export const dynamic = 'force-dynamic'
 
 /**
- * Main Dashboard Page
- *
- * Shows overview of quotes, setup progress, and quick actions.
+ * Home (T-152), top to bottom: quotes waiting for approval, unfinished
+ * requests, plan usage, the setup checklist until it's done, and four numbers
+ * for the last 30 days ("See all numbers" opens Analytics).
  */
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -39,7 +42,7 @@ export default async function DashboardPage() {
   const [{ data: tenant }, planLimit] = await Promise.all([
     supabase
       .from('tenants')
-      .select('name, branding_json, currency, quote_link_copied_at, quote_link_first_visit_at, selected_plan, onboarding_skipped_at')
+      .select('name, region, currency, quote_link_copied_at, quote_link_first_visit_at, selected_plan, onboarding_skipped_at, prices_checked_at')
       .eq('id', profile.tenant_id)
       .single(),
     checkPlanLimit(supabase, profile.tenant_id),
@@ -53,61 +56,45 @@ export default async function DashboardPage() {
     .is('completed_at', null)
     .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
 
-  const usagePercent = planLimit.unlimited
-    ? 0
-    : Math.min(100, Math.round((planLimit.used / planLimit.limit) * 100))
-  const limitReached = !planLimit.unlimited && planLimit.used >= planLimit.limit
-  const nearLimit = !limitReached && usagePercent >= 80
+  const tenantRow = tenant as {
+    region?: string | null
+    currency?: string | null
+    selected_plan?: string | null
+    onboarding_skipped_at?: string | null
+    quote_link_copied_at?: string | null
+    quote_link_first_visit_at?: string | null
+    prices_checked_at?: string | null
+  } | null
+  const currency = tenantRow?.currency || 'USD'
+  const locale = getRegion(tenantRow?.region).locale
+  const since = new Date(Date.now() - HOME_WINDOW_DAYS * 24 * 60 * 60 * 1000)
 
-  // Fetch real quote stats
-  const { data: quoteStats } = await supabase
-    .from('quotes')
-    .select('status, pricing_json')
-    .eq('tenant_id', profile.tenant_id)
-
-  const stats = {
-    sent: 0,
-    viewed: 0,
-    accepted: 0,
-    revenue: 0,
-  }
-
-  if (quoteStats) {
-    for (const quote of quoteStats) {
-      // Quotes Sent: status in sent, viewed, accepted, paid
-      if (['sent', 'viewed', 'accepted', 'paid'].includes(quote.status)) {
-        stats.sent++
-      }
-      // Quotes Viewed: status in viewed, accepted, paid
-      if (['viewed', 'accepted', 'paid'].includes(quote.status)) {
-        stats.viewed++
-      }
-      // Quotes Accepted: status in accepted, paid
-      if (['accepted', 'paid'].includes(quote.status)) {
-        stats.accepted++
-        // Revenue: sum of total from accepted/paid quotes
-        const total = (quote.pricing_json as { total?: number } | null)?.total
-        if (typeof total === 'number') {
-          stats.revenue += total
-        }
-      }
-    }
-  }
-
-  // Fetch setup completion status
-  const [servicesResult, widgetResult] = await Promise.all([
-    // Check if tenant has at least one active service
+  // Every query below is scoped to this tenant (RLS + explicit filter)
+  const [servicesResult, waitingResult, recentResult, realRequestResult] = await Promise.all([
+    supabase.from('services').select('id').eq('tenant_id', profile.tenant_id).eq('active', true).limit(1),
+    // a. waiting for approval, newest first
     supabase
-      .from('services')
-      .select('id')
+      .from('quotes')
+      .select('id, status, created_at, customer_json, pricing_json, content_json, is_test, services!service_id (name)')
       .eq('tenant_id', profile.tenant_id)
-      .eq('active', true)
-      .limit(1),
-    // Check if tenant has widget config with form fields
+      .eq('status', 'pending_review')
+      .eq('is_test', false)
+      .order('created_at', { ascending: false })
+      .limit(25),
+    // d. anything that happened in the last 30 days
     supabase
-      .from('widget_configs')
-      .select('config_json')
+      .from('quotes')
+      .select('status, created_at, sent_at, accepted_at, pricing_json, is_test, quote_requests!quote_request_id (source_type:source_json->>type)')
       .eq('tenant_id', profile.tenant_id)
+      .or(`created_at.gte.${since.toISOString()},sent_at.gte.${since.toISOString()},accepted_at.gte.${since.toISOString()}`),
+    // c. first real request: a customer's (not a setup test, not the business's
+    // own app quote — the source lives on the request row)
+    supabase
+      .from('quotes')
+      .select('id, quote_requests!quote_request_id!inner (id)')
+      .eq('tenant_id', profile.tenant_id)
+      .eq('is_test', false)
+      .or('source_json->>type.is.null,source_json->>type.neq.app', { referencedTable: 'quote_requests' })
       .limit(1),
   ])
 
@@ -115,190 +102,65 @@ export default async function DashboardPage() {
 
   // T-150: keep the plan chosen before signup, and take a business with no
   // services straight to setup (unless it chose to set up by hand)
-  await syncSelectedPlan(supabase, profile.tenant_id, (tenant as { selected_plan?: string | null } | null)?.selected_plan, user.user_metadata)
-  if (!hasService && !(tenant as { onboarding_skipped_at?: string | null } | null)?.onboarding_skipped_at) {
+  await syncSelectedPlan(supabase, profile.tenant_id, tenantRow?.selected_plan, user.user_metadata)
+  if (!hasService && !tenantRow?.onboarding_skipped_at) {
     redirect('/app/onboarding')
   }
-  const hasWidgetConfig = (() => {
-    const firstConfig = widgetResult.data?.[0]
-    if (!firstConfig) return false
-    const config = firstConfig.config_json as { fields?: unknown[] } | null
-    return Array.isArray(config?.fields) && config.fields.length > 0
-  })()
-  const hasBranding = (() => {
-    if (!tenant?.branding_json) return false
-    const branding = tenant.branding_json as { logoAssetId?: string | null; primaryColor?: string }
-    // Check if logo is set OR primary color is different from default (#2563eb)
-    return branding.logoAssetId !== null || (branding.primaryColor && branding.primaryColor !== '#2563eb')
-  })()
-  // T-149: ticked by real sharing (link copied, or the quote page's first
-  // visit), not by the tenant_sites row the Share page creates on its own
-  const hasSharedLink = Boolean(
-    (tenant as { quote_link_copied_at?: string | null } | null)?.quote_link_copied_at ||
-      (tenant as { quote_link_first_visit_at?: string | null } | null)?.quote_link_first_visit_at
+
+  const waiting: WaitingQuote[] = waitingForApproval(
+    (waitingResult.data ?? []) as unknown as Array<{
+      id: string
+      status: string
+      created_at: string
+      customer_json: { name?: string } | null
+      pricing_json: { total?: number } | null
+      content_json: { limitHold?: boolean } | null
+      is_test: boolean | null
+      services: { name?: string } | Array<{ name?: string }> | null
+    }>
+  ).map((q) => {
+    const service = Array.isArray(q.services) ? q.services[0] : q.services
+    return {
+      id: q.id,
+      customerName: q.customer_json?.name?.trim() || 'Customer',
+      serviceName: service?.name || 'Service',
+      priceLabel: formatMoney(q.pricing_json?.total ?? 0, currency, locale),
+      createdLabel: new Date(q.created_at).toLocaleDateString(locale, { day: 'numeric', month: 'short' }),
+    }
+  })
+
+  const checklist = buildChecklist({
+    hasService,
+    pricesCheckedAt: tenantRow?.prices_checked_at,
+    quoteLinkCopiedAt: tenantRow?.quote_link_copied_at,
+    quoteLinkFirstVisitAt: tenantRow?.quote_link_first_visit_at,
+    hasRealRequest: (realRequestResult.data?.length ?? 0) > 0,
+  })
+
+  const numbers = homeNumbers(
+    ((recentResult.data ?? []) as unknown as Array<HomeQuoteRow & { quote_requests?: { source_type?: string | null } | Array<{ source_type?: string | null }> | null }>).map(
+      (q) => ({ ...q, source_type: (Array.isArray(q.quote_requests) ? q.quote_requests[0] : q.quote_requests)?.source_type ?? null })
+    ),
+    since
   )
 
-  const setupSteps = [
-    { id: 'service', label: 'Add a service', completed: hasService, href: '/app/services' },
-    { id: 'widget', label: 'Configure widget', completed: hasWidgetConfig, href: '/app/share' },
-    { id: 'branding', label: 'Customize branding', completed: hasBranding, href: '/app/branding' },
-    { id: 'share', label: 'Share your quote link', completed: hasSharedLink, href: '/app/share' },
-  ]
-
-  const completedCount = setupSteps.filter((s) => s.completed).length
-  const allComplete = completedCount === setupSteps.length
+  const usagePercent = planLimit.unlimited ? 0 : Math.min(100, Math.round((planLimit.used / planLimit.limit) * 100))
+  const limitReached = !planLimit.unlimited && planLimit.used >= planLimit.limit
+  const nearLimit = !limitReached && usagePercent >= 80
+  const free = planLimit.per === 'total'
 
   return (
     <div>
-      <PageHeader
-        title={tenant?.name || 'Dashboard'}
-        description="Overview of your quotes and activity"
-      />
+      <PageHeader title={tenant?.name || 'Home'} />
 
-      {/* Plan usage warnings (T-101/T-102) */}
-      {limitReached && planLimit.overageAvailable && (
-        <div className="mb-8 rounded-warm-xl border border-tape/40 bg-butter/50 p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="font-display text-base font-bold text-tertiary">
-                Plan limit passed ({planLimit.used}/{planLimit.limit}) — overage billing active
-              </h2>
-              <p className="mt-1 text-sm text-tertiary">
-                Quoting continues uninterrupted. Extra quotes are billed at{' '}
-                {planLimit.overagePriceCents
-                  ? `$${(planLimit.overagePriceCents / 100).toFixed(2)}`
-                  : 'your plan rate'}{' '}
-                each — upgrading to a bigger plan usually works out cheaper.
-              </p>
-            </div>
-            <Link
-              href="/app/billing"
-              className="inline-flex shrink-0 items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90"
-            >
-              Compare Plans
-            </Link>
-          </div>
-        </div>
-      )}
-      {limitReached && !planLimit.overageAvailable && (
-        <div className="mb-8 rounded-warm-xl border border-danger/30 bg-danger-light/50 p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="font-display text-base font-bold text-danger">
-                Monthly quote limit reached ({planLimit.used}/{planLimit.limit})
-              </h2>
-              <p className="mt-1 text-sm text-danger">
-                New requests are still saved as leads, but they aren&apos;t priced — customers are told
-                you&apos;ll send their estimate shortly. Upgrade to price them instantly.
-              </p>
-            </div>
-            <Link
-              href="/app/billing"
-              className="inline-flex shrink-0 items-center justify-center rounded-lg bg-danger px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90"
-            >
-              Upgrade Plan
-            </Link>
-          </div>
-        </div>
-      )}
-      {nearLimit && (
-        <div className="mb-8 rounded-warm-xl border border-tape/40 bg-butter/50 p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="font-display text-base font-bold text-tertiary">
-                {usagePercent}% of your monthly quote limit used ({planLimit.used}/{planLimit.limit})
-              </h2>
-              <p className="mt-1 text-sm text-tertiary">
-                At the limit, new requests are saved as leads but not priced until you upgrade or the
-                month resets. Upgrade now to keep every estimate instant.
-              </p>
-            </div>
-            <Link
-              href="/app/billing"
-              className="inline-flex shrink-0 items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90"
-            >
-              View Plans
-            </Link>
-          </div>
-        </div>
-      )}
+      {/* a. T-152: the work waiting for the owner comes first */}
+      <WaitingForYou quotes={waiting} />
 
-      {/* AI onboarding hero — new tenants with no services yet (T-106) */}
-      {!hasService && (
-        <div className="mb-8 rounded-xl border border-primary bg-primary p-6 text-white">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="font-display text-xl font-bold">
-                Set up with AI — about 5 minutes
-              </h2>
-              <p className="mt-1 text-sm text-white/80">
-                Point us at your website (or describe your services), answer a couple of pricing
-                questions in plain English, and start quoting today.
-              </p>
-            </div>
-            <Link
-              href="/app/onboarding"
-              className="inline-flex shrink-0 items-center justify-center rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-primary transition-opacity hover:opacity-90"
-            >
-              Start Setup
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* Setup Progress - only show if not all complete */}
-      {!allComplete && (
-        <div className="mb-8 rounded-warm-xl bg-white shadow-warm-md p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-lg font-bold text-text-primary">Complete your setup</h2>
-            <span className="text-sm font-medium text-text-secondary">{completedCount} of {setupSteps.length} done</span>
-          </div>
-
-          {/* Progress bar */}
-          <div className="h-2 w-full rounded-full bg-surface mb-5">
-            <div
-              className="h-2 rounded-full bg-primary transition-all"
-              style={{ width: `${(completedCount / setupSteps.length) * 100}%` }}
-            />
-          </div>
-
-          {/* Steps grid */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {setupSteps.map((step) => (
-              <Link
-                key={step.id}
-                href={step.href}
-                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                  step.completed
-                    ? 'bg-mint text-primary'
-                    : 'bg-surface text-text-secondary hover:bg-surface hover:text-text-primary'
-                }`}
-              >
-                {step.completed ? (
-                  <svg className="h-4 w-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                      fillRule="evenodd"
-                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                ) : (
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full border border-current text-[10px] font-medium flex-shrink-0">
-                    {setupSteps.indexOf(step) + 1}
-                  </span>
-                )}
-                <span className="font-medium truncate">{step.label}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* T-151: people who started a request but didn't finish (last 7 days) */}
+      {/* b. T-151: people who started a request but didn't finish (last 7 days) */}
       {(unfinishedCount ?? 0) > 0 && (
         <Link
           href="/app/quotes?filter=unfinished"
-          className="mb-6 flex items-center justify-between gap-3 rounded-warm-lg border border-tape/40 bg-butter px-5 py-4 text-sm text-text-primary hover:border-tape"
+          className="mb-8 flex items-center justify-between gap-3 rounded-warm-lg border border-tape/40 bg-butter px-5 py-4 text-sm text-text-primary hover:border-tape"
           data-testid="unfinished-count"
         >
           <span>
@@ -309,49 +171,126 @@ export default async function DashboardPage() {
         </Link>
       )}
 
-      {/* Stats grid */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Quotes Sent" value={stats.sent.toString()} />
-        <StatCard title="Quotes Viewed" value={stats.viewed.toString()} />
-        <StatCard title="Quotes Accepted" value={stats.accepted.toString()} />
-        <StatCard title="Revenue" value={formatMoney(stats.revenue, (tenant as { currency?: string } | null)?.currency || 'USD', undefined, { decimals: 0 })} />
-      </div>
+      {/* Plan usage (T-101/T-102/T-134; T-152: the free allowance never resets) */}
+      {limitReached && planLimit.overageAvailable && (
+        <UsageBanner
+          tone="warn"
+          title={`Plan limit passed (${planLimit.used}/${planLimit.limit}) — overage billing active`}
+          text={`Quoting continues uninterrupted. Extra quotes are billed at ${
+            planLimit.overagePriceCents ? `$${(planLimit.overagePriceCents / 100).toFixed(2)}` : 'your plan rate'
+          } each — upgrading to a bigger plan usually works out cheaper.`}
+          cta="Compare plans"
+        />
+      )}
+      {limitReached && !planLimit.overageAvailable && (
+        <UsageBanner
+          tone="danger"
+          title={free ? `You've used your ${planLimit.limit} free quotes` : `Monthly quote limit reached (${planLimit.used}/${planLimit.limit})`}
+          text={`New requests are still saved as leads, but they aren't priced — customers are told you'll send their estimate shortly. ${
+            free ? 'Pick a plan to price them instantly.' : 'Upgrade to price them instantly.'
+          }`}
+          cta={free ? 'Pick a plan' : 'Upgrade plan'}
+        />
+      )}
+      {nearLimit && (
+        <UsageBanner
+          tone="warn"
+          title={
+            free
+              ? `${planLimit.used} of your ${planLimit.limit} free quotes used`
+              : `${usagePercent}% of your monthly quote limit used (${planLimit.used}/${planLimit.limit})`
+          }
+          text={
+            free
+              ? 'After your free quotes, new requests are saved as leads but not priced until you pick a plan.'
+              : 'At the limit, new requests are saved as leads but not priced until you upgrade or the month resets.'
+          }
+          cta="View plans"
+        />
+      )}
 
-      {/* Quick actions */}
-      <div className="mb-8">
-        <h2 className="mb-4 font-display text-xl font-bold text-text-primary">Quick Actions</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <QuickAction
-            href="/app/services"
-            icon={
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-            }
-            title="Configure Services"
-            description="Set up the services you offer"
-          />
-          <QuickAction
-            href="/app/share"
-            icon={
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-              </svg>
-            }
-            title="Share Your Quote Link"
-            description="Your link, QR code and embed code"
-          />
-          <QuickAction
-            href="/app/quotes"
-            icon={
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            }
-            title="View Quotes"
-            description="See all customer quotes"
-          />
+      {/* c. Setup checklist until complete (T-152) */}
+      {!checklist.complete && (
+        <section className="mb-8 rounded-warm-xl bg-white p-6 shadow-warm-md" data-testid="setup-checklist">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-display text-lg font-bold text-text-primary">Get set up</h2>
+            <span className="text-sm font-medium text-text-secondary">
+              {checklist.done} of {checklist.steps.length} done
+            </span>
+          </div>
+          <div className="mb-5 h-2 w-full rounded-full bg-surface">
+            <div
+              className="h-2 rounded-full bg-primary transition-all"
+              style={{ width: `${(checklist.done / checklist.steps.length) * 100}%` }}
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {checklist.steps.map((step, i) => (
+              <Link
+                key={step.id}
+                href={step.href}
+                data-testid={`checklist-${step.id}`}
+                data-done={step.completed ? 'true' : 'false'}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                  step.completed ? 'bg-mint text-primary' : 'bg-surface text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                {step.completed ? (
+                  <svg className="h-4 w-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                    <path
+                      fillRule="evenodd"
+                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                ) : (
+                  <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border border-current text-[10px] font-medium">
+                    {i + 1}
+                  </span>
+                )}
+                <span className="font-medium">{step.label}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* d. Four numbers for the last 30 days */}
+      <section data-testid="home-numbers">
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <h2 className="font-display text-lg font-bold text-text-primary">Last {HOME_WINDOW_DAYS} days</h2>
+          <Link href="/app/analytics" className="text-sm font-semibold text-primary hover:underline">
+            See all numbers
+          </Link>
         </div>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard title="Requests" value={numbers.requests.toString()} />
+          <StatCard title="Estimates sent" value={numbers.sent.toString()} />
+          <StatCard title="Accepted" value={numbers.accepted.toString()} />
+          <StatCard title="Value accepted" value={formatMoney(numbers.valueAccepted, currency, locale, { decimals: 0 })} />
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function UsageBanner({ tone, title, text, cta }: { tone: 'warn' | 'danger'; title: string; text: string; cta: string }) {
+  const danger = tone === 'danger'
+  return (
+    <div className={`mb-8 rounded-warm-xl border p-5 ${danger ? 'border-danger/30 bg-danger-light' : 'border-tape/40 bg-butter'}`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className={`font-display text-base font-bold ${danger ? 'text-danger' : 'text-tertiary'}`}>{title}</h2>
+          <p className={`mt-1 text-sm ${danger ? 'text-danger' : 'text-tertiary'}`}>{text}</p>
+        </div>
+        <Link
+          href="/app/settings/billing"
+          className={`inline-flex shrink-0 items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 ${
+            danger ? 'bg-danger' : 'bg-primary'
+          }`}
+        >
+          {cta}
+        </Link>
       </div>
     </div>
   )
@@ -361,32 +300,7 @@ function StatCard({ title, value }: { title: string; value: string }) {
   return (
     <div className="rounded-warm-xl bg-white shadow-warm-md p-6">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">{title}</p>
-      <p className="figure mt-3 text-4xl font-medium tracking-tight text-text-primary">{value}</p>
+      <p className="figure mt-3 text-2xl font-medium tracking-tight text-text-primary sm:text-4xl">{value}</p>
     </div>
-  )
-}
-
-function QuickAction({
-  href,
-  icon,
-  title,
-  description,
-}: {
-  href: string
-  icon: React.ReactNode
-  title: string
-  description: string
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex items-start gap-4 rounded-warm-xl bg-white shadow-warm-md p-5 transition-all hover:shadow-warm-hover hover:-translate-y-0.5"
-    >
-      <div className="rounded-warm-lg bg-mint p-2.5 text-primary">{icon}</div>
-      <div>
-        <h3 className="font-semibold text-text-primary">{title}</h3>
-        <p className="mt-0.5 text-sm text-text-secondary">{description}</p>
-      </div>
-    </Link>
   )
 }

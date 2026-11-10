@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
+import { freeOfferLabel } from '@estimator/shared'
 
 export const metadata: Metadata = {
   title: 'Features — Aistimator',
@@ -140,7 +141,7 @@ export default function FeaturesPage() {
               href="/signup"
               className="rounded-lg bg-white px-8 py-3.5 text-sm font-semibold text-primary transition-colors hover:bg-mint"
             >
-              Start free
+              {freeOfferLabel()}
             </Link>
             <Link
               href="/pricing"

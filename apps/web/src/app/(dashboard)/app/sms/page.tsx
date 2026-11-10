@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { PageHeader } from '@/components/dashboard/EmptyState'
+import { PRODUCT_NAME } from '@estimator/shared'
 
 interface SmsConfigResponse {
   configured: boolean
@@ -105,7 +106,7 @@ export default function SmsSettingsPage() {
     },
     {
       done: Boolean(data?.configured),
-      title: 'Point the number at Aistimator',
+      title: `Point the number at ${PRODUCT_NAME}`,
       body: `In Twilio, set "A message comes in" to HTTP POST ${data?.setup.webhookUrl ?? ''}`,
     },
   ]

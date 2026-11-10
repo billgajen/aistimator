@@ -159,14 +159,35 @@ export const PLANS: PlanDefinition[] = [
 ]
 
 /**
- * Quotes per month for a tenant WITHOUT a subscription.
- * GB (legacy) keeps the old free allowance; US has no free tier — new US
- * businesses get a small setup allowance to send test quotes before they
- * start the card-required Pro trial.
+ * T-152: the free allowance for a tenant WITHOUT a subscription.
+ * - US (and every new business): 10 priced quotes in total — it never resets,
+ *   so a small business can try it properly without a card.
+ * - GB (legacy, pre-US tenants): keeps its 50 a month.
+ * Test quotes (T-150) and unfinished requests (T-151) never count.
  */
-export const NO_SUBSCRIPTION_LIMIT: Record<string, number> = {
-  GB: 50,
-  US: 10, // TODO-OWNER: confirm the pre-trial test allowance
+export interface FreeAllowance {
+  quotes: number
+  /** 'total' = counted across all months; 'month' = resets each calendar month */
+  per: 'month' | 'total'
+}
+
+export const FREE_ALLOWANCE: Record<string, FreeAllowance> = {
+  GB: { quotes: 50, per: 'month' },
+  US: { quotes: 10, per: 'total' }, // TODO-OWNER: confirm the free allowance
+}
+
+export function freeAllowance(region: string | null | undefined): FreeAllowance {
+  return FREE_ALLOWANCE[region ?? 'GB'] ?? FREE_ALLOWANCE.GB!
+}
+
+/** Kept for callers: the free allowance's number of quotes. */
+export const NO_SUBSCRIPTION_LIMIT: Record<string, number> = Object.fromEntries(
+  Object.entries(FREE_ALLOWANCE).map(([region, a]) => [region, a.quotes])
+)
+
+/** The free offer for new businesses (the launch market), in the words the site uses. */
+export function freeOfferLabel(): string {
+  return `Try it free: ${FREE_ALLOWANCE.US!.quotes} quotes, no card`
 }
 
 export function getPlan(id: string | null | undefined): PlanDefinition | null {
@@ -178,7 +199,7 @@ export function offeredPlans(): PlanDefinition[] {
 }
 
 export function noSubscriptionLimit(region: string | null | undefined): number {
-  return NO_SUBSCRIPTION_LIMIT[region ?? 'GB'] ?? NO_SUBSCRIPTION_LIMIT.GB!
+  return freeAllowance(region).quotes
 }
 
 /** Env var holding the Stripe price id for a plan + interval + currency. */

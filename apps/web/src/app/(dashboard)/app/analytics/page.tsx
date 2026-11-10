@@ -213,7 +213,7 @@ export default function AnalyticsPage() {
                       )}
                     </div>
                     <Link
-                      href="/app/services"
+                      href="/app/prices"
                       className="inline-flex shrink-0 items-center rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-background"
                     >
                       Adjust pricing →
@@ -333,9 +333,11 @@ export default function AnalyticsPage() {
       <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-text-primary">Monthly Usage</h3>
+            <h3 className="text-lg font-semibold text-text-primary">{data?.usage.per === 'total' ? 'Free quotes' : 'Monthly Usage'}</h3>
             <p className="text-sm text-text-muted">
-              {data ? formatPeriod(data.usage.periodYYYYMM) : ''} - {data?.usage.planName} Plan
+              {data?.usage.per === 'total'
+                ? 'Counted in total, not per month'
+                : `${data ? formatPeriod(data.usage.periodYYYYMM) : ''} - ${data?.usage.planName} Plan`}
             </p>
           </div>
           <div className="text-right">

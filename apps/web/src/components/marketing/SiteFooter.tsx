@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { freeOfferLabel } from '@estimator/shared'
 
 /**
  * Marketing site footer — shared across all public pages.
@@ -37,7 +38,7 @@ export function SiteFooter() {
             <p className="text-xs font-semibold uppercase tracking-widest text-text-muted">Company</p>
             <ul className="mt-3 space-y-2 text-sm">
               <li><Link href="/login" className="text-text-secondary transition-colors hover:text-text-primary">Log in</Link></li>
-              <li><Link href="/signup" className="text-text-secondary transition-colors hover:text-text-primary">Start free</Link></li>
+              <li><Link href="/signup" className="text-text-secondary transition-colors hover:text-text-primary">{freeOfferLabel()}</Link></li>
               <li><Link href="/terms" className="text-text-secondary transition-colors hover:text-text-primary">Terms of service</Link></li>
               <li><Link href="/privacy" className="text-text-secondary transition-colors hover:text-text-primary">Privacy policy</Link></li>
             </ul>

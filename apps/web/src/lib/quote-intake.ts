@@ -500,6 +500,7 @@ export async function createQuoteSubmission(
       quoteId: quote.id,
       used: planLimit.used,
       limit: planLimit.limit,
+      per: planLimit.per,
     })
     const appUrlHeld = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     return respond({

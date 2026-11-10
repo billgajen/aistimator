@@ -3,7 +3,7 @@ import { getCurrentPeriod } from './usage'
 import { sendEmail, isPostmarkConfigured } from './postmark'
 import { generateLimitReachedEmailHtml } from './email-templates'
 import { getStripeClient, reportOverageMeterEvent, formatPrice } from './stripe'
-import { getPlan, noSubscriptionLimit } from '@estimator/shared'
+import { getPlan, freeAllowance, noSubscriptionLimit } from '@estimator/shared'
 
 /** Legacy (GB) monthly allowance for tenants without a subscription — kept for callers/tests. */
 export const DEFAULT_TRIAL_LIMIT = noSubscriptionLimit('GB')
@@ -15,6 +15,11 @@ export interface PlanLimitStatus {
   limit: number
   /** limit <= 0 means the plan is unlimited */
   unlimited: boolean
+  /**
+   * T-152: what `used` and `limit` count — this calendar month (plans and the
+   * legacy GB allowance) or all time (the free allowance, which never resets)
+   */
+  per: 'month' | 'total'
   /**
    * T-102: over-limit quotes may proceed as metered overage when the plan
    * defines an overage price AND the subscription is active (never free/trial).
@@ -32,7 +37,8 @@ export interface PlanLimitStatus {
 export function evaluateLimit(
   used: number,
   limit: number,
-  overage?: { priceCents: number | null; subscriptionActive: boolean; stripeCustomerId: string | null }
+  overage?: { priceCents: number | null; subscriptionActive: boolean; stripeCustomerId: string | null },
+  per: 'month' | 'total' = 'month'
 ): PlanLimitStatus {
   const unlimited = limit <= 0
   const overageAvailable = Boolean(
@@ -47,10 +53,26 @@ export function evaluateLimit(
     used,
     limit,
     unlimited,
+    per,
     overageAvailable,
     overagePriceCents: overageAvailable ? overage!.priceCents : null,
     stripeCustomerId: overage?.stripeCustomerId ?? null,
   }
+}
+
+/**
+ * T-152: priced quotes counted against an allowance — this month's row, or
+ * every month's rows summed for an allowance that never resets. Pure.
+ * (Tests and unfinished requests never increment these counters.)
+ */
+export function usedForAllowance(
+  rows: Array<{ period_yyyymm: string; estimates_created: number | null }> | null | undefined,
+  per: 'month' | 'total',
+  period: string
+): number {
+  const list = rows ?? []
+  if (per === 'total') return list.reduce((sum, r) => sum + (r.estimates_created ?? 0), 0)
+  return list.find((r) => r.period_yyyymm === period)?.estimates_created ?? 0
 }
 
 /**
@@ -66,7 +88,7 @@ export async function checkPlanLimit(
   try {
     const period = getCurrentPeriod()
 
-    const [{ data: subscription }, { data: usageCounter }, { data: tenant }] = await Promise.all([
+    const [{ data: subscription }, { data: usageRows }, { data: tenant }] = await Promise.all([
       supabase
         .from('subscriptions')
         .select('status, plan_id, stripe_customer_id, plans!plan_id (stripe_metered_price_id)')
@@ -74,10 +96,8 @@ export async function checkPlanLimit(
         .single(),
       supabase
         .from('usage_counters')
-        .select('estimates_created')
-        .eq('tenant_id', tenantId)
-        .eq('period_yyyymm', period)
-        .single(),
+        .select('period_yyyymm, estimates_created')
+        .eq('tenant_id', tenantId),
       supabase.from('tenants').select('region').eq('id', tenantId).single(),
     ])
 
@@ -88,15 +108,28 @@ export async function checkPlanLimit(
     const plan = live ? getPlan(subscription.plan_id as string) : null
     const meteredPriceId = (subscription?.plans as { stripe_metered_price_id?: string | null } | null)
       ?.stripe_metered_price_id
-    const limit = plan?.quoteLimit ?? noSubscriptionLimit((tenant as { region?: string } | null)?.region)
-    const used = usageCounter?.estimates_created ?? 0
+    // T-152: a live plan counts this month; no plan = the region's free
+    // allowance (US: 10 in total, never resets; legacy GB: 50 a month)
+    const allowance = plan ? null : freeAllowance((tenant as { region?: string } | null)?.region)
+    const limit = plan ? plan.quoteLimit : allowance!.quotes
+    const per = allowance?.per ?? 'month'
+    const used = usedForAllowance(
+      usageRows as Array<{ period_yyyymm: string; estimates_created: number | null }> | null,
+      per,
+      period
+    )
 
-    return evaluateLimit(used, limit, {
-      priceCents: plan?.overageEnabled ? plan.overagePriceCents ?? null : null,
-      // Overage only bills reliably on an active paid subscription — never trial
-      subscriptionActive: subscription?.status === 'active' && Boolean(meteredPriceId),
-      stripeCustomerId: subscription?.stripe_customer_id ?? null,
-    })
+    return evaluateLimit(
+      used,
+      limit,
+      {
+        priceCents: plan?.overageEnabled ? plan.overagePriceCents ?? null : null,
+        // Overage only bills reliably on an active paid subscription — never trial
+        subscriptionActive: subscription?.status === 'active' && Boolean(meteredPriceId),
+        stripeCustomerId: subscription?.stripe_customer_id ?? null,
+      },
+      per
+    )
   } catch (error) {
     console.error('[PlanLimits] Failed to check plan limit, allowing request:', error)
     return {
@@ -104,6 +137,7 @@ export async function checkPlanLimit(
       used: 0,
       limit: DEFAULT_TRIAL_LIMIT,
       unlimited: false,
+      per: 'month',
       overageAvailable: false,
       overagePriceCents: null,
       stripeCustomerId: null,
@@ -213,13 +247,16 @@ export async function maybeNotifyLimitReached(
       to,
       subject: overagePriceLabel
         ? `Monthly quote limit reached — extra quotes now ${overagePriceLabel} each`
-        : `You've reached your monthly quote limit (${status.limit})`,
+        : status.per === 'total'
+          ? `You've used your ${status.limit} free quotes`
+          : `You've reached your monthly quote limit (${status.limit})`,
       htmlBody: generateLimitReachedEmailHtml({
         businessName,
         used: status.used,
         limit: status.limit,
-        billingUrl: `${appUrl}/app/billing`,
+        billingUrl: `${appUrl}/app/settings/billing`,
         overagePriceLabel,
+        per: status.per,
       }),
       tag: 'plan-limit-reached',
     })

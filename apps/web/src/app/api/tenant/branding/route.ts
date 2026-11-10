@@ -2,10 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import type { TenantBranding, TenantTemplate } from '@estimator/shared'
+import { DEFAULT_PRIMARY_COLOR } from '@estimator/shared'
 
 const DEFAULT_BRANDING: TenantBranding = {
   logoAssetId: null,
-  primaryColor: '#2563eb',
+  primaryColor: DEFAULT_PRIMARY_COLOR,
   footerNotes: null,
 }
 
@@ -55,7 +56,7 @@ export async function GET() {
     // Fetch tenant
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
-      .select('id, name, branding_json, template_json')
+      .select('id, name, branding_json, template_json, region')
       .eq('id', profile.tenant_id)
       .single()
 
@@ -94,6 +95,8 @@ export async function GET() {
     return NextResponse.json({
       tenantId: tenant.id,
       tenantName: tenant.name,
+      // T-152: for region-aware placeholders
+      region: (tenant as { region?: string | null }).region ?? null,
       branding,
       template,
       logoUrl,

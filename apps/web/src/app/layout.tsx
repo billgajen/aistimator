@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Bricolage_Grotesque, Instrument_Sans, Spline_Sans_Mono } from 'next/font/google'
 import './globals.css'
+import { PRODUCT_NAME } from '@estimator/shared'
 
 const bricolage = Bricolage_Grotesque({
   subsets: ['latin'],
@@ -21,7 +22,7 @@ const splineMono = Spline_Sans_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Aistimator',
+  title: PRODUCT_NAME,
   description: 'Instant, evidence-backed estimates for service businesses',
 }
 
