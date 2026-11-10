@@ -73,6 +73,13 @@ export interface Tenant {
   template_json: TenantTemplate
   notification_email: string | null
   default_terms_text: string | null
+  /** T-149: public quote page address /quote/{slug} (migration 32) */
+  slug: string
+  /** T-149: set when the business changed its slug (allowed once) */
+  slug_changed_at?: string | null
+  /** T-149: first time the quote link was copied / the quote page was visited */
+  quote_link_copied_at?: string | null
+  quote_link_first_visit_at?: string | null
   created_at: string
   updated_at: string
 }

@@ -15,6 +15,51 @@
 
 ## Issues & Resolutions
 
+### 2026-11-10: T-149 — Quote link and QR code as the main way to go live
+
+**Problem:** a business could only go live by pasting a script tag. Many small trades can't edit their website or don't have one.
+
+**Built:**
+1. **Readable link per business (migration 32, additive, re-runnable):**
+   - `tenants.slug` (unique, format CHECK), `slug_changed_at`, `quote_link_copied_at` and `quote_link_first_visit_at`; new tables `tenant_slug_history` and `reserved_slugs`.
+   - Slugs are generated **in the database** (`generate_tenant_slug`, BEFORE INSERT trigger on `tenants`), so both signup paths get one: the auth trigger and `setup-tenant`.
+   - Existing tenants are backfilled oldest first, so the first business keeps the plain name. Clashes, reserved words and names under 3 characters get a 4-character suffix.
+   - A **guard trigger** refuses any slug change not made by the service role. The "users can update own tenant" RLS policy would otherwise let a client skip the format, reserved-word and once-only rules.
+2. **Slug rules** (`lib/tenant-slug.ts`): `slugify` mirrors the SQL (accents folded, "&" → "and", 40 characters) and `slugProblem` validates. It owns the reserved list; a unit test checks the migration's list and accent map match it.
+3. **`/quote/[slug]`** (server page) resolves the slug with `lib/quote-link.ts`:
+   - slug → tenant → **that tenant's own** active site key; a former slug → 308; anything else → plain 404.
+   - It renders the **same widget** as `/embed` (AD-024): the embed page body moved to `components/embed/EstimateWidget.tsx`, and `/embed/[tenantKey]` is now a thin wrapper. Branding, the white-label badge, Turnstile, the honeypot and the public API rate limits therefore apply as they do in the embed.
+   - New `quote_page` rate-limit scope (60/min/IP). Link-preview metadata uses the business name. The first visit sets `quote_link_first_visit_at`.
+4. **Share page** (`/app/share`; the menu item "Widget" → "Share"; `/app/widget` redirects there):
+   - "Your quote link" with Copy and Open, and a one-time change with live availability checking (`GET/PUT /api/tenant/slug`).
+   - QR code drawn in the browser (`qrcode-generator`, zero dependencies; `lib/qr.ts` turns modules into pixels for the canvas and the PNG download).
+   - "Where to put it": Google Business Profile, Facebook/Instagram bio, email signature and text reply, each with its own Copy. Region-aware via a new `RegionCopy.requestNoun` ("an estimate" for US, "a quote" for GB).
+   - "Add it to your website": the existing embed code (`lib/embed-snippet.ts`) plus "Send to my web person" (a `mailto:` draft with the code and plain instructions). The tenant key is no longer shown on its own.
+   - "Advanced": the existing field builder (`components/share/FormFieldsBuilder.tsx`), collapsed and unchanged.
+5. **Setup's last step** shows the quote link with Copy and Open first, then the embed snippet.
+6. **Home checklist:** "Embed on website" became "Share your quote link". It is ticked by `quote_link_copied_at` (via `POST /api/tenant/share-event`) or `quote_link_first_visit_at`. **Self-tick removed:** the old item checked for a `tenant_sites` row, which the Widget page created itself on first visit.
+
+**Verified:**
+- `verify-t149.mts` 35/35 live. It covers:
+  - signup slug, clash suffix, reserved suffix, backfill (no tenant without a slug);
+  - the Share page loads without "Your Tenant Key", and `/app/widget` → `/app/share`;
+  - `/quote/{slug}` renders this tenant's own widget and records the first visit; a request through that key priced $1,400 like the embed;
+  - a second business's page shows only its own widget; unknown, malformed and inactive are 404;
+  - `/embed`, widget config and `widget.js` unchanged;
+  - slug change: live check (reserved, taken, free), 400/409 refusals, the change itself, 308 from the old slug, once-only, the old slug unavailable to others, a direct row write refused (403);
+  - share-event, the checklist label, 400 for a bad event, 401 when logged out.
+- Playwright pass 14/14:
+  - on a 390 px phone the quote page shows the business, has no sideways scroll, and a request submitted through the form comes back "Your estimate is ready";
+  - the Share page order is right, Advanced is collapsed, and the link and all four texts copy exactly;
+  - the downloaded QR PNG decodes (jsQR) to the link, and the email draft carries the code.
+- Web tests 173 (+29: slug rules and SQL parity, resolution and isolation, share texts, mailto, embed snippet, QR round trip). Lint, typecheck, web and worker builds pass.
+
+**Not verified:** the slug-change form and the setup flow's last step by eye (both checked through their APIs). No gauntlet: no pricing or AI change.
+
+**Known limits:** two signups with the same business name in the same instant can race on the unique index; the second insert fails and that signup must be retried (very rare; noted rather than solved). Changing the slug is allowed once, as the ticket says.
+
+**Files:** `supabase/migrations/00000000000032_quote_link.sql`, `scripts/deploy-migration-32.sh`, `apps/web/src/lib/{tenant-slug,quote-link,quote-link-url,share-texts,embed-snippet,qr,tenant-site,current-tenant,rate-limit}.ts`, `apps/web/src/app/quote/[slug]/{page,not-found}.tsx`, `apps/web/src/app/embed/[tenantKey]/page.tsx`, `apps/web/src/components/embed/EstimateWidget.tsx` (moved), `apps/web/src/components/share/*`, `apps/web/src/app/(dashboard)/{layout.tsx,app/page.tsx,app/share/page.tsx,app/widget/page.tsx,app/onboarding/page.tsx,app/quotes/page.tsx}`, `apps/web/src/components/onboarding/OnboardingFlow.tsx`, `apps/web/src/app/api/tenant/{slug,share-event}/route.ts`, `packages/shared/src/{regions/*,database.types.ts}`, `scripts/hardcore-test/verify-t149.mts`, tests. Dependencies: `qrcode-generator` 2.0.4 (web), `jsqr` 1.4.0 (web, dev).
+
 ### 2026-11-10: T-148 — Banned customer words are repaired in code, not hidden
 
 **Problem:** the wording prompt was the only thing keeping "exact", "firm", "preliminary", grades and confidence language away from customers. T-147 added a fallback that hid the estimate when the guard tripped, which is safe but loses the instant estimate. The T-147 gap also stayed open: auto-send quotes, clarification-stage payloads and approve-without-edit sends were not checked at all.
@@ -3462,6 +3507,10 @@ if (pricingResult.estimatedTotal <= 0) {
 ### AD-035: Show the estimate, then the business confirms it (T-147)
 
 **Decision:** supersedes the default in AD-034. A quote still reaches "Quote" status only when the business approves it, but by default the customer sees the estimate as soon as it is priced, marked as an estimate the business will confirm, with Accept locked. A service can opt to hold the estimate until approval (the AD-034 behaviour) or to send automatically. The rest of AD-034 stands: two customer states, grades business-only, the public quote API as the only customer data path, the language guard, and the existing link staying valid through approval. **Why:** a customer who is shown nothing leaves; the honest promise is still the business's confirmation, and the page says so. **Rules that follow:** the reason a quote is waiting is recorded on the quote (`quotes.review_hold`), never inferred later from the service, so changing a service's mode does not change what earlier customers see. Showing early fails closed: only a priced quote recorded as `shown` is visible, and anything a check held, including generated wording that trips the language guard, stays hidden until approved. (T-148: banned words are now repaired first, by rewrite then removal; only wording that can't be repaired holds the quote.) No customer action may move a quote off `pending_review`; only the business's approval does. **Rejected:** deriving "shown" from the service's current mode at read time (a mode change would reveal held quotes), and storing the flag in `content_json` (dashboard edits rewrite it).
+
+### AD-036: The quote link is the main way to go live; slugs belong to the database (T-149)
+
+**Decision:** every business has a readable hosted quote page, `/quote/{slug}`, and the Share page leads with it and its QR code; the embed code is the second option. The page renders the one widget implementation (AD-024), never a copy. Slugs are generated and guarded **in the database**: a BEFORE INSERT trigger names every new tenant, and only the service role may change a slug, once. A former slug redirects forever and can't be reused, so a printed QR code never lands on another business. **Why:** most small trades can share a link but can't edit a website; generating in SQL covers every way a tenant is created, and the guard keeps the rules enforceable despite the tenant-update RLS policy. **Rejected:** generating slugs in app code at signup (two creation paths, one of them a DB trigger); unlimited changes (each change strands printed QR codes on a redirect); an iframe of `/embed` inside the hosted page (a frame inside a page on the same origin adds resize jank on phones for nothing).
 
 ---
 

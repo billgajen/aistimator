@@ -21,6 +21,7 @@ export const GB_REGION: RegionDefinition = {
     taxLabel: 'VAT',
     phoneExample: '07700 900123',
     languageVariant: 'British English (UK spelling: colour, centre)',
+    requestNoun: 'a quote',
   },
   referenceObjects: [
     { id: 'entry_door_height', label: 'standard entry door height', dimension: 'height', metres: 1.98 },

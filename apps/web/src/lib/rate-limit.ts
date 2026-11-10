@@ -13,7 +13,7 @@
 import { Redis } from '@upstash/redis'
 import { NextResponse } from 'next/server'
 
-export type RateLimitScope = 'quotes' | 'uploads' | 'chat' | 'marketing'
+export type RateLimitScope = 'quotes' | 'uploads' | 'chat' | 'marketing' | 'quote_page'
 
 export interface ScopeLimits {
   /** Max requests per window from a single IP */
@@ -46,6 +46,8 @@ const DEFAULT_LIMITS: Record<RateLimitScope, ScopeLimits> = {
   chat: { ipLimit: 15, tenantLimit: 100, windowSeconds: 60 },
   // T-144: Conversions API relay (signup events) — a person signs up once
   marketing: { ipLimit: 5, tenantLimit: 1000, windowSeconds: 60 },
+  // T-149: the hosted quote page /quote/{slug} (a page view: two DB reads)
+  quote_page: { ipLimit: 60, tenantLimit: 2000, windowSeconds: 60 },
 }
 
 function envInt(name: string, fallback: number): number {
@@ -176,7 +178,7 @@ export async function checkPublicRateLimit(
 }
 
 /** Extract the client IP from proxy headers (Vercel sets x-forwarded-for). */
-export function getClientIp(request: Request): string {
+export function getClientIp(request: Request | { headers: Headers }): string {
   const forwarded = request.headers.get('x-forwarded-for')
   if (forwarded) {
     const first = forwarded.split(',')[0]?.trim()

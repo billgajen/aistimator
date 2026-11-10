@@ -1,11 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { PageHeader } from '@/components/dashboard/EmptyState'
-
-interface WidgetPageClientProps {
-  tenantKey: string
-}
 
 /**
  * Field type options
@@ -72,15 +67,11 @@ function generateFieldId(label: string): string {
 }
 
 /**
- * Widget & Embed Page Client Component
- *
- * Configure widget form fields and get embed code.
+ * Extra form fields shown to customers (global or per service). T-149: moved
+ * from the Widget page into the Share page's "Advanced" section, unchanged;
+ * the embed code now lives in EmbedCodeCard.
  */
-export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
-  const [embedMode, setEmbedMode] = useState<'inline' | 'floating'>('inline')
-  const [displayMode, setDisplayMode] = useState<'form' | 'conversational'>('form')
-  const [embedCode, setEmbedCode] = useState('')
-  const [copied, setCopied] = useState(false)
+export function FormFieldsBuilder() {
 
   // Form builder state
   const [config, setConfig] = useState<WidgetConfig>(DEFAULT_CONFIG)
@@ -271,61 +262,21 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
     }))
   }
 
-  // Generate embed code
-  useEffect(() => {
-    const origin = window.location.origin
-    const displayAttr =
-      displayMode === 'conversational' ? `\n  data-display-mode="conversational"` : ''
-
-    let code = ''
-    if (embedMode === 'floating') {
-      code = `<!-- Estimator Widget (Floating) -->
-<script
-  src="${origin}/widget.js"
-  data-tenant-key="${tenantKey}"
-  data-mode="floating"
-  data-button-text="Get an instant quote"${displayAttr}
-  async
-></script>`
-    } else {
-      code = `<!-- Estimator Widget (Inline) -->
-<div id="estimator-widget"></div>
-<script
-  src="${origin}/widget.js"
-  data-tenant-key="${tenantKey}"
-  data-mode="inline"
-  data-container="#estimator-widget"${displayAttr}
-  async
-></script>`
-    }
-    setEmbedCode(code)
-  }, [embedMode, displayMode, tenantKey])
-
-  function handleCopy() {
-    navigator.clipboard.writeText(embedCode)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
   const needsOptions = ['select', 'radio', 'checkbox'].includes(newField.type)
 
   return (
     <div>
-      <PageHeader
-        title="Widget & Embed"
-        description="Configure the quote request form and embed it on your website"
-        actions={
-          hasChanges && (
-            <button
-              onClick={saveConfig}
-              disabled={saving}
-              className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
-            >
-              {saving ? 'Saving...' : 'Save Changes'}
-            </button>
-          )
-        }
-      />
+      {hasChanges && (
+        <div className="mb-4 flex justify-end">
+          <button
+            onClick={saveConfig}
+            disabled={saving}
+            className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      )}
 
       {/* Error message */}
       {error && (
@@ -354,9 +305,9 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
         </div>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div>
         {/* Form Configuration */}
-        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+        <div>
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-medium text-text-primary">Form Fields</h2>
@@ -643,98 +594,8 @@ export function WidgetPageClient({ tenantKey }: WidgetPageClientProps) {
           )}
         </div>
 
-        {/* Embed Code */}
-        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
-          <h2 className="text-lg font-medium text-text-primary">Embed Code</h2>
-          <p className="mt-1 text-sm text-text-muted">
-            Copy this code to your website
-          </p>
-
-          {/* Tenant Key Display */}
-          <div className="mt-4 rounded-md bg-background p-3">
-            <p className="text-xs text-text-muted">Your Tenant Key</p>
-            <code className="text-sm font-mono text-text-primary">{tenantKey}</code>
-          </div>
-
-          {/* Placement selector */}
-          <div className="mt-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Placement</p>
-            <div className="mt-1.5 flex gap-2">
-              {(['inline', 'floating'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setEmbedMode(mode)}
-                  className={`rounded-warm-lg px-3 py-1.5 text-sm font-medium capitalize ${
-                    embedMode === mode
-                      ? 'bg-mint text-primary'
-                      : 'bg-background text-text-secondary hover:bg-mist'
-                  }`}
-                >
-                  {mode === 'inline' ? 'Inline (on your page)' : 'Floating button'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Experience selector */}
-          <div className="mt-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Experience</p>
-            <div className="mt-1.5 flex gap-2">
-              {(['form', 'conversational'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setDisplayMode(mode)}
-                  className={`rounded-warm-lg px-3 py-1.5 text-sm font-medium capitalize ${
-                    displayMode === mode
-                      ? 'bg-mint text-primary'
-                      : 'bg-background text-text-secondary hover:bg-mist'
-                  }`}
-                >
-                  {mode === 'form' ? 'Step-by-step form' : 'AI chat (conversational)'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Code preview */}
-          <pre className="mt-4 overflow-x-auto rounded-warm-lg bg-text-primary p-4 text-sm text-gray-100 whitespace-pre-wrap">
-            {embedCode || 'Loading...'}
-          </pre>
-
-          <button
-            onClick={handleCopy}
-            className="mt-4 inline-flex items-center rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background"
-          >
-            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            {copied ? 'Copied!' : 'Copy to Clipboard'}
-          </button>
-        </div>
       </div>
 
-      {/* Preview link */}
-      <div className="mt-8 rounded-warm-lg bg-primary-light p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-medium text-primary">Test your widget</h3>
-            <p className="text-sm text-primary">
-              Preview how the widget looks and works before embedding
-            </p>
-          </div>
-          <a
-            href={`/demo?tenantKey=${tenantKey}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
-          >
-            Open Demo Page
-            <svg className="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-          </a>
-        </div>
-      </div>
     </div>
   )
 }

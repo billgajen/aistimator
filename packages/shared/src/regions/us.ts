@@ -20,6 +20,7 @@ export const US_REGION: RegionDefinition = {
     taxLabel: 'Sales tax',
     phoneExample: '(555) 123-4567',
     languageVariant: 'US English (US spelling: color, center; say "estimate" and "ZIP code")',
+    requestNoun: 'an estimate',
   },
   referenceObjects: [
     { id: 'entry_door_height', label: 'standard entry door height (80 in)', dimension: 'height', metres: round(80 * IN) },

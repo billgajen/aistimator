@@ -8,6 +8,7 @@
  */
 
 import { useState } from 'react'
+import { useCopy } from '@/components/share/useCopy'
 import Link from 'next/link'
 import type { ServiceDraftConfig, AddonConfig, MultiplierConfig, RegionCode } from '@estimator/shared'
 import { getRegion, listRegions, currencySymbol as symbolFor } from '@estimator/shared'
@@ -18,6 +19,8 @@ interface OnboardingFlowProps {
   businessName: string
   tenantKey: string
   appOrigin: string
+  /** T-149: the business's own quote page, shown first on the last step */
+  quoteLink: string | null
   /** T-133: tenant region (US for new signups, GB for legacy tenants) */
   initialRegion: RegionCode
   initialCurrency: string
@@ -45,6 +48,7 @@ export function OnboardingFlow({
   businessName,
   tenantKey,
   appOrigin,
+  quoteLink,
   initialRegion,
   initialCurrency,
   initialTaxEnabled,
@@ -318,6 +322,7 @@ export function OnboardingFlow({
   data-mode="floating"
   async
 ></script>`
+  const { copy, copiedId } = useCopy()
 
   const currentPricingService =
     step === 'pricing' && pricingQueue[pricingIndex] !== undefined
@@ -821,28 +826,47 @@ export function OnboardingFlow({
             You&apos;re ready to quote
           </h1>
           <p className="mt-2 text-text-secondary">
-            {createdCount} service{createdCount === 1 ? '' : 's'} created. Two ways to see it in
-            action:
+            {createdCount} service{createdCount === 1 ? '' : 's'} created. Here&apos;s how customers reach you:
           </p>
 
           <div className="mt-6 space-y-4">
-            <div className="rounded-xl border border-border p-4">
-              <h3 className="font-semibold text-text-primary">1. Try it yourself right now</h3>
-              <p className="mt-1 text-sm text-text-secondary">
-                Open your quote widget and submit a test request — you&apos;ll get a real quote back.
-              </p>
-              <a
-                href={`/embed/${tenantKey}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-              >
-                Open My Widget
-              </a>
-            </div>
+            {quoteLink && (
+              <div className="rounded-xl border border-border p-4">
+                <h3 className="font-semibold text-text-primary">1. Your quote link</h3>
+                <p className="mt-1 text-sm text-text-secondary">
+                  Share it anywhere: your Google profile, social bio, texts and emails. Try it yourself first and
+                  you&apos;ll get a real estimate back.
+                </p>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <code className="min-w-0 flex-1 truncate rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary">
+                    {quoteLink}
+                  </code>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => copy('link', quoteLink)}
+                      className="inline-flex items-center rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                    >
+                      {copiedId === 'link' ? 'Copied' : 'Copy'}
+                    </button>
+                    <a
+                      href={quoteLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-secondary hover:bg-surface"
+                    >
+                      Open
+                    </a>
+                  </div>
+                </div>
+                <Link href="/app/share" className="mt-2 inline-block text-sm text-text-secondary underline underline-offset-2">
+                  QR code and ready-made texts
+                </Link>
+              </div>
+            )}
 
             <div className="rounded-xl border border-border p-4">
-              <h3 className="font-semibold text-text-primary">2. Add it to your website</h3>
+              <h3 className="font-semibold text-text-primary">{quoteLink ? '2. ' : ''}Add it to your website</h3>
               <p className="mt-1 text-sm text-text-secondary">
                 Paste this snippet before the closing <code>&lt;/body&gt;</code> tag:
               </p>
@@ -851,10 +875,10 @@ export function OnboardingFlow({
               </pre>
               <button
                 type="button"
-                onClick={() => navigator.clipboard.writeText(embedSnippet)}
+                onClick={() => copy('embed', embedSnippet, { shareEvent: false })}
                 className="mt-2 inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-surface"
               >
-                Copy Snippet
+                {copiedId === 'embed' ? 'Copied' : 'Copy Snippet'}
               </button>
             </div>
           </div>

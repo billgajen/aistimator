@@ -38,7 +38,7 @@ export default async function DashboardPage() {
   const [{ data: tenant }, planLimit] = await Promise.all([
     supabase
       .from('tenants')
-      .select('name, branding_json, currency')
+      .select('name, branding_json, currency, quote_link_copied_at, quote_link_first_visit_at')
       .eq('id', profile.tenant_id)
       .single(),
     checkPlanLimit(supabase, profile.tenant_id),
@@ -86,7 +86,7 @@ export default async function DashboardPage() {
   }
 
   // Fetch setup completion status
-  const [servicesResult, widgetResult, sitesResult] = await Promise.all([
+  const [servicesResult, widgetResult] = await Promise.all([
     // Check if tenant has at least one active service
     supabase
       .from('services')
@@ -99,13 +99,6 @@ export default async function DashboardPage() {
       .from('widget_configs')
       .select('config_json')
       .eq('tenant_id', profile.tenant_id)
-      .limit(1),
-    // Check if tenant has active site configured
-    supabase
-      .from('tenant_sites')
-      .select('id')
-      .eq('tenant_id', profile.tenant_id)
-      .eq('is_active', true)
       .limit(1),
   ])
 
@@ -122,13 +115,18 @@ export default async function DashboardPage() {
     // Check if logo is set OR primary color is different from default (#2563eb)
     return branding.logoAssetId !== null || (branding.primaryColor && branding.primaryColor !== '#2563eb')
   })()
-  const hasVerifiedSite = (sitesResult.data?.length ?? 0) > 0
+  // T-149: ticked by real sharing (link copied, or the quote page's first
+  // visit), not by the tenant_sites row the Share page creates on its own
+  const hasSharedLink = Boolean(
+    (tenant as { quote_link_copied_at?: string | null } | null)?.quote_link_copied_at ||
+      (tenant as { quote_link_first_visit_at?: string | null } | null)?.quote_link_first_visit_at
+  )
 
   const setupSteps = [
     { id: 'service', label: 'Add a service', completed: hasService, href: '/app/services' },
-    { id: 'widget', label: 'Configure widget', completed: hasWidgetConfig, href: '/app/widget' },
+    { id: 'widget', label: 'Configure widget', completed: hasWidgetConfig, href: '/app/share' },
     { id: 'branding', label: 'Customize branding', completed: hasBranding, href: '/app/branding' },
-    { id: 'embed', label: 'Embed on website', completed: hasVerifiedSite, href: '/app/widget' },
+    { id: 'share', label: 'Share your quote link', completed: hasSharedLink, href: '/app/share' },
   ]
 
   const completedCount = setupSteps.filter((s) => s.completed).length
@@ -303,14 +301,14 @@ export default async function DashboardPage() {
             description="Set up the services you offer"
           />
           <QuickAction
-            href="/app/widget"
+            href="/app/share"
             icon={
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
               </svg>
             }
-            title="Get Embed Code"
-            description="Add the widget to your site"
+            title="Share Your Quote Link"
+            description="Your link, QR code and embed code"
           />
           <QuickAction
             href="/app/quotes"

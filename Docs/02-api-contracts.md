@@ -194,6 +194,13 @@ Response:
 
 { "ok": true }
 
+T-149 quote link (dashboard cookie or app Bearer; tenant from the signed-in user):
+	•	`GET /api/tenant/slug[?check=<slug>]` → `{ "slug", "changeable", "check?": { "slug", "available", "reason?", "message?" } }`. `reason`: `too_short` | `too_long` | `invalid_characters` | `reserved` | `taken` (another business's current or former slug).
+	•	`PUT /api/tenant/slug` `{ "slug" }` → `{ "slug", "changeable": false }`. Allowed once. 400 `INVALID_SLUG`, 409 `SLUG_TAKEN`, 409 `ALREADY_CHANGED`. The old slug goes to `tenant_slug_history`: it keeps redirecting and can never be taken by anyone else. Writing `tenants.slug` directly is refused by a DB trigger (only the service role may change it).
+	•	`POST /api/tenant/share-event` `{ "event": "copied" }` → `{ "ok": true }`. Sets `tenants.quote_link_copied_at` once (home checklist).
+
+Public page `GET /quote/:slug` (T-149): the business's hosted quote page, rendering the same widget as `/embed/:tenantKey` (AD-024), so submissions go through `POST /api/public/quotes` with that tenant's key under the same rate limits, Turnstile and honeypot. 200 for a current slug with an active site; 308 to `/quote/<current>` for a former slug; 404 for unknown, malformed or inactive. Rate limit scope `quote_page` (60/min/IP). The first view sets `tenants.quote_link_first_visit_at`. `/embed/:tenantKey`, `widget.js` and `iframe-loader.js` are unchanged.
+
 CRUD /api/services
 
 Create and manage services.

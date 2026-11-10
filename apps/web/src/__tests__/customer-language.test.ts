@@ -15,7 +15,7 @@ const ROOT = join(__dirname, '..', '..', '..', '..')
 const CUSTOMER_FILES = [
   'apps/web/src/app/q/[quoteId]/page.tsx',
   'apps/web/src/app/q/[quoteId]/clarify/page.tsx',
-  'apps/web/src/app/embed/[tenantKey]/page.tsx',
+  'apps/web/src/components/embed/EstimateWidget.tsx',
   'apps/web/src/lib/postmark.ts',
   'apps/worker/src/email/templates.ts',
 ]

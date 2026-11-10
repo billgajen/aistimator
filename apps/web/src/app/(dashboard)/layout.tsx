@@ -35,7 +35,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <NavSection title="Configure">
           <NavItem href="/app/services" icon={ServicesIcon} label="Services" />
-          <NavItem href="/app/widget" icon={WidgetIcon} label="Widget" />
+          <NavItem href="/app/share" icon={ShareIcon} label="Share" />
           <NavItem href="/app/whatsapp" icon={WhatsAppIcon} label="WhatsApp" />
           <NavItem href="/app/sms" icon={SmsIcon} label="SMS" />
           <NavItem href="/app/branding" icon={BrandingIcon} label="Branding" />
@@ -165,10 +165,10 @@ function ServicesIcon({ className }: { className?: string }) {
   )
 }
 
-function WidgetIcon({ className }: { className?: string }) {
+function ShareIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
     </svg>
   )
 }

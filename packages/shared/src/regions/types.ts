@@ -37,6 +37,8 @@ export interface RegionCopy {
   phoneExample: string
   /** Spelling/variant instruction handed to AI wording prompts */
   languageVariant: string
+  /** T-149: what customers ask a trade for, with its article: "an estimate" / "a quote" */
+  requestNoun: string
 }
 
 export interface RegionDefinition {

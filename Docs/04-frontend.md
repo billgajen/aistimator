@@ -22,7 +22,7 @@ Routes:
 - /app/onboarding
 - /app/services
 - /app/pricing
-- /app/widget
+- /app/share (T-149; /app/widget redirects here)
 - /app/branding
 - /app/quotes
 - /app/analytics
@@ -33,7 +33,7 @@ Key screens:
 - Onboarding checklist with test mode
 - Pricing rules editor
 - Service area restrictions editor (postcode or zip, county or state)
-- Widget config and embed code
+- Share: quote link, QR code, ready-made share texts, embed code, form fields (Advanced)
 - Quote template toggles and preview
 - Quotes list with status and actions
 
@@ -49,8 +49,17 @@ Must be:
 - Clear CTAs: accept, pay, contact
 - Show optional sections based on tenant settings
 
+### 4) Business quote page (public, no login, T-149)
+Routes:
+- /quote/[slug] (e.g. /quote/sunbelt-painting)
+
+The main way to go live: a readable link and QR code a business shares on its Google profile, social bio,
+email signature and text replies, with no website needed. Renders the same widget as /embed/[tenantKey]
+(one implementation, `components/embed/EstimateWidget.tsx`), full screen, with the tenant's logo, name,
+tagline, colour and the white-label "Powered by" rule. Unknown or inactive → plain 404; a former slug → 308.
+
 ## Embed modes
-### A) JS snippet embed (default)
+### A) JS snippet embed (second option since T-149)
 - Business pastes a script snippet.
 - Script loads your widget bundle from CDN and mounts into:
   - floating button modal, or

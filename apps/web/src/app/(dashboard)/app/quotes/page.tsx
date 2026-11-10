@@ -279,8 +279,8 @@ export default function QuotesPage() {
           action={
             !search && !statusFilter
               ? {
-                  label: 'Get embed code',
-                  href: '/app/widget',
+                  label: 'Share your quote link',
+                  href: '/app/share',
                 }
               : undefined
           }

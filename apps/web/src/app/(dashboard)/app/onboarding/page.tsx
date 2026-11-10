@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
 import { getRegion } from '@estimator/shared'
+import { getOrCreateTenantKey, appOriginFrom } from '@/lib/tenant-site'
+import { quoteLinkUrl } from '@/lib/quote-link-url'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,38 +36,12 @@ export default async function OnboardingPage() {
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('name, region, currency, tax_enabled, tax_rate')
+    .select('name, region, currency, tax_enabled, tax_rate, slug')
     .eq('id', profile.tenant_id)
     .single()
 
-  // Get or create tenant_site with tenant_key (same logic as the widget page)
-  let { data: tenantSite } = await supabase
-    .from('tenant_sites')
-    .select('tenant_key')
-    .eq('tenant_id', profile.tenant_id)
-    .single()
-
-  if (!tenantSite) {
-    const { data: newSite } = await supabase
-      .from('tenant_sites')
-      .insert({
-        tenant_id: profile.tenant_id,
-        domain: 'localhost',
-        tenant_key: `tkey_${crypto.randomUUID().replace(/-/g, '').slice(0, 24)}`,
-      })
-      .select('tenant_key')
-      .single()
-
-    tenantSite = newSite
-  }
-
-  const tenantKey = tenantSite?.tenant_key || 'ERROR_NO_KEY'
-
-  // Resolve app origin for the embed snippet
-  const headersList = headers()
-  const host = headersList.get('host') || 'localhost:3000'
-  const protocol = host.startsWith('localhost') ? 'http' : 'https'
-  const appOrigin = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`
+  const tenantKey = await getOrCreateTenantKey(supabase, profile.tenant_id)
+  const appOrigin = appOriginFrom(headers().get('host'))
 
   return (
     <div className="py-4">
@@ -73,6 +49,7 @@ export default async function OnboardingPage() {
         businessName={tenant?.name || 'your business'}
         tenantKey={tenantKey}
         appOrigin={appOrigin}
+        quoteLink={tenant?.slug ? quoteLinkUrl(appOrigin, tenant.slug) : null}
         initialRegion={getRegion(tenant?.region).code}
         initialCurrency={tenant?.currency || 'USD'}
         initialTaxEnabled={tenant?.tax_enabled ?? false}

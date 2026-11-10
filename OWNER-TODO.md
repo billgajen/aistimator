@@ -196,3 +196,21 @@ Code for every item is already built; these are the steps that unlock it.
 - [x] **"guaranteed" / "guarantee":** added to the guard's word list (`CUSTOMER_BANNED_WORDS`) in T-148. Your own text
   ("Workmanship guaranteed for 12 months") is still left as you typed it.
 
+## T-149 — Quote link and QR code
+
+- [ ] **Deploy in order:** `bash scripts/deploy-migration-32.sh` FIRST (the web app reads `tenants.slug` on the Share,
+  setup and home pages; without the column they fail), then the web app. The worker is not touched.
+- [ ] **Know what changes on deploy:** every business gets a link like `/quote/your-business-name`, existing ones
+  included (backfilled oldest first; a clash or reserved word gets a short suffix such as `-3f2a`). The menu item
+  "Widget" is now **Share**: link and QR code first, embed code second, form fields under Advanced. Installed widgets
+  and `/embed/...` links keep working unchanged.
+- [ ] **Changing the link is allowed once.** The old link keeps redirecting to the new one.
+- [ ] **Home checklist:** "Embed on website" became "Share your quote link". It ticks when you copy the link or the
+  page gets its first visit; existing tenants start unticked.
+- [ ] **Turnstile:** the quote page runs on the platform domain, the same as `/embed`, so the current Turnstile site
+  key covers it. No change needed.
+- [ ] **Later (custom domain):** when the custom domain is set, every shared link and printed QR code should use it.
+  Set `NEXT_PUBLIC_APP_URL` before businesses start printing QR codes, or old prints will point at the vercel.app address.
+- [ ] **Not checked by eye:** the "Change the end of the link" form (checked through the API) and the setup flow's
+  last step. The quote page on a phone and the Share page were screenshotted.
+
