@@ -8,6 +8,11 @@ const ADMIN_ROUTES = ['/admin']
 // Routes that should redirect to /app if already authenticated
 const AUTH_ROUTES = ['/login', '/signup']
 
+/** `/app` and `/app/...`, never `/approve` or `/apple` */
+export function underRoute(pathname: string, route: string): boolean {
+  return pathname === route || pathname.startsWith(`${route}/`)
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -43,8 +48,9 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Check if route is protected
-  const isProtectedRoute = PROTECTED_ROUTES.some((route) => pathname.startsWith(route))
-  const isAdminRoute = ADMIN_ROUTES.some((route) => pathname.startsWith(route))
+  // T-156: match whole path segments, so /approve (public) isn't caught by /app
+  const isProtectedRoute = PROTECTED_ROUTES.some((route) => underRoute(pathname, route))
+  const isAdminRoute = ADMIN_ROUTES.some((route) => underRoute(pathname, route))
   const isAuthRoute = AUTH_ROUTES.some((route) => pathname === route)
 
   // Redirect unauthenticated users from protected routes to login

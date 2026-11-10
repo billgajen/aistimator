@@ -40,6 +40,8 @@ export * from './ai-models'
 export * from './plans'
 export * from './brand'
 export * from './demo'
+// T-156: approve from the review email
+export * from './approval-link'
 
 // Quote status groups (queue processing)
 export * from './quote-status'

@@ -65,6 +65,7 @@ import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@estimator/shared'
 import { createSentenceRewriter } from './ai/wording-repair'
 import { sendQuoteEmails, sendReviewRequestEmail, sendEstimateShownEmail, isEmailConfigured } from './email'
+import { issueApprovalLink } from './approval-link'
 import { incrementUsageCounter } from './usage'
 
 /** T-153: photos a demo request reads at most (matches DEMO_MAX_PHOTOS in shared) */
@@ -2497,6 +2498,13 @@ export async function processQuote(
         ? { low: pricing.estimate.rangeLow, high: pricing.estimate.rangeHigh }
         : undefined
       try {
+        // T-156: the one-tap Approve & send link (test requests get one too;
+        // demo requests never reach here)
+        const approveUrl = await issueApprovalLink(supabase, {
+          quoteId,
+          tenantId: quoteData.quote.tenant_id,
+          appUrl: env.APP_URL || 'http://localhost:3000',
+        })
         const result = await sendReviewRequestEmail(
           {
             postmarkApiToken: env.POSTMARK_API_TOKEN!,
@@ -2519,6 +2527,9 @@ export async function processQuote(
             locale: regionCtx.locale,
             reason: awaitingBusinessReview ? undefined : qualityGateResult?.reason,
             primaryColor: tenant.branding_json?.primaryColor,
+            reviewHold: reviewDecision.reviewHold,
+            approveUrl,
+            isTest: quoteData.quote.is_test === true,
           }
         )
         if (!result.success) console.error('[Processor] Review request email failed:', result.error)

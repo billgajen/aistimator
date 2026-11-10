@@ -14,15 +14,21 @@
  *   Wording that can't be repaired that way must be edited: 400
  *   WORDING_NEEDS_EDIT. An edited quote's text is the business's own and is
  *   never touched.
+ * - T-156: the one function behind every approval: the dashboard, the app and
+ *   the one-tap email link (no user: `userId` null, `via: 'email_link'`).
+ *   `approved_via` records which.
  */
 
 import { formatMoney, getRegion, repairCustomerWording, businessPhrasesFrom } from '@estimator/shared'
 import type { QuotePricing, TenantBranding, CustomerWording, WordingRepairRecord, PricingRules, WorkStepConfig } from '@estimator/shared'
-import type { createClient } from '@/lib/supabase/server'
+import type { createClient, createAdminClient } from '@/lib/supabase/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { sendEmail, isPostmarkConfigured, generateCustomerEmailHtml } from '@/lib/postmark'
 
-type Supabase = Awaited<ReturnType<typeof createClient>>
+/** A signed-in user's client (dashboard, app) or the service role (email link, T-156) */
+type Supabase = Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient>
+
+export type ApprovalVia = 'dashboard' | 'app' | 'email_link'
 
 export type ApproveResult =
   | { ok: true; status: 'sent'; quoteViewUrl: string; emailed: boolean; emailError?: string }
@@ -93,9 +99,13 @@ export async function approveQuote(opts: {
   supabase: Supabase
   quoteId: string
   tenantId: string
-  userId: string
+  /** null for the email link: no one is signed in */
+  userId: string | null
+  via: ApprovalVia
 }): Promise<ApproveResult> {
-  const { supabase, quoteId, tenantId, userId } = opts
+  const { quoteId, tenantId, userId, via } = opts
+  // The two client types share every call used here
+  const supabase = opts.supabase as Awaited<ReturnType<typeof createClient>>
 
   const { data: quote, error } = await supabase
     .from('quotes')
@@ -138,6 +148,7 @@ export async function approveQuote(opts: {
       sent_at: now,
       approved_at: now,
       approved_by: userId,
+      approved_via: via,
       previous_token_hash: quote.quote_token_hash,
       quote_token_hash: hash,
       token_expires_at: expiry.toISOString(),

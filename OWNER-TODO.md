@@ -359,3 +359,22 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
   then blocks accept. The "Valid until" date shown to the customer comes from the estimate's validity days, not the
   link's expiry; they usually agree (30 days) but can differ after a reminder or resend renews the link. **Claim kept:**
   "Estimates expire automatically". If "Valid until" is ever made to follow the link, nothing to restore.
+
+## T-156 — Approve a quote from the email in one tap
+
+- [ ] **Deploy, in this order:**
+  1. migration 37: `bash scripts/deploy-migration-37.sh` (the `quote_approval_tokens` table, the trigger that ends
+     open links when a quote changes, and `quotes.approved_via`);
+  2. the worker: `(cd apps/worker && npx wrangler deploy --env production)`;
+  3. the web app: `npx vercel deploy --prod`.
+
+  The worker first, because the old web app ignores the new table. The web app last, because `/approve` needs the table.
+- [ ] **Try it by hand:** send a request to your own business. In the "Review and approve" email, tap **Approve & send**
+  on your phone, check the page shows the price, and press the button. You should see "Sent", and the customer address
+  should get "Your quote from …" once. Tap the button in the email again: "Already approved".
+- [ ] **Email delivery:** both the review email and the customer's confirmed quote wait on the Postmark account approval
+  (above). Until then they only reach your own domain.
+- [ ] **Per-IP limit:** the `approval_link` limit uses Upstash, which isn't set up in production, so it fails open. The
+  per-link cap (10 presses, counted in the database) applies regardless. See "Rate limiting" above.
+- Test requests from setup keep the review email, marked "[Test]" with a banner, and the button works like any other
+  (it counts toward nothing). Demo requests send no email.

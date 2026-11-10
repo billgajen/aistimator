@@ -228,6 +228,99 @@ export function businessNotificationEmail(data: BusinessEmailData): string {
   return emailWrapper(content, primaryColor)
 }
 
+export interface ReviewEmailData {
+  businessName: string
+  customerName: string
+  customerEmail?: string
+  customerPhone?: string
+  serviceName: string
+  jobAddress?: string
+  quoteId: string
+  /** Price or measured range, already formatted for the business's region */
+  total: string
+  /** T-156: the one-tap link; absent when it couldn't be issued (the dashboard link still works) */
+  approveUrl?: string
+  dashboardUrl: string
+  /** T-147 hold kind, said in plain words */
+  holdLine: string
+  /** Why a check held it */
+  reviewReason?: string
+  /** T-150: the owner's own test request from setup */
+  testBanner?: string
+  primaryColor?: string
+}
+
+/**
+ * T-146 / T-156: "Review and approve". A big Approve & send button (the
+ * one-tap link: it opens a confirmation page, it never approves on its own),
+ * a smaller dashboard link for editing, the price, and whether the customer
+ * can already see the estimate.
+ */
+export function reviewRequestEmail(data: ReviewEmailData): string {
+  const primaryColor = data.primaryColor || '#2563eb'
+  const testBanner = data.testBanner
+    ? `<div style="margin: 0 0 20px; padding: 12px 14px; background-color: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px;">
+        <p style="margin: 0; font-size: 13px; font-weight: 700; color: #92400e;">TEST REQUEST</p>
+        <p style="margin: 4px 0 0; font-size: 13px; color: #92400e;">${escapeHtml(data.testBanner)}</p>
+      </div>`
+    : ''
+  const approveButton = data.approveUrl
+    ? `<table role="presentation" style="width: 100%; margin: 24px 0 8px;">
+        <tr>
+          <td style="text-align: center;">
+            <a href="${escapeHtml(data.approveUrl)}" style="display: block; padding: 16px 28px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 17px; border-radius: 10px;" data-role="approve">
+              Approve &amp; send
+            </a>
+          </td>
+        </tr>
+      </table>
+      <p style="margin: 0 0 8px; text-align: center; font-size: 12px; color: #6b7280;">Opens a page to confirm. Works once, for 72 hours.</p>`
+    : ''
+  const dashboardLink = data.approveUrl
+    ? `<p style="margin: 16px 0 0; text-align: center; font-size: 14px;">
+        <a href="${escapeHtml(data.dashboardUrl)}" style="color: ${primaryColor}; text-decoration: underline;" data-role="dashboard">Open in dashboard to edit</a>
+      </p>`
+    : `<table role="presentation" style="width: 100%; margin: 24px 0;">
+        <tr>
+          <td style="text-align: center;">
+            <a href="${escapeHtml(data.dashboardUrl)}" style="display: inline-block; padding: 14px 28px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;" data-role="dashboard">
+              Review and approve
+            </a>
+          </td>
+        </tr>
+      </table>`
+
+  const content = `
+    ${testBanner}
+    <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
+      <p style="margin: 0; font-size: 14px; color: #6b7280;">Estimate ready for your approval</p>
+      <h1 style="margin: 8px 0 0; font-size: 24px; font-weight: 700; color: #111827;">${escapeHtml(data.customerName)}</h1>
+      <p style="margin: 4px 0 0; font-size: 15px; color: #374151;">${escapeHtml(data.serviceName)}</p>
+      <p style="margin: 12px 0 0; font-size: 28px; font-weight: 700; color: ${primaryColor};">${escapeHtml(data.total)}</p>
+    </div>
+
+    <div style="margin-bottom: 20px; padding: 14px 16px; background-color: #f9fafb; border-radius: 8px;">
+      <p style="margin: 0; font-size: 14px; color: #111827;" data-role="hold">${escapeHtml(data.holdLine)}</p>
+      ${data.reviewReason ? `<p style="margin: 8px 0 0; font-size: 13px; color: #92400e;" data-role="reason">Why: ${escapeHtml(data.reviewReason)}</p>` : ''}
+    </div>
+
+    ${approveButton}
+    ${dashboardLink}
+
+    <div style="margin-top: 28px; padding: 16px; background-color: #f9fafb; border-radius: 8px;">
+      <p style="margin: 0; font-weight: 600; color: #374151; font-size: 14px;">Customer details</p>
+      <p style="margin: 8px 0 0; color: #6b7280; font-size: 14px;">${escapeHtml(data.customerName)}</p>
+      ${data.customerEmail ? `<p style="margin: 4px 0 0; color: #6b7280; font-size: 14px;">${escapeHtml(data.customerEmail)}</p>` : ''}
+      ${data.customerPhone ? `<p style="margin: 4px 0 0; color: #6b7280; font-size: 14px;">Phone: ${escapeHtml(data.customerPhone)}</p>` : ''}
+      ${data.jobAddress ? `<p style="margin: 4px 0 0; color: #6b7280; font-size: 14px;">${escapeHtml(data.jobAddress)}</p>` : ''}
+    </div>
+
+    <p style="margin: 16px 0 0; color: #9ca3af; font-size: 12px;">Quote ID: ${escapeHtml(data.quoteId)}</p>
+  `
+
+  return emailWrapper(content, primaryColor)
+}
+
 /**
  * Escape HTML special characters
  */

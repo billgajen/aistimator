@@ -4,11 +4,12 @@
  * Handles sending quote notification emails to customers and businesses.
  */
 
-import { formatMoney } from '@estimator/shared'
+import { formatMoney, reviewEmailSubject, reviewHoldLine, TEST_REQUEST_BANNER } from '@estimator/shared'
 import { sendEmail, type PostmarkConfig } from './postmark'
 import {
   customerQuoteEmail,
   businessNotificationEmail,
+  reviewRequestEmail,
   type CustomerEmailData,
   type BusinessEmailData,
 } from './templates'
@@ -185,46 +186,64 @@ export interface ReviewRequestEmailData {
   /** Why a check held it (quality gate / send-guard); absent for the default review */
   reason?: string
   primaryColor?: string
+  /** T-147 hold kind: what the customer can see right now */
+  reviewHold?: 'shown' | 'held' | 'check' | null
+  /** T-156: the one-tap approval link (absent if it couldn't be issued) */
+  approveUrl?: string
+  /** T-150: the owner's test request from setup */
+  isTest?: boolean
 }
 
-/**
- * T-146: tell the business a quote is waiting for its approval. The customer
- * hears nothing until the business approves (the web app sends that email).
- */
-export async function sendReviewRequestEmail(
-  config: EmailConfig,
-  data: ReviewRequestEmailData
-): Promise<{ success: boolean; error?: string }> {
+/** T-156: the review email's subject and body (pure, for tests) */
+export function buildReviewRequestEmail(appUrl: string, data: ReviewRequestEmailData): { subject: string; html: string } {
   const locale = data.locale || 'en-GB'
   const money = (n: number) => formatMoney(n, data.currency, locale)
   const total = data.range && data.range.high > data.range.low
     ? `${money(data.range.low)} – ${money(data.range.high)}`
     : money(data.total)
-  const html = businessNotificationEmail({
+  const html = reviewRequestEmail({
     businessName: data.businessName,
     customerName: data.customerName,
-    customerEmail: data.customerEmail,
+    customerEmail: data.customerEmail || undefined,
     customerPhone: data.customerPhone,
     serviceName: data.serviceName,
     jobAddress: data.jobAddress,
     quoteId: data.quoteId,
-    dashboardUrl: `${config.appUrl}/app/quotes/${data.quoteId}`,
     total,
-    currency: data.currency,
-    primaryColor: data.primaryColor,
-    awaitingReview: true,
+    approveUrl: data.approveUrl,
+    dashboardUrl: `${appUrl}/app/quotes/${data.quoteId}`,
+    holdLine: reviewHoldLine(data.reviewHold),
     reviewReason: data.reason,
+    testBanner: data.isTest ? TEST_REQUEST_BANNER : undefined,
+    primaryColor: data.primaryColor,
   })
+  return {
+    subject: reviewEmailSubject({ customerName: data.customerName, serviceName: data.serviceName, price: total, isTest: data.isTest }),
+    html,
+  }
+}
+
+/**
+ * T-146: tell the business a quote is waiting for its approval.
+ * T-156: with a one-tap Approve & send link. The customer's confirmed quote
+ * email goes from the web app on approval.
+ */
+export async function sendReviewRequestEmail(
+  config: EmailConfig,
+  data: ReviewRequestEmailData
+): Promise<{ success: boolean; error?: string }> {
+  const { subject, html } = buildReviewRequestEmail(config.appUrl, data)
   const result = await sendEmail(
     { apiToken: config.postmarkApiToken, fromEmail: config.fromEmail, fromName: config.fromName || data.businessName },
     {
       to: data.ownerEmail,
-      subject: `Review and approve: ${data.customerName} - ${data.serviceName}`,
+      subject,
       htmlBody: html,
       tag: 'quote-review-request',
     }
   )
-  console.log(`[Email] Review request ${result.success ? 'sent' : 'failed'}: ${data.ownerEmail}`)
+  // No customer details in logs: the quote id is enough to find it
+  console.log(`[Email] Review request ${result.success ? 'sent' : 'failed'} for ${data.quoteId}`)
   return { success: result.success, error: result.error }
 }
 

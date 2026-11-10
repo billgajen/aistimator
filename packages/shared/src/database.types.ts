@@ -911,7 +911,23 @@ export interface Quote {
   is_test?: boolean
   /** T-147: why a pending_review quote awaits the business: shown | held | check */
   review_hold?: 'shown' | 'held' | 'check' | null
+  /** T-156: how the business approved it (approved_at is when) */
+  approved_via?: 'dashboard' | 'app' | 'email_link' | null
   paid_at: string | null
+}
+
+/** T-156: a link in the review email that approves one quote (service role only; hash only) */
+export interface QuoteApprovalToken {
+  id: string
+  tenant_id: string
+  quote_id: string
+  token_hash: string
+  expires_at: string
+  used_at: string | null
+  invalidated_at: string | null
+  invalidated_reason: 'replaced' | 'quote_changed' | null
+  attempts: number
+  created_at: string
 }
 
 export interface PlanFeatures {

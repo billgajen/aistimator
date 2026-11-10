@@ -116,6 +116,34 @@ The business approves a quote awaiting its review. The quote is marked approved 
 400 `INVALID_STATUS` (not `pending_review`), 400 `NOT_PRICED` (lead held at the plan limit, price it first), 400 `WORDING_NEEDS_EDIT` (T-148: the unedited generated wording has banned customer words that only deleting the scope would remove; edit it first), 409 `ALREADY_SENT` (a second tap), 404 for another tenant's quote.
 T-148: approving an unedited quote (`version` 1) first removes banned customer words from its generated wording and saves the result (`content_json`, plus `pricing_trace_json.wordingRepair`). An edited quote is sent as written.
 `PATCH /api/quotes/:id` with `sendToCustomer: true` also counts as approval. A held quote's first send emails "Your quote from …", not "Updated quote".
+T-156: every approval records how in `quotes.approved_via`: `dashboard` (cookie), `app` (Bearer), or `email_link` (below, with `approved_by` null). `approved_at` is when.
+
+**One-tap approval from the review email (T-156, AD-041)**
+
+The worker's "Review and approve: {customer} - {service} - {price}" email has an **Approve & send** button linking to `GET /approve/{token}`, plus "Open in dashboard to edit". A test request from setup has the subject prefixed "[Test] " and a banner at the top; demo requests send no email.
+- **The token:** 43 URL-safe characters (256 random bits), one per email, in `quote_approval_tokens` (migration 37).
+  - Only its sha256 is stored. It's bound to one quote and one tenant, expires after 72 hours, and works once.
+  - A newer review email for the same quote replaces it (`invalidated_reason = 'replaced'`).
+  - A database trigger invalidates it when the quote's status, version, pricing or wording changes by any route (`quote_changed`).
+  - It approves its own quote and nothing else. It is not a session.
+- `GET /approve/{token}` (page, no login): shows the business, customer, service, price or measured range, and scope summary. **Opening it never approves.** Headers: `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex, nofollow`, `Cache-Control: no-store`.
+
+POST /api/public/approval/:token (no auth; the token is the credential)
+- Rate limits:
+  - per IP and per link: scope `approval_link`, 10 and 5 a minute (Upstash; fails open without it);
+  - plus at most 10 presses per link, counted in the database, which holds without Redis.
+- It ignores any body: the quote and tenant come from the token's own row. It then calls the same `approveQuote` as the dashboard and app, so the status guard, wording repair, customer email and kept customer link all behave the same.
+- Response: `{ "outcome", "title", "body", "dashboardPath?", "emailed?" }`.
+- Status by outcome:
+  - 200 `approved` (`emailed: false` when the customer has no email address or email is off);
+  - 409 `already_approved` (a second press, or approved elsewhere; nothing changes);
+  - 410 `link_expired` (expired, replaced or invalidated);
+  - 409 `not_awaiting` (declined, expired or withdrawn);
+  - 400 `wording_needs_edit` (T-148);
+  - 400 `not_priced` (held at the plan limit);
+  - 429 `too_many` or `RATE_LIMITED`;
+  - 404 `not_found` (unknown token, or a token whose tenant doesn't own the quote).
+- No GET (405). Logs carry the quote id and outcome only.
 
 Services: `POST /api/services` and `PATCH /api/services/:id` accept `autoSend: boolean` ("Send automatically", default false) and, from T-147, `holdUntilApproved: boolean` ("Hold until I approve", default false). Both off is the default mode, "Show the estimate, then I confirm it". Setting one clears the other. Unless auto-send is on, the worker holds every quote that would have been sent (`pending_review`) and emails the business "Review and approve: …". Quotes created in the business's own app send no such email.
 
@@ -130,7 +158,7 @@ T-147 show, then confirm (supersedes the T-146 default; AD-035):
 	•	`POST /api/public/quotes/:quoteId/accept` returns 400 `INVALID_STATUS` until the business approves.
 	•	`POST /api/public/quotes/:quoteId/feedback` accepts `feedbackType: "feedback"` (Ask a question) on a shown-early quote and leaves the status at `pending_review`. `approval_request` is still 400 there.
 	•	After `POST /api/quotes/:quoteId/approve` the same link returns `review.state = "quote"` with `acceptQuoteEnabled` back to the tenant setting.
-	•	Emails: a shown-early quote sends the customer "Your estimate from {business}" at once (worker, Postmark tag `estimate-customer`), saying the business will confirm. "Your quote from {business}" still goes on approval. The business "Review and approve" email is unchanged.
+	•	Emails: a shown-early quote sends the customer "Your estimate from {business}" at once (worker, Postmark tag `estimate-customer`), saying the business will confirm. "Your quote from {business}" still goes on approval. The business "Review and approve" email gained the one-tap button and the hold line in T-156.
 
 POST /api/public/quotes/:quoteId/accept
 

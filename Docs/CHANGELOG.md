@@ -15,6 +15,71 @@
 
 ## Issues & Resolutions
 
+### 2026-11-10: T-156 — Approve a quote from the email in one tap, without logging in (AD-041)
+
+**Problem:** the "Review and approve" email linked to the dashboard, so an owner on a phone had to log in before approving. That was the slowest step left between a customer's request and a confirmed quote.
+
+**Built:**
+1. **Migration 37** (additive, re-runnable):
+   - `quote_approval_tokens`:
+     - columns: tenant, quote, sha256 `token_hash`, `expires_at` (+72 h), `used_at`, `invalidated_at` with a reason, `attempts`;
+     - row-level security on with no policies, so service role only.
+   - The trigger `quotes_invalidate_approval_links` (AFTER UPDATE, **SECURITY DEFINER**): when status, version, pricing or wording changes, every open link for that quote ends.
+     - It covers approval, edits, decline, expiry and repricing from any route, so no route can forget.
+     - SECURITY DEFINER because a dashboard edit runs with the user's token, which can't see the table. Without it the invalidation would silently match nothing.
+   - `quotes.approved_via` (`dashboard` | `app` | `email_link`).
+2. **`shared/approval-link.ts`** (pure apart from randomness and Web Crypto, shared by the worker, the web app and the live check):
+   - the token: 256 bits, base64url;
+   - `approvalLinkState`, `approvalPageOutcome` (the quote's own state wins: approved anywhere reads "already approved") and `approvalErrorOutcome`;
+   - plain words for every outcome;
+   - the email subject and the hold line.
+3. **Worker:**
+   - `issueApprovalLink` marks any open link for the quote `replaced`, then stores a new one (hash only). If that fails, the email still goes, with the dashboard button.
+   - The review email (`reviewRequestEmail` template, `buildReviewRequestEmail`) has:
+     - the subject "Review and approve: {customer} - {service} - {price or range}", money formatted for the region;
+     - a big **Approve & send** button, then "Open in dashboard to edit";
+     - the T-147 hold line: the customer can already see it / it's held until you approve / held for a check, with the reason.
+   - **Test requests** (T-150) keep the email and the button, with "[Test]" in the subject and a banner at the top. Demo requests send nothing, as before.
+   - The log line no longer names the owner's address.
+4. **Web:**
+   - **`/approve/[token]`** (no login, phone first) shows the business, customer, service, price or measured range, and scope summary.
+     - **Opening it changes nothing.** One **Approve & send** button posts.
+     - Every state offers "Open in dashboard to edit".
+     - Headers: `no-referrer`, `noindex`, `no-store`.
+   - **`POST /api/public/approval/[token]`**:
+     - rate-limited per IP and per link (`approval_link`), plus 10 presses per link counted in the database;
+     - reads the quote and tenant only from the token's row, then calls the same `approveQuote` (`userId` null, `via: 'email_link'`);
+     - marks the link used.
+   - It handles every outcome with a plain message: approved (or approved with no email sent), already approved, link expired, no longer waiting, wording needs editing, no price yet, too many tries, not found.
+   - The dashboard and app approve routes, and edit-then-send, now record `approved_via`.
+
+**Found while verifying:** the login middleware matched protected routes with `startsWith('/app')`, so `/approve/…` redirected to the login page (307). It now matches whole path segments (`underRoute`: `/app` and `/app/…`, never `/approve` or `/apple`). verify-t156 caught it on the first run.
+
+**Verified:**
+- `verify-t156.mts` 31/31 live (local stack, migration 37 applied twice):
+  - Opening the page twice, and a GET on the endpoint (405), approve and count nothing.
+  - The page shows the summary and one button, with no customer email address; the headers are set.
+  - Pressing approves the link's own quote (`sent`, `approved_via = email_link`, no user). Ids in the request body are ignored, and the rival business's quote is untouched. A link whose tenant doesn't own the quote shows and does nothing.
+  - The customer's existing link shows the confirmed quote with Accept enabled.
+  - A second press gets 409 "already approved" with nothing changed.
+  - Approving in the dashboard, or editing, invalidates the link through the trigger (`quote_changed`). Replaced and expired links get 410 while the newest link still works.
+  - Edge cases:
+    - an expired quote reads "no longer waiting";
+    - `WORDING_NEEDS_EDIT` gets 400 with the dashboard link, nothing sent and the link not used;
+    - the 11th press gets 429;
+    - a plan-limit hold shows "no price yet" with no button;
+    - a test request approves through its link and counts toward nothing.
+- Unit tests:
+  - web 352 (+30): the token's shape and hash; states and outcomes; plain copy for every outcome; that opening never writes; region money; approving once, with the customer emailed exactly once even for two presses at once; every refusal changing nothing; cross-quote and cross-tenant isolation; no ids from the request; the rate-limit scope; logs; `approved_via`; the middleware match.
+  - worker 476 (+11): the email's subject, button order, hold lines and reason, the test marking, the fallback without a link, escaping, issuing (replace, then hash only, 72 h; a failure never blocks the email), demo excluded and test included.
+  - mobile 11.
+- Regression set verify-t146–t155: 20/20, 33/33, 29/29, 35/35, 27/27, 35/35, 66/66, 36/36, 26/26, 46/46.
+- Lint, typecheck, web and worker builds pass. The page was checked by eye at 390 px (ready and approved states, no sideways scroll).
+
+**Not verified live:** no email is sent locally (no Postmark), so the worker's link issuing and the email itself are unit-tested, not seen in an inbox; the live links were made with the same shared function. The per-IP limit needs Upstash, which is off in production (it fails open); the per-link cap doesn't need it.
+
+**Files:** `supabase/migrations/00000000000037_approval_links.sql`, `scripts/deploy-migration-37.sh`, `packages/shared/src/{approval-link,database.types,index}.ts`, `apps/worker/src/{approval-link.ts,quote-processor.ts,email/index.ts,email/templates.ts,__tests__/review-email.test.ts}`, `apps/web/src/lib/{approval-link,quote-approval,rate-limit}.ts`, `apps/web/src/app/approve/[token]/{page,ApproveCard}.tsx`, `apps/web/src/app/api/public/approval/[token]/route.ts`, `apps/web/src/app/api/quotes/[quoteId]/{route.ts,approve/route.ts}`, `apps/web/src/middleware.ts`, `apps/web/next.config.js`, `apps/web/src/__tests__/approval-link.test.ts`, `scripts/hardcore-test/verify-t156.mts`.
+
 ### 2026-11-10: T-155 — Home page polish after the T-154 review
 
 **Problem:** the owner's review of T-154 found:
@@ -3924,6 +3989,23 @@ if (pricingResult.estimatedTotal <= 0) {
 ### AD-040: The public demo is one flagged example business, outside every count (T-153)
 
 **Decision:** /demo runs the real widget against one example tenant marked `is_demo`. The flag is set only by the service role (a guard trigger) and copied to its quotes by a trigger, so no API can forge it either way. A demo request goes through the normal pipeline with the business's own configured prices (AD-001). It is never counted (plan, usage, analytics, calibration, benchmarks), never emails anyone, uses the cheap models with one photo, and is deleted after 24 hours. Its limits are counted in the database, not Redis, so they hold where Upstash is off. **Why:** a visitor should see the real thing in a minute, and a demo must cost little and leave nothing behind. **Rejected:** a recorded video or fake estimate as the main path (not the real product); reusing `is_test` (test quotes email the typed address and show a Test badge); a separate demo widget (AD-024: one widget); a Redis-only cap (off in production).
+
+### AD-041: Approving from the email is a single-purpose link, pressed, never opened (T-156)
+
+**Decision:** the "Review and approve" email carries a link to `/approve/{token}`.
+- **The token:** one quote, one tenant, hash only, 72 hours, single use. It stops working when the quote changes by any route (a database trigger, so no route can forget), or when a newer email replaces it.
+- **The page approves nothing on its own.** Only the button's POST approves, so email scanners and link previews that fetch the page are harmless.
+- **The POST** reads the quote and tenant from the token's own row, never from the request. It approves through the same `approveQuote` as the dashboard and app, so the status guard, wording repair, customer email and kept customer link are identical.
+- **Recorded** as `approved_via = 'email_link'`, with no user.
+- **Presses per link are counted in the database**, so the limit holds where Upstash is off.
+
+**Why:** owners approve on their phones, from the email, and logging in first lost the speed T-147 bought. A token that can do exactly one thing, once, is safe to put in an email.
+
+**Rejected:**
+- approve on GET (scanners would approve quotes);
+- a magic-login link (far more power than approving one quote);
+- signing the quote id instead of storing a token (it can't be made single-use or revoked when the quote is edited);
+- per-route invalidation (easy to miss one).
 
 ---
 

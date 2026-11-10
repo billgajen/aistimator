@@ -13,7 +13,7 @@
 import { Redis } from '@upstash/redis'
 import { NextResponse } from 'next/server'
 
-export type RateLimitScope = 'quotes' | 'uploads' | 'chat' | 'marketing' | 'quote_page' | 'leads'
+export type RateLimitScope = 'quotes' | 'uploads' | 'chat' | 'marketing' | 'quote_page' | 'leads' | 'approval_link'
 
 export interface ScopeLimits {
   /** Max requests per window from a single IP */
@@ -50,6 +50,9 @@ const DEFAULT_LIMITS: Record<RateLimitScope, ScopeLimits> = {
   quote_page: { ipLimit: 60, tenantLimit: 2000, windowSeconds: 60 },
   // T-151: unfinished requests (contact step + progress updates): DB writes only
   leads: { ipLimit: 20, tenantLimit: 300, windowSeconds: 60 },
+  // T-156: the one-tap approval link (the "tenant" key is the link's hash;
+  // the database also caps presses per link, so this holds without Redis)
+  approval_link: { ipLimit: 10, tenantLimit: 5, windowSeconds: 60 },
 }
 
 function envInt(name: string, fallback: number): number {

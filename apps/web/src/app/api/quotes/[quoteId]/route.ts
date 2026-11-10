@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, bearerToken } from '@/lib/supabase/server'
 import { formatMoney, resolveRegionContext } from '@estimator/shared'
 import { type NextRequest, NextResponse } from 'next/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
@@ -395,6 +395,8 @@ export async function PATCH(
       updatePayload.sent_at = now
       updatePayload.approved_at = now
       updatePayload.approved_by = auth.userId
+      // T-156: editing then sending is an approval too
+      updatePayload.approved_via = bearerToken(request.headers.get('authorization')) ? 'app' : 'dashboard'
 
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
       quoteViewUrl = `${appUrl}/q/${quoteId}?token=${token}`
