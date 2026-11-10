@@ -362,7 +362,8 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
 
 ## T-156 — Approve a quote from the email in one tap
 
-- [ ] **Deploy, in this order:**
+- [x] **Deploy, in this order:** done 2026-11-10 22:28 UTC (commit `b0d310c`, worker `fb03997a-fd7a-4d76-b6df-817f622e3dc8`,
+  web `dpl_Dr12ziHWJFHJYD97Fk6WaAWZTw44`).
   1. migration 37: `bash scripts/deploy-migration-37.sh` (the `quote_approval_tokens` table, the trigger that ends
      open links when a quote changes, and `quotes.approved_via`);
   2. the worker: `(cd apps/worker && npx wrangler deploy --env production)`;

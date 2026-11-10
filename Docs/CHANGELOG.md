@@ -78,6 +78,20 @@
 
 **Not verified live:** no email is sent locally (no Postmark), so the worker's link issuing and the email itself are unit-tested, not seen in an inbox; the live links were made with the same shared function. The per-IP limit needs Upstash, which is off in production (it fails open); the per-link cap doesn't need it.
 
+**Deployed 2026-11-10 22:28 UTC** (commit `b0d310c`), in this order:
+1. migration 37 (`scripts/deploy-migration-37.sh`): latest `00000000000037`; token table present, RLS on, 0 policies, `approved_via` present, trigger present and SECURITY DEFINER;
+2. worker version `fb03997a-fd7a-4d76-b6df-817f622e3dc8`;
+3. web (Vercel `dpl_Dr12ziHWJFHJYD97Fk6WaAWZTw44`, READY).
+
+Live checks:
+- worker `/health` 200;
+- `/approve/{made-up token}` 200 with "This link doesn't work": the owner accepted this message for unknown tokens; links that really expired show "This link has expired". No login redirect; headers no-referrer, noindex, no-store;
+- POST with a made-up token 404;
+- `/app` signed out 307 to `/login`; `/quote/{slug}` 200;
+- public quote API 404 for a bad token; approve 401 when not logged in.
+
+No request was submitted to production.
+
 **Files:** `supabase/migrations/00000000000037_approval_links.sql`, `scripts/deploy-migration-37.sh`, `packages/shared/src/{approval-link,database.types,index}.ts`, `apps/worker/src/{approval-link.ts,quote-processor.ts,email/index.ts,email/templates.ts,__tests__/review-email.test.ts}`, `apps/web/src/lib/{approval-link,quote-approval,rate-limit}.ts`, `apps/web/src/app/approve/[token]/{page,ApproveCard}.tsx`, `apps/web/src/app/api/public/approval/[token]/route.ts`, `apps/web/src/app/api/quotes/[quoteId]/{route.ts,approve/route.ts}`, `apps/web/src/middleware.ts`, `apps/web/next.config.js`, `apps/web/src/__tests__/approval-link.test.ts`, `scripts/hardcore-test/verify-t156.mts`.
 
 ### 2026-11-10: T-155 — Home page polish after the T-154 review
