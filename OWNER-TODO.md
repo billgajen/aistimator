@@ -313,7 +313,8 @@ Code for every item is already built; these are the steps that unlock it.
 
 ## T-154 — Home page rewrite
 
-- [ ] **Deploy: web only** (`npx vercel deploy --prod`). No migration, no worker change.
+- [x] **Deploy: web only** (`npx vercel deploy --prod`). No migration, no worker change. Done 2026-11-10 with T-155
+  (commits 430756e, 8793481; deployment `dpl_GuF1ZuFeccR8pZFvDqduYoZmmxug`).
 - [ ] **Review the screenshots** in `scripts/hardcore-test/results/2026-11-10-t154-screenshots/` (home at 390 px and
   1440 px, the phone menu, a trade page, the features page, the social preview image).
 - [ ] **Founder section:** fill in `apps/web/src/lib/marketing/founder.ts` (name, role, a two-or-three-sentence note,
@@ -327,6 +328,8 @@ Code for every item is already built; these are the steps that unlock it.
   only show in the dashboard. Consider emailing the owner's login address by default (product change, not done).
 
 ## T-155 — Home page polish (deploy: web only, with T-154)
+
+- [x] **Deployed** 2026-11-10 with T-154 (web only, deployment `dpl_GuF1ZuFeccR8pZFvDqduYoZmmxug`).
 
 Features page gaps (checked 2026-11-10). The copy was reworded in T-155 to what is live; each item names the claim to
 put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans the old wording, so update it too).

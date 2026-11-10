@@ -73,6 +73,10 @@
 - Regression set verify-t146–t153: 20/20, 33/33, 29/29, 35/35, 27/27, 35/35, 66/66, 36/36.
 - Unit tests: web 322 (+12: the new strings, the reworded features lines and the banned old claims, the header button, the open menu rendered as a full-screen opaque modal with five links and the button, scroll lock and restore, the close and focus paths, the frames' layout, the social image), worker 465, mobile 11. Lint, typecheck, web and worker builds pass.
 
+**Deployed** 2026-11-10, together with T-154: commits 430756e (T-154) and 8793481 (T-155), web only (`npx vercel deploy --prod`, deployment `dpl_GuF1ZuFeccR8pZFvDqduYoZmmxug`); no migration, no worker change.
+- Live checks: `/`, `/pricing`, `/features`, `/painting` and `/trades/hvac` return 200 with the new copy and none of the old claims (the hero has "No website? Use your quote link.", "Add it anywhere", "Try it free" in the header). `/opengraph-image` returns 200 `image/png`.
+- The home page still says "No website needed." once, in the lead under "Add it anywhere" (approved T-154 copy). The fix covered the hero line only.
+
 **Files:** `apps/web/src/components/marketing/{MobileMenu,SiteNav,ProductStrip}.tsx`, `apps/web/src/lib/marketing/{home-copy,nav,scroll-lock,trades}.ts`, `apps/web/src/app/{page,opengraph-image}.tsx`, `apps/web/src/app/{features,pricing}/page.tsx`, `apps/web/src/__tests__/marketing-home.test.ts`, `scripts/hardcore-test/{browser.mjs,verify-t154.mts,verify-t155.mts}`.
 
 ### 2026-11-10: T-154 — Home page rewrite: say what it is, show it working, earn trust
