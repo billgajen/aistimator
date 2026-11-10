@@ -1,5 +1,6 @@
 'use client'
 
+import { WordingRepairCard } from '@/components/quotes/WordingRepairCard'
 import { useEffect, useState, use } from 'react'
 import { formatMoney } from '@estimator/shared'
 import Link from 'next/link'
@@ -326,6 +327,9 @@ export default function PricingTracePage({
           </p>
         </div>
       )}
+
+      {/* T-148: banned customer words found in the generated wording */}
+      {trace?.wordingRepair && <WordingRepairCard record={trace.wordingRepair} />}
 
       {/* Extracted Signals */}
       {quote.signals_json && (

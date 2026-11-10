@@ -2,6 +2,7 @@ import type { RegionCode, UnitSystem, ReferenceObject } from './regions/types'
 import type { AiUsageSummary } from './ai-models'
 import type { IdentificationSpec } from './identification'
 import type { ScanSpec } from './room-scan'
+import type { WordingRepairRecord } from './wording-repair'
 
 /**
  * Database types for the Estimator platform
@@ -827,6 +828,8 @@ export interface PricingTrace {
 
   /** T-135: tokens and estimated AI cost for this quote, by task + model */
   aiUsage?: AiUsageSummary
+  /** T-148: banned customer words found in the generated wording and how they were repaired (business-only) */
+  wordingRepair?: WordingRepairRecord
 }
 
 export interface Quote {

@@ -15,6 +15,40 @@
 
 ## Issues & Resolutions
 
+### 2026-11-10: T-148 — Banned customer words are repaired in code, not hidden
+
+**Problem:** the wording prompt was the only thing keeping "exact", "firm", "preliminary", grades and confidence language away from customers. T-147 added a fallback that hid the estimate when the guard tripped, which is safe but loses the instant estimate. The T-147 gap also stayed open: auto-send quotes, clarification-stage payloads and approve-without-edit sends were not checked at all.
+
+**Built:**
+1. **`shared/wording-repair.ts` (pure).** `repairCustomerWording` runs the customer language guard sentence by sentence over every AI-generated text a customer can read: the scope summary, assumptions, exclusions and notes; signal recommendations (`workDescription`, `costBreakdown`, `evidence`); and cross-service suggestions (`reason`, `note`, `extractedDetails`). It repairs in a fixed order:
+   - (a) the offending sentences go to a rewriter in one call. A rewrite is kept only if it passes the guard, isn't empty, stays roughly the same length, and adds no number the sentence didn't have (AD-001).
+   - (b) a sentence that still trips is removed; list items left empty are dropped, and so are recommendations left with no description.
+   - (c) whatever is left is "unresolved". In practice that only happens when the scope summary would end up empty.
+2. **Business text is never touched.** `businessPhrasesFrom` collects the phrases the business typed: service name, description, scope includes/excludes, default assumptions, add-on labels and work step names (whole and per sentence). `maskBusinessText` masks them before the guard runs. So "Price is firm for 30 days" stays word for word, even when the wording quotes it inside a longer sentence.
+3. **Worker (`quote-processor.ts` 4.7):** the repair runs after validation and before the quality gate. That means the clarification-stage, shown-early and auto-send payloads all store cleaned wording.
+   - First pass: one rewrite call (`ai/wording-repair.ts`, `wording` registry task, 15 s timeout) only when the guard trips. A clean quote makes no call; the guard is pure.
+   - Reprice: no AI, so it goes straight to removal.
+   - Unresolved wording holds the quote as `check` in every mode, auto-send included, and skips the clarification round, so the customer never reads it. This replaces the T-147 check at 4.9: `decideReviewHold` no longer takes `wordingProblems`.
+4. **Approve without editing** (`lib/quote-approval.ts` `wordingForApproval`, only when `version` is 1): the same repair runs, removal only, on the stored wording, and the result is saved in the approval UPDATE. This covers quotes priced before T-148 and quotes held for wording. Wording only deletion could fix returns 400 `WORDING_NEEDS_EDIT`; the dashboard and app already show the message. An edited quote (`version` > 1) is the business's text and is sent as written. "Save & Send" after an edit is unchanged.
+5. **Trace:** `pricing_trace_json.wordingRepair` (`WordingRepairRecord`) records the path, the sentences found, whether the rewrite was called and why it failed, what was rewritten (before/after), what was removed, and what is unresolved. The dashboard trace page shows it as "Customer wording" (`components/quotes/WordingRepairCard.tsx`). The public quote API never reads the trace, and a unit test pins that.
+
+**Found while verifying:** the first live run returned 404 on every approval. The new approve query selected `services.pricing_rules`, but that column doesn't exist: add-ons and steps live in `service_pricing_rules.rules_json`. Fixed before anything shipped, and the approve route now logs a load error instead of hiding it as "not found". verify-t146/t147 were re-run afterwards (20/20, 33/33).
+
+**Banned words:** "guaranteed" and "guarantee" were added to `CUSTOMER_BANNED_WORDS` (owner request, closing the gap the wording prompt alone covered). Business-authored text stays masked, so a business's own "Workmanship guaranteed" is left as typed. Engine-written text (pricing notes, takeoff methods, line labels) is code or business config, not AI wording, and isn't repaired.
+
+**Verified:** `verify-t148.mts` 29/29 live:
+- Step a against the real wording model: 3 of 3 banned sentences rewritten, none removed, clean, one call in 2.6 s.
+- A real quote with the business's own "firm" assumption is shown early, not held, as T-147 would have.
+- Clarification-stage payloads are clean.
+- Reprice with dirty stored wording, on a show-then-confirm and an auto-send service: the sentence is removed, the rest kept; shown early and sent respectively; recorded in the trace, never in the public payload.
+- Approve without editing removes the generated sentences and keeps the business assumption. Unrepairable scope gets 400 and the quote stays awaiting approval. An edited quote is sent as written.
+
+The generation path's rewrite was exercised against the real model but not inside a full quote: the model wrote clean wording for the provoking request, so no repair fired there.
+
+Unit tests: worker 463 (+17), web 144 (+5). Lint, typecheck, web and worker builds pass. No migration. No gauntlet: wording only, no pricing.
+
+**Files:** `packages/shared/src/{wording-repair.ts,review-mode.ts,database.types.ts,index.ts}`, `apps/worker/src/{ai/wording-repair.ts,quote-processor.ts,__tests__/wording-repair.test.ts,__tests__/review-mode.test.ts}`, `apps/web/src/lib/quote-approval.ts`, `apps/web/src/components/quotes/WordingRepairCard.tsx`, `apps/web/src/app/(dashboard)/app/quotes/[quoteId]/trace/page.tsx`, `apps/web/src/__tests__/customer-language.test.ts`, `scripts/hardcore-test/verify-t148.mts`.
+
 ### 2026-11-10: T-147 — Show, then confirm (new default for customer-facing estimates)
 
 **Owner decision:** under T-146 a quote held for review showed the customer no price unless a range was measured. Now the customer sees the estimate straight away, marked as an estimate the business will confirm. The business still approves every quote, and Accept stays locked until it does.
@@ -33,7 +67,7 @@
 - **Viewing before approval blocked `sent` → `viewed` afterwards.** The view handler only ran when `viewed_at` was empty. It now also runs for a `sent` quote, so the first view after approval is recorded.
 - **Generated wording can trip the customer language guard.** The live check caught "we'll confirm the exact dimensions with you" in an AI-written note (the T-146 wording prompt forbids "exact" but nothing enforces it). A shown-early estimate reaches the customer before anyone at the business reads it, so the worker now runs `findConfidenceLanguageInPayload` over the generated scope, assumptions, exclusions and notes. If it trips, the quote is a `check` hold with the reason in the business's review email. Only the generated wording is checked, not line labels, so a business that names a step "Firm mattress removal" is not held on every quote.
 
-**Not fixed here (existing behaviour):** the same generated wording can still reach the customer on an auto-send quote, in a clarification-stage payload, or after the business approves without editing. Enforcing the guard on all generated wording is a separate ticket.
+**Not fixed here (existing behaviour):** the same generated wording can still reach the customer on an auto-send quote, in a clarification-stage payload, or after the business approves without editing. Enforcing the guard on all generated wording is a separate ticket. **Closed by T-148.**
 
 **Verified:** `verify-t147.mts` 33/33 live (local stack, migration 31 applied and re-run cleanly):
 - Default service, flat $1,400: shown at once, `pending_review`, Accept locked (and 400 from the accept route), no range.
@@ -3425,7 +3459,7 @@ if (pricingResult.estimatedTotal <= 0) {
 
 ### AD-035: Show the estimate, then the business confirms it (T-147)
 
-**Decision:** supersedes the default in AD-034. A quote still reaches "Quote" status only when the business approves it, but by default the customer sees the estimate as soon as it is priced, marked as an estimate the business will confirm, with Accept locked. A service can opt to hold the estimate until approval (the AD-034 behaviour) or to send automatically. The rest of AD-034 stands: two customer states, grades business-only, the public quote API as the only customer data path, the language guard, and the existing link staying valid through approval. **Why:** a customer who is shown nothing leaves; the honest promise is still the business's confirmation, and the page says so. **Rules that follow:** the reason a quote is waiting is recorded on the quote (`quotes.review_hold`), never inferred later from the service, so changing a service's mode does not change what earlier customers see. Showing early fails closed: only a priced quote recorded as `shown` is visible, and anything a check held, including generated wording that trips the language guard, stays hidden until approved. No customer action may move a quote off `pending_review`; only the business's approval does. **Rejected:** deriving "shown" from the service's current mode at read time (a mode change would reveal held quotes), and storing the flag in `content_json` (dashboard edits rewrite it).
+**Decision:** supersedes the default in AD-034. A quote still reaches "Quote" status only when the business approves it, but by default the customer sees the estimate as soon as it is priced, marked as an estimate the business will confirm, with Accept locked. A service can opt to hold the estimate until approval (the AD-034 behaviour) or to send automatically. The rest of AD-034 stands: two customer states, grades business-only, the public quote API as the only customer data path, the language guard, and the existing link staying valid through approval. **Why:** a customer who is shown nothing leaves; the honest promise is still the business's confirmation, and the page says so. **Rules that follow:** the reason a quote is waiting is recorded on the quote (`quotes.review_hold`), never inferred later from the service, so changing a service's mode does not change what earlier customers see. Showing early fails closed: only a priced quote recorded as `shown` is visible, and anything a check held, including generated wording that trips the language guard, stays hidden until approved. (T-148: banned words are now repaired first, by rewrite then removal; only wording that can't be repaired holds the quote.) No customer action may move a quote off `pending_review`; only the business's approval does. **Rejected:** deriving "shown" from the service's current mode at read time (a mode change would reveal held quotes), and storing the flag in `content_json` (dashboard edits rewrite it).
 
 ---
 

@@ -54,7 +54,7 @@ import type { QualityGateResult, ClarificationQuestion } from '@estimator/shared
 import { AiUsageMeter } from '@estimator/shared'
 import { createAiClient } from './ai/factory'
 import type { AiClient } from './ai/client'
-import { computeEnvelope, enforceEnvelope, computeEstimateGrade, capFlatRateGrade, priceDependsOnJobFacts, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue, parseRoomScan, scanAnswers, scanEvidence, summarizeRoomScan, ROOM_SCAN_FIELD, decideReviewHold, reviewModeOf, customerEstimateRange, findConfidenceLanguageInPayload } from '@estimator/shared'
+import { computeEnvelope, enforceEnvelope, computeEstimateGrade, capFlatRateGrade, priceDependsOnJobFacts, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue, parseRoomScan, scanAnswers, scanEvidence, summarizeRoomScan, ROOM_SCAN_FIELD, decideReviewHold, reviewModeOf, customerEstimateRange, repairCustomerWording, businessPhrasesFrom } from '@estimator/shared'
 import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor, DEFAULT_ADJUDICATION_VALUE_THRESHOLD, DEFAULT_ADJUDICATION_TIMEOUT_MS } from './ai/measurement'
 import { formatScopeAnswers } from './ai/scope-answers'
 import { fieldOptions, snapToOption, answersOutsideOptions, type OptionField } from './answer-options'
@@ -63,6 +63,7 @@ import { buildTakeoff, buildReference } from './takeoff'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing, findLookalikeUnconditionedSteps } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@estimator/shared'
+import { createSentenceRewriter } from './ai/wording-repair'
 import { sendQuoteEmails, sendReviewRequestEmail, sendEstimateShownEmail, isEmailConfigured } from './email'
 import { incrementUsageCounter } from './usage'
 import type { Env } from './index'
@@ -1984,6 +1985,44 @@ export async function processQuote(
     }
   }
 
+  // 4.7 T-148: repair banned customer words in the generated wording, before
+  // anything is stored for the customer (clarification round, shown-early
+  // estimate, auto-send). The guard is pure, so a clean quote costs nothing;
+  // only when it trips does the first pass make ONE rewrite call (the
+  // reprice path runs no AI and goes straight to removing the sentence).
+  // Text the business typed itself is masked and never touched.
+  const wordingRepair = await timer.time('wording_repair', () => repairCustomerWording(
+    { ...content, signalRecommendations, crossServicePricing },
+    {
+      businessPhrases: businessPhrasesFrom({
+        serviceName: service.name,
+        serviceDescription: service.description,
+        scopeIncludes: service.scope_includes,
+        scopeExcludes: service.scope_excludes,
+        defaultAssumptions: service.default_assumptions,
+        addonLabels: (rules.addons || []).map((a) => a.label),
+        workStepNames: (rulesWithWorkSteps.workSteps || []).map((ws) => ws.name),
+      }),
+      path: reprice ? 'reprice' : 'generation',
+      ...(!reprice && textAi && { rewrite: createSentenceRewriter(textAi) }),
+    }
+  ))
+  const { signalRecommendations: repairedRecs, crossServicePricing: repairedCross, ...repairedContent } = wordingRepair.wording
+  Object.assign(content, repairedContent)
+  signalRecommendations = repairedRecs ?? signalRecommendations
+  crossServicePricing.length = 0
+  crossServicePricing.push(...(repairedCross ?? []))
+  const wordingUnresolved = wordingRepair.unresolved
+  if (wordingRepair.record.found > 0) {
+    // Business-only: the dashboard trace page shows it; the public API never reads the trace
+    pricingTrace.wordingRepair = wordingRepair.record
+    console.log(
+      `[Processor] T-148 wording repair: ${wordingRepair.record.found} sentence(s), ` +
+      `${wordingRepair.record.rewritten.length} rewritten, ${wordingRepair.record.removed.length} removed, ` +
+      `${wordingUnresolved.length} unresolved`
+    )
+  }
+
   // 4.75 Quality Gate: evaluate quote quality and decide on next action
   let qualityGateResult: QualityGateResult | undefined
   const clarificationCount = (quoteData.quote as unknown as { clarification_count?: number }).clarification_count ?? 0
@@ -2071,7 +2110,16 @@ export async function processQuote(
     )
   }
 
-  if (structuredSignals && textAi) {
+  // T-148: wording the repair could not clean goes to the business, never to
+  // a clarification round the customer would read it in
+  if (wordingUnresolved.length > 0) {
+    finalStatus = 'pending_review'
+    qualityGateResult = {
+      action: 'require_review',
+      reason: `The estimate's wording uses a word customers should not see (${wordingUnresolved[0]}). Edit the wording, then approve.`,
+      evaluatedAt: new Date().toISOString(),
+    }
+  } else if (structuredSignals && textAi) {
     try {
       qualityGateResult = await timer.time('quality_gate', () => evaluateQualityGate(
         {
@@ -2258,25 +2306,12 @@ export async function processQuote(
   // business created itself, and any quote a check above held stay hidden.
   // Clarification rounds and the AI quality gate still run first; this only
   // changes the final step.
-  // The generated wording is the one part nobody at the business has read:
-  // if it trips the customer language guard, the estimate is not shown early.
-  const wordingProblems = findConfidenceLanguageInPayload({
-    scopeSummary: content.scopeSummary,
-    assumptions: content.assumptions,
-    exclusions: content.exclusions,
-    notes: content.notes,
-  })
+  // (T-148: wording that could not be repaired was already held as a check at 4.7)
   const reviewDecision = decideReviewHold({
     statusAfterChecks: finalStatus,
     mode: reviewModeOf(service),
     businessCreated: quoteRequest.source_json?.type === 'app',
-    wordingProblems,
   })
-  if (finalStatus === 'sent' && reviewDecision.reviewHold === 'check') {
-    const reason = `The estimate's wording uses a word customers should not see (${wordingProblems[0]?.replace(/^\$\.[^:]*: /, '')}). Edit the wording, then approve.`
-    console.log(`[Processor] T-147: not shown early — ${wordingProblems.length} wording problem(s)`)
-    qualityGateResult = { action: 'require_review', reason, evaluatedAt: new Date().toISOString() }
-  }
   const awaitingBusinessReview = reviewDecision.reviewHold === 'shown' || reviewDecision.reviewHold === 'held'
   const shownEarly = reviewDecision.reviewHold === 'shown'
   finalStatus = reviewDecision.status

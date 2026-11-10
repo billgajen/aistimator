@@ -61,19 +61,6 @@ describe('T-147: hold kind', () => {
     }
   })
 
-  it('wording that trips the customer language guard is not shown early', () => {
-    const wordingProblems = findConfidenceLanguageInPayload({ notes: 'We will confirm the exact dimensions before ordering.' })
-    expect(wordingProblems.length).toBeGreaterThan(0)
-    expect(decideReviewHold({ statusAfterChecks: 'sent', mode: 'show_then_confirm', wordingProblems })).toEqual({
-      status: 'pending_review',
-      reviewHold: 'check',
-    })
-    // The other modes are unchanged by it
-    expect(decideReviewHold({ statusAfterChecks: 'sent', mode: 'hold_until_approved', wordingProblems }).reviewHold).toBe('held')
-    expect(decideReviewHold({ statusAfterChecks: 'sent', mode: 'auto_send', wordingProblems }).status).toBe('sent')
-    expect(decideReviewHold({ statusAfterChecks: 'sent', mode: 'show_then_confirm', wordingProblems: [] }).reviewHold).toBe('shown')
-  })
-
   it('a quote the business created itself behaves as before: held, not shown', () => {
     expect(decideReviewHold({ statusAfterChecks: 'sent', mode: 'show_then_confirm', businessCreated: true }).reviewHold).toBe('held')
     expect(decideReviewHold({ statusAfterChecks: 'sent', mode: 'auto_send', businessCreated: true }).status).toBe('sent')

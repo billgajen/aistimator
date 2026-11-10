@@ -177,8 +177,22 @@ Code for every item is already built; these are the steps that unlock it.
 - [ ] **Check one live email:** submit a test request on a default service and confirm "Your estimate from
   {business}" arrives, then approve it and confirm "Your quote from {business}" arrives. Postmark is not configured
   locally, so neither send was checked live (the template is unit-tested).
-- [ ] **Wording the customer shouldn't see:** if the generated wording contains "exact", "firm" or "preliminary", the
-  estimate is not shown early. You get the reason in the "Review and approve" email; edit the wording, then approve.
+- [ ] **Wording the customer shouldn't see:** superseded by T-148. Banned words are now rewritten or removed; only
+  wording that can't be fixed holds the estimate.
 - [ ] **Not checked by eye:** the three options in the service editor (Basic step) and the widget's "Your estimate is
   ready" state. The quote page was screenshotted.
+
+## T-148 — Banned customer words repaired in code
+
+- [ ] **Deploy in order:** worker first, then web. No migration. (Web first is also safe; the worker change is what
+  repairs new quotes.)
+- [ ] **What you'll notice:** an estimate whose wording had "exact", "firm" or "preliminary" is no longer hidden. The
+  sentence is rewritten (or removed) and the estimate goes out as normal. The quote's trace page has a **Customer
+  wording** section showing what changed. Your own scope, assumptions and exclusions are never changed.
+- [ ] **One new approve error:** "The estimate's wording uses a word customers should not see … Edit the wording, then
+  send it." It appears only when the whole scope summary is the problem. Edit the quote and use Save & Send.
+- [ ] **Auto-send services:** a quote whose wording can't be fixed is now held for you instead of going out (rare;
+  same reason in the review email).
+- [x] **"guaranteed" / "guarantee":** added to the guard's word list (`CUSTOMER_BANNED_WORDS`) in T-148. Your own text
+  ("Workmanship guaranteed for 12 months") is still left as you typed it.
 

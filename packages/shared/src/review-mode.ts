@@ -60,23 +60,19 @@ export interface ReviewHoldDecision {
  * itself (its own app) is held as before T-147: there is no customer waiting
  * on a page for it.
  *
- * `wordingProblems`: what the customer language guard found in the generated
- * wording. An estimate is shown before anyone at the business has read it, so
- * wording that trips the guard turns "shown" into a check hold.
+ * T-148: banned words in the generated wording are repaired before this
+ * runs; wording that could not be repaired arrives here as a check hold
+ * (`statusAfterChecks: 'pending_review'`).
  */
 export function decideReviewHold(input: {
   statusAfterChecks: 'sent' | 'pending_review'
   mode: ReviewMode
   businessCreated?: boolean
-  wordingProblems?: readonly string[]
 }): ReviewHoldDecision {
   if (input.statusAfterChecks === 'pending_review') return { status: 'pending_review', reviewHold: 'check' }
   if (input.mode === 'auto_send') return { status: 'sent', reviewHold: null }
   if (input.mode === 'hold_until_approved' || input.businessCreated) {
     return { status: 'pending_review', reviewHold: 'held' }
-  }
-  if (input.wordingProblems && input.wordingProblems.length > 0) {
-    return { status: 'pending_review', reviewHold: 'check' }
   }
   return { status: 'pending_review', reviewHold: 'shown' }
 }

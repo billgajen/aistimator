@@ -9,10 +9,15 @@
  * - Issues a fresh link for the email, and keeps the link the customer
  *   already holds valid (`previous_token_hash`) instead of breaking it.
  * - The status guard in the UPDATE makes a double tap send once.
+ * - T-148: approving without editing (version 1) sends the generated wording
+ *   as it is, so banned customer words in it are removed first (no AI here).
+ *   Wording that can't be repaired that way must be edited: 400
+ *   WORDING_NEEDS_EDIT. An edited quote's text is the business's own and is
+ *   never touched.
  */
 
-import { formatMoney, getRegion } from '@estimator/shared'
-import type { QuotePricing, TenantBranding } from '@estimator/shared'
+import { formatMoney, getRegion, repairCustomerWording, businessPhrasesFrom } from '@estimator/shared'
+import type { QuotePricing, TenantBranding, CustomerWording, WordingRepairRecord, PricingRules, WorkStepConfig } from '@estimator/shared'
 import type { createClient } from '@/lib/supabase/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { sendEmail, isPostmarkConfigured, generateCustomerEmailHtml } from '@/lib/postmark'
@@ -38,6 +43,52 @@ export function approvalBlocker(quote: {
   return null
 }
 
+interface ServiceText {
+  name: string
+  description?: string | null
+  scope_includes?: string[] | null
+  scope_excludes?: string[] | null
+  default_assumptions?: string[] | null
+  work_steps?: WorkStepConfig[] | null
+  /** Add-ons and steps live in the related service_pricing_rules row */
+  service_pricing_rules?: { rules_json?: Partial<PricingRules> | null } | Array<{ rules_json?: Partial<PricingRules> | null }> | null
+}
+
+/**
+ * T-148: the wording an unedited quote would send, with banned customer words
+ * removed. Pure apart from the clock. `changed` = the content must be saved.
+ */
+export async function wordingForApproval(opts: {
+  content: CustomerWording | null
+  version: number
+  service: ServiceText
+}): Promise<{ content: CustomerWording | null; changed: boolean; record?: WordingRepairRecord; unresolved: string[] }> {
+  const { content, version, service } = opts
+  // Edited by the business: its own text, sent as written
+  if (!content || version > 1) return { content, changed: false, unresolved: [] }
+  const ruleRow = Array.isArray(service.service_pricing_rules) ? service.service_pricing_rules[0] : service.service_pricing_rules
+  const rules = ruleRow?.rules_json ?? {}
+  const result = await repairCustomerWording(content, {
+    path: 'approval',
+    businessPhrases: businessPhrasesFrom({
+      serviceName: service.name,
+      serviceDescription: service.description,
+      scopeIncludes: service.scope_includes,
+      scopeExcludes: service.scope_excludes,
+      defaultAssumptions: service.default_assumptions,
+      addonLabels: (rules.addons || []).map((a) => a.label),
+      workStepNames: (rules.workSteps || service.work_steps || []).map((ws) => ws.name),
+    }),
+  })
+  const changed = result.record.rewritten.length + result.record.removed.length > 0
+  return {
+    content: result.wording,
+    changed,
+    ...(result.record.found > 0 && { record: result.record }),
+    unresolved: result.unresolved,
+  }
+}
+
 export async function approveQuote(opts: {
   supabase: Supabase
   quoteId: string
@@ -49,17 +100,33 @@ export async function approveQuote(opts: {
   const { data: quote, error } = await supabase
     .from('quotes')
     .select(
-      `id, status, quote_token_hash, pricing_json, content_json, customer_json,
+      `id, status, version, quote_token_hash, pricing_json, content_json, customer_json, pricing_trace_json,
        tenants!tenant_id ( id, name, region, branding_json ),
-       services!service_id ( id, name )`
+       services!service_id ( id, name, description, scope_includes, scope_excludes, default_assumptions, work_steps, service_pricing_rules ( rules_json ) )`
     )
     .eq('id', quoteId)
     .eq('tenant_id', tenantId)
     .single()
+  if (error && error.code !== 'PGRST116') console.error('[Approve] load failed:', error.message)
   if (error || !quote) return { ok: false, httpStatus: 404, code: 'NOT_FOUND', message: 'Quote not found' }
 
   const blocker = approvalBlocker(quote as never)
   if (blocker) return { ok: false, httpStatus: 400, ...blocker }
+
+  // T-148: what an unedited quote sends must pass the customer language guard
+  const wording = await wordingForApproval({
+    content: quote.content_json as CustomerWording | null,
+    version: (quote as { version?: number | null }).version ?? 1,
+    service: quote.services as unknown as ServiceText,
+  })
+  if (wording.unresolved.length > 0) {
+    return {
+      ok: false,
+      httpStatus: 400,
+      code: 'WORDING_NEEDS_EDIT',
+      message: `The estimate's wording uses a word customers should not see (${wording.unresolved[0]}). Edit the wording, then send it.`,
+    }
+  }
 
   const { token, hash } = generateQuoteToken()
   const expiry = getTokenExpiry(30)
@@ -74,6 +141,10 @@ export async function approveQuote(opts: {
       previous_token_hash: quote.quote_token_hash,
       quote_token_hash: hash,
       token_expires_at: expiry.toISOString(),
+      ...(wording.changed && { content_json: wording.content }),
+      ...(wording.record && {
+        pricing_trace_json: { ...((quote as { pricing_trace_json?: object | null }).pricing_trace_json ?? {}), wordingRepair: wording.record },
+      }),
     })
     .eq('id', quoteId)
     .eq('tenant_id', tenantId)

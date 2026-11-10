@@ -12,7 +12,7 @@
  */
 
 /** Words that describe price certainty — never shown to a customer */
-export const CUSTOMER_BANNED_WORDS = ['exact', 'firm', 'preliminary'] as const
+export const CUSTOMER_BANNED_WORDS = ['exact', 'firm', 'preliminary', 'guaranteed', 'guarantee'] as const
 
 /** Grade labels (shared/grading.ts) — never shown to a customer */
 export const CUSTOMER_BANNED_LABELS = ['Confirmed', 'Measured', 'Concept', 'Provisional'] as const
