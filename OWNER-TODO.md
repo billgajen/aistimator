@@ -255,9 +255,10 @@ Code for every item is already built; these are the steps that unlock it.
 
 ## T-152 — Simpler dashboard: waiting work first, five menu items, free allowance fixed
 
-- [ ] **Deploy in order:** `bash scripts/deploy-migration-35.sh` FIRST (Home reads `tenants.prices_checked_at`; without it
+- [x] **Deploy in order:** `bash scripts/deploy-migration-35.sh` FIRST (Home reads `tenants.prices_checked_at`; without it
   the home page query fails), then the **worker** (only its email footer reads the product name now), then the web app.
-- [ ] **Confirm the free allowance:** `FREE_ALLOWANCE` in `packages/shared/src/plans.ts` (`TODO-OWNER`): US 10 priced
+  Done 2026-11-10 17:27 UTC: migration 35, worker `4a4c0ddc`, web (commit `439353b`).
+- [x] **Confirm the free allowance** (owner decision 2026-11-10: 10 in total, no backfill for "Check your prices"): `FREE_ALLOWANCE` in `packages/shared/src/plans.ts` (`TODO-OWNER`): US 10 priced
   quotes **in total**, never resetting; legacy GB tenants keep 50 a month. Subscribed tenants are unchanged. A US
   business that already used quotes in earlier months now counts them all; if it has 10 or more, its next request
   is held as a lead until it picks a plan.
