@@ -198,8 +198,9 @@ Code for every item is already built; these are the steps that unlock it.
 
 ## T-149 — Quote link and QR code
 
-- [ ] **Deploy in order:** `bash scripts/deploy-migration-32.sh` FIRST (the web app reads `tenants.slug` on the Share,
+- [x] **Deploy in order:** `bash scripts/deploy-migration-32.sh` FIRST (the web app reads `tenants.slug` on the Share,
   setup and home pages; without the column they fail), then the web app. The worker is not touched.
+  Done 2026-11-10 12:36 UTC: migration 32, web (commit `e30a62a`). Worker not deployed.
 - [ ] **Know what changes on deploy:** every business gets a link like `/quote/your-business-name`, existing ones
   included (backfilled oldest first; a clash or reserved word gets a short suffix such as `-3f2a`). The menu item
   "Widget" is now **Share**: link and QR code first, embed code second, form fields under Advanced. Installed widgets
