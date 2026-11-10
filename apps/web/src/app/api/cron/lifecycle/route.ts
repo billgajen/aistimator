@@ -5,6 +5,9 @@ import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { sendEmail, isPostmarkConfigured } from '@/lib/postmark'
 import { generateQuoteReminderEmailHtml } from '@/lib/email-templates'
 import type { QuotePricing, TenantBranding } from '@estimator/shared'
+import { DEMO_RETENTION_HOURS } from '@estimator/shared'
+import { cleanUpDemoRequests } from '@/lib/demo/demo-cleanup'
+import { deleteFromR2, isR2Configured } from '@/lib/r2'
 
 /**
  * GET /api/cron/lifecycle — Vercel Cron (daily, see vercel.json)
@@ -15,6 +18,8 @@ import type { QuotePricing, TenantBranding } from '@estimator/shared'
  *    days after sending, if the customer has neither accepted nor declined.
  *    The token is rotated (we never store the raw token), so the reminder
  *    link supersedes the original email's link.
+ * 3. T-153: delete visitors' demo requests (and their uploads) older than
+ *    24 hours.
  *
  * Auth: Vercel sends `Authorization: Bearer ${CRON_SECRET}` automatically.
  * Fails closed if CRON_SECRET is unset.
@@ -77,6 +82,8 @@ export async function GET(request: Request) {
         services!service_id ( id, name )
       `)
       .in('status', REMINDER_STATUSES)
+      // T-153: a demo quote is never reminded
+      .eq('is_demo', false)
       .is('reminder_sent_at', null)
       .is('accepted_at', null)
       .is('declined_at', null)
@@ -162,8 +169,19 @@ export async function GET(request: Request) {
     }
   }
 
+  // ---- 3. T-153: delete visitors' demo requests after 24 hours ----------
+  let demo = { quotes: 0, requests: 0, assets: 0, objects: 0 }
+  try {
+    demo = await cleanUpDemoRequests(supabase, {
+      retentionHours: DEMO_RETENTION_HOURS,
+      deleteObjects: isR2Configured() ? deleteFromR2 : null,
+    })
+  } catch (demoError) {
+    console.error('[Lifecycle] Demo clean-up failed:', demoError)
+  }
+
   console.log(
-    `[Lifecycle] Done: expired=${expiredCount} remindersSent=${remindersSent} remindersFailed=${remindersFailed}`
+    `[Lifecycle] Done: expired=${expiredCount} remindersSent=${remindersSent} remindersFailed=${remindersFailed} demoDeleted=${demo.quotes}`
   )
-  return NextResponse.json({ expired: expiredCount, remindersSent, remindersFailed })
+  return NextResponse.json({ expired: expiredCount, remindersSent, remindersFailed, demoDeleted: demo })
 }

@@ -5,7 +5,7 @@
  * Provides signed URL generation for direct uploads and downloads.
  */
 
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 // Configuration
@@ -104,4 +104,22 @@ export async function uploadToR2(
   })
 
   await client.send(command)
+}
+
+/**
+ * T-153: delete objects (the demo clean-up). Up to 1,000 keys per call, as
+ * the S3 API allows; returns how many were deleted.
+ */
+export async function deleteFromR2(keys: string[]): Promise<number> {
+  if (keys.length === 0) return 0
+  const client = getR2Client()
+  let deleted = 0
+  for (let i = 0; i < keys.length; i += 1000) {
+    const batch = keys.slice(i, i + 1000)
+    const result = await client.send(
+      new DeleteObjectsCommand({ Bucket: R2_BUCKET_NAME, Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true } })
+    )
+    deleted += batch.length - (result.Errors?.length ?? 0)
+  }
+  return deleted
 }

@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { getRegion } from '@estimator/shared'
+import { getRegion, DEMO_LOGO_PATH } from '@estimator/shared'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import { hasCustomBranding } from '@/lib/plan-features'
 import { NextResponse } from 'next/server'
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
     // Fetch tenant info
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
-      .select('name, region, branding_json, contact_requirement')
+      .select('name, region, branding_json, contact_requirement, is_demo')
       .eq('id', tenantId)
       .single()
 
@@ -173,7 +173,10 @@ export async function GET(request: Request) {
     // Tenant branding for the widget: primary colour + a short-lived logo URL
     const brandingJson = (tenant.branding_json || {}) as Partial<TenantBranding>
     let logoUrl: string | null = null
-    if (brandingJson.logoAssetId && isR2Configured()) {
+    if ((tenant as { is_demo?: boolean }).is_demo) {
+      // T-153: the example business's logo is a file shipped with the app
+      logoUrl = DEMO_LOGO_PATH
+    } else if (brandingJson.logoAssetId && isR2Configured()) {
       const { data: logoAsset } = await supabase
         .from('assets')
         .select('r2_key')

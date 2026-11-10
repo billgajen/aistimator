@@ -37,7 +37,7 @@ export async function POST(
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
       .select(`
-        id, status, quote_token_hash, token_expires_at, accepted_at,
+        id, status, quote_token_hash, token_expires_at, accepted_at, is_demo,
         customer_json, pricing_json,
         tenants!tenant_id ( id, name, region, currency, notification_email, branding_json ),
         services!service_id ( id, name )
@@ -125,7 +125,8 @@ export async function POST(
       const customer = quote.customer_json as { name: string; email: string }
       const pricing = quote.pricing_json as QuotePricing | null
 
-      if (tenant?.notification_email && isPostmarkConfigured()) {
+      // T-153: a demo quote emails no one
+      if (tenant?.notification_email && isPostmarkConfigured() && !(quote as { is_demo?: boolean }).is_demo) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
         const totalFormatted = pricing
           ? (() => {

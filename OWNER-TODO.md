@@ -270,3 +270,22 @@ Code for every item is already built; these are the steps that unlock it.
   the old `/app/billing` return URL also still redirects.
 - [ ] **Existing businesses** see "Check your prices" unticked until they confirm (save a service on Prices).
   It never ticks on its own.
+
+## T-153 — A working public demo: "Try it as a customer"
+
+- [ ] **Deploy in order:**
+  1. `bash scripts/deploy-migration-36.sh` (adds the demo flag, its guard and the reserved slug).
+  2. `npx tsx scripts/seed-demo-tenant.mts --prod` (creates "Example Home Services" with its three services; safe to
+     re-run, it updates in place).
+  3. The **worker** (demo requests: no emails, no usage, no adjudication, one photo).
+  4. The **web app**.
+- [ ] **Set `DEMO_DAILY_CAP` in Vercel** (production). Default 200 demo requests a day if unset; each one is a real
+  AI run on the cheap models. `0` turns live runs off: every visitor then sees the recorded example. Optional:
+  `DEMO_IP_LIMIT_PER_HOUR` (default 5). Both are counted in the database, so they work without Upstash.
+- [ ] **The daily lifecycle cron needs `CRON_SECRET`** (already set since 2026-07): it now also deletes demo requests
+  and their uploads after 24 hours.
+- [ ] **Look at /demo on your phone once** and read the example prices: they are the US pack rates (`TODO-OWNER` in the
+  packs), shown as an example business's prices.
+- [ ] **What a visitor can't do:** sign into the demo business (it has no user), get any email or text, or create a
+  lead. The water heater path uses a sample label we drew (`apps/web/public/demo/`); when a reading is unsure it shows
+  a range and asks a question, like any real quote.

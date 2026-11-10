@@ -46,6 +46,8 @@ export interface QuoteIntakeInput {
    * server-issued token). Not limited by the plan and never counted.
    */
   isTest?: boolean
+  /** T-153: a visitor's request to the public example business (outside any plan, never counted) */
+  isDemo?: boolean
   /**
    * T-151 (public widget only): when the service asks no questions of its
    * own, the free-text description is required. WhatsApp/SMS don't set it.
@@ -106,12 +108,14 @@ export async function createQuoteSubmission(
   // with overage pricing); otherwise hard block. Customer-facing message is
   // deliberately neutral: never expose the business's billing state.
   const planLimit = await checkPlanLimit(supabase, tenantId)
-  // T-150: a test request is outside the plan: never held, never metered
+  // T-150: a test request is outside the plan: never held, never metered.
+  // T-153: so is a demo request (it also never counts as usage)
   const isTest = input.isTest === true
-  const isOverageQuote = !isTest && !planLimit.allowed && planLimit.overageAvailable
+  const outsidePlan = isTest || input.isDemo === true
+  const isOverageQuote = !outsidePlan && !planLimit.allowed && planLimit.overageAvailable
   // T-134 (AD-026): over the limit with overage off → capture as an unpriced
   // lead (never lose a submission); no AI runs, the business is told to upgrade
-  const limitHold = !isTest && !planLimit.allowed && !planLimit.overageAvailable
+  const limitHold = !outsidePlan && !planLimit.allowed && !planLimit.overageAvailable
   if (limitHold) {
     console.warn(
       `[Quotes] Plan limit reached for tenant (${planLimit.used}/${planLimit.limit}) — capturing as held lead`
@@ -514,7 +518,7 @@ export async function createQuoteSubmission(
   }
 
   // 12a. Increment usage counter for estimates_created (T-150: not for tests)
-  if (!isTest) {
+  if (!outsidePlan) {
     await incrementUsageCounter(supabase, tenantId, 'estimates_created')
     // 12b. If this consumed the last quote in the plan, notify the business once (T-101)
     await maybeNotifyLimitReached(supabase, tenantId, tenant.name)

@@ -42,6 +42,8 @@ export async function GET(request: Request) {
           )
         )
       `)
+      // T-153: the public demo business is not a customer
+      .eq('is_demo', false)
       .order('created_at', { ascending: false })
       .limit(limit + 1)
 

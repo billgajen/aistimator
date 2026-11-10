@@ -53,9 +53,11 @@ export async function POST(request: Request) {
 
   const [{ data: service }, { data: tenant }] = await Promise.all([
     supabase.from('services').select('id').eq('id', body.serviceId).eq('tenant_id', tenantId).eq('active', true).maybeSingle(),
-    supabase.from('tenants').select('contact_requirement').eq('id', tenantId).single(),
+    supabase.from('tenants').select('contact_requirement, is_demo').eq('id', tenantId).single(),
   ])
   if (!service) return fail(400, 'INVALID_SERVICE', 'Service not found or not available')
+  // T-153: a visitor trying the public demo is never anyone's lead
+  if ((tenant as { is_demo?: boolean } | null)?.is_demo) return NextResponse.json({ skipped: true })
 
   const contact = checkContact(body.customer ?? {}, contactRequirementOf(tenant?.contact_requirement))
   if (!contact.ok) return fail(400, 'VALIDATION_ERROR', Object.values(contact.errors)[0] ?? 'Check your details', { fields: contact.errors })

@@ -7,6 +7,8 @@
  * they match) and validates a slug the business types when changing it.
  */
 
+import { DEMO_SLUG } from '@estimator/shared'
+
 export const SLUG_MIN_LENGTH = 3
 export const SLUG_MAX_LENGTH = 40
 
@@ -51,7 +53,7 @@ export function slugProblem(slug: string): SlugProblem | null {
   if (slug.length < SLUG_MIN_LENGTH) return 'too_short'
   if (slug.length > SLUG_MAX_LENGTH) return 'too_long'
   if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(slug) || slug.includes('--')) return 'invalid_characters'
-  if (RESERVED_SLUGS.includes(slug)) return 'reserved'
+  if (RESERVED_SLUGS.includes(slug) || slug === DEMO_SLUG) return 'reserved'
   return null
 }
 

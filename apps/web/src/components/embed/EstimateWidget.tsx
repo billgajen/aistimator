@@ -24,8 +24,23 @@ const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
  * - Full widget functionality, Turnstile and the honeypot
  */
 
+/**
+ * T-153: the public demo on /demo. Same widget, with fake contact details
+ * filled in, a sample photo on offer, and the result handed to the page.
+ */
+export interface WidgetDemoOptions {
+  contact: { name: string; email: string; phone: string }
+  /** Shown on the contact step, e.g. "Example details. No message will be sent." */
+  contactNote: string
+  samplePhotoUrl: string
+  onResult: (result: { quoteId: string; quoteViewUrl: string; serviceName: string | null }) => void
+  /** The demo is over its limits: the page shows the recorded example */
+  onBusy: () => void
+}
+
 interface EstimateWidgetProps {
   tenantKey: string
+  demo?: WidgetDemoOptions
   /** T-149: the hosted quote page — fills the screen instead of sizing to a frame */
   hosted?: boolean
   /** T-150: server-verified test token from setup; the request is marked as a test */
@@ -469,7 +484,7 @@ function ConversationalChat({
 // MAIN EMBED PAGE
 // ============================================================================
 
-export function EstimateWidget({ tenantKey, hosted = false, testToken }: EstimateWidgetProps) {
+export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: EstimateWidgetProps) {
   const searchParams = useSearchParams()
   const serviceId = searchParams.get('serviceId')
   const displayMode = searchParams.get('mode')
@@ -483,9 +498,9 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken }: Estimat
 
   // Form state
   const [selectedService, setSelectedService] = useState<string>(serviceId || '')
-  const [customerName, setCustomerName] = useState('')
-  const [customerEmail, setCustomerEmail] = useState('')
-  const [customerPhone, setCustomerPhone] = useState('')
+  const [customerName, setCustomerName] = useState(demo?.contact.name ?? '')
+  const [customerEmail, setCustomerEmail] = useState(demo?.contact.email ?? '')
+  const [customerPhone, setCustomerPhone] = useState(demo?.contact.phone ?? '')
   const [jobPostcode, setJobPostcode] = useState('')
   const [jobDescription, setJobDescription] = useState('')
   const [jobQuantity, setJobQuantity] = useState<number | null>(null)
@@ -624,6 +639,14 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken }: Estimat
       const data = await response.json()
 
       if (!response.ok) {
+        // T-153: over the demo's limits, the page shows the recorded example
+        if (demo && response.status === 429) {
+          setError('The demo is busy right now. Here is an example estimate instead.')
+          setSuggestedService(null)
+          setStep('error')
+          demo.onBusy()
+          return
+        }
         setError(data.error?.message || 'Failed to submit')
 
         // Handle service mismatch with suggestion
@@ -639,6 +662,7 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken }: Estimat
 
       setQuoteResult(data)
       setStep('success')
+      demo?.onResult({ quoteId: data.quoteId, quoteViewUrl: data.quoteViewUrl, serviceName: selectedServiceData?.name ?? null })
 
       // Notify parent of successful submission
       if (window.parent !== window) {
@@ -795,6 +819,7 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken }: Estimat
           onNext={handleContactNext}
           saving={savingContact}
           serverErrors={contactErrors}
+          note={demo?.contactNote}
         />
       )}
       {displayMode !== 'conversational' && step === 'questions' && widgetData && (
@@ -822,6 +847,7 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken }: Estimat
           maxDocs={widgetData.files.maxDocs}
           photoGuidance={serviceMediaConfig?.photoGuidance ?? null}
           requiredAngles={serviceMediaConfig?.requiredAngles ?? []}
+          samplePhotoUrl={demo?.samplePhotoUrl}
           onBack={backFrom('files') ?? (() => setStep('contact'))}
           onNext={() => {
             lead.update('photos', { assetIds: uploadedFiles.filter((f) => f.status === 'complete').map((f) => f.assetId) })
@@ -847,7 +873,7 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken }: Estimat
       )}
       {displayMode !== 'conversational' && step === 'submitting' && <SubmittingState />}
       {step === 'success' && quoteResult && (
-        <SuccessState quoteUrl={quoteResult.quoteViewUrl} quoteId={quoteResult.quoteId} locale={widgetData?.region?.locale} businessName={widgetData?.tenantName || 'The business'} hasEmail={displayMode === 'conversational' || Boolean(customerEmail.trim())} />
+        <SuccessState quoteUrl={quoteResult.quoteViewUrl} quoteId={quoteResult.quoteId} locale={widgetData?.region?.locale} businessName={widgetData?.tenantName || 'The business'} hasEmail={!demo && (displayMode === 'conversational' || Boolean(customerEmail.trim()))} />
       )}
 
       {/* Honeypot — off-screen, never shown to humans */}
@@ -1014,10 +1040,13 @@ function FileUploadStep({
   maxDocs,
   photoGuidance,
   requiredAngles,
+  samplePhotoUrl,
   onBack,
   onNext,
 }: {
   tenantKey: string
+  /** T-153 demo: offer a photo shipped with the app */
+  samplePhotoUrl?: string
   files: UploadedFile[]
   setFiles: React.Dispatch<React.SetStateAction<UploadedFile[]>>
   minPhotos: number
@@ -1099,6 +1128,24 @@ function FileUploadStep({
     const selectedFiles = Array.from(e.target.files || [])
     const angleId = pendingAngleRef.current
     pendingAngleRef.current = null
+    await addFiles(selectedFiles, angleId)
+  }
+
+  /** T-153 demo: the sample photo goes through the same checks and upload */
+  async function useSamplePhoto() {
+    if (!samplePhotoUrl) return
+    setRejectMessage(null)
+    try {
+      const blob = await (await fetch(samplePhotoUrl)).blob()
+      const name = samplePhotoUrl.split('/').pop() || 'sample-photo.png'
+      const firstOpenAngle = requiredAngles.find((a) => !filledAngleIds.has(a.id))?.id ?? null
+      await addFiles([new File([blob], name, { type: blob.type || 'image/png' })], firstOpenAngle)
+    } catch {
+      setRejectMessage('The sample photo could not be loaded.')
+    }
+  }
+
+  async function addFiles(selectedFiles: File[], angleId: string | null) {
     if (selectedFiles.length === 0) return
 
     setIsUploading(true)
@@ -1216,6 +1263,18 @@ function FileUploadStep({
           ? `Add at least ${minPhotos} photo${minPhotos > 1 ? 's' : ''} of the job`
           : 'Add photos or documents (optional)'}
       </p>
+
+      {/* T-153 demo: a photo shipped with the app */}
+      {samplePhotoUrl && canAddPhotos && (
+        <button
+          type="button"
+          onClick={useSamplePhoto}
+          disabled={isUploading}
+          className="mb-4 w-full rounded-warm-lg border-2 border-dashed border-primary/40 bg-mint px-4 py-3 text-sm font-semibold text-primary hover:border-primary disabled:opacity-50"
+        >
+          Use a sample photo
+        </button>
+      )}
 
       {/* Photo guidance from service configuration */}
       {photoGuidance && (

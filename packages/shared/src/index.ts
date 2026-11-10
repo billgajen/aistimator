@@ -39,6 +39,7 @@ export * from './ai-models'
 // Re-export plan definitions (T-134)
 export * from './plans'
 export * from './brand'
+export * from './demo'
 
 // Quote status groups (queue processing)
 export * from './quote-status'

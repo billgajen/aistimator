@@ -38,7 +38,7 @@ export async function POST(
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
       .select(`
-        id, status, quote_token_hash, token_expires_at, accepted_at, declined_at,
+        id, status, quote_token_hash, token_expires_at, accepted_at, declined_at, is_demo,
         customer_json,
         tenants!tenant_id ( id, name, notification_email, branding_json ),
         services!service_id ( id, name )
@@ -113,7 +113,8 @@ export async function POST(
       const service = (Array.isArray(serviceRaw) ? serviceRaw[0] : serviceRaw) as { id: string; name: string }
       const customer = quote.customer_json as { name: string; email: string }
 
-      if (tenant?.notification_email && isPostmarkConfigured()) {
+      // T-153: a demo quote emails no one
+      if (tenant?.notification_email && isPostmarkConfigured() && !(quote as { is_demo?: boolean }).is_demo) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
         const htmlBody = generateQuoteDeclinedEmailHtml({
           businessName: tenant.name,

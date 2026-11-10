@@ -30,7 +30,7 @@ export function SiteFooter() {
               <li><Link href="/trades/electrical" className="text-text-secondary transition-colors hover:text-text-primary">Electrical</Link></li>
               <li><Link href="/trades/garage-doors" className="text-text-secondary transition-colors hover:text-text-primary">Garage doors</Link></li>
               <li><Link href="/painting" className="text-text-secondary transition-colors hover:text-text-primary">Painting</Link></li>
-              <li><Link href="/demo" className="text-text-secondary transition-colors hover:text-text-primary">Widget demo</Link></li>
+              <li><Link href="/demo" className="text-text-secondary transition-colors hover:text-text-primary">Try it as a customer</Link></li>
             </ul>
           </div>
 

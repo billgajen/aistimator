@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="750" viewBox="0 0 1000 750">
+  <!-- A sample rating label drawn for the Aistimator demo (T-153). The maker,
+       model and serial are invented; no real product or photo is used. -->
+  <defs>
+    <linearGradient id="tank" x1="0" x2="1">
+      <stop offset="0" stop-color="#9aa3a8"/><stop offset="0.5" stop-color="#d9dee1"/><stop offset="1" stop-color="#8d969b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1000" height="750" fill="url(#tank)"/>
+  <rect x="130" y="70" width="740" height="610" rx="10" fill="#fbfaf4" stroke="#5c6266" stroke-width="3"/>
+  <rect x="130" y="70" width="740" height="86" rx="10" fill="#26323a"/>
+  <text x="500" y="126" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="38" font-weight="700" fill="#ffffff" letter-spacing="3">SAMPLE LABEL · DEMO ONLY</text>
+  <g font-family="Helvetica, Arial, sans-serif" fill="#1b2823">
+    <text x="170" y="212" font-size="30" font-weight="700">RESIDENTIAL TANK WATER HEATER</text>
+    <text x="170" y="270" font-size="28">MODEL NO.  EX-50-NG-DEMO</text>
+    <text x="170" y="318" font-size="28">SERIAL NO.  0000-DEMO-0001</text>
+    <line x1="170" y1="345" x2="830" y2="345" stroke="#5c6266" stroke-width="2"/>
+    <text x="170" y="408" font-size="44" font-weight="700">CAPACITY  50 U.S. GAL</text>
+    <text x="170" y="474" font-size="44" font-weight="700">GAS TYPE  NATURAL GAS</text>
+    <text x="170" y="530" font-size="28">INPUT  40,000 BTU/HR</text>
+    <text x="170" y="578" font-size="28">RECOVERY  41 GAL/HR AT 90°F RISE</text>
+    <text x="170" y="640" font-size="22" fill="#5c6266">Example only. Not a real product.</text>
+  </g>
+</svg>

@@ -194,6 +194,14 @@ Response:
 
 { "ok": true }
 
+T-153 public demo ("Try it as a customer", /demo):
+	•	The demo business is one tenant with `tenants.is_demo = true` (migration 36), created by `scripts/seed-demo-tenant.mts`. Only the service role can set or change the flag (a guard trigger refuses a user token, 42501). `quotes.is_demo` is copied from the tenant on insert by a trigger, whatever the caller sends. No tenant or public API accepts or returns either flag.
+	•	`POST /api/public/quotes` to the demo business: Turnstile, honeypot, the `quotes` rate limit and upload limits as usual, then the demo limits, counted in the database: `DEMO_IP_LIMIT_PER_HOUR` (default 5) per IP (a salted hash, stored as `quote_requests.source_json.demoIp`) and `DEMO_DAILY_CAP` (default 200) in the last 24 h. Over either → 429 `{ error: { code: "DEMO_BUSY", reason: "ip_limit" | "daily_cap" } }` and nothing is created. A demo request is outside any plan and never counts as usage; test tokens don't apply.
+	•	`POST /api/public/leads` to the demo business → `{ skipped: true }` (no unfinished lead).
+	•	`GET /api/public/widget/config` for the demo business serves the shipped logo `/demo/example-home-services-logo.svg`.
+	•	Demo quotes send no email (worker, accept, decline, feedback, reminders), use no adjudication model, read one photo at most, are never recorded for calibration, and are excluded from benchmarks and the admin tenant list.
+	•	`GET /api/cron/lifecycle` pass 3 deletes demo quotes, requests and uploads (R2 objects first) older than 24 h; the response carries `demoDeleted: { quotes, requests, assets, objects }`.
+
 T-152 simpler dashboard:
 	•	`PUT /api/tenant` accepts `pricesChecked: true` (the business confirmed its prices: setup's "These are my prices", or saving a service on Prices). It stamps `tenants.prices_checked_at`, which ticks "Check your prices" on Home. Nothing else sets it.
 	•	`GET /api/billing` `usage.per`: `month` (a live plan, or the legacy GB 50 a month) or `total` (the free allowance: 10 priced quotes in total, never resets). With `total`, `estimatesCreated` is the sum over every month and `heldLeads` counts all held leads, not just this month's. Other fields unchanged.

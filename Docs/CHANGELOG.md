@@ -15,6 +15,70 @@
 
 ## Issues & Resolutions
 
+### 2026-11-10: T-153 — A working public demo: "Try it as a customer"
+
+**Problem:** "Try the live demo" opened a developer page asking for a Tenant Key. A visitor had nothing to try.
+
+**Built:**
+1. **Migration 36** (additive, re-runnable):
+   - `tenants.is_demo`, with a guard trigger: only the service role may set or change it (a user token gets 42501, as with the slug guard, AD-036).
+   - `quotes.is_demo`, copied from the tenant on insert by a trigger whatever the caller sends; an update keeps the old value.
+   - The demo slug `example-home-services` reserved (also in `lib/tenant-slug.ts`).
+2. **The demo business** (`scripts/seed-demo-tenant.mts`, idempotent, `--prod` via the keychain management API):
+   - "Example Home Services", fixed id, our own juniper-green colour and drawn logo (`public/demo/`), no user, no owner or notification email, benchmarks off.
+   - Three services built from the US packs exactly as setup builds them (`lib/demo/demo-services.ts` → `servicePayload`): Garage Door Spring Replacement and Interior Painting need no photo (rooms come from the form); Water Heater Replacement takes the label photo.
+   - All send automatically and take one photo at most. Prices are the packs' own, stored as the demo tenant's configuration (AD-001).
+   - The rows are written by the same builder `POST /api/services` now uses (`lib/service-rows.ts`, pulled out of the route without changing behaviour).
+3. **Demo requests** (`POST /api/public/quotes`):
+   - Turnstile, honeypot, the `quotes` rate limit and upload limits as for any request.
+   - Then the demo limits, counted in the database so they hold without Upstash (`lib/demo/demo-guard.ts`): `DEMO_IP_LIMIT_PER_HOUR` (5) per IP, keyed by a salted hash kept only on the demo request, and `DEMO_DAILY_CAP` (200) in the last 24 h. Over either → 429 `DEMO_BUSY`, nothing created.
+   - Outside any plan: no limit, no lead hold, no usage counter, no overage. Not marked `is_test` (no Test badge).
+   - No unfinished lead (`POST /api/public/leads` → `skipped`).
+   - Worker: no emails at all (this matters: with no owner, the business email fell back to the from-address); no `estimates_sent`; no adjudication model; one photo read. `is_demo` is in its field-by-field projection (the T-108/T-150 trap).
+   - Accept, decline and feedback emails and the reminder pass skip demo quotes. A visitor's clarification answers are never recorded as calibration. Benchmarks and the admin tenant list exclude the demo.
+4. **Clean-up:** the daily lifecycle cron's pass 3 (`lib/demo/demo-cleanup.ts`) deletes, for demo tenants only, uploads and PDFs older than 24 h (R2 objects first, via a new `deleteFromR2`), then quotes, then requests with no quote left. If R2 fails, the rows stay for the next run.
+5. **/demo** (marketing layout, phone first):
+   - "Try it as a customer", one line, and the note "Example Home Services is an example business with example prices".
+   - The real widget with a new `demo` option on `EstimateWidget` (no second implementation): contact pre-filled with reserved fake details (`sam.sample@example.com`, `(555) 010-0199`) and "No email or text will be sent to anyone"; "Use a sample photo" on the photo step (a rating label we drew, uploaded through the normal path); the success message never promises an email.
+   - The page polls the public quote API and shows the estimate on the same page (a range plus "would ask one question" when the quote waits for an answer), then a static "What the business sees" card with Approve & send, then "Try it free: 10 quotes, no card".
+   - Over the limits: a recorded example estimate (a real demo run; a unit test checks it still matches the pack's price) and the same signup button.
+   - `/demo?tenantKey=…` keeps the old developer view (moved unchanged to `components/demo/DeveloperDemo.tsx`), so the Share page's link still works.
+6. **Links:** the home page, the trade pages and the footer now say "Try it as a customer" and go to `/demo`.
+
+**Found while verifying:**
+- The first sample label printed "GAS" twice and only "NATURAL GAS" for the fuel. The label read capacity correctly, but the fuel varied between passes (natural gas / propane / electric) and the quote asked the customer. A "GAS TYPE NATURAL GAS" line, as real labels have, makes the fuel read reliably. The water heater still usually asks the customer to confirm capacity (a range of about $1,890–2,410 around the $2,150 price), which is the normal T-109 path; the page shows it as a range.
+- The widget's success message promised "we'll email you the link"; in the demo it now doesn't.
+- The browser harness clicked before the dev server's second config load (React StrictMode runs effects twice in development only) and was sent back to the service step; it now waits for the network to settle.
+
+**Verified:**
+- `verify-t153.mts` 36/36 live (web started with `DEMO_DAILY_CAP=8`, `DEMO_IP_LIMIT_PER_HOUR=3`, `CRON_SECRET`):
+  - the seeded business: flagged, slug, no user, no notification email, no benchmarks; three services, all auto-send, ≤ 1 photo, two without photos;
+  - `/demo` with the note and the demo widget; `?tenantKey=` opens the developer view; home, painting and trade pages link to `/demo` with the new words; the widget config never carries the flag and serves the shipped logo;
+  - no lead from the contact step; spring pair **$375** in 5.9–6.8 s; painting 2 rooms **$825**; the sample photo uploads; two photos are refused; the water heater is read from the label (range $1,890–2,410 around $2,150, with a question);
+  - all three flagged demo (not test); no usage counter; nothing recorded for calibration; the IP stored only as a hash;
+  - the 4th request from one IP → `DEMO_BUSY ip_limit`, nothing created; other IPs fill the cap of 8; the 9th → `DEMO_BUSY daily_cap`;
+  - a business can't set the flag through `PUT /api/tenant` or directly with its own token (403), `GET /api/tenant` never returns it, and it can't read a demo quote (404);
+  - clean-up: a demo request 23 h old is kept; after 24 h the cron deletes 8 quotes, 8 requests, 1 upload and its R2 object; a real business's 48 h old quote is untouched; the demo then takes requests again.
+- Playwright 14/14 on a 390 px phone, signed out:
+  - the note, the fake pre-filled contact details and the "no email or text" line; no sideways scroll;
+  - spring: the estimate appears on the page **5.5 s** after Continue at **$375.00**; "What the business sees" with Approve & send; the signup button;
+  - water heater: "Use a sample photo" fills the label slot and uploads, then the button goes (one photo); the estimate shows on the page as a range;
+  - painting: $825.00; the 4th run from the same visitor shows the recorded example and signup.
+- The worker logged "Demo request: no emails" for every demo run.
+- Regression set: verify-t146/t147/t148/t149/t150/t151/t152 20/20, 33/33, 29/29, 35/35, 27/27, 35/35, 66/66. One T-152 unit test read the old `!isTest` guard in the intake source; it now reads `outsidePlan` (same behaviour).
+- Unit tests: web 278 (+25):
+  - the demo services (three, from the packs, auto-send, one photo, two without photos, the packs' prices unchanged) and the shared row builder used by the API and the seed;
+  - the recorded example still matches the pack price and passes the customer language guard;
+  - the limits (cap first, then per IP; env parsing; the IP hashed and salted) and their place in the route (after Turnstile and the quotes limit, before any record);
+  - intake outside any plan without the Test mark; the worker's no-email, no-usage, no-adjudication and one-photo guards and its projection; no lead, reminder, calibration, benchmark or admin listing;
+  - the flag: guard and inherit triggers, no tenant or public API carries it, the slug reserved;
+  - clean-up: the cut-off, the order, demo rows only, rows kept when R2 fails, nothing without a demo tenant, the cron pass;
+  - /demo by default and the developer view with `?tenantKey`, one widget, the new link wording everywhere, our own drawn files.
+
+  Worker 465, mobile 11. Lint, typecheck, web and worker builds pass.
+
+**Files:** `supabase/migrations/00000000000036_public_demo.sql`, `scripts/{deploy-migration-36.sh,seed-demo-tenant.mts}`, `packages/shared/src/{demo,index}.ts`, `apps/web/public/demo/*`, `apps/web/src/lib/demo/{demo-services,demo-guard,demo-cleanup,demo-tenant,recorded-example}.ts`, `apps/web/src/lib/{service-rows,r2,quote-intake,measurement-memory,tenant-slug}.ts`, `apps/web/src/app/demo/page.tsx`, `apps/web/src/components/demo/{DemoExperience,DeveloperDemo}.tsx`, `apps/web/src/components/embed/{EstimateWidget,steps/ContactStep}.tsx`, `apps/web/src/app/api/{services,public/quotes,public/leads,public/widget/config,public/quotes/[quoteId]/{accept,decline,feedback,clarify},cron/lifecycle,learning/benchmarks,admin/tenants}/route.ts`, `apps/web/src/{app/page.tsx,components/marketing/{SiteFooter,TradeLanding}.tsx}`, `apps/web/.env.example`, `apps/worker/src/quote-processor.ts`, `scripts/hardcore-test/verify-t153.mts`, tests.
+
 ### 2026-11-10: T-152 — Simpler dashboard: waiting work first, five menu items, free allowance fixed
 
 **Problem:** the dashboard had ten menu items, three of them channels a business can't set up alone. Home led with stats and repeated shortcuts, not the work waiting for the owner. The free allowance reset every month, so a small business never had to pay.
@@ -3730,6 +3794,12 @@ if (pricingResult.estimatedTotal <= 0) {
 ### AD-039: Home is the work waiting; the free allowance is in total (T-152)
 
 **Decision:** the dashboard has five menu items (Home, Quotes, Prices, Share, Settings). Home leads with quotes waiting for approval, then unfinished requests, then a setup checklist whose every step ticks only on a real action (never on a row existing), then four 30-day numbers. WhatsApp quoting without setup lives on Share (wa.me plus WhatsApp Business texts), and full in-chat WhatsApp stays an advanced page. The free allowance for a business without a plan is counted across all months (`FREE_ALLOWANCE` per region, `per: 'total' | 'month'`) by summing the existing usage counters, so there's no new counter to keep in step. **Why:** an owner opens the app to act on work; a monthly free allowance meant a small business never had to pay. **Rejected:** a separate lifetime counter column (a second source of truth for usage), hiding WhatsApp as "coming soon" (it already works through the quote link), and ticking "Check your prices" whenever a service exists (it would tick together with "Add a service" and mean nothing).
+
+---
+
+### AD-040: The public demo is one flagged example business, outside every count (T-153)
+
+**Decision:** /demo runs the real widget against one example tenant marked `is_demo`. The flag is set only by the service role (a guard trigger) and copied to its quotes by a trigger, so no API can forge it either way. A demo request goes through the normal pipeline with the business's own configured prices (AD-001). It is never counted (plan, usage, analytics, calibration, benchmarks), never emails anyone, uses the cheap models with one photo, and is deleted after 24 hours. Its limits are counted in the database, not Redis, so they hold where Upstash is off. **Why:** a visitor should see the real thing in a minute, and a demo must cost little and leave nothing behind. **Rejected:** a recorded video or fake estimate as the main path (not the real product); reusing `is_test` (test quotes email the typed address and show a Test badge); a separate demo widget (AD-024: one widget); a Redis-only cap (off in production).
 
 ---
 

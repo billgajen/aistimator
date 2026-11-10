@@ -27,7 +27,7 @@ export function TradeLanding({ trade }: { trade: TradePage }) {
             {freeOfferLabel()}
           </Link>
           <Link href="/demo" className="rounded-lg border border-border bg-surface px-8 py-3 text-sm font-semibold text-text-primary transition-colors hover:border-border-strong">
-            Try the live demo
+            Try it as a customer
           </Link>
         </div>
       </section>

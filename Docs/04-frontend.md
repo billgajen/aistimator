@@ -16,6 +16,18 @@ Routes:
 - /legal/terms
 - /help (docs embedded here)
 
+Try it as a customer (T-153, /demo): every "Try the live demo" button and the footer "Widget demo" link now read
+"Try it as a customer" and open /demo. The page (marketing layout, phone first): heading, one line, a note that
+Example Home Services is an example business with example prices, then the real widget (`EstimateWidget` with its
+`demo` option — no second widget):
+- contact pre-filled with fake details (Sam Sample, sam.sample@example.com, (555) 010-0199) and "These are example
+  details. No email or text will be sent to anyone.";
+- "Use a sample photo" on the photo step (the drawn label in `public/demo/`, through the normal upload);
+- when priced, the estimate on the same page, then "What the business sees" (a static new-lead card with Approve &
+  send) and "Try it free: 10 quotes, no card";
+- over the demo's limits, a recorded example estimate with the same signup button.
+/demo?tenantKey=… keeps the old developer view (the Share page links there).
+
 Free offer (T-152): every "Start free" now reads "Try it free: 10 quotes, no card" (`freeOfferLabel()` from
 `packages/shared/src/plans.ts`). The free allowance is 10 priced quotes **in total** (it never resets); the pricing
 FAQ ("Can I try it for free?") and the billing page say the same.

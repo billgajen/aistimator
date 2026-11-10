@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { createQuoteSubmission } from '@/lib/quote-intake'
 import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
 import { verifyTurnstileToken } from '@/lib/turnstile'
+import { checkDemoAllowance, demoBusyResponse } from '@/lib/demo/demo-guard'
 import { NextResponse } from 'next/server'
 
 // Vercel function budget: sync processing (SYNC_QUOTE_PROCESSING=true) holds
@@ -140,7 +141,9 @@ export async function POST(request: Request) {
     const tenantId = tenantSite.tenant_id
 
     // T-151: which contact details this business requires (email, phone or both)
-    const { data: tenantContact } = await supabase.from('tenants').select('contact_requirement').eq('id', tenantId).single()
+    const { data: tenantContact } = await supabase.from('tenants').select('contact_requirement, is_demo').eq('id', tenantId).single()
+    // T-153: the public example business — its own limits, never counted
+    const isDemo = (tenantContact as { is_demo?: boolean } | null)?.is_demo === true
     const contact = checkContact(body.customer, contactRequirementOf(tenantContact?.contact_requirement))
     if (!contact.ok) {
       return NextResponse.json(
@@ -149,8 +152,16 @@ export async function POST(request: Request) {
       )
     }
 
+    let demoIp: string | null = null
+    if (isDemo) {
+      const demo = await checkDemoAllowance(supabase, tenantId, clientIp)
+      if (demo.decision !== 'ok') return demoBusyResponse(demo.decision)
+      demoIp = demo.ipHash
+    }
+
     // T-150: only a valid server-issued token for this tenant makes a test request
-    const test = await decideTestRequest(supabase, tenantId, body.testToken)
+    // (the demo business has no owner, so no test links)
+    const test = isDemo ? ({ kind: 'normal' } as const) : await decideTestRequest(supabase, tenantId, body.testToken)
     if (test.kind === 'refused') {
       return NextResponse.json({ error: { code: test.code, message: test.message } }, { status: test.status })
     }
@@ -161,15 +172,20 @@ export async function POST(request: Request) {
       customer: { name: contact.clean.name, email: contact.clean.email ?? undefined, phone: contact.clean.phone ?? undefined },
       job: body.job,
       assetIds: body.assetIds,
-      source: publicSource(body.source as Record<string, unknown> | undefined),
+      source: {
+        ...publicSource(body.source as Record<string, unknown> | undefined),
+        // T-153: the per-IP demo limit's key (a salted hash; deleted with the request)
+        ...(demoIp && { demoIp }),
+      },
       isTest: test.kind === 'test',
+      isDemo,
       // T-151: a service with no questions of its own still needs a description
       requireDescriptionWithoutQuestions: true,
     })
 
     // T-151: the request is now a quote — close the unfinished lead it came from
     const quoteId = (result.json as { quoteId?: string }).quoteId
-    if (result.status === 200 && quoteId) {
+    if (result.status === 200 && quoteId && !isDemo) {
       await completeLeads(supabase, {
         tenantId,
         quoteId,

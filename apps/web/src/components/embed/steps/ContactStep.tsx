@@ -23,6 +23,7 @@ export function ContactStep({
   onNext,
   saving,
   serverErrors,
+  note,
 }: {
   businessName: string
   requirement: ContactRequirement
@@ -39,6 +40,8 @@ export function ContactStep({
   saving: boolean
   /** Errors the server returned for these fields */
   serverErrors?: Partial<Record<'name' | 'email' | 'phone', string>>
+  /** T-153 demo: e.g. "Example details. No message will be sent." */
+  note?: string
 }) {
   const [touched, setTouched] = useState(false)
   const check = checkContact({ name, email, phone }, requirement)
@@ -55,6 +58,11 @@ export function ContactStep({
   return (
     <div className="p-6">
       <h3 className="font-display text-xl font-bold text-text-primary mb-5">Where should we send your estimate?</h3>
+      {note && (
+        <p className="-mt-2 mb-4 rounded-warm-lg border border-tape/50 bg-butter px-3 py-2 text-sm text-text-primary" role="note" data-testid="demo-contact-note">
+          {note}
+        </p>
+      )}
 
       <div className="space-y-4">
         <div>

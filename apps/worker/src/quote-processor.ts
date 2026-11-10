@@ -66,6 +66,9 @@ import type { CrossServicePricing } from '@estimator/shared'
 import { createSentenceRewriter } from './ai/wording-repair'
 import { sendQuoteEmails, sendReviewRequestEmail, sendEstimateShownEmail, isEmailConfigured } from './email'
 import { incrementUsageCounter } from './usage'
+
+/** T-153: photos a demo request reads at most (matches DEMO_MAX_PHOTOS in shared) */
+const DEMO_PHOTO_CAP = 1
 import type { Env } from './index'
 import { StageTimer } from './stage-timer'
 import { humanStatedQuantityKeys } from './quantity-sources'
@@ -122,6 +125,8 @@ interface QuoteData {
     clarification_answers_json?: Array<{ questionId: string; answer: string }> | null
     /** T-150: owner's test request from setup — not counted toward usage */
     is_test?: boolean
+    /** T-153: a visitor's request to the public demo — no emails, no usage, cheap models only */
+    is_demo?: boolean
     /** First-pass signals (+ reprice snapshot) and provisional content */
     signals_json?: unknown
     content_json?: unknown
@@ -565,9 +570,11 @@ export async function processQuote(
 
   // Apply triage photo strategy: limit which images to process
   const allImageAssets = assets.filter((a) => a.type === 'image')
+  // T-153: a demo request reads one photo at most (cost control)
+  const photoCap = quoteData.quote.is_demo === true ? Math.min(DEMO_PHOTO_CAP, triageDecision.photoStrategy.maxPhotos) : triageDecision.photoStrategy.maxPhotos
   const imageAssets = triageDecision.photoStrategy.skipVision
     ? []
-    : allImageAssets.slice(0, triageDecision.photoStrategy.maxPhotos)
+    : allImageAssets.slice(0, photoCap)
   // T-135: model per task from the registry (env-overridable); every call's
   // tokens are metered for the per-quote AI cost estimate in the trace
   const aiUsage = new AiUsageMeter()
@@ -811,7 +818,10 @@ export async function processQuote(
             covThreshold,
             valueThreshold: Number(env.ADJUDICATION_VALUE_THRESHOLD || DEFAULT_ADJUDICATION_VALUE_THRESHOLD),
           })
-          if (decision.shouldAdjudicate) {
+          // T-153: never the senior model on a demo request (cost control)
+          if (decision.shouldAdjudicate && quoteData.quote.is_demo === true) {
+            console.log(`[Processor] Demo request: adjudication skipped for ${m.signalKey}`)
+          } else if (decision.shouldAdjudicate) {
             console.log(
               `[Processor] Adjudicating ${m.signalKey} (${decision.reason}, provisional ${provisionalValue.toFixed(0)})`
             )
@@ -2433,7 +2443,7 @@ export async function processQuote(
 
   // 6. Increment usage counter for estimates_sent (T-150: the owner's test
   // requests from setup are never counted)
-  if (quoteData.quote.is_test !== true) {
+  if (quoteData.quote.is_test !== true && quoteData.quote.is_demo !== true) {
     await incrementUsageCounter(supabase, quoteData.quote.tenant_id, 'estimates_sent')
   }
 
@@ -2442,8 +2452,12 @@ export async function processQuote(
   // T-147: when the estimate is shown early the customer gets an estimate
   // email now. A quote the business created in its own app needs no email to
   // itself.
+  // T-153: a demo request sends no email to anyone (not even the from-address
+  // fallback the business email uses when there's no owner)
+  const emailOn = quoteData.quote.is_demo !== true && isEmailConfigured(env.POSTMARK_API_TOKEN, env.POSTMARK_FROM_EMAIL)
+  if (quoteData.quote.is_demo === true) console.log('[Processor] Demo request: no emails')
   if (finalStatus === 'pending_review') {
-    if (shownEarly && quoteToken && quoteRequest.customer_email && isEmailConfigured(env.POSTMARK_API_TOKEN, env.POSTMARK_FROM_EMAIL)) {
+    if (shownEarly && quoteToken && quoteRequest.customer_email && emailOn) {
       try {
         const result = await sendEstimateShownEmail(
           {
@@ -2477,7 +2491,7 @@ export async function processQuote(
     }
     if (
       quoteRequest.source_json?.type !== 'app' &&
-      isEmailConfigured(env.POSTMARK_API_TOKEN, env.POSTMARK_FROM_EMAIL)
+      emailOn
     ) {
       const range = pricing.estimate?.rangeLow !== undefined && pricing.estimate?.rangeHigh !== undefined
         ? { low: pricing.estimate.rangeLow, high: pricing.estimate.rangeHigh }
@@ -2512,7 +2526,7 @@ export async function processQuote(
         console.error('[Processor] Review request email error:', emailError)
       }
     }
-  } else if (isEmailConfigured(env.POSTMARK_API_TOKEN, env.POSTMARK_FROM_EMAIL)) {
+  } else if (emailOn) {
     const businessOwnerEmail = quoteData.businessOwnerEmail || env.POSTMARK_FROM_EMAIL!
 
     if (quoteToken) {
@@ -2748,6 +2762,8 @@ async function loadQuoteData(
       content_json: quote.content_json,
       // T-150: test requests from setup are not counted (same projection trap)
       is_test: quote.is_test === true,
+      // T-153: the public demo (same projection trap)
+      is_demo: quote.is_demo === true,
     },
     quoteRequest: quote.quote_requests as unknown as QuoteData['quoteRequest'],
     tenant: quote.tenants as unknown as QuoteData['tenant'],

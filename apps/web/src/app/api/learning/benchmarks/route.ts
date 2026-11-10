@@ -97,6 +97,8 @@ export async function GET() {
       .eq('benchmarks_opt_in', true)
       .eq('currency', tenant.currency)
       .neq('id', profile.tenant_id)
+      // T-153: the public demo's example prices are never a benchmark
+      .eq('is_demo', false)
 
     const otherTenantIds = (optedInTenants || []).map((t) => t.id)
     if (otherTenantIds.length === 0) {

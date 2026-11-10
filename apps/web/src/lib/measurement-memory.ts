@@ -15,9 +15,12 @@ export async function recordMeasurementExamples(
     service_id: string
     clarification_questions_json: unknown
     signals_json: unknown
+    /** T-153: a visitor's demo answers never become the demo business's calibration */
+    is_demo?: boolean | null
   },
   answers: Array<{ questionId: string; answer: string }>
 ): Promise<void> {
+  if (quote.is_demo) return
   try {
     const questions = (quote.clarification_questions_json || []) as Array<{ id: string; targetSignalKey: string }>
     const signals = ((quote.signals_json as { signals?: Array<{ key: string; value: unknown }> } | null)?.signals) || []
