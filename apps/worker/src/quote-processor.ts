@@ -2584,7 +2584,8 @@ export async function processQuote(
     } else {
       console.warn('[Processor] No quote token available, skipping emails')
     }
-  } else {
+  } else if (quoteData.quote.is_demo !== true) {
+    // T-153: a demo quote has already logged "Demo request: no emails"
     console.log('[Processor] Email not configured, skipping notifications')
   }
 
