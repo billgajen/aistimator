@@ -236,9 +236,10 @@ Code for every item is already built; these are the steps that unlock it.
 
 ## T-151 — Customer flow: contact first, unfinished requests, next step after accept
 
-- [ ] **Deploy in order:** `bash scripts/deploy-migration-34.sh` FIRST (the web app writes `request_leads` and reads
+- [x] **Deploy in order:** `bash scripts/deploy-migration-34.sh` FIRST (the web app writes `request_leads` and reads
   `tenants.contact_requirement`; without them the widget's contact step and every submission fail), then the
   **worker** (phone-only customers have no email: it must skip the customer email), then the web app.
+  Done 2026-11-10 15:15 UTC: migration 34, worker `4d9c4016`, web (commit `f147633`).
 - [ ] **Know what changes on deploy:** every widget (quote link and installed embeds) asks for contact details right
   after the service, then the questions, photos, and ZIP + description last. The address moved to accept. Default
   contact rule: email required, phone optional. Change it in Settings → Customer contact details.
