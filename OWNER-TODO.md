@@ -167,8 +167,9 @@ Code for every item is already built; these are the steps that unlock it.
 
 ## T-147 — Show, then confirm
 
-- [ ] **Deploy in order:** `bash scripts/deploy-migration-31.sh` FIRST (the worker writes `quotes.review_hold` and reads
+- [x] **Deploy in order:** `bash scripts/deploy-migration-31.sh` FIRST (the worker writes `quotes.review_hold` and reads
   `services.hold_until_approved`; without the column every quote update fails), then the worker, then the web app.
+  Done 2026-11-10 11:16 UTC: migration 31, worker `f890d5ac`, web (commit `4654f0a`).
 - [ ] **Know what changes on deploy:** every service that is not set to send automatically, existing ones included,
   starts showing the customer the estimate straight away, marked as an estimate you will confirm. Accept stays locked
   until you tap **Approve & send**. To keep a service hidden until you approve, edit it → Basic → **Hold until I

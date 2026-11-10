@@ -45,6 +45,8 @@
 
 `verify-t146.mts` 20/20 (its default service now sets `holdUntilApproved`). Worker tests 446 (+18: modes, hold kind, fail-closed `isShownEarly`, measured-range rule, payload guard, estimate email), web 139. Lint, typecheck, web and worker builds pass. Quote page screenshotted at 430 px.
 
+**Deployed 2026-11-10 11:16 UTC** (commit `4654f0a`): migration 31, then worker version `f890d5ac-2cab-42df-962c-70b769663e87`, then web (Vercel, Ready). Live checks: worker `/health` 200, public quote API 404 for a bad token, approve 401 when not logged in, `services.hold_until_approved` and `quotes.review_hold` present.
+
 **Not verified:** no email was sent live (no Postmark locally). The service editor radios and the widget state were not checked by eye. No gauntlet run: the ticket does not touch AI, quantities or pricing.
 
 **Files:** `supabase/migrations/00000000000031_show_then_confirm.sql`, `scripts/deploy-migration-31.sh`, `packages/shared/src/{review-mode.ts,api.types.ts,database.types.ts,index.ts}`, `apps/worker/src/{quote-processor.ts,email/index.ts,email/templates.ts,__tests__/review-mode.test.ts}`, `apps/web/src/app/api/public/quotes/[quoteId]/{route.ts,feedback/route.ts}`, `apps/web/src/app/api/services/{route.ts,[id]/route.ts}`, `apps/web/src/app/{q/[quoteId]/page.tsx,embed/[tenantKey]/page.tsx}`, `apps/web/src/app/(dashboard)/app/{services/page.tsx,quotes/[quoteId]/page.tsx}`, `scripts/hardcore-test/{verify-t147.mts,verify-t146.mts}`.
