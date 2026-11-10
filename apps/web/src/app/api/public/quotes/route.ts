@@ -1,3 +1,4 @@
+import { decideTestRequest, publicSource } from '@/lib/test-quotes'
 import { createAdminClient } from '@/lib/supabase/server'
 import { createQuoteSubmission } from '@/lib/quote-intake'
 import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
@@ -38,6 +39,8 @@ interface CreateQuoteRequest {
   turnstileToken?: string
   /** Honeypot — hidden field no human sees; any value means a bot */
   website?: string
+  /** T-150: server-issued test token from setup (owner's test request) */
+  testToken?: string
 }
 
 /**
@@ -140,13 +143,20 @@ export async function POST(request: Request) {
 
     const tenantId = tenantSite.tenant_id
 
+    // T-150: only a valid server-issued token for this tenant makes a test request
+    const test = await decideTestRequest(supabase, tenantId, body.testToken)
+    if (test.kind === 'refused') {
+      return NextResponse.json({ error: { code: test.code, message: test.message } }, { status: test.status })
+    }
+
     const result = await createQuoteSubmission(supabase, {
       tenantId,
       serviceId: body.serviceId,
       customer: body.customer,
       job: body.job,
       assetIds: body.assetIds,
-      source: (body.source as Record<string, unknown> | undefined) || { type: 'widget' },
+      source: publicSource(body.source as Record<string, unknown> | undefined),
+      isTest: test.kind === 'test',
     })
     return NextResponse.json(result.json, { status: result.status })
   } catch (error) {

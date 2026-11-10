@@ -144,7 +144,7 @@ check('the slug can’t be changed by writing to the tenant row directly', !dire
 // ---------- 5. the checklist ----------
 const copied = await http('POST', `${cfg.appUrl}/api/tenant/share-event`, { headers: twin.cookie, body: { event: 'copied' } })
 check('copying the link records it', copied.ok && Boolean((await tenantRow(twin.tenantId)).quote_link_copied_at))
-const home = await fetch(`${cfg.appUrl}/app`, { headers: twin.cookie })
+const home = await fetch(`${cfg.appUrl}/app`, { headers: a.cookie })
 const homeHtml = await home.text()
 check('the home checklist says "Share your quote link" (not "Embed on website")', homeHtml.includes('Share your quote link') && !homeHtml.includes('Embed on website'))
 check('a bad share event is refused', (await http('POST', `${cfg.appUrl}/api/tenant/share-event`, { headers: twin.cookie, body: { event: 'nope' } })).status === 400)

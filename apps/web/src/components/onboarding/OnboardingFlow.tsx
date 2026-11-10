@@ -5,15 +5,22 @@
  * 5-step wizard for the default path. Scripted flow with AI at the seams
  * (service extraction T-105, pricing compilation T-104); flow control is
  * deterministic. Target: signup → first test quote in under 10 minutes.
+ *
+ * T-150 flow: "What kind of work do you do?" (trade template, or "Something
+ * else" → website / describe) → tick services → price the unpriced ones →
+ * "Check your prices" (every path) → basics → create → a guided test quote.
  */
 
 import { useState } from 'react'
-import { useCopy } from '@/components/share/useCopy'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { ServiceDraftConfig, AddonConfig, MultiplierConfig, RegionCode } from '@estimator/shared'
-import { getRegion, listRegions, currencySymbol as symbolFor } from '@estimator/shared'
+import { getRegion, currencySymbol as symbolFor } from '@estimator/shared'
 import { describePricingRules } from '@/lib/pricing-describe'
 import { listPacks, getPack } from '@/lib/vertical-packs'
+import { isUnpriced, servicePayload, type DraftService } from '@/lib/onboarding-service'
+import { TradeStep } from './TradeStep'
+import { CheckPricesStep } from './CheckPricesStep'
+import { TestQuoteStep } from './TestQuoteStep'
 
 interface OnboardingFlowProps {
   businessName: string
@@ -27,46 +34,39 @@ interface OnboardingFlowProps {
   initialTaxEnabled: boolean
   /** DB decimal rate (0.2 = 20%) or null */
   initialTaxRate: number | null
+  /** T-150: a previous answer to "What kind of work do you do?" */
+  initialTrade: string | null
+  initialTradeOther: string
 }
 
-type Step = 'source' | 'extracting' | 'services' | 'pricing' | 'basics' | 'creating' | 'done'
-
-interface DraftService {
-  name: string
-  description: string
-  draft: ServiceDraftConfig
-  addons: AddonConfig[]
-  multipliers: MultiplierConfig[]
-  selected: boolean
-}
-
-function isUnpriced(svc: DraftService): boolean {
-  return svc.draft.pricing.workSteps.length === 0 && svc.draft.pricing.baseFee === 0
-}
+type Step = 'trade' | 'source' | 'extracting' | 'services' | 'pricing' | 'prices' | 'basics' | 'creating' | 'test'
 
 export function OnboardingFlow({
   businessName,
-  tenantKey,
-  appOrigin,
   quoteLink,
   initialRegion,
   initialCurrency,
   initialTaxEnabled,
   initialTaxRate,
+  initialTrade,
+  initialTradeOther,
 }: OnboardingFlowProps) {
-  const [step, setStep] = useState<Step>('source')
+  const router = useRouter()
+  const [step, setStep] = useState<Step>('trade')
   const [error, setError] = useState<string | null>(null)
+  const [savingTrade, setSavingTrade] = useState(false)
+  // T-150: services came from a trade template (their rates are starting points)
+  const [fromTemplate, setFromTemplate] = useState(false)
 
-  // Source step
-  const [sourceMode, setSourceMode] = useState<'website' | 'describe' | 'template'>('website')
+  // Source step ("Something else")
+  const [sourceMode, setSourceMode] = useState<'website' | 'describe'>('website')
   const [websiteUrl, setWebsiteUrl] = useState('')
   const [businessDescription, setBusinessDescription] = useState('')
   // T-133: region first — it decides currency, units and which packs fit
   const [region, setRegion] = useState<RegionCode>(initialRegion)
   const regionDef = getRegion(region)
-  // T-113: vertical pack templates (this region's packs listed first)
-  const availablePacks = listPacks(region)
-  const [selectedPackId, setSelectedPackId] = useState<string | null>(null)
+  // T-113: vertical pack templates for this region
+  const availablePacks = listPacks(region).filter((p) => p.region === region)
 
   // Extracted services
   const [services, setServices] = useState<DraftService[]>([])
@@ -103,13 +103,47 @@ export function OnboardingFlow({
     setRegion(next.code)
     setCurrency(next.currency)
     setTaxLabel(next.copy.taxLabel)
-    setSelectedPackId(null)
+  }
+
+  /** T-150: save the trade answer, then go to its template or to "tell us about it" */
+  const handleChooseTrade = async (trade: string, otherText: string) => {
+    setSavingTrade(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/tenant', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trade, tradeOther: trade === 'other' ? otherText : null }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error?.message || 'Could not save your answer')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save your answer')
+      setSavingTrade(false)
+      return
+    }
+    setSavingTrade(false)
+    if (trade === 'other') {
+      setFromTemplate(false)
+      setStep('source')
+    } else {
+      handleApplyPack(trade)
+    }
+  }
+
+  /** T-150: set up by hand instead; the dashboard stops sending them here */
+  const handleSkip = async () => {
+    await fetch('/api/onboarding/skip', { method: 'POST' }).catch(() => undefined)
+    router.push('/app/services')
   }
 
   /** T-113: apply a vertical pack — no network, no AI, instant */
-  const handleApplyPack = () => {
-    const pack = selectedPackId ? getPack(selectedPackId) : undefined
+  const handleApplyPack = (packId: string) => {
+    const pack = getPack(packId)
     if (!pack) return
+    setFromTemplate(true)
     setServices(
       pack.services.map((svc) => ({
         name: svc.name,
@@ -174,7 +208,7 @@ export function OnboardingFlow({
     setPricingIndex(0)
     setPricingText('')
     setCompileResult(null)
-    setStep(queue.length > 0 ? 'pricing' : 'basics')
+    setStep(queue.length > 0 ? 'pricing' : 'prices')
   }
 
   /** Pricing interview: compile the plain-language description for the current service */
@@ -233,7 +267,8 @@ export function OnboardingFlow({
     if (pricingIndex + 1 < pricingQueue.length) {
       setPricingIndex(pricingIndex + 1)
     } else {
-      setStep('basics')
+      // T-150: every path checks its prices before the basics
+      setStep('prices')
     }
   }
 
@@ -267,38 +302,13 @@ export function OnboardingFlow({
         throw new Error(data?.error?.message || `Failed to save business settings (${tenantRes.status})`)
       }
 
-      // Create services (same payload shape as bulk import)
+      // Create services (same payload shape as bulk import; lib/onboarding-service)
       let created = 0
       for (const svc of services.filter((s) => s.selected)) {
         const res = await fetch('/api/services', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: svc.name,
-            description: svc.description,
-            documentTypeDefault: 'instant_estimate',
-            scopeIncludes: svc.draft.scope.included,
-            scopeExcludes: svc.draft.scope.excluded,
-            defaultAssumptions: svc.draft.scope.assumptions,
-            mediaConfig: {
-              minPhotos: svc.draft.media.minPhotos,
-              maxPhotos: svc.draft.media.maxPhotos,
-              photoGuidance: svc.draft.media.photoGuidance,
-              // Guided-capture slots (T-107) — verified missing here: without
-              // this line pack/AI-draft angles were silently dropped
-              requiredAngles: svc.draft.media.requiredAngles,
-            },
-            workSteps: svc.draft.pricing.workSteps,
-            expectedSignals: svc.draft.expectedSignals,
-            pricingRules: {
-              baseFee: svc.draft.pricing.baseFee,
-              minimumCharge: svc.draft.pricing.minimumCharge,
-              addons: svc.addons,
-              multipliers: svc.multipliers,
-              workSteps: svc.draft.pricing.workSteps,
-            },
-            draftConfig: svc.draft,
-          }),
+          body: JSON.stringify(servicePayload(svc)),
         })
         if (res.ok) {
           created++
@@ -309,20 +319,12 @@ export function OnboardingFlow({
       if (created === 0) {
         throw new Error('No services could be created — please try again')
       }
-      setStep('done')
+      setStep('test')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setStep('basics')
     }
   }
-
-  const embedSnippet = `<script
-  src="${appOrigin}/widget.js"
-  data-tenant-key="${tenantKey}"
-  data-mode="floating"
-  async
-></script>`
-  const { copy, copiedId } = useCopy()
 
   const currentPricingService =
     step === 'pricing' && pricingQueue[pricingIndex] !== undefined
@@ -335,11 +337,14 @@ export function OnboardingFlow({
     <div className="mx-auto max-w-2xl">
       {/* Progress */}
       <div className="mb-8 flex items-center gap-2">
-        {(['source', 'services', 'pricing', 'basics', 'done'] as const).map((s, i) => {
-          const stepOrder: Step[] = ['source', 'services', 'pricing', 'basics', 'done']
-          const currentIdx = stepOrder.indexOf(
-            step === 'extracting' ? 'source' : step === 'creating' ? 'basics' : step
-          )
+        {(['trade', 'services', 'prices', 'basics', 'test'] as const).map((s, i) => {
+          const stepOrder: Step[] = ['trade', 'services', 'prices', 'basics', 'test']
+          const shown: Step =
+            step === 'source' || step === 'extracting' ? 'trade'
+              : step === 'pricing' ? 'prices'
+                : step === 'creating' ? 'basics'
+                  : step
+          const currentIdx = stepOrder.indexOf(shown)
           return (
             <div
               key={s}
@@ -351,120 +356,61 @@ export function OnboardingFlow({
         })}
       </div>
 
-      {error && step !== 'source' && (
+      {error && step !== 'source' && step !== 'trade' && (
         <div className="mb-6 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           {error}
         </div>
       )}
 
-      {/* STEP: source */}
+      {/* STEP: trade (T-150) */}
+      {step === 'trade' && (
+        <TradeStep
+          businessName={businessName}
+          region={region}
+          onRegionChange={handleRegionChange}
+          packs={availablePacks}
+          initialTrade={initialTrade}
+          initialOther={initialTradeOther}
+          saving={savingTrade}
+          error={error}
+          onChoose={handleChooseTrade}
+          onSkip={handleSkip}
+        />
+      )}
+
+      {/* STEP: source ("Something else") */}
       {step === 'source' && (
         <div>
           <h1 className="font-display text-3xl font-extrabold tracking-tight text-text-primary">
-            Let&apos;s get {businessName} quoting in minutes
+            Tell us about {businessName}
           </h1>
-          <div className="mt-5 max-w-xs">
-            <label className="mb-1 block text-sm font-medium text-text-secondary">
-              Where is your business?
-            </label>
-            <select
-              value={region}
-              onChange={(e) => handleRegionChange(e.target.value)}
-              className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            >
-              {listRegions().map((r) => (
-                <option key={r.code} value={r.code}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <p className="mt-4 text-text-secondary">
-            Next: where should we learn about your services?
-          </p>
+          <p className="mt-2 text-text-secondary">Where should we learn about your services?</p>
 
-          <div className={`mt-6 grid gap-3 ${availablePacks.length > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-            {availablePacks.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setSourceMode('template')}
-                className={`rounded-xl border p-4 text-left transition-colors ${
-                  sourceMode === 'template'
-                    ? 'border-primary bg-surface'
-                    : 'border-border hover:border-border-strong'
-                }`}
-              >
-                <div className="font-semibold text-text-primary">Use a template</div>
-                <div className="mt-1 text-sm text-text-secondary">
-                  Ready-made setup for your trade — fastest start
-                </div>
-              </button>
-            )}
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
             <button
               type="button"
               onClick={() => setSourceMode('website')}
               className={`rounded-xl border p-4 text-left transition-colors ${
-                sourceMode === 'website'
-                  ? 'border-primary bg-surface'
-                  : 'border-border hover:border-border-strong'
+                sourceMode === 'website' ? 'border-primary bg-surface' : 'border-border hover:border-border-strong'
               }`}
             >
               <div className="font-semibold text-text-primary">Read my website</div>
-              <div className="mt-1 text-sm text-text-secondary">
-                We&apos;ll read your services and pricing pages
-              </div>
+              <div className="mt-1 text-sm text-text-secondary">We&apos;ll read your services and pricing pages</div>
             </button>
             <button
               type="button"
               onClick={() => setSourceMode('describe')}
               className={`rounded-xl border p-4 text-left transition-colors ${
-                sourceMode === 'describe'
-                  ? 'border-primary bg-surface'
-                  : 'border-border hover:border-border-strong'
+                sourceMode === 'describe' ? 'border-primary bg-surface' : 'border-border hover:border-border-strong'
               }`}
             >
               <div className="font-semibold text-text-primary">I&apos;ll describe it</div>
-              <div className="mt-1 text-sm text-text-secondary">
-                Tell us what you offer in your own words
-              </div>
+              <div className="mt-1 text-sm text-text-secondary">Tell us what you offer in your own words</div>
             </button>
           </div>
 
           <div className="mt-4">
-            {sourceMode === 'template' ? (
-              <div className="space-y-2">
-                {availablePacks.map((pack) => (
-                  <label
-                    key={pack.id}
-                    className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
-                      selectedPackId === pack.id
-                        ? 'border-primary bg-surface'
-                        : 'border-border hover:border-border-strong'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="pack"
-                      checked={selectedPackId === pack.id}
-                      onChange={() => setSelectedPackId(pack.id)}
-                      className="mt-1 h-4 w-4 border-border text-primary focus:ring-primary/30"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-semibold text-text-primary">
-                        {pack.icon} {pack.name}
-                      </span>
-                      <span className="mt-0.5 block text-sm text-text-secondary">
-                        {pack.description}
-                      </span>
-                      <span className="mt-1 block text-xs text-text-muted">
-                        {pack.services.length} service{pack.services.length === 1 ? '' : 's'} with
-                        typical rates — review and adjust everything before going live
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            ) : sourceMode === 'website' ? (
+            {sourceMode === 'website' ? (
               <input
                 type="url"
                 value={websiteUrl}
@@ -481,7 +427,7 @@ export function OnboardingFlow({
                 value={businessDescription}
                 onChange={(e) => setBusinessDescription(e.target.value)}
                 rows={5}
-                placeholder={`e.g. "We're a painting and decorating company. We do interior painting, exterior painting, and wallpapering. Interior is priced per room, exterior depends on the size of the property..."`}
+                placeholder="Say what you offer and how you usually charge for it, the way you'd explain it to a customer."
                 className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 autoFocus
               />
@@ -489,29 +435,28 @@ export function OnboardingFlow({
           </div>
 
           {error && (
-            <div className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
-              {error}
-            </div>
+            <div className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</div>
           )}
 
           <div className="mt-4 flex items-center justify-between">
             <button
               type="button"
-              onClick={sourceMode === 'template' ? handleApplyPack : handleExtract}
-              disabled={
-                sourceMode === 'template'
-                  ? !selectedPackId
-                  : sourceMode === 'website'
-                    ? !websiteUrl.trim()
-                    : !businessDescription.trim()
-              }
+              onClick={handleExtract}
+              disabled={sourceMode === 'website' ? !websiteUrl.trim() : !businessDescription.trim()}
               className="inline-flex items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Continue
             </button>
-            <Link href="/app/services" className="text-sm text-text-muted hover:text-text-secondary">
-              Skip — set up manually instead
-            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setStep('trade')
+                setError(null)
+              }}
+              className="text-sm text-text-muted hover:text-text-secondary"
+            >
+              Back
+            </button>
           </div>
         </div>
       )}
@@ -565,7 +510,7 @@ export function OnboardingFlow({
                   <div className="mt-1 text-xs text-text-muted">
                     {isUnpriced(svc)
                       ? "No pricing found — we'll ask you next"
-                      : `${svc.draft.pricing.workSteps.length} priced item${svc.draft.pricing.workSteps.length === 1 ? '' : 's'} found`}
+                      : `${svc.draft.pricing.workSteps.length} priced item${svc.draft.pricing.workSteps.length === 1 ? '' : 's'}. You'll check the prices next`}
                   </div>
                 </div>
               </label>
@@ -584,7 +529,7 @@ export function OnboardingFlow({
             <button
               type="button"
               onClick={() => {
-                setStep('source')
+                setStep('trade')
                 setError(null)
               }}
               className="text-sm text-text-muted hover:text-text-secondary"
@@ -710,6 +655,23 @@ export function OnboardingFlow({
         </div>
       )}
 
+      {/* STEP: check your prices (T-150) */}
+      {step === 'prices' && (
+        <CheckPricesStep
+          services={services.map((svc, index) => ({ index, svc })).filter(({ svc }) => svc.selected)}
+          fromTemplate={fromTemplate}
+          currency={currency}
+          locale={regionDef.locale}
+          currencySymbol={currencySymbol}
+          onChange={(index, next) => setServices((prev) => prev.map((s, i) => (i === index ? next : s)))}
+          onConfirm={() => {
+            setError(null)
+            setStep('basics')
+          }}
+          onBack={() => setStep('services')}
+        />
+      )}
+
       {/* STEP: basics */}
       {step === 'basics' && (
         <div>
@@ -810,88 +772,14 @@ export function OnboardingFlow({
         </div>
       )}
 
-      {/* STEP: done */}
-      {step === 'done' && (
-        <div>
-          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-secondary-light">
-            <svg className="h-6 w-6 text-secondary" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
-          <h1 className="font-display text-3xl font-extrabold tracking-tight text-text-primary">
-            You&apos;re ready to quote
-          </h1>
-          <p className="mt-2 text-text-secondary">
-            {createdCount} service{createdCount === 1 ? '' : 's'} created. Here&apos;s how customers reach you:
-          </p>
-
-          <div className="mt-6 space-y-4">
-            {quoteLink && (
-              <div className="rounded-xl border border-border p-4">
-                <h3 className="font-semibold text-text-primary">1. Your quote link</h3>
-                <p className="mt-1 text-sm text-text-secondary">
-                  Share it anywhere: your Google profile, social bio, texts and emails. Try it yourself first and
-                  you&apos;ll get a real estimate back.
-                </p>
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <code className="min-w-0 flex-1 truncate rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary">
-                    {quoteLink}
-                  </code>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => copy('link', quoteLink)}
-                      className="inline-flex items-center rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                    >
-                      {copiedId === 'link' ? 'Copied' : 'Copy'}
-                    </button>
-                    <a
-                      href={quoteLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-secondary hover:bg-surface"
-                    >
-                      Open
-                    </a>
-                  </div>
-                </div>
-                <Link href="/app/share" className="mt-2 inline-block text-sm text-text-secondary underline underline-offset-2">
-                  QR code and ready-made texts
-                </Link>
-              </div>
-            )}
-
-            <div className="rounded-xl border border-border p-4">
-              <h3 className="font-semibold text-text-primary">{quoteLink ? '2. ' : ''}Add it to your website</h3>
-              <p className="mt-1 text-sm text-text-secondary">
-                Paste this snippet before the closing <code>&lt;/body&gt;</code> tag:
-              </p>
-              <pre className="mt-3 overflow-x-auto rounded-lg bg-primary p-3 text-xs text-white">
-                <code>{embedSnippet}</code>
-              </pre>
-              <button
-                type="button"
-                onClick={() => copy('embed', embedSnippet, { shareEvent: false })}
-                className="mt-2 inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-surface"
-              >
-                {copiedId === 'embed' ? 'Copied' : 'Copy Snippet'}
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <Link
-              href="/app"
-              className="inline-flex items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-            >
-              Go to Dashboard
-            </Link>
-          </div>
-        </div>
+      {/* STEP: guided test quote (T-150) */}
+      {step === 'test' && (
+        <TestQuoteStep
+          createdCount={createdCount}
+          quoteLink={quoteLink}
+          locale={regionDef.locale}
+          fallbackCurrency={currency}
+        />
       )}
     </div>
   )

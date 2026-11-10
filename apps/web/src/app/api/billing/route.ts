@@ -65,7 +65,7 @@ export async function GET() {
       .single()
 
     // T-134: plans come from the shared definitions, not the plans table
-    const { data: tenantRow } = await supabase.from('tenants').select('region, currency').eq('id', tenantId).single()
+    const { data: tenantRow } = await supabase.from('tenants').select('region, currency, selected_plan').eq('id', tenantId).single()
     const tenantRegion = (tenantRow as { region?: string } | null)?.region ?? null
 
     let subscriptionInfo: SubscriptionInfo = {
@@ -131,6 +131,7 @@ export async function GET() {
       subscription: subscriptionInfo,
       usage,
       availablePlans,
+      selectedPlanId: (tenantRow as { selected_plan?: string | null } | null)?.selected_plan ?? null,
     }
 
     return NextResponse.json(response)

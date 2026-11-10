@@ -80,6 +80,13 @@ export interface Tenant {
   /** T-149: first time the quote link was copied / the quote page was visited */
   quote_link_copied_at?: string | null
   quote_link_first_visit_at?: string | null
+  /** T-150: setup answer — a vertical pack id, or 'other' (+ trade_other) */
+  trade?: string | null
+  trade_other?: string | null
+  /** T-150: plan picked on the pricing page before signup (billing pre-select) */
+  selected_plan?: string | null
+  /** T-150: the business skipped guided setup */
+  onboarding_skipped_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -898,6 +905,8 @@ export interface Quote {
   approved_by?: string | null
   /** T-146: the pre-approval customer link, still accepted after approval */
   previous_token_hash?: string | null
+  /** T-150: the owner's test request from setup (never counted toward usage) */
+  is_test?: boolean
   /** T-147: why a pending_review quote awaits the business: shown | held | check */
   review_hold?: 'shown' | 'held' | 'check' | null
   paid_at: string | null

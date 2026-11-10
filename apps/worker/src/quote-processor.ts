@@ -120,6 +120,8 @@ interface QuoteData {
     clarification_count?: number
     clarification_questions_json?: Array<{ id: string; targetSignalKey: string }> | null
     clarification_answers_json?: Array<{ questionId: string; answer: string }> | null
+    /** T-150: owner's test request from setup — not counted toward usage */
+    is_test?: boolean
     /** First-pass signals (+ reprice snapshot) and provisional content */
     signals_json?: unknown
     content_json?: unknown
@@ -2429,8 +2431,11 @@ export async function processQuote(
     return { success: false, error: `Database error: ${updateError.message}` }
   }
 
-  // 6. Increment usage counter for estimates_sent
-  await incrementUsageCounter(supabase, quoteData.quote.tenant_id, 'estimates_sent')
+  // 6. Increment usage counter for estimates_sent (T-150: the owner's test
+  // requests from setup are never counted)
+  if (quoteData.quote.is_test !== true) {
+    await incrementUsageCounter(supabase, quoteData.quote.tenant_id, 'estimates_sent')
+  }
 
   // 7. Send notification emails. Pending review: the business gets a link to
   // review and approve, and the "Your quote from…" email goes on approval.
@@ -2741,6 +2746,8 @@ async function loadQuoteData(
       // left out here is invisible to the processor — the T-108 trap again)
       signals_json: quote.signals_json,
       content_json: quote.content_json,
+      // T-150: test requests from setup are not counted (same projection trap)
+      is_test: quote.is_test === true,
     },
     quoteRequest: quote.quote_requests as unknown as QuoteData['quoteRequest'],
     tenant: quote.tenants as unknown as QuoteData['tenant'],

@@ -21,6 +21,11 @@ export default function SignupPage() {
     setLoading(true)
 
     try {
+      // T-150: the plan picked on the pricing page (/signup?plan=…) rides along
+      // in the user's metadata; the tenant (created on verification) keeps it
+      // for the billing page to pre-select. Never starts checkout.
+      const plan = new URLSearchParams(window.location.search).get('plan')
+
       // Sign up the user - tenant is created automatically via database trigger
       const { error: signUpError } = await supabase.auth.signUp({
         email,
@@ -28,7 +33,11 @@ export default function SignupPage() {
         options: {
           data: {
             business_name: businessName,
+            ...(plan && /^[a-z0-9_]{1,40}$/.test(plan) && { selected_plan: plan }),
           },
+          // T-150: the verification link signs them in and sends them on to
+          // /app, which takes a business with no services straight to setup
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/app`,
         },
       })
 

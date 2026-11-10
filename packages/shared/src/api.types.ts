@@ -300,6 +300,8 @@ export interface QuoteListItem {
   paidAt: string | null
   total: number
   currency: string
+  /** T-150: the owner's test request from setup (not counted toward usage) */
+  isTest?: boolean
 }
 
 export interface QuotesListResponse {
@@ -392,6 +394,8 @@ export interface BillingResponse {
   subscription: SubscriptionInfo
   usage: BillingUsage
   availablePlans: PlanInfo[]
+  /** T-150: the plan picked on the pricing page before signup (pre-selected; never starts checkout) */
+  selectedPlanId?: string | null
 }
 
 export interface CreateCheckoutRequest {

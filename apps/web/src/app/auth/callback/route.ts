@@ -11,7 +11,9 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/app'
+  // Same-site paths only: "//host" or "@host" would turn `${origin}${next}` into another site
+  const requested = searchParams.get('next') ?? '/app'
+  const next = /^\/(?![/\\])[^@]*$/.test(requested) ? requested : '/app'
 
   if (code) {
     const supabase = await createClient()

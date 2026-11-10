@@ -72,6 +72,7 @@ export async function GET(request: Request) {
         paid_at,
         customer_json,
         pricing_json,
+        is_test,
         services!service_id (
           id,
           name
@@ -126,6 +127,7 @@ export async function GET(request: Request) {
         customerName: customer?.name || 'Unknown',
         customerEmail: customer?.email || '',
         status: quote.status as QuoteStatus,
+        isTest: (quote as { is_test?: boolean }).is_test === true,
         createdAt: quote.created_at,
         sentAt: quote.sent_at,
         viewedAt: quote.viewed_at,

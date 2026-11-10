@@ -1,3 +1,4 @@
+import { getPack } from '@/lib/vertical-packs'
 import { createClient } from '@/lib/supabase/server'
 import { getRegion, isRegionCode, isUnitSystem } from '@estimator/shared'
 import { type NextRequest, NextResponse } from 'next/server'
@@ -140,7 +141,13 @@ export async function PUT(request: NextRequest) {
       defaultTermsText,
       templateJson,
       benchmarksOptIn,
+      trade,
+      tradeOther,
     } = body as {
+      /** T-150: setup answer — a vertical pack id, or 'other' */
+      trade?: string | null
+      /** T-150: the business's own words when trade is 'other' */
+      tradeOther?: string | null
       name?: string
       region?: string
       unitSystem?: string | null
@@ -264,6 +271,19 @@ export async function PUT(request: NextRequest) {
 
     if (defaultTermsText !== undefined) {
       updates.default_terms_text = defaultTermsText ? defaultTermsText.trim() : null
+    }
+
+    // T-150: "What kind of work do you do?" — a known pack, or 'other' + free text
+    if (trade !== undefined) {
+      if (trade !== null && trade !== 'other' && !getPack(trade)) {
+        return NextResponse.json(
+          { error: { code: 'INVALID_INPUT', message: 'Unknown trade' } },
+          { status: 400 }
+        )
+      }
+      updates.trade = trade
+      const other = typeof tradeOther === 'string' ? tradeOther.trim().slice(0, 200) : ''
+      updates.trade_other = trade === 'other' && other ? other : null
     }
 
     if (templateJson !== undefined) {

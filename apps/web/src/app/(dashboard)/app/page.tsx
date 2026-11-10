@@ -1,3 +1,4 @@
+import { syncSelectedPlan } from '@/lib/signup-choices'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@estimator/shared'
 import { checkPlanLimit } from '@/lib/plan-limits'
@@ -38,7 +39,7 @@ export default async function DashboardPage() {
   const [{ data: tenant }, planLimit] = await Promise.all([
     supabase
       .from('tenants')
-      .select('name, branding_json, currency, quote_link_copied_at, quote_link_first_visit_at')
+      .select('name, branding_json, currency, quote_link_copied_at, quote_link_first_visit_at, selected_plan, onboarding_skipped_at')
       .eq('id', profile.tenant_id)
       .single(),
     checkPlanLimit(supabase, profile.tenant_id),
@@ -103,6 +104,13 @@ export default async function DashboardPage() {
   ])
 
   const hasService = (servicesResult.data?.length ?? 0) > 0
+
+  // T-150: keep the plan chosen before signup, and take a business with no
+  // services straight to setup (unless it chose to set up by hand)
+  await syncSelectedPlan(supabase, profile.tenant_id, (tenant as { selected_plan?: string | null } | null)?.selected_plan, user.user_metadata)
+  if (!hasService && !(tenant as { onboarding_skipped_at?: string | null } | null)?.onboarding_skipped_at) {
+    redirect('/app/onboarding')
+  }
   const hasWidgetConfig = (() => {
     const firstConfig = widgetResult.data?.[0]
     if (!firstConfig) return false

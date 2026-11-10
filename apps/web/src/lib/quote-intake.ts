@@ -39,6 +39,11 @@ export interface QuoteIntakeInput {
   source: Record<string, unknown>
   /** Business-created on site: the business chose the service, skip the AI service match */
   skipServiceMatch?: boolean
+  /**
+   * T-150: the owner's test request from setup (decided by the caller from a
+   * server-issued token). Not limited by the plan and never counted.
+   */
+  isTest?: boolean
 }
 
 export interface QuoteIntakeResult {
@@ -94,10 +99,12 @@ export async function createQuoteSubmission(
   // with overage pricing); otherwise hard block. Customer-facing message is
   // deliberately neutral: never expose the business's billing state.
   const planLimit = await checkPlanLimit(supabase, tenantId)
-  const isOverageQuote = !planLimit.allowed && planLimit.overageAvailable
+  // T-150: a test request is outside the plan: never held, never metered
+  const isTest = input.isTest === true
+  const isOverageQuote = !isTest && !planLimit.allowed && planLimit.overageAvailable
   // T-134 (AD-026): over the limit with overage off → capture as an unpriced
   // lead (never lose a submission); no AI runs, the business is told to upgrade
-  const limitHold = !planLimit.allowed && !planLimit.overageAvailable
+  const limitHold = !isTest && !planLimit.allowed && !planLimit.overageAvailable
   if (limitHold) {
     console.warn(
       `[Quotes] Plan limit reached for tenant (${planLimit.used}/${planLimit.limit}) — capturing as held lead`
@@ -412,6 +419,7 @@ export async function createQuoteSubmission(
       },
       document_type: service.document_type_default,
       is_general_inquiry: isGeneralInquiry,
+      is_test: isTest,
       content_json: limitHold
         ? leadHoldContent(tenant.name)
         : isGeneralInquiry
@@ -476,11 +484,12 @@ export async function createQuoteSubmission(
     })
   }
 
-  // 12a. Increment usage counter for estimates_created
-  await incrementUsageCounter(supabase, tenantId, 'estimates_created')
-
-  // 12b. If this consumed the last quote in the plan, notify the business once (T-101)
-  await maybeNotifyLimitReached(supabase, tenantId, tenant.name)
+  // 12a. Increment usage counter for estimates_created (T-150: not for tests)
+  if (!isTest) {
+    await incrementUsageCounter(supabase, tenantId, 'estimates_created')
+    // 12b. If this consumed the last quote in the plan, notify the business once (T-101)
+    await maybeNotifyLimitReached(supabase, tenantId, tenant.name)
+  }
 
   // 12c. Meter this quote to Stripe when it's beyond the plan limit (T-102).
   // Uses the quote ID as the idempotency identifier — retries can't double-bill.

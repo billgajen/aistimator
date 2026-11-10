@@ -215,3 +215,22 @@ Code for every item is already built; these are the steps that unlock it.
 - [ ] **Not checked by eye:** the "Change the end of the link" form (checked through the API) and the setup flow's
   last step. The quote page on a phone and the Share page were screenshotted.
 
+## T-150 — Setup that shows prices and ends with a test quote
+
+- [ ] **Deploy in order:** `bash scripts/deploy-migration-33.sh` FIRST (the web app writes `quotes.is_test` on every
+  new quote and reads the new tenant columns), then the **worker** (it stops counting test requests as sent), then
+  the web app.
+- [ ] **Supabase redirect URL:** signup now asks the verification email to return to
+  `https://estimator-web-phi.vercel.app/auth/callback?next=/app`. Add `https://estimator-web-phi.vercel.app/**` to
+  Supabase → Authentication → URL Configuration → Redirect URLs (and your custom domain later). Until it's there,
+  Supabase falls back to the Site URL, as today. Signing in afterwards still lands in setup.
+- [ ] **Know what changes on deploy:** a business with no services is sent to setup when it opens the dashboard,
+  until it creates a service or presses "Skip — set up manually instead". Existing businesses with services see no
+  change.
+- [ ] **Optional:** set `TEST_QUOTE_SECRET` in Vercel to sign test links with their own key. Without it the key is
+  derived from the Supabase service-role key; changing either invalidates open test links (2-hour links anyway).
+- [ ] **Test requests:** up to 10 per business per day are free and marked "Test"; after that the test link says to
+  try tomorrow. They still email the address typed into the form.
+- [ ] **Not checked live:** the verification email's redirect (no email locally). Everything after sign-in was
+  driven in a browser.
+

@@ -5,6 +5,7 @@ import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
 import { getRegion } from '@estimator/shared'
 import { getOrCreateTenantKey, appOriginFrom } from '@/lib/tenant-site'
 import { quoteLinkUrl } from '@/lib/quote-link-url'
+import { syncSelectedPlan } from '@/lib/signup-choices'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,10 +37,11 @@ export default async function OnboardingPage() {
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('name, region, currency, tax_enabled, tax_rate, slug')
+    .select('name, region, currency, tax_enabled, tax_rate, slug, selected_plan, trade, trade_other')
     .eq('id', profile.tenant_id)
     .single()
 
+  await syncSelectedPlan(supabase, profile.tenant_id, tenant?.selected_plan, user.user_metadata)
   const tenantKey = await getOrCreateTenantKey(supabase, profile.tenant_id)
   const appOrigin = appOriginFrom(headers().get('host'))
 
@@ -54,6 +56,8 @@ export default async function OnboardingPage() {
         initialCurrency={tenant?.currency || 'USD'}
         initialTaxEnabled={tenant?.tax_enabled ?? false}
         initialTaxRate={tenant?.tax_rate ?? null}
+        initialTrade={tenant?.trade ?? null}
+        initialTradeOther={tenant?.trade_other ?? ''}
       />
     </div>
   )

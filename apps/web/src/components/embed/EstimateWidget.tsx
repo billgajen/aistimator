@@ -23,6 +23,8 @@ interface EstimateWidgetProps {
   tenantKey: string
   /** T-149: the hosted quote page — fills the screen instead of sizing to a frame */
   hosted?: boolean
+  /** T-150: server-verified test token from setup; the request is marked as a test */
+  testToken?: string
 }
 
 interface ServiceMediaConfig {
@@ -472,7 +474,7 @@ function ConversationalChat({
 // MAIN EMBED PAGE
 // ============================================================================
 
-export function EstimateWidget({ tenantKey, hosted = false }: EstimateWidgetProps) {
+export function EstimateWidget({ tenantKey, hosted = false, testToken }: EstimateWidgetProps) {
   const searchParams = useSearchParams()
   const serviceId = searchParams.get('serviceId')
   const displayMode = searchParams.get('mode')
@@ -590,6 +592,7 @@ export function EstimateWidget({ tenantKey, hosted = false }: EstimateWidgetProp
           tenantKey,
           turnstileToken: turnstileToken || undefined,
           website: honeypot || undefined,
+          ...(testToken && { testToken }),
           serviceId: selectedService,
           customer: {
             name: customerName,
@@ -687,6 +690,11 @@ export function EstimateWidget({ tenantKey, hosted = false }: EstimateWidgetProp
       className={`${hosted ? 'min-h-screen' : 'min-h-full'} bg-background font-body p-3 sm:px-6 sm:py-10`}
       style={brandStyleVars(widgetData?.branding?.primaryColor)}
     >
+      {testToken && (
+        <p className="max-w-xl mx-auto mb-3 rounded-warm-lg border border-tape/50 bg-butter px-4 py-2.5 text-center text-sm text-text-primary" role="note">
+          Test mode: this is how your customers see your quote page. This request won&apos;t count toward your plan.
+        </p>
+      )}
       <div className="max-w-xl mx-auto bg-white rounded-warm-2xl border border-border shadow-warm-lg overflow-hidden pb-2">
       {/* Widget letterhead — shown in both form and conversational modes */}
       {widgetData && step !== 'loading' && step !== 'error' && step !== 'success' && (

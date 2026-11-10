@@ -211,6 +211,11 @@ export default function QuoteDetailPage({
           <div>
             <h1 className="font-display text-2xl font-extrabold text-text-primary">
               Quote for {customer.name}
+              {(quote as { is_test?: boolean }).is_test && (
+                <span className="ml-2 inline-flex items-center rounded-full bg-butter px-2 py-0.5 align-middle text-xs font-semibold uppercase tracking-wide text-tertiary" title="A test request from setup. It doesn't count toward your plan.">
+                  Test
+                </span>
+              )}
             </h1>
             <p className="text-sm text-text-secondary">
               {service.name} &middot; Created {formatDate(quote.created_at)}

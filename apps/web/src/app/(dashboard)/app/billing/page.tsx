@@ -309,6 +309,8 @@ function BillingPageContent() {
               key={plan.id}
               plan={plan}
               isCurrent={currentPlan?.id === plan.id}
+              // T-150: the plan picked before signup, highlighted until they subscribe
+              isChosen={!isPaid && data?.selectedPlanId === plan.id}
               interval={billingInterval}
               // Existing subscribers change plans in the Stripe portal (proration on);
               // new subscribers go through checkout (trial where the plan has one)
@@ -337,6 +339,7 @@ function BillingPageContent() {
 function PlanCard({
   plan,
   isCurrent,
+  isChosen = false,
   onSelect,
   loading,
   disabled,
@@ -345,6 +348,7 @@ function PlanCard({
   plan: PlanInfo
   interval: 'monthly' | 'annual'
   isCurrent: boolean
+  isChosen?: boolean
   onSelect: () => void
   loading: boolean
   disabled: boolean
@@ -352,9 +356,16 @@ function PlanCard({
   return (
     <div
       className={`relative rounded-warm-lg border p-6 ${
-        isCurrent ? 'border-blue-500 ring-2 ring-blue-500' : 'border-border'
+        isCurrent ? 'border-blue-500 ring-2 ring-blue-500' : isChosen ? 'border-primary ring-2 ring-primary' : 'border-border'
       }`}
     >
+      {isChosen && !isCurrent && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+          <span className="inline-flex items-center rounded-full bg-primary px-3 py-1 text-xs font-medium text-on-primary">
+            The plan you picked
+          </span>
+        </div>
+      )}
       {isCurrent && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
           <span className="inline-flex items-center rounded-full bg-primary px-3 py-1 text-xs font-medium text-white">

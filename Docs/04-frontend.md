@@ -19,7 +19,7 @@ Routes:
 ### 2) Dashboard (authenticated)
 Routes:
 - /app
-- /app/onboarding
+- /app/onboarding (T-150: where a new business with no services lands)
 - /app/services
 - /app/pricing
 - /app/share (T-149; /app/widget redirects here)
@@ -48,6 +48,19 @@ Must be:
 - Fast
 - Clear CTAs: accept, pay, contact
 - Show optional sections based on tenant settings
+
+### Setup (T-150, /app/onboarding)
+Signup (`/signup?plan=<id>` from the pricing page keeps the plan) → email verification → `/app`, which sends a
+business with no services to setup until it has one or presses "Skip". Steps:
+1. "What kind of work do you do?" — the region's trade templates as large options, plus "Something else" (free text).
+   A template goes to its services; "Something else" goes to "Read my website / I'll describe it".
+2. Tick services; price any unpriced ones in plain English.
+3. "Check your prices" (every path): each priced item, extras, adjustments ("Attic: +12%"), minimum charge and base
+   fee, all editable in place; template rates carry "These are typical starting prices. Change them to yours.";
+   "These are my prices" to continue; "Describe a change in plain English" per service. No engine terms.
+4. Basics (currency, tax, service area), then the services are created.
+5. Guided test: "Try it as your customer" opens /quote/[slug] in test mode; the estimate appears inline with
+   "Approve & send"; then the quote link with Copy and "Go to dashboard". Test requests aren't counted.
 
 ### 4) Business quote page (public, no login, T-149)
 Routes:

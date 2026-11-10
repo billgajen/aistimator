@@ -15,6 +15,55 @@
 
 ## Issues & Resolutions
 
+### 2026-11-10: T-150 — Setup that shows the business its prices and ends with a real test quote
+
+**Problem:** a business picking a trade template went pick template → tick services → tax → done. It never saw a price, the template rates were placeholders, and nothing ended in a real quote.
+
+**Built:**
+1. **Migration 33** (additive, re-runnable): `tenants.trade`, `trade_other` (≤ 200 chars), `selected_plan`, `onboarding_skipped_at`; `quotes.is_test` (default false, partial index).
+2. **Signup → setup:**
+   - `/signup?plan=<id>` keeps the plan in the user's metadata. The first `/app` or setup load copies it to `tenants.selected_plan` if it is an offered plan (`lib/signup-choices.ts`), and the billing page highlights "The plan you picked". Checkout never starts from it.
+   - Signup asks the verification email to return via `/auth/callback?next=/app`.
+   - `/app` redirects a business with no active services to `/app/onboarding` unless it pressed "Skip" (`POST /api/onboarding/skip`).
+   - **Fixed on the way:** the auth callback redirected to `${origin}${next}`, so `next=@evil.com` was an open redirect. It now accepts same-site paths only.
+3. **First question "What kind of work do you do?"** (`components/onboarding/TradeStep.tsx`): the region's packs as large options, plus "Something else" with free text, saved through `PUT /api/tenant` (`trade`, `tradeOther`; unknown trade → 400). A pack goes to its services; "Something else" goes to the existing website/describe screen. The region picker moved here, since packs depend on it.
+4. **"Check your prices"** (`CheckPricesStep.tsx`), on every path before the basics:
+   - `lib/price-list.ts` turns a draft service into a plain list and back: priced items with their condition in plain words, extras, adjustments ("Attic: +12%", "Jobs over $5,000: −10%"), minimum charge and base fee.
+   - Every number is editable in place. Edits write the same `workSteps`, `addons`, `multipliers`, `baseFee` and `minimumCharge` that `POST /api/services` and the service editor use (AD-001). The draft's own add-on list is kept in step by name, and bad numbers keep the old value.
+   - Template rates carry "These are typical starting prices. Change them to yours." "These are my prices" is required.
+   - "Describe a change in plain English" reuses `PricingComposer`. As in the service editor, an empty compile never wipes add-ons or adjustments (`applyCompile`).
+   - The create payload moved to `lib/onboarding-service.ts` (`servicePayload`), shared by setup and the live check.
+5. **Guided test** (`TestQuoteStep.tsx`, replacing "You're ready"):
+   - "Try it as your customer" calls `POST /api/onboarding/test-link` and opens `/quote/<slug>?test=<token>`. The page shows "Test mode".
+   - Setup polls `GET /api/onboarding/test-quote` and shows the estimate inline with "Approve & send" (the existing approve API), then the quote link with Copy and "Go to dashboard".
+6. **Server-issued test flag** (`lib/test-quote-token.ts`, `lib/test-quotes.ts`):
+   - An HMAC over tenant id and a 2-hour expiry, keyed by `TEST_QUOTE_SECRET` or a key derived from the service-role key, so no new env var is needed.
+   - `POST /api/public/quotes` verifies it against the tenant of the widget key: invalid, expired or another tenant's → 403. Any test marker a client puts in `source` is stripped.
+   - A test request skips the plan limit and lead hold, both usage counters (web `estimates_created`, worker `estimates_sent`), overage metering and the limit email.
+   - Capped at 10 per tenant per 24 h (429) so a test link can't be shared as a source of uncounted quotes.
+   - "Test" badge on the quotes list and quote page.
+
+**Found while verifying:** the live check showed a test request counted as *sent*. The worker's `loadQuoteData` copies the quote into an object field by field, so the new `is_test` column was invisible to it. This is the same enumerated-projection trap noted at T-108. `is_test` is now in the projection; re-run 27/27.
+
+**Verified:**
+- `verify-t150.mts` 27/27 live:
+  - setup and plan: a new signup is sent to setup; the plan is kept (an unoffered one isn't) and reaches billing;
+  - trade: pack, "Something else" with text, and an unknown trade (400);
+  - prices: a price list edit stores exactly; a test request through the test link was flagged and charged $175.50 + $1,333.33 = **$1,508.83**, with usage unchanged;
+  - guided test: setup's inline estimate, approve → sent, the list badge, and a rival business can't read it;
+  - forgery: `source.test: true` gives a normal counted quote; tampered, made-up and rival tokens get 403; the link needs a login; a bad token on the page is ignored;
+  - dashboard: a business with services sees it, and "Skip" stops the redirect.
+- Playwright 11/11 through the real screens:
+  - lands in setup; template path to "Check your prices" with the note and no engine terms;
+  - edited the single door to $1,400; created the services; the guided test opened the quote page in test mode;
+  - a request submitted as the customer appeared inline at **$1,550.00** ($150 + $1,400); Approve & send worked; the link and dashboard button show; the quotes list shows "Test";
+  - the "Something else → I'll describe it" path (real AI extraction) also reached "Check your prices", without the template note.
+- Unit tests: web 203 (+30): price list both ways (every pack service round-trips unchanged, one edit changes one number in the payload, add-on name sync, ±% adjustments, bad input kept), plain adjustment names, the screen rendered (every number present, no engine words), the token (tenant, expiry, tampering, wrong key, junk), source stripping, and plan ids. Worker 463. Lint, typecheck, web and worker builds pass. The web vitest config now uses the automatic JSX runtime so tests can render components.
+
+**Not verified:** the email-verification redirect itself (no email locally; it needs the Supabase redirect URL allowlisted, see OWNER-TODO). No gauntlet: no pricing or AI change.
+
+**Files:** `supabase/migrations/00000000000033_setup_test_quote.sql`, `scripts/deploy-migration-33.sh`, `apps/web/src/lib/{price-list,onboarding-service,test-quote-token,test-quotes,signup-choices}.ts`, `apps/web/src/components/onboarding/{OnboardingFlow,TradeStep,CheckPricesStep,TestQuoteStep}.tsx`, `apps/web/src/app/api/onboarding/{test-link,test-quote,skip}/route.ts`, `apps/web/src/app/api/{tenant,billing,quotes,public/quotes}/route.ts`, `apps/web/src/lib/quote-intake.ts`, `apps/web/src/app/quote/[slug]/page.tsx`, `apps/web/src/components/embed/EstimateWidget.tsx`, `apps/web/src/app/(auth)/signup/page.tsx`, `apps/web/src/app/auth/callback/route.ts`, `apps/web/src/app/(dashboard)/app/{page.tsx,onboarding/page.tsx,billing/page.tsx,quotes/page.tsx,quotes/[quoteId]/page.tsx}`, `apps/worker/src/quote-processor.ts`, `packages/shared/src/{api.types,database.types}.ts`, `apps/web/vitest.config.ts`, `scripts/hardcore-test/verify-t150.mts`, tests.
+
 ### 2026-11-10: T-149 — Quote link and QR code as the main way to go live
 
 **Problem:** a business could only go live by pasting a script tag. Many small trades can't edit their website or don't have one.
@@ -3513,6 +3562,10 @@ if (pricingResult.estimatedTotal <= 0) {
 ### AD-036: The quote link is the main way to go live; slugs belong to the database (T-149)
 
 **Decision:** every business has a readable hosted quote page, `/quote/{slug}`, and the Share page leads with it and its QR code; the embed code is the second option. The page renders the one widget implementation (AD-024), never a copy. Slugs are generated and guarded **in the database**: a BEFORE INSERT trigger names every new tenant, and only the service role may change a slug, once. A former slug redirects forever and can't be reused, so a printed QR code never lands on another business. **Why:** most small trades can share a link but can't edit a website; generating in SQL covers every way a tenant is created, and the guard keeps the rules enforceable despite the tenant-update RLS policy. **Rejected:** generating slugs in app code at signup (two creation paths, one of them a DB trigger); unlimited changes (each change strands printed QR codes on a redirect); an iframe of `/embed` inside the hosted page (a frame inside a page on the same origin adds resize jank on phones for nothing).
+
+### AD-037: Setup ends with the business's own prices and a real test quote; test requests are server-issued (T-150)
+
+**Decision:** guided setup always passes through "Check your prices" before anything is created, and ends with the owner submitting a request on their own quote page and approving it. The price list is a view over the existing pricing config, never a store of its own. A request is a test only when it carries an HMAC token the server issued to the signed-in owner for that tenant; the flag lives on `quotes.is_test`, set at creation, and every usage counter checks it. **Why:** template rates are placeholders, and a business that never sees its numbers sends wrong prices; the first quote should prove the whole loop on both sides. A client-settable flag would be a free-quotes switch. **Rejected:** a separate "setup prices" table (a second source of truth); a test flag in `source_json` (clients write it); a test mode on the public widget without a token; unlimited test requests (a shared test link would be uncounted quoting).
 
 ---
 

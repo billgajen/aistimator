@@ -316,7 +316,10 @@ export default function QuotesPage() {
                 {quotes.map((quote) => (
                   <tr key={quote.quoteId} className="hover:bg-surface transition-colors">
                     <td className="px-6 py-5 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-text-primary">{quote.customerName}</div>
+                      <div className="text-sm font-semibold text-text-primary">
+                        {quote.customerName}
+                        {quote.isTest && <TestBadge />}
+                      </div>
                       <div className="text-sm text-text-secondary">{quote.customerEmail}</div>
                     </td>
                     <td className="px-6 py-5 whitespace-nowrap">
@@ -447,5 +450,14 @@ export default function QuotesPage() {
         </>
       )}
     </div>
+  )
+}
+
+/** T-150: the owner's test request from setup */
+function TestBadge() {
+  return (
+    <span className="ml-2 inline-flex items-center rounded-full bg-butter px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-tertiary" title="A test request from setup. It doesn't count toward your plan.">
+      Test
+    </span>
   )
 }

@@ -194,6 +194,15 @@ Response:
 
 { "ok": true }
 
+T-150 setup and test requests (dashboard cookie or app Bearer; tenant from the signed-in user):
+	•	`PUT /api/tenant` also accepts `trade` (a vertical pack id, `"other"`, or null) and `tradeOther` (≤ 200 chars, kept only when `trade` is `"other"`). An unknown trade → 400 `INVALID_INPUT`.
+	•	`POST /api/onboarding/test-link` → `{ "url": "<origin>/quote/<slug>?test=<token>", "issuedAt", "expiresAt" }`. The token is an HMAC over the tenant id and a 2-hour expiry (key: `TEST_QUOTE_SECRET`, else derived from the service-role key). 401 when logged out.
+	•	`GET /api/onboarding/test-quote?since=<ISO>` → `{ "quote": null }` or `{ "quote": { id, status, serviceName, currency, subtotal, taxAmount, taxLabel, total, lines[{label, amount}], scopeSummary } }`: the tenant's latest test request since the link was issued.
+	•	`POST /api/onboarding/skip` → `{ "ok": true }`. Sets `tenants.onboarding_skipped_at`; `/app` stops redirecting to setup.
+	•	`POST /api/public/quotes` accepts `testToken`. Valid for this tenant's key → the quote is created with `quotes.is_test = true`, skips the plan limit and lead hold, and is never counted (`estimates_created` in the web app, `estimates_sent` in the worker) or metered. Invalid, expired or another tenant's → 403 `TEST_LINK_INVALID`. More than 10 test requests per tenant in 24 h → 429 `TEST_LIMIT_REACHED`. Any `test` / `isTest` / `is_test` key a client puts in `source` is stripped.
+	•	`GET /quote/:slug?test=<token>` shows a "Test mode" note when the token is valid for that tenant (an invalid one is ignored), and doesn't set the first-visit flag.
+	•	`GET /api/quotes` items carry `isTest`. `GET /api/billing` returns `selectedPlanId` (the plan picked on the pricing page; pre-selection only, never checkout).
+
 T-149 quote link (dashboard cookie or app Bearer; tenant from the signed-in user):
 	•	`GET /api/tenant/slug[?check=<slug>]` → `{ "slug", "changeable", "check?": { "slug", "available", "reason?", "message?" } }`. `reason`: `too_short` | `too_long` | `invalid_characters` | `reserved` | `taken` (another business's current or former slug).
 	•	`PUT /api/tenant/slug` `{ "slug" }` → `{ "slug", "changeable": false }`. Allowed once. 400 `INVALID_SLUG`, 409 `SLUG_TAKEN`, 409 `ALREADY_CHANGED`. The old slug goes to `tenant_slug_history`: it keeps redirecting and can never be taken by anyone else. Writing `tenants.slug` directly is refused by a DB trigger (only the service role may change it).
