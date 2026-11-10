@@ -273,13 +273,14 @@ Code for every item is already built; these are the steps that unlock it.
 
 ## T-153 — A working public demo: "Try it as a customer"
 
-- [ ] **Deploy in order:**
+- [x] **Deploy in order:** (done 2026-11-10 18:13 UTC: migration 36, seed, `DEMO_DAILY_CAP=100`, worker `cd26a177`,
+  web, commit `b0a9ea8`)
   1. `bash scripts/deploy-migration-36.sh` (adds the demo flag, its guard and the reserved slug).
   2. `npx tsx scripts/seed-demo-tenant.mts --prod` (creates "Example Home Services" with its three services; safe to
      re-run, it updates in place).
   3. The **worker** (demo requests: no emails, no usage, no adjudication, one photo).
   4. The **web app**.
-- [ ] **Set `DEMO_DAILY_CAP` in Vercel** (production). Default 200 demo requests a day if unset; each one is a real
+- [x] **Set `DEMO_DAILY_CAP` in Vercel** (production; set to 100 on 2026-11-10). Default 200 demo requests a day if unset; each one is a real
   AI run on the cheap models. `0` turns live runs off: every visitor then sees the recorded example. Optional:
   `DEMO_IP_LIMIT_PER_HOUR` (default 5). Both are counted in the database, so they work without Upstash.
 - [ ] **The daily lifecycle cron needs `CRON_SECRET`** (already set since 2026-07): it now also deletes demo requests
@@ -289,3 +290,23 @@ Code for every item is already built; these are the steps that unlock it.
 - [ ] **What a visitor can't do:** sign into the demo business (it has no user), get any email or text, or create a
   lead. The water heater path uses a sample label we drew (`apps/web/public/demo/`); when a reading is unsure it shows
   a range and asks a question, like any real quote.
+
+## Rate limiting (found at the T-153 deploy, 2026-11-10)
+
+- [ ] **Configure Upstash Redis — it is not set anywhere in production**, so every rate limit below is off (they fail
+  open by design). Create an Upstash Redis database, then set:
+  - Vercel (Production): `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`;
+  - worker: `npx wrangler secret put UPSTASH_REDIS_URL --env production` and `UPSTASH_REDIS_TOKEN` (note the
+    different names), then redeploy both.
+
+  Unprotected until then:
+  - `POST /api/public/quotes` (5/min per IP, 30/min per business): each request runs the AI pipeline. The plan
+    limits still cap what a business is charged; the honeypot is the only bot check while Turnstile is unset.
+  - `POST /api/public/widget/chat` (15/min per IP): every turn is a model call, with no other limit.
+  - `POST /api/public/uploads/init` (20/min per IP): issues upload URLs and creates asset rows.
+  - `POST /api/public/leads` and `PATCH /api/public/leads/:id` (20/min per IP): database writes.
+  - `GET /quote/:slug` (60/min per IP): the quote link page.
+  - `POST /api/marketing/event` (5/min per IP): the Meta relay (inactive while the Meta keys are unset).
+  - Worker queue consumer: the AI-processing limiter (100 global, 10 per business per window) and its stats endpoint.
+
+  The demo's own limits (`DEMO_DAILY_CAP`, `DEMO_IP_LIMIT_PER_HOUR`) are counted in the database and already apply.
