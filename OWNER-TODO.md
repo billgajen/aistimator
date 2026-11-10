@@ -184,8 +184,8 @@ Code for every item is already built; these are the steps that unlock it.
 
 ## T-148 — Banned customer words repaired in code
 
-- [ ] **Deploy in order:** worker first, then web. No migration. (Web first is also safe; the worker change is what
-  repairs new quotes.)
+- [x] **Deploy in order:** worker first, then web. No migration. (Web first is also safe; the worker change is what
+  repairs new quotes.) Done 2026-11-10 11:53 UTC: worker `9ad1faf9`, web (commit `5529f2b`).
 - [ ] **What you'll notice:** an estimate whose wording had "exact", "firm" or "preliminary" is no longer hidden. The
   sentence is rewritten (or removed) and the estimate goes out as normal. The quote's trace page has a **Customer
   wording** section showing what changed. Your own scope, assumptions and exclusions are never changed.

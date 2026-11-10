@@ -45,7 +45,9 @@
 
 The generation path's rewrite was exercised against the real model but not inside a full quote: the model wrote clean wording for the provoking request, so no repair fired there.
 
-Unit tests: worker 463 (+17), web 144 (+5). Lint, typecheck, web and worker builds pass. No migration. No gauntlet: wording only, no pricing.
+Unit tests: worker 463 (+17), web 147 (+8, including the two new banned words). Lint, typecheck, web and worker builds pass. No migration. No gauntlet: wording only, no pricing.
+
+**Deployed 2026-11-10 11:53 UTC** (commit `5529f2b`): worker version `9ad1faf9-8c46-4cc4-a9f8-ed7f3da1b89a`, then web (Vercel, Ready). Live checks: worker `/health` 200, public quote API 404 for a bad token, approve 401 when not logged in.
 
 **Files:** `packages/shared/src/{wording-repair.ts,review-mode.ts,database.types.ts,index.ts}`, `apps/worker/src/{ai/wording-repair.ts,quote-processor.ts,__tests__/wording-repair.test.ts,__tests__/review-mode.test.ts}`, `apps/web/src/lib/quote-approval.ts`, `apps/web/src/components/quotes/WordingRepairCard.tsx`, `apps/web/src/app/(dashboard)/app/quotes/[quoteId]/trace/page.tsx`, `apps/web/src/__tests__/customer-language.test.ts`, `scripts/hardcore-test/verify-t148.mts`.
 
