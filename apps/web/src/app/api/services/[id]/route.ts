@@ -130,6 +130,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       active,
       documentTypeDefault,
       autoSend,
+      holdUntilApproved,
       scopeIncludes,
       scopeExcludes,
       defaultAssumptions,
@@ -145,6 +146,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       documentTypeDefault?: DocumentType
       /** T-146: send quotes without business review */
       autoSend?: boolean
+      /** T-147: hide the estimate until approved */
+      holdUntilApproved?: boolean
       scopeIncludes?: string[]
       scopeExcludes?: string[]
       defaultAssumptions?: string[]
@@ -191,6 +194,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     if (typeof autoSend === 'boolean') {
       updates.auto_send = autoSend
+      // T-147: one mode at a time — sending automatically clears the hold
+      if (autoSend) updates.hold_until_approved = false
+    }
+    if (typeof holdUntilApproved === 'boolean' && autoSend !== true) {
+      updates.hold_until_approved = holdUntilApproved
+      if (holdUntilApproved && autoSend === undefined) updates.auto_send = false
     }
     if (documentTypeDefault !== undefined) {
       updates.document_type_default = documentTypeDefault

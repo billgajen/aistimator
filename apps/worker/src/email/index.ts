@@ -225,6 +225,62 @@ export async function sendReviewRequestEmail(
   return { success: result.success, error: result.error }
 }
 
+export interface EstimateShownEmailData {
+  quoteId: string
+  quoteToken: string
+  customerName: string
+  customerEmail: string
+  businessName: string
+  replyTo?: string
+  serviceName: string
+  total: number
+  /** Only a range the engine measured (never one invented around a flat price) */
+  range?: { low: number; high: number }
+  currency: string
+  locale?: string
+  scopeSummary?: string
+  primaryColor?: string
+}
+
+/**
+ * T-147: the customer's estimate, sent the moment it is priced while the
+ * business reviews it. Says the business will confirm; the "Your quote from…"
+ * email follows on approval (the web app sends that one).
+ */
+export async function sendEstimateShownEmail(
+  config: EmailConfig,
+  data: EstimateShownEmailData
+): Promise<{ success: boolean; error?: string }> {
+  const locale = data.locale || 'en-GB'
+  const money = (n: number) => formatMoney(n, data.currency, locale)
+  const total = data.range && data.range.high > data.range.low
+    ? `${money(data.range.low)} – ${money(data.range.high)}`
+    : money(data.total)
+  const html = customerQuoteEmail({
+    customerName: data.customerName,
+    businessName: data.businessName,
+    serviceName: data.serviceName,
+    quoteViewUrl: `${config.appUrl}/q/${data.quoteId}?token=${data.quoteToken}`,
+    total,
+    currency: data.currency,
+    scopeSummary: data.scopeSummary,
+    primaryColor: data.primaryColor,
+    awaitingConfirmation: true,
+  })
+  const result = await sendEmail(
+    { apiToken: config.postmarkApiToken, fromEmail: config.fromEmail, fromName: config.fromName || data.businessName },
+    {
+      to: data.customerEmail,
+      subject: `Your estimate from ${data.businessName}`,
+      htmlBody: html,
+      tag: 'estimate-customer',
+      ...(data.replyTo && { replyTo: data.replyTo }),
+    }
+  )
+  console.log(`[Email] Estimate email ${result.success ? 'sent' : 'failed'}: ${data.customerEmail}`)
+  return { success: result.success, error: result.error }
+}
+
 /**
  * Check if email is configured
  */

@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { quoteTokenFilter } from '@/lib/tokens'
 import { NextResponse } from 'next/server'
+import { isShownEarly } from '@estimator/shared'
 import { createHash } from 'crypto'
 import {
   sendEmail,
@@ -52,7 +53,7 @@ export async function POST(
       .from('quotes')
       .select(`
         id, status, tenant_id, quote_token_hash, token_expires_at,
-        customer_json, service_id,
+        customer_json, service_id, review_hold, pricing_json, content_json,
         tenants!tenant_id (
           id, name, notification_email, branding_json
         ),
@@ -80,8 +81,16 @@ export async function POST(
     }
 
     // Check quote is in a valid state for feedback
+    // T-147: a customer looking at an estimate shown before approval can ask a
+    // question (not request a review: the business is already reviewing).
+    const shownEarly = isShownEarly({
+      status: quote.status,
+      review_hold: quote.review_hold as string | null,
+      total: (quote.pricing_json as { total?: number } | null)?.total,
+      limitHold: (quote.content_json as { limitHold?: boolean } | null)?.limitHold,
+    })
     const validStatuses = ['sent', 'viewed', 'revised']
-    if (!validStatuses.includes(quote.status)) {
+    if (!validStatuses.includes(quote.status) && !(shownEarly && body.feedbackType === 'feedback')) {
       return NextResponse.json(
         { error: { code: 'INVALID_STATUS', message: `Cannot submit feedback for quote with status: ${quote.status}` } },
         { status: 400 }
@@ -107,11 +116,15 @@ export async function POST(
       )
     }
 
-    // Update quote status to feedback_received
-    await supabase
-      .from('quotes')
-      .update({ status: 'feedback_received' })
-      .eq('id', quoteId)
+    // Update quote status to feedback_received. T-147: not while the estimate
+    // awaits approval — it must stay pending_review so the business can still
+    // approve it and Accept stays locked.
+    if (!shownEarly) {
+      await supabase
+        .from('quotes')
+        .update({ status: 'feedback_received' })
+        .eq('id', quoteId)
+    }
 
     // Send notification email to business owner
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

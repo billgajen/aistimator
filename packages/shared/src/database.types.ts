@@ -353,6 +353,8 @@ export interface Service {
   tax_exempt?: boolean
   /** T-146: send quotes to the customer without business review (default false = review first) */
   auto_send?: boolean
+  /** T-147: hide the estimate from the customer until the business approves (default false = show, then confirm) */
+  hold_until_approved?: boolean
   created_at: string
   updated_at: string
 }
@@ -886,6 +888,8 @@ export interface Quote {
   approved_by?: string | null
   /** T-146: the pre-approval customer link, still accepted after approval */
   previous_token_hash?: string | null
+  /** T-147: why a pending_review quote awaits the business: shown | held | check */
+  review_hold?: 'shown' | 'held' | 'check' | null
   paid_at: string | null
 }
 

@@ -54,7 +54,7 @@ import type { QualityGateResult, ClarificationQuestion } from '@estimator/shared
 import { AiUsageMeter } from '@estimator/shared'
 import { createAiClient } from './ai/factory'
 import type { AiClient } from './ai/client'
-import { computeEnvelope, enforceEnvelope, computeEstimateGrade, capFlatRateGrade, priceDependsOnJobFacts, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue, parseRoomScan, scanAnswers, scanEvidence, summarizeRoomScan, ROOM_SCAN_FIELD } from '@estimator/shared'
+import { computeEnvelope, enforceEnvelope, computeEstimateGrade, capFlatRateGrade, priceDependsOnJobFacts, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue, parseRoomScan, scanAnswers, scanEvidence, summarizeRoomScan, ROOM_SCAN_FIELD, decideReviewHold, reviewModeOf, customerEstimateRange, findConfidenceLanguageInPayload } from '@estimator/shared'
 import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor, DEFAULT_ADJUDICATION_VALUE_THRESHOLD, DEFAULT_ADJUDICATION_TIMEOUT_MS } from './ai/measurement'
 import { formatScopeAnswers } from './ai/scope-answers'
 import { fieldOptions, snapToOption, answersOutsideOptions, type OptionField } from './answer-options'
@@ -63,7 +63,7 @@ import { buildTakeoff, buildReference } from './takeoff'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing, findLookalikeUnconditionedSteps } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@estimator/shared'
-import { sendQuoteEmails, sendReviewRequestEmail, isEmailConfigured } from './email'
+import { sendQuoteEmails, sendReviewRequestEmail, sendEstimateShownEmail, isEmailConfigured } from './email'
 import { incrementUsageCounter } from './usage'
 import type { Env } from './index'
 import { StageTimer } from './stage-timer'
@@ -176,6 +176,8 @@ interface QuoteData {
     high_value_threshold?: number | null
     /** T-146: send without business review (default false) */
     auto_send?: boolean
+    /** T-147: hide the estimate until the business approves (default false = show, then confirm) */
+    hold_until_approved?: boolean
     /** AI-generated draft configuration with suggestedFields containing mapsToSignal */
     draft_config?: ServiceDraftConfig | null
     /** T-133: service is not subject to sales tax / VAT */
@@ -2249,15 +2251,37 @@ export async function processQuote(
     }
   }
 
-  // 4.9 T-146: business review by default. A quote that would go straight to
-  // the customer waits for the business to approve it unless the service is
-  // set to "Send automatically without review". Clarification rounds and the
-  // AI quality gate still run first; this only changes the final step.
-  let awaitingBusinessReview = false
-  if (finalStatus === 'sent' && service.auto_send !== true) {
-    finalStatus = 'pending_review'
-    awaitingBusinessReview = true
-    console.log('[Processor] T-146: held for business review (service is not set to send automatically)')
+  // 4.9 T-146 / T-147: business review by default. A quote that would go
+  // straight to the customer waits for the business to approve it unless the
+  // service is set to send automatically. T-147: by default the customer sees
+  // the estimate meanwhile ("shown"); a service set to hold, a quote the
+  // business created itself, and any quote a check above held stay hidden.
+  // Clarification rounds and the AI quality gate still run first; this only
+  // changes the final step.
+  // The generated wording is the one part nobody at the business has read:
+  // if it trips the customer language guard, the estimate is not shown early.
+  const wordingProblems = findConfidenceLanguageInPayload({
+    scopeSummary: content.scopeSummary,
+    assumptions: content.assumptions,
+    exclusions: content.exclusions,
+    notes: content.notes,
+  })
+  const reviewDecision = decideReviewHold({
+    statusAfterChecks: finalStatus,
+    mode: reviewModeOf(service),
+    businessCreated: quoteRequest.source_json?.type === 'app',
+    wordingProblems,
+  })
+  if (finalStatus === 'sent' && reviewDecision.reviewHold === 'check') {
+    const reason = `The estimate's wording uses a word customers should not see (${wordingProblems[0]?.replace(/^\$\.[^:]*: /, '')}). Edit the wording, then approve.`
+    console.log(`[Processor] T-147: not shown early — ${wordingProblems.length} wording problem(s)`)
+    qualityGateResult = { action: 'require_review', reason, evaluatedAt: new Date().toISOString() }
+  }
+  const awaitingBusinessReview = reviewDecision.reviewHold === 'shown' || reviewDecision.reviewHold === 'held'
+  const shownEarly = reviewDecision.reviewHold === 'shown'
+  finalStatus = reviewDecision.status
+  if (awaitingBusinessReview) {
+    console.log(`[Processor] Held for business review (${shownEarly ? 'estimate shown to the customer' : 'hidden until approved'})`)
   }
 
   // 5. Update quote record with signals and pricing trace
@@ -2356,6 +2380,8 @@ export async function processQuote(
         quality_gate_json: qualityGateResult,
       }),
       status: finalStatus,
+      // T-147: why it awaits the business (null when it goes straight out)
+      review_hold: reviewDecision.reviewHold,
       // Only set sent_at if actually sending (not pending_review)
       ...(finalStatus === 'sent' && {
         sent_at: new Date().toISOString(),
@@ -2371,11 +2397,44 @@ export async function processQuote(
   // 6. Increment usage counter for estimates_sent
   await incrementUsageCounter(supabase, quoteData.quote.tenant_id, 'estimates_sent')
 
-  // 7. Send notification emails. Pending review: only the business hears,
-  // with a link to review and approve; the customer email goes on approval.
-  // A quote the business created in its own app needs no email to itself.
+  // 7. Send notification emails. Pending review: the business gets a link to
+  // review and approve, and the "Your quote from…" email goes on approval.
+  // T-147: when the estimate is shown early the customer gets an estimate
+  // email now. A quote the business created in its own app needs no email to
+  // itself.
   if (finalStatus === 'pending_review') {
-    console.log('[Processor] Quote pending review - customer email will be sent after approval')
+    if (shownEarly && quoteToken && quoteRequest.customer_email && isEmailConfigured(env.POSTMARK_API_TOKEN, env.POSTMARK_FROM_EMAIL)) {
+      try {
+        const result = await sendEstimateShownEmail(
+          {
+            postmarkApiToken: env.POSTMARK_API_TOKEN!,
+            fromEmail: env.POSTMARK_FROM_EMAIL!,
+            fromName: tenant.name,
+            appUrl: env.APP_URL || 'http://localhost:3000',
+          },
+          {
+            quoteId,
+            quoteToken,
+            customerName: quoteRequest.customer_name,
+            customerEmail: quoteRequest.customer_email,
+            businessName: tenant.name,
+            replyTo: quoteData.businessOwnerEmail || undefined,
+            serviceName: service.name,
+            total: pricing.total,
+            range: customerEstimateRange(pricing.estimate),
+            currency: pricing.currency,
+            locale: regionCtx.locale,
+            scopeSummary: content.scopeSummary,
+            primaryColor: tenant.branding_json?.primaryColor,
+          }
+        )
+        if (!result.success) console.error('[Processor] Estimate email failed:', result.error)
+      } catch (emailError) {
+        console.error('[Processor] Estimate email error:', emailError)
+      }
+    } else {
+      console.log('[Processor] Quote pending review - customer email will be sent after approval')
+    }
     if (
       quoteRequest.source_json?.type !== 'app' &&
       isEmailConfigured(env.POSTMARK_API_TOKEN, env.POSTMARK_FROM_EMAIL)
@@ -2527,7 +2586,8 @@ async function loadQuoteData(
         high_value_threshold,
         draft_config,
         tax_exempt,
-        auto_send
+        auto_send,
+        hold_until_approved
       )
     `)
     .eq('id', quoteId)

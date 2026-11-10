@@ -38,7 +38,7 @@ async function business(name: string) {
 }
 
 const svc = garageDoorsPackUS.services[0]!
-async function service(biz: Awaited<ReturnType<typeof business>>, autoSend?: boolean) {
+async function service(biz: Awaited<ReturnType<typeof business>>, autoSend?: boolean, holdUntilApproved?: boolean) {
   const created = expectOk('service', await http('POST', `${cfg.appUrl}/api/services`, {
     headers: biz.cookie,
     body: {
@@ -49,6 +49,7 @@ async function service(biz: Awaited<ReturnType<typeof business>>, autoSend?: boo
       pricingRules: { baseFee: 0, minimumCharge: 0, addons: svc.addons, multipliers: svc.multipliers, workSteps: svc.draft.pricing.workSteps },
       draftConfig: svc.draft,
       ...(autoSend !== undefined && { autoSend }),
+      ...(holdUntilApproved !== undefined && { holdUntilApproved }),
     },
   }))
   return created.service.id as string
@@ -66,7 +67,8 @@ const publicView = async (id: string, token: string) => http('GET', `${cfg.appUr
 
 // 1. Default: review first
 const a = await business('T146 Doors')
-const reviewed = await service(a) // autoSend omitted → off
+// T-147: the default is now "show, then confirm"; this script checks the hold mode
+const reviewed = await service(a, undefined, true)
 const q = await submit(a, reviewed)
 check('default service → quote awaits business approval', q.view.status === 'pending_review', q.view.status)
 // A flat-rate (Grade A) price has no measured range: the customer sees only

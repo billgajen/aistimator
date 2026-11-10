@@ -259,6 +259,15 @@ export default function QuoteDetailPage({
         </div>
       </div>
 
+      {/* T-147: what the customer sees while this waits for approval */}
+      {awaitingApproval && (
+        <p className="mb-6 rounded-lg border border-border bg-surface px-4 py-3 text-sm text-text-secondary">
+          {(quote as { review_hold?: string | null }).review_hold === 'shown'
+            ? 'The customer can already see this as an estimate. They can accept it once you approve.'
+            : 'The customer sees “Your estimate is being prepared” and no price until you approve.'}
+        </p>
+      )}
+
       {/* T-134: lead held because the monthly plan limit was reached */}
       {(quote.content_json as { limitHold?: boolean } | null)?.limitHold && quote.status === 'pending_review' && (
         <div className="mb-6 rounded-lg border border-tape/40 bg-butter/40 p-4">

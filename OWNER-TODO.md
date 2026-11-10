@@ -165,3 +165,19 @@ Code for every item is already built; these are the steps that unlock it.
 - [ ] **Old verify scripts:** `verify-t137.mts` / `verify-t138.mts` expect app quotes to end at `sent`. Under review-by-default
   they end at `pending_review` until approved. They're historical ticket checks; re-baseline only if you rerun them.
 
+## T-147 — Show, then confirm
+
+- [ ] **Deploy in order:** `bash scripts/deploy-migration-31.sh` FIRST (the worker writes `quotes.review_hold` and reads
+  `services.hold_until_approved`; without the column every quote update fails), then the worker, then the web app.
+- [ ] **Know what changes on deploy:** every service that is not set to send automatically, existing ones included,
+  starts showing the customer the estimate straight away, marked as an estimate you will confirm. Accept stays locked
+  until you tap **Approve & send**. To keep a service hidden until you approve, edit it → Basic → **Hold until I
+  approve**. Quotes already waiting at deploy time stay hidden.
+- [ ] **Check one live email:** submit a test request on a default service and confirm "Your estimate from
+  {business}" arrives, then approve it and confirm "Your quote from {business}" arrives. Postmark is not configured
+  locally, so neither send was checked live (the template is unit-tested).
+- [ ] **Wording the customer shouldn't see:** if the generated wording contains "exact", "firm" or "preliminary", the
+  estimate is not shown early. You get the reason in the "Review and approve" email; edit the wording, then approve.
+- [ ] **Not checked by eye:** the three options in the service editor (Basic step) and the widget's "Your estimate is
+  ready" state. The quote page was screenshotted.
+

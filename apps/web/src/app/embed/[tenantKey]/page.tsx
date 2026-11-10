@@ -1784,6 +1784,8 @@ function SuccessState({
 
   // Queue processing: past the poll window we stop and promise the email instead
   const [timedOut, setTimedOut] = useState(false)
+  // T-147: priced and visible to the customer, awaiting the business's confirmation
+  const [estimateShown, setEstimateShown] = useState(false)
 
   useEffect(() => {
     if (!token) return
@@ -1812,8 +1814,11 @@ function SuccessState({
           })
         }
         if (['awaiting_clarification', 'pending_review', 'sent', 'viewed', 'failed'].includes(data.status)) {
+          // T-147: an estimate shown while the business reviews it is ready to view
+          const shown = data.status === 'pending_review' && data.review?.confirmationPending === true
+          setEstimateShown(shown)
           setLiveStatus(data.status)
-          if (['sent', 'viewed', 'failed'].includes(data.status)) clearInterval(interval)
+          if (shown || ['sent', 'viewed', 'failed'].includes(data.status)) clearInterval(interval)
         }
       } catch {
         // Polling is best-effort; email remains the fallback channel
@@ -1854,6 +1859,27 @@ function SuccessState({
           className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover transition"
         >
           Confirm Details
+        </a>
+      </div>
+    )
+  }
+
+  // T-147: the estimate is visible now; the business confirms it afterwards
+  if (liveStatus === 'pending_review' && estimateShown) {
+    return (
+      <div className="text-center py-12 px-6 animate-fade-in-up">
+        <div className="w-16 h-16 bg-mint rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-secondary text-2xl">✓</span>
+        </div>
+        <h3 className="font-display text-xl font-bold text-text-primary mb-2">Your estimate is ready</h3>
+        <p className="text-sm text-text-secondary mb-6">{businessName} will confirm it shortly.</p>
+        <a
+          href={quoteUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover transition"
+        >
+          View Your Estimate
         </a>
       </div>
     )

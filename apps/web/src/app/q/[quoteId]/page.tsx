@@ -101,6 +101,35 @@ export default function QuotePage({ params }: QuotePageProps) {
     }
   }, [processing, quoteId, token])
 
+  // T-147: an estimate shown before approval — check quietly for the
+  // business's confirmation so this same page becomes the confirmed quote
+  // (with Accept) without a reload.
+  const awaitingConfirmation = quote?.status === 'pending_review' && quote.review?.confirmationPending === true
+  useEffect(() => {
+    if (!awaitingConfirmation || !token) return
+    let cancelled = false
+    let polls = 0
+    const interval = setInterval(async () => {
+      polls++
+      if (polls > 60) return clearInterval(interval) // ~15 min; a reload still works
+      try {
+        const poll = await fetch(`/api/public/quotes/${quoteId}?token=${token}&poll=1`)
+        if (!poll.ok) return
+        const polled = (await poll.json()) as QuoteViewResponse
+        if (cancelled || polled.status === 'pending_review') return
+        clearInterval(interval)
+        const full = await fetch(`/api/public/quotes/${quoteId}?token=${token}`)
+        if (!cancelled && full.ok) setQuote((await full.json()) as QuoteViewResponse)
+      } catch {
+        // best-effort; the next tick retries
+      }
+    }, 15000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [awaitingConfirmation, quoteId, token])
+
   async function handleAccept() {
     if (!token || accepting) return
 
@@ -223,11 +252,15 @@ export default function QuotePage({ params }: QuotePageProps) {
   const locale = quote.locale || 'en-GB'
   const brandVars = brandStyleVars(branding?.primaryColor)
   const showAcceptButton = acceptQuoteEnabled !== false
-  const canSubmitFeedback = ['sent', 'viewed', 'revised'].includes(status) && !feedbackSubmitted && !accepted && !declined
+  // T-147: the estimate is shown while the business reviews it — Accept is
+  // locked until they confirm; asking a question stays available
+  const confirmationPending = status === 'pending_review' && review?.confirmationPending === true
+  const canSubmitFeedback =
+    (['sent', 'viewed', 'revised'].includes(status) || confirmationPending) && !feedbackSubmitted && !accepted && !declined
 
   // Not priced yet (queued / generating), or processing failed: no document to show
   // T-146: held for the business with no price to show yet — same holding screen
-  const awaitingBusiness = status === 'pending_review' && !quote.provisional
+  const awaitingBusiness = status === 'pending_review' && !quote.provisional && !confirmationPending
   if (processing || status === 'failed' || awaitingBusiness) {
     const failed = status === 'failed'
     return (
@@ -677,7 +710,12 @@ export default function QuotePage({ params }: QuotePageProps) {
           {canSubmitFeedback && (
             <div className="px-6 sm:px-10 pb-8">
               <div className="tape-rule mb-7" />
-              {showAcceptButton && (
+              {confirmationPending && (
+                <p className="mb-6 rounded-warm-lg border border-border bg-surface px-4 py-3.5 text-center text-sm text-text-secondary">
+                  You can accept once {business.name} confirms this estimate.
+                </p>
+              )}
+              {showAcceptButton && !confirmationPending && (
                 <>
                   <button
                     onClick={handleAccept}
@@ -700,13 +738,15 @@ export default function QuotePage({ params }: QuotePageProps) {
 
               {feedbackMode === 'none' && (
                 <div className="flex gap-3">
-                  <button
-                    onClick={() => handleFeedback('approval_request')}
-                    disabled={submittingFeedback}
-                    className="flex-1 py-3 px-4 text-sm font-semibold text-text-primary bg-surface border border-border rounded-warm-lg hover:border-border-strong transition disabled:opacity-50"
-                  >
-                    {submittingFeedback ? 'Sending…' : 'Send for review'}
-                  </button>
+                  {!confirmationPending && (
+                    <button
+                      onClick={() => handleFeedback('approval_request')}
+                      disabled={submittingFeedback}
+                      className="flex-1 py-3 px-4 text-sm font-semibold text-text-primary bg-surface border border-border rounded-warm-lg hover:border-border-strong transition disabled:opacity-50"
+                    >
+                      {submittingFeedback ? 'Sending…' : 'Send for review'}
+                    </button>
+                  )}
                   <button
                     onClick={() => setFeedbackMode('feedback')}
                     className="flex-1 py-3 px-4 text-sm font-semibold text-text-primary bg-surface border border-border rounded-warm-lg hover:border-border-strong transition"
@@ -745,7 +785,7 @@ export default function QuotePage({ params }: QuotePageProps) {
               )}
 
               {/* Decline — deliberately quiet, below the primary actions */}
-              {!declineMode && (
+              {!declineMode && !confirmationPending && (
                 <p className="text-center mt-6">
                   <button
                     onClick={() => setDeclineMode(true)}

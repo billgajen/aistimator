@@ -15,6 +15,8 @@ export interface CustomerEmailData {
   validUntil?: string
   scopeSummary?: string
   primaryColor?: string
+  /** T-147: an estimate shown before the business approved it; the business will confirm */
+  awaitingConfirmation?: boolean
 }
 
 export interface BusinessEmailData {
@@ -79,7 +81,10 @@ function emailWrapper(content: string, _primaryColor: string = '#2563eb'): strin
 export function customerQuoteEmail(data: CustomerEmailData): string {
   const primaryColor = data.primaryColor || '#2563eb'
 
-  const validitySection = data.validUntil
+  const estimate = data.awaitingConfirmation === true
+  const validitySection = estimate
+    ? `<p style="margin: 0 0 24px; color: #6b7280; font-size: 14px;">${escapeHtml(data.businessName)} will review and confirm this estimate. You can accept it once they have.</p>`
+    : data.validUntil
     ? `<p style="margin: 0 0 24px; color: #6b7280; font-size: 14px;">This quote is valid until <strong>${data.validUntil}</strong>.</p>`
     : ''
 
@@ -97,18 +102,20 @@ export function customerQuoteEmail(data: CustomerEmailData): string {
       ${escapeHtml(data.businessName)}
     </h1>
     <p style="margin: 0 0 32px; color: #6b7280; font-size: 14px;">
-      Your quote for ${escapeHtml(data.serviceName)}
+      Your ${estimate ? 'estimate' : 'quote'} for ${escapeHtml(data.serviceName)}
     </p>
 
     <p style="margin: 0 0 16px; color: #374151; font-size: 16px; line-height: 1.5;">
       Hi ${escapeHtml(data.customerName)},
     </p>
     <p style="margin: 0 0 24px; color: #374151; font-size: 16px; line-height: 1.5;">
-      Thank you for your enquiry. We've prepared a quote for you:
+      ${estimate
+        ? 'Thank you for your enquiry. Here is your estimate, based on your photos and details:'
+        : "Thank you for your enquiry. We've prepared a quote for you:"}
     </p>
 
     <div style="margin: 24px 0; padding: 24px; background-color: #f0f9ff; border-radius: 8px; text-align: center;">
-      <p style="margin: 0 0 4px; color: #6b7280; font-size: 14px;">Quoted Total</p>
+      <p style="margin: 0 0 4px; color: #6b7280; font-size: 14px;">${estimate ? 'Estimate' : 'Quoted Total'}</p>
       <p style="margin: 0; font-size: 36px; font-weight: 700; color: ${primaryColor};">
         ${escapeHtml(data.total)}
       </p>
@@ -121,7 +128,7 @@ export function customerQuoteEmail(data: CustomerEmailData): string {
       <tr>
         <td style="text-align: center;">
           <a href="${escapeHtml(data.quoteViewUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
-            View Full Quote
+            ${estimate ? 'View Your Estimate' : 'View Full Quote'}
           </a>
         </td>
       </tr>

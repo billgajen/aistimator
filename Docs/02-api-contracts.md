@@ -116,7 +116,16 @@ The business approves a quote awaiting its review. The quote is marked approved 
 400 `INVALID_STATUS` (not `pending_review`), 400 `NOT_PRICED` (lead held at the plan limit, price it first), 409 `ALREADY_SENT` (a second tap), 404 for another tenant's quote.
 `PATCH /api/quotes/:id` with `sendToCustomer: true` also counts as approval. A held quote's first send emails "Your quote from …", not "Updated quote".
 
-Services: `POST /api/services` and `PATCH /api/services/:id` accept `autoSend: boolean` ("Send automatically without review", default false). With it off, the worker holds every quote that would have been sent (`pending_review`) and emails the business "Review and approve: …". Quotes created in the business's own app send no such email.
+Services: `POST /api/services` and `PATCH /api/services/:id` accept `autoSend: boolean` ("Send automatically", default false) and, from T-147, `holdUntilApproved: boolean` ("Hold until I approve", default false). Both off is the default mode, "Show the estimate, then I confirm it". Setting one clears the other. Unless auto-send is on, the worker holds every quote that would have been sent (`pending_review`) and emails the business "Review and approve: …". Quotes created in the business's own app send no such email.
+
+T-147 show, then confirm (supersedes the T-146 default; AD-035):
+	•	The worker records why a `pending_review` quote is waiting in `quotes.review_hold`: `shown` (default mode: the customer already sees the estimate), `held` (service set to hold, or a quote the business created in its app), `check` (validation, quality gate, send-guard, the service's own review rule, or generated wording that trips the customer language guard). `NULL` on older rows and plan-limit lead holds. Only `shown` with a price above zero is shown early (`isShownEarly`, `shared/review-mode.ts`).
+	•	`GET /api/public/quotes/:quoteId` for a shown-early quote: `status` stays `pending_review`; `review` is `{ "state": "estimate", "confirmationPending": true }`; `pricing`, `breakdown`, `takeoff` and `notes` (scope, assumptions, exclusions) carry the real figures; `estimateRange` is present only when the engine measured a range; no `provisional`; `acceptQuoteEnabled` is `false`. Every other `pending_review` quote is returned exactly as under T-146 (pricing zeroed, `provisional` only for a measured range).
+	•	Viewing never moves a quote off `pending_review`. The first view after approval still records `sent` → `viewed`, even if the customer opened the estimate earlier.
+	•	`POST /api/public/quotes/:quoteId/accept` returns 400 `INVALID_STATUS` until the business approves.
+	•	`POST /api/public/quotes/:quoteId/feedback` accepts `feedbackType: "feedback"` (Ask a question) on a shown-early quote and leaves the status at `pending_review`. `approval_request` is still 400 there.
+	•	After `POST /api/quotes/:quoteId/approve` the same link returns `review.state = "quote"` with `acceptQuoteEnabled` back to the tenant setting.
+	•	Emails: a shown-early quote sends the customer "Your estimate from {business}" at once (worker, Postmark tag `estimate-customer`), saying the business will confirm. "Your quote from {business}" still goes on approval. The business "Review and approve" email is unchanged.
 
 POST /api/public/quotes/:quoteId/accept
 

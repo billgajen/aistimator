@@ -15,6 +15,40 @@
 
 ## Issues & Resolutions
 
+### 2026-11-10: T-147 — Show, then confirm (new default for customer-facing estimates)
+
+**Owner decision:** under T-146 a quote held for review showed the customer no price unless a range was measured. Now the customer sees the estimate straight away, marked as an estimate the business will confirm. The business still approves every quote, and Accept stays locked until it does.
+
+**Built:**
+1. **Three modes per service (AD-035).** `services.auto_send` is unchanged; new `services.hold_until_approved` (migration 31, default false, additive and re-runnable). Both off = **Show the estimate, then I confirm it**, the new default, existing services included. `shared/review-mode.ts` holds the logic (`reviewModeOf`, `decideReviewHold`, `isShownEarly`, `customerEstimateRange`), all pure.
+2. **Hold kind is recorded per quote:** `quotes.review_hold` = `shown` | `held` | `check` (migration 31). The worker (`quote-processor.ts` 4.9) writes it once, at pricing time. Only the review-by-default branch can produce `shown`. A quote any check held (validation, quality gate, send-guard, zero price, the service's own review rule) is `check`. A hold-mode service, or a quote the business created in its own app, is `held`. Older rows and plan-limit lead holds have `NULL`. Everything except `shown` is hidden exactly as under T-146.
+3. **Public quote API:** a shown-early quote returns real pricing, breakdown, takeoff, scope, assumptions and exclusions with `status: pending_review`, `review: {state: 'estimate', confirmationPending: true}` and `acceptQuoteEnabled: false`. `estimateRange` appears only when the engine measured a range (same rule as auto-send, now one helper). No range is invented around a flat price.
+4. **Quote page:** the normal estimate document with "This is an estimate based on your photos and details. {business} will review and confirm it." In place of Accept: "You can accept once {business} confirms this estimate." Ask a question stays; "Send for review" and Decline are hidden until approval. The page checks every 15 s and becomes the confirmed quote on the same link without a reload.
+5. **Widget:** "Your estimate is ready" with the View button and "{business} will confirm it shortly."
+6. **Emails:** the worker sends the customer "Your estimate from {business}" at once (`sendEstimateShownEmail`, the customer template with an `awaitingConfirmation` variant). "Your quote from …" still goes on approval. The business "Review and approve" email is unchanged.
+7. **Dashboard:** the Basic step has three radio options in place of the auto-send checkbox. The quote page tells the business whether the customer can already see the estimate. Mobile app unchanged.
+
+**Found while building, and fixed:**
+- **Ask a question would have unlocked Accept.** The feedback route moved any quote to `feedback_received`, which the accept route allows and the approve route refuses. On a shown-early quote it now records the question and leaves the status at `pending_review`.
+- **Viewing before approval blocked `sent` → `viewed` afterwards.** The view handler only ran when `viewed_at` was empty. It now also runs for a `sent` quote, so the first view after approval is recorded.
+- **Generated wording can trip the customer language guard.** The live check caught "we'll confirm the exact dimensions with you" in an AI-written note (the T-146 wording prompt forbids "exact" but nothing enforces it). A shown-early estimate reaches the customer before anyone at the business reads it, so the worker now runs `findConfidenceLanguageInPayload` over the generated scope, assumptions, exclusions and notes. If it trips, the quote is a `check` hold with the reason in the business's review email. Only the generated wording is checked, not line labels, so a business that names a step "Firm mattress removal" is not held on every quote.
+
+**Not fixed here (existing behaviour):** the same generated wording can still reach the customer on an auto-send quote, in a clarification-stage payload, or after the business approves without editing. Enforcing the guard on all generated wording is a separate ticket.
+
+**Verified:** `verify-t147.mts` 33/33 live (local stack, migration 31 applied and re-run cleanly):
+- Default service, flat $1,400: shown at once, `pending_review`, Accept locked (and 400 from the accept route), no range.
+- A stored measured range ($1,250 to $1,550) comes back as `estimateRange` with the $1,400 total; it is gone once approved. The range was written onto a priced quote; the photo measurement itself was not run here.
+- A quote held by the service's review rule is `check`: "being prepared", no price.
+- Hold-mode service: as T-146. Auto-send service: straight out, Accept enabled.
+- Approve: the same link shows the confirmed quote with Accept enabled, the customer can accept, a second tap gets 400, a rival business gets 404.
+- Every public payload passes the customer language guard.
+
+`verify-t146.mts` 20/20 (its default service now sets `holdUntilApproved`). Worker tests 446 (+18: modes, hold kind, fail-closed `isShownEarly`, measured-range rule, payload guard, estimate email), web 139. Lint, typecheck, web and worker builds pass. Quote page screenshotted at 430 px.
+
+**Not verified:** no email was sent live (no Postmark locally). The service editor radios and the widget state were not checked by eye. No gauntlet run: the ticket does not touch AI, quantities or pricing.
+
+**Files:** `supabase/migrations/00000000000031_show_then_confirm.sql`, `scripts/deploy-migration-31.sh`, `packages/shared/src/{review-mode.ts,api.types.ts,database.types.ts,index.ts}`, `apps/worker/src/{quote-processor.ts,email/index.ts,email/templates.ts,__tests__/review-mode.test.ts}`, `apps/web/src/app/api/public/quotes/[quoteId]/{route.ts,feedback/route.ts}`, `apps/web/src/app/api/services/{route.ts,[id]/route.ts}`, `apps/web/src/app/{q/[quoteId]/page.tsx,embed/[tenantKey]/page.tsx}`, `apps/web/src/app/(dashboard)/app/{services/page.tsx,quotes/[quoteId]/page.tsx}`, `scripts/hardcore-test/{verify-t147.mts,verify-t146.mts}`.
+
 ### 2026-11-09: T-146 — Business review by default; no confidence language for customers
 
 **Owner decision (before the HVAC re-test):** quotes wait for the business to approve them, and the customer never sees grades or certainty words.
@@ -3385,7 +3419,11 @@ if (pricingResult.estimatedTotal <= 0) {
 
 ### AD-034: The business reviews by default; grades are business-only (T-146)
 
-**Decision:** a quote reaches the customer only after the business approves it, unless the service opts in to "Send automatically without review". The customer sees exactly two states, an **Estimate** (unreviewed) and a **Quote** ("Reviewed and confirmed by {business}"), and never a grade, a grade label, or the words "exact", "firm" or "preliminary". Uncertain quantities show as an unlabelled range. Grades and confidence stay in `pricing_json`, on the dashboard and in the accuracy tracking. **Why:** the honest promise is the business's confirmation, not the model's self-assessed precision ("Grade A, exact" on a flat $4,550 AC replacement). **Rules that follow:** the public quote API is the only customer data path, so it strips `estimate` and takeoff `evidence`. `shared/customer-language.ts` is the guard the gauntlet runs on every public payload. Approval keeps the customer's existing link valid (`previous_token_hash`) instead of rotating it away.
+**Decision:** a quote reaches the customer only after the business approves it, unless the service opts in to "Send automatically without review". The customer sees exactly two states, an **Estimate** (unreviewed) and a **Quote** ("Reviewed and confirmed by {business}"), and never a grade, a grade label, or the words "exact", "firm" or "preliminary". Uncertain quantities show as an unlabelled range. Grades and confidence stay in `pricing_json`, on the dashboard and in the accuracy tracking. **Why:** the honest promise is the business's confirmation, not the model's self-assessed precision ("Grade A, exact" on a flat $4,550 AC replacement). **Rules that follow:** the public quote API is the only customer data path, so it strips `estimate` and takeoff `evidence`. `shared/customer-language.ts` is the guard the gauntlet runs on every public payload. Approval keeps the customer's existing link valid (`previous_token_hash`) instead of rotating it away. **The default was superseded by AD-035 (T-147).**
+
+### AD-035: Show the estimate, then the business confirms it (T-147)
+
+**Decision:** supersedes the default in AD-034. A quote still reaches "Quote" status only when the business approves it, but by default the customer sees the estimate as soon as it is priced, marked as an estimate the business will confirm, with Accept locked. A service can opt to hold the estimate until approval (the AD-034 behaviour) or to send automatically. The rest of AD-034 stands: two customer states, grades business-only, the public quote API as the only customer data path, the language guard, and the existing link staying valid through approval. **Why:** a customer who is shown nothing leaves; the honest promise is still the business's confirmation, and the page says so. **Rules that follow:** the reason a quote is waiting is recorded on the quote (`quotes.review_hold`), never inferred later from the service, so changing a service's mode does not change what earlier customers see. Showing early fails closed: only a priced quote recorded as `shown` is visible, and anything a check held, including generated wording that trips the language guard, stays hidden until approved. No customer action may move a quote off `pending_review`; only the business's approval does. **Rejected:** deriving "shown" from the service's current mode at read time (a mode change would reveal held quotes), and storing the flag in `content_json` (dashboard edits rewrite it).
 
 ---
 

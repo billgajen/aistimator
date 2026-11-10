@@ -19,6 +19,7 @@ export * from './envelopes'
 export * from './grading'
 // T-146: customer-facing language guard (no grades / certainty words)
 export * from './customer-language'
+export * from './review-mode'
 export * from './identification'
 export * from './room-scan'
 export * from './accuracy'

@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { quoteTokenFilter } from '@/lib/tokens'
-import { isQuoteProcessing, resolveRegionContext } from '@estimator/shared'
+import { isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange } from '@estimator/shared'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
@@ -90,11 +90,15 @@ export async function GET(
     const isStatusPoll = url.searchParams.get('poll') === '1'
     // Queue path: opening the page before the worker has priced the quote is
     // not a view of the estimate (it would also block the later sent → viewed).
-    if (!quote.viewed_at && !isStatusPoll && !isQuoteProcessing(quote.status)) {
+    // T-147: a view never moves a quote off pending_review (only `sent` moves,
+    // to `viewed`). A customer who opened the estimate before approval already
+    // has viewed_at, so the first view after approval must still record
+    // sent → viewed.
+    if (!isStatusPoll && !isQuoteProcessing(quote.status) && (!quote.viewed_at || quote.status === 'sent')) {
       await supabase
         .from('quotes')
         .update({
-          viewed_at: new Date().toISOString(),
+          ...(!quote.viewed_at && { viewed_at: new Date().toISOString() }),
           status: quote.status === 'sent' ? 'viewed' : quote.status
         })
         .eq('id', quoteId)
@@ -199,8 +203,17 @@ export async function GET(
     // T-109 range-first: while the quote is provisional (awaiting customer
     // confirmation or business review), withhold exact pricing and expose an
     // estimated range instead — the final price may still change.
+    // T-147: a quote held only for the default business review, on a service
+    // set to "show, then confirm", is shown now with its real figures. Anything
+    // a check held (or an older / held row) stays provisional and hidden.
+    const shownEarly = isShownEarly({
+      status: quote.status,
+      review_hold: (quote as { review_hold?: string | null }).review_hold,
+      total: (quote.pricing_json as { total?: number } | null)?.total,
+      limitHold: (quote.content_json as { limitHold?: boolean } | null)?.limitHold,
+    })
     const isProvisional =
-      quote.status === 'awaiting_clarification' || quote.status === 'pending_review'
+      (quote.status === 'awaiting_clarification' || quote.status === 'pending_review') && !shownEarly
     let provisional: QuoteViewResponse['provisional']
     const storedRange = (pricing as { range?: { low?: number; high?: number } }).range
     const measuredLow = storedRange?.low ?? pricing.estimate?.rangeLow
@@ -228,13 +241,8 @@ export async function GET(
     const approvedAt = (quote as { approved_at?: string | null }).approved_at ?? null
     const review: QuoteViewResponse['review'] = approvedAt
       ? { state: 'quote', approvedAt }
-      : { state: 'estimate' }
-    const est = pricing.estimate
-    const estimateRange =
-      !isProvisional && !approvedAt && est && est.grade !== 'A' &&
-      est.rangeLow !== undefined && est.rangeHigh !== undefined && est.rangeHigh > est.rangeLow
-        ? { low: est.rangeLow, high: est.rangeHigh }
-        : undefined
+      : { state: 'estimate', ...(shownEarly && { confirmationPending: true }) }
+    const estimateRange = !isProvisional && !approvedAt ? customerEstimateRange(pricing.estimate) : undefined
     // Takeoff for the customer: plain-words method only (technical evidence is business-only)
     const customerTakeoff = (content.takeoff || []).map((row) => ({
       item: row.item,
@@ -316,8 +324,9 @@ export async function GET(
         signalRecommendations: content.signalRecommendations,
       }),
       // Accept quote toggle — defaults to true for backward compatibility.
-      // Never accept-able while provisional (price isn't final yet).
-      acceptQuoteEnabled: !isProvisional && tenant.template_json?.acceptQuoteEnabled !== false,
+      // Never accept-able while provisional (price isn't final yet), nor
+      // (T-147) while an estimate shown early awaits the business's approval.
+      acceptQuoteEnabled: !isProvisional && !shownEarly && tenant.template_json?.acceptQuoteEnabled !== false,
     }
 
     return NextResponse.json(response)

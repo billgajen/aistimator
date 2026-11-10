@@ -169,8 +169,12 @@ export interface QuoteViewResponse {
    * business ("This is an estimate based on your photos and details"),
    * 'quote' = approved ("Reviewed and confirmed by {business}"). Grades and
    * confidence never reach the customer (they stay in pricing_json).
+   *
+   * T-147: `confirmationPending` = the estimate is shown before the business
+   * approved it (status is still pending_review). Real pricing is returned,
+   * Accept is locked until the business confirms.
    */
-  review: { state: 'estimate' | 'quote'; approvedAt?: string }
+  review: { state: 'estimate' | 'quote'; approvedAt?: string; confirmationPending?: boolean }
   /** T-146: a price range for uncertain quantities on an unreviewed estimate. No label. */
   estimateRange?: { low: number; high: number }
   /** Questions to answer when status is awaiting_clarification (T-108) */

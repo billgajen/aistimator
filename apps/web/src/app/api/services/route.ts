@@ -138,9 +138,12 @@ export async function POST(request: NextRequest) {
       suggestedFields,
       pricingRules,  // BUG-003 FIX: Extract pricingRules from request body
       autoSend,
+      holdUntilApproved,
     } = body as {
       /** T-146: send quotes without business review (default false) */
       autoSend?: boolean
+      /** T-147: hide the estimate until approved (default false = show, then confirm) */
+      holdUntilApproved?: boolean
       name: string
       description?: string | null
       documentTypeDefault?: DocumentType
@@ -199,6 +202,7 @@ export async function POST(request: NextRequest) {
         active: true,
         document_type_default: documentTypeDefault || 'instant_estimate',
         auto_send: autoSend === true,
+        hold_until_approved: holdUntilApproved === true && autoSend !== true,
         scope_includes: scopeIncludes || [],
         scope_excludes: scopeExcludes || [],
         default_assumptions: defaultAssumptions || [],
