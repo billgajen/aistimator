@@ -171,7 +171,7 @@ export const TRADES: TradePage[] = [
     ],
     features: [
       { title: 'Interior and exterior templates', text: 'Per-room interiors and per-square-foot exteriors, pre-filled with typical US rates.' },
-      { title: 'You see the working', text: 'Your copy of each estimate shows how every quantity was worked out.' },
+      { title: 'You see the working', text: 'See the working behind every sent estimate.' },
       { title: 'Link or website', text: 'Share your quote link, or add it to your website.' },
     ],
     pricingExample: '“$2.75 per sq ft of wall, trim $350 flat, two-story add 20%”',

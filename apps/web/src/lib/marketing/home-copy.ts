@@ -15,7 +15,7 @@ export const HERO = {
   headline: 'Instant quotes on your website, in your prices.',
   subline:
     'Customers answer a few questions and send photos. They see an estimate from your prices straight away. You get the lead, and you confirm it.',
-  smallLine: 'For contractors and home-service businesses. No website needed.',
+  smallLine: 'For contractors and home-service businesses. No website? Use your quote link.',
   frames: ['Your customer asks', 'They see your price', 'You confirm it'] as const,
 }
 
@@ -85,7 +85,7 @@ export const STATISTICS: Statistic[] = [
 ]
 
 export const ADD_IT = {
-  heading: 'Add it in a minute',
+  heading: 'Add it anywhere',
   lead: 'No website needed. Share your quote link anywhere your customers already find you.',
   ways: [
     { title: 'Quote link', text: 'Your own page, for example /quote/your-business.' },

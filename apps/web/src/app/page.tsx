@@ -129,7 +129,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 6. Add it in a minute */}
+      {/* 6. Add it anywhere */}
       <section className="border-y border-border bg-surface py-16">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">{ADD_IT.heading}</h2>

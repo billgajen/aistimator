@@ -15,6 +15,66 @@
 
 ## Issues & Resolutions
 
+### 2026-11-10: T-155 — Home page polish after the T-154 review
+
+**Problem:** the owner's review of T-154 found:
+- a hero line that contradicted the headline ("on your website" … "No website needed");
+- a time promise back in a heading ("Add it in a minute");
+- a two-line pill for the header button on phones;
+- a phone menu that dropped down over the page with the hero buttons and frames still showing;
+- large empty gaps in product frames 1 and 3;
+- a stray yellow rule in the social image.
+
+**Changed (web only; no prices, plans or product behaviour):**
+1. **Hero small line** (home only): "For contractors and home-service businesses. No website? Use your quote link." Trade pages keep "No website needed."
+2. **"Add it in a minute" → "Add it anywhere".** "in a minute" joins the banned marketing phrases (the source scan and the browser check).
+3. **Header button:** below `md` it reads "Try it free" (`HEADER_SHORT_CTA` in `lib/marketing/nav.ts`), on one line, 44 px tall. From `md` up, and on every in-page button, it reads "Try it free: 10 quotes, no card".
+4. **Phone menu** (`MobileMenu`) is now a full-screen modal dialog (`fixed inset-0 z-50`, opaque) with its own header and X.
+   - The page behind can't scroll (`lib/marketing/scroll-lock.ts` locks `<html>` and `<body>` and restores them on close).
+   - Five links, then one "Try it free: 10 quotes, no card" button.
+   - Closes on a link, the X or Escape; Tab stays inside it; it closes if the window widens past `md`.
+   - Focus goes back to the menu button; after a link to another page, to that page's menu button (each page renders its own nav, so a module-level flag hands focus over).
+5. **Product frames** (`ProductStrip`, home and every trade page):
+   - The frame body overflowed its column by the caption's height (`h-full` under a caption), which added 32 px of empty space to every frame. It's now a flex column that fills exactly.
+   - The estimate frame drops its repeated service line.
+   - The lead frame shows the question the customer answered and the answer, as the owner sees on the lead.
+   - The photo chip is shorter, and phone frames are 84% wide (was 78%), so lines wrap less.
+   - The frames stay one height. The largest gap between content and button fell from 168 px to 63 px (painting at 390 px); most are 12–42 px.
+6. **Social image:** the yellow rule beside the button is removed.
+
+7. **Features page reworded to what is live.** Of the features page's promises:
+   - **Live:** automatic expiry.
+   - **Partly live:**
+     - the PDF: made only when the owner clicks Download PDF; DocRaptor test mode, since `DOCRAPTOR_API_KEY` isn't set;
+     - the one reminder: built and on, but delivery waits on Postmark account approval;
+     - the opt-in price comparisons: built, but they need 3 other opted-in businesses, so they're empty;
+     - "how every quantity was worked out": only on the trace page, which isn't linked while a quote awaits approval.
+
+   The owner decided to reword:
+   - "Estimate page in your branding, with a PDF" → "Estimate page in your branding". The pricing page's "Hosted estimate pages & PDFs" → "Hosted estimate pages".
+   - "Expiry and one polite reminder, automatically" → "Estimates expire automatically".
+   - The "Opt-in, anonymised price comparisons" bullet and the §05 phrase about comparing prices with similar businesses are removed; the rest of §05 stays.
+   - "You see how every quantity was worked out" and "Every estimate’s working visible in your dashboard" → "See the working behind every sent estimate". The painting page's matching line now says the same.
+
+   The source scan and verify-t155 ban the old claims on the home, features, pricing and trade pages. OWNER-TODO lists each gap with the claim to restore once it's fixed. The terms page's description of the service ("hosted pages, PDF and email") is unchanged, since a PDF can be made.
+
+**Found:** `verify-t154.mts` was never added to the repo in T-154; its browser pass ran from a scratch folder. It's added now, with `scripts/hardcore-test/browser.mjs`, which loads playwright and pngjs from `PLAYWRIGHT_DIR` outside the repo.
+
+**Verified:**
+- verify-t155 46/46 at 390 px and 1440 px:
+  - fixes 1–3, with the header button on one line at both sizes and the hero button keeping the full offer;
+  - the menu covers every point of the screen, locks scroll, and closes by the X, Escape and a link with focus returned;
+  - frames are equal height with gaps ≤ 64 px on the home page and all seven trade pages;
+  - no yellow pixels in the social image;
+  - the reworded features lines, with no PDF, reminder, price-comparison or every-quantity claim on the home, features, pricing or trade pages;
+  - no sideways scroll and no "in a minute" on all 13 marketing pages;
+  - the hero button's bottom edge is at 396 px of 844.
+- verify-t154 26/26.
+- Regression set verify-t146–t153: 20/20, 33/33, 29/29, 35/35, 27/27, 35/35, 66/66, 36/36.
+- Unit tests: web 322 (+12: the new strings, the reworded features lines and the banned old claims, the header button, the open menu rendered as a full-screen opaque modal with five links and the button, scroll lock and restore, the close and focus paths, the frames' layout, the social image), worker 465, mobile 11. Lint, typecheck, web and worker builds pass.
+
+**Files:** `apps/web/src/components/marketing/{MobileMenu,SiteNav,ProductStrip}.tsx`, `apps/web/src/lib/marketing/{home-copy,nav,scroll-lock,trades}.ts`, `apps/web/src/app/{page,opengraph-image}.tsx`, `apps/web/src/app/{features,pricing}/page.tsx`, `apps/web/src/__tests__/marketing-home.test.ts`, `scripts/hardcore-test/{browser.mjs,verify-t154.mts,verify-t155.mts}`.
+
 ### 2026-11-10: T-154 — Home page rewrite: say what it is, show it working, earn trust
 
 **Problem:** a contractor arriving from a phone ad saw a slogan, no product in use, a section about grades customers no longer see (T-146), and engine language ("deterministically", "escalated to a stronger model") instead of their day.

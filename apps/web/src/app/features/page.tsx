@@ -37,7 +37,7 @@ const STAGES = [
       'Sizes read from labels and rating plates',
       'Rooms, fixtures and quantities from the customer’s answers',
       'A range and one question when something is unclear',
-      'You see how every quantity was worked out',
+      'See the working behind every sent estimate',
     ],
   },
   {
@@ -49,7 +49,7 @@ const STAGES = [
       'Plain-English price setup, no formulas to learn',
       'Extras, adjustments, minimums and service areas',
       'Ready-made templates for common trades',
-      'Every estimate’s working visible in your dashboard',
+      'See the working behind every sent estimate',
     ],
   },
   {
@@ -58,21 +58,20 @@ const STAGES = [
     headline: 'An estimate page, and you have the last word.',
     body: 'Your customer gets a page in your branding with the estimate for their job, straight away. By default they can accept once you’ve confirmed it: one tap on Approve & send. You choose per service: show the estimate and confirm, hold it until you approve, or send automatically. They can accept, ask a question or decline, and it shows in your dashboard straight away.',
     details: [
-      'Estimate page in your branding, with a PDF',
+      'Estimate page in your branding',
       'Three ways to send, chosen per service',
       'Accept, ask a question or decline, shown in your dashboard',
-      'Expiry and one polite reminder, automatically',
+      'Estimates expire automatically',
     ],
   },
   {
     number: '05',
     name: 'Learn',
     headline: 'Your corrections improve the next estimate.',
-    body: 'When you correct an estimate or a customer confirms a measurement, that service’s future estimates use it. Your dashboard shows which services win work and where requests stall, and, if you opt in, how your prices compare with similar businesses.',
+    body: 'When you correct an estimate or a customer confirms a measurement, that service’s future estimates use it. Your dashboard shows which services win work and where requests stall.',
     details: [
       'Learns from your own corrections, per service',
       'Requests, estimates sent, accepted and value',
-      'Opt-in, anonymised price comparisons',
       'Unfinished requests listed with call and email buttons',
     ],
   },

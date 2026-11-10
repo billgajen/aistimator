@@ -6,3 +6,6 @@ export const NAV_LINKS = [
   { href: '/demo', label: 'Try it as a customer' },
   { href: '/login', label: 'Log in' },
 ] as const
+
+/** T-155: the header button's words below md (desktop and in-page buttons say freeOfferLabel()) */
+export const HEADER_SHORT_CTA = 'Try it free'

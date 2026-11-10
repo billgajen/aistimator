@@ -9,6 +9,11 @@ const money = (n: number) => formatMoney(n, 'USD', 'en-US')
  * the business's logo, and the owner confirms it from "Waiting for you".
  * Branded as the demo business. On a phone the frames swipe sideways inside
  * their own row, so the page itself never scrolls sideways.
+ *
+ * T-155: the three frames are the same height, and in each one the button
+ * sits just under the content. The frame fills its column (no overflow below
+ * the caption), the estimate frame is tighter, and the lead frame shows what
+ * the customer answered, so no frame is much shorter than the others.
  */
 export function ProductStrip({ example, captions }: { example: MarketingExample; captions: readonly [string, string, string] }) {
   return (
@@ -32,13 +37,13 @@ export function ProductStrip({ example, captions }: { example: MarketingExample;
 
 function Frame({ step, caption, children }: { step: number; caption: string; children: React.ReactNode }) {
   return (
-    <figure className="w-[78%] shrink-0 snap-center sm:w-[46%] md:w-auto">
+    <figure className="flex w-[84%] shrink-0 snap-center flex-col sm:w-[46%] md:w-auto" data-testid="product-frame">
       <figcaption className="mb-2 flex items-center gap-2 text-sm font-semibold text-text-primary">
         <span className="figure inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-white">{step}</span>
         {caption}
       </figcaption>
-      <div className="h-full rounded-[1.6rem] border border-border bg-white p-2 shadow-warm-lg" aria-hidden="true">
-        <div className="h-full rounded-[1.2rem] bg-background p-3">{children}</div>
+      <div className="flex flex-1 flex-col rounded-[1.6rem] border border-border bg-white p-2 shadow-warm-lg" aria-hidden="true">
+        <div className="flex flex-1 flex-col rounded-[1.2rem] bg-background p-3">{children}</div>
       </div>
     </figure>
   )
@@ -59,14 +64,14 @@ function BusinessHeader() {
 
 function CustomerAsks({ example }: { example: MarketingExample }) {
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-1 flex-col">
       <BusinessHeader />
       <div className="mt-3 rounded-xl border border-border bg-white p-3">
         <p className="text-[11px] font-semibold text-text-secondary">{example.serviceName}</p>
         <p className="mt-2 text-sm font-semibold text-text-primary">{example.question}</p>
         {example.photo ? (
-          <div className="mt-2 flex items-center gap-2 rounded-lg border-2 border-dashed border-primary/30 bg-mint px-2 py-2">
-            <span className="h-8 w-10 rounded bg-gradient-to-br from-[#9aa3a8] to-[#d9dee1]" />
+          <div className="mt-2 flex items-center gap-2 rounded-lg border-2 border-dashed border-primary/30 bg-mint px-2 py-1">
+            <span className="h-6 w-8 rounded bg-gradient-to-br from-[#9aa3a8] to-[#d9dee1]" />
             <span className="text-xs font-medium text-primary">{example.photo} ✓</span>
           </div>
         ) : null}
@@ -85,12 +90,11 @@ function CustomerAsks({ example }: { example: MarketingExample }) {
 
 function TheyGetAnEstimate({ example }: { example: MarketingExample }) {
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-1 flex-col">
       <BusinessHeader />
       <div className="mt-3 rounded-xl border border-border bg-white p-3">
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary">Your estimate</p>
-        <p className="mt-0.5 text-[11px] text-text-secondary">{example.serviceName}</p>
-        <ul className="mt-2 space-y-1 text-[11px]">
+        <ul className="mt-1.5 space-y-1 text-[11px]">
           {example.lines.map((l) => (
             <li key={l.label} className="flex justify-between gap-2">
               <span className="text-text-secondary">{l.label}</span>
@@ -113,7 +117,7 @@ function TheyGetAnEstimate({ example }: { example: MarketingExample }) {
 
 function YouConfirm({ example }: { example: MarketingExample }) {
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-1 flex-col">
       <div className="flex items-baseline justify-between">
         <p className="font-display text-sm font-bold text-text-primary">Waiting for you</p>
         <p className="text-[11px] text-text-secondary">
@@ -124,6 +128,10 @@ function YouConfirm({ example }: { example: MarketingExample }) {
         <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-tertiary">New lead</p>
         <p className="mt-1 truncate text-sm font-semibold text-text-primary">{example.customerName}</p>
         <p className="truncate text-[11px] text-text-secondary">{example.serviceName} · just now</p>
+        <div className="mt-2 rounded-md bg-surface px-2 py-1 text-[11px] leading-snug">
+          <p className="text-text-secondary">{example.question}</p>
+          <p className="font-semibold text-text-primary">{example.answer}</p>
+        </div>
         <p className="figure mt-2 text-xl text-text-primary">{money(example.total)}</p>
       </div>
       <div className="mt-auto pt-3">

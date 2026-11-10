@@ -326,3 +326,33 @@ Code for every item is already built; these are the steps that unlock it.
 - [ ] **Accept and decline alerts** reach the business only if Settings → Notifications has an address; otherwise they
   only show in the dashboard. Consider emailing the owner's login address by default (product change, not done).
 
+## T-155 — Home page polish (deploy: web only, with T-154)
+
+Features page gaps (checked 2026-11-10). The copy was reworded in T-155 to what is live; each item names the claim to
+put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans the old wording, so update it too).
+
+- [ ] **PDF.** No PDF is made in the normal flow: one exists only after you click Download PDF on the dashboard quotes
+  list, and only then does the customer page show a PDF button. A PDF made before a revision is served again unchanged.
+  `DOCRAPTOR_API_KEY` is not set in Vercel, so PDFs are DocRaptor test (watermarked) documents. Proof:
+  `api/quotes/[quoteId]/pdf/route.ts`, `api/public/quotes/[quoteId]/pdf/route.ts` (404 until made), `lib/docraptor.ts`.
+  **Restore once fixed:** "Estimate page in your branding, with a PDF" (features §04) and "Hosted estimate pages &
+  PDFs" (pricing page bullet).
+- [ ] **Reminder.** Built and on (the daily `/api/cron/lifecycle` sends one reminder 3 days after sending if there's no
+  response; Postmark is set in Vercel), but delivery waits for the Postmark account approval above. Quotes that were
+  revised or got questions never get one. **Restore once fixed:** "Expiry and one polite reminder, automatically"
+  (features §04; it now reads "Estimates expire automatically").
+- [ ] **Price comparisons.** Built (`api/learning/benchmarks`, opt-in on the Analytics page), but it needs 3 other
+  opted-in businesses with the same currency, so everyone sees "Not enough comparable businesses yet". Analytics is
+  reached only from "See all numbers" on Home, and there's no way to opt back out. **Restore once fixed:** the bullet
+  "Opt-in, anonymised price comparisons" and, at the end of the §05 text, ", and, if you opt in, how your prices compare
+  with similar businesses".
+- [ ] **Quantity working.** The quote's own page shows label and amount only. The working (quantity × rate) is on the
+  pricing trace page, linked only from the quotes list and only once a quote is sent, so not while it awaits your
+  approval. The trace doesn't show where a quantity came from (form, AI, derived) although the engine records it.
+  **Restore once fixed:** "You see how every quantity was worked out" (features §02), "Every estimate’s working visible
+  in your dashboard" (features §03) and, on the painting page, "Your copy of each estimate shows how every quantity was
+  worked out." (all now "See the working behind every sent estimate").
+- [ ] **Expiry (live; one wrinkle).** The daily cron expires quotes when the 30-day link runs out, and the customer page
+  then blocks accept. The "Valid until" date shown to the customer comes from the estimate's validity days, not the
+  link's expiry; they usually agree (30 days) but can differ after a reminder or resend renews the link. **Claim kept:**
+  "Estimates expire automatically". If "Valid until" is ever made to follow the link, nothing to restore.

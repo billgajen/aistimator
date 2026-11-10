@@ -2,17 +2,21 @@
  * T-154: the home page rewrite — every claim true of the live product, the
  * statistics as sourced, no grades or engine words anywhere on the marketing
  * site, the phone menu, the founder slot, and visuals priced from the packs.
+ * T-155: the polish after review (hero small line, no time claim, the phone
+ * header button, a full-screen phone menu, tighter frames, the social image).
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { SUPPORT_EMAIL, PRODUCT_NAME } from '@estimator/shared'
+import { SUPPORT_EMAIL, PRODUCT_NAME, freeOfferLabel } from '@estimator/shared'
 import { HERO, TRADES_HEADING, STATISTICS, FAQ, ADD_IT, CONTROL, HOW_IT_WORKS } from '@/lib/marketing/home-copy'
 import { FOUNDER, founderReady } from '@/lib/marketing/founder'
 import { FounderNote } from '@/components/marketing/FounderNote'
-import { NAV_LINKS } from '@/lib/marketing/nav'
+import { NAV_LINKS, HEADER_SHORT_CTA } from '@/lib/marketing/nav'
+import { MobileMenu } from '@/components/marketing/MobileMenu'
+import { lockPageScroll } from '@/lib/marketing/scroll-lock'
 import { marketingExample, EXAMPLE_TRADES } from '@/lib/marketing/examples'
 import { TRADES, templateTrades, tradeHref } from '@/lib/marketing/trades'
 import { listPacks } from '@/lib/vertical-packs'
@@ -46,7 +50,7 @@ const MARKETING_FILES = [
 
 describe('T-154: no grades, seals or engine words on the marketing site', () => {
   const banned =
-    /\bgrades?\b|grade-seal|Confirmed \/ Measured \/ Concept|determinist|escalat|stronger model|senior model|against references|reference-anchored|\bexact(ly)?\b|60 seconds|under a minute|deposit|firm price|firm replacement|Start free/i
+    /\bgrades?\b|grade-seal|Confirmed \/ Measured \/ Concept|determinist|escalat|stronger model|senior model|against references|reference-anchored|\bexact(ly)?\b|60 seconds|under a minute|deposit|firm price|firm replacement|Start free|in a minute/i
 
   it.each(MARKETING_FILES)('%s', (file) => {
     const match = banned.exec(code(file))
@@ -69,6 +73,18 @@ describe('T-154: the approved copy', () => {
     expect(HERO.headline).toBe('Instant quotes on your website, in your prices.')
     expect(HERO.subline).toBe('Customers answer a few questions and send photos. They see an estimate from your prices straight away. You get the lead, and you confirm it.')
     expect(TRADES_HEADING).toBe('Ready-made templates for your trade')
+  })
+
+  it('T-155: the small line under the hero buttons doesn’t contradict "on your website"', () => {
+    expect(HERO.smallLine).toBe('For contractors and home-service businesses. No website? Use your quote link.')
+    expect(code('app/page.tsx')).toContain('{HERO.smallLine}')
+    // trade pages keep their own line
+    expect(code('components/marketing/TradeLanding.tsx')).toContain('Your prices set the estimate, never the AI. No website needed.')
+  })
+
+  it('T-155: no time promise in the "add it" heading', () => {
+    expect(ADD_IT.heading).toBe('Add it anywhere')
+    expect(code('app/page.tsx')).not.toMatch(/in a minute/i)
   })
 
   it('the FAQ answers as approved', () => {
@@ -210,5 +226,104 @@ describe('T-154: phone menu, buttons, metadata', () => {
     expect(existsSync(join(ROOT, WEB, 'app/opengraph-image.tsx'))).toBe(true)
     expect(code('app/opengraph-image.tsx')).toContain('HERO.headline')
     expect(PRODUCT_NAME).toBe('Aistimator')
+  })
+})
+
+describe('T-155: the phone header button', () => {
+  it('says only "Try it free" below md, the full offer from md up', () => {
+    expect(HEADER_SHORT_CTA).toBe('Try it free')
+    const nav = code('components/marketing/SiteNav.tsx')
+    expect(nav).toMatch(/<span className="md:hidden">\{HEADER_SHORT_CTA\}<\/span>/)
+    expect(nav).toMatch(/<span className="hidden md:inline">\{freeOfferLabel\(\)\}<\/span>/)
+    // one line, never wrapped into a two-line pill
+    expect(nav).toMatch(/href="\/signup"\s+className="[^"]*whitespace-nowrap/)
+    expect(freeOfferLabel()).toBe('Try it free: 10 quotes, no card')
+  })
+
+  it('in-page buttons keep the full offer', () => {
+    for (const f of ['app/page.tsx', 'components/marketing/TradeLanding.tsx']) {
+      expect(code(f)).toContain('{freeOfferLabel()}')
+      expect(code(f)).not.toContain('HEADER_SHORT_CTA')
+    }
+  })
+})
+
+describe('T-155: the open phone menu', () => {
+  const html = renderToStaticMarkup(createElement(MobileMenu, { defaultOpen: true }))
+  const panel = /<div[^>]*data-testid="site-menu"[^>]*>/.exec(html)?.[0] ?? ''
+
+  it('covers the whole screen, opaque and above the sticky header, as a modal', () => {
+    expect(panel).toMatch(/\bfixed\b/)
+    expect(panel).toMatch(/\binset-0\b/)
+    expect(panel).toMatch(/\bbg-background\b/) // opaque: nothing of the page shows through
+    expect(panel).toMatch(/\bz-50\b/) // the header is z-40
+    expect(code('components/marketing/SiteNav.tsx')).toMatch(/sticky top-0 z-40/)
+    expect(panel).toContain('role="dialog"')
+    expect(panel).toContain('aria-modal="true"')
+  })
+
+  it('has the five links, then one sign-up button, and an X', () => {
+    const labels = [...html.matchAll(/<a [^>]*>([^<]+)<\/a>/g)].map((m) => m[1])
+    expect(labels).toEqual(['Features', 'Pricing', 'Trades', 'Try it as a customer', 'Log in', 'Try it free: 10 quotes, no card'])
+    expect(html).toMatch(/data-testid="site-menu-signup"/)
+    expect(html).toContain('aria-label="Close menu"')
+  })
+
+  it('locks the page behind it from scrolling, and puts it back on close', () => {
+    const html_ = { style: { overflow: '', overscrollBehavior: '' } }
+    const body = { style: { overflow: 'auto', overscrollBehavior: '' } }
+    const unlock = lockPageScroll(html_, body)
+    expect([html_.style.overflow, body.style.overflow]).toEqual(['hidden', 'hidden'])
+    expect([html_.style.overscrollBehavior, body.style.overscrollBehavior]).toEqual(['none', 'none'])
+    unlock()
+    expect([html_.style.overflow, body.style.overflow]).toEqual(['', 'auto'])
+    // the menu takes the lock while open and releases it in the effect's clean-up
+    const menu = code('components/marketing/MobileMenu.tsx')
+    expect(menu).toMatch(/if \(!open\) return\s+const unlock = lockPageScroll\(document\.documentElement, document\.body\)/)
+    expect(menu).toMatch(/return \(\) => \{\s+unlock\(\)/)
+  })
+
+  it('closes on a link, the X and Escape, and returns focus to the menu button', () => {
+    const menu = code('components/marketing/MobileMenu.tsx')
+    expect(menu).toMatch(/e\.key === 'Escape'[\s\S]{0,60}close\(\)/)
+    expect(menu).toMatch(/data-testid="site-menu-close"/)
+    expect((menu.match(/onClick=\{close\}/g) ?? []).length).toBe(1) // the X
+    expect((menu.match(/onClick=\{\(\) => onLink\(/g) ?? []).length).toBe(2) // each link, the sign-up button
+    // focus back on the menu button: after the X or Escape, and on the next page after a link
+    expect(menu).toMatch(/const close = useCallback\(\(\) => \{[\s\S]{0,200}buttonRef\.current\?\.focus\(\)/)
+    expect(menu).toMatch(/if \(!focusButtonOnMount\) return[\s\S]{0,80}buttonRef\.current\?\.focus\(\)/)
+  })
+})
+
+describe('T-155: the product frames and the social image', () => {
+  it('frames fill their column (no h-full overflow) and keep the button under the content', () => {
+    const strip = code('components/marketing/ProductStrip.tsx')
+    expect(strip).not.toContain('h-full')
+    expect(strip).toMatch(/<figure className="flex [^"]*flex-col/)
+  })
+
+  it('the social image has no yellow rule beside the button', () => {
+    expect(code('app/opengraph-image.tsx')).not.toMatch(/#DCAF3E/i)
+  })
+})
+
+describe('T-155: features promises match what is live (item 7 decision)', () => {
+  const features = code('app/features/page.tsx')
+
+  it('the four lines read as decided', () => {
+    expect(features).toContain("'Estimate page in your branding',")
+    expect(features).toContain("'Estimates expire automatically',")
+    expect(features.match(/'See the working behind every sent estimate'/g)).toHaveLength(2)
+    expect(features).toContain('Your dashboard shows which services win work and where requests stall.')
+    // the rest of section 05 stays
+    for (const kept of ['Learns from your own corrections, per service', 'Requests, estimates sent, accepted and value', 'Unfinished requests listed with call and email buttons']) expect(features).toContain(kept)
+  })
+
+  it('no PDF, reminder, price-comparison or every-quantity claim on the marketing pages', () => {
+    const pages = ['app/page.tsx', 'app/features/page.tsx', 'app/pricing/page.tsx', 'app/trades/page.tsx', 'app/painting/page.tsx', 'components/marketing/TradeLanding.tsx', 'components/marketing/ProductStrip.tsx', 'lib/marketing/home-copy.ts', 'lib/marketing/trades.ts']
+    for (const f of pages) {
+      expect(code(f), f).not.toMatch(/\bPDFs?\b|remind|price comparison|compare with similar|anonymi[sz]ed|every quantity was worked out|working visible/i)
+    }
+    expect(code('lib/marketing/trades.ts')).toContain('See the working behind every sent estimate.')
   })
 })

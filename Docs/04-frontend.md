@@ -8,11 +8,20 @@ Next.js deployed on Vercel. All frontend surfaces and API routes are served from
 Home page (T-154), top to bottom: hero ("Instant quotes on your website, in your prices.", sub-line, "Try it free: 10
 quotes, no card" + "Try it as a customer", and a three-frame strip drawn from our own UI with the demo business's
 branding) · trades row from the pack registry + "Other trades" · How it works (3 steps) · "Your prices. You stay in
-control." · What homeowners want (three statistics in their sources' words, each linked) · Add it in a minute · plans
+control." · What homeowners want (three statistics in their sources' words, each linked) · Add it anywhere · plans
 from `plans.ts` · FAQ · "Who is behind this" (only when `lib/marketing/founder.ts` is filled in) · final call to action.
-Copy lives in `lib/marketing/home-copy.ts`. Trade pages use the same hero with a trade-specific strip priced from the
-pack (`lib/marketing/examples.ts`). Phone menu (`MobileMenu`) below `md`. Marketing copy rules: no grades, no engine
-words, no "exact", no confirmed-quote-in-seconds, nothing not live for a new business (a unit test scans every page).
+The line under the hero buttons: "For contractors and home-service businesses. No website? Use your quote link." (trade
+pages keep their own line). Copy lives in `lib/marketing/home-copy.ts`. Trade pages use the same hero with a
+trade-specific strip priced from the pack (`lib/marketing/examples.ts`); the three frames are one height, with each
+button just under its content. Marketing copy rules: no grades, no engine words, no "exact", no time promises ("60
+seconds", "in a minute"), no confirmed-quote-in-seconds, nothing not live for a new business (a unit test scans every
+page).
+
+Header and phone menu (T-155): below `md` the header button reads "Try it free" on one line; from `md` up, and on every
+in-page button, "Try it free: 10 quotes, no card". The phone menu (`MobileMenu`) opens full screen over the page (a
+modal dialog, the page behind locked from scrolling), with Features, Pricing, Trades, Try it as a customer, Log in and
+one "Try it free: 10 quotes, no card" button. It closes on a link, the X or Escape, and focus goes back to the menu
+button (on the next page's button after a link).
 
 Routes:
 - /

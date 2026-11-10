@@ -25,7 +25,7 @@ const CHANNEL_LABEL: Record<PlanChannel, string> = {
 }
 
 function planBullets(plan: PlanDefinition): string[] {
-  const bullets = [...plan.channels.map((c) => CHANNEL_LABEL[c]), 'Hosted estimate pages & PDFs']
+  const bullets = [...plan.channels.map((c) => CHANNEL_LABEL[c]), 'Hosted estimate pages']
   if (plan.features.custom_branding) bullets.push('Your branding on every estimate')
   if (plan.features.calibration_insights) bullets.push('Accuracy insights from finished jobs')
   if (plan.features.lidar_scanning) bullets.push('LiDAR room scanning on site')

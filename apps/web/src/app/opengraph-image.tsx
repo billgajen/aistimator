@@ -21,7 +21,6 @@ export default function OpenGraphImage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <div style={{ display: 'flex', background: '#205E56', color: '#ffffff', fontSize: 28, fontWeight: 700, padding: '16px 28px', borderRadius: 14 }}>{freeOfferLabel()}</div>
-          <div style={{ display: 'flex', marginLeft: 24, height: 8, width: 220, background: '#DCAF3E', borderRadius: 4 }} />
         </div>
       </div>
     ),

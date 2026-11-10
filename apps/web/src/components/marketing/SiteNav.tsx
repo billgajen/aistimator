@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { MetaPixel } from './MetaPixel'
 import { MobileMenu } from './MobileMenu'
-import { NAV_LINKS } from '@/lib/marketing/nav'
+import { NAV_LINKS, HEADER_SHORT_CTA } from '@/lib/marketing/nav'
 import { freeOfferLabel, PRODUCT_NAME } from '@estimator/shared'
 
 /**
@@ -33,11 +33,14 @@ export function SiteNav() {
           >
             Log in
           </Link>
+          {/* T-155: below md the header says only "Try it free", on one line */}
           <Link
             href="/signup"
-            className="max-w-[9.5rem] rounded-lg bg-primary px-3 py-2 text-center text-[13px] font-semibold leading-tight text-white transition-colors hover:bg-primary-hover sm:max-w-none sm:px-4 sm:text-sm"
+            className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-lg bg-primary px-4 py-2 text-center text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+            data-testid="nav-signup"
           >
-            {freeOfferLabel()}
+            <span className="md:hidden">{HEADER_SHORT_CTA}</span>
+            <span className="hidden md:inline">{freeOfferLabel()}</span>
           </Link>
           <MobileMenu />
         </div>
