@@ -22,8 +22,10 @@ const splineMono = Spline_Sans_Mono({
 })
 
 export const metadata: Metadata = {
+  // T-154: absolute URLs for the social preview image
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   title: PRODUCT_NAME,
-  description: 'Instant, evidence-backed estimates for service businesses',
+  description: 'Instant quotes on your website, in your prices.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

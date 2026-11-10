@@ -1,342 +1,237 @@
 import Link from 'next/link'
-import { offeredPlans, formatMoney, freeOfferLabel, FREE_ALLOWANCE } from '@estimator/shared'
 import type { Metadata } from 'next'
+import { offeredPlans, formatMoney, freeOfferLabel, FREE_ALLOWANCE } from '@estimator/shared'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
-import { MiniEstimate } from '@/components/marketing/MiniEstimate'
+import { ProductStrip } from '@/components/marketing/ProductStrip'
+import { FounderNote } from '@/components/marketing/FounderNote'
+import { listPacks } from '@/lib/vertical-packs'
+import { templateTrades, tradeHref } from '@/lib/marketing/trades'
+import { marketingExample } from '@/lib/marketing/examples'
+import { HERO, TRADES_HEADING, OTHER_TRADES, HOW_IT_WORKS, CONTROL, STATISTICS, ADD_IT, PRICING_HEADING, FAQ, FINAL_CTA, PAGE_META } from '@/lib/marketing/home-copy'
 
 export const metadata: Metadata = {
-  title: 'Aistimator — instant quotes for service businesses',
-  description:
-    'Customers send photos from your website or by text. Aistimator measures the job and prices it from your rates — a professional quote in about 60 seconds.',
+  title: PAGE_META.title,
+  description: PAGE_META.description,
+  openGraph: { title: PAGE_META.title, description: PAGE_META.description, type: 'website' },
+  twitter: { card: 'summary_large_image', title: PAGE_META.title, description: PAGE_META.description },
 }
 
-const STEPS = [
-  {
-    number: '01',
-    title: 'Customer sends photos',
-    text: 'From the widget on your website or by text message. Guided capture asks for exactly the shots the job needs.',
-  },
-  {
-    number: '02',
-    title: 'AI measures the job',
-    text: 'It counts rooms, estimates wall areas against known references, and asks the customer to confirm when it isn’t sure.',
-  },
-  {
-    number: '03',
-    title: 'Your rates set the price',
-    text: 'The price is calculated from the rates you configured — deterministically. The AI never invents a number.',
-  },
-  {
-    number: '04',
-    title: 'Quote lands in 60 seconds',
-    text: 'A professional quote page with your branding, a measured range, and one-tap accept. PDF included.',
-  },
-]
+const primaryButton =
+  'inline-flex min-h-[48px] items-center justify-center rounded-lg bg-primary px-6 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-primary-hover'
+const secondaryButton =
+  'inline-flex min-h-[48px] items-center justify-center rounded-lg border border-border bg-surface px-6 py-3 text-center text-sm font-semibold text-text-primary transition-colors hover:border-border-strong'
 
-const FEATURES = [
-  {
-    title: 'Website widget, two ways',
-    text: 'A guided step-by-step form or an AI chat that feels like texting — inline on your page or behind a floating button.',
-  },
-  {
-    title: 'Text-message quoting',
-    text: 'Customers text your number, answer a few questions, send photos. The quote link comes straight back by text (WhatsApp too).',
-  },
-  {
-    title: 'Guided photo capture',
-    text: 'Per-service photo checklists with quality checks, so the AI measures from shots that actually show the job.',
-  },
-  {
-    title: 'A quote page, not a number',
-    text: 'Scope, terms, measured quantities and your branding on a hosted page customers can accept, decline or question.',
-  },
-  {
-    title: 'You stay in control',
-    text: 'Set review thresholds, edit any quote before it goes out, and update rates by typing plain English.',
-  },
-  {
-    title: 'It learns your numbers',
-    text: 'Every amendment and won job calibrates future measurements against how you actually price.',
-  },
-]
-
+/**
+ * T-154 home page: say what it is, show it working, earn trust.
+ * Copy: lib/marketing/home-copy.ts. Visuals: our own UI (ProductStrip).
+ */
 export default function HomePage() {
+  const example = marketingExample()
+  const trades = templateTrades(listPacks('US').filter((p) => p.region === 'US').map((p) => p.id))
+  const free = FREE_ALLOWANCE.US!.quotes
+
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen overflow-x-clip bg-background">
       <SiteNav />
 
-      {/* Hero — the artifact is the argument */}
-      <section className="mx-auto grid max-w-6xl items-center gap-14 px-6 pb-20 pt-16 lg:grid-cols-2 lg:pt-24">
-        <div className="animate-fade-in-up">
-          <p className="text-sm font-semibold uppercase tracking-widest text-secondary">
-            Instant quotes for service businesses
-          </p>
-          <h1 className="mt-4 font-display text-5xl font-extrabold leading-[1.05] tracking-tight text-text-primary sm:text-6xl">
-            The first quote
-            <br />
-            usually wins.
-            <br />
-            <span className="text-primary">Be first.</span>
+      {/* 1. Hero */}
+      <section className="mx-auto max-w-6xl px-4 pb-14 pt-8 sm:px-6 sm:pt-14" data-testid="hero">
+        <div className="max-w-3xl">
+          <h1 className="font-display text-[2.15rem] font-extrabold leading-[1.08] tracking-tight text-text-primary sm:text-5xl lg:text-6xl">
+            {HERO.headline}
           </h1>
-          <p className="mt-6 max-w-lg text-lg text-text-secondary">
-            Customers send photos from your website or by text. Aistimator measures the job and
-            prices it from your rates —{' '}
-            <span className="font-semibold text-text-primary">
-              a professional quote in about 60 seconds.
-            </span>
-          </p>
-          <div className="mt-8 flex flex-wrap gap-4">
-            <Link
-              href="/signup"
-              className="rounded-lg bg-primary px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
-            >
+          <p className="mt-4 max-w-2xl text-base text-text-secondary sm:text-lg">{HERO.subline}</p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Link href="/signup" className={primaryButton} data-testid="hero-signup">
               {freeOfferLabel()}
             </Link>
-            <Link
-              href="/demo"
-              className="rounded-lg border border-border bg-surface px-8 py-3.5 text-sm font-semibold text-text-primary transition-colors hover:border-border-strong"
-            >
+            <Link href="/demo" className={secondaryButton} data-testid="hero-demo">
               Try it as a customer
             </Link>
           </div>
-          <p className="mt-4 text-xs text-text-muted">
-            {/* T-152: the free allowance is in total, not per month */}
-            {FREE_ALLOWANCE.US!.quotes} priced quotes free in total, no card · about 5 minutes to set up
-          </p>
+          <p className="mt-3 text-xs text-text-muted">{HERO.smallLine}</p>
         </div>
-
-        <div className="animate-fade-in-up animation-delay-200 pt-6 lg:pt-0">
-          <MiniEstimate />
+        <div className="mt-10">
+          <ProductStrip example={example} captions={HERO.frames} />
         </div>
       </section>
 
-      {/* Speed-to-lead — the verified numbers */}
-      <section className="bg-primary py-16 text-white">
-        <div className="mx-auto max-w-6xl px-6">
-          <h2 className="text-center font-display text-2xl font-bold sm:text-3xl">
-            Most of your competitors never reply at all.
-          </h2>
-          <div className="mt-12 grid gap-10 text-center sm:grid-cols-3">
-            <div>
-              <p className="figure text-5xl font-medium">40%</p>
-              <div className="tape-rule-light mx-auto mt-3 w-16" />
-              <p className="mx-auto mt-3 max-w-[220px] text-sm text-white/70">
-                of home-service businesses never respond to a lead at all
-              </p>
-            </div>
-            <div>
-              <p className="figure text-5xl font-medium">95%</p>
-              <div className="tape-rule-light mx-auto mt-3 w-16" />
-              <p className="mx-auto mt-3 max-w-[220px] text-sm text-white/70">
-                miss the 5-minute window customers judge you by
-              </p>
-            </div>
-            <div>
-              <p className="figure text-5xl font-medium">21×</p>
-              <div className="tape-rule-light mx-auto mt-3 w-16" />
-              <p className="mx-auto mt-3 max-w-[220px] text-sm text-white/70">
-                more likely to win the conversation when you reply in 5 minutes, not 30
-              </p>
-            </div>
-          </div>
-          <p className="mt-10 text-center text-xs text-white/50">
-            Sources: Valve+Meter home-services audit (2024, n=466) · Lead Response Management Study
-          </p>
+      {/* 2. Trades */}
+      <section className="border-y border-border bg-surface py-10">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <h2 className="font-display text-xl font-bold text-text-primary sm:text-2xl">{TRADES_HEADING}</h2>
+          <ul className="mt-4 flex flex-wrap gap-2" data-testid="trades-row">
+            {trades.map((t) => (
+              <li key={t.slug}>
+                <Link href={tradeHref(t)} className="inline-flex min-h-[44px] items-center rounded-full border border-border bg-white px-4 text-sm font-semibold text-text-primary hover:border-primary">
+                  {t.label}
+                </Link>
+              </li>
+            ))}
+            <li>
+              <Link href="/signup" className="inline-flex min-h-[44px] items-center rounded-full border border-dashed border-border px-4 text-sm font-medium text-text-secondary hover:border-primary">
+                {OTHER_TRADES}
+              </Link>
+            </li>
+          </ul>
         </div>
       </section>
 
-      {/* How it works — a real sequence, numbered along the tape */}
-      <section className="mx-auto max-w-6xl px-6 py-20">
-        <h2 className="text-center font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">
-          Photos in. Quote out.
-        </h2>
-        <p className="mx-auto mt-3 max-w-xl text-center text-text-secondary">
-          Four steps, none of them yours. You only step in when you want to.
-        </p>
-        <div className="tape-rule mt-12" />
-        <div className="mt-8 grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-          {STEPS.map((step) => (
-            <div key={step.number}>
-              <p className="figure text-sm text-tape">{step.number}</p>
-              <h3 className="mt-2 font-display text-lg font-bold text-text-primary">{step.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-text-secondary">{step.text}</p>
-            </div>
+      {/* 3. How it works */}
+      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">How it works</h2>
+        <ol className="mt-8 grid gap-5 md:grid-cols-3">
+          {HOW_IT_WORKS.map((step, i) => (
+            <li key={step.title} className="rounded-warm-xl border border-border bg-white p-5">
+              <StepIcon index={i} />
+              <h3 className="mt-3 font-display text-lg font-bold text-text-primary">
+                <span className="figure mr-2 text-primary">{i + 1}</span>
+                {step.title}
+              </h3>
+              <p className="mt-1 text-sm text-text-secondary">{step.text}</p>
+            </li>
           ))}
-        </div>
+        </ol>
       </section>
 
-      {/* The line that matters */}
-      <section className="bg-mint py-20">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="grid items-start gap-12 lg:grid-cols-2">
-            <div>
-              <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">
-                Your price.
-                <br />
-                Never the AI&apos;s.
-              </h2>
-              <p className="mt-5 max-w-md text-text-secondary">
-                You describe your pricing in plain English —{' '}
-                <span className="font-medium text-text-primary">
-                  &quot;$375 per room, heavy prep adds $250&quot;
-                </span>{' '}
-                — and it becomes your pricing engine. Every quote is calculated from those rates,
-                every time, with the working shown.
-              </p>
-            </div>
-            <div className="grid gap-6 sm:grid-cols-2">
-              <div className="rounded-warm-xl bg-white p-6 shadow-warm-md">
-                <p className="text-xs font-semibold uppercase tracking-widest text-secondary">
-                  The AI does
-                </p>
-                <ul className="mt-4 space-y-2.5 text-sm text-text-secondary">
-                  <li>Reads the photos</li>
-                  <li>Counts rooms, measures walls</li>
-                  <li>Spots prep work and access issues</li>
-                  <li>Asks the customer when unsure</li>
-                  <li>Drafts the scope wording</li>
-                </ul>
-              </div>
-              <div className="rounded-warm-xl bg-white p-6 shadow-warm-md">
-                <p className="text-xs font-semibold uppercase tracking-widest text-danger">
-                  The AI never
-                </p>
-                <ul className="mt-4 space-y-2.5 text-sm text-text-secondary">
-                  <li>Sets a price</li>
-                  <li>Invents a rate</li>
-                  <li>Offers a discount</li>
-                  <li>Sends without your rules</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Measurement grades — butter/tape territory, legitimately */}
-      <section className="mx-auto max-w-6xl px-6 py-20">
-        <div className="grid items-center gap-12 lg:grid-cols-2">
-          <div className="order-2 lg:order-1">
-            <div className="flex items-center justify-center gap-8">
-              {[
-                { grade: 'A', label: 'Confirmed', color: 'var(--color-secondary)' },
-                { grade: 'B', label: 'Measured', color: 'var(--color-tertiary)' },
-                { grade: 'C', label: 'Concept', color: 'var(--color-text-muted)' },
-              ].map(({ grade, label, color }) => (
-                <div key={grade} className="text-center">
-                  <div className="grade-seal" style={{ color }}>
-                    <span className="font-display text-2xl font-bold leading-none">{grade}</span>
-                    <span className="mt-1 text-[7px] font-semibold uppercase tracking-[0.14em]">
-                      {label}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mx-auto mt-8 max-w-sm rounded-warm-xl bg-butter p-5">
-              <div className="flex items-baseline justify-between text-xs text-text-secondary">
-                <span>Measured range</span>
-                <span className="figure text-text-primary">$3,150 – $3,560</span>
-              </div>
-              <div className="relative mt-3 h-1.5 rounded-full bg-white/60">
-                <div className="absolute inset-y-0 left-[20%] right-[25%] rounded-full bg-tape" />
-              </div>
-            </div>
-          </div>
-          <div className="order-1 lg:order-2">
-            <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">
-              Estimates that know how sure they are.
-            </h2>
-            <p className="mt-5 max-w-md text-text-secondary">
-              Every quote carries a measurement grade — Confirmed, Measured or Concept — and a
-              range, so customers see an honest number instead of false precision. Photos are
-              measured against references with known sizes, cross-checked in multiple passes, and
-              escalated to a stronger model when the job is big enough to warrant it.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Feature grid */}
-      <section className="bg-surface py-20">
-        <div className="mx-auto max-w-6xl px-6">
-          <h2 className="text-center font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">
-            Everything between the lead and the yes.
-          </h2>
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((feature) => (
-              <div key={feature.title} className="rounded-warm-xl bg-white p-6 shadow-warm">
-                <h3 className="font-display text-base font-bold text-text-primary">{feature.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-text-secondary">{feature.text}</p>
+      {/* 4. Control */}
+      <section className="bg-mint py-16">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">{CONTROL.heading}</h2>
+          <div className="mt-8 grid gap-5 md:grid-cols-3">
+            {CONTROL.points.map((p) => (
+              <div key={p.title} className="rounded-warm-xl bg-white p-5 shadow-warm">
+                <h3 className="font-display text-base font-bold text-text-primary">{p.title}</h3>
+                <p className="mt-1 text-sm text-text-secondary">{p.text}</p>
               </div>
             ))}
           </div>
-          <p className="mt-10 text-center">
-            <Link href="/features" className="text-sm font-semibold text-primary hover:text-primary-hover">
-              See all features →
-            </Link>
-          </p>
         </div>
       </section>
 
-      {/* Pricing teaser */}
-      <section className="mx-auto max-w-6xl px-6 py-20">
-        <h2 className="text-center font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">
-          Priced like a tool, not a tax.
-        </h2>
-        <div className="mx-auto mt-12 grid max-w-4xl gap-6 sm:grid-cols-3">
-          {offeredPlans().map((def) => ({
-            name: def.name,
-            price: formatMoney((def.monthlyPrice.USD ?? 0) / 100, 'USD', 'en-US', { decimals: 0 }),
-            estimates: def.quoteLimit.toLocaleString('en-US'),
-            highlight: Boolean(def.recommended),
-          })).map((plan) => (
-            <div
-              key={plan.name}
-              className={`rounded-warm-xl p-6 text-center ${
-                plan.highlight
-                  ? 'bg-primary text-white shadow-warm-lg'
-                  : 'border border-border bg-white'
-              }`}
-            >
-              <p className={`text-sm font-semibold ${plan.highlight ? 'text-white/80' : 'text-text-secondary'}`}>
-                {plan.name}
-              </p>
-              <p className="figure mt-2 text-3xl font-medium">{plan.price}</p>
-              <p className={`mt-1 text-xs ${plan.highlight ? 'text-white/70' : 'text-text-muted'}`}>
-                per month · {plan.estimates} estimates
+      {/* 5. What homeowners want */}
+      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">What homeowners want</h2>
+        <div className="mt-8 grid gap-5 md:grid-cols-3" data-testid="statistics">
+          {STATISTICS.map((s) => (
+            <figure key={s.url} className="rounded-warm-xl border border-border bg-white p-5">
+              <p className="figure text-4xl font-medium text-primary">{s.figure}</p>
+              <blockquote className="mt-2 text-sm text-text-primary">{s.text}</blockquote>
+              <figcaption className="mt-3 text-xs text-text-muted">
+                Source:{' '}
+                <a href={s.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary underline underline-offset-2">
+                  {s.source}
+                </a>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      {/* 6. Add it in a minute */}
+      <section className="border-y border-border bg-surface py-16">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">{ADD_IT.heading}</h2>
+          <p className="mt-3 max-w-2xl text-text-secondary">{ADD_IT.lead}</p>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {ADD_IT.ways.map((w) => (
+              <div key={w.title} className="rounded-warm-xl bg-white p-5 shadow-warm">
+                <h3 className="font-display text-base font-bold text-text-primary">{w.title}</h3>
+                <p className="mt-1 text-sm text-text-secondary">{w.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 7. Pricing */}
+      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">{PRICING_HEADING}</h2>
+        <p className="mt-3 text-text-secondary">
+          <span className="figure">{free}</span> priced quotes free in total, no card.
+        </p>
+        <div className="mt-8 grid gap-5 sm:grid-cols-3">
+          {offeredPlans().map((def) => (
+            <div key={def.id} className={`rounded-warm-xl p-6 ${def.recommended ? 'bg-primary text-white shadow-warm-lg' : 'border border-border bg-white'}`}>
+              <p className={`text-sm font-semibold ${def.recommended ? 'text-white/80' : 'text-text-secondary'}`}>{def.name}</p>
+              <p className="figure mt-2 text-3xl font-medium">{formatMoney((def.monthlyPrice.USD ?? 0) / 100, 'USD', 'en-US', { decimals: 0 })}</p>
+              <p className={`mt-1 text-xs ${def.recommended ? 'text-white/70' : 'text-text-muted'}`}>
+                per month · {def.quoteLimit.toLocaleString('en-US')} quotes a month
               </p>
             </div>
           ))}
         </div>
-        <p className="mt-8 text-center">
-          <Link href="/pricing" className="text-sm font-semibold text-primary hover:text-primary-hover">
+        <p className="mt-6">
+          <Link href="/pricing" className="inline-flex min-h-[44px] items-center text-sm font-semibold text-primary hover:text-primary-hover">
             Compare plans →
           </Link>
         </p>
       </section>
 
-      {/* Final CTA */}
-      <section className="bg-primary py-20 text-white">
-        <div className="mx-auto max-w-3xl px-6 text-center">
-          <h2 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
-            Your next lead is comparing quotes tonight.
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-white/80">
-            Set up in about 5 minutes: describe your pricing in plain English, drop the widget on
-            your site, and the next enquiry gets a proper quote before you&apos;ve seen it.
-          </p>
-          <Link
-            href="/signup"
-            className="mt-8 inline-block rounded-lg bg-white px-8 py-3.5 text-sm font-semibold text-primary transition-colors hover:bg-mint"
-          >
-            {(() => { const t = offeredPlans().find((p) => p.trialDays); return t ? `Start your ${t.trialDays}-day trial` : 'Get started' })()}
-          </Link>
+      {/* 8. FAQ */}
+      <section className="border-t border-border bg-surface py-16">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6">
+          <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">Questions</h2>
+          <div className="mt-6 divide-y divide-border rounded-warm-xl border border-border bg-white" data-testid="faq">
+            {FAQ.map((f) => (
+              <details key={f.q} className="group px-5">
+                <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between gap-3 py-3 font-semibold text-text-primary">
+                  {f.q}
+                  <span className="text-text-muted transition-transform group-open:rotate-45" aria-hidden="true">+</span>
+                </summary>
+                <p className="pb-4 text-sm text-text-secondary">
+                  {f.a}
+                  {'link' in f && f.link ? (
+                    <>
+                      {' '}
+                      <Link href={f.link.href} className="font-semibold text-primary underline underline-offset-2">
+                        {f.link.label}
+                      </Link>
+                    </>
+                  ) : null}
+                </p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 9. Who is behind this (renders nothing until lib/marketing/founder.ts is filled in) */}
+      <FounderNote />
+
+      {/* 10. Final call to action */}
+      <section className="bg-primary py-16 text-white">
+        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
+          <h2 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">{FINAL_CTA}</h2>
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <Link href="/signup" className="inline-flex min-h-[48px] items-center justify-center rounded-lg bg-white px-6 py-3 text-sm font-semibold text-primary hover:bg-mint">
+              {freeOfferLabel()}
+            </Link>
+            <Link href="/demo" className="inline-flex min-h-[48px] items-center justify-center rounded-lg border border-white/40 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10">
+              Try it as a customer
+            </Link>
+          </div>
         </div>
       </section>
 
       <SiteFooter />
     </main>
+  )
+}
+
+/** Small line icons for the three steps (ask, price, confirm) */
+function StepIcon({ index }: { index: number }) {
+  const paths = [
+    'M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
+    'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+    'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+  ]
+  return (
+    <span className="inline-flex h-10 w-10 items-center justify-center rounded-warm-lg bg-mint text-primary" aria-hidden="true">
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
+        <path strokeLinecap="round" strokeLinejoin="round" d={paths[index]} />
+      </svg>
+    </span>
   )
 }

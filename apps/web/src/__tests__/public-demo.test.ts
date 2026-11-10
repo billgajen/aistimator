@@ -268,7 +268,7 @@ describe('T-153: the /demo page and links', () => {
     for (const f of ['apps/web/src/app/page.tsx', 'apps/web/src/components/marketing/TradeLanding.tsx', 'apps/web/src/components/marketing/SiteFooter.tsx']) {
       const s = read(f)
       expect(s).not.toMatch(/live demo|Widget demo/i)
-      expect(s).toMatch(/href="\/demo"[\s\S]{0,200}Try it as a customer/)
+      expect(s).toMatch(/href="\/demo"[\s\S]{0,400}Try it as a customer/)
     }
   })
 

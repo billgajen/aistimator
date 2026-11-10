@@ -5,6 +5,15 @@ Next.js deployed on Vercel. All frontend surfaces and API routes are served from
 
 ## Frontend surfaces
 ### 1) Marketing site
+Home page (T-154), top to bottom: hero ("Instant quotes on your website, in your prices.", sub-line, "Try it free: 10
+quotes, no card" + "Try it as a customer", and a three-frame strip drawn from our own UI with the demo business's
+branding) · trades row from the pack registry + "Other trades" · How it works (3 steps) · "Your prices. You stay in
+control." · What homeowners want (three statistics in their sources' words, each linked) · Add it in a minute · plans
+from `plans.ts` · FAQ · "Who is behind this" (only when `lib/marketing/founder.ts` is filled in) · final call to action.
+Copy lives in `lib/marketing/home-copy.ts`. Trade pages use the same hero with a trade-specific strip priced from the
+pack (`lib/marketing/examples.ts`). Phone menu (`MobileMenu`) below `md`. Marketing copy rules: no grades, no engine
+words, no "exact", no confirmed-quote-in-seconds, nothing not live for a new business (a unit test scans every page).
+
 Routes:
 - /
 - /pricing

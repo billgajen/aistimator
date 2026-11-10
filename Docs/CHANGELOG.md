@@ -15,6 +15,60 @@
 
 ## Issues & Resolutions
 
+### 2026-11-10: T-154 — Home page rewrite: say what it is, show it working, earn trust
+
+**Problem:** a contractor arriving from a phone ad saw a slogan, no product in use, a section about grades customers no longer see (T-146), and engine language ("deterministically", "escalated to a stronger model") instead of their day.
+
+**Built (web only):**
+1. **Home page** (`app/page.tsx`; copy in `lib/marketing/home-copy.ts`, approved 2026-11-10 with the owner's edits), top to bottom:
+   - Hero: "Instant quotes on your website, in your prices." with the sub-line, "Try it free: 10 quotes, no card" and "Try it as a customer".
+   - A three-frame strip drawn from our own UI (`components/marketing/ProductStrip.tsx`, the demo business's name, colour and logo): the customer asks, sees the estimate, the owner confirms from "Waiting for you". On a phone the frames swipe inside their own row.
+   - The trades row from the pack registry (`templateTrades`, each linking to its page), plus "Other trades".
+   - How it works (three steps with icons); "Your prices. You stay in control." (only your prices; you confirm first by default; three ways to send).
+   - What homeowners want: three statistics worded as their sources state them, each linked (ACHR NEWS / myCLEARopinion Dec 2024; Roofing Contractor 2025 survey; Mantel 2025, 422 homeowners).
+   - Add it in a minute (link, QR, WhatsApp, website; no website needed); pricing from `offeredPlans()` with the free-quotes line; FAQ (seven short answers); the founder slot; the final call to action.
+2. **Founder slot:** `lib/marketing/founder.ts` + `FounderNote`. Renders nothing until a name and a note are filled in; the email shows only when set. `SUPPORT_EMAIL` added to `packages/shared/src/brand.ts`, empty until the domain is chosen.
+3. **Removed everywhere on the marketing site:**
+   - the grades section and the grade seal (`MiniEstimate` deleted), and the grade bullets on the features page;
+   - the unsourced 40% / 95% / 21× block (home and every trade page);
+   - engine words ("deterministic", "senior/stronger model", "reference-anchored"), "exact", "60 seconds", "firm price in under a minute";
+   - the garage page's deposit claim;
+   - features that aren't live for a new business: text-message quoting (Twilio isn't set up) and the on-site app (not released). On the features page they became the quote link and QR; on trade pages, "Your quote link" and "You confirm first".
+4. **Features page** rewritten in plain words (Ask → Read the job → Price → Confirm → Learn), matching the live product.
+5. **Trade pages:** the home page's hero pattern with each trade's own visual. `lib/marketing/examples.ts` builds every example from the pack's own template rates (the home's spring pair $375, water heater $2,150, painting $825, and HVAC, plumbing and electrical), so a visual can't show a price the product wouldn't produce. Each trade's lede, headline and features were rewritten to "estimate from your prices; you confirm".
+6. **Phone menu:** `MobileMenu` (Features, Pricing, Trades, Try it as a customer, Log in; 48 px rows). Desktop links from `md` up. The wordmark is a 44 px tap target.
+7. **Metadata:** new home title and description, Open Graph and Twitter tags, `metadataBase`, and `app/opengraph-image.tsx` (Next's built-in `ImageResponse`, no new dependency). Meta Pixel wiring unchanged.
+8. **Privacy and terms made to agree with the copy.**
+   - Privacy §3 said photos improve the business's future estimates. Only the measurements taken from them do, never the photos; it now says so. §4 adds that no other business can see a business's customers' details and photos.
+   - The terms no longer say measurements are "shown as grades". Both are dated 10 November 2026.
+9. **Pricing:** the Business plan tagline "Exact on-site measurement with LiDAR scanning" → "On-site measurement with LiDAR scanning", and the bullet "LiDAR room scanning for exact prices" → "LiDAR room scanning on site". Wording only, no price or plan change.
+
+**Found while verifying:**
+- The three statistics as first worded in the ticket were looser than their sources. ACHR says "transparent on pricing" and "feature pricing on their websites". Roofing Contractor says "offers pricing on its website". Mantel's 69% covers heating and cooling *and other home services* shoppers, and its 15% is "very clear". The page uses the sources' words.
+- The accept and decline alerts to the business go only to the Settings → Notifications override address; a business that hasn't set it gets no email (product gap, not changed here). The copy promises what is always true: it shows in the dashboard.
+- The pricing page still lists "Quoting by text (SMS)" and "On-site app for your phone" as Pro channels, and the Pro tagline says the same. Plan content is out of scope; the home page's plan summary shows price and quotes only (see OWNER-TODO).
+- The approved pricing heading "Simple plans. Start free." contained "Start free", which T-152 removed everywhere (verify-t152 caught it). It reads "Simple plans. Try it free." now.
+- The nav links lived in the client-only menu file and the server nav called `.filter()` on them (a server/client boundary error, 404 page in dev). They moved to `lib/marketing/nav.ts`.
+- The plan tagline above was found by the rendered-text check, not the source scan; `plans.ts` is now in the source scan too.
+
+**Verified:**
+- Playwright 26/26:
+  - 390 px: the headline, sub-line and main button sit above the fold (button bottom at 401 px of 844); no sideways scroll on home, pricing, features, the trades index, all six trade pages, painting, demo, privacy and terms; every home tap target at least 40 px;
+  - the phone menu opens with the five links and they work; the hero buttons open signup and `/demo`; each statistic links out; no founder section while its file is empty; no grade or engine words in any page's rendered text;
+  - 1440 px: no sideways scroll, menu button hidden and links shown; the social image renders; the new `<title>` and `og:image` are served.
+- Screenshots for review: `scripts/hardcore-test/results/2026-11-10-t154-screenshots/` (home at 390 px and 1440 px, full page and above the fold, the phone menu, a trade page at both sizes, the features page, the social image).
+- Regression set: verify-t146–t153 20/20, 33/33, 29/29, 35/35, 27/27, 35/35, 66/66, 36/36 (t152 after the heading fix above).
+- Unit tests: web 310 (+32):
+  - no banned word in any marketing file, source with comments removed: grades, seal, engine words, "exact", "60 seconds", deposit, "firm price", "Start free";
+  - the 40% / 95% / 21× block and `MiniEstimate` gone; no SMS or app claims;
+  - the approved hero, headings and FAQ exactly; "by default" wherever every estimate is confirmed; the privacy page agrees with the FAQ;
+  - the statistics' URLs and wording; the founder section empty versus filled (rendered); every trade example resolves from its pack ($375 / $2,150 / $825); the trades row in registry order;
+  - the nav links; primary buttons only to signup or `/demo`; metadata and the social image.
+
+  Worker 465, mobile 11. Lint, typecheck, web and worker builds pass.
+
+**Files:** `apps/web/src/app/{page,layout,opengraph-image}.tsx`, `apps/web/src/app/{features,pricing,privacy,terms}/page.tsx`, `apps/web/src/components/marketing/{ProductStrip,FounderNote,MobileMenu,SiteNav,TradeLanding}.tsx` (`MiniEstimate.tsx` deleted), `apps/web/src/lib/marketing/{home-copy,examples,founder,nav,trades}.ts`, `packages/shared/src/{brand,plans}.ts`, `apps/web/src/__tests__/{marketing-home,public-demo}.test.ts`.
+
 ### 2026-11-10: T-153 — A working public demo: "Try it as a customer"
 
 **Problem:** "Try the live demo" opened a developer page asking for a Tenant Key. A visitor had nothing to try.

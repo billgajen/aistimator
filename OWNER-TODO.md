@@ -310,3 +310,19 @@ Code for every item is already built; these are the steps that unlock it.
   - Worker queue consumer: the AI-processing limiter (100 global, 10 per business per window) and its stats endpoint.
 
   The demo's own limits (`DEMO_DAILY_CAP`, `DEMO_IP_LIMIT_PER_HOUR`) are counted in the database and already apply.
+
+## T-154 — Home page rewrite
+
+- [ ] **Deploy: web only** (`npx vercel deploy --prod`). No migration, no worker change.
+- [ ] **Review the screenshots** in `scripts/hardcore-test/results/2026-11-10-t154-screenshots/` (home at 390 px and
+  1440 px, the phone menu, a trade page, the features page, the social preview image).
+- [ ] **Founder section:** fill in `apps/web/src/lib/marketing/founder.ts` (name, role, a two-or-three-sentence note,
+  optional photo in `apps/web/public/`). It stays hidden until name and note are set.
+- [ ] **Support email:** set `SUPPORT_EMAIL` in `packages/shared/src/brand.ts` once the domain is chosen; the founder
+  section shows it automatically.
+- [ ] **Pricing page still promises Pro channels that aren't live:** "Quoting by text (SMS)" and "On-site app for your
+  phone" (from `plans.ts` channels), and the Pro tagline says the same. Decide: set up Twilio and release the app, or
+  change the plan wording (plan content was out of scope for T-154).
+- [ ] **Accept and decline alerts** reach the business only if Settings → Notifications has an address; otherwise they
+  only show in the dashboard. Consider emailing the owner's login address by default (product change, not done).
+

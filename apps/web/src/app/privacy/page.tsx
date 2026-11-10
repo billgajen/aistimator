@@ -18,11 +18,11 @@ const SECTIONS = [
   },
   {
     title: '3. How photos and AI are used',
-    body: 'Photos and enquiry text are processed by AI models to extract measurements and job details used to build the quote. They are used to produce your quote and to improve the accuracy of the business’s own future estimates. We do not use your photos to train public AI models, and we do not sell your data.',
+    body: 'Photos and enquiry text are processed by AI models to read the job details and measurements used to prepare the estimate. Photos are used only to prepare the estimate. The measurements taken from them, never the photos, can improve the accuracy of that business’s own future estimates. We do not use your photos to train public AI models, and we do not sell your data.',
   },
   {
     title: '4. Where data lives',
-    body: 'Data is stored with our infrastructure providers: Supabase (database, EU region), Cloudflare (file storage and processing), Vercel (hosting), Stripe (payments), Postmark (email) and Google (AI processing). Uploads are stored privately and served only via time-limited signed links or the controlled quote page.',
+    body: 'Data is stored with our infrastructure providers: Supabase (database, EU region), Cloudflare (file storage and processing), Vercel (hosting), Stripe (payments), Postmark (email) and Google (AI processing). Uploads are stored privately and served only via time-limited signed links or the controlled quote page. Each business sees only its own customers’ details and photos; no other business can.',
   },
   {
     title: '5. How long we keep it',
@@ -50,7 +50,7 @@ export default function PrivacyPage() {
         <h1 className="font-display text-4xl font-extrabold tracking-tight text-text-primary">
           Privacy Policy
         </h1>
-        <p className="mt-3 text-sm text-text-muted">Last updated: 24 July 2026</p>
+        <p className="mt-3 text-sm text-text-muted">Last updated: 10 November 2026</p>
         <div className="tape-rule mt-8" />
         <div className="mt-10 space-y-8">
           {SECTIONS.map((section) => (

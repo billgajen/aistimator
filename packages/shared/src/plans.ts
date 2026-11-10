@@ -102,7 +102,7 @@ export const PLANS: PlanDefinition[] = [
   {
     id: 'plan_us_business',
     name: 'Business',
-    tagline: 'Exact on-site measurement with LiDAR scanning',
+    tagline: 'On-site measurement with LiDAR scanning',
     monthlyPrice: US_BUSINESS_MONTHLY,
     annualPrice: annualFromMonthly(US_BUSINESS_MONTHLY),
     quoteLimit: 600, // TODO-OWNER: confirm

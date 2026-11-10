@@ -18,7 +18,7 @@ const SECTIONS = [
   },
   {
     title: '3. Estimates are estimates',
-    body: 'Measurements derived from photographs carry stated uncertainty (shown as grades and ranges). They are a basis for a commercial offer, not a survey. You are responsible for verifying quantities before performing work, and for any difference between an estimate and the final price you charge.',
+    body: 'Measurements derived from photographs can be uncertain (where they are, the estimate shows a range). They are a basis for a commercial offer, not a survey. You are responsible for verifying quantities before performing work, and for any difference between an estimate and the final price you charge.',
   },
   {
     title: '4. Fair use and abuse',
@@ -58,7 +58,7 @@ export default function TermsPage() {
         <h1 className="font-display text-4xl font-extrabold tracking-tight text-text-primary">
           Terms of Service
         </h1>
-        <p className="mt-3 text-sm text-text-muted">Last updated: 24 July 2026</p>
+        <p className="mt-3 text-sm text-text-muted">Last updated: 10 November 2026</p>
         <div className="tape-rule mt-8" />
         <div className="mt-10 space-y-8">
           {SECTIONS.map((section) => (

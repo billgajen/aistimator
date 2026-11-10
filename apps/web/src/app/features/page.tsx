@@ -2,98 +2,98 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
-import { freeOfferLabel } from '@estimator/shared'
+import { freeOfferLabel, PRODUCT_NAME } from '@estimator/shared'
 
 export const metadata: Metadata = {
-  title: 'Features — Aistimator',
+  title: `Features — ${PRODUCT_NAME}`,
   description:
-    'How Aistimator turns customer photos into professional quotes: guided capture, reference-anchored measurement, deterministic pricing from your rates, and quote pages that close.',
+    'How customers get an estimate from your prices at once: your quote link, guided questions and photos, your own price list, and an estimate page you confirm before they accept.',
 }
 
 /**
- * The page follows the product's actual pipeline — each stage is a real
- * step in how an enquiry becomes an accepted quote, so the numbering
- * carries information, not decoration.
+ * The page follows the product's actual steps, from a customer's request to an
+ * accepted quote. T-154: plain words only; every claim matches the live
+ * product (no grades, no engine words, no "exact").
  */
 const STAGES = [
   {
     number: '01',
-    name: 'Capture',
+    name: 'Ask',
     headline: 'Meet the customer where they already are.',
-    body: 'Your website gets an embeddable widget — a guided step-by-step form or an AI chat that feels like texting, inline on the page or behind a floating button. Customers who’d rather text just message your number (SMS or WhatsApp). Either way, guided photo capture asks for exactly the shots the job needs — every room from the doorway, every elevation ground-to-roof — with quality checks that catch blurry or dark photos before they waste anyone’s time.',
+    body: 'Share your own quote link and QR code, send it in WhatsApp, or add it to your website as a step-by-step form or a chat. Each service asks only the questions that set its price, and asks for the photos it needs, with checks that catch blurry or dark shots before they waste anyone’s time.',
     details: [
-      'Step-by-step form or conversational AI chat',
-      'Floating button or inline embed — one script tag',
-      'Text-message intake with photos (SMS and WhatsApp)',
-      'Per-service photo checklists with quality checks',
+      'Your quote link and QR code, no website needed',
+      'On your website: a step-by-step form or a chat',
+      'Questions and photo checklists per service',
+      'Contact details first, so a half-finished request is still your lead',
     ],
   },
   {
     number: '02',
-    name: 'Measure',
-    headline: 'Measured against things with known sizes.',
-    body: 'The AI doesn’t guess areas — it anchors measurements to references in the photo with known dimensions: doors, bricks, standard fittings. Each job is measured in multiple independent passes; when the passes agree, confidence is high, and when they don’t, the spread becomes an honest range. Big jobs are escalated to a stronger model automatically, and when a number genuinely matters to the price, the customer confirms it in one tap.',
+    name: 'Read the job',
+    headline: 'It reads the details that set your price.',
+    body: 'The AI reads what matters from the answers and photos: how many rooms, the size on a rating plate, the capacity on a tank label, the wall area of a house. When something isn’t clear, it doesn’t guess: the customer sees a range and is asked one quick question.',
     details: [
-      'Reference-anchored measurement from photos',
-      'Multiple passes — variance becomes the range',
-      'Bigger jobs escalate to a senior model',
-      'In-flow confirmation for numbers that matter',
+      'Sizes read from labels and rating plates',
+      'Rooms, fixtures and quantities from the customer’s answers',
+      'A range and one question when something is unclear',
+      'You see how every quantity was worked out',
     ],
   },
   {
     number: '03',
     name: 'Price',
-    headline: 'Plain English in. Your rates out. Every time.',
-    body: 'You describe your pricing the way you’d tell an apprentice: “$375 per room, heavy prep adds $250, minimum job $400.” That becomes your pricing engine — deterministic, auditable, yours. The AI extracts quantities and drafts wording, but the arithmetic is done by code from your configuration. Change a rate by typing a sentence; the next quote uses it.',
+    headline: 'Plain English in. Your prices out.',
+    body: 'You describe your pricing the way you’d tell a new hire: “$375 per room, heavy prep adds $250, minimum job $400.” It becomes your price list, shown back to you in plain English. The AI reads the job; the price only ever comes from the prices you set. Change a price by typing a sentence; the next estimate uses it.',
     details: [
-      'Plain-language pricing setup — no formulas to learn',
-      'Deterministic engine: same inputs, same price',
-      'Addons, multipliers, minimums and service areas',
-      'Every calculation traceable in your dashboard',
+      'Plain-English price setup, no formulas to learn',
+      'Extras, adjustments, minimums and service areas',
+      'Ready-made templates for common trades',
+      'Every estimate’s working visible in your dashboard',
     ],
   },
   {
     number: '04',
-    name: 'Deliver',
-    headline: 'A commercial document, not a text with a number.',
-    body: 'Customers receive a hosted quote page in your branding: scope of works, measured quantities with the method shown, a grade that says how sure the measurement is, and a range around the total. They can accept in one tap, ask a question, or decline with a reason — and you’re notified the moment any of it happens. A PDF version is generated for the paper trail, quotes expire on schedule, and one polite reminder goes out automatically.',
+    name: 'Confirm',
+    headline: 'An estimate page, and you have the last word.',
+    body: 'Your customer gets a page in your branding with the estimate for their job, straight away. By default they can accept once you’ve confirmed it: one tap on Approve & send. You choose per service: show the estimate and confirm, hold it until you approve, or send automatically. They can accept, ask a question or decline, and it shows in your dashboard straight away.',
     details: [
-      'Hosted quote page with your branding + PDF',
-      'Measurement grades: Confirmed / Measured / Concept',
-      'One-tap accept, decline, questions — you’re notified instantly',
-      'Automatic expiry and a single follow-up reminder',
+      'Estimate page in your branding, with a PDF',
+      'Three ways to send, chosen per service',
+      'Accept, ask a question or decline, shown in your dashboard',
+      'Expiry and one polite reminder, automatically',
     ],
   },
   {
     number: '05',
     name: 'Learn',
-    headline: 'Every job tunes the next one.',
-    body: 'When you amend a quote or a measurement gets confirmed on site, that outcome feeds back into how your future jobs are measured. Your dashboard shows conversion by service, where quotes stall, and — if you opt in — how your rates compare to anonymised businesses like yours.',
+    headline: 'Your corrections improve the next estimate.',
+    body: 'When you correct an estimate or a customer confirms a measurement, that service’s future estimates use it. Your dashboard shows which services win work and where requests stall, and, if you opt in, how your prices compare with similar businesses.',
     details: [
-      'Per-service calibration from real outcomes',
-      'Conversion analytics: sent → viewed → accepted',
-      'Opt-in anonymised rate benchmarks',
-      'Review thresholds you set and adjust anytime',
+      'Learns from your own corrections, per service',
+      'Requests, estimates sent, accepted and value',
+      'Opt-in, anonymised price comparisons',
+      'Unfinished requests listed with call and email buttons',
     ],
   },
 ]
 
 export default function FeaturesPage() {
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen overflow-x-clip bg-background">
       <SiteNav />
 
-      <section className="mx-auto max-w-4xl px-6 pb-8 pt-16 text-center">
+      <section className="mx-auto max-w-4xl px-4 pb-8 pt-12 text-center sm:px-6 sm:pt-16">
         <h1 className="font-display text-4xl font-extrabold tracking-tight text-text-primary sm:text-5xl">
-          From photos to a signed yes.
+          From a customer’s question to a yes.
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-lg text-text-secondary">
-          Five stages between an enquiry and an accepted quote. Aistimator runs all of them — you
-          decide how much you want to watch.
+          Five steps between a request and an accepted quote. {PRODUCT_NAME} runs them, in your prices, and you
+          confirm before your customer accepts.
         </p>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 py-10">
+      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         <div className="space-y-20">
           {STAGES.map((stage) => (
             <div key={stage.number}>
@@ -134,7 +134,7 @@ export default function FeaturesPage() {
             See it price one of your jobs.
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-white/80">
-            The fastest way to judge it: set up your rates and send yourself a quote.
+            The fastest way to judge it: set up your prices and send yourself a test quote.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Link
