@@ -5,6 +5,8 @@
  * https://postmarkapp.com/developer/api/email-api
  */
 
+import { redactEmails } from '@estimator/shared'
+
 const POSTMARK_API_URL = 'https://api.postmarkapp.com/email'
 
 export interface PostmarkConfig {
@@ -59,7 +61,8 @@ export async function sendEmail(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      const errorMessage = (errorData as { Message?: string }).Message || `HTTP ${response.status}`
+      // T-157: the provider's message can name the recipient; no addresses in logs
+      const errorMessage = redactEmails((errorData as { Message?: string }).Message || `HTTP ${response.status}`)
       console.error('[Postmark] API error:', errorMessage)
       return {
         success: false,
@@ -73,7 +76,7 @@ export async function sendEmail(
       messageId: data.MessageID,
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorMessage = redactEmails(error instanceof Error ? error.message : 'Unknown error')
     console.error('[Postmark] Request failed:', errorMessage)
     return {
       success: false,

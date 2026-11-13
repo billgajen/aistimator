@@ -6,6 +6,8 @@ import { createHash } from 'crypto'
 import { sendEmail, isPostmarkConfigured } from '@/lib/postmark'
 import { generateQuoteAcceptedEmailHtml } from '@/lib/email-templates'
 import { checkAcceptance, timingLabel, type AcceptanceDetails } from '@/lib/acceptance'
+import { resolveBusinessEmail } from '@/lib/business-email'
+import { canCustomerDecide } from '@estimator/shared'
 import type { AcceptQuoteResponse, QuotePricing, TenantBranding } from '@estimator/shared'
 
 /**
@@ -39,7 +41,7 @@ export async function POST(
       .select(`
         id, status, quote_token_hash, token_expires_at, accepted_at, is_demo,
         customer_json, pricing_json,
-        tenants!tenant_id ( id, name, region, currency, notification_email, branding_json ),
+        tenants!tenant_id ( id, name, region, currency, branding_json ),
         services!service_id ( id, name )
       `)
       .eq('id', quoteId)
@@ -70,8 +72,8 @@ export async function POST(
     }
 
     // Check if quote is in a valid state to accept
-    const validStatuses = ['sent', 'viewed', 'revised', 'feedback_received']
-    if (!validStatuses.includes(quote.status)) {
+    // (T-157: an open customer question never blocks accepting)
+    if (!canCustomerDecide(quote.status)) {
       return NextResponse.json(
         { error: { code: 'INVALID_STATUS', message: `Cannot accept quote with status: ${quote.status}` } },
         { status: 400 }
@@ -117,7 +119,7 @@ export async function POST(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const tenantRaw = quote.tenants as any
       const tenant = (Array.isArray(tenantRaw) ? tenantRaw[0] : tenantRaw) as {
-        id: string; name: string; region?: string | null; currency?: string | null; notification_email: string | null; branding_json: TenantBranding | null
+        id: string; name: string; region?: string | null; currency?: string | null; branding_json: TenantBranding | null
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const serviceRaw = quote.services as any
@@ -125,8 +127,13 @@ export async function POST(
       const customer = quote.customer_json as { name: string; email: string }
       const pricing = quote.pricing_json as QuotePricing | null
 
-      // T-153: a demo quote emails no one
-      if (tenant?.notification_email && isPostmarkConfigured() && !(quote as { is_demo?: boolean }).is_demo) {
+      // T-153: a demo quote emails no one. T-157: the one business email rule
+      // (the Settings address, else the first user's account email).
+      const businessEmail =
+        tenant?.id && isPostmarkConfigured() && !(quote as { is_demo?: boolean }).is_demo
+          ? await resolveBusinessEmail(supabase, tenant.id)
+          : null
+      if (businessEmail) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
         const totalFormatted = pricing
           ? (() => {
@@ -152,7 +159,7 @@ export async function POST(
           }),
         })
         await sendEmail({
-          to: tenant.notification_email,
+          to: businessEmail,
           subject: `Quote accepted: ${customer?.name || 'Customer'} - ${service?.name || ''}`,
           htmlBody,
         })

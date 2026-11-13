@@ -8,6 +8,7 @@
  *   reads "Quote — Reviewed and confirmed by {business}".
  * - Issues a fresh link for the email, and keeps the link the customer
  *   already holds valid (`previous_token_hash`) instead of breaking it.
+ *   (T-157: every earlier link stays valid, in `link_token_hashes`.)
  * - The status guard in the UPDATE makes a double tap send once.
  * - T-148: approving without editing (version 1) sends the generated wording
  *   as it is, so banned customer words in it are removed first (no AI here).
@@ -24,6 +25,7 @@ import type { QuotePricing, TenantBranding, CustomerWording, WordingRepairRecord
 import type { createClient, createAdminClient } from '@/lib/supabase/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { sendEmail, isPostmarkConfigured, generateCustomerEmailHtml } from '@/lib/postmark'
+import { businessReplyTo } from '@/lib/business-email'
 
 /** A signed-in user's client (dashboard, app) or the service role (email link, T-156) */
 type Supabase = Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient>
@@ -195,6 +197,8 @@ export async function approveQuote(opts: {
     subject: `Your quote from ${tenant.name}`,
     htmlBody,
     tag: 'quote-approved',
+    // T-157: replies reach the business
+    replyTo: await businessReplyTo(tenantId),
   })
   if (!emailResult.success) console.error('[Approve] customer email failed:', emailResult.error)
   return { ok: true, status: 'sent', quoteViewUrl, emailed: emailResult.success, emailError: emailResult.error }

@@ -15,6 +15,106 @@
 
 ## Issues & Resolutions
 
+### 2026-11-13: T-157 — Quote actions that always work (fixes from Feedback 01) (AD-042)
+
+Six things around a quote were broken or misleading. Each is fixed at its root. Pricing, page layouts and what the customer is told are unchanged; rounding is the only change to any number (AD-001).
+
+**1. The business always gets its emails**
+- **What broke:** "quote accepted", "customer question" and "quote declined" reached the business only when Settings > Notifications had an address. Empty is the default, so most businesses got nothing. The worker did the reverse: it always used the first user's account email and ignored the setting.
+- **Root cause:** four copies of the lookup with three different rules (the public routes gated on `tenants.notification_email`; `plan-limits.ts` and `lead-hold.ts` each had a fallback copy; the worker had its own).
+- **Fix:** one rule, `chooseBusinessEmail` in `shared/business-email.ts`: the Settings address when set, otherwise the account email of the tenant's first user; the demo business (T-153) gets none.
+  - Web: `lib/business-email.ts` (`resolveBusinessEmail`, `businessEmailFor`, `businessReplyTo`), used by accept, decline, feedback, `plan-limits.ts` and `lead-hold.ts`. The copies are deleted. The account lookup needs the service role, so those callers no longer depend on which client they were handed (the price-a-held-lead route passed a user's client, whose lookup always failed).
+  - Worker: `business-email.ts` (`loadBusinessEmail`), same rule; `loadQuoteData` now reads `notification_email` and `is_demo`.
+  - The same address is the reply-to on customer emails: the worker's (as before, now by the rule) and, new, the web app's (approve, edit and send, send again, reminder).
+  - Test quotes behave as before.
+- **No addresses in logs:** `apps/worker/src/email/index.ts` logged the customer's and the business's address on every send. Those lines now carry the quote id. The email provider's error text can name the recipient, so both Postmark clients pass it through `redactEmails` before logging or returning it.
+
+**2. A button only shows when it will work**
+- **What broke:** the quote page's "Send" showed on accepted, revised, question and held quotes and always errored (the route only allowed `sent`, `viewed`, `expired`), with the error in a browser `alert()`. "Text link" showed with no SMS number connected. The quote page had no "Copy link", the only way to reach a customer who gave no email. The list refused Copy link and PDF on revised and question quotes.
+- **Root cause:** each page and each route kept its own status list, and they had drifted apart.
+- **Fix:** the rules live in `shared/quote-status.ts` and the button and its route read the same one:
+  - Send again: `sent`, `viewed`, `revised`, `expired`, and the customer has an email address;
+  - Copy link, Download PDF: `sent`, `viewed`, `feedback_received`, `revised`, `accepted`, `paid`, `expired`;
+  - Text link: the SMS route's list, and an active SMS number;
+  - Edit: unchanged.
+- Quote page: "Send" is now "Send again" by the rule; "Copy link" added (if the browser refuses the clipboard, the link is shown to copy by hand); "Text link" only when `GET /api/quotes/:id` says `smsActive` (one extra query in the quote's own load); one line under the header for what an action did or why it couldn't, never `alert()`. "Approved. No email went out" names Text link only when it is there.
+- Quotes list: the same rules for its icons.
+- Routes: the PDF routes now check the status (they checked nothing). Send again runs every check before writing (it used to replace the token and set `sent` and only then discover the customer had no email), answers about the quote before "email not configured", and guards its update on the status it read. Re-sending a revised quote keeps it revised (`statusAfterResend`); the SMS route uses the same helper, so texting a link no longer turns a revised quote, or one with an open question, into `sent`.
+- The action updates in resend, link, PDF and SMS are now also filtered by tenant id (row-level security already covered them).
+
+**3. A link the customer already has keeps working (AD-042)**
+- **What broke:** Copy link, Send again, Text link and the 3-day reminder each replaced the quote's token, so the link in the customer's earlier email stopped working. T-146 kept one earlier link (`previous_token_hash`), for approval and edit-and-send only.
+- **Root cause:** raw tokens are never stored, so handing out a link means a new token, and each route decided for itself whether to keep the old one. Most didn't.
+- **Fix:** migration 38. `quotes.link_token_hashes text[] not null default '{}'` and the trigger `quotes_keep_link_tokens` (BEFORE UPDATE): when `quote_token_hash` changes, the hash it replaces goes to the front of the list, without duplicates, keeping the newest 10. A trigger, so no route can forget; it also covers the re-price and admin retry routes. `quoteTokenFilter` matches the current link, `previous_token_hash` and the list; `quoteTokenMatches` is the same rule for a row already loaded (the clarify route compared the current hash only).
+- Expiry is unchanged: `token_expires_at` covers every link of the quote.
+- `scripts/deploy-migration-38.sh`, like the one for 37.
+
+**4. A customer question can be closed and never blocks the customer**
+- **What broke:** "Acknowledge" only changed the screen and came back on refresh. After asking a question the customer page hid Accept and Decline until the business re-sent, although the API allowed both. Edit and send resolved one question, leaving others pending.
+- **Root cause:** the button never called the server; the page tied every action to "no question sent yet"; the edit route resolved only the id the editor passed.
+- **Fix:**
+  - Quote page: the banner reads "Customer question", the button "Mark as answered". Old review requests get the same button.
+  - New `POST /api/quotes/:quoteId/feedback/:feedbackId/answered`: signed-in business only, scoped to its tenant and to that quote. Sets the feedback to `acknowledged`; when the quote is `feedback_received` and nothing is pending it goes back to `viewed`, with a status guard so a quote the customer just accepted is never moved back.
+  - Edit and send resolves every pending question on the quote.
+  - Customer page: Accept and Decline follow `canCustomerDecide` (the rule the accept and decline routes use), not the question. "Message sent" stays while the question is open, also after a reload: the public quote API returns `questionPending`. A second question while one is open stays off.
+  - An estimate shown before approval (T-147) stays locked: the page used to pretend the status was `feedback_received` after a question, which would now have shown Accept, so it keeps `pending_review` there.
+
+**5. Revised stays revised**
+- **What broke / root cause:** editing and sending a quote that was already revised flipped it back to `sent`, because `revised` was missing from the edit route's "already sent" list.
+- **Fix:** `statusAfterEditAndSend` in `shared/quote-status.ts`.
+
+**6. Money is always rounded**
+- **What broke:** 18 x 34.6 is 622.8000000000001 in floating point. The engine stored line amounts unrounded and the editor showed them raw.
+- **Root cause:** only the subtotal, tax and total were rounded, with `Math.round(x * 100) / 100`, which also gets 1.005 wrong (it gives 1).
+- **Fix:** `roundMoney` in `shared/money.ts`: 2 decimals, half away from zero, negatives too (18 x 34.6 → 622.8; 1.005 → 1.01; -1.005 → -1.01; 0.1 + 0.2 → 0.3).
+  - Engine (`rules-engine.ts`, both calculators, and the validator's added line): every line amount is rounded where it is created, and the running total only ever adds rounded lines, so the subtotal is the sum of the lines. Tax and total as before.
+  - Edit route: rounds each incoming line amount and the subtotal.
+  - Editor: amounts show and save with at most 2 decimals, including quotes already stored unrounded. No data migration.
+  - `splitLabelMath` moved from the customer page to `shared/money.ts`. `dropStaleLabelMath` (applied by the edit route): when the business changes a line's amount and leaves its label alone, the generated maths ("£18 x 34.6(Sqm)") is removed from that label, so the customer never sees maths that doesn't match the amount. Only an untouched generated label qualifies: exactly a label the quote had, one the pricing trace says the engine wrote, with no line of that label still at its old amount. Text the business typed is never rewritten. The label format the engine writes is unchanged.
+
+**Rounding, in one place (a note for later tickets):**
+- A multiplier's adjustment is a line. It is rounded, and the rounded line is added to the running total. Before, the running total was multiplied and rounded once at the end, so a quote with a multiplier on unrounded lines can now differ by a penny from what the old engine gave. The lines always add up; before, they didn't always.
+- A line that rounds to 0.00 is dropped, like any zero line (ISSUE-3).
+- The trace's `calculation` text for a work step still shows the raw product (business-only); `amount` and `runningTotal` are rounded.
+- Stored quotes are not rewritten. An old quote keeps its raw amounts until it is next saved.
+
+**Found while verifying:**
+- The first live run returned 404 for the owner pressing "Mark as answered". The route checked the id was a uuid, as `supabase/migrations/00000000000017_quote_amendments.sql` declares, but the database issues prefixed text ids (`fb_…`, default `generate_prefixed_id('fb')`). The route now accepts either shape; an id of neither shape, or one the tenant doesn't own, is 404. That migration file and the live table disagree about the id's type; nothing here depends on which.
+- With the list of 10, the customer's very first link also survives through `previous_token_hash` (T-146) until the next approval or edit-and-send replaces that column.
+- One local quote submission hung for four minutes in the worker after pricing and did not recur. See "Not changed" below.
+
+**Verified:**
+- `verify-t157.mts` 96/96 live (local stack, migration 38 applied twice to prove it re-runs), including the browser pass:
+  - *Email rule*, against real rows: setting empty → the first user's account email, from the web rule and the worker rule alike; setting filled → that address; another business gets its own; the demo business gets none.
+  - *Actions:* awaiting approval, all four link actions are 400 `INVALID_STATUS` and the page offers none. Sent: Copy link works, PDF passes its rule, Text link is refused without an SMS number. Send again with no customer email is 400 `NO_EMAIL` with nothing written. Accepted: Send again, Text link and Edit are refused and hidden; Copy link stays. Another business gets 404 on every action.
+  - *Links:* the customer's first link still opens the quote after approval, a copied link, a re-send and a reminder. An earlier link expires with the quote (410, not 404) and opens again when the expiry is restored. After 12 more copied links the list holds exactly the newest 10 with no duplicates. Another quote's link opens nothing.
+  - *Questions:* a question keeps Accept available and a second one is refused. "Mark as answered" is 404 for another business and for the wrong quote, 401 signed out; for the owner it is saved, survives a reload and puts the quote back to `viewed`, and the customer can then accept. With a question open the customer can accept or decline. Edit and send resolves both pending questions. An old review request closes with the same button. Before approval a question leaves Accept locked.
+  - *Revised:* edit and send twice gives `revised` both times; texting the link (SMS test mode, nothing sent) keeps it revised.
+  - *Money:* the 34.6 x 18 line stores 622.8; the lines (622.8 + 93.34) add up to the subtotal 716.14; tax 143.23 and total 859.37 as before; the trace carries the same amounts. Saving an edit rounds 600.005 to 600.01, drops the maths from the changed line only, and leaves a typed label that looks like maths alone. A quote stored as 622.8000000000001 saves as 622.8 with its label intact.
+  - *Pages (Chromium):* the buttons in each status, with and without SMS; a Send again failure shown on the page with no `alert()`; Copy link putting a working link on the clipboard; "Message sent" with Accept and Decline, before and after a reload; the banner closing and staying closed after a reload; the editor showing 622.8 and 0.3 for raw stored amounts; the quotes list icons.
+- Regression set verify-t146–t156: 20/20, 33/33, 29/29, 35/35, 27/27, 35/35, 66/66, 36/36, 26/26, 46/46, 31/31.
+- Unit tests: web 395 (+43, `quote-actions.test.ts`), worker 494 (+18, `quote-actions-t157.test.ts`), mobile 11. They cover the business email rule (setting filled, setting empty, demo tenant), the action rules, `roundMoney`, the maths label rule, `quoteTokenFilter`, the answered route's tenant scope, and that no log line carries an address.
+- Lint, typecheck, web build and worker build pass.
+
+**Not checked live (no real email is sent locally):**
+- that an email arrives at the resolved address, and the Reply-To header on customer emails. The address each sender resolves was checked against real rows, and the senders are unit-tested;
+- "Send again" delivering: locally it passes its own checks and stops at `EMAIL_NOT_CONFIGURED` having written nothing. The token was then replaced the way the route does it;
+- the reminder email: the cron skips reminders without Postmark. The token was replaced the way the cron does it.
+
+**Not changed, noted:**
+- The public feedback API still accepts `feedbackType: "approval_request"`. The customer page has no button for it any more, so customers can no longer send one from the page; old rows get the same "Mark as answered" button.
+- A plain Save (no send) with a linked question still resolves that one question and leaves the quote `feedback_received`, as before. It no longer blocks the customer.
+- `POST /api/app/quotes/:id/answers` still compares the business app's token with the current hash only (it decides whether the worker may email the customer; it is not a customer link).
+- The worker's AI calls for wording, add-on detection and validation have no timeout: `generateWording` passes no abort signal and the Gemini client's `fetch` sets none of its own. Only identification (25 s), adjudication (30 s), the measurement passes and the sentence rewriter (15 s) are bounded. A stalled call holds the request until the platform ends it, and the wording fallback only runs on an error, never on a stall. Not touched in this ticket.
+- `quote_feedback` still allows anonymous inserts (OWNER-TODO, rate limiting section).
+- Replying to the customer inside the app: v2 backlog (OWNER-TODO, product backlog item 8).
+
+**Not deployed, not committed.** Deploy order when it goes: migration 38, then the worker, then the web app (OWNER-TODO, T-157).
+
+**Files:** `supabase/migrations/00000000000038_quote_link_tokens.sql`, `scripts/deploy-migration-38.sh`, `scripts/hardcore-test/verify-t157.mts`, `packages/shared/src/{money,business-email,quote-status,index,api.types,database.types}.ts`, `apps/worker/src/{business-email.ts,quote-processor.ts,email/index.ts,email/postmark.ts,pricing/rules-engine.ts,ai/quote-validator.ts,__tests__/quote-actions-t157.test.ts}`, `apps/web/src/lib/{business-email,quote-action-copy,tokens,plan-limits,lead-hold,postmark,quote-approval,quote-intake}.ts`, `apps/web/src/lib/messaging/intake-engine.ts`, `apps/web/src/app/api/quotes/[quoteId]/{route.ts,resend,link,pdf,feedback/[feedbackId]/answered}`, `apps/web/src/app/api/sms/send-quote/route.ts`, `apps/web/src/app/api/cron/lifecycle/route.ts`, `apps/web/src/app/api/public/quotes/[quoteId]/{route.ts,accept,decline,feedback,clarify}`, `apps/web/src/app/(dashboard)/app/quotes/{page.tsx,[quoteId]/page.tsx}`, `apps/web/src/app/q/[quoteId]/page.tsx`, `apps/web/src/components/quote-editor/useQuotePricing.ts`, `apps/web/src/__tests__/{quote-actions,customer-language}.test.ts`, `Docs/{02-api-contracts,03-data-model}.md`, `OWNER-TODO.md`.
+
+---
+
 ### 2026-11-10: T-156 — Approve a quote from the email in one tap, without logging in (AD-041)
 
 **Problem:** the "Review and approve" email linked to the dashboard, so an owner on a phone had to log in before approving. That was the slowest step left between a customer's request and a confirmed quote.
@@ -4020,6 +4120,25 @@ if (pricingResult.estimatedTotal <= 0) {
 - a magic-login link (far more power than approving one quote);
 - signing the quote id instead of storing a token (it can't be made single-use or revoked when the quote is edited);
 - per-route invalidation (easy to miss one).
+
+### AD-042: Every link issued for a quote stays valid until the quote expires (T-157)
+
+**Decision:** a customer link never stops working because a newer one was issued. Raw tokens are still never stored, so every action that hands out a link makes a new token; the hash it replaces is kept in `quotes.link_token_hashes` by a database trigger on `quotes` (the newest 10, no duplicates), and every public token route accepts the current link, the pre-approval link (`previous_token_hash`, T-146) or any hash in the list. `token_expires_at` is the one expiry for all of them.
+
+**Why:** the customer acts on whichever email they open. A link that died because the business pressed Copy link, re-sent, texted, or because the reminder went out, looked like a broken product and lost the job.
+
+**Replaces:** the rotation trade-off recorded with the resend route, the SMS route and the reminder cron ("the original email link is superseded"). T-146's `previous_token_hash` stays; it was the same idea for two routes.
+
+**Rules that follow:**
+- No route keeps old links itself. The trigger does, so a new route that replaces the token cannot forget.
+- Expiry and revocation act on the quote, not on a link: to end every link, expire the quote (set `token_expires_at` in the past). There is no per-link revoke.
+- The list is bounded at 10. More than ten newer links push the oldest out; the pre-approval link survives separately.
+
+**Rejected:**
+- storing raw tokens so one link can be re-issued (a database leak would then be a set of working customer links);
+- per-route bookkeeping, as T-146 did (four routes had already been missed);
+- an unbounded list (one quote row growing without limit; ten covers approval, edits, a reminder and several copies);
+- a separate link table with per-link expiry (more than this needs: every link of a quote should live and die together).
 
 ---
 

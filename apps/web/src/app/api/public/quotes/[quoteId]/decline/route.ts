@@ -4,6 +4,8 @@ import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { sendEmail, isPostmarkConfigured } from '@/lib/postmark'
 import { generateQuoteDeclinedEmailHtml } from '@/lib/email-templates'
+import { resolveBusinessEmail } from '@/lib/business-email'
+import { canCustomerDecide } from '@estimator/shared'
 import type { DeclineQuoteResponse, TenantBranding } from '@estimator/shared'
 
 const MAX_REASON_LENGTH = 500
@@ -40,7 +42,7 @@ export async function POST(
       .select(`
         id, status, quote_token_hash, token_expires_at, accepted_at, declined_at, is_demo,
         customer_json,
-        tenants!tenant_id ( id, name, notification_email, branding_json ),
+        tenants!tenant_id ( id, name, branding_json ),
         services!service_id ( id, name )
       `)
       .eq('id', quoteId)
@@ -75,8 +77,8 @@ export async function POST(
       )
     }
 
-    const validStatuses = ['sent', 'viewed', 'revised', 'feedback_received']
-    if (!validStatuses.includes(quote.status)) {
+    // (T-157: an open customer question never blocks declining)
+    if (!canCustomerDecide(quote.status)) {
       return NextResponse.json(
         { error: { code: 'INVALID_STATUS', message: `Cannot decline quote with status: ${quote.status}` } },
         { status: 400 }
@@ -106,15 +108,20 @@ export async function POST(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const tenantRaw = quote.tenants as any
       const tenant = (Array.isArray(tenantRaw) ? tenantRaw[0] : tenantRaw) as {
-        id: string; name: string; notification_email: string | null; branding_json: TenantBranding | null
+        id: string; name: string; branding_json: TenantBranding | null
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const serviceRaw = quote.services as any
       const service = (Array.isArray(serviceRaw) ? serviceRaw[0] : serviceRaw) as { id: string; name: string }
       const customer = quote.customer_json as { name: string; email: string }
 
-      // T-153: a demo quote emails no one
-      if (tenant?.notification_email && isPostmarkConfigured() && !(quote as { is_demo?: boolean }).is_demo) {
+      // T-153: a demo quote emails no one. T-157: the one business email rule
+      // (the Settings address, else the first user's account email).
+      const businessEmail =
+        tenant?.id && isPostmarkConfigured() && !(quote as { is_demo?: boolean }).is_demo
+          ? await resolveBusinessEmail(supabase, tenant.id)
+          : null
+      if (businessEmail) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
         const htmlBody = generateQuoteDeclinedEmailHtml({
           businessName: tenant.name,
@@ -125,7 +132,7 @@ export async function POST(
           primaryColor: tenant.branding_json?.primaryColor,
         })
         await sendEmail({
-          to: tenant.notification_email,
+          to: businessEmail,
           subject: `Quote declined: ${customer?.name || 'Customer'} - ${service?.name || ''}`,
           htmlBody,
         })

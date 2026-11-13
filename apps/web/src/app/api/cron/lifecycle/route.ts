@@ -8,6 +8,7 @@ import type { QuotePricing, TenantBranding } from '@estimator/shared'
 import { DEMO_RETENTION_HOURS } from '@estimator/shared'
 import { cleanUpDemoRequests } from '@/lib/demo/demo-cleanup'
 import { deleteFromR2, isR2Configured } from '@/lib/r2'
+import { businessReplyTo } from '@/lib/business-email'
 
 /**
  * GET /api/cron/lifecycle — Vercel Cron (daily, see vercel.json)
@@ -16,8 +17,9 @@ import { deleteFromR2, isR2Configured } from '@/lib/r2'
  *    flipped to 'expired' so dashboards and analytics reflect reality.
  * 2. Remind: one follow-up email per quote, REMINDER_AFTER_DAYS (default 3)
  *    days after sending, if the customer has neither accepted nor declined.
- *    The token is rotated (we never store the raw token), so the reminder
- *    link supersedes the original email's link.
+ *    The reminder carries a new link (we never store the raw token). T-157:
+ *    the link in the original email keeps working too (the database trigger
+ *    keeps each replaced token in quotes.link_token_hashes).
  * 3. T-153: delete visitors' demo requests (and their uploads) older than
  *    24 hours.
  *
@@ -97,6 +99,17 @@ export async function GET(request: Request) {
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    // T-157: replies reach the business; one lookup per business per run
+    const replyToByTenant = new Map<string, Promise<string | undefined>>()
+    const replyToFor = (tenantId: string | undefined) => {
+      if (!tenantId) return Promise.resolve(undefined)
+      let lookup = replyToByTenant.get(tenantId)
+      if (!lookup) {
+        lookup = businessReplyTo(tenantId)
+        replyToByTenant.set(tenantId, lookup)
+      }
+      return lookup
+    }
 
     for (const row of candidates || []) {
       try {
@@ -113,8 +126,9 @@ export async function GET(request: Request) {
         const service = (Array.isArray(serviceRaw) ? serviceRaw[0] : serviceRaw) as { id: string; name: string }
         const pricing = row.pricing_json as QuotePricing | null
 
-        // Rotate the token (raw tokens are never stored). Mark the reminder
-        // BEFORE sending so a crash can't cause duplicate reminders.
+        // A new link for the reminder (raw tokens are never stored; the
+        // earlier links stay valid, T-157). Mark the reminder BEFORE sending
+        // so a crash can't cause duplicate reminders.
         const { token, hash } = generateQuoteToken()
         const { error: markError } = await supabase
           .from('quotes')
@@ -154,6 +168,7 @@ export async function GET(request: Request) {
           subject: `Reminder: your quote from ${tenant?.name || 'us'} is ready`,
           htmlBody,
           tag: 'quote-reminder',
+          replyTo: await replyToFor(tenant?.id),
         })
 
         if (result.success) {

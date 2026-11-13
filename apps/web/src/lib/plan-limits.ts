@@ -4,6 +4,7 @@ import { sendEmail, isPostmarkConfigured } from './postmark'
 import { generateLimitReachedEmailHtml } from './email-templates'
 import { getStripeClient, reportOverageMeterEvent, formatPrice } from './stripe'
 import { getPlan, freeAllowance, noSubscriptionLimit } from '@estimator/shared'
+import { businessEmailFor } from './business-email'
 
 /** Legacy (GB) monthly allowance for tenants without a subscription — kept for callers/tests. */
 export const DEFAULT_TRIAL_LIMIT = noSubscriptionLimit('GB')
@@ -172,35 +173,6 @@ export async function recordOverageQuote(
 }
 
 /**
- * Resolve the business notification email: tenants.notification_email override,
- * falling back to the tenant owner's account email (same resolution as the worker).
- */
-async function resolveBusinessEmail(
-  supabase: SupabaseClient,
-  tenantId: string
-): Promise<string | null> {
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('notification_email')
-    .eq('id', tenantId)
-    .single()
-
-  if (tenant?.notification_email) return tenant.notification_email
-
-  const { data: ownerProfile } = await supabase
-    .from('user_profiles')
-    .select('id')
-    .eq('tenant_id', tenantId)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .single()
-
-  if (!ownerProfile?.id) return null
-  const { data: authUser } = await supabase.auth.admin.getUserById(ownerProfile.id)
-  return authUser?.user?.email ?? null
-}
-
-/**
  * If the tenant has hit their monthly limit and hasn't been notified this period,
  * send the limit-reached email exactly once. Safe to call after every increment —
  * the conditional update on limit_notified_at IS NULL guards against races.
@@ -231,7 +203,8 @@ export async function maybeNotifyLimitReached(
       return
     }
 
-    const to = await resolveBusinessEmail(supabase, tenantId)
+    // T-157: the one business email rule (setting, else the first user's account email)
+    const to = await businessEmailFor(tenantId)
     if (!to) {
       console.error('[PlanLimits] Limit reached but no business email resolved for tenant')
       return

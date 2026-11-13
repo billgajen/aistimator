@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { formatMoney, getRegion } from '@estimator/shared'
+import { formatMoney, getRegion, statusAfterResend, QUOTE_SEND_AGAIN_STATUSES } from '@estimator/shared'
 import { NextResponse } from 'next/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import {
@@ -7,11 +7,20 @@ import {
   isPostmarkConfigured,
   generateCustomerEmailHtml,
 } from '@/lib/postmark'
-import type { QuotePricing, TenantBranding } from '@estimator/shared'
+import { businessReplyTo } from '@/lib/business-email'
+import type { QuotePricing, QuoteStatus, TenantBranding } from '@estimator/shared'
 
 /**
  * POST /api/quotes/:quoteId/resend
- * Regenerate token and resend quote email to customer
+ * "Send again": email the customer the quote with a fresh link.
+ *
+ * T-157:
+ * - the statuses are the rule the Send again button reads
+ *   (QUOTE_SEND_AGAIN_STATUSES): sent, viewed, revised, expired;
+ * - every check runs before anything is written, so a refusal changes nothing;
+ * - a revised quote stays revised;
+ * - the link in the customer's earlier email keeps working (the database
+ *   trigger keeps the replaced token in quotes.link_token_hashes).
  */
 export async function POST(
   _request: Request,
@@ -48,14 +57,6 @@ export async function POST(
       )
     }
 
-    // Check if email is configured
-    if (!isPostmarkConfigured()) {
-      return NextResponse.json(
-        { error: { code: 'EMAIL_NOT_CONFIGURED', message: 'Email service is not configured' } },
-        { status: 503 }
-      )
-    }
-
     // Fetch quote with tenant data
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
@@ -84,35 +85,11 @@ export async function POST(
       )
     }
 
-    // Check if quote can be resent (must be in a valid status)
-    const resendableStatuses = ['sent', 'viewed', 'expired']
-    if (!resendableStatuses.includes(quote.status)) {
+    // Check if quote can be resent (the rule the button reads)
+    if (!(QUOTE_SEND_AGAIN_STATUSES as readonly string[]).includes(quote.status)) {
       return NextResponse.json(
         { error: { code: 'INVALID_STATUS', message: `Cannot resend quote with status '${quote.status}'` } },
         { status: 400 }
-      )
-    }
-
-    // Generate new token
-    const { token, hash } = generateQuoteToken()
-    const tokenExpiry = getTokenExpiry(30) // 30 days
-
-    // Update quote with new token
-    const { error: updateError } = await supabase
-      .from('quotes')
-      .update({
-        quote_token_hash: hash,
-        token_expires_at: tokenExpiry.toISOString(),
-        status: 'sent', // Reset to sent status
-        sent_at: new Date().toISOString(),
-      })
-      .eq('id', quoteId)
-
-    if (updateError) {
-      console.error('Failed to update quote token:', updateError)
-      return NextResponse.json(
-        { error: { code: 'DB_ERROR', message: 'Failed to update quote' } },
-        { status: 500 }
       )
     }
 
@@ -125,13 +102,57 @@ export async function POST(
     }
     const service = quote.services as { id: string; name: string }
     const customer = quote.customer_json as { name: string; email: string }
-    // T-151: a phone-only customer can't be emailed; texting the link still works
+    // T-151: a phone-only customer can't be emailed. Checked before the token
+    // changes, so a refusal leaves the quote exactly as it was.
     if (!customer?.email) {
       return NextResponse.json(
-        { error: { code: 'NO_EMAIL', message: 'This customer gave a phone number only. Text them the link instead.' } },
+        { error: { code: 'NO_EMAIL', message: 'This customer gave no email address. Copy the link and send it to them another way.' } },
         { status: 400 }
       )
     }
+
+    // Check if email is configured (after the quote's own checks, so the
+    // answer is about this quote first; still before anything is written)
+    if (!isPostmarkConfigured()) {
+      return NextResponse.json(
+        { error: { code: 'EMAIL_NOT_CONFIGURED', message: 'Email service is not configured' } },
+        { status: 503 }
+      )
+    }
+
+    // Generate new token
+    const { token, hash } = generateQuoteToken()
+    const tokenExpiry = getTokenExpiry(30) // 30 days
+
+    // Update quote with new token. The status guard makes this safe against
+    // a change made since the quote was read.
+    const { data: updated, error: updateError } = await supabase
+      .from('quotes')
+      .update({
+        quote_token_hash: hash,
+        token_expires_at: tokenExpiry.toISOString(),
+        status: statusAfterResend(quote.status as QuoteStatus),
+        sent_at: new Date().toISOString(),
+      })
+      .eq('id', quoteId)
+      .eq('tenant_id', profile.tenant_id)
+      .eq('status', quote.status)
+      .select('id')
+
+    if (updateError) {
+      console.error('Failed to update quote token:', updateError)
+      return NextResponse.json(
+        { error: { code: 'DB_ERROR', message: 'Failed to update quote' } },
+        { status: 500 }
+      )
+    }
+    if (!updated || updated.length === 0) {
+      return NextResponse.json(
+        { error: { code: 'INVALID_STATUS', message: 'This quote changed while sending. Reload and try again.' } },
+        { status: 409 }
+      )
+    }
+
     const pricing = quote.pricing_json as QuotePricing
     const branding = tenant.branding_json || { primaryColor: '#2563eb' }
 
@@ -168,6 +189,8 @@ export async function POST(
       subject: `Your quote from ${tenant.name}`,
       htmlBody,
       tag: 'quote-resend',
+      // T-157: replies reach the business
+      replyTo: await businessReplyTo(profile.tenant_id),
     })
 
     if (!emailResult.success) {

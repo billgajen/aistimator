@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { brandStyleVars } from '@/lib/color'
 import type { QuoteViewResponse, QuoteStatus } from '@estimator/shared'
-import { formatMoney, formatDate, formatNumber, currencySymbol, unitDisplayLabel, isQuoteProcessing, PRODUCT_NAME } from '@estimator/shared'
+import { formatMoney, formatDate, formatNumber, currencySymbol, unitDisplayLabel, isQuoteProcessing, canCustomerDecide, splitLabelMath, PRODUCT_NAME } from '@estimator/shared'
 
 interface QuotePageProps {
   params: { quoteId: string }
@@ -215,7 +215,14 @@ export default function QuotePage({ params }: QuotePageProps) {
         setFeedbackSubmitted(true)
         setFeedbackMode('none')
         if (quote) {
-          setQuote({ ...quote, status: 'feedback_received' as QuoteStatus })
+          // T-157: an estimate shown before approval stays pending_review on
+          // the server (T-147), so it stays so here too: Accept must not
+          // appear until the business confirms.
+          setQuote({
+            ...quote,
+            questionPending: true,
+            ...(quote.status !== 'pending_review' && { status: 'feedback_received' as QuoteStatus }),
+          })
         }
       } else {
         const data = await response.json().catch(() => null)
@@ -265,8 +272,14 @@ export default function QuotePage({ params }: QuotePageProps) {
   // T-147: the estimate is shown while the business reviews it — Accept is
   // locked until they confirm; asking a question stays available
   const confirmationPending = status === 'pending_review' && review?.confirmationPending === true
-  const canSubmitFeedback =
-    (['sent', 'viewed', 'revised'].includes(status) || confirmationPending) && !feedbackSubmitted && !accepted && !declined
+  // T-157: a question the business has not answered yet (also after a reload).
+  // It never hides Accept or Decline; only a second question stays off.
+  const questionOpen = feedbackSubmitted || quote.questionPending === true
+  const settled = accepted || declined
+  const canDecide = canCustomerDecide(status) && !settled
+  const canAskQuestion =
+    (['sent', 'viewed', 'revised'].includes(status) || confirmationPending) && !questionOpen && !settled
+  const showActions = (canDecide || confirmationPending) && !settled
 
   // Not priced yet (queued / generating), or processing failed: no document to show
   // T-146: held for the business with no price to show yet — same holding screen
@@ -717,7 +730,7 @@ export default function QuotePage({ params }: QuotePageProps) {
           )}
 
           {/* Actions */}
-          {canSubmitFeedback && (
+          {showActions && (
             <div className="px-6 sm:px-10 pb-8">
               <div className="tape-rule mb-7" />
               {confirmationPending && (
@@ -730,7 +743,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                   {actionError}
                 </p>
               )}
-              {showAcceptButton && !confirmationPending && acceptMode && (
+              {showAcceptButton && canDecide && acceptMode && (
                 <div className="mb-6">
                   <AcceptDetailsForm
                     businessName={business.name}
@@ -745,7 +758,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                   />
                 </div>
               )}
-              {showAcceptButton && !confirmationPending && !acceptMode && (
+              {showAcceptButton && canDecide && !acceptMode && (
                 <>
                   <button
                     onClick={() => setAcceptMode(true)}
@@ -758,15 +771,17 @@ export default function QuotePage({ params }: QuotePageProps) {
                     Accepting tells {business.name} to go ahead. Nothing is charged today.
                   </p>
 
-                  <div className="flex items-center my-6">
-                    <div className="flex-1 border-t border-border" />
-                    <span className="px-3 text-xs text-text-muted">or</span>
-                    <div className="flex-1 border-t border-border" />
-                  </div>
+                  {canAskQuestion && (
+                    <div className="flex items-center my-6">
+                      <div className="flex-1 border-t border-border" />
+                      <span className="px-3 text-xs text-text-muted">or</span>
+                      <div className="flex-1 border-t border-border" />
+                    </div>
+                  )}
                 </>
               )}
 
-              {feedbackMode === 'none' && (
+              {canAskQuestion && feedbackMode === 'none' && (
                 <div className="flex gap-3">
                   <button
                     onClick={() => setFeedbackMode('feedback')}
@@ -777,7 +792,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                 </div>
               )}
 
-              {feedbackMode === 'feedback' && (
+              {canAskQuestion && feedbackMode === 'feedback' && (
                 <div className="space-y-3">
                   <textarea
                     value={feedbackText}
@@ -806,7 +821,7 @@ export default function QuotePage({ params }: QuotePageProps) {
               )}
 
               {/* Decline — deliberately quiet, below the primary actions */}
-              {!declineMode && !confirmationPending && (
+              {!declineMode && canDecide && (
                 <p className="text-center mt-6">
                   <button
                     onClick={() => setDeclineMode(true)}
@@ -817,7 +832,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                 </p>
               )}
 
-              {declineMode && (
+              {declineMode && canDecide && (
                 <div className="mt-6 space-y-3 border border-border rounded-warm-lg p-4 bg-surface">
                   <p className="text-sm font-semibold text-text-primary">Decline this estimate</p>
                   <textarea
@@ -848,8 +863,8 @@ export default function QuotePage({ params }: QuotePageProps) {
             </div>
           )}
 
-          {/* Feedback submitted confirmation */}
-          {feedbackSubmitted && !accepted && (
+          {/* Question sent: stays while the business has not answered it */}
+          {questionOpen && !settled && (
             <div className="mx-6 sm:mx-10 mb-8 bg-mint border border-primary/15 rounded-warm-xl p-6 text-center">
               <h3 className="font-display text-lg font-bold text-text-primary mb-1">Message sent</h3>
               <p className="text-sm text-text-secondary">
@@ -1099,14 +1114,6 @@ function StatusBadge({ status }: { status: QuoteStatus }) {
       {config.label}
     </span>
   )
-}
-
-/** Engine labels embed their maths ("Hourly service  £28 x 4(Hrs)") — split it
- *  out so the ledger line stays clean and the working sits beneath in mono. */
-function splitLabelMath(label: string): [string, string | null] {
-  const m = label.match(/^(.*?)\s{2,}([£$€].+\sx\s.+)$/)
-  if (!m) return [label, null]
-  return [m[1] ?? label, (m[2] ?? '').replace(/\sx\s/, ' × ').replace(/\(/, ' ').replace(/\)/, '')]
 }
 
 /** T-133: Intl formatting with the tenant's locale (any ISO currency) */

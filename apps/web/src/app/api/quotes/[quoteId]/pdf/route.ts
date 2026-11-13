@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { getRegion } from '@estimator/shared'
+import { getRegion, canDownloadQuotePdf } from '@estimator/shared'
 import { NextResponse } from 'next/server'
 import { generatePdf, isDocRaptorConfigured } from '@/lib/docraptor'
 import { generateQuotePdfHtml, type QuotePdfData } from '@/lib/pdf-template'
@@ -71,6 +71,14 @@ export async function POST(
       return NextResponse.json(
         { error: { code: 'QUOTE_NOT_FOUND', message: 'Quote not found' } },
         { status: 404 }
+      )
+    }
+
+    // T-157: the rule the Download PDF button reads
+    if (!canDownloadQuotePdf(quote.status)) {
+      return NextResponse.json(
+        { error: { code: 'INVALID_STATUS', message: `Quote is still ${quote.status}` } },
+        { status: 400 }
       )
     }
 
@@ -220,6 +228,7 @@ export async function POST(
           .from('quotes')
           .update({ pdf_asset_id: pdfAssetId })
           .eq('id', quoteId)
+          .eq('tenant_id', profile.tenant_id)
 
         // Generate download URL
         downloadUrl = await generateDownloadUrl(r2Key)
@@ -288,7 +297,7 @@ export async function GET(
     // Fetch quote
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
-      .select('id, pdf_asset_id')
+      .select('id, status, pdf_asset_id')
       .eq('id', quoteId)
       .eq('tenant_id', profile.tenant_id)
       .single()
@@ -297,6 +306,14 @@ export async function GET(
       return NextResponse.json(
         { error: { code: 'QUOTE_NOT_FOUND', message: 'Quote not found' } },
         { status: 404 }
+      )
+    }
+
+    // T-157: the rule the Download PDF button reads
+    if (!canDownloadQuotePdf(quote.status)) {
+      return NextResponse.json(
+        { error: { code: 'INVALID_STATUS', message: `Quote is still ${quote.status}` } },
+        { status: 400 }
       )
     }
 

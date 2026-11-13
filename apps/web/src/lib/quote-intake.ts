@@ -496,7 +496,7 @@ export async function createQuoteSubmission(
 
   // 12. Held leads (T-134) are not priced, so they don't consume the plan
   if (limitHold) {
-    await notifyLeadHeld(supabase, {
+    await notifyLeadHeld({
       tenantId,
       businessName: tenant.name,
       customerName: input.customer.name,

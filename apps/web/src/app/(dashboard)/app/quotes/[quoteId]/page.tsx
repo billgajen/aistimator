@@ -3,7 +3,8 @@
 import { AcceptanceCard } from '@/components/quotes/AcceptanceCard'
 import type { AcceptanceDetails } from '@/lib/acceptance'
 import { useEffect, useState, useCallback } from 'react'
-import { formatMoney } from '@estimator/shared'
+import { formatMoney, quoteActions } from '@estimator/shared'
+import { approvedWithoutEmailMessage, copyLinkFallbackMessage } from '@/lib/quote-action-copy'
 import Link from 'next/link'
 import { FinalInvoiceCard } from '@/components/analytics/FinalInvoiceCard'
 import type {
@@ -13,7 +14,6 @@ import type {
   QuoteContent,
   AmendmentSummary,
   QuoteFeedback,
-  FeedbackStatus,
 } from '@estimator/shared'
 
 export default function QuoteDetailPage({
@@ -32,7 +32,11 @@ export default function QuoteDetailPage({
   // T-134: price a lead held by the plan limit
   const [pricingHeld, setPricingHeld] = useState(false)
   const [priceResult, setPriceResult] = useState<string | null>(null)
-  const [textResult, setTextResult] = useState<string | null>(null)
+  // T-157: one line under the header for what an action did, or why it
+  // couldn't. Errors show here, never in a browser alert().
+  const [actionNote, setActionNote] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null)
+  const [copying, setCopying] = useState(false)
+  const [answering, setAnswering] = useState<string | null>(null)
 
   const fetchQuote = useCallback(async () => {
     try {
@@ -57,40 +61,75 @@ export default function QuoteDetailPage({
 
   const handleResend = async () => {
     setResending(true)
+    setActionNote(null)
     try {
       const response = await fetch(`/api/quotes/${quoteId}/resend`, {
         method: 'POST',
       })
+      const json = await response.json().catch(() => null)
       if (response.ok) {
+        setActionNote({ text: 'Sent to the customer again', tone: 'ok' })
         await fetchQuote()
       } else {
-        const errData = await response.json()
-        alert(errData.error?.message || 'Failed to resend')
+        setActionNote({ text: json?.error?.message || 'Could not send this quote again', tone: 'error' })
       }
     } catch {
-      alert('Failed to resend quote')
+      setActionNote({ text: 'Could not send this quote again. Check your connection and try again.', tone: 'error' })
     } finally {
       setResending(false)
     }
   }
 
+  // T-157: a link the business can send any way it likes. It is the only way
+  // to reach a customer who gave no email address.
+  const handleCopyLink = async () => {
+    setCopying(true)
+    setActionNote(null)
+    try {
+      const response = await fetch(`/api/quotes/${quoteId}/link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: true }),
+      })
+      const json = await response.json().catch(() => null)
+      if (!response.ok || !json?.quoteViewUrl) {
+        setActionNote({ text: json?.error?.message || 'Could not make a link for this quote', tone: 'error' })
+        return
+      }
+      try {
+        await navigator.clipboard.writeText(json.quoteViewUrl)
+        setActionNote({ text: 'Link copied', tone: 'ok' })
+      } catch {
+        // The browser refused the clipboard: show the link so it can be copied by hand
+        setActionNote({ text: copyLinkFallbackMessage(json.quoteViewUrl), tone: 'ok' })
+      }
+    } catch {
+      setActionNote({ text: 'Could not make a link for this quote. Check your connection and try again.', tone: 'error' })
+    } finally {
+      setCopying(false)
+    }
+  }
+
   // T-146: one-tap approval of a quote awaiting review
   const [approving, setApproving] = useState(false)
-  const [approveResult, setApproveResult] = useState<string | null>(null)
   const handleApprove = async () => {
     setApproving(true)
-    setApproveResult(null)
+    setActionNote(null)
     try {
       const response = await fetch(`/api/quotes/${quoteId}/approve`, { method: 'POST' })
       const json = await response.json().catch(() => null)
       if (response.ok) {
-        setApproveResult(json?.emailed ? 'Sent to the customer' : 'Approved. No email went out (no customer email or email not set up); use Text link or copy the link.')
+        // T-157: never point at Text link when it isn't on the page
+        setActionNote({
+          text: json?.emailed ? 'Sent to the customer' : approvedWithoutEmailMessage({ smsActive: data?.smsActive === true }),
+          tone: 'ok',
+        })
         await fetchQuote()
       } else {
-        setApproveResult(json?.error?.message || 'Could not approve this quote')
+        setActionNote({ text: json?.error?.message || 'Could not approve this quote', tone: 'error' })
       }
     } catch {
-      setApproveResult('Could not approve this quote')
+      setActionNote({ text: 'Could not approve this quote', tone: 'error' })
     } finally {
       setApproving(false)
     }
@@ -115,7 +154,7 @@ export default function QuoteDetailPage({
 
   const handleTextLink = async () => {
     setTexting(true)
-    setTextResult(null)
+    setActionNote(null)
     try {
       const response = await fetch('/api/sms/send-quote', {
         method: 'POST',
@@ -124,28 +163,37 @@ export default function QuoteDetailPage({
       })
       const json = await response.json().catch(() => null)
       if (response.ok) {
-        setTextResult(json?.test ? `Recorded (test mode) to ${json.to}` : `Texted to ${json?.to}`)
+        setActionNote({ text: json?.test ? `Recorded (test mode) to ${json.to}` : `Texted to ${json?.to}`, tone: 'ok' })
         await fetchQuote()
       } else {
-        setTextResult(json?.error?.message || 'Failed to text the link')
+        setActionNote({ text: json?.error?.message || 'Failed to text the link', tone: 'error' })
       }
     } catch {
-      setTextResult('Failed to text the link')
+      setActionNote({ text: 'Failed to text the link', tone: 'error' })
     } finally {
       setTexting(false)
     }
   }
 
-  const handleResolveFeedback = async (feedbackId: string) => {
-    // Mark feedback as acknowledged via the PATCH endpoint (include in a save)
-    // For now, we'll handle this when edit mode save is implemented
-    if (!data) return
-    setData({
-      ...data,
-      feedback: data.feedback.map((f) =>
-        f.id === feedbackId ? { ...f, status: 'acknowledged' as FeedbackStatus } : f
-      ),
-    })
+  // T-157: "Mark as answered" is saved (it used to change the screen only and
+  // come back on refresh). The quote is re-read, since answering the last open
+  // question moves it from "Feedback" back to "Viewed".
+  const handleMarkAnswered = async (feedbackId: string) => {
+    setAnswering(feedbackId)
+    setActionNote(null)
+    try {
+      const response = await fetch(`/api/quotes/${quoteId}/feedback/${feedbackId}/answered`, { method: 'POST' })
+      const json = await response.json().catch(() => null)
+      if (response.ok) {
+        await fetchQuote()
+      } else {
+        setActionNote({ text: json?.error?.message || 'Could not save that. Please try again.', tone: 'error' })
+      }
+    } catch {
+      setActionNote({ text: 'Could not save that. Check your connection and try again.', tone: 'error' })
+    } finally {
+      setAnswering(null)
+    }
   }
 
   if (loading) {
@@ -172,8 +220,13 @@ export default function QuoteDetailPage({
   const content = quote.content_json as QuoteContent
   const customer = quote.customer_json as { name: string; email: string; phone?: string }
   const pendingFeedback = feedback.filter((f) => f.status === 'pending')
-  const canEdit = !['accepted', 'paid', 'generating', 'queued', 'failed'].includes(quote.status)
-  const canSend = !['generating', 'queued', 'failed'].includes(quote.status)
+  // T-157: a button only shows when it will work. These are the rules the
+  // routes behind the buttons apply (packages/shared/src/quote-status.ts).
+  const actions = quoteActions(quote.status, {
+    hasEmail: Boolean(customer?.email),
+    smsActive: data.smsActive === true,
+  })
+  const canEdit = actions.edit
   // T-151: what the customer told the business when accepting
   const acceptance = (quote as unknown as { acceptance_json?: AcceptanceDetails | null }).acceptance_json ?? null
   // T-146: a priced quote waiting for the business; held leads are priced first
@@ -226,7 +279,7 @@ export default function QuoteDetailPage({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <StatusBadge status={quote.status as QuoteStatus} />
           {canEdit && (
             <button
@@ -245,28 +298,53 @@ export default function QuoteDetailPage({
               {approving ? 'Sending…' : 'Approve & send'}
             </button>
           )}
-          {canSend && !awaitingApproval && (
+          {actions.sendAgain && (
             <button
               onClick={handleResend}
               disabled={resending}
               className="px-4 py-2 text-sm font-semibold text-white bg-primary rounded-lg hover:bg-primary-hover disabled:opacity-50 transition-colors"
+              data-testid="send-again"
             >
-              {resending ? 'Sending...' : 'Send'}
+              {resending ? 'Sending…' : 'Send again'}
             </button>
           )}
-          {['sent', 'viewed', 'feedback_received', 'revised', 'expired'].includes(quote.status) && (
+          {actions.copyLink && (
+            <button
+              onClick={handleCopyLink}
+              disabled={copying}
+              className="px-4 py-2 text-sm font-semibold text-text-primary bg-background border border-border rounded-lg hover:bg-surface disabled:opacity-50 transition-colors"
+              data-testid="copy-link"
+            >
+              {copying ? 'Copying…' : 'Copy link'}
+            </button>
+          )}
+          {actions.textLink && (
             <button
               onClick={handleTextLink}
               disabled={texting}
               className="px-4 py-2 text-sm font-semibold text-text-primary bg-background border border-border rounded-lg hover:bg-surface disabled:opacity-50 transition-colors"
+              data-testid="text-link"
             >
               {texting ? 'Texting…' : 'Text link'}
             </button>
           )}
-          {textResult && <span className="self-center text-xs text-text-muted">{textResult}</span>}
-          {approveResult && <span className="self-center text-xs text-text-muted">{approveResult}</span>}
         </div>
       </div>
+
+      {/* T-157: what the last action did, or why it couldn't (never an alert) */}
+      {actionNote && (
+        <p
+          role={actionNote.tone === 'error' ? 'alert' : 'status'}
+          data-testid="action-note"
+          className={`mb-6 break-words rounded-lg border px-4 py-3 text-sm ${
+            actionNote.tone === 'error'
+              ? 'border-danger/20 bg-danger-light text-danger'
+              : 'border-border bg-surface text-text-secondary'
+          }`}
+        >
+          {actionNote.text}
+        </p>
+      )}
 
       {/* T-147: what the customer sees while this waits for approval */}
       {awaitingApproval && (
@@ -304,7 +382,7 @@ export default function QuoteDetailPage({
       {/* T-151: what the customer told you when accepting */}
       {acceptance && <AcceptanceCard details={acceptance} />}
 
-      {/* Pending feedback alert */}
+      {/* Open customer questions (and old review requests, which customers can no longer send) */}
       {pendingFeedback.length > 0 && (
         <div className="mb-6 space-y-3">
           {pendingFeedback.map((fb) => (
@@ -316,7 +394,7 @@ export default function QuoteDetailPage({
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-semibold uppercase text-tertiary">
-                      {fb.feedback_type === 'approval_request' ? 'Review Request' : 'Customer Feedback'}
+                      {fb.feedback_type === 'approval_request' ? 'Review Request' : 'Customer question'}
                     </span>
                     <span className="text-xs text-text-muted">{formatDate(fb.created_at)}</span>
                   </div>
@@ -328,10 +406,12 @@ export default function QuoteDetailPage({
                   )}
                 </div>
                 <button
-                  onClick={() => handleResolveFeedback(fb.id)}
-                  className="px-3 py-1.5 text-xs font-medium text-text-secondary border border-border rounded-lg hover:bg-background transition-colors whitespace-nowrap"
+                  onClick={() => handleMarkAnswered(fb.id)}
+                  disabled={answering === fb.id}
+                  className="px-3 py-1.5 text-xs font-medium text-text-secondary border border-border rounded-lg hover:bg-background disabled:opacity-50 transition-colors whitespace-nowrap"
+                  data-testid="mark-answered"
                 >
-                  Acknowledge
+                  {answering === fb.id ? 'Saving…' : 'Mark as answered'}
                 </button>
               </div>
             </div>

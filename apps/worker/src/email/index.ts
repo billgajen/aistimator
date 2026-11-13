@@ -31,6 +31,7 @@ export interface QuoteEmailData {
   }
   business: {
     name: string
+    /** T-157: the business's address by the shared rule (also the customer email's reply-to) */
     ownerEmail: string
     primaryColor?: string
   }
@@ -126,8 +127,9 @@ export async function sendQuoteEmails(
       })
     : { success: false, error: 'No customer email (phone only)' }
 
+  // T-157: no email addresses in logs; the quote id is enough to find it
   console.log(
-    `[Email] Customer email ${customerResult.success ? 'sent' : 'failed'}: ${data.customer.email}`
+    `[Email] Customer email ${customerResult.success ? 'sent' : data.customer.email ? 'failed' : 'skipped (no address)'} for ${data.quoteId}`
   )
 
   // Send business notification email
@@ -153,9 +155,7 @@ export async function sendQuoteEmails(
     tag: 'quote-business',
   })
 
-  console.log(
-    `[Email] Business email ${businessResult.success ? 'sent' : 'failed'}: ${data.business.ownerEmail}`
-  )
+  console.log(`[Email] Business email ${businessResult.success ? 'sent' : 'failed'} for ${data.quoteId}`)
 
   return {
     customerEmail: {
@@ -299,7 +299,7 @@ export async function sendEstimateShownEmail(
       ...(data.replyTo && { replyTo: data.replyTo }),
     }
   )
-  console.log(`[Email] Estimate email ${result.success ? 'sent' : 'failed'}: ${data.customerEmail}`)
+  console.log(`[Email] Estimate email ${result.success ? 'sent' : 'failed'} for ${data.quoteId}`)
   return { success: result.success, error: result.error }
 }
 

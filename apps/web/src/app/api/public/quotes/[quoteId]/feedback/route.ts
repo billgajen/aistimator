@@ -8,6 +8,7 @@ import {
   isPostmarkConfigured,
 } from '@/lib/postmark'
 import { generateFeedbackNotificationEmailHtml } from '@/lib/email-templates'
+import { resolveBusinessEmail } from '@/lib/business-email'
 import type { SubmitFeedbackRequest, SubmitFeedbackResponse } from '@estimator/shared'
 import type { TenantBranding } from '@estimator/shared'
 
@@ -55,7 +56,7 @@ export async function POST(
         id, status, tenant_id, quote_token_hash, token_expires_at, is_demo,
         customer_json, service_id, review_hold, pricing_json, content_json,
         tenants!tenant_id (
-          id, name, notification_email, branding_json
+          id, name, branding_json
         ),
         services!service_id (
           id, name
@@ -130,15 +131,26 @@ export async function POST(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tenantRaw = quote.tenants as any
     const tenant = (Array.isArray(tenantRaw) ? tenantRaw[0] : tenantRaw) as {
-      id: string; name: string; notification_email: string | null; branding_json: TenantBranding | null
+      id: string; name: string; branding_json: TenantBranding | null
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const serviceRaw = quote.services as any
     const service = (Array.isArray(serviceRaw) ? serviceRaw[0] : serviceRaw) as { id: string; name: string }
     const customer = quote.customer_json as { name: string; email: string }
 
-    // T-153: a demo quote emails no one
-    if (tenant.notification_email && isPostmarkConfigured() && !(quote as { is_demo?: boolean }).is_demo) {
+    // T-153: a demo quote emails no one. T-157: the one business email rule
+    // (the Settings address, else the first user's account email). A failed
+    // lookup never fails the customer's message, which is already saved.
+    let businessEmail: string | null = null
+    try {
+      businessEmail =
+        isPostmarkConfigured() && !(quote as { is_demo?: boolean }).is_demo
+          ? await resolveBusinessEmail(supabase, quote.tenant_id)
+          : null
+    } catch (lookupError) {
+      console.error('[Feedback] business email lookup failed:', lookupError instanceof Error ? lookupError.message : 'unknown error')
+    }
+    if (businessEmail) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
       const dashboardUrl = `${appUrl}/app/quotes/${quoteId}`
       const branding = tenant.branding_json || { primaryColor: '#2563eb' }
@@ -154,7 +166,7 @@ export async function POST(
       })
 
       const emailResult = await sendEmail({
-        to: tenant.notification_email,
+        to: businessEmail,
         subject: `Customer ${body.feedbackType === 'approval_request' ? 'review request' : 'feedback'} on quote: ${customer.name}`,
         htmlBody,
         tag: 'quote-feedback',

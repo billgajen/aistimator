@@ -5,9 +5,9 @@
  * The AI pipeline does not run, so a held lead costs nothing to keep.
  */
 
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendEmail, isPostmarkConfigured } from './postmark'
 import { generateLeadHeldEmailHtml } from './email-templates'
+import { businessEmailFor } from './business-email'
 
 /** Customer-facing message for a held lead (never mentions billing). */
 export function leadHeldMessage(businessName: string): string {
@@ -25,23 +25,12 @@ export function leadHoldContent(businessName: string): Record<string, unknown> {
 
 /** Email the business about a held lead. Never throws — capture must not depend on email. */
 export async function notifyLeadHeld(
-  supabase: SupabaseClient,
   opts: { tenantId: string; businessName: string; customerName: string; serviceName: string; quoteId: string; used: number; limit: number; per?: 'month' | 'total' }
 ): Promise<void> {
   try {
     if (!isPostmarkConfigured()) return
-    const { data: tenant } = await supabase.from('tenants').select('notification_email').eq('id', opts.tenantId).single()
-    let to = (tenant as { notification_email?: string | null } | null)?.notification_email ?? null
-    if (!to) {
-      const { data: owner } = await supabase
-        .from('user_profiles')
-        .select('id')
-        .eq('tenant_id', opts.tenantId)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .single()
-      if (owner?.id) to = (await supabase.auth.admin.getUserById(owner.id)).data?.user?.email ?? null
-    }
+    // T-157: the one business email rule (setting, else the first user's account email)
+    const to = await businessEmailFor(opts.tenantId)
     if (!to) return
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
     await sendEmail({

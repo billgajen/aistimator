@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { enqueueQuoteJob, repriceQuoteNow } from '@/lib/queue'
 import { recordMeasurementExamples } from '@/lib/measurement-memory'
+import { quoteTokenMatches } from '@/lib/tokens'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import type { ClarifyQuoteRequest } from '@estimator/shared'
@@ -43,7 +44,7 @@ export async function POST(
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
       .select(
-        'id, tenant_id, service_id, status, quote_token_hash, token_expires_at, quote_request_id, signals_json, clarification_questions_json, is_demo'
+        'id, tenant_id, service_id, status, quote_token_hash, previous_token_hash, link_token_hashes, token_expires_at, quote_request_id, signals_json, clarification_questions_json, is_demo'
       )
       .eq('id', quoteId)
       .single()
@@ -55,8 +56,8 @@ export async function POST(
       )
     }
 
-    // Validate token
-    if (quote.quote_token_hash !== tokenHash) {
+    // Validate token (T-157: any link issued for this quote, like the other public routes)
+    if (!quoteTokenMatches(quote, tokenHash)) {
       return NextResponse.json(
         { error: { code: 'INVALID_TOKEN', message: 'Invalid token' } },
         { status: 401 }

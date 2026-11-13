@@ -81,7 +81,10 @@ describe('T-146: approval', () => {
 
   it('the pre-approval link stays valid alongside the new one', () => {
     const h = hashToken('abc')
-    expect(quoteTokenFilter(h)).toBe(`quote_token_hash.eq.${h},previous_token_hash.eq.${h}`)
+    // T-157: plus every earlier link of the quote (link_token_hashes)
+    expect(quoteTokenFilter(h)).toBe(
+      `quote_token_hash.eq.${h},previous_token_hash.eq.${h},link_token_hashes.cs.{${h}}`
+    )
     // anything that is not a sha256 hex digest can't inject into the filter
     expect(quoteTokenFilter('x,status.eq.sent')).not.toContain('status')
   })

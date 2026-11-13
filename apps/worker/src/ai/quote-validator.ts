@@ -28,6 +28,7 @@ import type {
   ExtractedSignal,
 } from '@estimator/shared'
 import type { PricingResult } from '../pricing/rules-engine'
+import { roundMoney } from '@estimator/shared'
 import type { QuoteContent } from './wording'
 
 // ============================================================================
@@ -473,12 +474,14 @@ export function applyAutoCorrections(
         }
 
         const qty = quantity || 1
-        const amount = workStep.defaultCost * qty
+        // T-157: a line amount is rounded where it is created, and the
+        // subtotal stays the sum of the rounded lines
+        const amount = roundMoney(workStep.defaultCost * qty)
         correctedPricing.breakdown.push({
           label: workStep.name,
           amount,
         })
-        correctedPricing.subtotal += amount
+        correctedPricing.subtotal = roundMoney(correctedPricing.subtotal + amount)
 
         // Recalculate tax if applicable
         if (correctedPricing.taxRate) {
@@ -486,7 +489,7 @@ export function applyAutoCorrections(
           correctedPricing.taxAmount = Math.round(rawTax * 100) / 100
         }
 
-        correctedPricing.total = correctedPricing.subtotal + correctedPricing.taxAmount
+        correctedPricing.total = roundMoney(correctedPricing.subtotal + correctedPricing.taxAmount)
 
         appliedFixes.push(`Added ${workStep.name}: £${amount}`)
         break

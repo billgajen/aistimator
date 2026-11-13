@@ -1,5 +1,13 @@
 import { createClient, bearerToken } from '@/lib/supabase/server'
-import { formatMoney, resolveRegionContext } from '@estimator/shared'
+import {
+  formatMoney,
+  resolveRegionContext,
+  roundMoney,
+  dropStaleLabelMath,
+  canEditQuote,
+  statusAfterEditAndSend,
+  QUOTE_ALREADY_SENT_STATUSES,
+} from '@estimator/shared'
 import { type NextRequest, NextResponse } from 'next/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import {
@@ -8,6 +16,7 @@ import {
   generateCustomerEmailHtml,
 } from '@/lib/postmark'
 import { generateRevisedQuoteEmailHtml } from '@/lib/email-templates'
+import { businessReplyTo } from '@/lib/business-email'
 import type {
   UpdateQuoteRequest,
   UpdateQuoteResponse,
@@ -95,8 +104,9 @@ export async function GET(
       )
     }
 
-    // Fetch amendments and feedback in parallel
-    const [amendmentsResult, feedbackResult] = await Promise.all([
+    // Fetch amendments and feedback in parallel, plus (T-157) whether the
+    // tenant has an active SMS number: "Text link" only shows when it can work
+    const [amendmentsResult, feedbackResult, smsResult] = await Promise.all([
       supabase
         .from('quote_amendments')
         .select('id, version, source, changes_json, created_at, amended_by')
@@ -109,6 +119,11 @@ export async function GET(
         .eq('quote_id', quoteId)
         .eq('tenant_id', auth.tenantId)
         .order('created_at', { ascending: false }),
+      supabase
+        .from('sms_configs')
+        .select('is_active')
+        .eq('tenant_id', auth.tenantId)
+        .maybeSingle(),
     ])
 
     const amendments: AmendmentSummary[] = (amendmentsResult.data || []).map(
@@ -159,6 +174,7 @@ export async function GET(
       service: quote.service,
       amendments,
       feedback,
+      smsActive: (smsResult.data as { is_active?: boolean } | null)?.is_active === true,
     }
 
     return NextResponse.json(response)
@@ -285,6 +301,12 @@ export async function PATCH(
         { status: 400 }
       )
     }
+    if (!Array.isArray(body.pricing_json.breakdown)) {
+      return NextResponse.json(
+        { error: { code: 'INVALID_REQUEST', message: 'pricing_json.breakdown must be a list of lines' } },
+        { status: 400 }
+      )
+    }
 
     // Fetch current quote
     const { data: quote, error: quoteError } = await supabase
@@ -292,7 +314,7 @@ export async function PATCH(
       .select(`
         *,
         tenants!tenant_id (
-          id, name, region, currency, tax_enabled, tax_label, tax_rate, branding_json, notification_email
+          id, name, region, currency, tax_enabled, tax_label, tax_rate, branding_json
         ),
         services!service_id (
           id, name
@@ -309,9 +331,8 @@ export async function PATCH(
       )
     }
 
-    // Reject if status doesn't allow editing
-    const nonEditableStatuses: QuoteStatus[] = ['accepted', 'paid', 'generating', 'queued', 'failed']
-    if (nonEditableStatuses.includes(quote.status as QuoteStatus)) {
+    // Reject if status doesn't allow editing (the rule the Edit button reads)
+    if (!canEditQuote(quote.status)) {
       return NextResponse.json(
         { error: { code: 'INVALID_STATUS', message: `Cannot edit quote with status '${quote.status}'` } },
         { status: 400 }
@@ -336,12 +357,30 @@ export async function PATCH(
     const tenant = quote.tenants as {
       id: string; name: string; region?: string | null; currency: string
       tax_enabled: boolean; tax_label: string | null; tax_rate: number
-      branding_json: TenantBranding | null; notification_email: string | null
+      branding_json: TenantBranding | null
     }
     const service = quote.services as { id: string; name: string }
 
+    const beforePricing = quote.pricing_json as QuotePricing
+    const beforeContent = quote.content_json as QuoteContent
+
+    // T-157: money is always rounded. Each line to 2 decimals, and the
+    // subtotal is the sum of the rounded lines, so the lines always add up.
+    // A line whose amount changed under an untouched generated label loses
+    // that label's maths ("£18 x 34.6(Sqm)"): the customer never sees maths
+    // that doesn't match the amount. Text the business typed is left alone.
+    const generatedLabels = (
+      (quote.pricing_trace_json as { trace?: Array<{ description?: unknown }> } | null)?.trace ?? []
+    )
+      .map((step) => step.description)
+      .filter((d): d is string => typeof d === 'string')
     const pricing = { ...body.pricing_json }
-    pricing.subtotal = pricing.breakdown.reduce((sum, item) => sum + item.amount, 0)
+    pricing.breakdown = dropStaleLabelMath(
+      beforePricing?.breakdown ?? [],
+      body.pricing_json.breakdown.map((item) => ({ ...item, amount: roundMoney(Number(item.amount)) })),
+      generatedLabels
+    )
+    pricing.subtotal = roundMoney(pricing.breakdown.reduce((sum, item) => sum + item.amount, 0))
 
     if (tenant.tax_enabled && tenant.tax_rate > 0) {
       pricing.taxLabel = resolveRegionContext(tenant).taxLabel // T-133: region default label
@@ -353,19 +392,15 @@ export async function PATCH(
     pricing.total = Math.round((pricing.subtotal + pricing.taxAmount) * 100) / 100
 
     // Compute changes
-    const beforePricing = quote.pricing_json as QuotePricing
-    const beforeContent = quote.content_json as QuoteContent
     const changes = computeChanges(beforePricing, pricing, beforeContent, body.content_json)
 
     const newVersion = currentVersion + 1
     const now = new Date().toISOString()
 
     // Determine new status
+    // T-157: a quote the customer already had becomes, or stays, revised
     let newStatus = quote.status as QuoteStatus
-    if (body.sendToCustomer) {
-      const wasAlreadySent = ['sent', 'viewed', 'feedback_received'].includes(quote.status)
-      newStatus = wasAlreadySent ? 'revised' : 'sent'
-    }
+    if (body.sendToCustomer) newStatus = statusAfterEditAndSend(newStatus)
 
     // Build update payload
     const updatePayload: Record<string, unknown> = {
@@ -388,7 +423,8 @@ export async function PATCH(
       const tokenExpiry = getTokenExpiry(30)
       // T-146: sending after editing IS the business's review — the customer
       // sees "Quote — reviewed and confirmed". The link the customer already
-      // holds stays valid alongside the new one.
+      // holds stays valid alongside the new one (T-157: so does every earlier
+      // link, kept by the database trigger in link_token_hashes).
       updatePayload.previous_token_hash = quote.quote_token_hash
       updatePayload.quote_token_hash = hash
       updatePayload.token_expires_at = tokenExpiry.toISOString()
@@ -407,6 +443,7 @@ export async function PATCH(
       .from('quotes')
       .update(updatePayload)
       .eq('id', quoteId)
+      .eq('tenant_id', auth.tenantId)
       .eq('version', currentVersion) // Double-check optimistic lock at DB level
 
     if (updateError) {
@@ -433,20 +470,35 @@ export async function PATCH(
       feedback_id: body.feedbackId || null,
     })
 
-    // Resolve linked feedback if applicable
-    if (body.feedbackId) {
+    // T-157: sending the edited quote answers the customer, so every pending
+    // question on this quote is resolved, not only the one the editor linked.
+    // A plain save still resolves just the linked one, as before.
+    if (body.sendToCustomer) {
+      await supabase
+        .from('quote_feedback')
+        .update({ status: 'resolved' })
+        .eq('quote_id', quoteId)
+        .eq('tenant_id', auth.tenantId)
+        .eq('status', 'pending')
+    } else if (body.feedbackId) {
       await supabase
         .from('quote_feedback')
         .update({ status: 'resolved' })
         .eq('id', body.feedbackId)
+        .eq('quote_id', quoteId)
         .eq('tenant_id', auth.tenantId)
     }
 
     // Send revised email to customer if requested
     // T-146: a held quote's first send is the customer's FIRST quote, not an update
-    const firstSend = !['sent', 'viewed', 'feedback_received', 'revised'].includes(quote.status)
+    const firstSend = !(QUOTE_ALREADY_SENT_STATUSES as readonly string[]).includes(quote.status)
     // T-151: a phone-only customer has no email address to send to
     const customerEmail = (quote.customer_json as { email?: string | null } | null)?.email
+    // T-157: replies to a customer email reach the business
+    const replyTo =
+      body.sendToCustomer && quoteViewUrl && isPostmarkConfigured() && customerEmail
+        ? await businessReplyTo(auth.tenantId)
+        : undefined
     if (body.sendToCustomer && quoteViewUrl && isPostmarkConfigured() && firstSend && customerEmail) {
       const customer = quote.customer_json as { name: string; email: string }
       const locale = resolveRegionContext(tenant).locale
@@ -462,6 +514,7 @@ export async function PATCH(
           primaryColor: tenant.branding_json?.primaryColor,
         }),
         tag: 'quote-approved',
+        replyTo,
       })
       if (!emailResult.success) console.error('Failed to send quote email:', emailResult.error)
     } else if (body.sendToCustomer && quoteViewUrl && isPostmarkConfigured() && customerEmail) {
@@ -482,6 +535,7 @@ export async function PATCH(
         subject: `Updated quote from ${tenant.name}`,
         htmlBody,
         tag: 'quote-revised',
+        replyTo,
       })
 
       if (!emailResult.success) {

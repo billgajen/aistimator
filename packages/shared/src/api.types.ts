@@ -201,6 +201,12 @@ export interface QuoteViewResponse {
   signalRecommendations?: SignalRecommendation[]
   /** Whether the Accept Quote button is shown to customers */
   acceptQuoteEnabled?: boolean
+  /**
+   * T-157: the customer asked a question the business has not answered yet.
+   * The page keeps its "Message sent" note (also after a reload) and offers no
+   * second question; Accept and Decline stay available.
+   */
+  questionPending?: boolean
 }
 
 export interface AcceptQuoteRequest {
@@ -531,6 +537,17 @@ export interface QuoteDetailResponse {
   }
   amendments: AmendmentSummary[]
   feedback: QuoteFeedback[]
+  /** T-157: the tenant has an active SMS number, so "Text link" can work */
+  smsActive?: boolean
+}
+
+/** T-157: POST /api/quotes/:quoteId/feedback/:feedbackId/answered */
+export interface MarkFeedbackAnsweredResponse {
+  feedbackId: string
+  feedbackStatus: 'acknowledged' | 'resolved'
+  /** The quote's status afterwards (feedback_received → viewed once nothing is pending) */
+  quoteStatus: QuoteStatus
+  pendingLeft: number
 }
 
 // ============================================================================

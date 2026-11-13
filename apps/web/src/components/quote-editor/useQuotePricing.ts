@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
+import { roundMoney } from '@estimator/shared'
 import type { QuotePricing } from '@estimator/shared'
 
 export interface LineItem {
@@ -14,25 +15,36 @@ interface UseQuotePricingOptions {
   currency: string
 }
 
+/**
+ * T-157: amounts show and save with at most 2 decimals. That includes quotes
+ * stored before the engine rounded its lines (18 x 34.6 = 622.8000000000001):
+ * they are rounded as they load, so nothing raw reaches the screen or the save.
+ * The server rounds again on save; it also drops stale label maths there.
+ */
 export function useQuotePricing({ initialPricing, currency }: UseQuotePricingOptions) {
   const [items, setItems] = useState<LineItem[]>(() =>
     initialPricing.breakdown.map((b, i) => ({
       id: `item-${i}`,
       label: b.label,
-      amount: b.amount,
+      amount: roundMoney(b.amount),
       autoRecommended: b.autoRecommended,
       recommendationReason: b.recommendationReason,
     }))
   )
   const [pricingNotes, setPricingNotes] = useState<string[]>(initialPricing.notes || [])
-  const [availableAddons, setAvailableAddons] = useState(initialPricing.availableAddons || [])
+  const [availableAddons, setAvailableAddonsRaw] = useState(() =>
+    (initialPricing.availableAddons || []).map((a) => ({ ...a, price: roundMoney(a.price) }))
+  )
+  const setAvailableAddons = useCallback((next: NonNullable<QuotePricing['availableAddons']>) => {
+    setAvailableAddonsRaw(next.map((a) => ({ ...a, price: roundMoney(a.price) })))
+  }, [])
 
   // Tax comes from the server — we show a preview but server recalculates
   const taxRate = initialPricing.taxRate || 0
   const taxLabel = initialPricing.taxLabel || 'Tax'
 
   const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.amount, 0),
+    () => roundMoney(items.reduce((sum, item) => sum + item.amount, 0)),
     [items]
   )
 
@@ -59,7 +71,11 @@ export function useQuotePricing({ initialPricing, currency }: UseQuotePricingOpt
 
   const updateItem = useCallback((id: string, updates: Partial<LineItem>) => {
     setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
+      prev.map((item) =>
+        item.id === id
+          ? { ...item, ...updates, ...(updates.amount !== undefined && { amount: roundMoney(updates.amount) }) }
+          : item
+      )
     )
   }, [])
 

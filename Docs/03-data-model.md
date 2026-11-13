@@ -87,14 +87,28 @@ The generated quote record for delivery and tracking.
 - document_type
 - content_json (jsonb) scope summary, notes, optional sections
 - status (enum: queued, generating, sent, viewed, accepted, paid, expired, failed)
-- quote_token_hash (for public access)
-- token_expires_at (timestamptz)
+- quote_token_hash (for public access: the newest link)
+- previous_token_hash (text, nullable; T-146: the link issued before approval, still accepted)
+- link_token_hashes (text[], not null, default '{}'; T-157, migration 38: the sha256 of every earlier link of the quote, newest first, no duplicates, at most 10. Written only by the trigger `quotes_keep_link_tokens` (BEFORE UPDATE): when `quote_token_hash` changes, the hash it replaces goes to the front. A link stays valid until the quote's links expire; AD-042)
+- token_expires_at (timestamptz; covers every link of the quote)
 - pdf_asset_id (nullable)
 - created_at
 - sent_at
 - viewed_at
 - accepted_at
 - paid_at
+
+Money in `pricing_json` (T-157): every `breakdown[].amount` has at most 2 decimals, rounded half away from zero where the line is created (`roundMoney` in `packages/shared/src/money.ts`), and `subtotal` is the sum of the rounded lines. Quotes stored before T-157 may hold unrounded amounts (622.8000000000001); there is no data migration, the editor and the edit route round them on the next save.
+
+### quote_feedback
+A customer's question on a quote (migration 17). Older rows may be review requests (`approval_request`), which customers can no longer send from the page.
+- id
+- quote_id (fk -> quotes.id)
+- tenant_id
+- feedback_type (feedback | approval_request)
+- feedback_text
+- status (pending | acknowledged | resolved): `acknowledged` = the business pressed "Mark as answered" (T-157); `resolved` = the business edited the quote and sent it
+- created_at
 
 ### quote_versions (optional v1, or v2)
 - id

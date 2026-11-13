@@ -726,7 +726,7 @@ async function createQuoteFromIntake(
 
     // T-134: held leads are not priced and don't consume the plan
     if (limitHold) {
-      await notifyLeadHeld(supabase, {
+      await notifyLeadHeld({
         tenantId,
         businessName: tenant.name,
         customerName: data.customerName,

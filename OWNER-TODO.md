@@ -95,6 +95,10 @@ Code for every item is already built; these are the steps that unlock it.
   7. **Review notifications by SMS and push (T-146 follow-up).** "Awaiting your approval" alerts go by email only. SMS
      needs a business mobile number setting (`sms_configs` is the customer-facing number). Push needs
      `expo-notifications`, device tokens and an Apple push key in the mobile app.
+  8. **Reply to the customer inside the app (T-157 follow-up, v2 backlog).** A customer question reaches the business
+     by email and shows on the quote page, but the business answers outside the app (phone, its own email) and then
+     presses "Mark as answered", or edits the quote and sends it. A reply box that emails or texts the customer and
+     keeps the thread on the quote is not built.
 - [x] **Disagreement path decided 2026-11-09:** both. The reviewer gets the scope answers and a 30 s cap (CHANGELOG 2026-11-09).
 
 ## T-139 — Identification signals (nameplate reading)
@@ -310,6 +314,10 @@ Code for every item is already built; these are the steps that unlock it.
   - Worker queue consumer: the AI-processing limiter (100 global, 10 per business per window) and its stats endpoint.
 
   The demo's own limits (`DEMO_DAILY_CAP`, `DEMO_IP_LIMIT_PER_HOUR`) are counted in the database and already apply.
+- [ ] **`quote_feedback` still allows anonymous inserts** (policy "Public can insert feedback", `WITH CHECK (true)`, plus
+  `GRANT INSERT … TO anon`), although the public feedback route writes with the service role and checks the quote's
+  token first. Anyone with the public anon key could insert rows straight into the table. Left as it is in T-157 on
+  purpose; drop the policy and the grant in a later migration.
 
 ## T-154 — Home page rewrite
 
@@ -379,3 +387,40 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
   per-link cap (10 presses, counted in the database) applies regardless. See "Rate limiting" above.
 - Test requests from setup keep the review email, marked "[Test]" with a banner, and the button works like any other
   (it counts toward nothing). Demo requests send no email.
+
+## T-157 — Quote actions that always work
+
+- [ ] **Deploy, in this order** (nothing is deployed or committed yet):
+  1. migration 38: `bash scripts/deploy-migration-38.sh` (`quotes.link_token_hashes` and the trigger that keeps the
+     replaced link whenever a quote's token changes). It refuses to run unless production is at 37.
+  2. the worker: `(cd apps/worker && npx wrangler deploy --env production)`;
+  3. the web app: `npx vercel deploy --prod`.
+
+  The migration first, because the new web app's public quote routes read the new column: without it every customer
+  quote page would fail. The old web app and old worker ignore the column, and the trigger already protects links
+  they hand out. The worker before the web app keeps the rounding and the business email rule in step with the editor.
+- [ ] **Try by hand, with your own business and a customer address you can read:**
+  1. *Emails to you.* Leave Settings > Notifications empty. Accept a quote as the customer: "Quote accepted" should
+     reach your login email. Ask a question and decline another quote: the same. Then fill in a different address in
+     Settings and repeat one of them: it should go there instead, and so should the worker's "Review and approve"
+     email for a new request. Reply to a customer email ("Your quote from …"): the reply should be addressed to you.
+  2. *Buttons.* On a sent quote: **Send again**, **Copy link**, Edit. On an accepted quote: Copy link only. On a
+     quote awaiting approval: Approve & send and Edit only. **Text link** should be missing everywhere until an SMS
+     number is connected. Press Send again on a quote whose customer has no email: it isn't offered. Any failure
+     should appear as a line under the header, never a browser pop-up.
+  3. *Links.* Open the link from the customer's first email. Then press Send again, Copy link, and wait for (or
+     trigger) the 3-day reminder. The first link should still open the quote each time, and so should every newer one.
+  4. *Questions.* As the customer, ask a question: "Message sent" shows, Accept and Decline stay, and it is the same
+     after a reload. On the quote page the banner reads "Customer question"; press **Mark as answered**, reload, and
+     it should stay closed with the status back to Viewed. The customer can then ask again or accept.
+  5. *Revised.* Edit a sent quote and Save & Send twice: the status should read Revised both times.
+  6. *Money.* Open an older painting quote with a line like "Exterior walls  £18 x 34.6(Sqm)" in the editor: the amount
+     box should read 622.8, not 622.8000000000001. Change that amount, leave the label, save: the customer page
+     should show "Exterior walls" with no maths under it. A line you leave alone keeps its maths.
+- [ ] **Email delivery** still waits on the Postmark account approval (above). Until then every email in step 1 only
+  reaches addresses on your own sending domain.
+- Not built here, by the ticket: new status wording, tabs and next-step layout; any SMS work beyond hiding the button;
+  replying to the customer inside the app (backlog item 8 above).
+- The live check is `scripts/hardcore-test/verify-t157.mts` (add `PLAYWRIGHT_DIR=…` for the page checks). It joins the
+  regression set: run t146 to t157 before a commit or deploy.
+

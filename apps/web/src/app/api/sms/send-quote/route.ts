@@ -2,20 +2,24 @@
  * POST /api/sms/send-quote — text a quote link to the customer (T-136).
  * Body: { quoteId, phone? } (phone defaults to the customer's phone on the quote).
  *
- * Rotates the quote token (raw tokens are never stored — same trade-off as
- * the resend route) and refuses numbers that replied STOP.
+ * Issues a new link (raw tokens are never stored) and refuses numbers that
+ * replied STOP.
+ *
+ * T-157: the statuses are the rule the Text link button reads
+ * (QUOTE_TEXT_LINK_STATUSES; the button also needs an active SMS number, which
+ * this route checks below). The links the customer already has keep working
+ * (the database trigger keeps each replaced token in quotes.link_token_hashes),
+ * and a revised quote or an open customer question keeps its status.
  */
 
 import { NextResponse, type NextRequest } from 'next/server'
-import { getRegion } from '@estimator/shared'
+import { getRegion, statusAfterResend, QUOTE_TEXT_LINK_STATUSES, type QuoteStatus } from '@estimator/shared'
 import { requireTenant } from '@/lib/auth-tenant'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { normalizePhone, sendSmsChecked } from '@/lib/sms'
 import { createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
-
-const SENDABLE = ['sent', 'viewed', 'feedback_received', 'revised', 'expired']
 
 export async function POST(request: NextRequest) {
   const auth = await requireTenant()
@@ -34,7 +38,7 @@ export async function POST(request: NextRequest) {
     .eq('tenant_id', tenantId)
     .single()
   if (!quote) return NextResponse.json({ error: { code: 'NOT_FOUND', message: 'Quote not found' } }, { status: 404 })
-  if (!SENDABLE.includes(quote.status as string)) {
+  if (!(QUOTE_TEXT_LINK_STATUSES as readonly string[]).includes(quote.status as string)) {
     return NextResponse.json(
       { error: { code: 'INVALID_STATUS', message: `Cannot text a quote with status '${quote.status}'` } },
       { status: 400 }
@@ -62,8 +66,14 @@ export async function POST(request: NextRequest) {
   const { token, hash } = generateQuoteToken()
   await supabase
     .from('quotes')
-    .update({ quote_token_hash: hash, token_expires_at: getTokenExpiry(30).toISOString(), status: 'sent', sent_at: new Date().toISOString() })
+    .update({
+      quote_token_hash: hash,
+      token_expires_at: getTokenExpiry(30).toISOString(),
+      status: statusAfterResend(quote.status as QuoteStatus),
+      sent_at: new Date().toISOString(),
+    })
     .eq('id', quote.id)
+    .eq('tenant_id', tenantId)
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const link = `${appUrl}/q/${quote.id}?token=${token}`

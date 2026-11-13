@@ -66,6 +66,7 @@ import type { CrossServicePricing } from '@estimator/shared'
 import { createSentenceRewriter } from './ai/wording-repair'
 import { sendQuoteEmails, sendReviewRequestEmail, sendEstimateShownEmail, isEmailConfigured } from './email'
 import { issueApprovalLink } from './approval-link'
+import { loadBusinessEmail } from './business-email'
 import { incrementUsageCounter } from './usage'
 
 /** T-153: photos a demo request reads at most (matches DEMO_MAX_PHOTOS in shared) */
@@ -2634,7 +2635,9 @@ async function loadQuoteData(
         tax_enabled,
         tax_label,
         tax_rate,
-        branding_json
+        branding_json,
+        notification_email,
+        is_demo
       ),
       services!service_id (
         id,
@@ -2699,21 +2702,14 @@ async function loadQuoteData(
     }
   }
 
-  // Load business owner email (first user for the tenant)
-  const { data: ownerProfile } = await supabase
-    .from('user_profiles')
-    .select('id')
-    .eq('tenant_id', quote.tenant_id)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .single()
-
-  let businessOwnerEmail: string | undefined
-  if (ownerProfile?.id) {
-    // Get the user's email from auth.users
-    const { data: authUser } = await supabase.auth.admin.getUserById(ownerProfile.id)
-    businessOwnerEmail = authUser?.user?.email || undefined
-  }
+  // T-157: where emails to the business go, and the reply-to on customer
+  // emails: the notification email from Settings when set, otherwise the
+  // first user's account email (the rule the web app applies too)
+  const businessOwnerEmail = await loadBusinessEmail(
+    supabase,
+    quote.tenant_id,
+    quote.tenants as { notification_email?: string | null; is_demo?: boolean | null } | null
+  )
 
   // Load widget config to get field labels and mapsToSignal mappings
   // First try service-specific config, then fall back to tenant default

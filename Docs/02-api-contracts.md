@@ -108,7 +108,7 @@ T-146 additions to this response:
 	•	`estimateRange`: `{ "low", "high" }` only on an unreviewed estimate with uncertain quantities. No label.
 	•	`provisional` while `pending_review`: only when the engine measured a range. A flat price shows no number until it is approved.
 	•	`pricing` NEVER carries `estimate` (grade/label/description), and `takeoff[]` rows carry no `evidence`. Both are business-only (`GET /api/quotes/:id`).
-	•	The token may be the current link or the one issued before approval (`quotes.previous_token_hash`). The same applies to accept, decline, feedback, pdf and asset routes.
+	•	The token may be the current link or the one issued before approval (`quotes.previous_token_hash`). The same applies to accept, decline, feedback, pdf and asset routes. T-157: or any earlier link of the quote (`quotes.link_token_hashes`), see "T-157 quote actions" below.
 
 POST /api/quotes/:quoteId/approve (T-146, dashboard cookie or app Bearer)
 The business approves a quote awaiting its review. The quote is marked approved (`approved_at`/`approved_by`) and sent, and the customer is emailed a fresh link. The link they already hold keeps working.
@@ -222,6 +222,24 @@ Response:
 
 { "ok": true }
 
+T-157 quote actions that always work (dashboard cookie or app Bearer unless marked public; AD-042):
+	•	**One rule per action**, in `packages/shared/src/quote-status.ts`, read by the button and by the route it calls:
+		- Send again (`POST /api/quotes/:id/resend`): `sent`, `viewed`, `revised`, `expired`, and the customer has an email address. Otherwise 400 `INVALID_STATUS` or 400 `NO_EMAIL`; then 503 `EMAIL_NOT_CONFIGURED`. Every check runs before anything is written. A change made while sending → 409 `INVALID_STATUS`. A revised quote stays `revised` (`statusAfterResend`); anything else becomes `sent`.
+		- Copy link (`POST /api/quotes/:id/link`) and Download PDF (`POST` and `GET /api/quotes/:id/pdf`): `sent`, `viewed`, `feedback_received`, `revised`, `accepted`, `paid`, `expired`. Otherwise 400 `INVALID_STATUS` (new on the PDF routes; the link route used to refuse `feedback_received` and `revised`).
+		- Text link (`POST /api/sms/send-quote`): `sent`, `viewed`, `feedback_received`, `revised`, `expired` (unchanged), and an active SMS number (400 `SMS_NOT_CONFIGURED`). It now leaves a `revised` or `feedback_received` quote in that status instead of setting `sent`.
+		- Edit (`PATCH /api/quotes/:id`): unchanged (not `accepted`, `paid`, `generating`, `queued`, `failed`).
+	•	`GET /api/quotes/:quoteId` also returns `smsActive: boolean` (the tenant has an active row in `sms_configs`). The quote page shows "Text link" only when it is true.
+	•	**Links.** Every route that hands out a link still makes a new token (raw tokens are never stored), but the replaced one keeps working: a database trigger (migration 38) puts the old `quote_token_hash` at the front of `quotes.link_token_hashes` (no duplicates, the newest 10). All public token routes (`GET /api/public/quotes/:id`, accept, decline, feedback, pdf, clarify, assets) accept the current link, `previous_token_hash`, or any hash in that list. Expiry is unchanged: `token_expires_at` covers every link of the quote (410 `TOKEN_EXPIRED`).
+	•	`POST /api/quotes/:quoteId/feedback/:feedbackId/answered` ("Mark as answered") → `{ "feedbackId", "feedbackStatus": "acknowledged" | "resolved", "quoteStatus", "pendingLeft" }`. Sets a pending question (or an old review request) to `acknowledged`. When the quote is `feedback_received` and nothing is pending, it goes back to `viewed`. Scoped to the signed-in user's tenant and to that quote: any other id is 404 `NOT_FOUND`. 401 when signed out. Pressing twice is harmless.
+	•	`PATCH /api/quotes/:quoteId`:
+		- `sendToCustomer: true` on a quote the customer already had (`sent`, `viewed`, `feedback_received`, `revised`) gives `revised`; it used to flip `revised` back to `sent`. A first send is still `sent`.
+		- with `sendToCustomer: true` every pending `quote_feedback` row of the quote becomes `resolved`, not only `feedbackId`. A plain save still resolves only `feedbackId`.
+		- each `pricing_json.breakdown[].amount` is rounded to 2 decimals (`roundMoney`: half away from zero) and `subtotal` is the sum of the rounded lines. Tax and total as before. `breakdown` must be an array (400 `INVALID_REQUEST`).
+		- a line whose amount changed while its label is still exactly the engine's generated label loses that label's maths ("Exterior walls  £18 x 34.6(Sqm)" → "Exterior walls"). A label the business typed or changed is never rewritten.
+	•	`GET /api/public/quotes/:quoteId` (public) also returns `questionPending: true` while a question from the customer is unanswered. `POST …/accept` and `POST …/decline` (public) are allowed in `sent`, `viewed`, `revised` and `feedback_received`, as before; the page no longer hides them after a question. A second question while one is open is still refused (400 `INVALID_STATUS` from `feedback_received`).
+	•	**Emails to the business** (quote accepted, customer question, quote declined, plan limit, held lead, and the worker's new-quote and review emails) go to `tenants.notification_email` when set, otherwise to the account email of the tenant's first user. The demo business gets none. The same address is the `Reply-To` on customer emails (worker, approve, edit and send, send again, reminder). Before T-157 the three public routes sent nothing unless the setting was filled, and the worker ignored the setting.
+	•	The engine rounds every line amount where it is created, so stored `pricing_json.breakdown[].amount` and `pricing_trace_json.trace[].amount` have at most 2 decimals and the lines add up to `subtotal`. The label format is unchanged.
+
 T-153 public demo ("Try it as a customer", /demo):
 	•	The demo business is one tenant with `tenants.is_demo = true` (migration 36), created by `scripts/seed-demo-tenant.mts`. Only the service role can set or change the flag (a guard trigger refuses a user token, 42501). `quotes.is_demo` is copied from the tenant on insert by a trigger, whatever the caller sends. No tenant or public API accepts or returns either flag.
 	•	`POST /api/public/quotes` to the demo business: Turnstile, honeypot, the `quotes` rate limit and upload limits as usual, then the demo limits, counted in the database: `DEMO_IP_LIMIT_PER_HOUR` (default 5) per IP (a salted hash, stored as `quote_requests.source_json.demoIp`) and `DEMO_DAILY_CAP` (default 200) in the last 24 h. Over either → 429 `{ error: { code: "DEMO_BUSY", reason: "ip_limit" | "daily_cap" } }` and nothing is created. A demo request is outside any plan and never counts as usage; test tokens don't apply.
@@ -245,7 +263,7 @@ T-151 customer flow:
 	•	`GET /api/leads?days=30` (dashboard) → `{ items: [{ leadId, customerName, customerEmail, customerPhone, serviceName, progress, progressLabel, answerCount, photoCount, postcode, createdAt, lastActiveAt }] }`: unfinished only, own tenant.
 	•	`POST /api/public/quotes/:quoteId/accept` accepts `details: { timing: asap|two_weeks|flexible, timingNote?, address, phone }` (all but the note required when `details` is sent; 400 with `fields`). Saved as `quotes.acceptance_json` and included in the business's acceptance email. A request without `details` (a page opened before T-151) accepts as before.
 	•	`GET /api/public/quotes/:quoteId` returns `customer.phone` (the link holder's own number, to confirm on accept). `GET /api/quotes/:quoteId` now also returns `review_hold`, `is_test` and `acceptance_json`.
-	•	`quote_requests.customer_email` is nullable (phone-only requests). Customer emails (worker estimate/quote emails, approve, edit-and-send, reminders) are skipped when there is no address; `POST /api/quotes/:id/resend` → 400 `NO_EMAIL` ("Text them the link instead").
+	•	`quote_requests.customer_email` is nullable (phone-only requests). Customer emails (worker estimate/quote emails, approve, edit-and-send, reminders) are skipped when there is no address; `POST /api/quotes/:id/resend` → 400 `NO_EMAIL` (T-157: "This customer gave no email address. Copy the link and send it to them another way.", checked before anything is written).
 
 T-150 setup and test requests (dashboard cookie or app Bearer; tenant from the signed-in user):
 	•	`PUT /api/tenant` also accepts `trade` (a vertical pack id, `"other"`, or null) and `tradeOther` (≤ 200 chars, kept only when `trade` is `"other"`). An unknown trade → 400 `INVALID_INPUT`.

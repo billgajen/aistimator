@@ -2,8 +2,9 @@
 
 import { UnfinishedLeads, UnfinishedBadge } from '@/components/quotes/UnfinishedLeads'
 import { useEffect, useState, useCallback } from 'react'
-import { formatMoney } from '@estimator/shared'
+import { formatMoney, canCopyQuoteLink, canDownloadQuotePdf, canSendQuoteAgain } from '@estimator/shared'
 import Link from 'next/link'
+import { copyLinkFallbackMessage } from '@/lib/quote-action-copy'
 import { EmptyState, PageHeader } from '@/components/dashboard/EmptyState'
 import type { QuoteListItem, QuoteStatus } from '@estimator/shared'
 
@@ -92,8 +93,13 @@ export default function QuotesPage() {
         throw new Error(data.error?.message || 'Failed to generate link')
       }
 
-      await navigator.clipboard.writeText(data.quoteViewUrl)
-      showToast('Quote link copied to clipboard', 'success')
+      try {
+        await navigator.clipboard.writeText(data.quoteViewUrl)
+        showToast('Quote link copied to clipboard', 'success')
+      } catch {
+        // The browser refused the clipboard: leave the link on screen to copy by hand
+        setToast({ message: copyLinkFallbackMessage(data.quoteViewUrl), type: 'success' })
+      }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to copy link', 'error')
     } finally {
@@ -226,7 +232,7 @@ export default function QuotesPage() {
       {/* Toast notification */}
       {toast && (
         <div
-          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-warm-lg shadow-warm-lg ${
+          className={`fixed top-4 right-4 z-50 max-w-md break-words px-4 py-3 rounded-warm-lg shadow-warm-lg ${
             toast.type === 'success'
               ? 'bg-secondary-light text-secondary border border-secondary/20'
               : 'bg-danger-light text-danger border border-danger/20'
@@ -405,8 +411,8 @@ export default function QuotesPage() {
                           </Link>
                         )}
 
-                        {/* Copy Link */}
-                        {['sent', 'viewed', 'accepted', 'paid', 'expired'].includes(quote.status) && (
+                        {/* Copy Link (T-157: the rule the route applies) */}
+                        {canCopyQuoteLink(quote.status) && (
                           <button
                             onClick={() => handleCopyLink(quote.quoteId)}
                             disabled={actionLoading === quote.quoteId}
@@ -419,8 +425,8 @@ export default function QuotesPage() {
                           </button>
                         )}
 
-                        {/* Download PDF */}
-                        {['sent', 'viewed', 'accepted', 'paid'].includes(quote.status) && (
+                        {/* Download PDF (T-157: the rule the route applies) */}
+                        {canDownloadQuotePdf(quote.status) && (
                           <button
                             onClick={() => handleDownloadPdf(quote.quoteId)}
                             disabled={actionLoading === quote.quoteId}
@@ -433,13 +439,13 @@ export default function QuotesPage() {
                           </button>
                         )}
 
-                        {/* Resend Email */}
-                        {['sent', 'viewed', 'expired'].includes(quote.status) && (
+                        {/* Send again (T-157: the rule the route applies; needs an email address) */}
+                        {canSendQuoteAgain(quote.status, { hasEmail: Boolean(quote.customerEmail) }) && (
                           <button
                             onClick={() => handleResendEmail(quote.quoteId)}
                             disabled={actionLoading === quote.quoteId}
                             className="text-text-secondary hover:text-text-primary disabled:opacity-50 transition-colors"
-                            title="Resend email"
+                            title="Send again"
                           >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />

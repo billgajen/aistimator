@@ -9,7 +9,7 @@
  * IMPORTANT: AI does NOT set prices. All pricing is computed from rules.
  */
 
-import { currencySymbol } from '@estimator/shared'
+import { currencySymbol, roundMoney } from '@estimator/shared'
 import type { ExtractedSignals } from '../ai/signals'
 import type {
   MeasurementModel,
@@ -184,16 +184,20 @@ export function calculatePricing(
   const notes: string[] = []
   let subtotal = 0
 
+  // T-157: every line amount is rounded where it is created, and the subtotal
+  // is the sum of the rounded lines, so the lines always add up.
+
   // 1. Start with base fee
   if (rules.baseFee > 0) {
-    breakdown.push({ label: 'Base fee', amount: rules.baseFee })
-    subtotal += rules.baseFee
+    const baseFee = roundMoney(rules.baseFee)
+    breakdown.push({ label: 'Base fee', amount: baseFee })
+    subtotal += baseFee
   }
 
   // 1.5 Process matched inventory items (for rental/event businesses)
   if (jobData?.matchedItems && jobData.matchedItems.length > 0) {
     for (const item of jobData.matchedItems) {
-      const lineAmount = item.quantity * item.pricePerUnit
+      const lineAmount = roundMoney(item.quantity * item.pricePerUnit)
       const label = `${item.quantity} × ${item.catalogName} @ ${formatCurrency(item.pricePerUnit, currency)}`
       breakdown.push({
         label,
@@ -243,7 +247,7 @@ export function calculatePricing(
     }
 
     if (quantity) {
-      const unitAmount = quantity * measurementModel.pricePerUnit
+      const unitAmount = roundMoney(quantity * measurementModel.pricePerUnit)
       const unitLabel = measurementModel.unitLabel || getDefaultUnitLabel(measurementModel.unit)
       const label = `${quantity} ${unitLabel} × ${formatCurrency(measurementModel.pricePerUnit, currency)}`
       breakdown.push({ label, amount: unitAmount })
@@ -259,7 +263,7 @@ export function calculatePricing(
 
   // Legacy unit pricing support (deprecated)
   if (!measurementModel && rules.unitPricing && signals.dimensions) {
-    const unitAmount = signals.dimensions.value * rules.unitPricing.pricePerUnit
+    const unitAmount = roundMoney(signals.dimensions.value * rules.unitPricing.pricePerUnit)
     const label = `${signals.dimensions.value} ${signals.dimensions.unit} × ${formatCurrency(rules.unitPricing.pricePerUnit, currency)}/${rules.unitPricing.unit}`
     breakdown.push({ label, amount: unitAmount })
     subtotal += unitAmount
@@ -278,13 +282,14 @@ export function calculatePricing(
   for (const addon of rules.addons) {
     const addonMatch = shouldApplyAddon(addon, signals, answers, searchableText, aiDetectedAddonIds, serviceContext, aiAddonDetectionRan)
     if (addonMatch.apply) {
+      const addonAmount = roundMoney(addon.price)
       breakdown.push({
         label: addon.label,
-        amount: addon.price,
+        amount: addonAmount,
         autoRecommended: addonMatch.autoRecommended,
         recommendationReason: addonMatch.reason,
       })
-      subtotal += addon.price
+      subtotal += addonAmount
 
       // Track recommended addons for display
       if (addonMatch.autoRecommended) {
@@ -304,12 +309,13 @@ export function calculatePricing(
 
   for (const mult of rules.multipliers) {
     if (shouldApplyMultiplier(mult, answers, runningSubtotal)) {
-      const adjustmentAmount = runningSubtotal * (mult.multiplier - 1)
+      // The adjustment is a line: round it, then add the rounded line
+      const adjustmentAmount = roundMoney(runningSubtotal * (mult.multiplier - 1))
       if (adjustmentAmount !== 0) {
         // Generate descriptive label from the condition if none provided
         const label = mult.label || generateMultiplierLabel(mult, answers)
-        breakdown.push({ label, amount: Math.round(adjustmentAmount * 100) / 100 })
-        runningSubtotal = runningSubtotal * mult.multiplier
+        breakdown.push({ label, amount: adjustmentAmount })
+        runningSubtotal = roundMoney(runningSubtotal + adjustmentAmount)
       }
     }
   }
@@ -326,14 +332,14 @@ export function calculatePricing(
   // 5. Apply minimum charge
   if (rules.minimumCharge > 0 && subtotal < rules.minimumCharge) {
     notes.push(`Minimum charge of ${formatCurrency(rules.minimumCharge, currency)} applied`)
-    subtotal = rules.minimumCharge
+    subtotal = roundMoney(rules.minimumCharge)
     // Replace breakdown with minimum charge
     breakdown.length = 0
-    breakdown.push({ label: 'Minimum charge', amount: rules.minimumCharge })
+    breakdown.push({ label: 'Minimum charge', amount: subtotal })
   }
 
-  // Round subtotal
-  subtotal = Math.round(subtotal * 100) / 100
+  // The sum of the rounded lines (rounded once more only to clear float dust)
+  subtotal = roundMoney(subtotal)
 
   // 6. Calculate tax
   // ISSUE-8 FIX: Use proper rounding to avoid penny discrepancies
@@ -1808,15 +1814,25 @@ export function calculatePricingWithTrace(
   let multiplierAdjustment = 0
   let minimumApplied = false
 
+  // T-157: every line amount is rounded where it is created (18 x 34.6 is
+  // 622.8000000000001 in floating point), and the running total only ever
+  // adds rounded lines. So the subtotal is the sum of the lines the customer
+  // sees, to the penny. Prices still come only from the business's
+  // configuration (AD-001); rounding is the only thing done to a number here.
+  const addLine = (amount: number) => {
+    runningTotal = roundMoney(runningTotal + amount)
+  }
+
   // 1. Base fee
   if (rules.baseFee > 0) {
-    runningTotal += rules.baseFee
+    const baseFee = roundMoney(rules.baseFee)
+    addLine(baseFee)
     traceSteps.push({
       type: 'base_fee',
       description: 'Base service fee',
       signalsUsed: [],
       calculation: `Base fee: ${rules.baseFee}`,
-      amount: rules.baseFee,
+      amount: baseFee,
       runningTotal,
     })
   }
@@ -1850,6 +1866,8 @@ export function calculatePricingWithTrace(
       }
 
       const stepResult = calculateWorkStepCost(step, signalsArray, signals, answers, zeroDefaultFields)
+      // T-157: the line amount, rounded where the line is created
+      stepResult.cost = roundMoney(stepResult.cost)
 
       // ISSUE-3 FIX: Skip zero-cost line items (e.g., "0 sockets × £25 = £0")
       // This prevents unprofessional-looking quotes with $0 line items
@@ -1863,7 +1881,7 @@ export function calculatePricingWithTrace(
         stepResult.signalsUsed.unshift({ key: step.triggerSignal, value: signalValue })
       }
 
-      runningTotal += stepResult.cost
+      addLine(stepResult.cost)
       workStepsTotal += stepResult.cost
 
       // Build descriptive label showing unit math for per_unit/per_hour steps
@@ -1915,12 +1933,12 @@ export function calculatePricingWithTrace(
         base = runningTotal
         baseDescription = 'subtotal'
       }
-      const amount = Math.round(base * (step.defaultCost / 100) * 100) / 100
+      const amount = roundMoney(base * (step.defaultCost / 100))
       if (amount === 0) {
         console.log(`[Pricing] Skipping percent step "${step.name}" - zero amount`)
         continue
       }
-      runningTotal += amount
+      addLine(amount)
       workStepsTotal += amount
       stepAmountsById.set(step.id, amount)
       traceSteps.push({
@@ -1940,8 +1958,8 @@ export function calculatePricingWithTrace(
   // 3. Inventory items (for rental/event businesses)
   if (jobData?.matchedItems && jobData.matchedItems.length > 0) {
     for (const item of jobData.matchedItems) {
-      const lineAmount = item.quantity * item.pricePerUnit
-      runningTotal += lineAmount
+      const lineAmount = roundMoney(item.quantity * item.pricePerUnit)
+      addLine(lineAmount)
       inventoryTotal += lineAmount
 
       traceSteps.push({
@@ -1987,8 +2005,8 @@ export function calculatePricingWithTrace(
     }
 
     if (quantity) {
-      const unitAmount = quantity * measurementModel.pricePerUnit
-      runningTotal += unitAmount
+      const unitAmount = roundMoney(quantity * measurementModel.pricePerUnit)
+      addLine(unitAmount)
       measurementTotal += unitAmount
 
       const unitLabel = measurementModel.unitLabel || getDefaultUnitLabel(measurementModel.unit)
@@ -2020,8 +2038,9 @@ export function calculatePricingWithTrace(
   for (const addon of rules.addons) {
     const addonMatch = shouldApplyAddon(addon, signals, answers, searchableText, aiDetectedAddonIds, serviceContext, aiAddonDetectionRan)
     if (addonMatch.apply) {
-      runningTotal += addon.price
-      addonsTotal += addon.price
+      const addonAmount = roundMoney(addon.price)
+      addLine(addonAmount)
+      addonsTotal += addonAmount
 
       traceSteps.push({
         type: 'addon',
@@ -2033,7 +2052,7 @@ export function calculatePricingWithTrace(
             ? [{ key: 'detected_condition', value: addonMatch.reason || '' }]
             : [],
         calculation: `Addon: ${addon.price}`,
-        amount: addon.price,
+        amount: addonAmount,
         runningTotal,
       })
 
@@ -2054,11 +2073,12 @@ export function calculatePricingWithTrace(
 
   for (const mult of rules.multipliers) {
     if (shouldApplyMultiplier(mult, answers, runningTotal)) {
-      const adjustmentAmount = runningTotal * (mult.multiplier - 1)
+      // The adjustment is a line of its own: round it, then add the rounded line
+      const adjustmentAmount = roundMoney(runningTotal * (mult.multiplier - 1))
       if (adjustmentAmount !== 0) {
         const label = mult.label || generateMultiplierLabel(mult, answers)
         const conditionKey = mult.when.subject === 'subtotal' ? 'subtotal' : mult.when.fieldId || 'condition'
-        runningTotal = runningTotal * mult.multiplier
+        addLine(adjustmentAmount)
         multiplierAdjustment += adjustmentAmount
 
         traceSteps.push({
@@ -2067,8 +2087,8 @@ export function calculatePricingWithTrace(
           description: label,
           signalsUsed: [{ key: conditionKey, value: mult.when.equals ?? mult.when.value ?? '' }],
           calculation: `${subtotalBeforeMultipliers} × ${mult.multiplier} = ${runningTotal}`,
-          amount: Math.round(adjustmentAmount * 100) / 100,
-          runningTotal: Math.round(runningTotal * 100) / 100,
+          amount: adjustmentAmount,
+          runningTotal,
         })
       }
     }
@@ -2080,23 +2100,25 @@ export function calculatePricingWithTrace(
   // Note: Automatic access difficulty multiplier was removed.
   // Businesses can configure access-based pricing as work steps with trigger conditions if needed.
 
-  // 7. Minimum charge
-  let subtotal = Math.round(runningTotal * 100) / 100
+  // 7. Minimum charge. The subtotal is the sum of the rounded lines.
+  let subtotal = runningTotal
   if (rules.minimumCharge > 0 && subtotal < rules.minimumCharge) {
     notes.push(`Minimum charge of ${formatCurrency(rules.minimumCharge, currency)} applied`)
     minimumApplied = true
 
+    // The top-up is a line too: the lines then add up to the minimum
+    const minimumCharge = roundMoney(rules.minimumCharge)
     traceSteps.push({
       type: 'minimum',
       description: 'Minimum charge applied',
       signalsUsed: [],
       calculation: `Subtotal ${subtotal} < minimum ${rules.minimumCharge}`,
-      amount: rules.minimumCharge - subtotal,
-      runningTotal: rules.minimumCharge,
+      amount: roundMoney(minimumCharge - subtotal),
+      runningTotal: minimumCharge,
     })
 
-    subtotal = rules.minimumCharge
-    runningTotal = rules.minimumCharge
+    subtotal = minimumCharge
+    runningTotal = minimumCharge
   }
 
   // 8. Tax

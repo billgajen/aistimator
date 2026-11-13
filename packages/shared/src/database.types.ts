@@ -907,6 +907,12 @@ export interface Quote {
   approved_by?: string | null
   /** T-146: the pre-approval customer link, still accepted after approval */
   previous_token_hash?: string | null
+  /**
+   * T-157: every earlier customer link of this quote (sha256, newest first, at
+   * most 10). Kept by a database trigger whenever quote_token_hash changes, so
+   * a link the customer already has keeps working until the quote expires.
+   */
+  link_token_hashes?: string[]
   /** T-150: the owner's test request from setup (never counted toward usage) */
   is_test?: boolean
   /** T-147: why a pending_review quote awaits the business: shown | held | check */

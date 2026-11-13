@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { quoteTokenFilter } from '@/lib/tokens'
-import { isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange } from '@estimator/shared'
+import { isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange, canCustomerDecide } from '@estimator/shared'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
@@ -254,6 +254,21 @@ export async function GET(
       method: row.method,
     }))
 
+    // T-157: is a question from the customer still waiting for the business?
+    // The page keeps its "Message sent" note while one is (also after a
+    // reload) and offers no second question. Only looked up where a question
+    // can exist: a quote the customer can decide on, or an estimate shown early.
+    let questionPending = false
+    if (canCustomerDecide(quote.status) || shownEarly) {
+      const { count } = await supabase
+        .from('quote_feedback')
+        .select('id', { count: 'exact', head: true })
+        .eq('quote_id', quoteId)
+        .eq('tenant_id', quote.tenant_id)
+        .eq('status', 'pending')
+      questionPending = (count ?? 0) > 0
+    }
+
     // T-133: locale + currency fallback come from the tenant's region
     const regionCtx = resolveRegionContext(tenant)
     const response: QuoteViewResponse = {
@@ -328,6 +343,7 @@ export async function GET(
       // Never accept-able while provisional (price isn't final yet), nor
       // (T-147) while an estimate shown early awaits the business's approval.
       acceptQuoteEnabled: !isProvisional && !shownEarly && tenant.template_json?.acceptQuoteEnabled !== false,
+      ...(questionPending && { questionPending: true }),
     }
 
     return NextResponse.json(response)

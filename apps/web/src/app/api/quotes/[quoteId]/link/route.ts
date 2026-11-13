@@ -1,10 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
+import { canCopyQuoteLink } from '@estimator/shared'
 
 /**
  * POST /api/quotes/:quoteId/link
  * Generate a quote link. Only regenerates token if expired or force=true
+ *
+ * T-157: the statuses are the rule the Copy link button reads
+ * (QUOTE_LINK_STATUSES). Raw tokens are never stored, so a link to copy is
+ * always a new token; the links the customer already has keep working (the
+ * database trigger keeps each replaced token in quotes.link_token_hashes).
  */
 export async function POST(
   request: Request,
@@ -65,9 +71,8 @@ export async function POST(
       )
     }
 
-    // Check if quote is in a viewable status
-    const viewableStatuses = ['sent', 'viewed', 'accepted', 'paid', 'expired']
-    if (!viewableStatuses.includes(quote.status)) {
+    // Check if quote is in a viewable status (the rule the button reads)
+    if (!canCopyQuoteLink(quote.status)) {
       return NextResponse.json(
         { error: { code: 'INVALID_STATUS', message: `Quote is still ${quote.status}` } },
         { status: 400 }
@@ -103,6 +108,7 @@ export async function POST(
         token_expires_at: tokenExpiry.toISOString(),
       })
       .eq('id', quoteId)
+      .eq('tenant_id', profile.tenant_id)
 
     if (updateError) {
       console.error('Failed to update quote token:', updateError)

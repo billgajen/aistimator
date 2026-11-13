@@ -3,7 +3,7 @@
  *
  * Used for resending quote emails from the dashboard.
  */
-import { PRODUCT_NAME } from '@estimator/shared'
+import { PRODUCT_NAME, redactEmails } from '@estimator/shared'
 
 const POSTMARK_API_URL = 'https://api.postmarkapp.com/email'
 
@@ -65,7 +65,8 @@ export async function sendEmail(message: EmailMessage): Promise<PostmarkResponse
 
     if (!response.ok) {
       const errorData = (await response.json().catch(() => ({}))) as { Message?: string }
-      const errorMessage = errorData.Message || `HTTP ${response.status}`
+      // T-157: the provider's message can name the recipient; no addresses in logs
+      const errorMessage = redactEmails(errorData.Message || `HTTP ${response.status}`)
       console.error('[Postmark] API error:', errorMessage)
       return {
         success: false,
@@ -79,7 +80,7 @@ export async function sendEmail(message: EmailMessage): Promise<PostmarkResponse
       messageId: data.MessageID,
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorMessage = redactEmails(error instanceof Error ? error.message : 'Unknown error')
     console.error('[Postmark] Request failed:', errorMessage)
     return {
       success: false,
