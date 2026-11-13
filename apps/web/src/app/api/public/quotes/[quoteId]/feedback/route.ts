@@ -166,6 +166,7 @@ export async function POST(
       })
 
       const emailResult = await sendEmail({
+        from: { kind: 'business' },
         to: businessEmail,
         subject: `Customer ${body.feedbackType === 'approval_request' ? 'review request' : 'feedback'} on quote: ${customer.name}`,
         htmlBody,

@@ -164,6 +164,7 @@ export async function GET(request: Request) {
         })
 
         const result = await sendEmail({
+          from: { kind: 'customer', businessName: tenant?.name },
           to: customer.email,
           subject: `Reminder: your quote from ${tenant?.name || 'us'} is ready`,
           htmlBody,

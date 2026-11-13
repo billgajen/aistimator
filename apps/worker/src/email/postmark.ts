@@ -5,17 +5,23 @@
  * https://postmarkapp.com/developer/api/email-api
  */
 
-import { redactEmails } from '@estimator/shared'
+import { emailFromHeader, redactEmails } from '@estimator/shared'
+import type { EmailSender } from '@estimator/shared'
 
 const POSTMARK_API_URL = 'https://api.postmarkapp.com/email'
 
 export interface PostmarkConfig {
   apiToken: string
   fromEmail: string
-  fromName?: string
 }
 
 export interface EmailMessage {
+  /**
+   * T-159: who the email is for decides the sender name. To a customer it is
+   * "<business name> via <product>", to the business the product name. The
+   * address is always the configured sending address.
+   */
+  from: EmailSender
   to: string
   subject: string
   htmlBody: string
@@ -46,9 +52,7 @@ export async function sendEmail(
         'X-Postmark-Server-Token': config.apiToken,
       },
       body: JSON.stringify({
-        From: config.fromName
-          ? `${config.fromName} <${config.fromEmail}>`
-          : config.fromEmail,
+        From: emailFromHeader(message.from, config.fromEmail),
         To: message.to,
         Subject: message.subject,
         HtmlBody: message.htmlBody,

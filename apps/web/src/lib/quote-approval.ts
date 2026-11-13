@@ -193,6 +193,7 @@ export async function approveQuote(opts: {
     primaryColor: tenant.branding_json?.primaryColor,
   })
   const emailResult = await sendEmail({
+    from: { kind: 'customer', businessName: tenant.name },
     to: customer.email,
     subject: `Your quote from ${tenant.name}`,
     htmlBody,

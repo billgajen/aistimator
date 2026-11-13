@@ -15,6 +15,33 @@
 
 ## Issues & Resolutions
 
+### 2026-11-13: T-159 — Emails show a sender name
+
+Emails had no proper sender name, so each mail app showed whatever it made up from the address.
+
+- **What was wrong.** The web app sent every email with a bare From address (approval, edit and send, send again, the reminder, and the five emails to the business). The worker did set a name, but it was the business name pasted straight into the header, `${name} <${address}>`, with no quoting or cleaning, and its review email had the product name typed in as a string.
+- **Root cause.** Two Postmark clients, each building the From header its own way, and nothing that said who an email was for.
+- **Fix.** `packages/shared/src/email-from.ts` builds the header for both apps (`emailFromHeader`). `sendEmail` in `apps/web/src/lib/postmark.ts` and `apps/worker/src/email/postmark.ts` now requires a `from`: `{ kind: 'customer', businessName }` or `{ kind: 'business' }`. It is a required field, so a new sender does not compile until it says who the email is for.
+  - To a customer: `"<business name> via Aistimator" <address>`. The business name is the tenant's (`tenants.name`), passed in by the caller; the product name is `PRODUCT_NAME`.
+  - To the business: `"Aistimator" <address>`.
+  - Reply-to is untouched: customer emails still reply to the business (T-157).
+  - The address is still `POSTMARK_FROM_EMAIL`. No new env var. If that value was ever set as `Name <address>`, the address is taken out of it and the name dropped, so the header cannot be doubled.
+- **A business name is display text only.** Before it is used it loses line breaks, tabs and every other control character, the Unicode line separators, text-direction overrides and angle brackets; spaces are collapsed; it is cut to 60 characters (whole characters, never half of one). Then the name is put in quotes with `"` and `\` escaped. A name can therefore not close the quotes, bring its own address, or start a new header. An empty name falls back to the product name alone.
+- **Every sender, by kind.** Customer: approve (`lib/quote-approval.ts`), edit and send (first send and revised, `api/quotes/[quoteId]/route.ts`), send again (`resend/route.ts`), the reminder (`api/cron/lifecycle/route.ts`), and the worker's quote and estimate emails. Business: quote accepted, quote declined, customer question, new lead waiting (`lib/lead-hold.ts`), plan limit (`lib/plan-limits.ts`), and the worker's "new quote" and "review and approve" emails.
+- **Changed on purpose:** the worker's "New quote" email to the business used to go out under the business's own name. It is an email to the business, so it now reads Aistimator, like every other email to the business.
+- **Removed:** `fromName` from the worker's `PostmarkConfig` and `EmailConfig`, the three places `quote-processor.ts` set it, and the hardcoded `'Aistimator'` among them.
+
+**Not changed:** who gets an email and when; subjects and bodies; reply-to; the demo business still emails no one; no address is logged (the T-157 tests still pass).
+
+**Constraint:** the From header is built in `shared/email-from.ts` only. A unit test lists every file that calls `sendEmail` with the kind it must pass, and fails if a caller appears that is not on the list.
+
+**Verified (2026-11-13, local stack, not deployed):**
+- Unit tests: web 458, worker 499, mobile 11, all pass. New: `apps/web/src/__tests__/email-from.test.ts` (21) and `apps/worker/src/__tests__/email-from-t159.test.ts` (5). They cover a plain name, quotes, a backslash, commas, angle brackets, line breaks and other control characters, a very long name, an empty name, accents, a set of hostile names, the exact `From` each app hands to Postmark for a customer and for a business email (reply-to unchanged), and the list of callers with their kinds.
+- Regression, t146 to t158: 20, 33, 29, 35, 27, 35, 66, 36, 26, 46, 31, 96, 116, all pass, with the browser passes.
+- `pnpm lint`, `pnpm typecheck`, the web build and the worker build pass.
+
+**Not checked:** a real email in a real inbox. Locally there is no email provider, so nothing is sent; the tests stop at the request handed to Postmark. Whether Postmark and mail apps show the name as written is the hand test in `OWNER-TODO.md`.
+
 ### 2026-11-13: T-158 — Quotes say whose turn it is and what to do next (Feedback 01) (AD-043)
 
 A business owner looking at a quote could not tell who had to act. The labels (Sent, Viewed, Revised, Feedback, Accepted) named a database state, not a person, and the list's actions were icons with no words. This ticket is wording, layout and one list filter. No status value, no action rule and no price changed.

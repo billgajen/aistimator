@@ -17,7 +17,6 @@ import {
 export interface EmailConfig {
   postmarkApiToken: string
   fromEmail: string
-  fromName?: string
   appUrl: string
 }
 
@@ -85,7 +84,6 @@ export async function sendQuoteEmails(
   const postmarkConfig: PostmarkConfig = {
     apiToken: config.postmarkApiToken,
     fromEmail: config.fromEmail,
-    fromName: config.fromName || data.business.name,
   }
 
   const quoteViewUrl = `${config.appUrl}/q/${data.quoteId}?token=${data.quoteToken}`
@@ -119,6 +117,7 @@ export async function sendQuoteEmails(
   // T-151: a phone-only customer has no email address; the business is still told
   const customerResult = data.customer.email
     ? await sendEmail(postmarkConfig, {
+        from: { kind: 'customer', businessName: data.business.name },
         to: data.customer.email,
         subject: `Your quote from ${data.business.name}`,
         htmlBody: customerHtml,
@@ -149,6 +148,7 @@ export async function sendQuoteEmails(
 
   const businessHtml = businessNotificationEmail(businessEmailData)
   const businessResult = await sendEmail(postmarkConfig, {
+    from: { kind: 'business' },
     to: data.business.ownerEmail,
     subject: `New quote: ${data.customer.name} - ${data.service.name}`,
     htmlBody: businessHtml,
@@ -234,8 +234,9 @@ export async function sendReviewRequestEmail(
 ): Promise<{ success: boolean; error?: string }> {
   const { subject, html } = buildReviewRequestEmail(config.appUrl, data)
   const result = await sendEmail(
-    { apiToken: config.postmarkApiToken, fromEmail: config.fromEmail, fromName: config.fromName || data.businessName },
+    { apiToken: config.postmarkApiToken, fromEmail: config.fromEmail },
     {
+      from: { kind: 'business' },
       to: data.ownerEmail,
       subject,
       htmlBody: html,
@@ -290,8 +291,9 @@ export async function sendEstimateShownEmail(
     awaitingConfirmation: true,
   })
   const result = await sendEmail(
-    { apiToken: config.postmarkApiToken, fromEmail: config.fromEmail, fromName: config.fromName || data.businessName },
+    { apiToken: config.postmarkApiToken, fromEmail: config.fromEmail },
     {
+      from: { kind: 'customer', businessName: data.businessName },
       to: data.customerEmail,
       subject: `Your estimate from ${data.businessName}`,
       htmlBody: html,

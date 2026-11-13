@@ -217,6 +217,7 @@ export async function maybeNotifyLimitReached(
         ? formatPrice(status.overagePriceCents, 'usd')
         : undefined
     await sendEmail({
+      from: { kind: 'business' },
       to,
       subject: overagePriceLabel
         ? `Monthly quote limit reached — extra quotes now ${overagePriceLabel} each`

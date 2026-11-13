@@ -2465,7 +2465,6 @@ export async function processQuote(
           {
             postmarkApiToken: env.POSTMARK_API_TOKEN!,
             fromEmail: env.POSTMARK_FROM_EMAIL!,
-            fromName: tenant.name,
             appUrl: env.APP_URL || 'http://localhost:3000',
           },
           {
@@ -2510,7 +2509,6 @@ export async function processQuote(
           {
             postmarkApiToken: env.POSTMARK_API_TOKEN!,
             fromEmail: env.POSTMARK_FROM_EMAIL!,
-            fromName: 'Aistimator',
             appUrl: env.APP_URL || 'http://localhost:3000',
           },
           {
@@ -2549,7 +2547,6 @@ export async function processQuote(
           {
             postmarkApiToken: env.POSTMARK_API_TOKEN!,
             fromEmail: env.POSTMARK_FROM_EMAIL!,
-            fromName: tenant.name,
             appUrl: env.APP_URL || 'http://localhost:3000',
           },
           {

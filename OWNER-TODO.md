@@ -478,3 +478,26 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
 - The live check is `scripts/hardcore-test/verify-t158.mts` (add `PLAYWRIGHT_DIR=…` for the page checks; it saves
   screenshots of the list, the quote page and the phone width into its results folder). It joins the regression set:
   run t146 to t158 before a commit or deploy.
+
+## T-159 — Emails show a sender name
+
+- [ ] **Deploy, in this order:** the worker, then the web app.
+  1. `(cd apps/worker && npx wrangler deploy --env production)`
+  2. `npx vercel deploy --prod`
+
+  No migration and no new setting: the address still comes from `POSTMARK_FROM_EMAIL`. Either order is safe (each
+  app names its own emails); the worker first keeps every email consistent from the moment the web app changes.
+- [ ] **Try by hand:**
+  1. *A customer email.* Approve a quote for a customer address you can read (or press Send again). In the inbox the
+     sender should read "<your business name> via Aistimator", not a bare address. Reply to it: the reply should
+     still be addressed to you.
+  2. *A business email.* Accept that quote as the customer, or send in a new request and wait for "Review and
+     approve". The sender should read "Aistimator".
+  3. If your business name has a comma, quotes or an ampersand in it, check it shows whole and unbroken.
+- [ ] **Email delivery** still waits on the Postmark account approval (above). Until then these emails only reach
+  addresses on your own sending domain.
+- Worth knowing: a business name longer than 60 characters is cut in the sender name (mail apps shorten long sender
+  names anyway). The name inside the email itself is not cut.
+- No live check script for this one: locally there is no email provider, so nothing is sent. The header is checked
+  in the unit tests, including what each app hands to Postmark.
+

@@ -3,11 +3,18 @@
  *
  * Used for resending quote emails from the dashboard.
  */
-import { PRODUCT_NAME, redactEmails } from '@estimator/shared'
+import { PRODUCT_NAME, emailFromHeader, redactEmails } from '@estimator/shared'
+import type { EmailSender } from '@estimator/shared'
 
 const POSTMARK_API_URL = 'https://api.postmarkapp.com/email'
 
 interface EmailMessage {
+  /**
+   * T-159: who the email is for decides the sender name. To a customer it is
+   * "<business name> via <product>", to the business the product name. The
+   * address is always POSTMARK_FROM_EMAIL.
+   */
+  from: EmailSender
   to: string
   subject: string
   htmlBody: string
@@ -52,7 +59,7 @@ export async function sendEmail(message: EmailMessage): Promise<PostmarkResponse
         'X-Postmark-Server-Token': apiToken,
       },
       body: JSON.stringify({
-        From: fromEmail,
+        From: emailFromHeader(message.from, fromEmail),
         To: message.to,
         Subject: message.subject,
         HtmlBody: message.htmlBody,

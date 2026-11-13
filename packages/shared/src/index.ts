@@ -50,6 +50,8 @@ export * from './quote-turn'
 // T-157: money rounding, label maths, the business email rule
 export * from './money'
 export * from './business-email'
+// T-159: the From header on every email
+export * from './email-from'
 
 // ID prefixes for stable, readable IDs
 export const ID_PREFIXES = {

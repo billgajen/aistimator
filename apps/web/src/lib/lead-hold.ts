@@ -34,6 +34,7 @@ export async function notifyLeadHeld(
     if (!to) return
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
     await sendEmail({
+      from: { kind: 'business' },
       to,
       subject: `New lead waiting: ${opts.customerName} — ${opts.per === 'total' ? 'pick a plan' : 'upgrade'} to price it instantly`,
       htmlBody: generateLeadHeldEmailHtml({

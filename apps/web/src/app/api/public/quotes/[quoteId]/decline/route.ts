@@ -132,6 +132,7 @@ export async function POST(
           primaryColor: tenant.branding_json?.primaryColor,
         })
         await sendEmail({
+          from: { kind: 'business' },
           to: businessEmail,
           subject: `Quote declined: ${customer?.name || 'Customer'} - ${service?.name || ''}`,
           htmlBody,

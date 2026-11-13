@@ -506,6 +506,7 @@ export async function PATCH(
       const customer = quote.customer_json as { name: string; email: string }
       const locale = resolveRegionContext(tenant).locale
       const emailResult = await sendEmail({
+        from: { kind: 'customer', businessName: tenant.name },
         to: customer.email,
         subject: `Your quote from ${tenant.name}`,
         htmlBody: generateCustomerEmailHtml({
@@ -534,6 +535,7 @@ export async function PATCH(
       })
 
       const emailResult = await sendEmail({
+        from: { kind: 'customer', businessName: tenant.name },
         to: customer.email,
         subject: `Updated quote from ${tenant.name}`,
         htmlBody,

@@ -159,6 +159,7 @@ export async function POST(
           }),
         })
         await sendEmail({
+          from: { kind: 'business' },
           to: businessEmail,
           subject: `Quote accepted: ${customer?.name || 'Customer'} - ${service?.name || ''}`,
           htmlBody,
