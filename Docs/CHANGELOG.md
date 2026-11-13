@@ -59,14 +59,20 @@ A business owner looking at a quote could not tell who had to act. The labels (S
 - `verify-t157.mts` had four browser checks tied to wording this ticket replaced (the "Timeline" heading, the "Viewed" badge, list icons found by title, "Accept this estimate" on an approved quote). Their selectors were updated; what each check proves is the same.
 - A T-151 unit test read "Decline this estimate" from the customer page's source. The words moved to the shared map, so it now checks the page uses them and what they say.
 
-**Verified (2026-11-13, local stack, not deployed):**
+**Verified (2026-11-13, local stack, before the deploy):**
 - Unit tests: web 437, worker 494, mobile 11, all pass. New: `apps/web/src/__tests__/quote-turn.test.ts` (42): every status and its group, the three `pending_review` cases, each detail line, each next step, the time words, the tracker, the customer words, Home's list, and the list route.
 - `scripts/hardcore-test/verify-t158.mts` with the browser pass: 116/116. It covers the list API (groups, counts, default tab, `status=declined`, search, tenant isolation, the mobile app's call), label, detail and button for a quote in every group read from real rows, Home, the tabs and counts, a next-step button per group, the More menu, the Next step box, the tracker for approved, automatic, accepted, declined, expired and paid quotes, the customer wording for a reviewed and an unreviewed quote, and the list and quote page at phone width. It saves screenshots into its results folder.
 - Regression, t146 to t157: 20, 33, 29, 35, 27, 35, 66, 36, 26, 46, 31, 96, all pass (t154, t155 and t157 with their browser passes).
 - `pnpm lint`, `pnpm typecheck`, the web build and the worker build pass.
 - Five quotes in the live check went through the real pipeline (approve, automatic send, customer view, accept, decline, a customer question). The other rows are copies of those with a status set by hand, because this ticket is how a status reads, not how a quote reaches it.
 
-**Not checked:** "Send again" pressed from a list row (locally there is no email provider; the route is the T-157 one and its rule is what decides whether the button shows). Production: nothing is deployed.
+**Not checked:** "Send again" pressed from a list row (locally there is no email provider; the route is the T-157 one and its rule is what decides whether the button shows).
+
+**Deployed 2026-11-13 22:52 UTC** (commit `879de02`): web only, `npx vercel deploy --prod`, deployment `dpl_4DgPGdsvb7dDP5CDzyBXGiqbSHSv`, Ready and serving `estimator-web-phi.vercel.app`. No migration and no worker deploy. `pnpm lint` and `pnpm typecheck` passed again before the commit; no code changed after the full verify run above, so the scripts were not re-run.
+
+Live checks, read-only (nothing was submitted to production): `/` 200; `/login` 200; `/app` signed out 307 to `/login?next=%2Fapp`; `GET /api/quotes` signed out 401 `UNAUTHORIZED`, with and without `group`; the public quote API with a made-up id and token 404 `QUOTE_NOT_FOUND`; worker `/health` 200.
+
+Not proven in production: the new screens with real data (tabs, counts, labels, the Next step box, search). Every one of them needs a signed-in session, and the checks above were signed out. They are the hand tests in `OWNER-TODO.md`.
 
 ### 2026-11-13: T-157 — Quote actions that always work (fixes from Feedback 01) (AD-042)
 

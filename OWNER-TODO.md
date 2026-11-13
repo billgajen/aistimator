@@ -99,6 +99,7 @@ Code for every item is already built; these are the steps that unlock it.
      by email and shows on the quote page, but the business answers outside the app (phone, its own email) and then
      presses "Mark as answered", or edits the quote and sends it. A reply box that emails or texts the customer and
      keeps the thread on the quote is not built.
+  9. **Suggest chasing a quiet customer (T-158 follow-up).** A quote the customer opened several days ago and has not answered still reads "Nothing for you to do". Make its next step "Contact customer" after a set number of days.
 - [x] **Disagreement path decided 2026-11-09:** both. The reviewer gets the scope answers and a 30 s cap (CHANGELOG 2026-11-09).
 
 ## T-139 — Identification signals (nameplate reading)
@@ -440,7 +441,8 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
 
 ## T-158 — Quotes say whose turn it is
 
-- [ ] **Deploy: the web app only.** `npx vercel deploy --prod`. No migration and no worker deploy: nothing in the
+- [x] **Deploy: the web app only.** Done 2026-11-13 22:52 UTC (commit `879de02`, web
+  `dpl_4DgPGdsvb7dDP5CDzyBXGiqbSHSv`). `npx vercel deploy --prod`. No migration and no worker deploy: nothing in the
   database changed, and the worker's behaviour is the same (the new shared file is not used by it).
 - [ ] **Try by hand, on your own business:**
   1. *Tabs.* Open Quotes. It should open on **Needs you** when anything waits for you, otherwise on **All**. Each tab
@@ -469,7 +471,7 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
 - Worth knowing:
   - "Opened <when>" is the first time the customer opened the quote. A later visit does not change it.
   - An opened quote always reads "Nothing for you to do", however long ago it was opened. The app does not yet
-    suggest chasing a customer who has gone quiet.
+    suggest chasing a customer who has gone quiet (product backlog item 9 above).
   - The mobile app still shows its own status words (`apps/mobile/src/lib/price.ts`). It was outside this ticket.
 - Not built here, by the ticket: the menu, a Home redesign, a "seen" state for unfinished requests, the sign-in
   tagline (next ticket); replying to the customer inside the app (backlog item 8); a "booked" or "job done" status.
