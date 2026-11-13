@@ -481,7 +481,8 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
 
 ## T-159 — Emails show a sender name
 
-- [ ] **Deploy, in this order:** the worker, then the web app.
+- [x] **Deploy, in this order:** the worker, then the web app. Done 2026-11-13 23:18 UTC (commit `ed75bf2`, worker
+  `18e5cd25-0f05-47ff-9366-10d2e259fb3b`, web `dpl_D3aagpDvXwnVBAws7i3Ux8Hg4M9s`).
   1. `(cd apps/worker && npx wrangler deploy --env production)`
   2. `npx vercel deploy --prod`
 

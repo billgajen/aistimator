@@ -35,12 +35,18 @@ Emails had no proper sender name, so each mail app showed whatever it made up fr
 
 **Constraint:** the From header is built in `shared/email-from.ts` only. A unit test lists every file that calls `sendEmail` with the kind it must pass, and fails if a caller appears that is not on the list.
 
-**Verified (2026-11-13, local stack, not deployed):**
+**Verified (2026-11-13, local stack, before the deploy):**
 - Unit tests: web 458, worker 499, mobile 11, all pass. New: `apps/web/src/__tests__/email-from.test.ts` (21) and `apps/worker/src/__tests__/email-from-t159.test.ts` (5). They cover a plain name, quotes, a backslash, commas, angle brackets, line breaks and other control characters, a very long name, an empty name, accents, a set of hostile names, the exact `From` each app hands to Postmark for a customer and for a business email (reply-to unchanged), and the list of callers with their kinds.
 - Regression, t146 to t158: 20, 33, 29, 35, 27, 35, 66, 36, 26, 46, 31, 96, 116, all pass, with the browser passes.
 - `pnpm lint`, `pnpm typecheck`, the web build and the worker build pass.
 
 **Not checked:** a real email in a real inbox. Locally there is no email provider, so nothing is sent; the tests stop at the request handed to Postmark. Whether Postmark and mail apps show the name as written is the hand test in `OWNER-TODO.md`.
+
+**Deployed 2026-11-13 23:18 UTC** (commit `ed75bf2`), in this order: worker version `18e5cd25-0f05-47ff-9366-10d2e259fb3b`, then web (`npx vercel deploy --prod`, deployment `dpl_D3aagpDvXwnVBAws7i3Ux8Hg4M9s`, Ready and serving `estimator-web-phi.vercel.app`). No migration. `pnpm lint` and `pnpm typecheck` passed again before the commit; no app code changed after the full verify run above, so the scripts were not re-run.
+
+Live checks, read-only (nothing was submitted to production): `/` 200; `/login` 200; `/app` signed out 307 to `/login?next=%2Fapp`; worker `/health` 200 (before and after the web deploy); the public quote API with a made-up id and token 404 `QUOTE_NOT_FOUND`.
+
+Not proven in production: the sender name on a delivered email. That needs a real email, and these checks send none. It is the hand test in `OWNER-TODO.md`.
 
 ### 2026-11-13: T-158 — Quotes say whose turn it is and what to do next (Feedback 01) (AD-043)
 
