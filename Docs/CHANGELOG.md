@@ -79,7 +79,7 @@ Six things around a quote were broken or misleading. Each is fixed at its root. 
 - Stored quotes are not rewritten. An old quote keeps its raw amounts until it is next saved.
 
 **Found while verifying:**
-- The first live run returned 404 for the owner pressing "Mark as answered". The route checked the id was a uuid, as `supabase/migrations/00000000000017_quote_amendments.sql` declares, but the database issues prefixed text ids (`fb_…`, default `generate_prefixed_id('fb')`). The route now accepts either shape; an id of neither shape, or one the tenant doesn't own, is 404. That migration file and the live table disagree about the id's type; nothing here depends on which.
+- The first live run returned 404 for the owner pressing "Mark as answered". The route checked the id was a uuid, as `supabase/migrations/00000000000017_quote_amendments.sql` declares, but the database issues prefixed text ids (`fb_…`, default `generate_prefixed_id('fb')`). The route now accepts either shape; an id of neither shape, or one the tenant doesn't own, is 404. That migration file and the local table disagree about the id's type (production turned out to be `uuid`, see the deploy record below); nothing here depends on which.
 - With the list of 10, the customer's very first link also survives through `previous_token_hash` (T-146) until the next approval or edit-and-send replaces that column.
 - One local quote submission hung for four minutes in the worker after pricing and did not recur. See "Not changed" below.
 
@@ -109,7 +109,21 @@ Six things around a quote were broken or misleading. Each is fixed at its root. 
 - `quote_feedback` still allows anonymous inserts (OWNER-TODO, rate limiting section).
 - Replying to the customer inside the app: v2 backlog (OWNER-TODO, product backlog item 8).
 
-**Not deployed, not committed.** Deploy order when it goes: migration 38, then the worker, then the web app (OWNER-TODO, T-157).
+**Deployed 2026-11-13 17:58 UTC** (commit `7eafff7`), in this order:
+1. migration 38 (`scripts/deploy-migration-38.sh`): latest `00000000000038`; `quotes.link_token_hashes` present (`text[]`, not null, default `'{}'`); trigger `quotes_keep_link_tokens` present, enabled, BEFORE UPDATE;
+2. worker version `fdd2fb86-9425-4f89-b05a-27d7cbd69ea9`;
+3. web (Vercel `dpl_BLrNeaZ7cU8yiYiRjrmb4JmB3o7w`, READY, aliased to `estimator-web-phi.vercel.app`).
+
+Live checks (read-only):
+- worker `/health` 200; `/` and `/login` 200; `/app` signed out 307;
+- public quote API: 404 `QUOTE_NOT_FOUND` for a made-up token, 401 `MISSING_TOKEN` with none;
+- `POST /api/quotes/{id}/feedback/{id}/answered` signed out: 401;
+- **production `quote_feedback.id` is `uuid`** (default `gen_random_uuid()`, as migration 17's file says; `quote_amendments.feedback_id` is `uuid` too). The local database issues `fb_…` text ids instead, so local and production differ here. The answered route accepts both shapes;
+- no production quote has a kept link yet (`link_token_hashes` is empty everywhere): the list fills from the next token change on.
+
+Not proven in production: that a real customer link opens through the new token filter. A made-up token is 404 whether the filter matches nothing or fails, and no real token is stored to try. The same filter passed against the local database; opening one existing quote link by hand settles it (OWNER-TODO, T-157).
+
+No request was submitted to production.
 
 **Files:** `supabase/migrations/00000000000038_quote_link_tokens.sql`, `scripts/deploy-migration-38.sh`, `scripts/hardcore-test/verify-t157.mts`, `packages/shared/src/{money,business-email,quote-status,index,api.types,database.types}.ts`, `apps/worker/src/{business-email.ts,quote-processor.ts,email/index.ts,email/postmark.ts,pricing/rules-engine.ts,ai/quote-validator.ts,__tests__/quote-actions-t157.test.ts}`, `apps/web/src/lib/{business-email,quote-action-copy,tokens,plan-limits,lead-hold,postmark,quote-approval,quote-intake}.ts`, `apps/web/src/lib/messaging/intake-engine.ts`, `apps/web/src/app/api/quotes/[quoteId]/{route.ts,resend,link,pdf,feedback/[feedbackId]/answered}`, `apps/web/src/app/api/sms/send-quote/route.ts`, `apps/web/src/app/api/cron/lifecycle/route.ts`, `apps/web/src/app/api/public/quotes/[quoteId]/{route.ts,accept,decline,feedback,clarify}`, `apps/web/src/app/(dashboard)/app/quotes/{page.tsx,[quoteId]/page.tsx}`, `apps/web/src/app/q/[quoteId]/page.tsx`, `apps/web/src/components/quote-editor/useQuotePricing.ts`, `apps/web/src/__tests__/{quote-actions,customer-language}.test.ts`, `Docs/{02-api-contracts,03-data-model}.md`, `OWNER-TODO.md`.
 

@@ -319,6 +319,15 @@ Code for every item is already built; these are the steps that unlock it.
   token first. Anyone with the public anon key could insert rows straight into the table. Left as it is in T-157 on
   purpose; drop the policy and the grant in a later migration.
 
+## Reliability (found during T-157, 2026-11-13)
+
+- [ ] **The worker's wording, add-on detection and validation AI calls have no timeout.** A stalled call holds the
+  request until the platform ends it (one local submission hung for four minutes), and the wording fallback only
+  runs on an error, never on a stall. Give them one in a small ticket, like identification (25 s), adjudication
+  (30 s) and the sentence rewriter (15 s) already have.
+- Production `quote_feedback.id` is `uuid`; the local database issues `fb_…` text ids. Harmless today (the
+  "answered" route accepts both), but local and production schemas differ there.
+
 ## T-154 — Home page rewrite
 
 - [x] **Deploy: web only** (`npx vercel deploy --prod`). No migration, no worker change. Done 2026-11-10 with T-155
@@ -390,15 +399,18 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
 
 ## T-157 — Quote actions that always work
 
-- [ ] **Deploy, in this order** (nothing is deployed or committed yet):
+- [x] **Deploy, in this order:** done 2026-11-13 17:58 UTC (commit `7eafff7`, worker `fdd2fb86-9425-4f89-b05a-27d7cbd69ea9`,
+  web `dpl_BLrNeaZ7cU8yiYiRjrmb4JmB3o7w`).
   1. migration 38: `bash scripts/deploy-migration-38.sh` (`quotes.link_token_hashes` and the trigger that keeps the
-     replaced link whenever a quote's token changes). It refuses to run unless production is at 37.
+     replaced link whenever a quote's token changes);
   2. the worker: `(cd apps/worker && npx wrangler deploy --env production)`;
   3. the web app: `npx vercel deploy --prod`.
 
   The migration first, because the new web app's public quote routes read the new column: without it every customer
   quote page would fail. The old web app and old worker ignore the column, and the trigger already protects links
   they hand out. The worker before the web app keeps the rounding and the business email rule in step with the editor.
+- [ ] **First, open one existing quote link** (from any customer email sent before today). It should open as before.
+  This is the one thing the read-only deploy checks could not prove: a made-up token gets 404 either way.
 - [ ] **Try by hand, with your own business and a customer address you can read:**
   1. *Emails to you.* Leave Settings > Notifications empty. Accept a quote as the customer: "Quote accepted" should
      reach your login email. Ask a question and decline another quote: the same. Then fill in a different address in
