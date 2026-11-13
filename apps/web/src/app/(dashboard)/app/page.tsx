@@ -1,8 +1,8 @@
 import { syncSelectedPlan } from '@/lib/signup-choices'
 import { createClient } from '@/lib/supabase/server'
-import { formatMoney, getRegion } from '@estimator/shared'
+import { formatMoney, getRegion, quoteTurn } from '@estimator/shared'
 import { buildChecklist } from '@/lib/setup-checklist'
-import { homeNumbers, waitingForApproval, HOME_WINDOW_DAYS, type HomeQuoteRow } from '@/lib/home-numbers'
+import { homeNumbers, waitingForYou, WAITING_FOR_YOU_STATUSES, HOME_WINDOW_DAYS, type HomeQuoteRow } from '@/lib/home-numbers'
 import { WaitingForYou, type WaitingQuote } from '@/components/home/WaitingForYou'
 import { checkPlanLimit } from '@/lib/plan-limits'
 import { PageHeader } from '@/components/dashboard/EmptyState'
@@ -12,7 +12,8 @@ import { redirect } from 'next/navigation'
 export const dynamic = 'force-dynamic'
 
 /**
- * Home (T-152), top to bottom: quotes waiting for approval, unfinished
+ * Home (T-152), top to bottom: quotes waiting for the owner (T-158: to
+ * approve, a customer question, or a request that could not be priced), unfinished
  * requests, plan usage, the setup checklist until it's done, and four numbers
  * for the last 30 days ("See all numbers" opens Analytics).
  */
@@ -72,12 +73,13 @@ export default async function DashboardPage() {
   // Every query below is scoped to this tenant (RLS + explicit filter)
   const [servicesResult, waitingResult, recentResult, realRequestResult] = await Promise.all([
     supabase.from('services').select('id').eq('tenant_id', profile.tenant_id).eq('active', true).limit(1),
-    // a. waiting for approval, newest first
+    // a. waiting for the owner, newest first (T-158: also customer questions
+    // and requests that could not be priced)
     supabase
       .from('quotes')
       .select('id, status, created_at, customer_json, pricing_json, content_json, is_test, services!service_id (name)')
       .eq('tenant_id', profile.tenant_id)
-      .eq('status', 'pending_review')
+      .in('status', [...WAITING_FOR_YOU_STATUSES])
       .eq('is_test', false)
       .order('created_at', { ascending: false })
       .limit(25),
@@ -107,12 +109,12 @@ export default async function DashboardPage() {
     redirect('/app/onboarding')
   }
 
-  const waiting: WaitingQuote[] = waitingForApproval(
+  const waiting: WaitingQuote[] = waitingForYou(
     (waitingResult.data ?? []) as unknown as Array<{
       id: string
       status: string
       created_at: string
-      customer_json: { name?: string } | null
+      customer_json: { name?: string; email?: string } | null
       pricing_json: { total?: number } | null
       content_json: { limitHold?: boolean } | null
       is_test: boolean | null
@@ -120,12 +122,25 @@ export default async function DashboardPage() {
     }>
   ).map((q) => {
     const service = Array.isArray(q.services) ? q.services[0] : q.services
+    const total = q.pricing_json?.total ?? 0
+    // T-158: the same label and next step the quotes list shows
+    const turn = quoteTurn({
+      status: q.status,
+      customerName: q.customer_json?.name,
+      hasEmail: Boolean(q.customer_json?.email),
+      total,
+      held: q.content_json?.limitHold === true,
+    })
     return {
       id: q.id,
       customerName: q.customer_json?.name?.trim() || 'Customer',
       serviceName: service?.name || 'Service',
-      priceLabel: formatMoney(q.pricing_json?.total ?? 0, currency, locale),
+      priceLabel: total > 0 ? formatMoney(total, currency, locale) : null,
       createdLabel: new Date(q.created_at).toLocaleDateString(locale, { day: 'numeric', month: 'short' }),
+      label: turn.label,
+      tone: turn.tone,
+      action: turn.action === 'approve' ? 'approve' : 'open',
+      buttonLabel: turn.buttonLabel ?? '',
     }
   })
 

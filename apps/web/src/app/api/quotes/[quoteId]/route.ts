@@ -164,6 +164,9 @@ export async function GET(
         triage_json: quote.triage_json,
         quality_gate_json: quote.quality_gate_json,
         approved_at: quote.approved_at ?? null,
+        // T-158: the tracker's final step (declined or expired) shows its date
+        declined_at: quote.declined_at ?? null,
+        token_expires_at: quote.token_expires_at ?? null,
         // This response enumerates fields: a column left out here is invisible
         // to the dashboard quote page. T-147's review_hold and T-150's is_test
         // were missing until T-151 added acceptance_json.

@@ -3,13 +3,15 @@
 import { AcceptanceCard } from '@/components/quotes/AcceptanceCard'
 import type { AcceptanceDetails } from '@/lib/acceptance'
 import { useEffect, useState, useCallback } from 'react'
-import { formatMoney, quoteActions } from '@estimator/shared'
+import { formatMoney, quoteActions, quoteTurn, quoteTracker, customerFirstName } from '@estimator/shared'
+import { NextStepBox } from '@/components/quotes/NextStepBox'
+import { QuoteTracker } from '@/components/quotes/QuoteTracker'
+import { TurnBadge } from '@/components/quotes/TurnBadge'
 import { approvedWithoutEmailMessage, copyLinkFallbackMessage } from '@/lib/quote-action-copy'
 import Link from 'next/link'
 import { FinalInvoiceCard } from '@/components/analytics/FinalInvoiceCard'
 import type {
   QuoteDetailResponse,
-  QuoteStatus,
   QuotePricing,
   QuoteContent,
   AmendmentSummary,
@@ -230,8 +232,37 @@ export default function QuoteDetailPage({
   // T-151: what the customer told the business when accepting
   const acceptance = (quote as unknown as { acceptance_json?: AcceptanceDetails | null }).acceptance_json ?? null
   // T-146: a priced quote waiting for the business; held leads are priced first
-  const awaitingApproval =
-    quote.status === 'pending_review' && !(content as { limitHold?: boolean } | null)?.limitHold && (pricing?.total ?? 0) > 0
+  const held = (content as { limitHold?: boolean } | null)?.limitHold === true
+  const awaitingApproval = quote.status === 'pending_review' && !held && (pricing?.total ?? 0) > 0
+  // T-158: whose turn it is and the one next step, from the shared map. The
+  // same map words the quotes list and Home.
+  const turn = quoteTurn({
+    status: quote.status,
+    customerName: customer?.name,
+    hasEmail: Boolean(customer?.email),
+    total: pricing?.total,
+    held,
+    createdAt: quote.created_at,
+    sentAt: quote.sent_at,
+    viewedAt: quote.viewed_at,
+    acceptedAt: quote.accepted_at,
+    paidAt: quote.paid_at,
+    declinedAt: quote.declined_at,
+    expiresAt: quote.token_expires_at,
+  })
+  const trackerSteps = quoteTracker({
+    status: quote.status,
+    total: pricing?.total,
+    held,
+    createdAt: quote.created_at,
+    approvedAt: quote.approved_at,
+    sentAt: quote.sent_at,
+    viewedAt: quote.viewed_at,
+    acceptedAt: quote.accepted_at,
+    paidAt: quote.paid_at,
+    declinedAt: quote.declined_at,
+    expiresAt: quote.token_expires_at,
+  })
 
   if (editMode) {
     // Dynamic import to keep initial bundle small
@@ -255,7 +286,7 @@ export default function QuoteDetailPage({
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <Link
             href="/app/quotes"
@@ -279,9 +310,10 @@ export default function QuoteDetailPage({
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <StatusBadge status={quote.status as QuoteStatus} />
-          {canEdit && (
+        <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+          <TurnBadge turn={turn} showDetail={false} />
+          {/* T-158: a button that is the next step sits in the Next step box, not here as well */}
+          {canEdit && turn.action !== 'add_price' && (
             <button
               onClick={() => setEditMode(true)}
               className="px-4 py-2 text-sm font-semibold text-text-primary bg-background border border-border rounded-lg hover:bg-surface transition-colors"
@@ -289,16 +321,7 @@ export default function QuoteDetailPage({
               Edit
             </button>
           )}
-          {awaitingApproval && (
-            <button
-              onClick={handleApprove}
-              disabled={approving}
-              className="px-4 py-2 text-sm font-semibold text-white bg-primary rounded-lg hover:bg-primary-hover disabled:opacity-50 transition-colors"
-            >
-              {approving ? 'Sending…' : 'Approve & send'}
-            </button>
-          )}
-          {actions.sendAgain && (
+          {actions.sendAgain && turn.action !== 'send_again' && (
             <button
               onClick={handleResend}
               disabled={resending}
@@ -346,41 +369,21 @@ export default function QuoteDetailPage({
         </p>
       )}
 
-      {/* T-147: what the customer sees while this waits for approval */}
-      {awaitingApproval && (
-        <p className="mb-6 rounded-lg border border-border bg-surface px-4 py-3 text-sm text-text-secondary">
-          {(quote as { review_hold?: string | null }).review_hold === 'shown'
-            ? 'The customer can already see this as an estimate. They can accept it once you approve.'
-            : 'The customer sees “Your estimate is being prepared” and no price until you approve.'}
-        </p>
-      )}
-
-      {/* T-134: lead held because the monthly plan limit was reached */}
-      {(quote.content_json as { limitHold?: boolean } | null)?.limitHold && quote.status === 'pending_review' && (
-        <div className="mb-6 rounded-lg border border-tape/40 bg-butter/40 p-4">
-          <p className="text-sm font-semibold text-text-primary">Lead saved — not priced yet</p>
-          <p className="mt-1 text-sm text-text-secondary">
-            This request arrived after your plan&apos;s monthly limit. The customer was told you&apos;ll send their estimate
-            shortly. Upgrade your plan, then price it here — or contact the customer yourself.
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <a href="/app/settings/billing" className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">
-              Upgrade plan
-            </a>
-            <button
-              onClick={handlePriceHeldLead}
-              disabled={pricingHeld}
-              className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-semibold text-text-primary hover:bg-surface disabled:opacity-50"
-            >
-              {pricingHeld ? 'Starting…' : 'Price this lead'}
-            </button>
-            {priceResult && <span className="text-xs text-text-muted">{priceResult}</span>}
-          </div>
-        </div>
-      )}
-
-      {/* T-151: what the customer told you when accepting */}
-      {acceptance && <AcceptanceCard details={acceptance} />}
+      {/* T-158: whose turn it is, in one sentence, with the one main button */}
+      <NextStepBox
+        turn={turn}
+        firstName={customerFirstName(customer?.name)}
+        email={customer?.email || null}
+        phone={acceptance?.phone || customer?.phone || null}
+        approving={approving}
+        onApprove={handleApprove}
+        onEdit={() => setEditMode(true)}
+        pricing={pricingHeld}
+        priceResult={priceResult}
+        onPrice={handlePriceHeldLead}
+        resending={resending}
+        onSendAgain={handleResend}
+      />
 
       {/* Open customer questions (and old review requests, which customers can no longer send) */}
       {pendingFeedback.length > 0 && (
@@ -418,6 +421,21 @@ export default function QuoteDetailPage({
           ))}
         </div>
       )}
+
+      {/* T-158: the four steps, replacing the plain timeline */}
+      <QuoteTracker steps={trackerSteps} />
+
+      {/* T-147: what the customer sees while this waits for approval */}
+      {awaitingApproval && (
+        <p className="mb-6 rounded-lg border border-border bg-surface px-4 py-3 text-sm text-text-secondary">
+          {(quote as { review_hold?: string | null }).review_hold === 'shown'
+            ? 'The customer can already see this as an estimate. They can accept it once you approve.'
+            : 'The customer sees “Your estimate is being prepared” and no price until you approve.'}
+        </p>
+      )}
+
+      {/* T-151: what the customer told you when accepting */}
+      {acceptance && <AcceptanceCard details={acceptance} />}
 
       {/* Business notes */}
       {quote.business_notes && (
@@ -530,20 +548,6 @@ export default function QuoteDetailPage({
           {customer.phone && <p className="text-text-secondary">{customer.phone}</p>}
         </div>
       </Section>
-
-      {/* Timeline */}
-      <Section title="Timeline">
-        <div className="text-sm space-y-2">
-          <TimelineEntry label="Created" date={quote.created_at} />
-          {quote.sent_at && <TimelineEntry label="Sent" date={quote.sent_at} />}
-          {quote.viewed_at && <TimelineEntry label="Viewed" date={quote.viewed_at} />}
-          {quote.last_amended_at && (
-            <TimelineEntry label={`Edited (v${quote.version})`} date={quote.last_amended_at} />
-          )}
-          {quote.accepted_at && <TimelineEntry label="Accepted" date={quote.accepted_at} />}
-          {quote.paid_at && <TimelineEntry label="Paid" date={quote.paid_at} />}
-        </div>
-      </Section>
     </div>
   )
 }
@@ -553,15 +557,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div className="mb-6 bg-surface border border-border rounded-lg p-5">
       <h3 className="text-sm font-semibold text-text-primary mb-3">{title}</h3>
       {children}
-    </div>
-  )
-}
-
-function TimelineEntry({ label, date }: { label: string; date: string }) {
-  return (
-    <div className="flex justify-between">
-      <span className="text-text-secondary">{label}</span>
-      <span className="text-text-muted">{formatDate(date)}</span>
     </div>
   )
 }
@@ -619,30 +614,6 @@ function VersionHistory({
         </div>
       )}
     </div>
-  )
-}
-
-function StatusBadge({ status }: { status: QuoteStatus }) {
-  const config: Record<QuoteStatus, { label: string; className: string }> = {
-    queued: { label: 'Queued', className: 'bg-background text-text-secondary' },
-    generating: { label: 'Processing', className: 'bg-tertiary-light text-tertiary' },
-    pending_review: { label: 'Awaiting your approval', className: 'bg-tertiary-light text-tertiary' },
-    awaiting_clarification: { label: 'Awaiting Info', className: 'bg-tertiary-light text-tertiary' },
-    sent: { label: 'Sent', className: 'bg-primary-light text-primary' },
-    viewed: { label: 'Viewed', className: 'bg-primary-light text-primary' },
-    feedback_received: { label: 'Feedback', className: 'bg-tertiary-light text-tertiary' },
-    revised: { label: 'Revised', className: 'bg-primary-light text-primary' },
-    accepted: { label: 'Accepted', className: 'bg-secondary-light text-secondary' },
-    declined: { label: 'Declined', className: 'bg-background text-text-muted' },
-    paid: { label: 'Paid', className: 'bg-secondary-light text-secondary' },
-    expired: { label: 'Expired', className: 'bg-background text-text-muted' },
-    failed: { label: 'Failed', className: 'bg-danger-light text-danger' },
-  }
-  const c = config[status] || config.sent
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${c.className}`}>
-      {c.label}
-    </span>
   )
 }
 

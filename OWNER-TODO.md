@@ -424,8 +424,10 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
      trigger) the 3-day reminder. The first link should still open the quote each time, and so should every newer one.
   4. *Questions.* As the customer, ask a question: "Message sent" shows, Accept and Decline stay, and it is the same
      after a reload. On the quote page the banner reads "Customer question"; press **Mark as answered**, reload, and
-     it should stay closed with the status back to Viewed. The customer can then ask again or accept.
-  5. *Revised.* Edit a sent quote and Save & Send twice: the status should read Revised both times.
+     it should stay closed with the status back to Viewed (T-158: it now reads "Waiting for customer", with "They
+     opened it today" in the Next step box). The customer can then ask again or accept.
+  5. *Revised.* Edit a sent quote and Save & Send twice: the status should read Revised both times (T-158: it now
+     reads "Waiting for customer", "Updated quote sent today" on the list).
   6. *Money.* Open an older painting quote with a line like "Exterior walls  £18 x 34.6(Sqm)" in the editor: the amount
      box should read 622.8, not 622.8000000000001. Change that amount, leave the label, save: the customer page
      should show "Exterior walls" with no maths under it. A line you leave alone keeps its maths.
@@ -436,3 +438,41 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
 - The live check is `scripts/hardcore-test/verify-t157.mts` (add `PLAYWRIGHT_DIR=…` for the page checks). It joins the
   regression set: run t146 to t157 before a commit or deploy.
 
+## T-158 — Quotes say whose turn it is
+
+- [ ] **Deploy: the web app only.** `npx vercel deploy --prod`. No migration and no worker deploy: nothing in the
+  database changed, and the worker's behaviour is the same (the new shared file is not used by it).
+- [ ] **Try by hand, on your own business:**
+  1. *Tabs.* Open Quotes. It should open on **Needs you** when anything waits for you, otherwise on **All**. Each tab
+     shows a count: Needs you, Waiting for customer, Accepted, Closed, Unfinished, All. On your phone the tabs should
+     scroll sideways and each quote should stack.
+  2. *Labels.* No quote should read Sent, Viewed, Revised or Feedback. A sent quote reads "Waiting for customer" with
+     a line such as "Sent 2 days ago, not opened yet" or "Opened yesterday".
+  3. *One button with words.* A quote awaiting approval: **Check and approve**. A customer question: **Answer
+     question**. An accepted quote: **Contact customer**. A quote unopened for 3 days, or expired: **Send again**.
+     A quote sent today: no button. Everything else is under **More**, in words (Copy link, Download PDF, Send again,
+     Pricing trace).
+  4. *Search.* Type part of a customer's name or email. The list should narrow and the counts with it. (Search used
+     to fail on every attempt; see the changelog.)
+  5. *Quote page.* A quote awaiting approval starts with "Check the price and approve. The customer can accept only
+     after you approve." and **Approve & send**. After approving it reads "Nothing for you to do. Waiting for
+     <first name>. Sent today, not opened yet." An accepted quote reads "<Name> accepted on <date>. Contact them to
+     book the job." with **Email** and **Call**.
+  6. *Progress.* Under the box: Request received, You approved, Customer opened, Customer accepted, each with its date
+     once done. A service set to send automatically shows "Sent automatically" as step two. A declined quote ends
+     with "Customer declined".
+  7. *Home.* "Waiting for you" should also list a customer question and a request that could not be priced, and count
+     them: "3 need you".
+  8. *Customer page.* Open an approved quote as the customer: the button reads "Accept this quote", the quiet link
+     "Decline this quote", and afterwards "Quote accepted" or "Quote declined". For a service that sends
+     automatically, all of these still say "estimate".
+- Worth knowing:
+  - "Opened <when>" is the first time the customer opened the quote. A later visit does not change it.
+  - An opened quote always reads "Nothing for you to do", however long ago it was opened. The app does not yet
+    suggest chasing a customer who has gone quiet.
+  - The mobile app still shows its own status words (`apps/mobile/src/lib/price.ts`). It was outside this ticket.
+- Not built here, by the ticket: the menu, a Home redesign, a "seen" state for unfinished requests, the sign-in
+  tagline (next ticket); replying to the customer inside the app (backlog item 8); a "booked" or "job done" status.
+- The live check is `scripts/hardcore-test/verify-t158.mts` (add `PLAYWRIGHT_DIR=…` for the page checks; it saves
+  screenshots of the list, the quote page and the phone width into its results folder). It joins the regression set:
+  run t146 to t158 before a commit or deploy.

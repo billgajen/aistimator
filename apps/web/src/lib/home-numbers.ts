@@ -48,3 +48,21 @@ export function waitingForApproval<
     .filter((q) => q.status === 'pending_review' && !q.is_test && !q.content_json?.limitHold && (q.pricing_json?.total ?? 0) > 0)
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
 }
+
+/** T-158: the statuses Home's "Waiting for you" reads (the "Needs you" group) */
+export const WAITING_FOR_YOU_STATUSES = ['pending_review', 'feedback_received', 'failed'] as const
+
+/**
+ * Pure (T-158): everything on Home that waits for the owner, newest first —
+ * quotes to approve (the rule above), customer questions, and requests that
+ * could not be priced. Setup tests and requests held by the plan limit stay
+ * out, as before: the plan banner covers the held ones.
+ */
+export function waitingForYou<
+  T extends { status: string; created_at: string; pricing_json: { total?: number } | null; content_json: { limitHold?: boolean } | null; is_test?: boolean | null },
+>(rows: T[] | null | undefined): T[] {
+  const approvals = new Set(waitingForApproval(rows))
+  return (rows ?? [])
+    .filter((q) => approvals.has(q) || (!q.is_test && (q.status === 'feedback_received' || q.status === 'failed')))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+}

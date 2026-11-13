@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { brandStyleVars } from '@/lib/color'
 import type { QuoteViewResponse, QuoteStatus } from '@estimator/shared'
-import { formatMoney, formatDate, formatNumber, currencySymbol, unitDisplayLabel, isQuoteProcessing, canCustomerDecide, splitLabelMath, PRODUCT_NAME } from '@estimator/shared'
+import { formatMoney, formatDate, formatNumber, currencySymbol, unitDisplayLabel, isQuoteProcessing, canCustomerDecide, customerDecisionWords, splitLabelMath, PRODUCT_NAME } from '@estimator/shared'
 
 interface QuotePageProps {
   params: { quoteId: string }
@@ -265,6 +265,9 @@ export default function QuotePage({ params }: QuotePageProps) {
   const { business, branding, customer, pricing, notes, validUntil, assets, status, actions, crossServicePricing, signalRecommendations, version: quoteVersion, acceptQuoteEnabled, takeoff, reference, review, estimateRange } = quote
   // T-146: exactly two customer states — an unreviewed Estimate or a reviewed Quote
   const isReviewedQuote = review?.state === 'quote'
+  // T-158: "quote" around Accept and Decline once the business has reviewed
+  // it; "estimate" on one that was sent automatically
+  const words = customerDecisionWords(isReviewedQuote)
   // T-133: tenant locale for money and dates (legacy quotes without one render as before)
   const locale = quote.locale || 'en-GB'
   const brandVars = brandStyleVars(branding?.primaryColor)
@@ -765,7 +768,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                     disabled={accepting}
                     className="w-full py-4 px-4 rounded-warm-xl font-display font-bold text-on-primary text-base bg-primary hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 disabled:cursor-not-allowed transition"
                   >
-                    {accepting ? 'Accepting…' : `Accept this estimate — ${formatCurrency(pricing.total, pricing.currency, locale)}`}
+                    {accepting ? 'Accepting…' : `${words.accept} — ${formatCurrency(pricing.total, pricing.currency, locale)}`}
                   </button>
                   <p className="text-xs text-text-muted text-center mt-2.5">
                     Accepting tells {business.name} to go ahead. Nothing is charged today.
@@ -827,14 +830,14 @@ export default function QuotePage({ params }: QuotePageProps) {
                     onClick={() => setDeclineMode(true)}
                     className="text-xs text-text-muted underline underline-offset-2 hover:text-text-secondary transition"
                   >
-                    No longer need this? Decline this estimate
+                    {words.declineLink}
                   </button>
                 </p>
               )}
 
               {declineMode && canDecide && (
                 <div className="mt-6 space-y-3 border border-border rounded-warm-lg p-4 bg-surface">
-                  <p className="text-sm font-semibold text-text-primary">Decline this estimate</p>
+                  <p className="text-sm font-semibold text-text-primary">{words.declineTitle}</p>
                   <textarea
                     value={declineReason}
                     onChange={(e) => setDeclineReason(e.target.value)}
@@ -848,14 +851,14 @@ export default function QuotePage({ params }: QuotePageProps) {
                       onClick={() => { setDeclineMode(false); setDeclineReason('') }}
                       className="flex-1 py-3 px-4 text-sm font-semibold text-text-secondary border border-border rounded-warm-lg hover:bg-white transition"
                     >
-                      Keep the estimate
+                      {words.keep}
                     </button>
                     <button
                       onClick={handleDecline}
                       disabled={declining}
                       className="flex-1 py-3 px-4 text-sm font-semibold text-danger border border-danger/30 rounded-warm-lg hover:bg-danger-light disabled:opacity-50 transition"
                     >
-                      {declining ? 'Declining…' : 'Decline estimate'}
+                      {declining ? 'Declining…' : words.declineButton}
                     </button>
                   </div>
                 </div>
@@ -876,7 +879,7 @@ export default function QuotePage({ params }: QuotePageProps) {
           {/* Declined state */}
           {declined && (
             <div className="mx-6 sm:mx-10 mb-8 bg-surface border border-border rounded-warm-xl p-6 text-center">
-              <h3 className="font-display text-lg font-bold text-text-primary mb-1">Estimate declined</h3>
+              <h3 className="font-display text-lg font-bold text-text-primary mb-1">{words.declined}</h3>
               <p className="text-sm text-text-secondary">
                 No problem — thanks for letting {business.name} know. If anything changes, just get in touch.
               </p>
@@ -893,7 +896,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                 <span className="font-display text-xl font-bold">✓</span>
                 <span className="mt-1 text-[7.5px] font-semibold uppercase tracking-[0.14em]">Accepted</span>
               </div>
-              <h3 className="font-display text-lg font-bold text-primary mb-1">Estimate accepted</h3>
+              <h3 className="font-display text-lg font-bold text-primary mb-1">{words.accepted}</h3>
               <p className="text-sm text-text-secondary">
                 Thank you! {business.name} will be in touch shortly.
               </p>

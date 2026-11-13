@@ -519,7 +519,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
     const p = await ctx.newPage()
     watch(p)
     await p.goto(`${cfg.appUrl}/app/quotes/${id}`, { waitUntil: 'networkidle' })
-    await p.getByText('Timeline').first().waitFor({ timeout: 30_000 })
+    await p.getByTestId('quote-tracker').waitFor({ timeout: 30_000 }) // T-158: the tracker replaced the plain timeline
     return p
   }
   const buttonsOn = async (p: Page) => ({
@@ -591,8 +591,9 @@ if (!process.env.PLAYWRIGHT_DIR) {
   const custState = async () => {
     await cust.getByText('Price breakdown').first().waitFor({ timeout: 30_000 })
     return {
-      accept: await shown(cust, /Accept this estimate/), ask: await shown(cust, 'Ask a question'),
-      decline: await shown(cust, /Decline this estimate/), sent: (await cust.getByText('Message sent').count()) > 0,
+      // T-158: q8 is approved, so its buttons say "quote" (they said "estimate")
+      accept: await shown(cust, /Accept this quote/), ask: await shown(cust, 'Ask a question'),
+      decline: await shown(cust, /Decline this quote/), sent: (await cust.getByText('Message sent').count()) > 0,
     }
   }
   await cust.goto(custUrl, { waitUntil: 'networkidle' })
@@ -615,13 +616,14 @@ if (!process.env.PLAYWRIGHT_DIR) {
   await button(pQuestion, 'Mark as answered').click()
   await banner.waitFor({ state: 'detached', timeout: 30_000 })
   await pQuestion.reload({ waitUntil: 'networkidle' })
-  await pQuestion.getByText('Timeline').first().waitFor({ timeout: 30_000 })
-  check('page: after a reload the question is still closed and the quote reads Viewed', (await pQuestion.getByText('Customer question', { exact: true }).count()) === 0 && !(await shown(pQuestion, 'Mark as answered')) && (await pQuestion.getByText('Viewed', { exact: true }).count()) > 0)
+  await pQuestion.getByTestId('quote-tracker').waitFor({ timeout: 30_000 }) // T-158: the tracker replaced the plain timeline
+  // T-158: a viewed quote reads "Waiting for customer … They opened it <when>" (it used to read "Viewed")
+  check('page: after a reload the question is still closed and the quote reads as viewed again', (await pQuestion.getByText('Customer question', { exact: true }).count()) === 0 && !(await shown(pQuestion, 'Mark as answered')) && (await pQuestion.getByTestId('turn-label').first().innerText()) === 'Waiting for customer' && /They opened it/.test(await pQuestion.getByTestId('next-step-sentence').innerText()) && (await row(q8.id)).status === 'viewed')
   await pQuestion.close()
   await cust.reload({ waitUntil: 'networkidle' })
   const c3 = await custState()
   check('customer page, once answered: the note is gone and a new question can be asked', !c3.sent && c3.accept && c3.ask && c3.decline, c3)
-  await button(cust, /Accept this estimate/).click()
+  await button(cust, /Accept this quote/).click()
   check('customer page: Accept opens the next-step form', (await cust.getByText(/When would you like|When suits/i).count()) > 0 || (await cust.locator('form, [data-testid="accept-details"]').count()) > 0)
 
   // an estimate shown before approval: a question must not unlock Accept
@@ -652,20 +654,31 @@ if (!process.env.PLAYWRIGHT_DIR) {
   // change the amount, leave the label, save: the customer no longer sees the old maths
   await pEdit.locator('input[type="number"]').first().fill('600')
   await pEdit.getByRole('button', { name: 'Save', exact: true }).first().click()
-  await pEdit.getByText('Timeline').first().waitFor({ timeout: 30_000 })
+  await pEdit.getByTestId('quote-tracker').waitFor({ timeout: 30_000 }) // T-158: the tracker replaced the plain timeline
   const s3 = (await row(q7.id, 'pricing_json')) as { pricing_json: Pricing }
   check('editor: changing the amount and saving drops that label’s maths; the other line keeps its own', s3.pricing_json.breakdown[0]!.label === 'Exterior walls' && s3.pricing_json.breakdown[0]!.amount === 600 && s3.pricing_json.breakdown[1]!.label === raw[1]!.label && s3.pricing_json.breakdown[1]!.amount === 0.3 && s3.pricing_json.subtotal === 600.3, s3.pricing_json.breakdown)
 
   // ---- the quotes list uses the same rules ----
   const list = await ctxA.newPage()
   await list.goto(`${cfg.appUrl}/app/quotes`, { waitUntil: 'networkidle' })
+  // T-158: the list opens on "Needs you"; these quotes are spread over the tabs
+  await list.getByTestId('tab-all').click()
   await list.getByText('Morgan Question').first().waitFor({ timeout: 30_000 })
+  // T-158: the actions are words now, on the row's next-step button or in its
+  // More menu (they were icons found by title). What is checked is the same:
+  // which of Copy link, Download PDF and Send again a row offers.
   const icons = async (customerName: string) => {
-    const tr = list.locator('tr', { hasText: customerName }).first()
-    return { copy: await tr.locator('button[title="Copy quote link"]').count(), pdf: await tr.locator('button[title="Download PDF"]').count(), send: await tr.locator('button[title="Send again"]').count() }
+    const tr = list.locator('[data-testid="quote-row"]', { hasText: customerName }).first()
+    await tr.getByTestId('more-button').click()
+    const words = await tr.locator('[data-testid="more-menu"] [role="menuitem"]').allInnerTexts()
+    await list.keyboard.press('Escape')
+    await tr.getByTestId('more-menu').waitFor({ state: 'detached' })
+    const nextStep = (await tr.getByTestId('next-step-button').count()) ? await tr.getByTestId('next-step-button').innerText() : ''
+    const count = (word: string) => words.filter((w) => w === word).length + (nextStep === word ? 1 : 0)
+    return { copy: count('Copy link'), pdf: count('Download PDF'), send: count('Send again') }
   }
   const li = { accepted: await icons('Morgan Question'), revised: await icons('Jordan First'), noEmail: await icons('Pat Phoneonly'), pending: await icons('Sam Early') }
-  check('quotes list: the same rules for its icons',
+  check('quotes list: the same rules for its actions',
     li.accepted.copy === 1 && li.accepted.pdf === 1 && li.accepted.send === 0 &&
     li.revised.copy === 1 && li.revised.pdf === 1 && li.revised.send === 1 &&
     li.noEmail.copy === 1 && li.noEmail.send === 0 &&

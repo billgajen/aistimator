@@ -2,6 +2,7 @@
  * API request/response types for the Estimator platform
  */
 
+import type { QuoteListCounts, QuoteListGroup } from './quote-turn'
 import type {
   QuoteStatus,
   DocumentType,
@@ -317,11 +318,21 @@ export interface QuoteListItem {
   currency: string
   /** T-150: the owner's test request from setup (not counted toward usage) */
   isTest?: boolean
+  /** T-158: for the detail line and next step (quote-turn.ts) */
+  declinedAt?: string | null
+  /** T-158: when the customer's link runs out */
+  expiresAt?: string | null
+  /** T-158: saved but not priced, because the plan limit was reached */
+  held?: boolean
 }
 
 export interface QuotesListResponse {
   items: QuoteListItem[]
   nextCursor: string | null
+  /** T-158: how many quotes are in each tab (they follow the search text) */
+  counts?: QuoteListCounts
+  /** T-158: the group these items are from (`group=default` resolves to one) */
+  group?: QuoteListGroup
 }
 
 // ============================================================================
@@ -515,6 +526,9 @@ export interface QuoteDetailResponse {
     quality_gate_json?: unknown
     /** T-146: when the business approved it */
     approved_at?: string | null
+    /** T-158: for the tracker's final step */
+    declined_at?: string | null
+    token_expires_at?: string | null
     /** T-147: why a pending_review quote awaits the business: shown | held | check */
     review_hold?: 'shown' | 'held' | 'check' | null
     /** T-150: the owner's test request from setup */

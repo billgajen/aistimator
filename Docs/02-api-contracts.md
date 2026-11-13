@@ -352,6 +352,17 @@ Response (example):
   "nextCursor": null
 }
 
+T-158 (whose turn it is, AD-043). Query: `search`, `status`, `limit`, `cursor`, and `group`:
+	•	`group` = `needs_you` | `waiting` | `accepted` | `closed` | `all` filters by the groups in `packages/shared/src/quote-turn.ts` (`QUOTE_GROUP_STATUSES`: needs_you = `pending_review`, `feedback_received`, `failed`; waiting = `sent`, `viewed`, `revised`, `awaiting_clarification`; accepted = `accepted`, `paid`; closed = `declined`, `expired`). `queued` and `generating` are in no tab and come back under `all`.
+	•	`group=default` resolves on the server: `needs_you` when it has any quote, otherwise `all`.
+	•	With `group`, the response also carries `counts` (`{ needs_you, waiting, accepted, closed, unfinished, all }`) and `group` (the one used). The quote counts follow `search`; `unfinished` is the number of unfinished requests in the last 30 days (the same rows as `GET /api/leads`). An unknown group → 400 `INVALID_GROUP`.
+	•	**Without `group` the response is as before**: every quote, no `counts`, no `group` (the mobile app's call).
+	•	Items also carry `declinedAt`, `expiresAt` (the link's expiry) and `held` (saved but not priced: the plan limit was reached). They feed the label, detail line and next step (`quoteTurn`).
+	•	`status=declined` is accepted (it was missing from the valid statuses, so that filter returned every quote).
+	•	`search` matches the customer's name or email. Before T-158 every search answered 500: the filter compared JSON with `ilike`. The value is quoted, so commas and brackets are part of the search.
+	•	Every query in the route (the list, the five quote counts, the unfinished count) is filtered by the caller's tenant.
+	•	`GET /api/quotes/:quoteId` also returns `declined_at` and `token_expires_at` (the quote page's tracker).
+
 
 ⸻
 

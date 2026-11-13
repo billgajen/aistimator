@@ -66,8 +66,11 @@ Routes:
 - /app/whatsapp, /app/sms (no menu item; reachable by URL, behaviour unchanged; WhatsApp is reached from Share)
 
 Home, top to bottom (T-152):
-1. "Waiting for you": quotes awaiting approval (priced, not a test, not a held lead), newest first, each with
-   customer, service, price and Approve & send. Hidden when empty.
+1. "Waiting for you": what waits for the owner, newest first (not a test, not a held lead). Quotes awaiting approval
+   (priced) show customer, service, price and Approve & send. T-158: customer questions ("Customer asked a question",
+   button "Answer question") and requests that could not be priced ("Could not be priced", button "Contact customer")
+   are listed too, with the labels the quotes list uses; their button opens the quote. The count reads "3 need you".
+   Hidden when empty.
 2. "Started, didn't finish": the 7-day count (T-151). Hidden when zero.
 3. Plan usage banner at 80% / at the limit (the free allowance says "free quotes", not "monthly").
 4. Setup checklist until complete: Add a service · Check your prices · Share your quote link · First real request
@@ -79,13 +82,60 @@ Share (T-149 + T-152): quote link · QR code · where to put it · **Use it on W
 wa.me with the link; greeting, away and quick-reply texts for the WhatsApp Business app with where to paste them;
 "Connect your WhatsApp number for full in-chat quoting (advanced)" → /app/whatsapp) · embed code · Advanced.
 
+Whose turn it is (T-158, AD-043). The dashboard never shows a raw status. `quoteTurn` in
+`packages/shared/src/quote-turn.ts` turns a quote into a group, a label, a detail line and one next step; the quotes
+list, the quote page and Home all use it, and every word of it lives in that file.
+
+| Group | Statuses | Label | Detail line | Next step |
+|---|---|---|---|---|
+| Needs you | pending_review, priced | Needs your approval | Received 2 days ago | Check and approve |
+| Needs you | pending_review, no price | Needs your approval | No price yet | Add the price |
+| Needs you | pending_review, held by the plan limit | Saved, not priced yet | Your plan limit was reached | Price this request |
+| Needs you | feedback_received | Customer asked a question | Waiting for your answer | Answer question |
+| Needs you | failed | Could not be priced | Received 2 days ago | Contact customer |
+| Waiting for customer | sent | Waiting for customer | Sent 2 days ago, not opened yet (or "not opened since" when it was opened before the last send) | none; after 3 days unopened: Send again (Contact customer when there is no email) |
+| Waiting for customer | viewed | Waiting for customer | Opened yesterday | none |
+| Waiting for customer | revised | Waiting for customer | Updated quote sent yesterday | none |
+| Waiting for customer | awaiting_clarification | Waiting for customer | Waiting for their answers | none |
+| Accepted | accepted | Customer accepted | Accepted on 12 Nov | Contact customer |
+| Accepted | paid | Paid | Paid on 14 Nov | none |
+| Closed | declined | Customer declined | Declined on 12 Nov | none |
+| Closed | expired | Expired | Expired on 12 Nov | Send again (Contact customer when there is no email) |
+| Working | queued, generating | Working out the price | Received today | none |
+
+Time words: today, yesterday, "2 days ago" up to 6, then "on 12 Nov", by calendar day in the viewer's time zone.
+
+Quotes list (/app/quotes, T-158):
+- Tabs with counts instead of a status dropdown: Needs you · Waiting for customer · Accepted · Closed · Unfinished ·
+  All. Opens on Needs you when it has any, otherwise All. Unfinished is the T-151 list ("Working" has no tab; it shows
+  under All). The tab row scrolls sideways on a phone. One request (`GET /api/quotes?group=…`) returns the rows and
+  every count; the counts follow the search box.
+- Each row: customer (with the "Test" tag), service, total, the label with its detail line, and one worded Next step
+  button. "Send again" sends in place; every other button opens the quote.
+- "More" on each row, with words: Open quote, Send again, Copy link, Download PDF, Pricing trace, each shown by the
+  T-157 rule its route applies. No icon-only actions.
+- A grid from the `xl` breakpoint; below it each row stacks.
+
+Quote page (/app/quotes/[quoteId], T-158):
+- Header: the label, then Edit, Send again, Copy link and Text link by the T-157 rules.
+- "Next step" box: one sentence and one main button from the shared map. Approve & send (awaiting approval), Edit
+  quote (no price yet), Price this request + Upgrade plan (held by the plan limit; this replaced the "Lead saved"
+  box), Send again (unopened for 3 days, or expired), Email and Call links (accepted, a customer question, could not
+  be priced; each only when the detail exists), or no button with "Nothing for you to do. Waiting for …". A button
+  that is the next step is in the box and not in the header as well.
+- An open customer question, with "Mark as answered", sits directly under the box.
+- "Progress": four steps replacing the timeline. Request received · You approved (or "Sent automatically" for a
+  service that sends without review) · Customer opened · Customer accepted. Done steps show their date; "Customer
+  declined" or "Expired" is the final step instead; "Paid <date>" is a second line under step four. Steps stack on a
+  phone.
+
 Key screens:
 - Home setup checklist (T-152) and the guided test in setup (T-150)
 - Pricing rules editor
 - Service area restrictions editor (postcode or zip, county or state)
 - Share: quote link, QR code, ready-made share texts, embed code, form fields (Advanced)
 - Quote template toggles and preview
-- Quotes list with status and actions
+- Quotes list with tabs, the whose-turn label and one next step per row (T-158, above)
 
 ### 3) Hosted quote page (public, no login)
 Routes:
@@ -144,6 +194,10 @@ tagline, colour and the white-label "Powered by" rule. Unknown or inactive → p
 - Quote page: Accept asks "When suits you?" (as soon as possible / within two weeks / flexible + note), the job
   address and a phone number, then accepts. Ask a question and the quiet Decline link stay; no "Send for review";
   errors are shown in the page (no browser alerts).
+- Quote page wording (T-158): once the business has reviewed it, the page already says "Your quote", and now the
+  decision does too: "Accept this quote — …", "Quote accepted", "Quote declined", "No longer need this? Decline this
+  quote", "Decline this quote" / "Keep the quote" / "Decline quote". A quote sent automatically (not reviewed) keeps
+  "estimate" in every one of them. The words come from `customerDecisionWords` in the shared map.
 - Minimal steps, 3 to 8 questions typical
 - Photo and document upload
 - Progress indicator

@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { listRegions } from '@estimator/shared'
+import { listRegions, customerDecisionWords } from '@estimator/shared'
 import { checkContact, contactRequirementOf, descriptionRequired, isPlausiblePhone, usableContact } from '@/lib/contact-rules'
 import { laterProgress, cleanAnswers, cleanAssetIds, completeLeads, hashLeadToken, isLeadProgress, PROGRESS_WORDS } from '@/lib/request-leads'
 import { checkAcceptance, timingLabel, TIMING_CHOICES } from '@/lib/acceptance'
@@ -214,7 +214,11 @@ describe('T-151: quote page and widget', () => {
 
   it('keeps Accept, Ask a question and the quiet Decline link', () => {
     expect(quotePage).toContain('Ask a question')
-    expect(quotePage).toMatch(/Decline this estimate/)
+    // T-158: the decline link's words come from the shared map ("quote" once
+    // the business reviewed it, "estimate" before)
+    expect(quotePage).toContain('{words.declineLink}')
+    expect(customerDecisionWords(false).declineLink).toMatch(/Decline this estimate/)
+    expect(customerDecisionWords(true).declineLink).toMatch(/Decline this quote/)
     expect(quotePage).toContain('AcceptDetailsForm')
   })
 

@@ -15,6 +15,59 @@
 
 ## Issues & Resolutions
 
+### 2026-11-13: T-158 — Quotes say whose turn it is and what to do next (Feedback 01) (AD-043)
+
+A business owner looking at a quote could not tell who had to act. The labels (Sent, Viewed, Revised, Feedback, Accepted) named a database state, not a person, and the list's actions were icons with no words. This ticket is wording, layout and one list filter. No status value, no action rule and no price changed.
+
+**1. One shared status map**
+- **What was wrong:** the quotes list and the quote page each had their own copy of a table of status labels, and Home had its own rule for what waits. "Feedback" was a customer question nobody was told to answer.
+- **Fix:** `packages/shared/src/quote-turn.ts`. `quoteTurn(quote)` returns a group, a label, a detail line, the next-step sentence and the one next action. `quoteTracker(quote)` returns the four tracker steps. `QUOTE_TURN_COPY` holds every other word (tabs, list buttons, page buttons, the More menu, tracker labels, Home's count). Both local label tables are deleted; the list, the quote page and Home read this file and nothing else.
+- **Groups:** Needs you (`pending_review`, `feedback_received`, `failed`), Waiting for customer (`sent`, `viewed`, `revised`, `awaiting_clarification`), Accepted (`accepted`, `paid`), Closed (`declined`, `expired`), Working (`queued`, `generating`). Every status is in exactly one group (`QUOTE_GROUP_STATUSES`); the list API filters with the same lists.
+- **Labels:** "Needs your approval", "Saved, not priced yet" (held by the plan limit), "Customer asked a question", "Could not be priced", "Waiting for customer", "Customer accepted", "Paid", "Customer declined", "Expired", "Working out the price". "Sent", "Viewed" and "Revised" are no longer shown as statuses; they are the detail line under "Waiting for customer" ("Sent 2 days ago, not opened yet", "Opened yesterday", "Updated quote sent yesterday", "Waiting for their answers").
+- **Three `pending_review` cases, not two:** priced (approve), held by the plan limit (price it), and priced at nothing without a hold ("No price yet", next step "Add the price": Approve would answer `NOT_PRICED`).
+- **Time words** are calendar days in the viewer's time zone: today, yesterday, "2 days ago" up to 6, then "on 12 Nov". A date that is missing leaves the line shorter; nothing is invented.
+- **Next step.** One of six actions or none: Check and approve, Add the price, Price this request, Answer question, Send again, Contact customer. "Send again" is offered as the next step only when the T-157 rule allows it (`canSendQuoteAgain`), on a quote unopened for 3 days (`SEND_AGAIN_AFTER_DAYS`, the automatic reminder's default wait) or expired; a customer with no email gets "Contact customer" instead.
+
+**2. Quotes list**
+- Tabs with counts replace the status dropdown: Needs you, Waiting for customer, Accepted, Closed, Unfinished, All. It opens on Needs you when that has any, otherwise All. Unfinished shows the T-151 list; the butter strip that pointed to it is gone (the tab carries the count). Home's `?filter=unfinished` link still lands there.
+- Each row: customer, service, total, the label with its detail line, one worded Next step button, and a "More" menu (Open quote, Send again, Copy link, Download PDF, Pricing trace), each item by the rule its route applies. No icon-only action is left. "Send again" sends in place; the other buttons open the quote.
+- `GET /api/quotes` takes `group` (`needs_you | waiting | accepted | closed | all | default`) and, with it, returns `counts` and the `group` used in the same response. `default` resolves on the server, so the first paint is one request. **Without `group` the route answers as before** (every quote, no counts): that is the mobile app's call.
+- **Fix: `declined` was missing from the route's valid statuses**, so `?status=declined` silently returned every quote.
+- **Found while verifying: the list's search has never worked.** The filter was `customer_json->name.ilike…`; `->` returns JSON, Postgres has no `ilike` for it, and every search answered 500 ("Failed to fetch quotes"). It reads the text now (`->>`), and the value is quoted so a comma or a bracket stays part of the search instead of breaking the filter. The counts follow the search text.
+- A count that fails has no body to read (a HEAD request), so a missing number is treated as a failure, not as zero.
+- Rows are a grid from the `xl` breakpoint and stack below it. The last column has a fixed width: each row is its own grid, and an `auto` column was sized per row, so the columns did not line up.
+
+**3. Quote page**
+- A "Next step" box at the top: the sentence and one main button (Approve & send, Edit quote, Price this request with Upgrade plan, Send again, or Email and Call links when the details exist). A button that is the next step sits in the box and not in the header as well, so "Approve & send" moved into the box and "Send again" shows once.
+- The T-134 "Lead saved — not priced yet" box is replaced by the Next step box, with the same two actions.
+- A four-step tracker replaces the plain timeline: Request received, You approved (or "Sent automatically" when `approved_at` is empty and the quote was sent), Customer opened, Customer accepted. Declined or expired is the final step. Paid adds a second line under step four. An open customer question sits directly under the box.
+- `GET /api/quotes/:id` now returns `declined_at` and `token_expires_at` (the tracker's final step needs the date).
+- The header stacks on a phone.
+
+**4. Home**
+- "Waiting for you" also lists customer questions and requests that could not be priced, with the same labels, and a button that opens the quote ("Answer question", "Contact customer"). Approvals keep their one-tap Approve & send. The count reads "3 need you" (was "3 to approve"). Setup tests and requests held by the plan limit stay out, as before (`waitingForYou` in `lib/home-numbers.ts`).
+
+**5. Customer page wording**
+- Once the business has reviewed a quote (`review.state === 'quote'`), the words around the decision say "quote": "Accept this quote — …", "Quote accepted", "Quote declined", and the decline controls ("Decline this quote", "Keep the quote", "Decline quote"). A quote that was sent automatically keeps "estimate" in all of them. `customerDecisionWords(reviewed)` in the shared map; the T-146 guard passes on both sets.
+
+**Not changed:** status values and every transition; the T-157 action rules (the map calls them, it does not restate them); prices; the header buttons other than the two that moved into the box; emails; the mobile app (it lists every quote as before, with its own labels); the customer page's other lines ("Estimate for …" in the letterhead, "Ask us to add any of these to your estimate").
+
+**Constraints worth knowing**
+- "Opened <when>" is the first time the customer opened it. `viewed_at` is written once; a later visit does not move it.
+- "Sent automatically" is read from the data (sent, never approved), so a quote sent before T-146 reads that way too.
+- A `viewed` quote stays "Nothing for you to do" however long ago it was opened. Chasing a quiet customer is not suggested by the app yet.
+- `verify-t157.mts` had four browser checks tied to wording this ticket replaced (the "Timeline" heading, the "Viewed" badge, list icons found by title, "Accept this estimate" on an approved quote). Their selectors were updated; what each check proves is the same.
+- A T-151 unit test read "Decline this estimate" from the customer page's source. The words moved to the shared map, so it now checks the page uses them and what they say.
+
+**Verified (2026-11-13, local stack, not deployed):**
+- Unit tests: web 437, worker 494, mobile 11, all pass. New: `apps/web/src/__tests__/quote-turn.test.ts` (42): every status and its group, the three `pending_review` cases, each detail line, each next step, the time words, the tracker, the customer words, Home's list, and the list route.
+- `scripts/hardcore-test/verify-t158.mts` with the browser pass: 116/116. It covers the list API (groups, counts, default tab, `status=declined`, search, tenant isolation, the mobile app's call), label, detail and button for a quote in every group read from real rows, Home, the tabs and counts, a next-step button per group, the More menu, the Next step box, the tracker for approved, automatic, accepted, declined, expired and paid quotes, the customer wording for a reviewed and an unreviewed quote, and the list and quote page at phone width. It saves screenshots into its results folder.
+- Regression, t146 to t157: 20, 33, 29, 35, 27, 35, 66, 36, 26, 46, 31, 96, all pass (t154, t155 and t157 with their browser passes).
+- `pnpm lint`, `pnpm typecheck`, the web build and the worker build pass.
+- Five quotes in the live check went through the real pipeline (approve, automatic send, customer view, accept, decline, a customer question). The other rows are copies of those with a status set by hand, because this ticket is how a status reads, not how a quote reaches it.
+
+**Not checked:** "Send again" pressed from a list row (locally there is no email provider; the route is the T-157 one and its rule is what decides whether the button shows). Production: nothing is deployed.
+
 ### 2026-11-13: T-157 — Quote actions that always work (fixes from Feedback 01) (AD-042)
 
 Six things around a quote were broken or misleading. Each is fixed at its root. Pricing, page layouts and what the customer is told are unchanged; rounding is the only change to any number (AD-001).
@@ -4153,6 +4206,24 @@ if (pricingResult.estimatedTotal <= 0) {
 - per-route bookkeeping, as T-146 did (four routes had already been missed);
 - an unbounded list (one quote row growing without limit; ten covers approval, edits, a reminder and several copies);
 - a separate link table with per-link expiry (more than this needs: every link of a quote should live and die together).
+
+### AD-043: The business sees whose turn it is, not the raw status (T-158)
+
+**Decision:** the dashboard never shows a quote's database status. It shows a group (Needs you, Waiting for customer, Accepted, Closed, Working), a label that names who acts, a detail line, and at most one next step. All of it comes from one pure function, `quoteTurn` in `shared/quote-turn.ts`, used by the quotes list, the quote page and Home. The list API filters by the same groups.
+
+**Why:** a status says what happened to a row; an owner needs to know whether to do something. "Viewed" and "Revised" both mean "wait", and "Feedback" meant "answer this", and none of them said so. The labels were also kept in two copies, with a third rule on Home, so a change to one screen would not reach the others.
+
+**Rules that follow:**
+- The statuses and their transitions are untouched. Groups and labels are a reading of the status plus a few facts on the row (price, plan hold, email address, timestamps); nothing new is stored.
+- Wording lives in `shared/quote-turn.ts` only. A page that needs a status word imports it; a new status must be added to `QUOTE_GROUP_STATUSES` (a unit test fails if one is in no group or in two).
+- The map never decides what is allowed. It asks the T-157 rules (`quote-status.ts`), so a next step is only offered when its route will accept it.
+- At most one next step per quote. Every other action is secondary and has words (no icon-only actions).
+- The customer's two words stay as AD-034 set them: "estimate" before the business's review, "quote" after it, now including the accept and decline controls.
+
+**Rejected:**
+- new statuses ("needs_answer", "awaiting_customer") stored on the quote: a migration and every route's transitions, for what is a reading of data already there;
+- computing the group in SQL (a view or a generated column): the held and no-price cases read JSON fields, and the labels would still be worded in the app;
+- keeping "Sent / Viewed / Revised" as badges and adding a second "whose turn" badge: two labels to reconcile at a glance is the problem this ticket removes.
 
 ---
 
