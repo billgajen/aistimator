@@ -544,19 +544,23 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
 
 ## T-162 — The product is called Qolumns
 
-Built and checked locally. **Not committed, not deployed.** No domain, address or URL changed: that is the next
-ticket.
+No domain, address or URL changed: that is the next ticket.
 
-- [ ] **Deploy, in this order:**
+- [x] **Deploy, in this order:** done 2026-11-14 17:24 UTC (commit `906323a`; worker version
+  `2ad7e64c-592d-49c3-844a-4becd95f6134`; web `dpl_EiSzpwavbPiUHawQTeVbcaxLHUri`; production is at migration
+  `00000000000040`).
   1. migration 40: `bash scripts/deploy-migration-40.sh` (reserves the quote-link names `qolumns` and `qolums`). It
      first checks that no business holds either word and stops if one does;
   2. the worker: `cd apps/worker && npx wrangler deploy --env production` (emails then say "Powered by Qolumns"
      and come from "… via Qolumns");
   3. the web app: `npx vercel deploy --prod`.
 
+  Checked live, signed out and read-only: the five public pages, both loader files, the two reserved names, worker
+  health, the quote API's 404, and that the web app's `R2_BUCKET_NAME` names the bucket the worker binds (yes).
+
   The order is not fragile: the old web app ignores the two new rows, and worker and web only disagree on the name
   in an email for the minutes between steps 2 and 3. Nothing else depends on it.
-- [ ] **Try by hand, after the deploy:**
+- [ ] **Try by hand:**
   1. *Pages.* Home, Pricing, a trade page, Terms, Privacy and the login page say "Qolumns" in the header, the
      footer ("© 2026 Qolumns.") and the browser tab. Share the home page link in a chat app: the preview image
      should say Qolumns (previews are cached; a new link such as `/?v=2` forces a fresh one).

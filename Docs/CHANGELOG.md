@@ -148,18 +148,40 @@ container id and the reserved-list check (now migrations 32 and 40) in `quote-li
   26, 46, 31, 96, 116, 96, all pass. (After that run only comments in the harness changed: the suggested Playwright
   folder name.)
 
-**Deploy order (not done; nothing is committed):** migration 40 (`bash scripts/deploy-migration-40.sh`), then the
-worker, then the web app. The old web app ignores the two new rows, and between the worker and the web deploy only
-the name in an email differs. Hand tests, the infrastructure names left alone and what renaming each would involve,
-and the names only the owner can change (Stripe products, GitHub repo, Supabase project label, Postmark) are in the
-T-162 section of `OWNER-TODO.md`.
+**Deployed 2026-11-14 17:24 UTC** (commit `906323a`), in this order: migration 40 with
+`scripts/deploy-migration-40.sh` (production was at `00000000000039` with no business holding either word; after it
+`reserved_new 2`, `reserved_total 50`, `latest 00000000000040`), then the worker (`npx wrangler deploy --env production`,
+version `2ad7e64c-592d-49c3-844a-4becd95f6134`), then web (`npx vercel deploy --prod`, deployment
+`dpl_EiSzpwavbPiUHawQTeVbcaxLHUri`, Ready and serving `estimator-web-phi.vercel.app`). `pnpm lint` and `pnpm typecheck`
+passed again before the commit. No code changed after the full verify run above (only harness comments and docs),
+so the scripts were not re-run.
+
+Live checks, read-only (nothing was submitted to production):
+- `/`, `/login`, `/pricing`, `/terms` and `/privacy`: 200, each shows "Qolumns" in its text and title ("… — Qolumns",
+  "Qolumns - Auth", "Pricing — Qolumns", "Terms of Service — Qolumns", "Privacy Policy — Qolumns"), and neither
+  earlier name is anywhere in the page source (the second in any letter case, the first as a whole word).
+- `/widget.js` and `/iframe-loader.js`: 200, with `QolumnsWidget`, `QolumnsIframe`, `qolumns-widget`, `qolumns-resize`,
+  `qolumns-submitted`, `qolumns:submitted`, the launcher id and the `[qolumns]` prefix, and none of the old names.
+- `qolumns` and `qolums` are in production's reserved list (the deploy script's own check, above), and
+  `/quote/qolumns` and `/quote/qolums` are 404.
+- Worker `/health`: 200. The public quote API with a made-up id and token: 404 `QUOTE_NOT_FOUND`.
+- R2: `R2_BUCKET_NAME` exists for the production web app and names the same bucket the worker binds
+  (`aistimator-assets`): yes. Compared without printing or saving any value (`vercel env run`, which answered only
+  yes or no; a control with another name answered no).
+
+Seen while checking, not changed: in production the worker answers 401 at `/` (everything but `/health` needs the
+shared token), so its "Qolumns worker" line is only seen locally.
+
+Hand tests, the infrastructure names left alone and what renaming each would involve, and the names only the owner
+can change (Stripe products, GitHub repo, Supabase project label, Postmark) are in the T-162 section of
+`OWNER-TODO.md`.
 
 **Not checked:**
 - a real email in a real inbox (locally nothing is sent; the tests stop at the header and the rendered HTML);
 - the mobile app on a device or as a native build (typecheck and unit tests only). No native module name changed,
   so there was nothing to build on the native side;
-- production. Nothing was deployed and nothing was submitted to production. The deploy order and the hand tests
-  are in `OWNER-TODO.md`.
+- in production, anything signed in or sent: the dashboard, a customer quote page, the emails and the website code
+  on a real page. The live checks above were signed out and read-only. They are the hand tests in `OWNER-TODO.md`.
 
 ### 2026-11-14: T-161 — Three design skills installed, current design audited (no visible change)
 
