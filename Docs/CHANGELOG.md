@@ -61,14 +61,25 @@ The owner's feedback: the five-item menu was too thin and "Share" and "Prices" w
 - "2 hours ago" counts elapsed time, not calendar days, so it reads the same wherever the page is rendered.
 - Regression scripts changed for the renames only: `verify-t149.mts` (three places: it loads the page at `/app/quote-link` twice, and expects `/app/widget` to redirect there) and `verify-t152.mts` (five places: the menu's links with its "no … item" check, the redirect direction for `/app/prices`, the `/app/widget` target, the list of pages that must load, and the Share page fetch, which use the new addresses). What each check proves is the same. Three T-152 unit tests and one T-158 unit test were updated the same way.
 
-**Verified (2026-11-14, local stack with migration 39, not deployed):**
+**Verified (2026-11-14, local stack with migration 39, before the deploy):**
 - Unit tests: web 496, worker 499, mobile 11, all pass. New: `apps/web/src/__tests__/home-and-menu.test.ts` (38): the seen and handled rules and their database filter, the routes' tenant scoping, the activity builder, the time words, the 30-day comparison, the empty state, the menu sections, the renames and redirects, the sign-in line and the settings label.
 - `scripts/hardcore-test/verify-t160.mts` with the browser pass: 96/96. Old addresses redirect; new, seen and done for unfinished requests, and that another business can neither see nor mark them; Home's counts, activity lines and comparison from real rows; the three menu sections on desktop and phone; the banner and badge clearing when the list is opened and coming back for a new person; Done; Home for a business with data and for one with none; the sign-in line; the settings label. It saves screenshots into its results folder.
 - Regression, t146 to t158, run again after the last code change: 20, 33, 29, 35, 27, 35, 66, 36, 26, 46, 31, 96, 116, all pass, with the browser passes.
 - `pnpm lint`, `pnpm typecheck`, the web build and the worker build pass.
 - One quote in the live check went through the real pipeline (approve, customer view, question, accept). The other rows are copies of it with dates and a status set by hand, so the two 30-day periods and each activity line are known exactly.
 
-**Not checked:** `scripts/deploy-migration-39.sh` has not been run (it was checked for syntax only; it is the migration-38 script with the new file and checks). Production: nothing is deployed.
+**Deployed 2026-11-14 08:55 UTC** (commit `704753b`), in this order: migration 39 with `scripts/deploy-migration-39.sh` (production was at `00000000000038`; after it `seen_col 1`, `handled_col 1`, both nullable, the index present, `latest 00000000000039`), then web (`npx vercel deploy --prod`, deployment `dpl_CorK2Fmdg56YHNGNAEgasGhnvgf8`, Ready and serving `estimator-web-phi.vercel.app`). No worker deploy. `pnpm lint` and `pnpm typecheck` passed again before the commit; no code changed after the full verify run above, so the scripts were not re-run.
+
+Live checks, read-only (nothing was submitted to production):
+- `request_leads.seen_at` and `handled_at` exist in production (the deploy script's own check, above).
+- `/` 200; `/login` 200 and it shows "Instant quotes on your website, in your prices." (the old line is gone).
+- Signed out, `/app/prices` redirects (307) to `/app/services` and ends at `/login?next=%2Fapp%2Fservices`; `/app/share` and `/app/widget` redirect to `/app/quote-link` and end at `/login?next=%2Fapp%2Fquote-link`. A query string is kept by the redirect (`/app/prices?x=1` → `/app/services?x=1`).
+- Signed out, `GET /api/leads/new-count`, `POST /api/leads/seen` and `POST /api/leads/:id/done` all answer 401 `UNAUTHORIZED` (so does `GET /api/leads`). The two POSTs are refused before anything is read or written.
+- The public quote API with a made-up id and token: 404 `QUOTE_NOT_FOUND`. Worker `/health`: 200.
+
+Seen while checking, not changed: the sign-in redirect's `next` keeps the path but not the query string (`/login?next=%2Fapp%2Fservices` for `/app/services?x=1`). That is the middleware's behaviour from before this ticket.
+
+Not proven in production: the signed-in screens with real data (the menu, the badge and banner clearing, Done, Home's new blocks). The checks above were signed out. They are the hand tests in `OWNER-TODO.md`.
 
 ### 2026-11-13: T-159 — Emails show a sender name
 

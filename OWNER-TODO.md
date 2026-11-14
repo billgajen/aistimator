@@ -506,7 +506,8 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
 
 ## T-160 — Sectioned menu, a fuller Home, unfinished requests that clear
 
-- [ ] **Deploy, in this order:**
+- [x] **Deploy, in this order:** done 2026-11-14 08:55 UTC (commit `704753b`, web
+  `dpl_CorK2Fmdg56YHNGNAEgasGhnvgf8`; production is at migration `00000000000039`).
   1. migration 39: `bash scripts/deploy-migration-39.sh` (`request_leads.seen_at` and `handled_at`);
   2. the web app: `npx vercel deploy --prod`.
 
