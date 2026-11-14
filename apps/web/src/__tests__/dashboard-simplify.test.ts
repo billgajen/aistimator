@@ -14,6 +14,7 @@ import {
   findConfidenceLanguage,
   PRODUCT_NAME,
   DEFAULT_PRIMARY_COLOR,
+  QUOTE_TURN_COPY,
 } from '@estimator/shared'
 import { checkPlanLimit, evaluateLimit, usedForAllowance } from '@/lib/plan-limits'
 import { getCurrentPeriod } from '@/lib/usage'
@@ -222,28 +223,33 @@ describe('T-152: Home leads with the work waiting', () => {
     expect(at('<WaitingForYou')).toBeLessThan(at('data-testid="unfinished-count"'))
     expect(at('data-testid="unfinished-count"')).toBeLessThan(at('data-testid="setup-checklist"'))
     expect(at('data-testid="setup-checklist"')).toBeLessThan(at('data-testid="home-numbers"'))
-    expect(home).toContain('See all numbers')
+    // T-160: the words moved to the shared map
+    expect(home).toContain('{N.all}')
+    expect(QUOTE_TURN_COPY.home.numbers.all).toBe('See all numbers')
     expect(home).not.toMatch(/Quick Actions|QuickAction/)
   })
 })
 
-describe('T-152: five menu items; old URLs still work', () => {
-  it('Home, Quotes, Prices, Share, Settings — nothing else', () => {
+describe('T-152: old URLs still work (the five-item menu was replaced by T-160)', () => {
+  it('the menu: T-160 put it in sections; "Prices" is "Services" and "Share" is "Quote link"', () => {
     const layout = read('apps/web/src/app/(dashboard)/layout.tsx')
-    const labels = [...layout.matchAll(/\{ href: '[^']+', label: '([^']+)'/g)].map((m) => m[1])
-    expect(labels).toEqual(['Home', 'Quotes', 'Prices', 'Share', 'Settings'])
+    const items = [...layout.matchAll(/\{ key: '([^']+)', href: '([^']+)'/g)].map((m) => m[2])
+    expect(items).toEqual(['/app', '/app/quotes', '/app/quotes?filter=unfinished', '/app/analytics', '/app/services', '/app/quote-link', '/app/whatsapp', '/app/settings'])
   })
 
   it('renamed pages redirect, and every old page still exists or redirects', async () => {
     const config = (await import(join(WEB, 'next.config.js'))).default as { redirects: () => Promise<Array<{ source: string; destination: string }>> }
     const redirects = Object.fromEntries((await config.redirects()).map((r) => [r.source, r.destination]))
+    // T-160: /app/services is the page again; /app/prices, /app/share and /app/widget redirect
     expect(redirects).toEqual({
-      '/app/services': '/app/prices',
+      '/app/prices': '/app/services',
+      '/app/share': '/app/quote-link',
+      '/app/widget': '/app/quote-link',
       '/app/branding': '/app/settings/branding',
       '/app/billing': '/app/settings/billing',
     })
     const app = 'apps/web/src/app/(dashboard)/app'
-    for (const page of ['prices', 'settings', 'settings/branding', 'settings/billing', 'settings/notifications', 'analytics', 'sms', 'whatsapp', 'widget', 'share', 'quotes']) {
+    for (const page of ['services', 'settings', 'settings/branding', 'settings/billing', 'settings/notifications', 'analytics', 'sms', 'whatsapp', 'quote-link', 'quotes']) {
       expect(existsSync(join(ROOT, app, page, 'page.tsx'))).toBe(true)
     }
     for (const moved of Object.keys(redirects)) expect(existsSync(join(ROOT, app, moved.replace('/app/', ''), 'page.tsx'))).toBe(false)

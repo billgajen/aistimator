@@ -57,7 +57,7 @@ export function slugProblem(slug: string): SlugProblem | null {
   return null
 }
 
-/** Plain words for the Share page. */
+/** Plain words for the Quote link page. */
 export function slugProblemMessage(problem: SlugProblem | 'taken' | 'already_changed'): string {
   switch (problem) {
     case 'too_short':

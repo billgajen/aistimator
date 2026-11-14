@@ -68,7 +68,7 @@ function generateFieldId(label: string): string {
 
 /**
  * Extra form fields shown to customers (global or per service). T-149: moved
- * from the Widget page into the Share page's "Advanced" section, unchanged;
+ * from the Widget page into the Quote link page's "Advanced" section, unchanged;
  * the embed code now lives in EmbedCodeCard.
  */
 export function FormFieldsBuilder() {

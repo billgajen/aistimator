@@ -140,7 +140,7 @@ export function OnboardingFlow({
   /** T-150: set up by hand instead; the dashboard stops sending them here */
   const handleSkip = async () => {
     await fetch('/api/onboarding/skip', { method: 'POST' }).catch(() => undefined)
-    router.push('/app/prices')
+    router.push('/app/services')
   }
 
   /** T-113: apply a vertical pack — no network, no AI, instant */

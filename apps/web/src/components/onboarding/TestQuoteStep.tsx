@@ -215,7 +215,7 @@ export function TestQuoteStep({
           >
             Go to dashboard
           </Link>
-          <Link href="/app/share" className="text-sm text-text-secondary underline underline-offset-2">
+          <Link href="/app/quote-link" className="text-sm text-text-secondary underline underline-offset-2">
             QR code, ready-made texts and website code
           </Link>
         </div>

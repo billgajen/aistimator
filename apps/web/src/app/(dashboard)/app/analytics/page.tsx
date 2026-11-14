@@ -213,7 +213,7 @@ export default function AnalyticsPage() {
                       )}
                     </div>
                     <Link
-                      href="/app/prices"
+                      href="/app/services"
                       className="inline-flex shrink-0 items-center rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-background"
                     >
                       Adjust pricing →

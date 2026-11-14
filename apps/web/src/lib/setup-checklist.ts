@@ -4,7 +4,7 @@
  * Each step ticks only on a real action by the business or its customers:
  * 1. Add a service        — an active service exists
  * 2. Check your prices    — the business confirmed them (setup's "These are my
- *                           prices", or saving a service on Prices)
+ *                           prices", or saving a service on Services)
  * 3. Share your quote link — the link was copied or the page had its first visit
  * 4. First real request    — a customer request arrived (not a setup test,
  *                           not a quote the business made in its own app)
@@ -31,13 +31,13 @@ export interface ChecklistStep {
 
 export function buildChecklist(input: ChecklistInput): { steps: ChecklistStep[]; done: number; complete: boolean } {
   const steps: ChecklistStep[] = [
-    { id: 'service', label: 'Add a service', completed: input.hasService, href: '/app/prices' },
-    { id: 'prices', label: 'Check your prices', completed: Boolean(input.pricesCheckedAt), href: '/app/prices' },
+    { id: 'service', label: 'Add a service', completed: input.hasService, href: '/app/services' },
+    { id: 'prices', label: 'Check your prices', completed: Boolean(input.pricesCheckedAt), href: '/app/services' },
     {
       id: 'share',
       label: 'Share your quote link',
       completed: Boolean(input.quoteLinkCopiedAt || input.quoteLinkFirstVisitAt),
-      href: '/app/share',
+      href: '/app/quote-link',
     },
     { id: 'first_request', label: 'First real request received', completed: input.hasRealRequest, href: '/app/quotes' },
   ]

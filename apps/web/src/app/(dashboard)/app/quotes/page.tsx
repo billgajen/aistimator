@@ -4,7 +4,8 @@ import { UnfinishedLeads } from '@/components/quotes/UnfinishedLeads'
 import { QuoteTabs } from '@/components/quotes/QuoteTabs'
 import { QuoteRowMenu, type QuoteRowMenuItem } from '@/components/quotes/QuoteRowMenu'
 import { TurnBadge } from '@/components/quotes/TurnBadge'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { Suspense, useEffect, useState, useCallback, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   formatMoney,
   canCopyQuoteLink,
@@ -12,19 +13,39 @@ import {
   canSendQuoteAgain,
   canViewPricingTrace,
   quoteTurn,
+  QUOTE_LIST_GROUPS,
   QUOTE_TURN_COPY,
 } from '@estimator/shared'
 import Link from 'next/link'
 import { copyLinkFallbackMessage } from '@/lib/quote-action-copy'
 import { EmptyState, PageHeader } from '@/components/dashboard/EmptyState'
-import type { QuoteListCounts, QuoteListItem, QuoteListTab, QuotesListResponse } from '@estimator/shared'
+import type { QuoteListCounts, QuoteListGroup, QuoteListItem, QuoteListTab, QuotesListResponse } from '@estimator/shared'
 
 // One grid per row, so the last column has a fixed width: an `auto` column
 // would be sized per row and the columns would not line up. Wide screens only;
 // below that the rows stack.
 const ROW_GRID = 'xl:grid xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_7rem_minmax(0,1.3fr)_15rem] xl:items-center xl:gap-x-5'
 
+/**
+ * The address carries ?filter=unfinished for the Unfinished tab (the menu's
+ * "Unfinished requests" and Home's banner open it), and reading the address
+ * needs a Suspense boundary on a prerendered page.
+ */
 export default function QuotesPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>}>
+      <QuotesList />
+    </Suspense>
+  )
+}
+
+function QuotesList() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const filter = searchParams.get('filter')
+  // T-160: Home's "Where your quotes stand" opens a tab by name (?tab=waiting)
+  const tabParam = searchParams.get('tab')
+  const tabFromAddress = (QUOTE_LIST_GROUPS as readonly string[]).includes(tabParam ?? '') ? (tabParam as QuoteListGroup) : null
   const [quotes, setQuotes] = useState<QuoteListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -41,14 +62,36 @@ export default function QuotesPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   // The tab the server just picked: its quotes are already on screen
   const resolvedTab = useRef<QuoteListTab | null>(null)
+  // T-160: the newest request wins. A reply for a tab the user has since left
+  // (a slow one, or the Unfinished tab's counts-only request) is dropped, so
+  // it can never put the wrong quotes on screen or end the loading state early.
+  const latestFetch = useRef(0)
 
-  // T-151: Home links straight to the unfinished requests
+  // T-151/T-160: the address decides whether the Unfinished tab is open, so
+  // the menu's "Quotes" and "Unfinished requests" both work from this page.
+  const tabNow = useRef(tab)
+  tabNow.current = tab
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('filter') === 'unfinished') setTab('unfinished')
+    if (filter === 'unfinished') {
+      if (tabNow.current !== 'unfinished') setTab('unfinished')
+    } else if (tabFromAddress) {
+      if (tabNow.current !== tabFromAddress) {
+        latestFetch.current++ // a reply still on its way belongs to the tab being left
+        setLoading(true)
+        setTab(tabFromAddress)
+      }
+    } else if (tabNow.current === 'unfinished') {
+      // Back to the quotes: let the server pick the tab again
+      latestFetch.current++
+      resolvedTab.current = null
+      setLoading(true)
+      setTab(null)
+    }
     setReady(true)
-  }, [])
+  }, [filter, tabFromAddress])
 
   const fetchQuotes = useCallback(async (cursor?: string | null, append = false) => {
+    const mine = ++latestFetch.current
     try {
       if (append) {
         setLoadingMore(true)
@@ -65,6 +108,7 @@ export default function QuotesPage() {
 
       const response = await fetch(`/api/quotes?${params.toString()}`)
       const data = await response.json()
+      if (mine !== latestFetch.current) return // overtaken by a newer request
 
       if (!response.ok) {
         throw new Error(data.error?.message || 'Failed to fetch quotes')
@@ -83,9 +127,11 @@ export default function QuotesPage() {
         setTab(list.group)
       }
       setError(null)
+      setLoading(false)
+      setLoadingMore(false)
     } catch (err) {
+      if (mine !== latestFetch.current) return
       setError(err instanceof Error ? err.message : 'Failed to fetch quotes')
-    } finally {
       setLoading(false)
       setLoadingMore(false)
     }
@@ -108,10 +154,14 @@ export default function QuotesPage() {
 
   const selectTab = (next: QuoteListTab) => {
     if (next === tab) return
-    // Don't leave the last tab's quotes on screen while the next ones load
+    // Don't leave the last tab's quotes on screen while the next ones load,
+    // and drop any reply still on its way for the tab being left
+    latestFetch.current++
     setLoading(true)
     setOpenMenu(null)
     setTab(next)
+    // Keep the address in step with the tab (the menu highlights by it)
+    router.replace(next === 'unfinished' ? '/app/quotes?filter=unfinished' : `/app/quotes?tab=${next}`, { scroll: false })
   }
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -264,7 +314,7 @@ export default function QuotesPage() {
       {/* T-158: tabs by whose turn it is, with counts */}
       <QuoteTabs active={tab} counts={counts} onSelect={selectTab} />
 
-      {tab === 'unfinished' ? <UnfinishedLeads /> : (<>
+      {tab === 'unfinished' ? <UnfinishedLeads onChange={fetchQuotes} /> : (<>
       <div className="mb-6">
         <input
           type="text"
@@ -306,7 +356,7 @@ export default function QuotesPage() {
             !search && group === 'all'
               ? {
                   label: 'Share your quote link',
-                  href: '/app/share',
+                  href: '/app/quote-link',
                 }
               : undefined
           }

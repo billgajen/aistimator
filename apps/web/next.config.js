@@ -9,7 +9,11 @@ const nextConfig = {
    */
   async redirects() {
     return [
-      { source: '/app/services', destination: '/app/prices', permanent: false },
+      // T-160: "Prices" is "Services" again and "Share" is "Quote link"; old
+      // bookmarks and links keep working (the query string is carried over)
+      { source: '/app/prices', destination: '/app/services', permanent: false },
+      { source: '/app/share', destination: '/app/quote-link', permanent: false },
+      { source: '/app/widget', destination: '/app/quote-link', permanent: false },
       { source: '/app/branding', destination: '/app/settings/branding', permanent: false },
       { source: '/app/billing', destination: '/app/settings/billing', permanent: false },
     ]

@@ -110,6 +110,27 @@ A customer's question on a quote (migration 17). Older rows may be review reques
 - status (pending | acknowledged | resolved): `acknowledged` = the business pressed "Mark as answered" (T-157); `resolved` = the business edited the quote and sent it
 - created_at
 
+### request_leads (T-151, migration 34; T-160, migration 39)
+A request saved the moment the customer gives their contact details, before they finish. Not a quote: it never
+runs AI, never counts toward usage, and is not in the quote pipeline (AD-038).
+- id (`lead_…`)
+- tenant_id, service_id (nullable)
+- customer_name, customer_email, customer_phone (at least one of email or phone)
+- progress (contact | questions | photos | details), job_answers (jsonb), job_postcode, asset_ids (jsonb), source_json
+- lead_token_hash (the customer's own token for updating it)
+- quote_id, completed_at: set when the request is submitted and becomes a quote. Finished leads are never listed.
+- seen_at (timestamptz, null; T-160): when the business first saw it. Null = new. The Home banner and the menu badge
+  count only new ones. Set by `POST /api/leads/seen` when the Unfinished list is opened.
+- handled_at (timestamptz, null; T-160): when the business pressed "Done". A handled request leaves the list and
+  every count. Set by `POST /api/leads/:leadId/done`.
+- created_at, updated_at
+
+Listed = `completed_at` is null, `handled_at` is null, started in the last 30 days. New = listed and `seen_at` is null.
+The rule is `apps/web/src/lib/unfinished-leads.ts`, used by the list, the tab count, the banner and the badge.
+RLS: the business can read its own rows and cannot write. Leads are written by the public API, and `seen_at` and
+`handled_at` by signed-in dashboard routes, both with the service role and a tenant filter.
+Indexes: `(tenant_id, created_at desc)` where not completed; the same where also not handled and not seen (the count).
+
 ### quote_versions (optional v1, or v2)
 - id
 - quote_id

@@ -7,8 +7,10 @@ import { SharePageClient } from '@/components/share/SharePageClient'
 export const dynamic = 'force-dynamic'
 
 /**
- * T-149: Share — the quote link and QR code first, the embed code second,
- * the form-field builder under Advanced. (Was /app/widget.)
+ * T-149: the quote link and QR code first, the embed code second, the
+ * form-field builder under Advanced. T-160: the page is "Quote link" at
+ * /app/quote-link (it was "Share" at /app/share, and before that /app/widget;
+ * both redirect here).
  */
 export default async function SharePage() {
   const supabase = await createClient()

@@ -51,34 +51,62 @@ Free offer (T-152): every "Start free" now reads "Try it free: 10 quotes, no car
 FAQ ("Can I try it for free?") and the billing page say the same.
 
 ### 2) Dashboard (authenticated)
-Menu (T-152), desktop and phone: **Home, Quotes, Prices, Share, Settings**.
+Menu (T-160, AD-044), in three sections, the same on desktop and in the phone menu:
+- **Work:** Home · Quotes · Unfinished requests (with a count of new ones) · Analytics
+- **Set up:** Services · Quote link · WhatsApp
+- **Account:** Settings
+
 Routes:
 - /app (Home)
 - /app/onboarding (T-150: where a new business with no services lands)
-- /app/quotes
-- /app/prices (was /app/services, which redirects here)
-- /app/share (T-149; /app/widget redirects here)
+- /app/quotes (`?tab=needs_you|waiting|accepted|closed|all` opens a tab; `?filter=unfinished` opens the Unfinished
+  tab, which is where the menu's "Unfinished requests" goes. The address follows the tab.)
+- /app/services (T-160: "Services"; it was "Prices" at /app/prices, which redirects here)
+- /app/quote-link (T-160: "Quote link", "Give customers this link, or put the form on your website."; it was
+  "Share" at /app/share, and before that /app/widget; both redirect here)
 - /app/settings (one area with tabs: Business · Branding · Billing · Notifications)
   - /app/settings/branding (was /app/branding, which redirects here)
   - /app/settings/billing (was /app/billing, which redirects here)
-  - /app/settings/notifications
-- /app/analytics (no menu item; "See all numbers" on Home)
-- /app/whatsapp, /app/sms (no menu item; reachable by URL, behaviour unchanged; WhatsApp is reached from Share)
+  - /app/settings/notifications (the field is "Send notifications to")
+- /app/analytics, /app/whatsapp (in the menu since T-160)
+- /app/sms (no menu item; reachable by URL, behaviour unchanged)
 
-Home, top to bottom (T-152):
+Unfinished requests (T-151, T-160): people who gave their details and did not finish. The list (the Unfinished tab)
+shows everyone from the last 30 days who is not marked done. Opening it marks them seen: the Home banner and the
+menu badge count only people not seen yet, so both clear and come back only for a new person, who is tagged "New".
+"Done" on a person removes them for good.
+
+Home, top to bottom (T-152, T-160):
 1. "Waiting for you": what waits for the owner, newest first (not a test, not a held lead). Quotes awaiting approval
    (priced) show customer, service, price and Approve & send. T-158: customer questions ("Customer asked a question",
    button "Answer question") and requests that could not be priced ("Could not be priced", button "Contact customer")
    are listed too, with the labels the quotes list uses; their button opens the quote. The count reads "3 need you".
    Hidden when empty.
-2. "Started, didn't finish": the 7-day count (T-151). Hidden when zero.
+2. New unfinished requests: "2 new people started a request but didn't finish. A quick call often wins the job."
+   with "See who". Only people the business has not seen; hidden when there are none.
 3. Plan usage banner at 80% / at the limit (the free allowance says "free quotes", not "monthly").
 4. Setup checklist until complete: Add a service · Check your prices · Share your quote link · First real request
    received. Each ticks only on a real action (`lib/setup-checklist.ts`). Branding is not a step; the Branding tab
    shows a tick when a logo or a non-default colour is really set.
-5. Four numbers for the last 30 days: requests, estimates sent, accepted, value accepted. "See all numbers" → Analytics.
+5. "Where your quotes stand": three counts, each opening its tab: Needs you · Waiting for customer · Accepted
+   ("in the last 30 days"). The groups and names are the T-158 ones.
+6. "Latest activity": the last six events, newest first, each linking to its quote, for example "Sarah opened the
+   quote, 2 hours ago". Six kinds: sent a request, you approved, opened, asked a question, accepted, declined. Read
+   from the quotes' own timestamps; last 30 days.
+7. "Your quote link": the link with Copy and Open, and "QR code and website form" to the Quote link page. Beside
+   Latest activity on a wide screen, under it on a phone.
+8. "Last 30 days": requests, estimates sent, accepted, value accepted, each with "up 3", "down 1" or "same" against
+   the 30 days before. "See all numbers" → Analytics.
 
-Share (T-149 + T-152): quote link · QR code · where to put it · **Use it on WhatsApp** ("Send on WhatsApp" via
+A business with no quotes yet sees one line in 5 ("No quotes yet. When a customer sends a request, you will see here
+whose turn it is.") and in 6 ("Nothing has happened yet. New requests, opens and answers will show here."), and the
+four numbers without a change line. Setup tests are in none of the counts. On a phone everything is one column in
+this order; the three counts stack and the four numbers sit two by two.
+
+Sign-in and sign-up (T-160) show the home page's headline under the product name (`HERO.headline` in
+`lib/marketing/home-copy.ts`), so they always match the home page.
+
+Quote link page (T-149 + T-152; "Share" until T-160): quote link · QR code · where to put it · **Use it on WhatsApp** ("Send on WhatsApp" via
 wa.me with the link; greeting, away and quick-reply texts for the WhatsApp Business app with where to paste them;
 "Connect your WhatsApp number for full in-chat quoting (advanced)" → /app/whatsapp) · embed code · Advanced.
 
@@ -133,7 +161,7 @@ Key screens:
 - Home setup checklist (T-152) and the guided test in setup (T-150)
 - Pricing rules editor
 - Service area restrictions editor (postcode or zip, county or state)
-- Share: quote link, QR code, ready-made share texts, embed code, form fields (Advanced)
+- Quote link: quote link, QR code, ready-made share texts, embed code, form fields (Advanced)
 - Quote template toggles and preview
 - Quotes list with tabs, the whose-turn label and one next step per row (T-158, above)
 

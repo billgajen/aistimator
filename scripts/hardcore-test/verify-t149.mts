@@ -77,12 +77,13 @@ check('a reserved name gets a suffix', (await tenantRow(reservedBiz.tenantId)).s
 const missing = await http('GET', `${cfg.supabaseUrl}/rest/v1/tenants?slug=is.null&select=id`, { headers: admin })
 check('every existing tenant has a slug (backfilled)', missing.ok && missing.json.length === 0, missing.json?.length)
 
-// The Share page creates the widget key on first visit (as the Widget page did)
-const sharePage = await fetch(`${cfg.appUrl}/app/share`, { headers: a.cookie, redirect: 'manual' })
+// The Share page creates the widget key on first visit (as the Widget page did).
+// T-160: the page is "Quote link" at /app/quote-link; /app/share and /app/widget redirect to it.
+const sharePage = await fetch(`${cfg.appUrl}/app/quote-link`, { headers: a.cookie, redirect: 'manual' })
 const shareHtml = await sharePage.text()
 check('the Share page loads, with the link and without "Your Tenant Key"', sharePage.status === 200 && shareHtml.includes(`/quote/${aRow.slug}`) && !shareHtml.includes('Your Tenant Key'), sharePage.status)
 const oldWidgetPage = await fetch(`${cfg.appUrl}/app/widget`, { headers: a.cookie, redirect: 'manual' })
-check('the old /app/widget address sends you to /app/share', [307, 308].includes(oldWidgetPage.status) && (oldWidgetPage.headers.get('location') ?? '').endsWith('/app/share'), oldWidgetPage.status)
+check('the old /app/widget address sends you to the page (now /app/quote-link)', [307, 308].includes(oldWidgetPage.status) && (oldWidgetPage.headers.get('location') ?? '').endsWith('/app/quote-link'), oldWidgetPage.status)
 const site = (await sb.select('tenant_sites', `tenant_id=eq.${a.tenantId}&select=tenant_key,is_active`))[0]
 const serviceId = await service(a)
 
@@ -97,7 +98,7 @@ const viaLink = await submit(site.tenant_key, serviceId)
 check('a request from the quote page produces a quote, as the embed does', ['sent', 'viewed'].includes(viaLink.status) && viaLink.pricing?.total === 1400, { status: viaLink.status, total: viaLink.pricing?.total })
 
 // Isolation: the twin business's page shows only the twin's widget
-await fetch(`${cfg.appUrl}/app/share`, { headers: twin.cookie })
+await fetch(`${cfg.appUrl}/app/quote-link`, { headers: twin.cookie })
 const twinSite = (await sb.select('tenant_sites', `tenant_id=eq.${twin.tenantId}&select=tenant_key`))[0]
 const twinPage = await page(`/quote/${twinRow.slug}`)
 check('another business’s slug shows only its own widget', twinPage.status === 200 && twinPage.html.includes(twinSite.tenant_key) && !twinPage.html.includes(site.tenant_key))

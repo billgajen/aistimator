@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 /**
  * T-153: /demo — try it as a customer, with an example business.
- * With ?tenantKey= (the dashboard's Share page links here) the developer view
+ * With ?tenantKey= (the dashboard's Quote link page links here) the developer view
  * opens instead, unchanged.
  */
 export default async function DemoPage({ searchParams }: { searchParams: { tenantKey?: string } }) {

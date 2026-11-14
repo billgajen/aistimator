@@ -346,7 +346,7 @@ function TagInput({
 }
 
 /**
- * Prices page (T-152: was "Services", /app/services redirects here)
+ * Services page (T-160: "Services" again, at /app/services; T-152 had named it "Prices", and /app/prices redirects here)
  *
  * Manage the services offered by the tenant.
  */
@@ -941,7 +941,7 @@ export default function ServicesPage() {
   return (
     <div>
       <PageHeader
-        title="Prices"
+        title="Services"
         description="Your services and what you charge for each"
         actions={
           <div className="flex items-center gap-3">

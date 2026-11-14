@@ -64,9 +64,11 @@ Code for every item is already built; these are the steps that unlock it.
 
 ## Production smoke test (2026-11-08)
 
-- [ ] **Postmark: add DKIM and Return-Path DNS records** for the sending domain, then request account approval
-  (Postmark → Sender Signatures / Domains). Until it's approved, Postmark only delivers to addresses on the
-  From domain. The GB smoke test's business notification to a gmail address was rejected. **Do this before beta.**
+- [x] **Postmark account approved on 11 Nov 2026.** Emails now reach any address, not only the sending domain. (The
+  GB smoke test's business notification to a gmail address was rejected on 8 Nov, before the approval.)
+- [x] **Postmark DKIM:** the sending domain was verified in Postmark on 10 Nov 2026.
+- [ ] **Postmark Return-Path:** check that the Return-Path DNS record shows as verified (Postmark → Sender Signatures /
+  Domains). It helps delivery; it does not block sending.
 - Engineering backlog from the smoke test (not owner work; listed so it isn't lost, details in CHANGELOG
   2026-11-08): internal notes shown to customers, raw unit labels,
   "worth considering" duplicating scope items, clarification page + email styling, "Powered by Estimator" name.
@@ -359,7 +361,7 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
   **Restore once fixed:** "Estimate page in your branding, with a PDF" (features §04) and "Hosted estimate pages &
   PDFs" (pricing page bullet).
 - [ ] **Reminder.** Built and on (the daily `/api/cron/lifecycle` sends one reminder 3 days after sending if there's no
-  response; Postmark is set in Vercel), but delivery waits for the Postmark account approval above. Quotes that were
+  response; Postmark is set in Vercel, and the account was approved on 11 Nov 2026). Quotes that were
   revised or got questions never get one. **Restore once fixed:** "Expiry and one polite reminder, automatically"
   (features §04; it now reads "Estimates expire automatically").
 - [ ] **Price comparisons.** Built (`api/learning/benchmarks`, opt-in on the Analytics page), but it needs 3 other
@@ -391,8 +393,8 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
 - [ ] **Try it by hand:** send a request to your own business. In the "Review and approve" email, tap **Approve & send**
   on your phone, check the page shows the price, and press the button. You should see "Sent", and the customer address
   should get "Your quote from …" once. Tap the button in the email again: "Already approved".
-- [ ] **Email delivery:** both the review email and the customer's confirmed quote wait on the Postmark account approval
-  (above). Until then they only reach your own domain.
+- [x] **Email delivery:** the Postmark account was approved on 11 Nov 2026, so the review email and the customer's
+  confirmed quote reach any address. (Written while the approval was pending.)
 - [ ] **Per-IP limit:** the `approval_link` limit uses Upstash, which isn't set up in production, so it fails open. The
   per-link cap (10 presses, counted in the database) applies regardless. See "Rate limiting" above.
 - Test requests from setup keep the review email, marked "[Test]" with a banner, and the button works like any other
@@ -432,8 +434,8 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
   6. *Money.* Open an older painting quote with a line like "Exterior walls  £18 x 34.6(Sqm)" in the editor: the amount
      box should read 622.8, not 622.8000000000001. Change that amount, leave the label, save: the customer page
      should show "Exterior walls" with no maths under it. A line you leave alone keeps its maths.
-- [ ] **Email delivery** still waits on the Postmark account approval (above). Until then every email in step 1 only
-  reaches addresses on your own sending domain.
+- [x] **Email delivery:** the Postmark account was approved on 11 Nov 2026, so every email in step 1 reaches any
+  address. (This note said it was still waiting; that was out of date.)
 - Not built here, by the ticket: new status wording, tabs and next-step layout; any SMS work beyond hiding the button;
   replying to the customer inside the app (backlog item 8 above).
 - The live check is `scripts/hardcore-test/verify-t157.mts` (add `PLAYWRIGHT_DIR=…` for the page checks). It joins the
@@ -495,10 +497,46 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
   2. *A business email.* Accept that quote as the customer, or send in a new request and wait for "Review and
      approve". The sender should read "Aistimator".
   3. If your business name has a comma, quotes or an ampersand in it, check it shows whole and unbroken.
-- [ ] **Email delivery** still waits on the Postmark account approval (above). Until then these emails only reach
-  addresses on your own sending domain.
+- [x] **Email delivery:** the Postmark account was approved on 11 Nov 2026, so these emails reach any address. (This
+  note said it was still waiting; that was out of date.)
 - Worth knowing: a business name longer than 60 characters is cut in the sender name (mail apps shorten long sender
   names anyway). The name inside the email itself is not cut.
 - No live check script for this one: locally there is no email provider, so nothing is sent. The header is checked
   in the unit tests, including what each app hands to Postmark.
+
+## T-160 — Sectioned menu, a fuller Home, unfinished requests that clear
+
+- [ ] **Deploy, in this order:**
+  1. migration 39: `bash scripts/deploy-migration-39.sh` (`request_leads.seen_at` and `handled_at`);
+  2. the web app: `npx vercel deploy --prod`.
+
+  The migration first: the new Home, the menu badge and the Unfinished list read the new columns, and would fail
+  without them. The old web app ignores the columns, so the gap between the two steps is safe. No worker deploy.
+- [ ] **Try by hand:**
+  1. *Menu.* Three sections: Work (Home, Quotes, Unfinished requests, Analytics), Set up (Services, Quote link,
+     WhatsApp), Account (Settings). No "Prices", "Share" or SMS. On your phone, open the menu: the same sections, and
+     it closes when you tap an item.
+  2. *Old bookmarks.* Open /app/prices and /app/share: they should land on Services and Quote link.
+  3. *Unfinished requests.* On your own quote link, give your details and stop before sending. Home should show
+     "1 new person started a request but didn't finish" and the menu a "1" beside Unfinished requests. Open the list:
+     the person is tagged "New", and the "1" goes. Go back to Home: the banner is gone. Start another unfinished
+     request: both come back. Press **Done** on a person: they leave the list and stay gone after a reload.
+  4. *Home.* Below the checklist: "Where your quotes stand" with three counts (tap one: it opens that tab of Quotes),
+     "Latest activity" with lines such as "Sarah opened the quote, 2 hours ago" (tap one: it opens the quote), "Your
+     quote link" with Copy and Open, and "Last 30 days" with "up 3", "down 1" or "same" under each number.
+  5. *A new business.* Sign up a second account (or look at one with no quotes): it should read "No quotes yet…" and
+     "Nothing has happened yet…", not zeros and an empty box.
+  6. *Sign-in.* The login page should read "Instant quotes on your website, in your prices." under the name.
+  7. *Settings > Notifications.* The field is labelled "Send notifications to".
+- Worth knowing:
+  - "Done" has no undo. The person is kept in the database, only hidden.
+  - Home's counts leave out test quotes; the tabs on Quotes include them (with the "Test" tag). So "Needs you" on Home
+    can be lower than the tab's count while a test quote waits.
+  - "Accepted" on Home is the last 30 days; the Accepted tab lists every accepted quote.
+  - Latest activity covers the last 30 days. "Opened" is the first time the customer opened the quote.
+- Not built here, by the ticket: any change to the Services, Quote link, Analytics or WhatsApp pages beyond titles,
+  paths and wording; one-click WhatsApp connection; SMS; chasing quiet customers (backlog item 9).
+- The live check is `scripts/hardcore-test/verify-t160.mts` (add `PLAYWRIGHT_DIR=…` for the page checks; it saves
+  screenshots of Home, the phone menu and the Unfinished list into its results folder). It joins the regression set:
+  run t146 to t160 before a commit or deploy (there is no verify-t159).
 

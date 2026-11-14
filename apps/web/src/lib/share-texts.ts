@@ -78,7 +78,7 @@ export interface WhatsAppText {
 }
 
 /**
- * T-152: "Use it on WhatsApp" on Share — texts for the free WhatsApp Business
+ * T-152: "Use it on WhatsApp" on the Quote link page — texts for the free WhatsApp Business
  * app, each carrying the business's own quote link. Pure.
  */
 export function buildWhatsAppTexts(opts: { businessName: string; link: string; region?: string | null }): WhatsAppText[] {

@@ -140,6 +140,62 @@ export const QUOTE_TURN_COPY = {
   home: {
     title: 'Waiting for you',
     count: (n: number) => (n === 1 ? 'needs you' : 'need you'),
+    /** T-160: "Where your quotes stand" */
+    stand: {
+      title: 'Where your quotes stand',
+      acceptedNote: 'in the last 30 days',
+      empty: 'No quotes yet. When a customer sends a request, you will see here whose turn it is.',
+    },
+    /** T-160: "Latest activity" */
+    activity: {
+      title: 'Latest activity',
+      empty: 'Nothing has happened yet. New requests, opens and answers will show here.',
+      quiet: 'Nothing in the last 30 days.',
+    },
+    /** T-160: "Your quote link" */
+    quoteLink: {
+      title: 'Your quote link',
+      copy: 'Copy',
+      copied: 'Copied',
+      open: 'Open',
+      more: 'QR code and website form',
+    },
+    /** T-160: the four numbers and how they changed */
+    numbers: {
+      title: (days: number) => `Last ${days} days`,
+      all: 'See all numbers',
+      note: (days: number) => `Compared with the ${days} days before.`,
+      requests: 'Requests',
+      sent: 'Estimates sent',
+      accepted: 'Accepted',
+      valueAccepted: 'Value accepted',
+      up: (amount: string) => `up ${amount}`,
+      down: (amount: string) => `down ${amount}`,
+      same: 'same',
+    },
+  },
+  /** T-160: the dashboard menu, in sections */
+  menu: {
+    sections: { work: 'Work', setUp: 'Set up', account: 'Account' },
+    home: 'Home',
+    quotes: 'Quotes',
+    unfinished: 'Unfinished requests',
+    analytics: 'Analytics',
+    services: 'Services',
+    quoteLink: 'Quote link',
+    whatsapp: 'WhatsApp',
+    settings: 'Settings',
+  },
+  /** T-160: unfinished requests (people who started and did not finish) */
+  unfinished: {
+    banner: (n: number) =>
+      `${n === 1 ? 'new person' : 'new people'} started a request but didn't finish. A quick call often wins the job.`,
+    bannerButton: 'See who',
+    newTag: 'New',
+    done: 'Done',
+    doneSaving: 'Saving…',
+    doneNote: "Marked as done. They won't show here again.",
+    saveFailed: 'Could not save that. Please try again.',
   },
 } as const
 
@@ -187,6 +243,53 @@ export function whenWords(iso: string | null | undefined, opts: QuoteTurnOptions
   if (days === 1) return 'yesterday'
   if (days < 7) return `${days} days ago`
   return `on ${shortDate(iso, opts)}`
+}
+
+/**
+ * How long ago, by the clock: "just now", "5 minutes ago", "2 hours ago",
+ * "yesterday", "3 days ago", then "on 12 Nov" (T-160, Home's latest activity).
+ * It counts elapsed time, not calendar days, so it reads the same wherever it
+ * is worked out.
+ */
+export function agoWords(iso: string | null | undefined, opts: QuoteTurnOptions = {}): string | null {
+  if (!iso) return null
+  const then = new Date(iso)
+  if (Number.isNaN(then.getTime())) return null
+  const minutes = Math.max(0, Math.floor(((opts.now ?? new Date()).getTime() - then.getTime()) / 60_000))
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'yesterday'
+  if (days < 7) return `${days} days ago`
+  return `on ${shortDate(iso, opts)}`
+}
+
+// ---------------------------------------------------------------------------
+// Latest activity (T-160): one line per thing that happened to a quote
+// ---------------------------------------------------------------------------
+
+export type QuoteActivityKind = 'request' | 'approved' | 'opened' | 'question' | 'accepted' | 'declined'
+
+/** "Sarah opened the quote". No "his" or "her": a name does not tell us which. */
+export function quoteActivityLine(kind: QuoteActivityKind, customerName: string | null | undefined): string {
+  const first = customerFirstName(customerName)
+  const Name = first ?? 'A customer'
+  switch (kind) {
+    case 'request':
+      return `${Name} sent a request`
+    case 'approved':
+      return first ? `You approved ${first}'s quote` : 'You approved a quote'
+    case 'opened':
+      return `${Name} opened the quote`
+    case 'question':
+      return `${Name} asked a question`
+    case 'accepted':
+      return `${Name} accepted the quote`
+    case 'declined':
+      return `${Name} declined the quote`
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -11,7 +11,7 @@ import { UseItOnWhatsApp } from './UseItOnWhatsApp'
 import { EmbedCodeCard } from './EmbedCodeCard'
 import { FormFieldsBuilder } from './FormFieldsBuilder'
 
-/** T-149: the Share page, in the order a small trade needs it. */
+/** T-149: the Quote link page (was "Share" until T-160), in the order a small trade needs it. */
 export function SharePageClient(props: {
   appOrigin: string
   tenantKey: string
@@ -26,7 +26,7 @@ export function SharePageClient(props: {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Share" description="Send customers to your own quote page. No website needed." />
+      <PageHeader title="Quote link" description="Give customers this link, or put the form on your website." />
 
       <QuoteLinkCard
         appOrigin={props.appOrigin}

@@ -476,8 +476,10 @@ describe('list API', () => {
   it('filters by group with the shared statuses and scopes every query to the tenant', () => {
     expect(route).toContain('QUOTE_GROUP_STATUSES[group]')
     expect(route).toContain('defaultQuoteListGroup(counts)')
-    // the list query, the quote counts and the unfinished count
-    expect(route.match(/\.eq\('tenant_id', tenantId\)/g)?.length).toBe(3)
+    // the list query and the quote counts filter by tenant directly; the
+    // unfinished count goes through the shared rule (T-160), which does too
+    expect(route.match(/\.eq\('tenant_id', tenantId\)/g)?.length).toBe(2)
+    expect(route).toMatch(/unfinishedFilter\(\s*supabase\.from\('request_leads'\)[^)]*\),\s*tenantId\s*\)/)
     expect(route.match(/\.from\('(quotes|request_leads)'\)/g)?.length).toBe(3)
   })
 

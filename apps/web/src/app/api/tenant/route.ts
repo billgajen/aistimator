@@ -149,7 +149,7 @@ export async function PUT(request: NextRequest) {
       contactRequirement,
       pricesChecked,
     } = body as {
-      /** T-152: the business confirmed its prices (setup or the Prices page) */
+      /** T-152: the business confirmed its prices (setup or the Services page) */
       pricesChecked?: boolean
       /** T-151: 'email' | 'phone' | 'both' — which contact details customers must give */
       contactRequirement?: string

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { QUOTE_GROUP_STATUSES, QUOTE_LIST_GROUPS, defaultQuoteListGroup } from '@estimator/shared'
+import { unfinishedFilter } from '@/lib/unfinished-leads'
 import type { QuoteListCounts, QuoteListGroup, QuoteListItem, QuotesListResponse, QuoteStatus } from '@estimator/shared'
 
 const VALID_STATUSES: QuoteStatus[] = [
@@ -18,9 +19,6 @@ const VALID_STATUSES: QuoteStatus[] = [
   'expired',
   'failed',
 ]
-
-/** Unfinished requests are counted over the same window the Unfinished tab lists (GET /api/leads) */
-const UNFINISHED_WINDOW_DAYS = 30
 
 type Supabase = Awaited<ReturnType<typeof createClient>>
 
@@ -50,13 +48,11 @@ async function countTabs(supabase: Supabase, tenantId: string, search: string): 
     return count
   }
   const countUnfinished = async () => {
-    const since = new Date(Date.now() - UNFINISHED_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString()
-    const { count, error } = await supabase
-      .from('request_leads')
-      .select('id', { count: 'exact', head: true })
-      .eq('tenant_id', tenantId)
-      .is('completed_at', null)
-      .gte('created_at', since)
+    // T-160: the same rule as the Unfinished list (not finished, not marked done, last 30 days)
+    const { count, error } = await unfinishedFilter(
+      supabase.from('request_leads').select('id', { count: 'exact', head: true }),
+      tenantId
+    )
     if (error || count === null) throw error ?? new Error('count failed')
     return count
   }

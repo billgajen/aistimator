@@ -58,7 +58,7 @@ export function NotificationsSettings() {
 
       <div className="mt-6">
         <label htmlFor="notification-email" className="block text-sm font-medium text-text-secondary">
-          Notification Email (Override)
+          Send notifications to
         </label>
         <input
           id="notification-email"

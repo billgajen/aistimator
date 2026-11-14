@@ -81,15 +81,18 @@ const holdId = await doorService(a, { holdUntilApproved: true })
 const homeHtml = await home(a)
 const nav = /<nav[^>]*aria-label="Main"[^>]*>([\s\S]*?)<\/nav>/.exec(homeHtml)?.[1] ?? ''
 const navLinks = [...nav.matchAll(/href="([^"]+)"/g)].map((m) => m[1])
-check('the menu has five items: Home, Quotes, Prices, Share, Settings', JSON.stringify(navLinks) === JSON.stringify(['/app', '/app/quotes', '/app/prices', '/app/share', '/app/settings']), navLinks)
-check('…with no Analytics, WhatsApp, SMS, Branding or Billing item', !/>(Analytics|WhatsApp|SMS|Branding|Billing|Services)</.test(nav))
-for (const [from, to] of [['/app/services', '/app/prices'], ['/app/branding', '/app/settings/branding'], ['/app/billing?success=true', '/app/settings/billing?success=true']] as const) {
+// T-160 replaced the five-item menu with three sections (AD-044); "Prices" is
+// "Services" and "Share" is "Quote link". What this still proves: one menu,
+// in a known order, with Branding, Billing and SMS out of it.
+check('the menu: Home, Quotes, Unfinished requests, Analytics, Services, Quote link, WhatsApp, Settings (T-160)', JSON.stringify(navLinks) === JSON.stringify(['/app', '/app/quotes', '/app/quotes?filter=unfinished', '/app/analytics', '/app/services', '/app/quote-link', '/app/whatsapp', '/app/settings']), navLinks)
+check('…with no SMS, Branding or Billing item', !/>(SMS|Branding|Billing|Prices|Share)</.test(nav))
+for (const [from, to] of [['/app/prices', '/app/services'], ['/app/branding', '/app/settings/branding'], ['/app/billing?success=true', '/app/settings/billing?success=true']] as const) {
   const r = await page(`${cfg.appUrl}${from}`, a.cookie)
   check(`${from} redirects to ${to}`, r.status === 307 && r.location?.endsWith(to) === true, { status: r.status, location: r.location })
 }
 const widget = await page(`${cfg.appUrl}/app/widget`, a.cookie)
-check('/app/widget still redirects to Share (T-149)', [307, 308].includes(widget.status) && /\/app\/share$/.test(widget.location ?? ''), widget.status)
-for (const p of ['/app/prices', '/app/settings', '/app/settings/branding', '/app/settings/billing', '/app/settings/notifications', '/app/analytics', '/app/whatsapp', '/app/sms', '/app/share', '/app/quotes']) {
+check('/app/widget still redirects to the quote link page (T-149; /app/quote-link since T-160)', [307, 308].includes(widget.status) && /\/app\/quote-link$/.test(widget.location ?? ''), widget.status)
+for (const p of ['/app/services', '/app/settings', '/app/settings/branding', '/app/settings/billing', '/app/settings/notifications', '/app/analytics', '/app/whatsapp', '/app/sms', '/app/quote-link', '/app/quotes']) {
   const r = await page(`${cfg.appUrl}${p}`, a.cookie)
   check(`${p} loads`, r.status === 200, r.status)
 }
@@ -101,7 +104,7 @@ check('the WhatsApp page is the same page as before', /WhatsApp/.test(whatsappPa
 
 // ---------- 2. Share → Use it on WhatsApp ----------
 const slug = (await sb.select('tenants', `id=eq.${a.tenantId}&select=slug`))[0].slug as string
-const shareHtml = text((await page(`${cfg.appUrl}/app/share`, a.cookie)).html)
+const shareHtml = text((await page(`${cfg.appUrl}/app/quote-link`, a.cookie)).html) // T-160: was /app/share
 const waHref = /data-testid="send-on-whatsapp"[^>]*|href="(https:\/\/wa\.me\/\?text=[^"]+)"/.exec(shareHtml)
 const waUrl = /href="(https:\/\/wa\.me\/\?text=[^"]+)"/.exec(shareHtml)?.[1] ?? ''
 check('Share has "Use it on WhatsApp"', shareHtml.includes('Use it on WhatsApp') && Boolean(waHref))

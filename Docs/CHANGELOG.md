@@ -15,6 +15,61 @@
 
 ## Issues & Resolutions
 
+### 2026-11-13: T-160 — Sectioned menu, a fuller Home, unfinished requests that clear, sign-in line (Feedback 01) (AD-044)
+
+The owner's feedback: the five-item menu was too thin and "Share" and "Prices" were the wrong words; Home looked empty; the "people started a request" banner never went away and had no permanent place; the sign-in line was weak. No status, price or quote flow changed.
+
+**1. The menu, in sections (AD-044)**
+- Work: Home, Quotes, Unfinished requests, Analytics. Set up: Services, Quote link, WhatsApp. Account: Settings (its four tabs unchanged). No SMS item; `/app/sms` still opens by its address. The same panel is the phone menu, and it now closes when an item is tapped.
+- "Services" replaces "Prices" and "Quote link" replaces "Share": menu labels, page titles, and the pages themselves, which moved to `/app/services` and `/app/quote-link`. `/app/prices`, `/app/share` and `/app/widget` redirect (in `next.config.js`, query string kept); the redirect that used to send `/app/services` to `/app/prices` is reversed. The Quote link page's description is "Give customers this link, or put the form on your website."
+- No email named either page, so no email changed. The checklist keeps "Check your prices" and "Share your quote link" (they name an action, not a page) and links to the new addresses.
+- "Unfinished requests" opens the Unfinished tab of the quotes list (`/app/quotes?filter=unfinished`). The quotes page now keeps its address in step with the open tab (`?tab=<group>` or `?filter=unfinished`), so the menu highlights the right item and Home can open a tab by name. Reading the address needs a Suspense boundary on a prerendered page; the menu and the quotes list each have one.
+
+**2. Unfinished requests that clear**
+- **What was wrong:** Home counted every unfinished request from the last 7 days, so the banner stayed for a week whatever the owner did, and there was no way to say "dealt with".
+- **Fix:** migration 39 adds `request_leads.seen_at` and `handled_at`. One rule, `lib/unfinished-leads.ts`: a request is *listed* while it is not finished, not handled and was started in the last 30 days; it is *new* while it is listed and not seen. The Home banner and the menu badge count new ones; the list and its tab count show everyone listed.
+- Opening the Unfinished list marks the people on it as seen (`POST /api/leads/seen`), so the banner and badge clear at once and come back only when another person starts and does not finish. The list is read with the moment it was read (`asOf`), and only requests started up to then are marked, so someone who starts while the list is open stays new. People who were new keep a "New" tag for that visit.
+- "Done" on a person (`POST /api/leads/:leadId/done`) sets `handled_at`: they leave the list and every count. There is no undo.
+- `GET /api/leads` still changes nothing when read. `GET /api/leads/new-count` is the badge.
+- **Tenant isolation:** the business has no write policy on `request_leads` (and gets none). The two writes use the service role after `requireTenant()`, filtered by the signed-in user's tenant, and "done" looks the row up by id and tenant, so another business's request is a 404.
+- The banner no longer says "in the last 7 days": it counts new people over the same 30 days the list covers.
+
+**3. A fuller Home**, in this order: (a) Waiting for you, as T-158 left it; (b) the new-unfinished banner; the plan banner when there is one; (c) the setup checklist until done; then
+- **(d) Where your quotes stand:** Needs you, Waiting for customer, and Accepted "in the last 30 days", with the T-158 groups and names, each opening that tab.
+- **(e) Latest activity:** the last six events, newest first, each linking to its quote: "Sarah sent a request", "You approved Sarah's quote", "Sarah opened the quote", "Sarah asked a question", "Sarah accepted the quote", "Sarah declined the quote", with "2 hours ago". Built by `buildHomeActivity` from timestamps the quotes already carry (`created_at`, `approved_at`, `viewed_at`, `accepted_at`, `declined_at`) and from `quote_feedback.created_at`. No new table. No "his" or "her": a name does not say which.
+- **(f) Your quote link:** the link, Copy, Open, and "QR code and website form" to the Quote link page. Copy is the same action as on that page (it also ticks the checklist step).
+- **(g) Last 30 days:** the four numbers as before, each with "up 3", "down 1" or "same" against the 30 days before (`homeNumbers(rows, since, until)`, `compareHomeNumbers`). Money is compared in whole units, the way it is shown.
+- A business with no quotes at all sees one friendly line in (d) and in (e), not zeros and an empty box, and no row of "same" under the numbers.
+- **Queries:** three more than before, all a fixed number and none per quote: how many quotes wait for a customer, whether the business has ever had a quote, and the last 30 days' customer questions. The "Needs you" count rides on the existing waiting-list query, the comparison on the existing 30-day query (widened to 60 days), and the unfinished count replaced the old one. Setup tests are left out of every count.
+- **Found while verifying:** at phone width the quote link stretched Home wider than the screen (a grid cell is as wide as its longest line). Fixed with `min-w-0` on the two cells.
+- **Found by the regression run (verify-t158):** leaving the Unfinished tab could show one quote under "All" for a moment. The Unfinished tab asks the list API for the counts only (`limit=1`), and that reply could land after the tab had changed, replacing the list and ending the loading state early. The race was already in the T-158 list page; keeping the address in step with the tab made it likely. Fixed in the page: every request has a number, a tab change retires the ones in flight, and a reply that is not the newest is dropped (`latestFetch`).
+
+**4. Sign-in line.** The auth pages show `HERO.headline` from `lib/marketing/home-copy.ts` ("Instant quotes on your website, in your prices.") in place of "AI-powered estimates for your business", so sign-in always matches the home page.
+
+**5. Settings wording.** "Notification Email (Override)" is "Send notifications to".
+
+**6. Housekeeping.** `OWNER-TODO.md` said in several places that email delivery waits on the Postmark account approval. The account was approved on 11 Nov 2026 and the sending domain verified (DKIM) on 10 Nov; those notes are corrected. Return-Path is left as a check item.
+
+**Wording** for all of it lives in `shared/quote-turn.ts` (`QUOTE_TURN_COPY.menu`, `.home`, `.unfinished`, `quoteActivityLine`, `agoWords`), next to the T-158 labels it reuses.
+
+**Not changed:** the Services, Quote link, Analytics and WhatsApp pages beyond titles, paths and wording; the Settings tabs; statuses, prices and the quote flow; the mobile app.
+
+**Constraints worth knowing**
+- Home's counts leave out setup tests; the quotes list's tab counts include them (with their "Test" tag), as before. "Needs you" on Home can therefore be lower than the tab's count while a test quote waits.
+- "Accepted" on Home is the last 30 days; the Accepted tab it opens lists every accepted quote.
+- Latest activity covers 30 days. "Opened" is the first time the customer opened the quote (`viewed_at` is written once).
+- "2 hours ago" counts elapsed time, not calendar days, so it reads the same wherever the page is rendered.
+- Regression scripts changed for the renames only: `verify-t149.mts` (three places: it loads the page at `/app/quote-link` twice, and expects `/app/widget` to redirect there) and `verify-t152.mts` (five places: the menu's links with its "no … item" check, the redirect direction for `/app/prices`, the `/app/widget` target, the list of pages that must load, and the Share page fetch, which use the new addresses). What each check proves is the same. Three T-152 unit tests and one T-158 unit test were updated the same way.
+
+**Verified (2026-11-14, local stack with migration 39, not deployed):**
+- Unit tests: web 496, worker 499, mobile 11, all pass. New: `apps/web/src/__tests__/home-and-menu.test.ts` (38): the seen and handled rules and their database filter, the routes' tenant scoping, the activity builder, the time words, the 30-day comparison, the empty state, the menu sections, the renames and redirects, the sign-in line and the settings label.
+- `scripts/hardcore-test/verify-t160.mts` with the browser pass: 96/96. Old addresses redirect; new, seen and done for unfinished requests, and that another business can neither see nor mark them; Home's counts, activity lines and comparison from real rows; the three menu sections on desktop and phone; the banner and badge clearing when the list is opened and coming back for a new person; Done; Home for a business with data and for one with none; the sign-in line; the settings label. It saves screenshots into its results folder.
+- Regression, t146 to t158, run again after the last code change: 20, 33, 29, 35, 27, 35, 66, 36, 26, 46, 31, 96, 116, all pass, with the browser passes.
+- `pnpm lint`, `pnpm typecheck`, the web build and the worker build pass.
+- One quote in the live check went through the real pipeline (approve, customer view, question, accept). The other rows are copies of it with dates and a status set by hand, so the two 30-day periods and each activity line are known exactly.
+
+**Not checked:** `scripts/deploy-migration-39.sh` has not been run (it was checked for syntax only; it is the migration-38 script with the new file and checks). Production: nothing is deployed.
+
 ### 2026-11-13: T-159 — Emails show a sender name
 
 Emails had no proper sender name, so each mail app showed whatever it made up from the address.
@@ -4263,6 +4318,27 @@ if (pricingResult.estimatedTotal <= 0) {
 - new statuses ("needs_answer", "awaiting_customer") stored on the quote: a migration and every route's transitions, for what is a reading of data already there;
 - computing the group in SQL (a view or a generated column): the held and no-price cases read JSON fields, and the labels would still be worded in the app;
 - keeping "Sent / Viewed / Revised" as badges and adding a second "whose turn" badge: two labels to reconcile at a glance is the problem this ticket removes.
+
+### AD-044: The menu is sectioned and Home shows where every quote stands (T-160)
+
+**Decision:** replaces the five-item menu of AD-039. The dashboard menu has three sections: Work (Home, Quotes, Unfinished requests, Analytics), Set up (Services, Quote link, WhatsApp) and Account (Settings). Home still leads with the work waiting (AD-039), and then shows where every quote stands by whose turn it is (the AD-043 groups), what happened lately, the quote link, and the last 30 days against the 30 before. Unfinished requests have a permanent place in the menu, and the business can clear them: seeing the list clears the count, and "Done" removes a person.
+
+**Why:** five items hid things an owner looks for (Analytics, WhatsApp, the people who did not finish), and two of the five had names that described the product's machinery ("Share", "Prices") instead of the thing ("Quote link", "Services"). A Home that showed only waiting work looked empty on a good day. A banner that could not be cleared was noise after the first look.
+
+**Rules that follow:**
+- Unfinished requests are still not quotes (AD-038): `seen_at` and `handled_at` live on `request_leads`, and the rule for "listed" and "new" is one function used by the list, its tab count, the banner and the badge.
+- Home is built from a fixed number of tenant-scoped queries and from columns that already exist. The activity feed is a reading of timestamps, not a log; there is no activity table to keep in step.
+- Menu labels, Home's headings and every line on it come from `shared/quote-turn.ts`, with the AD-043 labels.
+- A read never writes: listing unfinished requests does not mark them. Marking is its own signed-in request.
+- An old address always redirects. `/app/prices`, `/app/share` and `/app/widget` join `/app/branding` and `/app/billing`.
+
+**Rejected:**
+- an activity table written by every route that changes a quote (a second record of what the timestamps already say, and every new route could forget it);
+- marking unfinished requests seen when Home is opened (the banner would clear before the owner had looked at who they are);
+- clearing the banner after a number of days (it clears whether or not anyone looked);
+- deleting a request on "Done" (it is still the business's lead, and a count of them is worth having later);
+- its own page for unfinished requests (the quotes list already has the tab; the menu item opens it);
+- a per-quote lookup for the activity lines (Home must stay a fixed number of queries).
 
 ---
 
