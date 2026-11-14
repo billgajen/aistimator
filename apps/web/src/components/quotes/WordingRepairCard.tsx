@@ -13,7 +13,7 @@ const PATH_LABEL: Record<WordingRepairRecord['path'], string> = {
 
 export function WordingRepairCard({ record }: { record: WordingRepairRecord }) {
   return (
-    <div className="rounded-warm-lg border border-border bg-surface">
+    <div className="rounded-xl border border-border bg-surface">
       <div className="border-b border-border px-6 py-4">
         <h2 className="text-lg font-medium text-text-primary">Customer wording</h2>
         <p className="text-sm text-text-muted">
@@ -27,7 +27,7 @@ export function WordingRepairCard({ record }: { record: WordingRepairRecord }) {
             <h3 className="mb-2 font-medium text-text-primary">Rewritten</h3>
             <ul className="space-y-2">
               {record.rewritten.map((r, i) => (
-                <li key={i} className="rounded-warm-lg bg-background p-3">
+                <li key={i} className="rounded-xl bg-background p-3">
                   <p className="text-xs text-text-muted">{r.field}</p>
                   <p className="text-text-muted line-through">{r.before}</p>
                   <p className="text-text-primary">{r.after}</p>
@@ -41,7 +41,7 @@ export function WordingRepairCard({ record }: { record: WordingRepairRecord }) {
             <h3 className="mb-2 font-medium text-text-primary">Removed</h3>
             <ul className="space-y-2">
               {record.removed.map((r, i) => (
-                <li key={i} className="rounded-warm-lg bg-background p-3">
+                <li key={i} className="rounded-xl bg-background p-3">
                   <p className="text-xs text-text-muted">{r.field}</p>
                   <p className="text-text-muted line-through">{r.text}</p>
                 </li>

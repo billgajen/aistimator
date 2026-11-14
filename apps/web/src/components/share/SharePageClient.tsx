@@ -38,7 +38,7 @@ export function SharePageClient(props: {
         }}
       />
 
-      <section className="rounded-warm-lg bg-surface p-6 shadow-warm">
+      <section className="rounded-xl bg-surface p-6 shadow-warm">
         <h2 className="mb-4 text-lg font-medium text-text-primary">QR code</h2>
         <QrCode value={link} fileName={`${slug}-quote-qr.png`} />
       </section>
@@ -56,7 +56,7 @@ export function SharePageClient(props: {
         region={props.region}
       />
 
-      <details className="group rounded-warm-lg bg-surface p-6 shadow-warm">
+      <details className="group rounded-xl bg-surface p-6 shadow-warm">
         <summary className="flex cursor-pointer list-none items-center gap-2 text-lg font-medium text-text-primary">
           <svg className="h-4 w-4 text-text-muted transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

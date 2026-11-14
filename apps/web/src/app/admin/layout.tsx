@@ -18,24 +18,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <nav className="flex items-center gap-4">
               <Link
                 href="/admin/quotes"
-                className="rounded-warm-lg px-3 py-1 text-sm text-surface/80 hover:bg-white/10 transition-colors"
+                className="rounded-xl px-3 py-1 text-sm text-surface/80 hover:bg-white/10 transition-colors"
               >
                 Quotes
               </Link>
               <Link
                 href="/admin/tenants"
-                className="rounded-warm-lg px-3 py-1 text-sm text-surface/80 hover:bg-white/10 transition-colors"
+                className="rounded-xl px-3 py-1 text-sm text-surface/80 hover:bg-white/10 transition-colors"
               >
                 Tenants
               </Link>
               <Link
                 href="/admin/activity"
-                className="rounded-warm-lg px-3 py-1 text-sm text-surface/80 hover:bg-white/10 transition-colors"
+                className="rounded-xl px-3 py-1 text-sm text-surface/80 hover:bg-white/10 transition-colors"
               >
                 Activity
               </Link>
               <span className="mx-2 text-text-muted">|</span>
-              <Link href="/app" className="rounded-warm-lg px-3 py-1 text-sm text-surface/80 hover:bg-white/10 transition-colors">
+              <Link href="/app" className="rounded-xl px-3 py-1 text-sm text-surface/80 hover:bg-white/10 transition-colors">
                 Exit Admin
               </Link>
             </nav>
@@ -44,7 +44,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 animate-fade-in-up">{children}</main>
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{children}</main>
     </div>
   )
 }

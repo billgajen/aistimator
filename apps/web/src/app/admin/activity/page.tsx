@@ -65,9 +65,9 @@ export default function AdminActivityPage() {
   const getResourceBadge = (type: string) => {
     const styles: Record<string, string> = {
       quote: 'bg-primary-light text-primary',
-      tenant: 'bg-cyan-100 text-cyan-800',
+      tenant: 'bg-mist text-text-secondary',
       user: 'bg-tertiary-light text-tertiary',
-      subscription: 'bg-teal-100 text-teal-800',
+      subscription: 'bg-mint text-primary',
     }
     return (
       <span
@@ -91,7 +91,7 @@ export default function AdminActivityPage() {
             setResourceFilter(e.target.value)
             setActivities([])
           }}
-          className="rounded-warm-lg border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="rounded-xl border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
         >
           <option value="">All resources</option>
           <option value="quote">Quotes</option>
@@ -102,10 +102,10 @@ export default function AdminActivityPage() {
       </div>
 
       {/* Error State */}
-      {error && <div className="mt-4 rounded-warm-lg bg-danger-light p-4 text-danger">{error}</div>}
+      {error && <div className="mt-4 rounded-xl bg-danger-light p-4 text-danger">{error}</div>}
 
       {/* Results Table */}
-      <div className="mt-6 overflow-hidden rounded-warm-lg bg-surface shadow">
+      <div className="mt-6 overflow-hidden rounded-xl bg-surface shadow">
         <table className="min-w-full divide-y divide-border">
           <thead className="bg-background">
             <tr>

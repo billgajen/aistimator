@@ -13,9 +13,9 @@ export function HomeQuoteLink({ link }: { link: string }) {
   const Q = QUOTE_TURN_COPY.home.quoteLink
   const { copy, copiedId } = useCopy()
   return (
-    <section className="min-w-0 rounded-warm-xl bg-white p-6 shadow-warm-md" data-testid="home-quote-link">
+    <section className="min-w-0 rounded-2xl bg-white p-6 shadow-warm-md" data-testid="home-quote-link">
       <h2 className="mb-3 font-display text-lg font-bold text-text-primary">{Q.title}</h2>
-      <code className="block truncate rounded-warm-lg border border-border bg-background px-3.5 py-2.5 text-sm text-text-primary" data-testid="home-quote-link-url">
+      <code className="block truncate rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm text-text-primary" data-testid="home-quote-link-url">
         {link}
       </code>
       <div className="mt-3 flex flex-wrap items-center gap-2">

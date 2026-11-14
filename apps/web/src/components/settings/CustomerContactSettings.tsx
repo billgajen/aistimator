@@ -32,7 +32,7 @@ export function CustomerContactSettings({ initial }: { initial: ContactRequireme
   }
 
   return (
-    <div className="rounded-warm-lg bg-surface p-6 shadow-warm" data-testid="contact-settings">
+    <div className="rounded-xl bg-surface p-6 shadow-warm" data-testid="contact-settings">
       <h2 className="text-lg font-medium text-text-primary">Customer contact details</h2>
       <p className="mt-1 text-sm text-text-muted">What customers must give you before the questions, so you can reach them even if they don&apos;t finish.</p>
       <fieldset className="mt-4 space-y-2">
@@ -49,7 +49,7 @@ export function CustomerContactSettings({ initial }: { initial: ContactRequireme
       </fieldset>
       <div className="mt-4 flex items-center justify-end gap-3">
         {message && <span className={`text-sm ${message.ok ? 'text-secondary' : 'text-danger'}`}>{message.text}</span>}
-        <button onClick={save} disabled={saving} className="inline-flex items-center rounded-warm-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50">
+        <button onClick={save} disabled={saving} className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50">
           {saving ? 'Saving...' : 'Save contact settings'}
         </button>
       </div>

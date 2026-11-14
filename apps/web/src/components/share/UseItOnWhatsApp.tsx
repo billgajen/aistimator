@@ -15,7 +15,7 @@ export function UseItOnWhatsApp(props: { businessName: string; link: string; reg
   const sendUrl = whatsAppShareUrl(whatsAppSendMessage(props))
 
   return (
-    <section className="rounded-warm-lg bg-surface p-6 shadow-warm" data-testid="use-it-on-whatsapp">
+    <section className="rounded-xl bg-surface p-6 shadow-warm" data-testid="use-it-on-whatsapp">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-medium text-text-primary">Use it on WhatsApp</h2>
@@ -43,7 +43,7 @@ export function UseItOnWhatsApp(props: { businessName: string; link: string; reg
       <h3 className="mt-6 text-sm font-semibold text-text-primary">For the WhatsApp Business app</h3>
       <ul className="mt-3 space-y-3">
         {texts.map((t) => (
-          <li key={t.id} className="rounded-warm-lg border border-border bg-background p-4">
+          <li key={t.id} className="rounded-xl border border-border bg-background p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h4 className="text-sm font-semibold text-text-primary">{t.label}</h4>

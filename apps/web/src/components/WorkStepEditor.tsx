@@ -231,7 +231,7 @@ export function WorkStepEditor({
   return (
     <div className="space-y-3">
       {workSteps.length === 0 ? (
-        <div className="rounded-warm-lg border-2 border-dashed border-border p-4 text-center">
+        <div className="rounded-xl border-2 border-dashed border-border p-4 text-center">
           <p className="text-sm text-text-muted">No pricing items defined yet</p>
           <p className="mb-2 text-xs text-text-muted">
             Add items that will appear as lines on your quote
@@ -253,7 +253,7 @@ export function WorkStepEditor({
             return (
               <div
                 key={step.id}
-                className={`rounded-warm-lg border bg-surface ${hasQuantityIssue ? 'border-amber-300' : 'border-border'}`}
+                className={`rounded-xl border bg-surface ${hasQuantityIssue ? 'border-tertiary-line' : 'border-border'}`}
               >
                 {/* Step Header */}
                 <div
@@ -307,9 +307,9 @@ export function WorkStepEditor({
                             ) : step.quantitySource?.type === 'constant' ? (
                               <span className="text-secondary">{step.quantitySource.value}</span>
                             ) : step.quantitySource?.type === 'ai_signal' ? (
-                              <span className="text-amber-600">AI (legacy)</span>
+                              <span className="text-tertiary">AI (legacy)</span>
                             ) : (
-                              <span className="text-red-500">needs link</span>
+                              <span className="text-danger">needs link</span>
                             )}
                           </>
                         )}
@@ -333,7 +333,7 @@ export function WorkStepEditor({
                   </div>
                   <div className="flex items-center gap-2">
                     {hasQuantityIssue && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
+                      <span className="rounded-full bg-tertiary-light px-2 py-0.5 text-xs text-tertiary">
                         Needs link
                       </span>
                     )}
@@ -343,7 +343,7 @@ export function WorkStepEditor({
                         e.stopPropagation()
                         removeStep(step.id)
                       }}
-                      className="rounded p-1 text-text-muted hover:bg-danger-light hover:text-danger"
+                      className="rounded-sm p-1 text-text-muted hover:bg-danger-light hover:text-danger"
                     >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path
@@ -372,7 +372,7 @@ export function WorkStepEditor({
                   <div className="border-t border-primary/20 bg-primary-light px-4 py-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <svg className="h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
                         <span className="text-sm text-primary">
@@ -386,7 +386,7 @@ export function WorkStepEditor({
                             e.stopPropagation()
                             acceptAutoLink(step.id, suggestion)
                           }}
-                          className="rounded bg-primary px-2 py-1 text-xs font-medium text-white hover:bg-primary-hover"
+                          className="rounded-sm bg-primary px-2 py-1 text-xs font-medium text-white hover:bg-primary-hover"
                         >
                           Yes, link it
                         </button>
@@ -396,7 +396,7 @@ export function WorkStepEditor({
                             e.stopPropagation()
                             setAutoLinkSuggestions(prev => ({ ...prev, [step.id]: null }))
                           }}
-                          className="rounded px-2 py-1 text-xs text-primary hover:bg-primary-light"
+                          className="rounded-sm px-2 py-1 text-xs text-primary hover:bg-primary-light"
                         >
                           No
                         </button>
@@ -410,10 +410,10 @@ export function WorkStepEditor({
                   <div className="space-y-4 border-t border-border px-4 py-4">
                     {/* Auto-link Suggestion (when expanded) */}
                     {suggestion && (
-                      <div className="rounded-warm-lg bg-primary-light p-3">
+                      <div className="rounded-xl bg-primary-light p-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <svg className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
                             <div>
@@ -427,14 +427,14 @@ export function WorkStepEditor({
                             <button
                               type="button"
                               onClick={() => acceptAutoLink(step.id, suggestion)}
-                              className="rounded-warm-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
+                              className="rounded-xl bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
                             >
                               Yes, link it
                             </button>
                             <button
                               type="button"
                               onClick={() => setAutoLinkSuggestions(prev => ({ ...prev, [step.id]: null }))}
-                              className="rounded-warm-lg px-3 py-1.5 text-sm text-primary hover:bg-primary-light"
+                              className="rounded-xl px-3 py-1.5 text-sm text-primary hover:bg-primary-light"
                             >
                               No thanks
                             </button>
@@ -453,7 +453,7 @@ export function WorkStepEditor({
                           value={step.name}
                           onChange={(e) => updateStep(step.id, { name: e.target.value })}
                           placeholder="e.g., Bedroom Cleaning"
-                          className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         />
                       </div>
                       <div>
@@ -480,7 +480,7 @@ export function WorkStepEditor({
 
                             updateStep(step.id, updates)
                           }}
-                          className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         >
                           {COST_TYPES.map((type) => (
                             <option key={type.value} value={type.value}>
@@ -511,7 +511,7 @@ export function WorkStepEditor({
                                 defaultCost: parseFloat(e.target.value) || 0,
                               })
                             }
-                            className="w-full rounded-warm-lg border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            className="w-full rounded-xl border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                           />
                         </div>
                       </div>
@@ -525,8 +525,8 @@ export function WorkStepEditor({
                           <select
                             value={getMultiplyByValue(step)}
                             onChange={(e) => handleMultiplyByChange(step.id, e.target.value)}
-                            className={`w-full rounded-warm-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 ${
-                              !step.quantitySource ? 'border-amber-300 bg-amber-50' : 'border-border'
+                            className={`w-full rounded-xl border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 ${
+                              !step.quantitySource ? 'border-tertiary-line bg-tertiary-light' : 'border-border'
                             }`}
                           >
                             <option value="">Select what to multiply by...</option>
@@ -564,7 +564,7 @@ export function WorkStepEditor({
                           </select>
 
                           {!step.quantitySource && (
-                            <p className="mt-1 text-xs text-amber-600">
+                            <p className="mt-1 text-xs text-tertiary">
                               Required: Select what determines the quantity
                             </p>
                           )}
@@ -589,7 +589,7 @@ export function WorkStepEditor({
                           value={step.unitLabel || ''}
                           onChange={(e) => updateStep(step.id, { unitLabel: e.target.value || undefined })}
                           placeholder="e.g., bedrooms, sq ft, items"
-                          className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         />
                         <p className="mt-1 text-xs text-text-muted">
                           Shown on the quote (e.g., &quot;3 bedrooms × $25&quot;)
@@ -606,7 +606,7 @@ export function WorkStepEditor({
                           onChange={(e) =>
                             updateStep(step.id, { optional: e.target.checked })
                           }
-                          className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                          className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
                         />
                         <span className="text-sm text-text-secondary">Only include when condition is met</span>
                       </label>
@@ -614,7 +614,7 @@ export function WorkStepEditor({
 
                     {/* Optional Step Trigger */}
                     {step.optional && (
-                      <div className="rounded-warm-lg bg-background p-3">
+                      <div className="rounded-xl bg-background p-3">
                         <p className="mb-2 text-sm font-medium text-text-secondary">
                           When to include this item
                         </p>
@@ -630,7 +630,7 @@ export function WorkStepEditor({
                                   triggerSignal: e.target.value || undefined,
                                 })
                               }
-                              className="w-full rounded-warm-lg border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                              className="w-full rounded-xl border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                             >
                               <option value="">Select question...</option>
                               {expectedSignals.map((sig) => (
@@ -654,7 +654,7 @@ export function WorkStepEditor({
                                   },
                                 })
                               }
-                              className="w-full rounded-warm-lg border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                              className="w-full rounded-xl border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                             >
                               {OPERATORS.map((op) => (
                                 <option key={op.value} value={op.value}>
@@ -681,7 +681,7 @@ export function WorkStepEditor({
                                   })
                                 }
                                 placeholder="Value"
-                                className="w-full rounded-warm-lg border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                className="w-full rounded-xl border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                               />
                             </div>
                           )}
@@ -699,7 +699,7 @@ export function WorkStepEditor({
                         value={step.description}
                         onChange={(e) => updateStep(step.id, { description: e.target.value })}
                         placeholder="Brief note about this item"
-                        className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                       />
                     </div>
 
@@ -728,7 +728,7 @@ export function WorkStepEditor({
         <button
           type="button"
           onClick={addStep}
-          className="inline-flex w-full items-center justify-center gap-1 rounded-warm-lg border border-dashed border-border px-3 py-2 text-sm text-text-secondary hover:border-border-strong hover:text-text-primary"
+          className="inline-flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border px-3 py-2 text-sm text-text-secondary hover:border-border-strong hover:text-text-primary"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

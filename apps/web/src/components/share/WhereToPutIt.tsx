@@ -7,12 +7,12 @@ import { useCopy } from './useCopy'
 export function WhereToPutIt({ texts }: { texts: ShareText[] }) {
   const { copy, copiedId } = useCopy()
   return (
-    <section className="rounded-warm-lg bg-surface p-6 shadow-warm">
+    <section className="rounded-xl bg-surface p-6 shadow-warm">
       <h2 className="text-lg font-medium text-text-primary">Where to put it</h2>
       <p className="mt-1 text-sm text-text-muted">Copy a ready-made line and paste it where your customers already find you.</p>
       <ul className="mt-4 space-y-3">
         {texts.map((t) => (
-          <li key={t.id} className="rounded-warm-lg border border-border bg-background p-4">
+          <li key={t.id} className="rounded-xl border border-border bg-background p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="text-sm font-semibold text-text-primary">{t.label}</h3>

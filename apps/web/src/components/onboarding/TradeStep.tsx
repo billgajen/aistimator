@@ -120,7 +120,7 @@ export function TradeStep({
         </div>
       )}
 
-      {error && <div className="mt-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
+      {error && <div className="mt-4 rounded-lg border border-danger-line bg-danger-light p-3 text-sm text-danger">{error}</div>}
 
       <div className="mt-6 flex items-center justify-between">
         <button

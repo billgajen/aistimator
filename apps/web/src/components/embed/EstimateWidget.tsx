@@ -393,15 +393,15 @@ function ConversationalChat({
             {msg.images && msg.images.length > 0 && (
               <div className="mb-1 flex justify-end gap-1">
                 {msg.images.map((url, j) => (
-                  <img key={j} src={url} alt="Upload" className="h-20 w-20 rounded-warm-lg object-cover" />
+                  <img key={j} src={url} alt="Upload" className="h-20 w-20 rounded-xl object-cover" />
                 ))}
               </div>
             )}
             <div
               className={`px-3.5 py-2.5 text-sm leading-snug ${
                 msg.role === 'user'
-                  ? 'rounded-warm-lg rounded-br-sm bg-primary text-on-primary'
-                  : 'rounded-warm-lg rounded-bl-sm bg-mist text-text-primary'
+                  ? 'rounded-xl rounded-br-xs bg-primary text-on-primary'
+                  : 'rounded-xl rounded-bl-xs bg-mist text-text-primary'
               }`}
             >
               {msg.text}
@@ -409,7 +409,7 @@ function ConversationalChat({
           </div>
         ))}
         {sending && (
-          <div className="self-start rounded-warm-lg rounded-bl-sm bg-mist px-3.5 py-2.5 text-sm text-text-muted">
+          <div className="self-start rounded-xl rounded-bl-xs bg-mist px-3.5 py-2.5 text-sm text-text-muted">
             Typing...
           </div>
         )}
@@ -455,7 +455,7 @@ function ConversationalChat({
         <button
           onClick={() => fileInputRef.current?.click()}
           title="Add photos"
-          className="rounded-warm-lg border border-border p-2 text-lg leading-none text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+          className="rounded-xl border border-border p-2 text-lg leading-none text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
         >
           📷
         </button>
@@ -466,12 +466,12 @@ function ConversationalChat({
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
           placeholder="Type your message..."
           disabled={sending}
-          className="flex-1 rounded-warm-lg border border-border bg-white px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-primary"
+          className="flex-1 rounded-xl border border-border bg-white px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-primary"
         />
         <button
           onClick={handleSend}
           disabled={sending || !input.trim()}
-          className="rounded-warm-lg bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-hover disabled:cursor-default disabled:bg-text-muted"
+          className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-hover disabled:cursor-default disabled:bg-text-muted"
         >
           Send
         </button>
@@ -732,11 +732,11 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
       style={brandStyleVars(widgetData?.branding?.primaryColor)}
     >
       {testToken && (
-        <p className="max-w-xl mx-auto mb-3 rounded-warm-lg border border-tape/50 bg-butter px-4 py-2.5 text-center text-sm text-text-primary" role="note">
+        <p className="max-w-xl mx-auto mb-3 rounded-xl border border-tape/50 bg-butter px-4 py-2.5 text-center text-sm text-text-primary" role="note">
           Test mode: this is how your customers see your quote page. This request won&apos;t count toward your plan.
         </p>
       )}
-      <div className="max-w-xl mx-auto bg-white rounded-warm-2xl border border-border shadow-warm-lg overflow-hidden pb-2">
+      <div className="max-w-xl mx-auto bg-white rounded-3xl border border-border shadow-warm-lg overflow-hidden pb-2">
       {/* Widget letterhead — shown in both form and conversational modes */}
       {widgetData && step !== 'loading' && step !== 'error' && step !== 'success' && (
         <div className="flex items-start justify-between gap-4 px-6 pt-6">
@@ -986,7 +986,7 @@ function ErrorState({
         <div className="mb-4">
           <button
             onClick={onSelectSuggested}
-            className="px-5 py-3 text-sm font-semibold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover transition"
+            className="px-5 py-3 text-sm font-semibold bg-primary text-on-primary rounded-xl hover:bg-primary-hover transition"
           >
             Switch to &quot;{suggestedService.name}&quot; and Submit
           </button>
@@ -995,7 +995,7 @@ function ErrorState({
 
       <button
         onClick={onRetry}
-        className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-warm-lg hover:border-border-strong transition"
+        className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-xl hover:border-border-strong transition"
       >
         Start Over
       </button>
@@ -1021,7 +1021,7 @@ function ServiceStep({
           <button
             key={service.id}
             onClick={() => onSelect(service.id)}
-            className="w-full text-left px-5 py-4 text-[15px] font-medium bg-white border border-border rounded-warm-lg hover:border-primary hover:bg-mint transition"
+            className="w-full text-left px-5 py-4 text-[15px] font-medium bg-white border border-border rounded-xl hover:border-primary hover:bg-mint transition"
           >
             {service.name}
           </button>
@@ -1270,7 +1270,7 @@ function FileUploadStep({
           type="button"
           onClick={useSamplePhoto}
           disabled={isUploading}
-          className="mb-4 w-full rounded-warm-lg border-2 border-dashed border-primary/40 bg-mint px-4 py-3 text-sm font-semibold text-primary hover:border-primary disabled:opacity-50"
+          className="mb-4 w-full rounded-xl border-2 border-dashed border-primary/40 bg-mint px-4 py-3 text-sm font-semibold text-primary hover:border-primary disabled:opacity-50"
         >
           Use a sample photo
         </button>
@@ -1279,7 +1279,7 @@ function FileUploadStep({
       {/* Photo guidance from service configuration */}
       {photoGuidance && (
         <div className="mb-4 p-3 bg-primary-light border border-primary/20 rounded-lg">
-          <p className="text-sm text-blue-800">{photoGuidance}</p>
+          <p className="text-sm text-text-primary">{photoGuidance}</p>
         </div>
       )}
 
@@ -1302,7 +1302,7 @@ function FileUploadStep({
                   disabled={filled || !canAddPhotos}
                   className={`w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
                     filled
-                      ? 'border-green-300 bg-green-50'
+                      ? 'border-secondary-line bg-secondary-light'
                       : 'border-dashed border-border-strong hover:border-primary/60 hover:bg-mint/50'
                   }`}
                 >
@@ -1311,17 +1311,17 @@ function FileUploadStep({
                     <img
                       src={slotFile.previewUrl}
                       alt={angle.label}
-                      className="w-10 h-10 rounded object-cover flex-shrink-0"
+                      className="w-10 h-10 rounded-sm object-cover flex-shrink-0"
                     />
                   ) : (
-                    <span className="w-10 h-10 rounded-warm-lg bg-surface flex items-center justify-center flex-shrink-0 text-lg">
+                    <span className="w-10 h-10 rounded-xl bg-surface flex items-center justify-center flex-shrink-0 text-lg">
                       📷
                     </span>
                   )}
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium text-text-primary">
                       {angle.label}
-                      {filled && <span className="ml-2 text-green-600">✓</span>}
+                      {filled && <span className="ml-2 text-secondary">✓</span>}
                     </span>
                     {angle.guidance && !filled && (
                       <span className="block text-xs text-text-muted">{angle.guidance}</span>
@@ -1337,8 +1337,8 @@ function FileUploadStep({
 
       {/* Hard-rejected photo message (too small etc.) */}
       {rejectMessage && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-800">{rejectMessage}</p>
+        <div className="mb-4 p-3 bg-danger-light border border-danger-line rounded-lg">
+          <p className="text-sm text-danger">{rejectMessage}</p>
         </div>
       )}
 
@@ -1347,7 +1347,7 @@ function FileUploadStep({
         {files.map((file) => (
           <div
             key={file.id}
-            className="relative aspect-square bg-surface rounded-warm-lg overflow-hidden"
+            className="relative aspect-square bg-surface rounded-xl overflow-hidden"
           >
             {file.file.type.startsWith('image/') ? (
               <img
@@ -1372,7 +1372,7 @@ function FileUploadStep({
             )}
 
             {file.status === 'error' && (
-              <div className="absolute inset-0 bg-red-500 bg-opacity-75 flex items-center justify-center">
+              <div className="absolute inset-0 bg-[color-mix(in_srgb,var(--color-danger)_75%,transparent)] flex items-center justify-center">
                 <span className="text-white text-xs px-2 text-center">{file.error}</span>
               </div>
             )}
@@ -1380,18 +1380,18 @@ function FileUploadStep({
             {/* Quality review overlay (T-107): retake vs use anyway */}
             {file.status === 'needs_review' && (
               <div className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center p-1.5 text-center">
-                <span className="text-amber-300 text-[10px] leading-tight mb-1.5">
+                <span className="text-butter text-[10px] leading-tight mb-1.5">
                   {file.qualityIssues?.[0] || 'This photo may be hard to analyse.'}
                 </span>
                 <button
                   onClick={() => handleRemove(file.id)}
-                  className="w-full mb-1 px-1 py-1 bg-white text-ink rounded text-[10px] font-semibold hover:bg-surface"
+                  className="w-full mb-1 px-1 py-1 bg-white text-ink rounded-sm text-[10px] font-semibold hover:bg-surface"
                 >
                   Retake
                 </button>
                 <button
                   onClick={() => handleUseAnyway(file.id)}
-                  className="w-full px-1 py-1 bg-transparent border border-white/60 text-white rounded text-[10px] hover:bg-white/10"
+                  className="w-full px-1 py-1 bg-transparent border border-white/60 text-white rounded-sm text-[10px] hover:bg-white/10"
                 >
                   Use anyway
                 </button>
@@ -1412,7 +1412,7 @@ function FileUploadStep({
 
         {/* Add button (shared input also serves the guided slots) */}
         <label
-          className={`aspect-square bg-surface rounded-warm-lg border-2 border-dashed border-border-strong items-center justify-center cursor-pointer hover:bg-surface ${
+          className={`aspect-square bg-surface rounded-xl border-2 border-dashed border-border-strong items-center justify-center cursor-pointer hover:bg-surface ${
             canAddPhotos || canAddDocs ? 'flex' : 'hidden'
           }`}
         >
@@ -1442,7 +1442,7 @@ function FileUploadStep({
 
       {/* Validation message */}
       {!hasMinPhotos && minPhotos > 0 && (
-        <p className="text-xs text-amber-600 mb-4">
+        <p className="text-xs text-tertiary mb-4">
           Please add at least {minPhotos} photo{minPhotos > 1 ? 's' : ''} to continue
         </p>
       )}
@@ -1450,14 +1450,14 @@ function FileUploadStep({
       <div className="flex gap-3 mt-6">
         <button
           onClick={onBack}
-          className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-warm-lg hover:border-border-strong transition"
+          className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-xl hover:border-border-strong transition"
         >
           Back
         </button>
         <button
           onClick={onNext}
           disabled={!canContinue}
-          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 disabled:cursor-not-allowed transition"
+          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-on-primary rounded-xl hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 disabled:cursor-not-allowed transition"
         >
           Continue
         </button>
@@ -1564,7 +1564,7 @@ function SuccessState({
   if (liveStatus === 'awaiting_clarification' && clarifyUrl) {
     return (
       <div className="text-center py-12 px-6">
-        <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 bg-tertiary-light rounded-full flex items-center justify-center mx-auto mb-4">
           <span className="text-2xl">✋</span>
         </div>
         <h3 className="font-display text-xl font-bold text-text-primary mb-2">One quick check</h3>
@@ -1580,7 +1580,7 @@ function SuccessState({
           href={clarifyUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover transition"
+          className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-xl hover:bg-primary-hover transition"
         >
           Confirm Details
         </a>
@@ -1601,7 +1601,7 @@ function SuccessState({
           href={quoteUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover transition"
+          className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-xl hover:bg-primary-hover transition"
         >
           View Your Estimate
         </a>
@@ -1625,7 +1625,7 @@ function SuccessState({
           href={quoteUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover transition"
+          className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-xl hover:bg-primary-hover transition"
         >
           View Estimate
         </a>
@@ -1647,7 +1647,7 @@ function SuccessState({
           href={quoteUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover transition"
+          className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-xl hover:bg-primary-hover transition"
         >
           View Your Estimate
         </a>

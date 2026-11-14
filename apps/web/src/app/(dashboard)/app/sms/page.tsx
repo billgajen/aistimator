@@ -23,7 +23,7 @@ interface SmsConfigResponse {
 }
 
 const inputClass =
-  'mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30'
+  'mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30'
 
 export default function SmsSettingsPage() {
   const [data, setData] = useState<SmsConfigResponse | null>(null)
@@ -116,12 +116,12 @@ export default function SmsSettingsPage() {
       <PageHeader title="SMS" description="Customers text your number, send photos, and get an estimate link back by text." />
 
       {data?.setup.testMode && (
-        <div className="rounded-warm-lg border border-tape/40 bg-butter/40 p-4 text-sm text-text-secondary">
+        <div className="rounded-xl border border-tape/40 bg-butter/40 p-4 text-sm text-text-secondary">
           Test mode: texts are recorded but not sent (Twilio credentials are not configured on this server).
         </div>
       )}
 
-      <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+      <div className="rounded-xl bg-surface p-6 shadow-warm">
         <h2 className="text-lg font-medium text-text-primary">Setup checklist</h2>
         <ol className="mt-4 space-y-4">
           {checklist.map((item, i) => (
@@ -155,7 +155,7 @@ export default function SmsSettingsPage() {
         </ol>
       </div>
 
-      <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+      <div className="rounded-xl bg-surface p-6 shadow-warm">
         <h2 className="text-lg font-medium text-text-primary">Your number</h2>
         <div className="mt-4 grid gap-6 sm:grid-cols-2">
           <div>
@@ -177,14 +177,14 @@ export default function SmsSettingsPage() {
           <button
             onClick={save}
             disabled={saving}
-            className="rounded-warm-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary hover:bg-primary-hover disabled:opacity-50"
+            className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-on-primary hover:bg-primary-hover disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>
 
-      <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+      <div className="rounded-xl bg-surface p-6 shadow-warm">
         <h2 className="text-lg font-medium text-text-primary">This month</h2>
         <p className="mt-2 text-sm text-text-secondary">
           <span className="figure text-2xl text-text-primary">{data?.usage.outboundSegmentsThisMonth ?? 0}</span> outbound SMS segments.

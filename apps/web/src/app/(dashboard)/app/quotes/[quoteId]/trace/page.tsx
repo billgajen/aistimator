@@ -141,7 +141,7 @@ export default function PricingTracePage({
 
   if (error || !quote) {
     return (
-      <div className="rounded-warm-lg bg-danger-light p-6 text-center">
+      <div className="rounded-xl bg-danger-light p-6 text-center">
         <p className="text-danger">{error || 'Quote not found'}</p>
         <Link href="/app/quotes" className="mt-4 inline-block text-primary hover:text-primary">
           Back to Quotes
@@ -178,7 +178,7 @@ export default function PricingTracePage({
       </div>
 
       {/* Quote Summary Card */}
-      <div className="rounded-warm-lg border border-border bg-surface p-6">
+      <div className="rounded-xl border border-border bg-surface p-6">
         <h2 className="mb-4 text-lg font-medium text-text-primary">Quote Summary</h2>
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <div>
@@ -203,7 +203,7 @@ export default function PricingTracePage({
 
       {/* Pricing Trace */}
       {trace ? (
-        <div className="rounded-warm-lg border border-border bg-surface">
+        <div className="rounded-xl border border-border bg-surface">
           <div className="border-b border-border px-6 py-4">
             <h2 className="text-lg font-medium text-text-primary">Calculation Steps</h2>
             <p className="text-sm text-text-muted">
@@ -253,7 +253,7 @@ export default function PricingTracePage({
                       {step.signalsUsed.map((signal, sigIndex) => (
                         <span
                           key={sigIndex}
-                          className="inline-flex items-center rounded-warm-lg bg-background px-2 py-0.5 text-xs text-text-secondary"
+                          className="inline-flex items-center rounded-xl bg-background px-2 py-0.5 text-xs text-text-secondary"
                         >
                           {signal.key}: {String(signal.value)}
                         </span>
@@ -315,7 +315,7 @@ export default function PricingTracePage({
           )}
         </div>
       ) : (
-        <div className="rounded-warm-lg border border-border bg-surface p-6 text-center">
+        <div className="rounded-xl border border-border bg-surface p-6 text-center">
           <svg className="mx-auto h-12 w-12 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
@@ -333,7 +333,7 @@ export default function PricingTracePage({
 
       {/* Extracted Signals */}
       {quote.signals_json && (
-        <div className="rounded-warm-lg border border-border bg-surface">
+        <div className="rounded-xl border border-border bg-surface">
           <div className="border-b border-border px-6 py-4">
             <h2 className="text-lg font-medium text-text-primary">Extracted Signals</h2>
             <p className="text-sm text-text-muted">
@@ -341,7 +341,7 @@ export default function PricingTracePage({
             </p>
           </div>
           <div className="px-6 py-4">
-            <pre className="overflow-x-auto rounded-warm-lg bg-background p-4 text-sm text-text-primary">
+            <pre className="overflow-x-auto rounded-xl bg-background p-4 text-sm text-text-primary">
               {JSON.stringify(quote.signals_json, null, 2)}
             </pre>
           </div>

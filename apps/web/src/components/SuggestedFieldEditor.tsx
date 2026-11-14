@@ -110,7 +110,7 @@ export function SuggestedFieldEditor({
   return (
     <div className="space-y-3">
       {fields.length === 0 ? (
-        <div className="rounded-warm-lg border-2 border-dashed border-border p-4 text-center">
+        <div className="rounded-xl border-2 border-dashed border-border p-4 text-center">
           <p className="text-sm text-text-muted">No questions defined yet</p>
           <p className="mb-2 text-xs text-text-muted">
             Add questions to collect information for accurate pricing
@@ -128,7 +128,7 @@ export function SuggestedFieldEditor({
           {fields.map((field, index) => (
             <div
               key={index}
-              className="rounded-warm-lg border border-border bg-surface"
+              className="rounded-xl border border-border bg-surface"
             >
               {/* Field Header */}
               <div
@@ -193,7 +193,7 @@ export function SuggestedFieldEditor({
                       e.stopPropagation()
                       removeField(index)
                     }}
-                    className="rounded p-1 text-text-muted hover:bg-danger-light hover:text-danger"
+                    className="rounded-sm p-1 text-text-muted hover:bg-danger-light hover:text-danger"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
@@ -235,7 +235,7 @@ export function SuggestedFieldEditor({
                           })
                         }}
                         placeholder="e.g., Number of Rooms"
-                        className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                       />
                     </div>
                     <div>
@@ -252,7 +252,7 @@ export function SuggestedFieldEditor({
                               : undefined,
                           })
                         }
-                        className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                       >
                         {FIELD_TYPES.map((type) => (
                           <option key={type.value} value={type.value}>
@@ -272,7 +272,7 @@ export function SuggestedFieldEditor({
                       value={field.helpText || ''}
                       onChange={(e) => updateField(index, { helpText: e.target.value || undefined })}
                       placeholder="Instructions for the customer"
-                      className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                   </div>
 
@@ -282,12 +282,12 @@ export function SuggestedFieldEditor({
                       <label className="mb-1 block text-sm font-medium text-text-secondary">
                         Options
                       </label>
-                      <div className="min-h-[60px] rounded-warm-lg border border-border p-2">
+                      <div className="min-h-[60px] rounded-xl border border-border p-2">
                         <div className="flex flex-wrap gap-2">
                           {field.options?.map((option, optionIndex) => (
                             <span
                               key={optionIndex}
-                              className="inline-flex items-center gap-1 rounded-warm-lg bg-primary-light px-2 py-1 text-sm text-primary"
+                              className="inline-flex items-center gap-1 rounded-xl bg-primary-light px-2 py-1 text-sm text-primary"
                             >
                               {option}
                               <button
@@ -332,7 +332,7 @@ export function SuggestedFieldEditor({
                         type="checkbox"
                         checked={field.required}
                         onChange={(e) => updateField(index, { required: e.target.checked })}
-                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                        className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
                       />
                       <span className="text-sm text-text-secondary">Required</span>
                     </label>
@@ -343,7 +343,7 @@ export function SuggestedFieldEditor({
                         onChange={(e) =>
                           updateField(index, { criticalForPricing: e.target.checked })
                         }
-                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                        className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
                       />
                       <span className="text-sm text-text-secondary">Critical for Pricing</span>
                     </label>
@@ -360,7 +360,7 @@ export function SuggestedFieldEditor({
         <button
           type="button"
           onClick={addField}
-          className="inline-flex w-full items-center justify-center gap-1 rounded-warm-lg border border-dashed border-border px-3 py-2 text-sm text-text-secondary hover:border-border-strong hover:text-text-primary"
+          className="inline-flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border px-3 py-2 text-sm text-text-secondary hover:border-border-strong hover:text-text-primary"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

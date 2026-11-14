@@ -45,7 +45,7 @@ export default function LoginPage() {
 
       <form onSubmit={handleLogin} className="space-y-4">
         {error && (
-          <div className="rounded-warm-lg bg-danger-light p-3 text-sm text-danger">{error}</div>
+          <div className="rounded-xl bg-danger-light p-3 text-sm text-danger">{error}</div>
         )}
 
         <div>
@@ -58,7 +58,7 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full rounded-warm-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             placeholder="you@example.com"
           />
         </div>
@@ -73,7 +73,7 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="w-full rounded-warm-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             placeholder="••••••••"
           />
         </div>

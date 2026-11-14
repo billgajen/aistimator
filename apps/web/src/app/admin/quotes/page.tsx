@@ -97,9 +97,9 @@ export default function AdminQuotesPage() {
       queued: 'bg-background text-text-primary',
       generating: 'bg-primary-light text-primary',
       sent: 'bg-secondary-light text-secondary',
-      viewed: 'bg-cyan-100 text-cyan-800',
-      accepted: 'bg-emerald-100 text-emerald-800',
-      paid: 'bg-teal-100 text-teal-800',
+      viewed: 'bg-mist text-text-secondary',
+      accepted: 'bg-secondary-light text-secondary',
+      paid: 'bg-mint text-primary',
       failed: 'bg-danger-light text-danger',
       expired: 'bg-tertiary-light text-tertiary',
     }
@@ -122,7 +122,7 @@ export default function AdminQuotesPage() {
       {/* Toast */}
       {toast && (
         <div
-          className={`mt-4 rounded-warm-lg p-4 ${
+          className={`mt-4 rounded-xl p-4 ${
             toast.type === 'success' ? 'bg-secondary-light text-secondary' : 'bg-danger-light text-danger'
           }`}
         >
@@ -137,12 +137,12 @@ export default function AdminQuotesPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by quote ID (qte_...) or customer email"
-          className="flex-1 rounded-warm-lg border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="flex-1 rounded-xl border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-warm-lg border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="rounded-xl border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
         >
           <option value="">All statuses</option>
           <option value="queued">Queued</option>
@@ -156,17 +156,17 @@ export default function AdminQuotesPage() {
         </select>
         <button
           type="submit"
-          className="rounded-warm-lg bg-primary px-6 py-2 text-white hover:bg-primary-hover"
+          className="rounded-xl bg-primary px-6 py-2 text-white hover:bg-primary-hover"
         >
           Search
         </button>
       </form>
 
       {/* Error State */}
-      {error && <div className="mt-4 rounded-warm-lg bg-danger-light p-4 text-danger">{error}</div>}
+      {error && <div className="mt-4 rounded-xl bg-danger-light p-4 text-danger">{error}</div>}
 
       {/* Results Table */}
-      <div className="mt-6 overflow-hidden rounded-warm-lg bg-surface shadow">
+      <div className="mt-6 overflow-hidden rounded-xl bg-surface shadow">
         <table className="min-w-full divide-y divide-border">
           <thead className="bg-background">
             <tr>
@@ -223,7 +223,7 @@ export default function AdminQuotesPage() {
                     <button
                       onClick={() => handleRetry(quote.quoteId)}
                       disabled={retrying === quote.quoteId}
-                      className="rounded bg-tertiary-light px-2 py-1 text-xs font-medium text-tertiary hover:bg-yellow-200 disabled:opacity-50"
+                      className="rounded-sm bg-tertiary-light px-2 py-1 text-xs font-medium text-tertiary hover:bg-tertiary-line disabled:opacity-50"
                     >
                       {retrying === quote.quoteId ? 'Retrying...' : 'Retry'}
                     </button>

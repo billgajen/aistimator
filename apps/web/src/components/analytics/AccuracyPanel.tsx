@@ -64,7 +64,7 @@ export function AccuracyPanel() {
 
   if (!report) return null
   return (
-    <div className="mb-8 rounded-warm-lg bg-surface p-6 shadow-warm">
+    <div className="mb-8 rounded-xl bg-surface p-6 shadow-warm">
       <h3 className="text-lg font-semibold text-text-primary">Estimate accuracy</h3>
       {!report.overall ? (
         <p className="mt-2 text-sm text-text-muted">

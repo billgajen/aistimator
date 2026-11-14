@@ -83,7 +83,7 @@ export default function HomePage() {
         <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">How it works</h2>
         <ol className="mt-8 grid gap-5 md:grid-cols-3">
           {HOW_IT_WORKS.map((step, i) => (
-            <li key={step.title} className="rounded-warm-xl border border-border bg-white p-5">
+            <li key={step.title} className="rounded-2xl border border-border bg-white p-5">
               <StepIcon index={i} />
               <h3 className="mt-3 font-display text-lg font-bold text-text-primary">
                 <span className="figure mr-2 text-primary">{i + 1}</span>
@@ -101,7 +101,7 @@ export default function HomePage() {
           <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">{CONTROL.heading}</h2>
           <div className="mt-8 grid gap-5 md:grid-cols-3">
             {CONTROL.points.map((p) => (
-              <div key={p.title} className="rounded-warm-xl bg-white p-5 shadow-warm">
+              <div key={p.title} className="rounded-2xl bg-white p-5 shadow-warm">
                 <h3 className="font-display text-base font-bold text-text-primary">{p.title}</h3>
                 <p className="mt-1 text-sm text-text-secondary">{p.text}</p>
               </div>
@@ -115,7 +115,7 @@ export default function HomePage() {
         <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">What homeowners want</h2>
         <div className="mt-8 grid gap-5 md:grid-cols-3" data-testid="statistics">
           {STATISTICS.map((s) => (
-            <figure key={s.url} className="rounded-warm-xl border border-border bg-white p-5">
+            <figure key={s.url} className="rounded-2xl border border-border bg-white p-5">
               <p className="figure text-4xl font-medium text-primary">{s.figure}</p>
               <blockquote className="mt-2 text-sm text-text-primary">{s.text}</blockquote>
               <figcaption className="mt-3 text-xs text-text-muted">
@@ -136,7 +136,7 @@ export default function HomePage() {
           <p className="mt-3 max-w-2xl text-text-secondary">{ADD_IT.lead}</p>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {ADD_IT.ways.map((w) => (
-              <div key={w.title} className="rounded-warm-xl bg-white p-5 shadow-warm">
+              <div key={w.title} className="rounded-2xl bg-white p-5 shadow-warm">
                 <h3 className="font-display text-base font-bold text-text-primary">{w.title}</h3>
                 <p className="mt-1 text-sm text-text-secondary">{w.text}</p>
               </div>
@@ -153,7 +153,7 @@ export default function HomePage() {
         </p>
         <div className="mt-8 grid gap-5 sm:grid-cols-3">
           {offeredPlans().map((def) => (
-            <div key={def.id} className={`rounded-warm-xl p-6 ${def.recommended ? 'bg-primary text-white shadow-warm-lg' : 'border border-border bg-white'}`}>
+            <div key={def.id} className={`rounded-2xl p-6 ${def.recommended ? 'bg-primary text-white shadow-warm-lg' : 'border border-border bg-white'}`}>
               <p className={`text-sm font-semibold ${def.recommended ? 'text-white/80' : 'text-text-secondary'}`}>{def.name}</p>
               <p className="figure mt-2 text-3xl font-medium">{formatMoney((def.monthlyPrice.USD ?? 0) / 100, 'USD', 'en-US', { decimals: 0 })}</p>
               <p className={`mt-1 text-xs ${def.recommended ? 'text-white/70' : 'text-text-muted'}`}>
@@ -173,7 +173,7 @@ export default function HomePage() {
       <section className="border-t border-border bg-surface py-16">
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
           <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">Questions</h2>
-          <div className="mt-6 divide-y divide-border rounded-warm-xl border border-border bg-white" data-testid="faq">
+          <div className="mt-6 divide-y divide-border rounded-2xl border border-border bg-white" data-testid="faq">
             {FAQ.map((f) => (
               <details key={f.q} className="group px-5">
                 <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between gap-3 py-3 font-semibold text-text-primary">
@@ -228,7 +228,7 @@ function StepIcon({ index }: { index: number }) {
     'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
   ]
   return (
-    <span className="inline-flex h-10 w-10 items-center justify-center rounded-warm-lg bg-mint text-primary" aria-hidden="true">
+    <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-mint text-primary" aria-hidden="true">
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
         <path strokeLinecap="round" strokeLinejoin="round" d={paths[index]} />
       </svg>

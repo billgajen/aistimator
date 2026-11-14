@@ -18,7 +18,7 @@ export interface ActivityLine {
 export function LatestActivity({ lines, hasQuotes }: { lines: ActivityLine[]; hasQuotes: boolean }) {
   const A = QUOTE_TURN_COPY.home.activity
   return (
-    <section className="rounded-warm-xl bg-white p-6 shadow-warm-md" data-testid="home-activity">
+    <section className="rounded-2xl bg-white p-6 shadow-warm-md" data-testid="home-activity">
       <h2 className="mb-3 font-display text-lg font-bold text-text-primary">{A.title}</h2>
       {lines.length === 0 ? (
         <p className="text-sm text-text-secondary" data-testid="activity-empty">

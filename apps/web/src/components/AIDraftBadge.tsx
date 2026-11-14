@@ -58,7 +58,7 @@ export function AIDraftBadge({
           type="button"
           onClick={onRegenerate}
           disabled={isRegenerating}
-          className="inline-flex items-center gap-1 rounded-warm-lg px-2 py-1 text-xs text-text-secondary hover:bg-background hover:text-text-primary disabled:opacity-50"
+          className="inline-flex items-center gap-1 rounded-xl px-2 py-1 text-xs text-text-secondary hover:bg-background hover:text-text-primary disabled:opacity-50"
         >
           <svg
             className={`h-3.5 w-3.5 ${isRegenerating ? 'animate-spin' : ''}`}
@@ -80,7 +80,7 @@ export function AIDraftBadge({
         <button
           type="button"
           onClick={onClear}
-          className="inline-flex items-center gap-1 rounded-warm-lg px-2 py-1 text-xs text-text-secondary hover:bg-background hover:text-text-primary"
+          className="inline-flex items-center gap-1 rounded-xl px-2 py-1 text-xs text-text-secondary hover:bg-background hover:text-text-primary"
         >
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path

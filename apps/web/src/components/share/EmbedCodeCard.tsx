@@ -30,10 +30,10 @@ export function EmbedCodeCard({
   const mailto = webPersonMailto({ businessName, link, embedCode: code, region })
 
   const pill = (active: boolean) =>
-    `rounded-warm-lg px-3 py-1.5 text-sm font-medium ${active ? 'bg-mint text-primary' : 'bg-background text-text-secondary hover:bg-mist'}`
+    `rounded-xl px-3 py-1.5 text-sm font-medium ${active ? 'bg-mint text-primary' : 'bg-background text-text-secondary hover:bg-mist'}`
 
   return (
-    <section className="rounded-warm-lg bg-surface p-6 shadow-warm">
+    <section className="rounded-xl bg-surface p-6 shadow-warm">
       <h2 className="text-lg font-medium text-text-primary">Add it to your website</h2>
       <p className="mt-1 text-sm text-text-muted">
         If you have a website, the same form can sit on it. Paste this code, or send it to whoever looks after the site.
@@ -54,7 +54,7 @@ export function EmbedCodeCard({
         </div>
       </div>
 
-      <pre className="mt-4 overflow-x-auto whitespace-pre-wrap rounded-warm-lg bg-text-primary p-4 text-sm text-gray-100" data-testid="embed-code">
+      <pre className="mt-4 overflow-x-auto whitespace-pre-wrap rounded-xl bg-text-primary p-4 text-sm text-background" data-testid="embed-code">
         {code}
       </pre>
 

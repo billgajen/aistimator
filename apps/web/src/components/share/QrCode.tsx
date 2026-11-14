@@ -38,7 +38,7 @@ export function QrCode({ value, fileName }: { value: string; fileName: string })
         ref={canvasRef}
         role="img"
         aria-label={`QR code for ${value}`}
-        className="h-44 w-44 rounded-warm-lg border border-border bg-white"
+        className="h-44 w-44 rounded-xl border border-border bg-white"
       />
       <div className="text-center sm:text-left">
         <p className="text-sm text-text-secondary">

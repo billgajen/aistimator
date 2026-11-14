@@ -60,11 +60,11 @@ export function LogoUpload({
   return (
     <>
       {logoUrl ? (
-        <div className="mt-4 flex items-center gap-4 rounded-warm-lg border border-border bg-background p-4">
+        <div className="mt-4 flex items-center gap-4 rounded-xl border border-border bg-background p-4">
           {/* eslint-disable-next-line @next/next/no-img-element -- signed R2 URL */}
           <img src={logoUrl} alt="Your logo" className="h-16 max-w-[200px] object-contain" />
           <div className="ml-auto flex gap-2">
-            <label className="cursor-pointer rounded-warm-lg border border-border px-3 py-2 text-sm font-medium text-text-secondary hover:bg-surface">
+            <label className="cursor-pointer rounded-xl border border-border px-3 py-2 text-sm font-medium text-text-secondary hover:bg-surface">
               Replace
               <input
                 type="file"
@@ -77,14 +77,14 @@ export function LogoUpload({
             <button
               onClick={handleLogoRemove}
               disabled={uploadingLogo}
-              className="rounded-warm-lg border border-danger/30 px-3 py-2 text-sm font-medium text-danger hover:bg-danger-light disabled:opacity-50"
+              className="rounded-xl border border-danger/30 px-3 py-2 text-sm font-medium text-danger hover:bg-danger-light disabled:opacity-50"
             >
               Remove
             </button>
           </div>
         </div>
       ) : (
-        <label className="mt-4 flex h-32 cursor-pointer items-center justify-center rounded-warm-lg border-2 border-dashed border-border bg-background transition-colors hover:border-border-strong">
+        <label className="mt-4 flex h-32 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border bg-background transition-colors hover:border-border-strong">
           <input
             type="file"
             accept="image/png,image/jpeg,image/webp"

@@ -113,7 +113,7 @@ export default function FeaturesPage() {
                     {stage.details.map((detail) => (
                       <li
                         key={detail}
-                        className="rounded-warm-lg border border-border bg-white px-4 py-3 text-sm text-text-primary"
+                        className="rounded-xl border border-border bg-white px-4 py-3 text-sm text-text-primary"
                       >
                         {detail}
                       </li>

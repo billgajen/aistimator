@@ -163,7 +163,7 @@ export default function BrandingPage() {
     return (
       <div>
         <div className="flex min-h-[400px] items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
       </div>
     )
@@ -174,9 +174,9 @@ export default function BrandingPage() {
 
       {/* Success message */}
       {success && (
-        <div className="mb-4 rounded-warm-lg bg-secondary-light p-4">
+        <div className="mb-4 rounded-xl bg-secondary-light p-4">
           <div className="flex">
-            <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="h-5 w-5 text-secondary" viewBox="0 0 20 20" fill="currentColor">
               <path
                 fillRule="evenodd"
                 d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -190,9 +190,9 @@ export default function BrandingPage() {
 
       {/* Error message */}
       {error && (
-        <div className="mb-4 rounded-warm-lg bg-danger-light p-4">
+        <div className="mb-4 rounded-xl bg-danger-light p-4">
           <div className="flex">
-            <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="h-5 w-5 text-danger" viewBox="0 0 20 20" fill="currentColor">
               <path
                 fillRule="evenodd"
                 d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
@@ -200,7 +200,7 @@ export default function BrandingPage() {
               />
             </svg>
             <p className="ml-3 text-sm text-danger">{error}</p>
-            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-danger">
+            <button onClick={() => setError(null)} className="ml-auto text-danger hover:text-danger">
               <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fillRule="evenodd"
@@ -217,7 +217,7 @@ export default function BrandingPage() {
         {/* Settings Column */}
         <div className="space-y-6">
           {/* Logo section */}
-          <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+          <div className="rounded-xl bg-surface p-6 shadow-warm">
             <h2 className="text-lg font-medium text-text-primary">Logo</h2>
             <p className="mt-1 text-sm text-text-muted">Your logo appears on quotes and the widget</p>
 
@@ -232,7 +232,7 @@ export default function BrandingPage() {
           </div>
 
           {/* Business identity */}
-          <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+          <div className="rounded-xl bg-surface p-6 shadow-warm">
             <h2 className="text-lg font-medium text-text-primary">Business Details</h2>
             <p className="mt-1 text-sm text-text-muted">
               Shown on your quotes and PDFs so customers can reach you
@@ -247,7 +247,7 @@ export default function BrandingPage() {
                   maxLength={80}
                   onChange={(e) => setBranding({ ...branding, tagline: e.target.value || null })}
                   placeholder="e.g., Family-run since 1998"
-                  className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -258,7 +258,7 @@ export default function BrandingPage() {
                     value={branding.phone || ''}
                     onChange={(e) => setBranding({ ...branding, phone: e.target.value || null })}
                     placeholder={regionCopy.phoneExample}
-                    className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                 </div>
                 <div>
@@ -268,7 +268,7 @@ export default function BrandingPage() {
                     value={branding.email || ''}
                     onChange={(e) => setBranding({ ...branding, email: e.target.value || null })}
                     placeholder={regionCopy.emailExample}
-                    className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                 </div>
               </div>
@@ -279,14 +279,14 @@ export default function BrandingPage() {
                   value={branding.website || ''}
                   onChange={(e) => setBranding({ ...branding, website: e.target.value || null })}
                   placeholder={regionCopy.websiteExample}
-                  className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
             </div>
           </div>
 
           {/* Colors section */}
-          <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+          <div className="rounded-xl bg-surface p-6 shadow-warm">
             <h2 className="text-lg font-medium text-text-primary">Brand Colors</h2>
             <p className="mt-1 text-sm text-text-muted">Customize the widget and quote appearance</p>
 
@@ -313,14 +313,14 @@ export default function BrandingPage() {
                   type="color"
                   value={branding.primaryColor}
                   onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
-                  className="h-10 w-10 cursor-pointer rounded-warm-lg border border-border"
+                  className="h-10 w-10 cursor-pointer rounded-xl border border-border"
                 />
                 <input
                   type="text"
                   value={branding.primaryColor}
                   onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
                   pattern="^#[0-9A-Fa-f]{6}$"
-                  className="w-28 rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-28 rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
               <p className="mt-1 text-xs text-text-muted">Used for buttons, links, and accents</p>
@@ -328,7 +328,7 @@ export default function BrandingPage() {
           </div>
 
           {/* Footer notes */}
-          <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+          <div className="rounded-xl bg-surface p-6 shadow-warm">
             <h2 className="text-lg font-medium text-text-primary">Footer Notes</h2>
             <p className="mt-1 text-sm text-text-muted">
               Additional text shown at the bottom of quotes
@@ -340,13 +340,13 @@ export default function BrandingPage() {
                 onChange={(e) => setBranding({ ...branding, footerNotes: e.target.value || null })}
                 placeholder="e.g., Thank you for your business! Payment terms: Net 30"
                 rows={3}
-                className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
           </div>
 
           {/* Template toggles */}
-          <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+          <div className="rounded-xl bg-surface p-6 shadow-warm">
             <h2 className="text-lg font-medium text-text-primary">Quote Template</h2>
             <p className="mt-1 text-sm text-text-muted">Choose which sections to show on quotes</p>
 
@@ -356,7 +356,7 @@ export default function BrandingPage() {
                   type="checkbox"
                   checked={template.showLineItems}
                   onChange={(e) => setTemplate({ ...template, showLineItems: e.target.checked })}
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                  className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
                 />
                 <div>
                   <span className="text-sm font-medium text-text-secondary">Show line items</span>
@@ -371,7 +371,7 @@ export default function BrandingPage() {
                   onChange={(e) =>
                     setTemplate({ ...template, includeAssumptions: e.target.checked })
                   }
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                  className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
                 />
                 <div>
                   <span className="text-sm font-medium text-text-secondary">Include assumptions</span>
@@ -386,7 +386,7 @@ export default function BrandingPage() {
                   onChange={(e) =>
                     setTemplate({ ...template, includeExclusions: e.target.checked })
                   }
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                  className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
                 />
                 <div>
                   <span className="text-sm font-medium text-text-secondary">Include exclusions</span>
@@ -401,7 +401,7 @@ export default function BrandingPage() {
                   onChange={(e) =>
                     setTemplate({ ...template, acceptQuoteEnabled: e.target.checked })
                   }
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                  className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
                 />
                 <div>
                   <span className="text-sm font-medium text-text-secondary">Allow customers to accept quotes directly</span>
@@ -421,7 +421,7 @@ export default function BrandingPage() {
                   onChange={(e) =>
                     setTemplate({ ...template, validityDays: parseInt(e.target.value) || 30 })
                   }
-                  className="mt-1 w-24 rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="mt-1 w-24 rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
                 <p className="mt-1 text-xs text-text-muted">
                   How long quotes remain valid for acceptance
@@ -435,7 +435,7 @@ export default function BrandingPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="inline-flex items-center rounded-warm-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+              className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
             >
               {saving ? (
                 <>
@@ -451,12 +451,12 @@ export default function BrandingPage() {
 
         {/* Preview Column */}
         <div className="lg:sticky lg:top-6 lg:self-start">
-          <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+          <div className="rounded-xl bg-surface p-6 shadow-warm">
             <h2 className="mb-4 text-lg font-medium text-text-primary">Preview</h2>
 
             {/* Quote Preview */}
             <div
-              className="rounded-warm-lg border border-border bg-surface p-6"
+              className="rounded-xl border border-border bg-surface p-6"
               style={{ '--primary-color': branding.primaryColor } as React.CSSProperties}
             >
               {/* Header */}
@@ -571,7 +571,7 @@ export default function BrandingPage() {
               {/* Accept button preview */}
               {template.acceptQuoteEnabled !== false && (
                 <button
-                  className="mt-4 w-full rounded-warm-lg py-2 text-sm font-medium"
+                  className="mt-4 w-full rounded-xl py-2 text-sm font-medium"
                   style={{ backgroundColor: branding.primaryColor, color: readableTextOn(branding.primaryColor) }}
                 >
                   Accept Quote

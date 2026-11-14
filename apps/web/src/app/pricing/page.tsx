@@ -112,7 +112,7 @@ export default function PricingPage() {
             return (
             <div
               key={def.id}
-              className={`relative flex flex-col rounded-warm-2xl p-8 ${
+              className={`relative flex flex-col rounded-3xl p-8 ${
                 plan.highlight
                   ? 'bg-primary text-white shadow-warm-lg'
                   : 'border border-border bg-white shadow-warm'

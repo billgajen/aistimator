@@ -622,3 +622,51 @@ a new environment set up from `.env.example` would point the web app and the wor
 - The live check is `scripts/hardcore-test/verify-t162.mts` (add `PLAYWRIGHT_DIR=…` for the pages and the website
   code in a real browser; it saves screenshots and the four rendered emails into its results folder). It joins the
   regression set: run t146 to t162 before a commit or deploy (there is no verify-t159 or verify-t161).
+
+## T-164 — Design foundations: one design file, fixed tokens, a preview page
+
+Built and checked locally. **Not committed, not deployed.** No page was redesigned; pages changed only where a
+token changed.
+
+- [ ] **Deploy: web only** (`npx vercel deploy --prod`). No migration and no worker change.
+- [ ] **Choose on the preview page, `/design`** (it is not linked from anywhere; type the address). Use the
+  Accent switch at the top and look at the whole page with each one, on your phone too.
+  1. **The accent:** tomato, orange or yellow. Orange is in place until you choose. Things to weigh:
+     - *Orange:* button text is our dark ink and reads well (5.0:1).
+     - *Tomato:* white text does not pass on it (4.0:1), and neither does our ink (3.8:1), so button text has to be
+       near-black. Look at the "Try it free" button with tomato selected and decide if you like that.
+     - *Yellow:* the strongest contrast for dark text (9.7:1), but its light tint is almost the butter colour we
+       keep for measurements, so "needs you" would look like a measurement note again.
+     - With every accent, button text is dark, never white. The accent is also never used as the colour of text on
+       the page: a highlighted word is the accent *behind* the word.
+  2. **The wordmark:** "Qolumns" or "qolumns", both drawn under "Wordmark". Real pages keep the current text logo
+     until you choose.
+  Tell me the two choices and they go in as one small ticket (the accent becomes the default token; the wordmark
+  replaces the text logo).
+- [ ] **Look at, after the deploy** (these are the visible effects of the token fixes):
+  1. *Quotes and Home.* "Needs your approval", the "Needs you" tile, the unfinished-requests banner, the menu's
+     count and the "New" tag are a soft orange now, not yellow. "Waiting for customer" is a quiet blue-grey.
+  2. *Small grey text* (times, "Received today", hints) is darker and easier to read. So are amber, green and red
+     labels.
+  3. *Fields and outlined buttons* have a clearer edge everywhere, including your quote link's form and the accept
+     form.
+  4. *Keyboard.* Press Tab on the home page until you reach the buttons in the green band at the bottom: the ring
+     is white there (it was invisible). Click into any field: it shows a clear dark ring.
+  5. *The dashboard* no longer fades in when it loads.
+  6. *Reduced motion.* On your phone or Mac, turn on "Reduce motion" in Accessibility: nothing slides or loops.
+- Worth knowing:
+  - `Docs/design/system.md` is now the one file that decides how things look and move. The three design skills only
+    advise. A change to a colour, font or animation rule starts there.
+  - The customer's pages (the request form and the quote page) keep the business's own brand colour. Our accent is
+    never shown on them.
+  - `/design` is public if someone types the address, but it is marked "do not index", linked from nowhere, and
+    shows nothing private.
+- **Found, for later tickets** (details in `Docs/CHANGELOG.md` and `Docs/design/system.md`, "Known gaps"):
+  - 228 colour classes that ask for a see-through tint (for example a soft ring or a soft border) have never done
+    anything, because of how the colours are defined. Turning them on is the right fix, but it changes how many
+    pages look at once, so it needs its own ticket and a look at every page.
+  - On a phone the shared buttons are 40 px tall and fields 42 px; the rule is 44 px. Small tags use 11 px text;
+    the floor is 12 px.
+- The live check is `scripts/hardcore-test/verify-t164.mts` (add `PLAYWRIGHT_DIR=…`; almost all of it is the
+  browser pass; it saves `/design` at both widths with each accent into its results folder). It joins the
+  regression set: run t146 to t164 before a commit or deploy (there is no verify-t159, t161 or t163).

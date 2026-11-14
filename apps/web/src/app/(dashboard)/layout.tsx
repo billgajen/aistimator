@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { PRODUCT_NAME, QUOTE_TURN_COPY } from '@qolumns/shared'
 import { UNFINISHED_CHANGED_EVENT } from '@/lib/unfinished-leads'
+import { NEEDS_YOU_MARK } from '@/lib/status-tone'
 
 /**
  * Dashboard shell — "the studio desk", panel edition.
@@ -36,7 +37,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const closeMenu = useCallback(() => setSidebarOpen(false), [])
 
   const panel = (
-    <div className="flex h-full flex-col rounded-warm-2xl bg-white shadow-warm-md">
+    <div className="flex h-full flex-col rounded-3xl bg-white shadow-warm-md">
       {/* Wordmark */}
       <div className="px-5 pt-5 pb-4">
         <Link href="/app" className="group inline-block">
@@ -62,7 +63,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <form action="/api/auth/signout" method="POST">
           <button
             type="submit"
-            className="flex w-full items-center gap-3 rounded-warm-lg px-3 py-2.5 text-[15px] font-medium text-text-muted hover:bg-surface hover:text-text-primary transition-colors"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium text-text-muted hover:bg-surface hover:text-text-primary transition-colors"
           >
             <SignOutIcon className="h-5 w-5" />
             Sign out
@@ -107,7 +108,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <span className="font-display text-lg font-bold tracking-tight text-text-primary">{PRODUCT_NAME}</span>
         </header>
 
-        <main className="animate-fade-in-up mx-auto max-w-[1860px] px-4 py-8 sm:px-8 sm:py-10">
+        <main className="mx-auto max-w-[1860px] px-4 py-8 sm:px-8 sm:py-10">
           {children}
         </main>
       </div>
@@ -213,7 +214,7 @@ function NavItem({ item, active, badge, onNavigate }: { item: NavEntry; active: 
       aria-current={active ? 'page' : undefined}
       data-testid="nav-item"
       data-key={item.key}
-      className={`flex items-center gap-3 rounded-warm-lg px-3 py-2.5 text-[15px] transition-colors ${
+      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] transition-colors ${
         active
           ? 'bg-mint text-primary font-semibold'
           : 'text-text-secondary font-medium hover:bg-surface hover:text-text-primary'
@@ -223,7 +224,7 @@ function NavItem({ item, active, badge, onNavigate }: { item: NavEntry; active: 
       <span className="min-w-0 flex-1 truncate">{item.label}</span>
       {badge > 0 && (
         <span
-          className="figure rounded-full bg-butter px-2 py-0.5 text-xs font-semibold text-tertiary"
+          className={`figure rounded-full px-2 py-0.5 text-xs font-semibold ${NEEDS_YOU_MARK}`}
           data-testid="nav-badge"
           aria-label={`${badge} new`}
         >

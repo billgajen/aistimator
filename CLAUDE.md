@@ -30,6 +30,7 @@ You are building a SaaS platform that lets businesses embed an estimate widget o
 ## Working style
 - Implement one ticket at a time. Do not implement multiple tickets in one pass.
 - Before coding, read the relevant docs in `/docs`.
+- Read `Docs/design/system.md` before any UI work. That file decides colour, type, shape, imagery, layout and motion; the design skills in `.claude/skills` only advise.
 - Provide a short implementation plan first, then implement, then run checks.
 
 ## Code conventions

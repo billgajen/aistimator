@@ -438,7 +438,7 @@ export function BulkServiceUpload({ open, onClose, onServicesCreated }: BulkServ
                         type="checkbox"
                         checked={svc.selected}
                         onChange={() => toggleService(index)}
-                        className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                        className="mt-0.5 h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-text-primary">{svc.name}</div>

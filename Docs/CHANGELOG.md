@@ -15,6 +15,132 @@
 
 ## Issues & Resolutions
 
+### 2026-11-14: T-164 — Design foundations: one design file, fixed tokens, a preview page (AD-046)
+
+Before any page is redesigned, the rules are written down once and the tokens the T-161 audit found wrong are fixed.
+No page was redesigned: pages changed only where a token changed.
+
+**1. One design file.** `Docs/design/system.md` decides colour, type, shape, imagery, layout, motion and status
+colours, says which skill leads where, and rules on each of the eleven points where the skills disagree
+(`audit.md`, section 6). The skills advise. `CLAUDE.md` says to read it before any UI work.
+
+**2. Token fixes**
+
+| What | Before | Now |
+|---|---|---|
+| `text-muted` | `#8A948E`, 2.75 to 3.13:1 | `#626C66`: 5.17 on paper, 4.78 on grey cards, 5.45 on white |
+| amber (`tertiary`) on its tint | `#A5731B`, 3.44:1 | `#7F5710`, 5.32:1 |
+| green (`secondary`) on its tint | `#3E7F58`, 4.05:1 | `#326B49`, 5.32:1 |
+| red (`danger`) on its tint | `#B84A3B`, 4.17:1 | `#A23D2F`, 5.25:1 |
+| the edge of a field or outlined control | `border` `#E5E2D8`, 1.23:1 | new `field` `#808781`: 3.50 on paper, 3.23 on grey cards, 3.68 on white |
+| focus ring | the brand colour, 1:1 on a juniper surface | `--color-focus`: ink on light grounds, light inside a juniper or brand-coloured surface |
+
+- Green and red were not on the ticket's list, but "status pills in all five colours" could not pass 4.5:1 without
+  them.
+- **Fields:** their class strings live in shared constants and `cn()` calls as well as in tags, so one CSS rule
+  lifts every field and outlined button still written with `border-border`. It has the specificity of one class,
+  so `focus:`, `hover:` and error borders still win. New code writes `border-field`.
+- **Focus:** an outline is drawn outside its element, so the light colour is set for what sits *inside*
+  `.bg-primary` (and ink surfaces), never for the surface itself: a juniper button on paper keeps the ink ring.
+  Inside a business's brand colour it is `on-primary`, the colour already worked out to read on that brand.
+  Controls that hide the outline and draw their focus with Tailwind's `ring` (108 of them) showed Tailwind's
+  default translucent blue (about 1.9:1 on paper), because their ring colour classes write no CSS (see "Found").
+  While focused they now take `--color-focus` too. A ring used as decoration is not touched.
+- **Raw Tailwind colours:** 158 in 19 files, each replaced by the nearest token (red → `danger`, amber and yellow →
+  `tertiary`, green → `secondary`, blue → `primary`, zinc and gray → ink, text and line tokens, teal, cyan and
+  purple chips → `mint` and `mist`). New `-line` tokens (`danger-line`, `tertiary-line`, `secondary-line`,
+  `accent-line`) are the soft edge of a tinted box.
+- **One radius scale** replaces Tailwind's: `xs` 2, `sm` 4, `md` 6, `lg` 8, `xl` 12, `2xl` 16, `3xl` 20, `full`. The
+  classes were renamed so every corner is the same size as before: `rounded-warm-lg` → `rounded-xl`,
+  `rounded-warm-xl` → `rounded-2xl`, `rounded-warm-2xl` → `rounded-3xl`, bare `rounded` → `rounded-sm`. The two
+  arbitrary corners of the marketing product frames stay until the marketing ticket (changing them would show).
+- **Status colours by whose turn it is** (`lib/status-tone.ts`): needs you = the accent tint, waiting and working =
+  neutral (`mist`), accepted = green, closed = grey, failed = red. "Needs you" no longer uses butter anywhere: the
+  pill, Home's tile, Home's unfinished-requests banner, the menu's count and the "New" tag.
+
+**3. The accent and the name.** Accent tokens (`accent`, `accent-tint`, `accent-line`, `accent-ink`, `on-accent`)
+with three candidates switched by `data-accent`: tomato `#E8412C`, orange `#F26B2A` (the default), yellow `#FFC53D`.
+Worked out while building them, and written into `system.md`:
+- white fails as button text on all three (4.0, 3.0 and 1.6:1). Orange and yellow take ink (5.0 and 9.7:1);
+  tomato needs near-black `#140806` (4.9:1), since ink is 3.8:1;
+- the accent cannot be text on paper (orange 2.9:1, yellow 1.5:1), so a highlighted word is the accent behind the
+  word;
+- yellow's tint is close to butter, which is reserved for measurement.
+No real page uses the accent except the "needs you" tint. A `Wordmark` component draws the name two ways, "Qolumns"
+and "qolumns", on `/design` only.
+
+**4. Motion.** Tokens: hover in 150 ms, out 120 ms, press 90 ms, menu 200 ms, enter 250 ms, `--ease-move` and
+`--ease-enter`. Classes `motion-press`, `motion-menu` and `animate-fade-in-up`, transform and opacity only. They are
+written after the utilities, because a control often carries Tailwind's `transition-colors` too and would
+otherwise lose its transform. The whole-page fade is gone from the dashboard layout (and the admin layout). The
+customer quote page's loading rule is the tape being drawn, not a pulse. One global rule stills every transition
+and animation under reduced motion (it was a list of our own classes). No motion library; CSS was enough.
+
+**5. `/design`:** not linked from anywhere, `noindex, nofollow`, built from the real tokens and components
+(`Button`, `Badge`, `Card`, `Input`, `Select`, `TurnBadge`, `ProductStrip`). `Button` gained an `accent` variant,
+used only there.
+
+**What changed on a customer-facing page** (contrast and the replacements this ticket asked for, nothing else):
+- small grey text, amber, green and red are darker; field and outlined-button edges are darker;
+- the focus ring is ink (it was the business's colour) and fields show a clear ring when focused;
+- the clarification page's near-black (`zinc-900`) is our ink, and its field edges are the control edge;
+- the quote error page's button and the dashboard's spinners are juniper (they were Tailwind blue);
+- the loading rule on the quote page is the tape being drawn;
+- the entrance fade is 250 ms on the new curve (it was 300 ms).
+The business's brand colour on the request form and the quote page is untouched, and our accent is not on them.
+
+**Found, not fixed**
+- **Opacity modifiers on our colour tokens write no CSS.** 228 classes in 51 files (`ring-primary/30` ×89,
+  `ring-primary/20`, `border-danger/30`, `border-tape/50`, `bg-ink/40` and so on) do nothing: the tokens are plain
+  `var()` strings and Tailwind 3.4 cannot put an alpha on them. So tinted borders fall back to the default
+  hairline, and the phone menu's dimming layer has no colour. Making the tokens take an alpha would switch all 228
+  on at once and change how many pages look, customer pages included (34 are in customer-facing files), so it is a
+  ticket of its own. A unit test stops the number growing.
+- **ui-ux-pro-max web checklist on `/design`:** text contrast, control names, heading order, labels, alt text, the
+  24 px minimum target, no sideways scroll, viewport and language all pass at 390 and 1440 with each accent. Two
+  failures, both in the shared components the page is built from: on a phone `Button` is 40 px tall (34 px at
+  `sm`) and fields are 42 px, under the 44 px rule; and `Badge` text is 11 px, under the 12 px floor.
+- Butter outside measurement (notice banners, the "Test" tag, "Most popular"), 21 shadows outside the scale, and
+  trade-page sections on a narrower container: listed in `system.md` under "Known gaps".
+
+**Constraints introduced**
+- `system.md` decides. A token, colour, font or scale changes there first, by its own ticket.
+- No raw Tailwind palette colour and no new opacity modifier on a colour token; no class outside the radius scale;
+  no motion library; the contrast ratios above. All held by `design-tokens.test.ts`.
+- Our accent never appears on the request form or the customer quote page.
+
+**Regression scripts changed:** none. No token change broke a check in t146 to t162, and no existing unit test
+needed a change.
+
+**Verified (2026-11-14, local stack):**
+- `pnpm install --frozen-lockfile` clean (no dependency added). `pnpm lint` and `pnpm typecheck` pass. Web build and
+  worker build pass; `/design` builds as a static page.
+- Unit tests: web 543, worker 499, mobile 11, all pass. New: `apps/web/src/__tests__/design-tokens.test.ts` (29):
+  every ratio in the table above worked out from the values in `globals.css` (it fails if one drops), each accent's
+  on-colour and tint, the focus rules, the status map, the motion tokens and the one reduced-motion rule, no raw
+  palette colour, the radius scale, no butter on "needs you", no new opacity modifier on a token, `/design`
+  unlinked and noindex, and `system.md` present with its headings.
+- `scripts/hardcore-test/verify-t164.mts` with the browser pass: 100/100.
+  - `/design` at 390 and 1440 with each accent: the switch recolours the button, the highlighted word, "needs you"
+    and the swatch; button and pill text read at 4.5:1 as painted; nothing scrolls sideways; both wordmarks; the
+    menu, button and entering card run on their tokens.
+  - The focus ring, by tabbing through home, pricing, features, login, dashboard Home and a customer quote page:
+    every control's ring (outline or Tailwind ring) is 3:1 or more against what is behind it, and none is left
+    without one. The five buttons on the juniper band and the Pro plan card read 7.51:1 (they were 1:1).
+  - On real pages: "Needs your approval" and Home's "Needs you" tile are the accent tint, not butter; the muted
+    line and field edges have the new values; the dashboard does not fade in.
+  - Motion: without the setting the phone drawer, the setup bar and the tape rule move (0.2 s, 0.15 s, a 1.2 s
+    loop); with reduced motion all three are still.
+  - The customer quote page's panel is the business's colour and none of our accent colours is painted on it.
+  - `/design` is `noindex, nofollow`; no public page links to it.
+- Regression, t146 to t162, with the browser passes, after the last code change: 20, 33, 29, 35, 27, 35, 66, 36, 26,
+  46, 31, 96, 116, 96, 77, all pass.
+- One request per script run went through the real pipeline. Test names are made up (Marlo Finch, Alder Lane
+  Doors).
+
+**Not checked:** the result on a real phone or with a screen reader; production. Nothing is committed or deployed.
+The deploy is web only (no migration, no worker change); see `OWNER-TODO.md`.
+
 ### 2026-11-14: T-162 — The product is called Qolumns (AD-045)
 
 The product was "Estimator" at first and then "Aistimator". It is now **Qolumns**. This ticket renames it from what
@@ -4571,6 +4697,31 @@ if (pricingResult.estimatedTotal <= 0) {
 - renaming the worker, the bucket or the Vercel project in the same change (each moves a production address or data; none is needed for the name people read);
 - editing applied migrations or history docs to remove the earlier names (history stays as written);
 - a second constant for a lower-case form of the name (identifiers are their own strings in `EMBED_NAMES`, not derived from the display name).
+
+---
+
+### AD-046: system.md decides, the skills advise (T-164)
+
+**Decision:** `Docs/design/system.md` is the one place that decides how the product looks and moves: colour (paper, juniper, one accent used on about a tenth of a screen), type, the radius and shadow scales, the container, imagery, layout, motion and the status colours. The three design skills are consulted for the area each leads (taste for marketing structure and imagery, ui-ux-pro-max for the UX of the dashboard and customer pages, design-motion-principles for motion) and never decide. The tokens in `globals.css` and `tailwind.config.ts` implement that file, `/design` shows it as it renders, and `design-tokens.test.ts` holds its numbers.
+
+**Why:** the T-161 audit showed the three skills disagree with each other on eleven points and each would replace our palette or fonts if followed. Without one written ruling, every redesign ticket would re-argue them, and the result would depend on which skill was read last.
+
+**Rules that follow:**
+- A change to a colour, font, scale or motion rule is a ticket that changes `system.md` first, then the tokens, then the test.
+- Colours are tokens. No raw Tailwind palette colour, and no opacity modifier on a token (it writes no CSS).
+- The accent is for the main button, one highlighted word and "needs you". It is never text on paper, white is never text on it, and it never appears on a customer's page, where the business's own colour rules.
+- Butter and tape are for measurement only. A warning is amber (`tertiary`); "needs you" is the accent tint.
+- Status colours follow whose turn it is (AD-043), from one map.
+- Focus is one colour that flips on dark surfaces; every control gets it, however it draws its focus.
+- Motion is transform and opacity only, from the tokens. The dashboard has no entrance animations. Reduced motion is one global rule.
+- Never run taste's `gate.mjs --start` or `start.mjs deal` here (T-161).
+
+**Rejected:**
+- adopting one skill's design system wholesale (each replaces the brand);
+- making the colour tokens alpha-capable in this ticket (228 dead classes would switch on at once and change many pages; it needs its own ticket and its own look at every page);
+- a codemod of every field's border class (the class strings live in shared constants; one CSS rule reaches all of them and cannot outrank focus or error borders);
+- a motion library (CSS did everything this ticket needed);
+- applying the accent to real pages before the owner has chosen it.
 
 ---
 

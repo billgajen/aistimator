@@ -52,7 +52,7 @@ export function WaitingForYou({ quotes }: { quotes: WaitingQuote[] }) {
   const open = quotes.filter((q) => !state[q.id]?.sent).length
 
   return (
-    <section className="mb-8 rounded-warm-xl bg-white p-6 shadow-warm-md" data-testid="waiting-for-you">
+    <section className="mb-8 rounded-2xl bg-white p-6 shadow-warm-md" data-testid="waiting-for-you">
       <div className="mb-4 flex items-baseline justify-between gap-3">
         <h2 className="font-display text-lg font-bold text-text-primary">{QUOTE_TURN_COPY.home.title}</h2>
         <span className="text-sm text-text-secondary" data-testid="waiting-count">

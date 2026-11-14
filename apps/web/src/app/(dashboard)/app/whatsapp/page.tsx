@@ -197,7 +197,7 @@ export default function WhatsAppSettingsPage() {
       {/* Toast */}
       {toast && (
         <div
-          className={`mb-4 rounded-warm-lg p-4 ${
+          className={`mb-4 rounded-xl p-4 ${
             toast.type === 'success' ? 'bg-secondary-light text-secondary' : 'bg-danger-light text-danger'
           }`}
         >
@@ -205,10 +205,10 @@ export default function WhatsAppSettingsPage() {
         </div>
       )}
 
-      {error && <div className="mb-4 rounded-warm-lg bg-danger-light p-4 text-danger">{error}</div>}
+      {error && <div className="mb-4 rounded-xl bg-danger-light p-4 text-danger">{error}</div>}
 
       {/* Status Card */}
-      <div className="mb-6 rounded-warm-lg bg-surface p-6 shadow-warm">
+      <div className="mb-6 rounded-xl bg-surface p-6 shadow-warm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div
@@ -239,7 +239,7 @@ export default function WhatsAppSettingsPage() {
                 type="button"
                 onClick={handleTestConnection}
                 disabled={testing}
-                className="rounded-warm-lg border border-border px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-background disabled:opacity-50"
+                className="rounded-xl border border-border px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-background disabled:opacity-50"
               >
                 {testing ? 'Testing…' : 'Test Connection'}
               </button>
@@ -258,7 +258,7 @@ export default function WhatsAppSettingsPage() {
       </div>
 
       {/* Configuration Form */}
-      <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+      <div className="rounded-xl bg-surface p-6 shadow-warm">
         <h2 className="text-lg font-medium text-text-primary">
           {configured ? 'Update Configuration' : 'Connect WhatsApp'}
         </h2>
@@ -277,7 +277,7 @@ export default function WhatsAppSettingsPage() {
               value={phoneNumberId}
               onChange={(e) => setPhoneNumberId(e.target.value)}
               placeholder="e.g., 1234567890123456"
-              className="mt-1 block w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="mt-1 block w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               required
             />
             <p className="mt-1 text-xs text-text-muted">
@@ -295,7 +295,7 @@ export default function WhatsAppSettingsPage() {
               value={displayPhoneNumber}
               onChange={(e) => setDisplayPhoneNumber(e.target.value)}
               placeholder="e.g., +1 234 567 8900"
-              className="mt-1 block w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="mt-1 block w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               required
             />
             <p className="mt-1 text-xs text-text-muted">
@@ -313,7 +313,7 @@ export default function WhatsAppSettingsPage() {
               value={accessToken}
               onChange={(e) => setAccessToken(e.target.value)}
               placeholder={configured ? '••••••••' : 'Enter your access token'}
-              className="mt-1 block w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="mt-1 block w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               required={!configured}
             />
             <p className="mt-1 text-xs text-text-muted">
@@ -327,7 +327,7 @@ export default function WhatsAppSettingsPage() {
               id="isActive"
               checked={isActive}
               onChange={(e) => setIsActive(e.target.checked)}
-              className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+              className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
             />
             <label htmlFor="isActive" className="text-sm text-text-secondary">
               Enable WhatsApp integration
@@ -338,7 +338,7 @@ export default function WhatsAppSettingsPage() {
             <button
               type="submit"
               disabled={saving}
-              className="rounded-warm-lg bg-primary px-4 py-2 text-white hover:bg-primary-hover disabled:opacity-50"
+              className="rounded-xl bg-primary px-4 py-2 text-white hover:bg-primary-hover disabled:opacity-50"
             >
               {saving ? 'Saving...' : configured ? 'Update Configuration' : 'Connect WhatsApp'}
             </button>
@@ -347,7 +347,7 @@ export default function WhatsAppSettingsPage() {
               <button
                 type="button"
                 onClick={handleDisconnect}
-                className="rounded-warm-lg border border-danger/20 px-4 py-2 text-danger hover:bg-danger-light"
+                className="rounded-xl border border-danger/20 px-4 py-2 text-danger hover:bg-danger-light"
               >
                 Disconnect
               </button>
@@ -363,7 +363,7 @@ export default function WhatsAppSettingsPage() {
             Step-by-step setup (~15 minutes, one time)
           </h3>
 
-          <div className="rounded-warm-lg bg-surface p-5 shadow-warm">
+          <div className="rounded-xl bg-surface p-5 shadow-warm">
             <h4 className="font-semibold text-text-primary">
               <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">1</span>
               Create your Meta app with WhatsApp
@@ -381,7 +381,7 @@ export default function WhatsAppSettingsPage() {
             </ol>
           </div>
 
-          <div className="rounded-warm-lg bg-surface p-5 shadow-warm">
+          <div className="rounded-xl bg-surface p-5 shadow-warm">
             <h4 className="font-semibold text-text-primary">
               <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">2</span>
               Point Meta&apos;s webhook at us
@@ -391,7 +391,7 @@ export default function WhatsAppSettingsPage() {
               <span className="font-medium">messages</span> field:
             </p>
             <div className="mt-3 space-y-2">
-              <div className="flex items-center gap-2 rounded bg-background p-3">
+              <div className="flex items-center gap-2 rounded-sm bg-background p-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-text-muted">Callback URL</p>
                   <code className="block truncate text-sm text-text-primary">{setup?.webhookUrl || '…'}</code>
@@ -399,12 +399,12 @@ export default function WhatsAppSettingsPage() {
                 <button
                   type="button"
                   onClick={() => setup?.webhookUrl && navigator.clipboard.writeText(setup.webhookUrl)}
-                  className="shrink-0 rounded border border-border px-2 py-1 text-xs font-medium text-text-secondary hover:bg-surface"
+                  className="shrink-0 rounded-sm border border-border px-2 py-1 text-xs font-medium text-text-secondary hover:bg-surface"
                 >
                   Copy
                 </button>
               </div>
-              <div className="flex items-center gap-2 rounded bg-background p-3">
+              <div className="flex items-center gap-2 rounded-sm bg-background p-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-text-muted">Verify token</p>
                   <code className="block truncate text-sm text-text-primary">
@@ -415,7 +415,7 @@ export default function WhatsAppSettingsPage() {
                   <button
                     type="button"
                     onClick={() => navigator.clipboard.writeText(setup.verifyToken!)}
-                    className="shrink-0 rounded border border-border px-2 py-1 text-xs font-medium text-text-secondary hover:bg-surface"
+                    className="shrink-0 rounded-sm border border-border px-2 py-1 text-xs font-medium text-text-secondary hover:bg-surface"
                   >
                     Copy
                   </button>
@@ -424,7 +424,7 @@ export default function WhatsAppSettingsPage() {
             </div>
           </div>
 
-          <div className="rounded-warm-lg bg-surface p-5 shadow-warm">
+          <div className="rounded-xl bg-surface p-5 shadow-warm">
             <h4 className="font-semibold text-text-primary">
               <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">3</span>
               Get your credentials and connect above

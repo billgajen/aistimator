@@ -45,7 +45,7 @@ export function NextStepBox({
 
   return (
     <section
-      className={`mb-6 rounded-warm-xl border bg-white p-5 shadow-warm-md ${turn.action ? 'border-primary/25' : 'border-border'}`}
+      className={`mb-6 rounded-2xl border bg-white p-5 shadow-warm-md ${turn.action ? 'border-primary/25' : 'border-border'}`}
       data-testid="next-step"
       data-action={turn.action ?? 'none'}
     >

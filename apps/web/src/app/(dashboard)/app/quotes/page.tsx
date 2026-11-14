@@ -301,7 +301,7 @@ function QuotesList() {
       {/* Toast notification */}
       {toast && (
         <div
-          className={`fixed top-4 right-4 z-50 max-w-md break-words px-4 py-3 rounded-warm-lg shadow-warm-lg ${
+          className={`fixed top-4 right-4 z-50 max-w-md break-words px-4 py-3 rounded-xl shadow-warm-lg ${
             toast.type === 'success'
               ? 'bg-secondary-light text-secondary border border-secondary/20'
               : 'bg-danger-light text-danger border border-danger/20'
@@ -319,7 +319,7 @@ function QuotesList() {
         <input
           type="text"
           placeholder="Search by customer name or email..."
-          className="w-full max-w-md rounded-warm-lg border border-border bg-surface px-4 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className="w-full max-w-md rounded-xl border border-border bg-surface px-4 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -327,7 +327,7 @@ function QuotesList() {
 
       {/* Error state */}
       {error && (
-        <div className="mb-6 rounded-warm-lg bg-danger-light border border-danger/20 p-4 text-danger">
+        <div className="mb-6 rounded-xl bg-danger-light border border-danger/20 p-4 text-danger">
           {error}
         </div>
       )}

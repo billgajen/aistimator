@@ -1,6 +1,6 @@
 import { cn } from '@/lib/cn'
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline'
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline' | 'accent'
 type ButtonSize = 'sm' | 'md' | 'lg'
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -21,6 +21,10 @@ const variantStyles: Record<ButtonVariant, string> = {
     'bg-danger text-white hover:bg-danger/90 focus:ring-danger/30',
   outline:
     'border border-border bg-surface text-text-primary hover:bg-background focus:ring-primary/20',
+  // T-164: the one main action of a screen (system.md, Colour). Not used on
+  // real pages yet; the owner picks the accent on /design first.
+  accent:
+    'bg-accent text-on-accent hover:opacity-90 focus:ring-accent',
 }
 
 const sizeStyles: Record<ButtonSize, string> = {

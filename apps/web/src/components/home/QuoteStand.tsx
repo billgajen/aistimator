@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { QUOTE_TURN_COPY } from '@qolumns/shared'
+import { NEEDS_YOU_SURFACE } from '@/lib/status-tone'
 
 /**
  * T-160: "Where your quotes stand" on Home — three counts by whose turn it
@@ -22,7 +23,7 @@ export function QuoteStand({
   const T = QUOTE_TURN_COPY.tabs
   const S = QUOTE_TURN_COPY.home.stand
   const tiles = [
-    { key: 'needs_you', label: T.needs_you, count: needsYou, note: null as string | null, tone: needsYou > 0 ? 'bg-butter' : 'bg-white' },
+    { key: 'needs_you', label: T.needs_you, count: needsYou, note: null as string | null, tone: needsYou > 0 ? NEEDS_YOU_SURFACE : 'bg-white' },
     { key: 'waiting', label: T.waiting, count: waiting, note: null as string | null, tone: 'bg-white' },
     { key: 'accepted', label: T.accepted, count: accepted, note: S.acceptedNote, tone: 'bg-white' },
   ]
@@ -35,7 +36,7 @@ export function QuoteStand({
             <Link
               key={tile.key}
               href={`/app/quotes?tab=${tile.key}`}
-              className={`flex items-center justify-between gap-3 rounded-warm-xl p-5 shadow-warm-md transition-shadow hover:shadow-warm-lg sm:flex-col sm:items-start sm:justify-start ${tile.tone}`}
+              className={`flex items-center justify-between gap-3 rounded-2xl p-5 shadow-warm-md transition-shadow hover:shadow-warm-lg sm:flex-col sm:items-start sm:justify-start ${tile.tone}`}
               data-testid="stand-tile"
               data-group={tile.key}
             >
@@ -50,7 +51,7 @@ export function QuoteStand({
           ))}
         </div>
       ) : (
-        <p className="rounded-warm-xl bg-white p-5 text-sm text-text-secondary shadow-warm-md" data-testid="stand-empty">
+        <p className="rounded-2xl bg-white p-5 text-sm text-text-secondary shadow-warm-md" data-testid="stand-empty">
           {S.empty}
         </p>
       )}

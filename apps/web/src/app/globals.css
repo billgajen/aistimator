@@ -7,6 +7,10 @@
    Paper, ink, and the measuring tape. Pastel surfaces, one
    confident juniper brand hue, butter/tape reserved for
    everything measurement (takeoff, grades, ranges).
+
+   Docs/design/system.md decides what these mean and where each
+   is used (T-164, AD-046). Read it before changing a value: a
+   unit test (design-tokens.test.ts) holds the contrast ratios.
    ============================================================ */
 
 @layer base {
@@ -24,7 +28,7 @@
     --color-ink-deep: #141F1A;   /* dashboard sidebar */
     --color-text-primary: #1B2823;
     --color-text-secondary: #4F5D57;
-    --color-text-muted: #8A948E;
+    --color-text-muted: #626C66;     /* 4.5:1 or more on paper, grey cards, white, mint and mist */
 
     /* Brand */
     --color-primary: #205E56;        /* juniper */
@@ -32,16 +36,45 @@
     --color-primary-light: #DFEDE5;
 
     /* Semantic */
-    --color-secondary: #3E7F58;      /* success green, kept close to brand family */
+    /* Each reads at 4.5:1 or more on its own light tint (status pills) */
+    --color-secondary: #326B49;      /* success green, kept close to brand family */
     --color-secondary-light: #E0F0E4;
-    --color-tertiary: #A5731B;       /* amber ink (warnings), butter's dark twin */
+    --color-tertiary: #7F5710;       /* amber ink (warnings); not for measurement, not for "needs you" */
     --color-tertiary-light: #F7E9C6;
-    --color-danger: #B84A3B;
+    --color-danger: #A23D2F;
     --color-danger-light: #F8E3DD;
+    /* The soft edge of a tinted box (an opacity modifier on a token writes no CSS) */
+    --color-secondary-line: #B4C7B9;
+    --color-tertiary-line: #CFC0A6;
+    --color-danger-line: #DBB7B0;
 
     /* Lines */
-    --color-border: #E5E2D8;
+    --color-border: #E5E2D8;         /* decoration: cards, dividers */
     --color-border-strong: #CFCBBD;
+    --color-field: #808781;          /* the edge of a field or an outlined control: 3:1 or more on paper, grey cards and white */
+
+    /* Accent: about a tenth of a screen (the main button, one highlighted
+       word, "needs you"). Orange until the owner chooses on /design; the
+       other two candidates are the [data-accent] blocks below. Never text on
+       paper: text on the fill is on-accent, text on the tint is accent-ink. */
+    --color-accent: #F26B2A;
+    --color-accent-tint: #FDE7DD;
+    --color-accent-line: #F7C7AF;
+    --color-accent-ink: #91431B;
+    --color-on-accent: #1B2823;
+
+    /* Keyboard focus: ink on light grounds; flipped on juniper, a business's
+       brand colour and ink (see the rules after the utilities) */
+    --color-focus: var(--color-ink);
+
+    /* Motion (system.md, Motion). Transform and opacity only. */
+    --motion-hover-in: 150ms;
+    --motion-hover-out: 120ms;
+    --motion-press: 90ms;
+    --motion-menu: 200ms;
+    --motion-enter: 250ms;
+    --ease-move: cubic-bezier(0.2, 0.8, 0.2, 1);    /* something that moves or changes */
+    --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);   /* something arriving and settling */
 
     /* Type */
     --font-display: var(--font-bricolage);
@@ -62,8 +95,31 @@
     color: var(--color-ink);
   }
 
+  /* The two other accent candidates. On any element: it and everything in it. */
+  [data-accent='orange'] {
+    --color-accent: #F26B2A;
+    --color-accent-tint: #FDE7DD;
+    --color-accent-line: #F7C7AF;
+    --color-accent-ink: #91431B;
+    --color-on-accent: #1B2823;
+  }
+  [data-accent='tomato'] {
+    --color-accent: #E8412C;
+    --color-accent-tint: #FBE1DD;
+    --color-accent-line: #F4B9AF;
+    --color-accent-ink: #8C2C1C;
+    --color-on-accent: #140806;
+  }
+  [data-accent='yellow'] {
+    --color-accent: #FFC53D;
+    --color-accent-tint: #FFEFC2;
+    --color-accent-line: #FED574;
+    --color-accent-ink: #765A1D;
+    --color-on-accent: #1B2823;
+  }
+
   :focus-visible {
-    outline: 2px solid var(--color-primary);
+    outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }
 }
@@ -136,7 +192,89 @@
   }
 }
 
-/* Fade-in animation */
+/* A control that hides the outline and draws its focus with Tailwind's
+   `ring` gets the same colour as the outline, not Tailwind's own default (a
+   translucent blue, 1.9:1 on paper). Only while it has focus: a ring used as
+   decoration (the current step of the request form) is not touched. A ring
+   colour class that writes CSS (focus:ring-danger) still wins. Tailwind
+   cannot take a var() as its default ring colour in the config, so it is set
+   here. */
+:focus {
+  --tw-ring-color: var(--color-focus);
+}
+
+/* Keyboard focus on a dark ground. An outline is drawn outside its element,
+   over whatever is behind it, so the colour is set for what sits INSIDE a
+   juniper, brand-coloured or ink surface, never for the surface itself (a
+   juniper button on paper keeps the ink ring). on-primary is the colour that
+   reads on the business's brand colour (lib/color.ts), white on juniper. */
+.bg-primary *,
+.bg-primary-hover * {
+  --color-focus: rgb(var(--color-on-primary-rgb, 255 255 255));
+}
+.bg-ink *,
+.bg-ink-deep * {
+  --color-focus: var(--color-background);
+}
+
+/* The edge of a field or an outlined control reads at 3:1 (--color-field).
+   New code writes border-field. This rule lifts every field and outlined
+   button still written with the decorative border colour, wherever its class
+   string lives. It has the specificity of one class, so it replaces
+   .border-border and still loses to focus:, hover: and error borders. */
+:where(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color'], [type='hidden']), select, textarea, button, [role='button'], a:where(.inline-flex)):where(:not([class*='border-danger'])).border-border,
+:where(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color'], [type='hidden']), select, textarea, button, [role='button'], a:where(.inline-flex)):where(:not([class*='border-danger'])).border-border-strong {
+  border-color: var(--color-field);
+}
+
+/* ------------------------------------------------------------
+   Motion (system.md, Motion). Feedback under 200 ms, transform
+   and opacity only, one curve for moves and one for entrances.
+   Written after the utilities on purpose: a control often carries
+   Tailwind's transition-colors as well, and these must win over it.
+   ------------------------------------------------------------ */
+
+/* A control that answers the pointer: in 150 ms, out 120 ms, press 90 ms */
+.motion-press {
+  transition:
+    transform var(--motion-hover-out) var(--ease-move),
+    opacity var(--motion-hover-out) var(--ease-move),
+    background-color var(--motion-hover-out) var(--ease-move);
+}
+.motion-press:hover {
+  transition-duration: var(--motion-hover-in);
+  transform: translateY(-1px);
+}
+.motion-press:active {
+  transition-duration: var(--motion-press);
+  transform: translateY(1px) scale(0.985);
+}
+
+/* A menu or small panel: opens in 200 ms from 6 px above, closes faster.
+   Set data-open="true" to open it. It leaves the tab order when closed. */
+.motion-menu {
+  opacity: 0;
+  transform: translateY(-6px);
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-hover-out) var(--ease-move),
+    transform var(--motion-hover-out) var(--ease-move),
+    visibility 0s linear var(--motion-hover-out);
+}
+.motion-menu[data-open='true'] {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity var(--motion-menu) var(--ease-enter),
+    transform var(--motion-menu) var(--ease-enter),
+    visibility 0s;
+}
+
+/* Entrance: opacity and a short rise, once. Marketing and customer pages
+   only; the dashboard has no entrance animations (system.md, Motion). */
 @keyframes fade-in-up {
   from {
     opacity: 0;
@@ -149,7 +287,7 @@
 }
 
 .animate-fade-in-up {
-  animation: fade-in-up 0.3s ease-out;
+  animation: fade-in-up var(--motion-enter) var(--ease-enter);
 }
 
 /* Staggered animation delays */
@@ -168,13 +306,18 @@
   animation: tape-measuring 1.2s linear infinite;
 }
 
+/* Reduced motion: one rule for everything, ours and Tailwind's. Every
+   transition and animation ends at once in its final state and nothing
+   loops, so nothing stays hidden and nothing keeps moving. */
 @media (prefers-reduced-motion: reduce) {
-  .tape-measuring,
-  .animate-fade-in-up,
-  .animation-delay-100,
-  .animation-delay-200,
-  .animation-delay-300,
-  .animation-delay-400 {
-    animation: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
   }
 }

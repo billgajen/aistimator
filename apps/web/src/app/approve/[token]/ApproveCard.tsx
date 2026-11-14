@@ -41,7 +41,7 @@ export function ApproveCard({ token, initialOutcome, summary }: { token: string;
     <main className="min-h-screen bg-background px-4 py-6 sm:py-12">
       <div className="mx-auto max-w-md">
         <p className="mb-4 text-center font-display text-sm font-extrabold tracking-tight text-text-secondary">{PRODUCT_NAME}</p>
-        <div className="rounded-warm-xl bg-white p-5 shadow-warm-md sm:p-6" data-testid="approve-card" data-outcome={outcome}>
+        <div className="rounded-2xl bg-white p-5 shadow-warm-md sm:p-6" data-testid="approve-card" data-outcome={outcome}>
           {summary && (
             <div className="border-b border-border pb-4">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-tertiary">{summary.businessName}</p>

@@ -109,7 +109,7 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <p className="text-zinc-500">Loading...</p>
+        <p className="text-text-muted">Loading...</p>
       </div>
     )
   }
@@ -118,8 +118,8 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-6">
         <div className="max-w-md text-center">
-          <h1 className="text-2xl font-extrabold text-zinc-900 mb-4">Thank you!</h1>
-          <p className="text-zinc-600">
+          <h1 className="text-2xl font-extrabold text-text-primary mb-4">Thank you!</h1>
+          <p className="text-text-secondary">
             Your answers have been received. Your updated quote will be ready shortly.
             You will receive an email when it is ready.
           </p>
@@ -132,26 +132,26 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-6">
         <div className="max-w-md text-center">
-          <h1 className="text-2xl font-extrabold text-zinc-900 mb-4">Unable to load</h1>
-          <p className="text-zinc-600">{error}</p>
+          <h1 className="text-2xl font-extrabold text-text-primary mb-4">Unable to load</h1>
+          <p className="text-text-secondary">{error}</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 py-12 px-4">
+    <div className="min-h-screen bg-background py-12 px-4">
       <div className="max-w-lg mx-auto">
         <div className="bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.08)] p-8">
-          <h1 className="text-2xl font-extrabold text-zinc-900 mb-2">
+          <h1 className="text-2xl font-extrabold text-text-primary mb-2">
             Quick questions about your quote
           </h1>
-          <p className="text-zinc-500 mb-8">
+          <p className="text-text-muted mb-8">
             We need a little more information to finalize your quote. It will only take a moment.
           </p>
 
           {error && (
-            <div className="bg-red-50 text-red-700 p-3 rounded-md mb-6 text-sm">
+            <div className="bg-danger-light text-danger p-3 rounded-md mb-6 text-sm">
               {error}
             </div>
           )}
@@ -159,7 +159,7 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
           <form onSubmit={handleSubmit} className="space-y-6">
             {questions.map((q) => (
               <div key={q.id} className="space-y-2">
-                <label className="block text-sm font-semibold text-zinc-900">
+                <label className="block text-sm font-semibold text-text-primary">
                   {q.question}
                 </label>
 
@@ -167,7 +167,7 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
                   /* T-108: one-tap confirmation of the AI's extracted value */
                   <div className="space-y-2">
                     {q.evidence && (
-                      <p className="text-xs text-zinc-500 italic">
+                      <p className="text-xs text-text-muted italic">
                         What we saw: {q.evidence}
                       </p>
                     )}
@@ -177,8 +177,8 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
                         onClick={() => setAnswers(prev => ({ ...prev, [q.id]: String(q.aiValue) }))}
                         className={`flex-1 px-4 py-3 rounded-md border text-sm font-semibold transition-colors ${
                           answers[q.id] === String(q.aiValue)
-                            ? 'border-green-600 bg-green-50 text-green-800'
-                            : 'border-zinc-200 text-zinc-900 hover:border-zinc-400'
+                            ? 'border-secondary bg-secondary-light text-secondary'
+                            : 'border-field text-text-primary hover:border-ink'
                         }`}
                       >
                         ✓ Yes, {String(q.aiValue)} is right
@@ -188,8 +188,8 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
                         onClick={() => setAnswers(prev => ({ ...prev, [q.id]: prev[q.id] === String(q.aiValue) || prev[q.id] === undefined ? '' : prev[q.id] || '' }))}
                         className={`flex-1 px-4 py-3 rounded-md border text-sm font-semibold transition-colors ${
                           answers[q.id] !== undefined && answers[q.id] !== String(q.aiValue)
-                            ? 'border-zinc-900 bg-zinc-50 text-zinc-900'
-                            : 'border-zinc-200 text-zinc-900 hover:border-zinc-400'
+                            ? 'border-ink bg-surface text-text-primary'
+                            : 'border-field text-text-primary hover:border-ink'
                         }`}
                       >
                         No, let me correct it
@@ -207,9 +207,9 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
                                 value={option}
                                 checked={answers[q.id] === option}
                                 onChange={() => setAnswers(prev => ({ ...prev, [q.id]: option }))}
-                                className="w-4 h-4 text-zinc-900 border-zinc-300"
+                                className="w-4 h-4 text-text-primary border-field"
                               />
-                              <span className="text-sm text-zinc-700">{option}</span>
+                              <span className="text-sm text-text-secondary">{option}</span>
                             </label>
                           ))}
                         </div>
@@ -220,7 +220,7 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
                           value={answers[q.id] || ''}
                           onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
                           autoFocus
-                          className="w-full px-3 py-2 border border-zinc-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                          className="w-full px-3 py-2 border border-field rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink"
                         />
                       )
                     )}
@@ -235,9 +235,9 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
                           value={option}
                           checked={answers[q.id] === option}
                           onChange={() => setAnswers(prev => ({ ...prev, [q.id]: option }))}
-                          className="w-4 h-4 text-zinc-900 border-zinc-300"
+                          className="w-4 h-4 text-text-primary border-field"
                         />
-                        <span className="text-sm text-zinc-700">{option}</span>
+                        <span className="text-sm text-text-secondary">{option}</span>
                       </label>
                     ))}
                     <label className="flex items-center gap-3 cursor-pointer">
@@ -247,9 +247,9 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
                         value="_other"
                         checked={answers[q.id] !== undefined && !q.options.includes(answers[q.id] || '')}
                         onChange={() => setAnswers(prev => ({ ...prev, [q.id]: '' }))}
-                        className="w-4 h-4 text-zinc-900 border-zinc-300"
+                        className="w-4 h-4 text-text-primary border-field"
                       />
-                      <span className="text-sm text-zinc-700">Other</span>
+                      <span className="text-sm text-text-secondary">Other</span>
                     </label>
                     {answers[q.id] !== undefined && !q.options.includes(answers[q.id] || '') && (
                       <input
@@ -257,7 +257,7 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
                         placeholder="Please specify..."
                         value={answers[q.id] || ''}
                         onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
-                        className="w-full px-3 py-2 border border-zinc-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                        className="w-full px-3 py-2 border border-field rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink"
                       />
                     )}
                   </div>
@@ -267,7 +267,7 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
                     placeholder="Your answer..."
                     value={answers[q.id] || ''}
                     onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
-                    className="w-full px-3 py-2 border border-zinc-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                    className="w-full px-3 py-2 border border-field rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink"
                   />
                 )}
               </div>
@@ -276,7 +276,7 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3 px-4 bg-zinc-900 text-white font-semibold rounded-md hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full py-3 px-4 bg-ink text-white font-semibold rounded-md hover:bg-ink-deep disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {submitting ? 'Submitting...' : 'Submit answers'}
             </button>

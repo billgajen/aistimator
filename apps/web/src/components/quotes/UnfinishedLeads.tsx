@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { QUOTE_TURN_COPY } from '@qolumns/shared'
 import { UNFINISHED_CHANGED_EVENT } from '@/lib/unfinished-leads'
+import { NEEDS_YOU_MARK } from '@/lib/status-tone'
 
 export interface UnfinishedLead {
   leadId: string
@@ -24,7 +25,7 @@ export interface UnfinishedLead {
 /** T-151: the "Started, didn't finish" badge */
 export function UnfinishedBadge() {
   return (
-    <span className="inline-flex items-center rounded-full bg-butter px-2.5 py-0.5 text-xs font-semibold text-tertiary">
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${NEEDS_YOU_MARK}`}>
       Started, didn&apos;t finish
     </span>
   )
@@ -98,11 +99,11 @@ export function UnfinishedLeads({ onChange }: { onChange?: () => void }) {
     }
   }
 
-  if (error) return <div className="mb-6 rounded-warm-lg bg-danger-light border border-danger/20 p-4 text-danger">{error}</div>
+  if (error) return <div className="mb-6 rounded-xl bg-danger-light border border-danger/20 p-4 text-danger">{error}</div>
   if (!items) return <p className="py-10 text-center text-sm text-text-muted">Loading…</p>
   if (items.length === 0) {
     return (
-      <div className="rounded-warm-lg bg-surface p-8 text-center shadow-warm" data-testid="unfinished-empty">
+      <div className="rounded-xl bg-surface p-8 text-center shadow-warm" data-testid="unfinished-empty">
         {note && (
           <p role={note.tone === 'error' ? 'alert' : 'status'} className="mb-3 text-sm text-text-secondary" data-testid="unfinished-note">
             {note.text}
@@ -133,7 +134,7 @@ export function UnfinishedLeads({ onChange }: { onChange?: () => void }) {
       {items.map((lead) => (
         <div
           key={lead.leadId}
-          className="rounded-warm-lg bg-surface p-4 shadow-warm sm:flex sm:items-start sm:justify-between sm:gap-4"
+          className="rounded-xl bg-surface p-4 shadow-warm sm:flex sm:items-start sm:justify-between sm:gap-4"
           data-testid="unfinished-lead"
           data-lead-id={lead.leadId}
           data-new={lead.isNew ? 'true' : 'false'}

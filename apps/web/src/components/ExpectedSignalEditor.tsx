@@ -94,7 +94,7 @@ export function ExpectedSignalEditor({
   return (
     <div className="space-y-3">
       {signals.length === 0 ? (
-        <div className="rounded-warm-lg border-2 border-dashed border-border p-4 text-center">
+        <div className="rounded-xl border-2 border-dashed border-border p-4 text-center">
           <p className="text-sm text-text-muted">No signals defined</p>
           <p className="mb-2 text-xs text-text-muted">
             Signals define what AI should extract from photos and forms
@@ -112,7 +112,7 @@ export function ExpectedSignalEditor({
           {signals.map((signal, index) => (
             <div
               key={index}
-              className="rounded-warm-lg border border-border bg-surface"
+              className="rounded-xl border border-border bg-surface"
             >
               {/* Signal Header */}
               <div
@@ -141,7 +141,7 @@ export function ExpectedSignalEditor({
                       e.stopPropagation()
                       removeSignal(index)
                     }}
-                    className="rounded p-1 text-text-muted hover:bg-danger-light hover:text-danger"
+                    className="rounded-sm p-1 text-text-muted hover:bg-danger-light hover:text-danger"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
@@ -181,7 +181,7 @@ export function ExpectedSignalEditor({
                           updateSignal(index, { signalKey: key })
                         }}
                         placeholder="e.g., item_count"
-                        className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                       />
                       <p className="mt-1 text-xs text-text-muted">
                         Unique identifier (auto-formatted)
@@ -199,7 +199,7 @@ export function ExpectedSignalEditor({
                             possibleValues: e.target.value === 'enum' ? [] : undefined,
                           })
                         }
-                        className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                       >
                         {SIGNAL_TYPES.map((type) => (
                           <option key={type.value} value={type.value}>
@@ -219,7 +219,7 @@ export function ExpectedSignalEditor({
                       value={signal.description}
                       onChange={(e) => updateSignal(index, { description: e.target.value })}
                       placeholder="What does this signal represent?"
-                      className="w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                   </div>
 
@@ -229,12 +229,12 @@ export function ExpectedSignalEditor({
                       <label className="mb-1 block text-sm font-medium text-text-secondary">
                         Possible Values
                       </label>
-                      <div className="min-h-[60px] rounded-warm-lg border border-border p-2">
+                      <div className="min-h-[60px] rounded-xl border border-border p-2">
                         <div className="flex flex-wrap gap-2">
                           {signal.possibleValues?.map((value, valueIndex) => (
                             <span
                               key={valueIndex}
-                              className="inline-flex items-center gap-1 rounded-warm-lg bg-primary-light px-2 py-1 text-sm text-primary"
+                              className="inline-flex items-center gap-1 rounded-xl bg-primary-light px-2 py-1 text-sm text-primary"
                             >
                               {value}
                               <button
@@ -284,7 +284,7 @@ export function ExpectedSignalEditor({
         <button
           type="button"
           onClick={addSignal}
-          className="inline-flex w-full items-center justify-center gap-1 rounded-warm-lg border border-dashed border-border px-3 py-2 text-sm text-text-secondary hover:border-border-strong hover:text-text-primary"
+          className="inline-flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border px-3 py-2 text-sm text-text-secondary hover:border-border-strong hover:text-text-primary"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

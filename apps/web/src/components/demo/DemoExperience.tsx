@@ -102,7 +102,7 @@ export function DemoExperience({ tenantKey }: { tenantKey: string }) {
           <div className="mt-8 space-y-6" data-testid="demo-result">
             <EstimateCard estimate={estimate} recorded={phase === 'busy'} />
             <BusinessSees estimate={estimate} />
-            <div className="rounded-warm-xl bg-primary p-6 text-center text-white">
+            <div className="rounded-2xl bg-primary p-6 text-center text-white">
               <p className="font-display text-lg font-bold">Your customers could get this from you, with your prices.</p>
               <Link
                 href="/signup"
@@ -125,7 +125,7 @@ function money(n: number, e: DemoEstimate) {
 
 function EstimateCard({ estimate, recorded }: { estimate: DemoEstimate; recorded: boolean }) {
   return (
-    <section className="rounded-warm-2xl border border-border bg-white p-6 shadow-warm-lg" data-testid={recorded ? 'demo-recorded' : 'demo-estimate'}>
+    <section className="rounded-3xl border border-border bg-white p-6 shadow-warm-lg" data-testid={recorded ? 'demo-recorded' : 'demo-estimate'}>
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-tertiary">
         {recorded ? 'Example estimate (recorded)' : 'Your estimate'}
       </p>
@@ -176,10 +176,10 @@ function EstimateCard({ estimate, recorded }: { estimate: DemoEstimate; recorded
 /** A static example of the owner's view — not a live dashboard */
 function BusinessSees({ estimate }: { estimate: DemoEstimate }) {
   return (
-    <section className="rounded-warm-2xl bg-surface p-6 shadow-warm" data-testid="demo-business-sees">
+    <section className="rounded-3xl bg-surface p-6 shadow-warm" data-testid="demo-business-sees">
       <h2 className="font-display text-lg font-bold text-text-primary">What the business sees</h2>
       <p className="mt-1 text-sm text-text-secondary">An example of the owner&apos;s phone the moment a request arrives.</p>
-      <div className="mt-4 rounded-warm-xl border border-border bg-white p-4" aria-label="Example of the business's view">
+      <div className="mt-4 rounded-2xl border border-border bg-white p-4" aria-label="Example of the business's view">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-tertiary">New lead</p>
         <div className="mt-2 flex items-center justify-between gap-3">
           <div className="min-w-0">

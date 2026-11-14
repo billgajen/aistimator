@@ -192,7 +192,7 @@ export function TestQuoteStep({
         </div>
       )}
 
-      {error && <div className="mt-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
+      {error && <div className="mt-4 rounded-lg border border-danger-line bg-danger-light p-3 text-sm text-danger">{error}</div>}
 
       <div className="mt-4 rounded-xl border border-border bg-surface p-5">
         <h2 className="font-semibold text-text-primary">{priced ? '3' : '2'}. Share your quote link</h2>

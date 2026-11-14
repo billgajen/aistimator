@@ -50,7 +50,7 @@ export function ContactStep({
   const phoneRequired = requirement !== 'email'
 
   const field = (hasError: boolean) =>
-    `w-full px-4 py-3 text-[15px] bg-white border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${
+    `w-full px-4 py-3 text-[15px] bg-white border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${
       hasError ? 'border-danger/50 focus:ring-danger/25 focus:border-danger' : 'border-border focus:ring-primary/25 focus:border-primary'
     }`
   const optional = <span className="font-normal text-text-muted"> (optional)</span>
@@ -59,7 +59,7 @@ export function ContactStep({
     <div className="p-6">
       <h3 className="font-display text-xl font-bold text-text-primary mb-5">Where should we send your estimate?</h3>
       {note && (
-        <p className="-mt-2 mb-4 rounded-warm-lg border border-tape/50 bg-butter px-3 py-2 text-sm text-text-primary" role="note" data-testid="demo-contact-note">
+        <p className="-mt-2 mb-4 rounded-xl border border-tape/50 bg-butter px-3 py-2 text-sm text-text-primary" role="note" data-testid="demo-contact-note">
           {note}
         </p>
       )}
@@ -92,7 +92,7 @@ export function ContactStep({
 
       <div className="flex gap-3 mt-6">
         {onBack && (
-          <button type="button" onClick={onBack} className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-warm-lg hover:border-border-strong transition">
+          <button type="button" onClick={onBack} className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-xl hover:border-border-strong transition">
             Back
           </button>
         )}
@@ -103,7 +103,7 @@ export function ContactStep({
             if (check.ok) onNext()
           }}
           disabled={saving}
-          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 transition"
+          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-on-primary rounded-xl hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 transition"
         >
           {saving ? 'Saving…' : 'Continue'}
         </button>

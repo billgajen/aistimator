@@ -71,7 +71,7 @@ function CustomerAsks({ example }: { example: MarketingExample }) {
         <p className="mt-2 text-sm font-semibold text-text-primary">{example.question}</p>
         {example.photo ? (
           <div className="mt-2 flex items-center gap-2 rounded-lg border-2 border-dashed border-primary/30 bg-mint px-2 py-1">
-            <span className="h-6 w-8 rounded bg-gradient-to-br from-[#9aa3a8] to-[#d9dee1]" />
+            <span className="h-6 w-8 rounded-sm bg-gradient-to-br from-[#9aa3a8] to-[#d9dee1]" />
             <span className="text-xs font-medium text-primary">{example.photo} ✓</span>
           </div>
         ) : null}

@@ -1,5 +1,27 @@
 # /docs/04-frontend.md
 
+## Design system (T-164, AD-046)
+`Docs/design/system.md` decides colour, type, shape, imagery, layout and motion. Read it before any UI work; the three
+design skills only advise. The tokens are in `apps/web/src/app/globals.css` and `apps/web/tailwind.config.ts`, and a
+unit test (`design-tokens.test.ts`) holds their contrast ratios and the source rules.
+
+- **/design** (not linked, noindex): the tokens and the real components as they render, with an accent switch
+  (tomato, orange, yellow; orange is the default), both wordmarks, the type, radius and shadow scales, the five status
+  colours, a sample marketing band, a sample dashboard row and the motion tokens. It is where the owner chooses the
+  accent and the wordmark. No real page uses the accent yet, except the "needs you" tint.
+- **Status colours** are by whose turn it is (`lib/status-tone.ts`): needs you = the accent tint, waiting and working
+  = neutral, accepted = green, closed = grey, failed = red. Butter is for measurement only.
+- **Focus:** one ring colour (`--color-focus`): ink on light grounds, light inside a juniper or brand-coloured
+  surface. Controls that draw their focus with Tailwind's `ring` use the same colour.
+- **Fields and outlined controls** have an edge of 3:1 (`border-field`; a CSS rule lifts every field and outlined
+  button still written with `border-border`).
+- **Motion:** tokens `--motion-*` and `--ease-*`, classes `motion-press`, `motion-menu` and `animate-fade-in-up`. The
+  dashboard has no entrance animation. One global rule stills everything under reduced motion. The customer quote page
+  waits with the tape rule being drawn, not a pulse.
+- **One radius scale** (`rounded-sm` 4 to `rounded-3xl` 20, `rounded-full`); there is no bare `rounded` and no
+  `rounded-warm-*`.
+- No raw Tailwind palette colour and no opacity modifier on a colour token (it writes no CSS); both are tested.
+
 ## Deployment
 Next.js deployed on Vercel. All frontend surfaces and API routes are served from Vercel.
 

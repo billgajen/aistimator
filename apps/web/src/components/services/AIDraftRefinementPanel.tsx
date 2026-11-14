@@ -259,7 +259,7 @@ export function AIDraftRefinementPanel({
           <button
             type="button"
             onClick={() => setCollapsed(true)}
-            className="rounded p-1 text-text-muted hover:text-text-primary"
+            className="rounded-sm p-1 text-text-muted hover:text-text-primary"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />

@@ -976,7 +976,7 @@ export default function ServicesPage() {
       {error && (
         <div className="mb-4 rounded-lg bg-danger-light p-4">
           <div className="flex">
-            <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="h-5 w-5 text-danger" viewBox="0 0 20 20" fill="currentColor">
               <path
                 fillRule="evenodd"
                 d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
@@ -986,7 +986,7 @@ export default function ServicesPage() {
             <div className="ml-3">
               <p className="text-sm text-danger">{error}</p>
             </div>
-            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-danger">
+            <button onClick={() => setError(null)} className="ml-auto text-danger hover:text-danger">
               <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fillRule="evenodd"
@@ -1110,7 +1110,7 @@ export default function ServicesPage() {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 backdrop-blur-[3px] p-4">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-warm-2xl bg-background shadow-document">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-background shadow-document">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-border px-6 py-5">
               <div>
@@ -1212,7 +1212,7 @@ export default function ServicesPage() {
                         placeholder="e.g., Kitchen Renovation"
                         className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
                           nameError
-                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                            ? 'border-danger focus:border-danger focus:ring-danger'
                             : 'border-border focus:border-primary focus:ring-primary/30'
                         }`}
                         required
@@ -1328,7 +1328,7 @@ export default function ServicesPage() {
                             type="button"
                             onClick={generateAIDraft}
                             disabled={generatingDraft}
-                            className="text-sm text-tertiary hover:text-purple-900"
+                            className="text-sm text-tertiary hover:text-text-primary"
                           >
                             Regenerate
                           </button>
@@ -1873,7 +1873,7 @@ export default function ServicesPage() {
                                   }))
                                   setSimulatorResult(null)
                                 }}
-                                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                                className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
                               />
                               <span className="text-sm text-text-secondary">{field.label}</span>
                             </label>
@@ -1904,16 +1904,16 @@ export default function ServicesPage() {
                               <div className="flex items-center gap-2">
                                 <span className="text-text-primary">{item.name}</span>
                                 {item.quantitySource === 'form_field' && (
-                                  <span className="rounded bg-primary-light px-1.5 py-0.5 text-xs text-primary">form</span>
+                                  <span className="rounded-sm bg-primary-light px-1.5 py-0.5 text-xs text-primary">form</span>
                                 )}
                                 {item.quantitySource === 'constant' && (
-                                  <span className="rounded bg-secondary-light px-1.5 py-0.5 text-xs text-secondary">fixed</span>
+                                  <span className="rounded-sm bg-secondary-light px-1.5 py-0.5 text-xs text-secondary">fixed</span>
                                 )}
                                 {item.quantitySource === 'ai_signal' && (
-                                  <span className="rounded bg-tertiary-light px-1.5 py-0.5 text-xs font-semibold text-tertiary">AI</span>
+                                  <span className="rounded-sm bg-tertiary-light px-1.5 py-0.5 text-xs font-semibold text-tertiary">AI</span>
                                 )}
                                 {item.quantitySource === 'missing' && (
-                                  <span className="rounded bg-danger-light px-1.5 py-0.5 text-xs text-danger">no source</span>
+                                  <span className="rounded-sm bg-danger-light px-1.5 py-0.5 text-xs text-danger">no source</span>
                                 )}
                               </div>
                               <div className="text-right">

@@ -17,7 +17,7 @@ function BillingPageLoading() {
   return (
     <div>
       <div className="flex items-center justify-center py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     </div>
   )
@@ -131,7 +131,7 @@ function BillingPageContent() {
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       active: 'bg-secondary-light text-secondary',
-      trialing: 'bg-blue-100 text-primary',
+      trialing: 'bg-primary-light text-primary',
       past_due: 'bg-tertiary-light text-tertiary',
       canceled: 'bg-background text-text-primary',
       none: 'bg-background text-text-primary',
@@ -163,7 +163,7 @@ function BillingPageContent() {
     return (
       <div>
         <div className="flex items-center justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
       </div>
     )
@@ -172,7 +172,7 @@ function BillingPageContent() {
   if (error) {
     return (
       <div>
-        <div className="rounded-warm-lg bg-danger-light p-4 text-danger">{error}</div>
+        <div className="rounded-xl bg-danger-light p-4 text-danger">{error}</div>
       </div>
     )
   }
@@ -186,7 +186,7 @@ function BillingPageContent() {
       {/* Toast notification */}
       {toast && (
         <div
-          className={`mb-4 rounded-warm-lg p-4 ${
+          className={`mb-4 rounded-xl p-4 ${
             toast.type === 'success' ? 'bg-secondary-light text-secondary' : 'bg-danger-light text-danger'
           }`}
         >
@@ -195,7 +195,7 @@ function BillingPageContent() {
       )}
 
       {/* Current plan card */}
-      <div className="mb-8 rounded-warm-lg bg-surface p-6 shadow-warm">
+      <div className="mb-8 rounded-xl bg-surface p-6 shadow-warm">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-medium text-text-primary">Current Plan</h2>
@@ -209,7 +209,7 @@ function BillingPageContent() {
               <button
                 onClick={handlePortal}
                 disabled={portalLoading}
-                className="rounded-warm-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background disabled:opacity-50"
+                className="rounded-xl border border-border bg-surface px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background disabled:opacity-50"
               >
                 {portalLoading ? 'Loading...' : 'Manage Billing'}
               </button>
@@ -223,9 +223,9 @@ function BillingPageContent() {
             <p className="mt-1 text-2xl font-bold text-text-primary" data-testid="usage-count">
               {data?.usage.estimatesCreated || 0} / {data?.usage.planLimit || 50}
             </p>
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-200">
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-border">
               <div
-                className={`h-full ${usagePercentage >= 90 ? 'bg-red-500' : usagePercentage >= 75 ? 'bg-yellow-500' : 'bg-primary'}`}
+                className={`h-full ${usagePercentage >= 90 ? 'bg-danger' : usagePercentage >= 75 ? 'bg-tertiary' : 'bg-primary'}`}
                 style={{ width: `${usagePercentage}%` }}
               />
             </div>
@@ -244,7 +244,7 @@ function BillingPageContent() {
                 )}
               </p>
             ) : data?.usage.level === 'limit' ? (
-              <p className="mt-2 text-xs text-red-600">
+              <p className="mt-2 text-xs text-danger">
                 {freeTotal ? 'Free quotes used' : 'Limit reached'} — new requests are saved as leads but not priced
                 {data.usage.heldLeads ? ` (${data.usage.heldLeads} waiting)` : ''}. {freeTotal ? 'Pick a plan' : 'Upgrade'} to price them.
               </p>
@@ -281,14 +281,14 @@ function BillingPageContent() {
         </div>
 
         {data?.subscription.cancelAtPeriodEnd && (
-          <div className="mt-4 rounded-warm-lg bg-tertiary-light p-3 text-sm text-tertiary">
+          <div className="mt-4 rounded-xl bg-tertiary-light p-3 text-sm text-tertiary">
             Your subscription will be canceled at the end of the current billing period.
           </div>
         )}
       </div>
 
       {/* Available plans */}
-      <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+      <div className="rounded-xl bg-surface p-6 shadow-warm">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="text-lg font-medium text-text-primary">Available Plans</h2>
@@ -359,8 +359,8 @@ function PlanCard({
 }) {
   return (
     <div
-      className={`relative rounded-warm-lg border p-6 ${
-        isCurrent ? 'border-blue-500 ring-2 ring-blue-500' : isChosen ? 'border-primary ring-2 ring-primary' : 'border-border'
+      className={`relative rounded-xl border p-6 ${
+        isCurrent ? 'border-ink ring-2 ring-ink' : isChosen ? 'border-primary ring-2 ring-primary' : 'border-border'
       }`}
     >
       {isChosen && !isCurrent && (
@@ -411,7 +411,7 @@ function PlanCard({
       <button
         onClick={onSelect}
         disabled={disabled || loading}
-        className={`mt-6 w-full rounded-warm-lg px-4 py-2 text-sm font-medium transition-colors ${
+        className={`mt-6 w-full rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
           isCurrent
             ? 'cursor-not-allowed bg-background text-text-muted'
             : disabled
@@ -429,11 +429,11 @@ function FeatureItem({ included, label }: { included: boolean; label: string }) 
   return (
     <li className="flex items-center gap-2 text-sm">
       {included ? (
-        <svg className="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="h-4 w-4 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
       ) : (
-        <svg className="h-4 w-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="h-4 w-4 text-border-strong" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>
       )}

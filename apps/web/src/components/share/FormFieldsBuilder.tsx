@@ -282,7 +282,7 @@ export function FormFieldsBuilder() {
       {error && (
         <div className="mb-4 rounded-md bg-danger-light p-4">
           <div className="flex">
-            <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="h-5 w-5 text-danger" viewBox="0 0 20 20" fill="currentColor">
               <path
                 fillRule="evenodd"
                 d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
@@ -290,9 +290,9 @@ export function FormFieldsBuilder() {
               />
             </svg>
             <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-sm text-danger">{error}</p>
             </div>
-            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-danger">
+            <button onClick={() => setError(null)} className="ml-auto text-danger hover:text-danger">
               <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fillRule="evenodd"
@@ -328,10 +328,10 @@ export function FormFieldsBuilder() {
 
           {loading ? (
             <div className="mt-6 flex items-center justify-center py-8">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
           ) : config.fields.length === 0 && !showAddField ? (
-            <div className="mt-6 rounded-warm-lg border-2 border-dashed border-border p-8 text-center">
+            <div className="mt-6 rounded-xl border-2 border-dashed border-border p-8 text-center">
               <svg className="mx-auto h-10 w-10 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
@@ -354,7 +354,7 @@ export function FormFieldsBuilder() {
               {config.fields.map((field, index) => (
                 <div
                   key={field.fieldId}
-                  className="flex items-center gap-3 rounded-warm-lg border border-border p-3"
+                  className="flex items-center gap-3 rounded-xl border border-border p-3"
                 >
                   <div className="flex flex-col gap-1">
                     <button
@@ -380,11 +380,11 @@ export function FormFieldsBuilder() {
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-text-primary">{field.label}</span>
                       {field.required && (
-                        <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">Required</span>
+                        <span className="rounded-sm bg-danger-light px-1.5 py-0.5 text-xs text-danger">Required</span>
                       )}
                     </div>
                     <div className="mt-1 flex items-center gap-2 text-xs text-text-muted">
-                      <span className="rounded bg-background px-1.5 py-0.5">
+                      <span className="rounded-sm bg-background px-1.5 py-0.5">
                         {FIELD_TYPES.find((t) => t.value === field.type)?.label || field.type}
                       </span>
                       <span className="font-mono">{field.fieldId}</span>
@@ -392,11 +392,11 @@ export function FormFieldsBuilder() {
                         <span>{field.options.length} options</span>
                       )}
                       {field.serviceId ? (
-                        <span className="rounded bg-purple-100 px-1.5 py-0.5 text-purple-700">
+                        <span className="rounded-sm bg-mist px-1.5 py-0.5 text-text-secondary">
                           {services.find((s) => s.id === field.serviceId)?.name || 'Service-specific'}
                         </span>
                       ) : (
-                        <span className="rounded bg-green-100 px-1.5 py-0.5 text-secondary">
+                        <span className="rounded-sm bg-secondary-light px-1.5 py-0.5 text-secondary">
                           All Services
                         </span>
                       )}
@@ -405,10 +405,10 @@ export function FormFieldsBuilder() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => updateField(index, { required: !field.required })}
-                      className={`rounded px-2 py-1 text-xs ${
+                      className={`rounded-sm px-2 py-1 text-xs ${
                         field.required
-                          ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                          : 'bg-background text-text-secondary hover:bg-gray-200'
+                          ? 'bg-danger-light text-danger hover:bg-danger-line'
+                          : 'bg-background text-text-secondary hover:bg-border'
                       }`}
                     >
                       {field.required ? 'Required' : 'Optional'}
@@ -427,7 +427,7 @@ export function FormFieldsBuilder() {
 
               {/* Add field form */}
               {showAddField && (
-                <div className="rounded-warm-lg border-2 border-primary/20 bg-primary-light p-4">
+                <div className="rounded-xl border-2 border-primary/20 bg-primary-light p-4">
                   <h3 className="font-medium text-text-primary">Add New Field</h3>
 
                   <div className="mt-4 space-y-4">
@@ -439,7 +439,7 @@ export function FormFieldsBuilder() {
                           value={newField.label}
                           onChange={(e) => setNewField((prev) => ({ ...prev, label: e.target.value }))}
                           placeholder="e.g., Surface Condition"
-                          className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         />
                       </div>
                       <div>
@@ -447,7 +447,7 @@ export function FormFieldsBuilder() {
                         <select
                           value={newField.type}
                           onChange={(e) => setNewField((prev) => ({ ...prev, type: e.target.value as FieldType }))}
-                          className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         >
                           {FIELD_TYPES.map((type) => (
                             <option key={type.value} value={type.value}>{type.label}</option>
@@ -467,7 +467,7 @@ export function FormFieldsBuilder() {
                           value={newField.fieldId}
                           onChange={(e) => setNewField((prev) => ({ ...prev, fieldId: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') }))}
                           placeholder={generateFieldId(newField.label) || 'field_id'}
-                          className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="mt-1 w-full rounded-xl border border-border px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         />
                       </div>
                       <div>
@@ -475,7 +475,7 @@ export function FormFieldsBuilder() {
                         <select
                           value={newField.serviceId || ''}
                           onChange={(e) => setNewField((prev) => ({ ...prev, serviceId: e.target.value || null }))}
-                          className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         >
                           <option value="">All Services (Global)</option>
                           {services.map((service) => (
@@ -494,7 +494,7 @@ export function FormFieldsBuilder() {
                           type="checkbox"
                           checked={newField.required}
                           onChange={(e) => setNewField((prev) => ({ ...prev, required: e.target.checked }))}
-                          className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                          className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
                         />
                         <span className="text-sm text-text-secondary">Required field</span>
                       </label>
@@ -511,14 +511,14 @@ export function FormFieldsBuilder() {
                                 value={opt.value}
                                 onChange={(e) => updateNewFieldOption(optIndex, 'value', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                                 placeholder="value"
-                                className="w-32 rounded-warm-lg border border-border px-3 py-1.5 font-mono text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                className="w-32 rounded-xl border border-border px-3 py-1.5 font-mono text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                               />
                               <input
                                 type="text"
                                 value={opt.label}
                                 onChange={(e) => updateNewFieldOption(optIndex, 'label', e.target.value)}
                                 placeholder="Display label"
-                                className="flex-1 rounded-warm-lg border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                className="flex-1 rounded-xl border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                               />
                               {(newField.options?.length || 0) > 1 && (
                                 <button
@@ -558,13 +558,13 @@ export function FormFieldsBuilder() {
                             serviceId: null,
                           })
                         }}
-                        className="rounded-warm-lg border border-border px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-background"
+                        className="rounded-xl border border-border px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-background"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={addField}
-                        className="rounded-warm-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
+                        className="rounded-xl bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
                       >
                         Add Field
                       </button>
@@ -577,14 +577,14 @@ export function FormFieldsBuilder() {
 
           {/* Tip about multipliers */}
           {config.fields.length > 0 && (
-            <div className="mt-6 rounded-warm-lg bg-amber-50 p-4">
+            <div className="mt-6 rounded-xl bg-tertiary-light p-4">
               <div className="flex">
-                <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                <svg className="h-5 w-5 text-tertiary" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
                 <div className="ml-3">
-                  <h3 className="text-sm font-medium text-amber-800">Use with Pricing Multipliers</h3>
-                  <p className="mt-1 text-sm text-amber-700">
+                  <h3 className="text-sm font-medium text-tertiary">Use with Pricing Multipliers</h3>
+                  <p className="mt-1 text-sm text-tertiary">
                     Go to Pricing Rules to create multipliers that adjust prices based on customer answers.
                     Use the Field ID (e.g., &quot;{config.fields[0]?.fieldId}&quot;) when setting up multiplier conditions.
                   </p>

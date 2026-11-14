@@ -101,8 +101,8 @@ export default function AnalyticsPage() {
 
   // Get usage bar color based on percentage
   const getUsageColor = (percentage: number) => {
-    if (percentage >= 90) return 'bg-red-500'
-    if (percentage >= 75) return 'bg-yellow-500'
+    if (percentage >= 90) return 'bg-danger'
+    if (percentage >= 75) return 'bg-tertiary'
     return 'bg-primary'
   }
 
@@ -114,7 +114,7 @@ export default function AnalyticsPage() {
           description="Track your quote performance and conversion rates"
         />
         <div className="flex items-center justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
       </div>
     )
@@ -127,7 +127,7 @@ export default function AnalyticsPage() {
           title="Analytics"
           description="Track your quote performance and conversion rates"
         />
-        <div className="rounded-warm-lg bg-danger-light p-4 text-danger">
+        <div className="rounded-xl bg-danger-light p-4 text-danger">
           {error}
         </div>
       </div>
@@ -143,25 +143,25 @@ export default function AnalyticsPage() {
 
       {/* Stats cards */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+        <div className="rounded-xl bg-surface p-6 shadow-warm">
           <p className="text-sm font-medium text-text-muted">Total Quotes</p>
           <p className="mt-2 text-3xl font-bold text-text-primary">
             {data?.metrics.totalQuotes || 0}
           </p>
         </div>
-        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+        <div className="rounded-xl bg-surface p-6 shadow-warm">
           <p className="text-sm font-medium text-text-muted">Quotes Viewed</p>
           <p className="mt-2 text-3xl font-bold text-text-primary">
             {data?.metrics.quotesViewed || 0}
           </p>
         </div>
-        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+        <div className="rounded-xl bg-surface p-6 shadow-warm">
           <p className="text-sm font-medium text-text-muted">Quotes Accepted</p>
           <p className="mt-2 text-3xl font-bold text-text-primary">
             {data?.metrics.quotesAccepted || 0}
           </p>
         </div>
-        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+        <div className="rounded-xl bg-surface p-6 shadow-warm">
           <p className="text-sm font-medium text-text-muted">Conversion Rate</p>
           <p className="mt-2 text-3xl font-bold text-text-primary">
             {data?.metrics.conversionRate || 0}%
@@ -186,7 +186,7 @@ export default function AnalyticsPage() {
               .map(({ svc, sug }, i) => (
                 <div
                   key={`${svc.serviceId}-${sug.type}-${i}`}
-                  className="rounded-warm-lg bg-surface p-5 shadow-warm"
+                  className="rounded-xl bg-surface p-5 shadow-warm"
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
@@ -194,10 +194,10 @@ export default function AnalyticsPage() {
                         <span
                           className={`inline-flex h-2 w-2 shrink-0 rounded-full ${
                             sug.type === 'raise_rates'
-                              ? 'bg-green-500'
+                              ? 'bg-secondary'
                               : sug.type === 'lower_rates'
-                                ? 'bg-amber-500'
-                                : 'bg-blue-500'
+                                ? 'bg-tertiary'
+                                : 'bg-primary'
                           }`}
                         />
                         <h4 className="font-semibold text-text-primary">{sug.headline}</h4>
@@ -227,7 +227,7 @@ export default function AnalyticsPage() {
 
       {/* Per-service outcomes table (T-110) */}
       {calibration && calibration.length > 0 && (
-        <div className="mb-8 rounded-warm-lg bg-surface p-6 shadow-warm">
+        <div className="mb-8 rounded-xl bg-surface p-6 shadow-warm">
           <h3 className="mb-4 text-lg font-semibold text-text-primary">Quote Outcomes by Service</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -264,7 +264,7 @@ export default function AnalyticsPage() {
 
       {/* Market benchmarks (T-115) — anonymized, opt-in, informational only */}
       {benchmarks && (
-        <div className="mb-8 rounded-warm-lg bg-surface p-6 shadow-warm">
+        <div className="mb-8 rounded-xl bg-surface p-6 shadow-warm">
           <h3 className="text-lg font-semibold text-text-primary">Market Benchmarks</h3>
           {!benchmarks.optedIn ? (
             <div className="mt-2">
@@ -311,7 +311,7 @@ export default function AnalyticsPage() {
                       per {b.unit} (median {b.median.toLocaleString()}). You charge{' '}
                       <span
                         className={`font-semibold ${
-                          inRange ? 'text-secondary' : 'text-amber-600'
+                          inRange ? 'text-secondary' : 'text-tertiary'
                         }`}
                       >
                         {b.yourRate.toLocaleString()}
@@ -330,7 +330,7 @@ export default function AnalyticsPage() {
       )}
 
       {/* Usage section */}
-      <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+      <div className="rounded-xl bg-surface p-6 shadow-warm">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-text-primary">{data?.usage.per === 'total' ? 'Free quotes' : 'Monthly Usage'}</h3>
@@ -353,7 +353,7 @@ export default function AnalyticsPage() {
 
         {/* Progress bar */}
         <div className="mt-4">
-          <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
+          <div className="h-3 w-full overflow-hidden rounded-full bg-border">
             <div
               className={`h-full transition-all ${getUsageColor(usagePercentage)}`}
               style={{ width: `${usagePercentage}%` }}
@@ -379,7 +379,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Additional metrics */}
-      <div className="mt-6 rounded-warm-lg bg-surface p-6 shadow-warm">
+      <div className="mt-6 rounded-xl bg-surface p-6 shadow-warm">
         <h3 className="text-lg font-semibold text-text-primary">Quote Funnel</h3>
         <p className="mb-4 text-sm text-text-muted">Track how quotes progress through stages</p>
 
@@ -425,9 +425,9 @@ function FunnelRow({
     <div className="flex items-center gap-4">
       <span className="w-20 text-sm text-text-secondary">{label}</span>
       <div className="flex-1">
-        <div className="h-6 w-full overflow-hidden rounded bg-background">
+        <div className="h-6 w-full overflow-hidden rounded-sm bg-background">
           <div
-            className="h-full bg-blue-500 transition-all"
+            className="h-full bg-primary transition-all"
             style={{ width: `${percentage}%` }}
           />
         </div>

@@ -52,7 +52,7 @@ export function NotificationsSettings() {
   }
 
   return (
-    <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+    <div className="rounded-xl bg-surface p-6 shadow-warm">
       <h2 className="text-lg font-medium text-text-primary">Notifications</h2>
       <p className="mt-1 text-sm text-text-muted">Where we email you about new requests and quotes</p>
 
@@ -66,7 +66,7 @@ export function NotificationsSettings() {
           value={notificationEmail}
           onChange={(e) => setNotificationEmail(e.target.value)}
           placeholder={userEmail || 'Leave empty to use account email'}
-          className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
         <p className="mt-1 text-xs text-text-muted">
           Quote notifications will be sent to this email instead of your account email. Leave empty to use your
@@ -83,7 +83,7 @@ export function NotificationsSettings() {
         <button
           onClick={save}
           disabled={saving}
-          className="inline-flex items-center rounded-warm-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+          className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
         >
           {saving ? 'Saving...' : 'Save Notifications'}
         </button>

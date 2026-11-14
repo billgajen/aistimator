@@ -167,7 +167,7 @@ export function PricingComposer({
       </div>
 
       {error && (
-        <div className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        <div className="mt-3 rounded-lg border border-danger-line bg-danger-light p-3 text-sm text-danger">
           {error}
         </div>
       )}
@@ -207,11 +207,11 @@ export function PricingComposer({
 
           {/* Questions the AI needs answered instead of guessing */}
           {result.ambiguities.length > 0 && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
-              <h4 className="mb-2 text-sm font-bold text-amber-900">
+            <div className="rounded-lg border border-tertiary-line bg-tertiary-light p-4">
+              <h4 className="mb-2 text-sm font-bold text-tertiary">
                 A few things weren&apos;t clear — answer these in your description and recompile:
               </h4>
-              <ul className="list-inside list-disc space-y-1 text-sm text-amber-800">
+              <ul className="list-inside list-disc space-y-1 text-sm text-tertiary">
                 {result.ambiguities.map((q, i) => (
                   <li key={i}>{q}</li>
                 ))}

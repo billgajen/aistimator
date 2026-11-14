@@ -363,7 +363,7 @@ export function OnboardingFlow({
       </div>
 
       {error && step !== 'source' && step !== 'trade' && (
-        <div className="mb-6 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        <div className="mb-6 rounded-lg border border-danger-line bg-danger-light p-3 text-sm text-danger">
           {error}
         </div>
       )}
@@ -441,7 +441,7 @@ export function OnboardingFlow({
           </div>
 
           {error && (
-            <div className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</div>
+            <div className="mt-3 rounded-lg border border-danger-line bg-danger-light p-3 text-sm text-danger">{error}</div>
           )}
 
           <div className="mt-4 flex items-center justify-between">
@@ -506,7 +506,7 @@ export function OnboardingFlow({
                       prev.map((s, i) => (i === index ? { ...s, selected: !s.selected } : s))
                     )
                   }
-                  className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                  className="mt-1 h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold text-text-primary">{svc.name}</div>
@@ -628,11 +628,11 @@ export function OnboardingFlow({
               </div>
 
               {compileResult.ambiguities.length > 0 && (
-                <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
-                  <h4 className="mb-2 text-sm font-bold text-amber-900">
+                <div className="rounded-lg border border-tertiary-line bg-tertiary-light p-4">
+                  <h4 className="mb-2 text-sm font-bold text-tertiary">
                     A few things weren&apos;t clear:
                   </h4>
-                  <ul className="list-inside list-disc space-y-1 text-sm text-amber-800">
+                  <ul className="list-inside list-disc space-y-1 text-sm text-tertiary">
                     {compileResult.ambiguities.map((q, i) => (
                       <li key={i}>{q}</li>
                     ))}
@@ -708,7 +708,7 @@ export function OnboardingFlow({
                   type="checkbox"
                   checked={taxEnabled}
                   onChange={(e) => setTaxEnabled(e.target.checked)}
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                  className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
                 />
                 <span className="text-sm font-medium text-text-primary">
                   Add {regionDef.copy.taxLabel.toLowerCase()} to estimates

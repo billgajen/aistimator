@@ -264,7 +264,7 @@ export default async function DashboardPage() {
       {(unfinishedCount ?? 0) > 0 && (
         <Link
           href="/app/quotes?filter=unfinished"
-          className="mb-8 flex items-center justify-between gap-3 rounded-warm-lg border border-tape/40 bg-butter px-5 py-4 text-sm text-text-primary hover:border-tape"
+          className="mb-8 flex items-center justify-between gap-3 rounded-xl border border-accent-line bg-accent-tint px-5 py-4 text-sm text-text-primary hover:border-accent"
           data-testid="unfinished-count"
         >
           <span>
@@ -314,7 +314,7 @@ export default async function DashboardPage() {
 
       {/* c. Setup checklist until complete (T-152) */}
       {!checklist.complete && (
-        <section className="mb-8 rounded-warm-xl bg-white p-6 shadow-warm-md" data-testid="setup-checklist">
+        <section className="mb-8 rounded-2xl bg-white p-6 shadow-warm-md" data-testid="setup-checklist">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-display text-lg font-bold text-text-primary">Get set up</h2>
             <span className="text-sm font-medium text-text-secondary">
@@ -395,7 +395,7 @@ export default async function DashboardPage() {
 function UsageBanner({ tone, title, text, cta }: { tone: 'warn' | 'danger'; title: string; text: string; cta: string }) {
   const danger = tone === 'danger'
   return (
-    <div className={`mb-8 rounded-warm-xl border p-5 ${danger ? 'border-danger/30 bg-danger-light' : 'border-tape/40 bg-butter'}`}>
+    <div className={`mb-8 rounded-2xl border p-5 ${danger ? 'border-danger/30 bg-danger-light' : 'border-tape/40 bg-butter'}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className={`font-display text-base font-bold ${danger ? 'text-danger' : 'text-tertiary'}`}>{title}</h2>
@@ -416,7 +416,7 @@ function UsageBanner({ tone, title, text, cta }: { tone: 'warn' | 'danger'; titl
 
 function StatCard({ title, value, change }: { title: string; value: string; change?: string | null }) {
   return (
-    <div className="rounded-warm-xl bg-white shadow-warm-md p-6" data-testid="home-number">
+    <div className="rounded-2xl bg-white shadow-warm-md p-6" data-testid="home-number">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">{title}</p>
       <p className="figure mt-3 text-2xl font-medium tracking-tight text-text-primary sm:text-4xl">{value}</p>
       {/* T-160: against the 30 days before */}

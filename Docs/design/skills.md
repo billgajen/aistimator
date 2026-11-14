@@ -1,8 +1,9 @@
 # Design skills (T-161)
 
 Three Claude Code skills, installed for this project only, in `.claude/skills/`. They **advise**. They do not
-decide: our colours, fonts and tokens ("The Measured Document", `apps/web/src/app/globals.css`) stay unless the
-owner changes them in a ticket of their own.
+decide: `Docs/design/system.md` does (T-164). It says which skill leads where and rules on each point where they
+disagree. Our colours, fonts and tokens ("The Measured Document", `apps/web/src/app/globals.css`) change only by a
+ticket that changes that file first.
 
 | Skill (folder) | Repo | Commit | Licence | Version |
 |---|---|---|---|---|

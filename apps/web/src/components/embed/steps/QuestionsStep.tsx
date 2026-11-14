@@ -135,7 +135,7 @@ export function QuestionsStep({
               value={jobQuantity ?? ''}
               onChange={(e) => onQuantityChange(e.target.value ? Number(e.target.value) : null)}
               placeholder={`Enter ${measurementModel.unit || 'quantity'}`}
-              className={`w-full px-4 py-3 text-[15px] border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${inputNormalClass}`}
+              className={`w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${inputNormalClass}`}
             />
             <p className="mt-1 text-xs text-text-muted">
               This helps us provide a more accurate estimate
@@ -151,7 +151,7 @@ export function QuestionsStep({
             <div key={field.fieldId}>
               <label className="block text-[13px] font-semibold text-text-primary mb-1.5">
                 {field.label}
-                {field.required && <span className="text-red-500 ml-1">*</span>}
+                {field.required && <span className="text-danger ml-1">*</span>}
               </label>
 
               {/* Text input */}
@@ -162,7 +162,7 @@ export function QuestionsStep({
                   onChange={(e) => onFieldChange(field.fieldId, e.target.value)}
                   onBlur={() => handleFieldBlur(field.fieldId)}
                   placeholder={field.placeholder}
-                  className={`w-full px-4 py-3 text-[15px] border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
+                  className={`w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
                 />
               )}
 
@@ -174,7 +174,7 @@ export function QuestionsStep({
                   onBlur={() => handleFieldBlur(field.fieldId)}
                   placeholder={field.placeholder}
                   rows={3}
-                  className={`w-full px-4 py-3 text-[15px] border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
+                  className={`w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
                 />
               )}
 
@@ -186,7 +186,7 @@ export function QuestionsStep({
                   onChange={(e) => onFieldChange(field.fieldId, e.target.value ? Number(e.target.value) : '')}
                   onBlur={() => handleFieldBlur(field.fieldId)}
                   placeholder={field.placeholder}
-                  className={`w-full px-4 py-3 text-[15px] border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
+                  className={`w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
                 />
               )}
 
@@ -196,7 +196,7 @@ export function QuestionsStep({
                   value={(answers[field.fieldId] as string) || ''}
                   onChange={(e) => onFieldChange(field.fieldId, e.target.value)}
                   onBlur={() => handleFieldBlur(field.fieldId)}
-                  className={`w-full px-4 py-3 text-[15px] border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
+                  className={`w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
                 >
                   <option value="">Select...</option>
                   {field.options.map((opt) => (
@@ -211,7 +211,7 @@ export function QuestionsStep({
               {field.type === 'radio' && field.options && (
                 <div className="space-y-2 mt-1">
                   {field.options.map((opt) => (
-                    <label key={opt.value} className="flex items-center gap-2.5 px-4 py-3 bg-white border border-border rounded-warm-lg cursor-pointer hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-mint transition">
+                    <label key={opt.value} className="flex items-center gap-2.5 px-4 py-3 bg-white border border-border rounded-xl cursor-pointer hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-mint transition">
                       <input
                         type="radio"
                         name={field.fieldId}
@@ -232,12 +232,12 @@ export function QuestionsStep({
                   {field.options.map((opt) => {
                     const currentValues = (answers[field.fieldId] as string[]) || []
                     return (
-                      <label key={opt.value} className="flex items-center gap-2.5 px-4 py-3 bg-white border border-border rounded-warm-lg cursor-pointer hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-mint transition">
+                      <label key={opt.value} className="flex items-center gap-2.5 px-4 py-3 bg-white border border-border rounded-xl cursor-pointer hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-mint transition">
                         <input
                           type="checkbox"
                           checked={currentValues.includes(opt.value)}
                           onChange={(e) => handleCheckboxChange(field.fieldId, opt.value, e.target.checked)}
-                          className="w-[18px] h-[18px] rounded border-border-strong text-primary focus:ring-primary/25 accent-[#205E56]"
+                          className="w-[18px] h-[18px] rounded-sm border-border-strong text-primary focus:ring-primary/25 accent-[#205E56]"
                         />
                         <span className="text-sm text-text-secondary">{opt.label}</span>
                       </label>
@@ -248,12 +248,12 @@ export function QuestionsStep({
 
               {/* Boolean (single checkbox) */}
               {field.type === 'boolean' && (
-                <label className="flex items-center gap-2.5 px-4 py-3 bg-white border border-border rounded-warm-lg cursor-pointer hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-mint transition">
+                <label className="flex items-center gap-2.5 px-4 py-3 bg-white border border-border rounded-xl cursor-pointer hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-mint transition">
                   <input
                     type="checkbox"
                     checked={(answers[field.fieldId] as boolean) || false}
                     onChange={(e) => onFieldChange(field.fieldId, e.target.checked)}
-                    className="w-[18px] h-[18px] rounded border-border-strong text-primary focus:ring-primary/25 accent-[#205E56]"
+                    className="w-[18px] h-[18px] rounded-sm border-border-strong text-primary focus:ring-primary/25 accent-[#205E56]"
                   />
                   <span className="text-sm text-text-secondary">{field.helpText || 'Yes'}</span>
                 </label>
@@ -277,14 +277,14 @@ export function QuestionsStep({
         {onBack && (
           <button
             onClick={onBack}
-            className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-warm-lg hover:border-border-strong transition"
+            className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-xl hover:border-border-strong transition"
           >
             Back
           </button>
         )}
         <button
           onClick={handleContinue}
-          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover active:scale-[0.995] transition"
+          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-on-primary rounded-xl hover:bg-primary-hover active:scale-[0.995] transition"
         >
           Continue
         </button>

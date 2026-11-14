@@ -30,7 +30,7 @@ export function JobDetailsStep({
 }) {
   const [touched, setTouched] = useState(false)
   const missingDescription = descriptionRequired && !description.trim()
-  const input = 'w-full px-4 py-3 text-[15px] border rounded-warm-lg placeholder:text-text-muted focus:outline-none focus:ring-2 transition border-border bg-background focus:ring-primary/25 focus:border-primary focus:bg-white'
+  const input = 'w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition border-border bg-background focus:ring-primary/25 focus:border-primary focus:bg-white'
 
   return (
     <div className="p-6">
@@ -53,7 +53,7 @@ export function JobDetailsStep({
       </div>
       <div className="flex gap-3 mt-6">
         {onBack && (
-          <button type="button" onClick={onBack} className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-warm-lg hover:border-border-strong transition">
+          <button type="button" onClick={onBack} className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-xl hover:border-border-strong transition">
             Back
           </button>
         )}
@@ -63,7 +63,7 @@ export function JobDetailsStep({
             setTouched(true)
             if (!missingDescription) onSubmit()
           }}
-          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-on-primary rounded-warm-lg hover:bg-primary-hover active:scale-[0.995] transition"
+          className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-on-primary rounded-xl hover:bg-primary-hover active:scale-[0.995] transition"
         >
           Get Quote
         </button>

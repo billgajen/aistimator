@@ -202,7 +202,7 @@ export default function SettingsPage() {
     return (
       <div>
         <div className="flex min-h-[400px] items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
       </div>
     )
@@ -213,9 +213,9 @@ export default function SettingsPage() {
 
       {/* Success message */}
       {success && (
-        <div className="mb-4 rounded-warm-lg bg-secondary-light p-4">
+        <div className="mb-4 rounded-xl bg-secondary-light p-4">
           <div className="flex">
-            <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="h-5 w-5 text-secondary" viewBox="0 0 20 20" fill="currentColor">
               <path
                 fillRule="evenodd"
                 d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -229,9 +229,9 @@ export default function SettingsPage() {
 
       {/* Error message */}
       {error && (
-        <div className="mb-4 rounded-warm-lg bg-danger-light p-4">
+        <div className="mb-4 rounded-xl bg-danger-light p-4">
           <div className="flex">
-            <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="h-5 w-5 text-danger" viewBox="0 0 20 20" fill="currentColor">
               <path
                 fillRule="evenodd"
                 d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
@@ -241,7 +241,7 @@ export default function SettingsPage() {
             <p className="ml-3 text-sm text-danger">{error}</p>
             <button
               onClick={() => setError(null)}
-              className="ml-auto text-red-400 hover:text-danger"
+              className="ml-auto text-danger hover:text-danger"
             >
               <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path
@@ -257,7 +257,7 @@ export default function SettingsPage() {
 
       <div className="space-y-6">
         {/* Business Info */}
-        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+        <div className="rounded-xl bg-surface p-6 shadow-warm">
           <h2 className="text-lg font-medium text-text-primary">Business Information</h2>
           <p className="mt-1 text-sm text-text-muted">Basic information about your business</p>
 
@@ -268,7 +268,7 @@ export default function SettingsPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
             <div>
@@ -276,7 +276,7 @@ export default function SettingsPage() {
               <input
                 type="email"
                 value={userEmail}
-                className="mt-1 w-full rounded-warm-lg border border-border bg-background px-3 py-2 text-text-muted"
+                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-text-muted"
                 disabled
               />
               <p className="mt-1 text-xs text-text-muted">Email is managed through your account</p>
@@ -292,7 +292,7 @@ export default function SettingsPage() {
                   setCurrency(next.currency)
                   setUnitSystem(null)
                 }}
-                className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
                 {listRegions().map((r) => (
                   <option key={r.code} value={r.code}>
@@ -312,7 +312,7 @@ export default function SettingsPage() {
                 value={currency}
                 maxLength={3}
                 onChange={(e) => setCurrency(e.target.value.toUpperCase())}
-                className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 uppercase focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-xl border border-border px-3 py-2 uppercase focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               <datalist id="currency-options">
                 {CURRENCIES.map((c) => (
@@ -330,7 +330,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setUnitSystem(e.target.value === '' ? null : (e.target.value as UnitSystem))
                 }
-                className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
                 <option value="">
                   Region default ({getRegion(region).unitSystem === 'imperial' ? 'feet, sq ft' : 'metres, sqm'})
@@ -345,7 +345,7 @@ export default function SettingsPage() {
             <button
               onClick={() => handleSave('business')}
               disabled={saving}
-              className="inline-flex items-center rounded-warm-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+              className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
             >
               {saving ? 'Saving...' : 'Save Business Info'}
             </button>
@@ -353,7 +353,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Tax Settings */}
-        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+        <div className="rounded-xl bg-surface p-6 shadow-warm">
           <h2 className="text-lg font-medium text-text-primary">Tax Settings</h2>
           <p className="mt-1 text-sm text-text-muted">Configure how taxes are calculated on quotes</p>
 
@@ -363,7 +363,7 @@ export default function SettingsPage() {
                 type="checkbox"
                 checked={taxEnabled}
                 onChange={(e) => setTaxEnabled(e.target.checked)}
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
               />
               <span className="text-sm font-medium text-text-secondary">Enable tax on quotes</span>
             </label>
@@ -378,7 +378,7 @@ export default function SettingsPage() {
                   value={taxLabel}
                   onChange={(e) => setTaxLabel(e.target.value)}
                   placeholder={`${getRegion(region).copy.taxLabel} (region default)`}
-                  className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
                 <p className="mt-1 text-xs text-text-muted">
                   This label appears on quotes (e.g., VAT, GST, Sales Tax)
@@ -393,7 +393,7 @@ export default function SettingsPage() {
                   step="0.01"
                   value={taxRatePercent}
                   onChange={(e) => setTaxRatePercent(e.target.value)}
-                  className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
                 <p className="mt-1 text-xs text-text-muted">Enter as percentage (e.g., 20 for 20%)</p>
               </div>
@@ -404,7 +404,7 @@ export default function SettingsPage() {
             <button
               onClick={() => handleSave('tax')}
               disabled={saving}
-              className="inline-flex items-center rounded-warm-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+              className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
             >
               {saving ? 'Saving...' : 'Save Tax Settings'}
             </button>
@@ -412,7 +412,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Service Area */}
-        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+        <div className="rounded-xl bg-surface p-6 shadow-warm">
           <h2 className="text-lg font-medium text-text-primary">Service Area</h2>
           <p className="mt-1 text-sm text-text-muted">Define where you provide services</p>
 
@@ -451,7 +451,7 @@ export default function SettingsPage() {
                     : 'Enter counties or states separated by commas or one per line\ne.g., California, Texas, New York'
                 }
                 rows={4}
-                className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               <p className="mt-1 text-xs text-text-muted">
                 Separate multiple values with commas or put each on a new line
@@ -463,7 +463,7 @@ export default function SettingsPage() {
             <button
               onClick={() => handleSave('serviceArea')}
               disabled={saving}
-              className="inline-flex items-center rounded-warm-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+              className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
             >
               {saving ? 'Saving...' : 'Save Service Area'}
             </button>
@@ -471,7 +471,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Quote Template Settings */}
-        <div className="rounded-warm-lg bg-surface p-6 shadow-warm">
+        <div className="rounded-xl bg-surface p-6 shadow-warm">
           <h2 className="text-lg font-medium text-text-primary">Quote Template</h2>
           <p className="mt-1 text-sm text-text-muted">
             Configure the default appearance and content of your quotes
@@ -483,7 +483,7 @@ export default function SettingsPage() {
                 type="checkbox"
                 checked={showLineItems}
                 onChange={(e) => setShowLineItems(e.target.checked)}
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
               />
               <div>
                 <span className="text-sm font-medium text-text-secondary">Show line items</span>
@@ -496,7 +496,7 @@ export default function SettingsPage() {
                 type="checkbox"
                 checked={includeAssumptions}
                 onChange={(e) => setIncludeAssumptions(e.target.checked)}
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
               />
               <div>
                 <span className="text-sm font-medium text-text-secondary">Include assumptions</span>
@@ -511,7 +511,7 @@ export default function SettingsPage() {
                 type="checkbox"
                 checked={includeExclusions}
                 onChange={(e) => setIncludeExclusions(e.target.checked)}
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
               />
               <div>
                 <span className="text-sm font-medium text-text-secondary">Include exclusions</span>
@@ -533,7 +533,7 @@ export default function SettingsPage() {
                 max="365"
                 value={validityDays}
                 onChange={(e) => setValidityDays(e.target.value)}
-                className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               <p className="mt-1 text-xs text-text-muted">
                 How long quotes remain valid before expiring
@@ -550,7 +550,7 @@ export default function SettingsPage() {
               onChange={(e) => setDefaultTermsText(e.target.value)}
               placeholder="Enter your default terms and conditions text that will appear on all quotes..."
               rows={4}
-              className="mt-1 w-full rounded-warm-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
             <p className="mt-1 text-xs text-text-muted">
               This text will appear at the bottom of all quotes
@@ -561,7 +561,7 @@ export default function SettingsPage() {
             <button
               onClick={() => handleSave('quoteTemplate')}
               disabled={saving}
-              className="inline-flex items-center rounded-warm-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+              className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
             >
               {saving ? 'Saving...' : 'Save Quote Template'}
             </button>
@@ -576,7 +576,7 @@ export default function SettingsPage() {
         )}
 
         {/* Account Info (read-only) */}
-        <div className="rounded-warm-lg bg-background p-6">
+        <div className="rounded-xl bg-background p-6">
           <h2 className="text-lg font-medium text-text-primary">Account Information</h2>
           <p className="mt-1 text-sm text-text-muted">Your account details</p>
 
@@ -588,13 +588,13 @@ export default function SettingsPage() {
         </div>
 
         {/* Danger Zone */}
-        <div className="rounded-warm-lg border border-danger/20 bg-danger-light p-6">
+        <div className="rounded-xl border border-danger/20 bg-danger-light p-6">
           <h2 className="text-lg font-medium text-danger">Danger Zone</h2>
           <p className="mt-1 text-sm text-danger">Irreversible actions that affect your account</p>
 
           <div className="mt-6">
             <button
-              className="rounded-warm-lg border border-red-300 bg-surface px-4 py-2 text-sm font-medium text-danger hover:bg-danger-light"
+              className="rounded-xl border border-danger-line bg-surface px-4 py-2 text-sm font-medium text-danger hover:bg-danger-light"
               disabled
             >
               Delete Account

@@ -12,10 +12,10 @@ export default function AdminDashboard() {
         {/* Quotes Card */}
         <Link
           href="/admin/quotes"
-          className="block rounded-warm-lg bg-surface p-6 shadow-warm transition-shadow hover:shadow-warm-hover"
+          className="block rounded-xl bg-surface p-6 shadow-warm transition-shadow hover:shadow-warm-hover"
         >
           <div className="flex items-center gap-4">
-            <div className="rounded-warm-lg bg-primary-light p-3">
+            <div className="rounded-xl bg-primary-light p-3">
               <svg
                 className="h-6 w-6 text-primary"
                 fill="none"
@@ -43,10 +43,10 @@ export default function AdminDashboard() {
         {/* Tenants Card */}
         <Link
           href="/admin/tenants"
-          className="block rounded-warm-lg bg-surface p-6 shadow-warm transition-shadow hover:shadow-warm-hover"
+          className="block rounded-xl bg-surface p-6 shadow-warm transition-shadow hover:shadow-warm-hover"
         >
           <div className="flex items-center gap-4">
-            <div className="rounded-warm-lg bg-secondary-light p-3">
+            <div className="rounded-xl bg-secondary-light p-3">
               <svg
                 className="h-6 w-6 text-secondary"
                 fill="none"
@@ -74,10 +74,10 @@ export default function AdminDashboard() {
         {/* Activity Card */}
         <Link
           href="/admin/activity"
-          className="block rounded-warm-lg bg-surface p-6 shadow-warm transition-shadow hover:shadow-warm-hover"
+          className="block rounded-xl bg-surface p-6 shadow-warm transition-shadow hover:shadow-warm-hover"
         >
           <div className="flex items-center gap-4">
-            <div className="rounded-warm-lg bg-primary-light p-3">
+            <div className="rounded-xl bg-primary-light p-3">
               <svg
                 className="h-6 w-6 text-primary"
                 fill="none"
@@ -104,7 +104,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="mt-8 rounded-warm-lg bg-tertiary-light p-4">
+      <div className="mt-8 rounded-xl bg-tertiary-light p-4">
         <h3 className="font-medium text-tertiary">Support Tips</h3>
         <ul className="mt-2 space-y-1 text-sm text-tertiary">
           <li>Search quotes by ID (e.g., qte_xxx) or customer email</li>

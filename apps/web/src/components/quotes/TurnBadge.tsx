@@ -1,24 +1,18 @@
-import type { QuoteTurn, QuoteTurnTone } from '@qolumns/shared'
-
-const TONE: Record<QuoteTurnTone, string> = {
-  attention: 'bg-tertiary-light text-tertiary',
-  danger: 'bg-danger-light text-danger',
-  waiting: 'bg-primary-light text-primary',
-  good: 'bg-secondary-light text-secondary',
-  closed: 'border border-border bg-surface text-text-muted',
-  working: 'border border-border bg-surface text-text-secondary',
-}
+import type { QuoteTurn } from '@qolumns/shared'
+import { STATUS_TONE } from '@/lib/status-tone'
 
 /**
  * T-158: whose turn it is on a quote. The label and the detail line come from
- * `quoteTurn` in @qolumns/shared; nothing is worded here.
+ * `quoteTurn` in @qolumns/shared; nothing is worded here. The colour is by
+ * whose turn it is (T-164, lib/status-tone.ts).
  */
 export function TurnBadge({ turn, showDetail = true }: { turn: Pick<QuoteTurn, 'label' | 'detail' | 'tone'>; showDetail?: boolean }) {
   return (
     <div className="min-w-0">
       <span
-        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${TONE[turn.tone]}`}
+        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_TONE[turn.tone]}`}
         data-testid="turn-label"
+        data-tone={turn.tone}
       >
         {turn.label}
       </span>

@@ -239,7 +239,7 @@ export default function QuotePage({ params }: QuotePageProps) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="tape-rule w-40 mx-auto animate-pulse" />
+          <div className="tape-rule tape-measuring w-40 mx-auto" aria-hidden="true" />
           <p className="mt-4 text-sm text-text-secondary">Preparing your estimate…</p>
         </div>
       </div>
@@ -249,7 +249,7 @@ export default function QuotePage({ params }: QuotePageProps) {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <div className="text-center max-w-md bg-surface border border-border rounded-warm-2xl shadow-warm-md p-8">
+        <div className="text-center max-w-md bg-surface border border-border rounded-3xl shadow-warm-md p-8">
           <p className="figure text-danger text-3xl mb-3">!</p>
           <h1 className="font-display text-xl font-bold text-text-primary mb-2">This estimate can&apos;t be opened</h1>
           <p className="text-sm text-text-secondary">{error}</p>
@@ -292,7 +292,7 @@ export default function QuotePage({ params }: QuotePageProps) {
     return (
       <div className="min-h-screen bg-background py-8 px-4 sm:py-14" style={brandVars}>
         <div className="max-w-2xl mx-auto animate-fade-in-up">
-          <div className="bg-background rounded-warm-2xl shadow-document overflow-hidden">
+          <div className="bg-background rounded-3xl shadow-document overflow-hidden">
             <Letterhead
               business={business}
               status={status}
@@ -336,7 +336,7 @@ export default function QuotePage({ params }: QuotePageProps) {
     return (
       <div className="min-h-screen bg-background py-8 px-4 sm:py-14" style={brandVars}>
         <div className="max-w-2xl mx-auto animate-fade-in-up">
-          <div className="bg-background rounded-warm-2xl shadow-document overflow-hidden">
+          <div className="bg-background rounded-3xl shadow-document overflow-hidden">
             <Letterhead
               business={business}
               status={status}
@@ -367,7 +367,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                   </p>
                   <a
                     href={`/q/${quoteId}/clarify?token=${token}`}
-                    className="inline-block px-6 py-3.5 bg-butter text-ink font-semibold rounded-warm-lg hover:brightness-105 active:scale-[0.99] transition"
+                    className="inline-block px-6 py-3.5 bg-butter text-ink font-semibold rounded-xl hover:brightness-105 active:scale-[0.99] transition"
                   >
                     Confirm details
                   </a>
@@ -399,7 +399,7 @@ export default function QuotePage({ params }: QuotePageProps) {
     <div className="min-h-screen bg-background py-8 px-4 sm:py-14" style={brandVars}>
       <div className="max-w-2xl mx-auto">
         {/* The document */}
-        <div className="animate-fade-in-up bg-background rounded-warm-2xl shadow-document overflow-hidden">
+        <div className="animate-fade-in-up bg-background rounded-3xl shadow-document overflow-hidden">
           <Letterhead
             business={business}
             status={status}
@@ -490,7 +490,7 @@ export default function QuotePage({ params }: QuotePageProps) {
               )}
 
               {pricing.notes && pricing.notes.length > 0 && (
-                <div className="bg-butter/50 border border-tape/30 rounded-warm-lg px-4 py-3.5 mb-5">
+                <div className="bg-butter/50 border border-tape/30 rounded-xl px-4 py-3.5 mb-5">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-tertiary mb-1.5">Worth knowing</p>
                   <ul className="text-[13px] leading-relaxed text-tertiary space-y-1.5">
                     {pricing.notes.map((note, index) => (
@@ -532,7 +532,7 @@ export default function QuotePage({ params }: QuotePageProps) {
             {/* Measurement & takeoff */}
             {takeoff && takeoff.length > 0 && (
               <section className="mb-8">
-                <div className="rounded-warm-xl border border-tape/40 bg-butter/40 overflow-hidden">
+                <div className="rounded-2xl border border-tape/40 bg-butter/40 overflow-hidden">
                   <div className="px-5 pt-4 pb-3">
                     <SectionLabel tone="tape">Measurement &amp; takeoff</SectionLabel>
                     <p className="text-xs text-text-muted -mt-1">
@@ -568,7 +568,7 @@ export default function QuotePage({ params }: QuotePageProps) {
             {/* Optional extras */}
             {pricing.availableAddons && pricing.availableAddons.length > 0 && (
               <section className="mb-8">
-                <div className="bg-mint/70 border border-primary/15 rounded-warm-xl px-5 py-4">
+                <div className="bg-mint/70 border border-primary/15 rounded-2xl px-5 py-4">
                   <SectionLabel tone="brand">Optional extras</SectionLabel>
                   <div className="space-y-2">
                     {pricing.availableAddons.map((addon) => (
@@ -591,7 +591,7 @@ export default function QuotePage({ params }: QuotePageProps) {
             {/* Cross-service pricing */}
             {crossServicePricing && crossServicePricing.length > 0 && (
               <section className="mb-8">
-                <div className="bg-mist/70 border border-border rounded-warm-xl px-5 py-4">
+                <div className="bg-mist/70 border border-border rounded-2xl px-5 py-4">
                   <SectionLabel>
                     {crossServicePricing.every(s => !s.isEstimate)
                       ? 'Other services you mentioned'
@@ -639,7 +639,7 @@ export default function QuotePage({ params }: QuotePageProps) {
             {/* Potential additional work */}
             {signalRecommendations && signalRecommendations.length > 0 && (
               <section className="mb-8">
-                <div className="bg-surface border border-border rounded-warm-xl px-5 py-4">
+                <div className="bg-surface border border-border rounded-2xl px-5 py-4">
                   <SectionLabel>Worth considering</SectionLabel>
                   <p className="text-xs text-text-secondary mb-3 -mt-1">
                     From your description, you may also need:
@@ -719,7 +719,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                       href={asset.viewUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block aspect-square bg-surface rounded-warm-lg overflow-hidden hover:opacity-85 transition-opacity"
+                      className="block aspect-square bg-surface rounded-xl overflow-hidden hover:opacity-85 transition-opacity"
                     >
                       <img
                         src={asset.viewUrl}
@@ -737,12 +737,12 @@ export default function QuotePage({ params }: QuotePageProps) {
             <div className="px-6 sm:px-10 pb-8">
               <div className="tape-rule mb-7" />
               {confirmationPending && (
-                <p className="mb-6 rounded-warm-lg border border-border bg-surface px-4 py-3.5 text-center text-sm text-text-secondary">
+                <p className="mb-6 rounded-xl border border-border bg-surface px-4 py-3.5 text-center text-sm text-text-secondary">
                   You can accept once {business.name} confirms this estimate.
                 </p>
               )}
               {actionError && (
-                <p role="alert" className="mb-5 rounded-warm-lg border border-danger/30 bg-danger-light px-4 py-3 text-sm text-danger" data-testid="action-error">
+                <p role="alert" className="mb-5 rounded-xl border border-danger/30 bg-danger-light px-4 py-3 text-sm text-danger" data-testid="action-error">
                   {actionError}
                 </p>
               )}
@@ -766,7 +766,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                   <button
                     onClick={() => setAcceptMode(true)}
                     disabled={accepting}
-                    className="w-full py-4 px-4 rounded-warm-xl font-display font-bold text-on-primary text-base bg-primary hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    className="w-full py-4 px-4 rounded-2xl font-display font-bold text-on-primary text-base bg-primary hover:bg-primary-hover active:scale-[0.995] disabled:opacity-50 disabled:cursor-not-allowed transition"
                   >
                     {accepting ? 'Accepting…' : `${words.accept} — ${formatCurrency(pricing.total, pricing.currency, locale)}`}
                   </button>
@@ -788,7 +788,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                 <div className="flex gap-3">
                   <button
                     onClick={() => setFeedbackMode('feedback')}
-                    className="flex-1 py-3 px-4 text-sm font-semibold text-text-primary bg-surface border border-border rounded-warm-lg hover:border-border-strong transition"
+                    className="flex-1 py-3 px-4 text-sm font-semibold text-text-primary bg-surface border border-border rounded-xl hover:border-border-strong transition"
                   >
                     Ask a question
                   </button>
@@ -801,21 +801,21 @@ export default function QuotePage({ params }: QuotePageProps) {
                     value={feedbackText}
                     onChange={(e) => setFeedbackText(e.target.value)}
                     placeholder="Questions, changes, anything we should know…"
-                    className="w-full px-4 py-3 text-sm border border-border rounded-warm-lg bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary resize-none transition"
+                    className="w-full px-4 py-3 text-sm border border-border rounded-xl bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary resize-none transition"
                     rows={3}
                     autoFocus
                   />
                   <div className="flex gap-3">
                     <button
                       onClick={() => { setFeedbackMode('none'); setFeedbackText('') }}
-                      className="flex-1 py-3 px-4 text-sm font-semibold text-text-secondary border border-border rounded-warm-lg hover:bg-surface transition"
+                      className="flex-1 py-3 px-4 text-sm font-semibold text-text-secondary border border-border rounded-xl hover:bg-surface transition"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleFeedback}
                       disabled={submittingFeedback || !feedbackText.trim()}
-                      className="flex-1 py-3 px-4 text-sm font-semibold text-on-primary bg-primary rounded-warm-lg hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      className="flex-1 py-3 px-4 text-sm font-semibold text-on-primary bg-primary rounded-xl hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition"
                     >
                       {submittingFeedback ? 'Sending…' : 'Send message'}
                     </button>
@@ -836,27 +836,27 @@ export default function QuotePage({ params }: QuotePageProps) {
               )}
 
               {declineMode && canDecide && (
-                <div className="mt-6 space-y-3 border border-border rounded-warm-lg p-4 bg-surface">
+                <div className="mt-6 space-y-3 border border-border rounded-xl p-4 bg-surface">
                   <p className="text-sm font-semibold text-text-primary">{words.declineTitle}</p>
                   <textarea
                     value={declineReason}
                     onChange={(e) => setDeclineReason(e.target.value)}
                     placeholder="Optional: let us know why, it helps us improve"
                     maxLength={500}
-                    className="w-full px-4 py-3 text-sm border border-border rounded-warm-lg bg-white text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary resize-none transition"
+                    className="w-full px-4 py-3 text-sm border border-border rounded-xl bg-white text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary resize-none transition"
                     rows={3}
                   />
                   <div className="flex gap-3">
                     <button
                       onClick={() => { setDeclineMode(false); setDeclineReason('') }}
-                      className="flex-1 py-3 px-4 text-sm font-semibold text-text-secondary border border-border rounded-warm-lg hover:bg-white transition"
+                      className="flex-1 py-3 px-4 text-sm font-semibold text-text-secondary border border-border rounded-xl hover:bg-white transition"
                     >
                       {words.keep}
                     </button>
                     <button
                       onClick={handleDecline}
                       disabled={declining}
-                      className="flex-1 py-3 px-4 text-sm font-semibold text-danger border border-danger/30 rounded-warm-lg hover:bg-danger-light disabled:opacity-50 transition"
+                      className="flex-1 py-3 px-4 text-sm font-semibold text-danger border border-danger/30 rounded-xl hover:bg-danger-light disabled:opacity-50 transition"
                     >
                       {declining ? 'Declining…' : words.declineButton}
                     </button>
@@ -868,7 +868,7 @@ export default function QuotePage({ params }: QuotePageProps) {
 
           {/* Question sent: stays while the business has not answered it */}
           {questionOpen && !settled && (
-            <div className="mx-6 sm:mx-10 mb-8 bg-mint border border-primary/15 rounded-warm-xl p-6 text-center">
+            <div className="mx-6 sm:mx-10 mb-8 bg-mint border border-primary/15 rounded-2xl p-6 text-center">
               <h3 className="font-display text-lg font-bold text-text-primary mb-1">Message sent</h3>
               <p className="text-sm text-text-secondary">
                 {business.name} will review it and get back to you.
@@ -878,7 +878,7 @@ export default function QuotePage({ params }: QuotePageProps) {
 
           {/* Declined state */}
           {declined && (
-            <div className="mx-6 sm:mx-10 mb-8 bg-surface border border-border rounded-warm-xl p-6 text-center">
+            <div className="mx-6 sm:mx-10 mb-8 bg-surface border border-border rounded-2xl p-6 text-center">
               <h3 className="font-display text-lg font-bold text-text-primary mb-1">{words.declined}</h3>
               <p className="text-sm text-text-secondary">
                 No problem — thanks for letting {business.name} know. If anything changes, just get in touch.
@@ -888,7 +888,7 @@ export default function QuotePage({ params }: QuotePageProps) {
 
           {/* Accepted state */}
           {accepted && (
-            <div className="mx-6 sm:mx-10 mb-8 bg-mint border border-primary/20 rounded-warm-xl p-6 text-center">
+            <div className="mx-6 sm:mx-10 mb-8 bg-mint border border-primary/20 rounded-2xl p-6 text-center">
               <div
                 className="grade-seal mx-auto mb-3"
                 style={{ color: JUNIPER, ['--seal-gap' as never]: 'var(--color-mint)' }}

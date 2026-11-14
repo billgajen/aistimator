@@ -9,7 +9,7 @@ interface BadgeProps {
 }
 
 const variantStyles: Record<BadgeVariant, string> = {
-  processing: 'bg-butter text-tertiary',
+  processing: 'bg-tertiary-light text-tertiary',
   success: 'bg-secondary-light text-secondary',
   danger: 'bg-danger-light text-danger',
   info: 'bg-primary-light text-primary',

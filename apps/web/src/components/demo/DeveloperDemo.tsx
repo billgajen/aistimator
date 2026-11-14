@@ -94,7 +94,7 @@ function DemoPageContent() {
       {/* Configuration */}
       {!showDemo && (
         <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="bg-surface rounded-warm-lg shadow p-6">
+          <div className="bg-surface rounded-xl shadow p-6">
             <h2 className="text-lg font-semibold mb-4">Configuration</h2>
 
             <div className="space-y-4">
@@ -107,7 +107,7 @@ function DemoPageContent() {
                   value={tenantKey}
                   onChange={(e) => setTenantKey(e.target.value)}
                   placeholder="tkey_xxx"
-                  className="w-full px-3 py-2 border rounded-warm-lg focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
                 <p className="text-xs text-text-muted mt-1">
                   Get this from your tenant settings in the dashboard
@@ -156,7 +156,7 @@ function DemoPageContent() {
 
               <button
                 onClick={handleStartDemo}
-                className="w-full bg-primary text-white py-2 px-4 rounded-warm-lg font-medium hover:bg-primary-hover"
+                className="w-full bg-primary text-white py-2 px-4 rounded-xl font-medium hover:bg-primary-hover"
               >
                 Load Widget
               </button>
@@ -164,13 +164,13 @@ function DemoPageContent() {
           </div>
 
           {/* Embed code preview */}
-          <div className="bg-surface rounded-warm-lg shadow p-6 mt-6">
+          <div className="bg-surface rounded-xl shadow p-6 mt-6">
             <h2 className="text-lg font-semibold mb-4">Embed Code</h2>
             <p className="text-sm text-text-secondary mb-4">
               Copy this code to embed the widget on your website:
             </p>
 
-            <pre className="bg-gray-900 text-gray-100 p-4 rounded-warm-lg text-sm overflow-x-auto whitespace-pre-wrap">
+            <pre className="bg-ink-deep text-background p-4 rounded-xl text-sm overflow-x-auto whitespace-pre-wrap">
               {embedCode}
             </pre>
 
@@ -179,7 +179,7 @@ function DemoPageContent() {
                 navigator.clipboard.writeText(embedCode)
                 alert('Copied to clipboard!')
               }}
-              className="mt-4 px-4 py-2 text-sm border border-border rounded-warm-lg hover:bg-background"
+              className="mt-4 px-4 py-2 text-sm border border-border rounded-xl hover:bg-background"
             >
               Copy to Clipboard
             </button>
@@ -190,7 +190,7 @@ function DemoPageContent() {
       {/* Demo area */}
       {showDemo && (
         <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="bg-surface rounded-warm-lg shadow p-6 mb-6">
+          <div className="bg-surface rounded-xl shadow p-6 mb-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Widget Preview</h2>
               <button
@@ -204,11 +204,11 @@ function DemoPageContent() {
             <p className="text-sm text-text-secondary mb-4">
               Placement: <span className="font-medium">{placement}</span> | Experience:{' '}
               <span className="font-medium">{experience}</span> | Tenant Key:{' '}
-              <code className="bg-background px-1 rounded">{tenantKey}</code>
+              <code className="bg-background px-1 rounded-sm">{tenantKey}</code>
             </p>
 
             {placement === 'inline' && (
-              <div className="border rounded-warm-lg overflow-hidden">
+              <div className="border rounded-xl overflow-hidden">
                 <IframeWidget
                   tenantKey={tenantKey}
                   mode={experience === 'conversational' ? 'conversational' : undefined}
@@ -233,7 +233,7 @@ function DemoPageContent() {
       {/* Simulated page content */}
       {showDemo && (
         <div className="max-w-4xl mx-auto px-4 pb-20">
-          <div className="bg-surface rounded-warm-lg shadow p-6">
+          <div className="bg-surface rounded-xl shadow p-6">
             <h2 className="text-xl font-semibold mb-4">Sample Page Content</h2>
             <p className="text-text-secondary mb-4">
               This is example page content to demonstrate how the widget looks
@@ -264,7 +264,7 @@ function ModeOption({
   return (
     <button
       onClick={onSelect}
-      className={`p-3 rounded-warm-lg border-2 text-left transition-colors ${
+      className={`p-3 rounded-xl border-2 text-left transition-colors ${
         selected ? 'border-primary bg-primary-light' : 'border-border hover:border-border-strong'
       }`}
     >

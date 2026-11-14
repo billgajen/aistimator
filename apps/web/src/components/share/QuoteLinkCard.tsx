@@ -79,14 +79,14 @@ export function QuoteLinkCard({
   const canSave = Boolean(candidate) && candidate !== slug && check?.slug === candidate && check.available
 
   return (
-    <section className="rounded-warm-lg bg-surface p-6 shadow-warm">
+    <section className="rounded-xl bg-surface p-6 shadow-warm">
       <h2 className="text-lg font-medium text-text-primary">Your quote link</h2>
       <p className="mt-1 text-sm text-text-muted">
         Customers open it, tell you about the job and add photos. No website needed.
       </p>
 
       <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <code className="min-w-0 flex-1 truncate rounded-warm-lg border border-border bg-background px-3.5 py-2.5 text-sm text-text-primary" data-testid="quote-link">
+        <code className="min-w-0 flex-1 truncate rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm text-text-primary" data-testid="quote-link">
           {link}
         </code>
         <div className="flex gap-2">
@@ -123,7 +123,7 @@ export function QuoteLinkCard({
       {!changeable && <p className="mt-3 text-xs text-text-muted">You&apos;ve already changed this link once. Your old link still works.</p>}
 
       {editing && (
-        <div className="mt-4 rounded-warm-lg border border-border bg-background p-4">
+        <div className="mt-4 rounded-xl border border-border bg-background p-4">
           <label className="block text-sm font-medium text-text-primary" htmlFor="slug-input">
             New ending
           </label>
