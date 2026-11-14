@@ -625,10 +625,12 @@ a new environment set up from `.env.example` would point the web app and the wor
 
 ## T-164 — Design foundations: one design file, fixed tokens, a preview page
 
-Built and checked locally. **Not committed, not deployed.** No page was redesigned; pages changed only where a
-token changed.
+No page was redesigned; pages changed only where a token changed.
 
-- [ ] **Deploy: web only** (`npx vercel deploy --prod`). No migration and no worker change.
+- [x] **Deploy: web only** (`npx vercel deploy --prod`). Done 2026-11-14 18:21 UTC (commit `54598d1`, web
+  `dpl_7AVnVC1wNGVXRjow9HZGb9nx6EB2`). No migration and no worker change. Checked live, signed out and read-only:
+  `/`, `/login` and `/pricing` load; `/design` loads, says "do not index" and is linked from nowhere (there is no
+  sitemap); the quote API answers 404 to a made-up link.
 - [ ] **Choose on the preview page, `/design`** (it is not linked from anywhere; type the address). Use the
   Accent switch at the top and look at the whole page with each one, on your phone too.
   1. **The accent:** tomato, orange or yellow. Orange is in place until you choose. Things to weigh:
@@ -643,7 +645,7 @@ token changed.
      until you choose.
   Tell me the two choices and they go in as one small ticket (the accent becomes the default token; the wordmark
   replaces the text logo).
-- [ ] **Look at, after the deploy** (these are the visible effects of the token fixes):
+- [ ] **Look at** (these are the visible effects of the token fixes):
   1. *Quotes and Home.* "Needs your approval", the "Needs you" tile, the unfinished-requests banner, the menu's
      count and the "New" tag are a soft orange now, not yellow. "Waiting for customer" is a quiet blue-grey.
   2. *Small grey text* (times, "Received today", hints) is darker and easier to read. So are amber, green and red
@@ -661,12 +663,19 @@ token changed.
     never shown on them.
   - `/design` is public if someone types the address, but it is marked "do not index", linked from nowhere, and
     shows nothing private.
-- **Found, for later tickets** (details in `Docs/CHANGELOG.md` and `Docs/design/system.md`, "Known gaps"):
-  - 228 colour classes that ask for a see-through tint (for example a soft ring or a soft border) have never done
-    anything, because of how the colours are defined. Turning them on is the right fix, but it changes how many
-    pages look at once, so it needs its own ticket and a look at every page.
-  - On a phone the shared buttons are 40 px tall and fields 42 px; the rule is 44 px. Small tags use 11 px text;
-    the floor is 12 px.
+- **Follow-ups found here** (each needs its own ticket; details in `Docs/CHANGELOG.md` and
+  `Docs/design/system.md`, "Known gaps"):
+  - [ ] **228 colour classes with an opacity modifier write no CSS.** Classes that ask for a see-through tint of
+    one of our colours (`ring-primary/30`, `border-danger/30`, `border-tape/50`, `bg-ink/40` and so on, in 51 files)
+    have never done anything, because our colours are defined in a way Tailwind cannot make see-through. So soft
+    borders show as the plain default line, and the phone menu's dimming layer has no colour. The fix is to define
+    the colours so they can take a tint. It will switch all 228 on at once and change how many pages look,
+    34 of them in the request form and the quote page, so it needs a look at every page, not a quiet change. A test
+    already stops new ones being added.
+  - [ ] **Tap sizes and small tags** (the two things the ui-ux-pro-max checklist failed on `/design`, both in the
+    shared components). On a phone the shared button is 40 px tall (34 px at its small size) and fields are 42 px;
+    the rule is 44 px. Tags (`Badge`) use 11 px text; the floor is 12 px. Fixing them makes every button, field and
+    tag in the product slightly taller or larger, so do it with the dashboard redesign, not on its own.
 - The live check is `scripts/hardcore-test/verify-t164.mts` (add `PLAYWRIGHT_DIR=…`; almost all of it is the
   browser pass; it saves `/design` at both widths with each accent into its results folder). It joins the
   regression set: run t146 to t164 before a commit or deploy (there is no verify-t159, t161 or t163).

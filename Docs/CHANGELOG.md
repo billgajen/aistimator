@@ -138,8 +138,23 @@ needed a change.
 - One request per script run went through the real pipeline. Test names are made up (Marlo Finch, Alder Lane
   Doors).
 
-**Not checked:** the result on a real phone or with a screen reader; production. Nothing is committed or deployed.
-The deploy is web only (no migration, no worker change); see `OWNER-TODO.md`.
+**Deployed 2026-11-14 18:21 UTC** (commit `54598d1`): web only (`npx vercel deploy --prod`, deployment
+`dpl_7AVnVC1wNGVXRjow9HZGb9nx6EB2`, Ready and serving `estimator-web-phi.vercel.app`). No migration, no worker deploy.
+`pnpm lint` and `pnpm typecheck` passed again before the commit. No code changed after the full verify and
+regression run above (only this entry's verification record), so the scripts were not re-run.
+
+Live checks, read-only (nothing was submitted to production):
+- `/`, `/login` and `/pricing`: 200.
+- `/design`: 200, with `<meta name="robots" content="noindex, nofollow, nocache">`. The home page, its footer,
+  `/login` and `/pricing` have no link to it. There is no `/sitemap.xml` and no `/robots.txt` (both 404), so
+  neither lists it.
+- The public quote API with a made-up id and token: 404 `QUOTE_NOT_FOUND`.
+- The stylesheet production serves carries the new values (`text-muted` `#626C66`, `field` `#808781`, `tertiary`
+  `#7F5710`, `accent` `#F26B2A`) and the one reduced-motion rule.
+
+**Not checked:** the result on a real phone or with a screen reader; in production, anything signed in (the
+dashboard's status colours, the menu's count) or on a customer's quote page. The live checks were signed out and
+read-only. They are the hand tests in `OWNER-TODO.md`.
 
 ### 2026-11-14: T-162 — The product is called Qolumns (AD-045)
 
