@@ -1,9 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { getRegion, DEMO_LOGO_PATH } from '@estimator/shared'
+import { getRegion, DEMO_LOGO_PATH } from '@qolumns/shared'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import { hasCustomBranding } from '@/lib/plan-features'
 import { NextResponse } from 'next/server'
-import type { TenantBranding } from '@estimator/shared'
+import type { TenantBranding } from '@qolumns/shared'
 
 /**
  * GET /api/public/widget/config

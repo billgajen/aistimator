@@ -1,7 +1,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { uploadToR2, generateDownloadUrl, isR2Configured } from '@/lib/r2'
-import type { TenantBranding } from '@estimator/shared'
+import type { TenantBranding } from '@qolumns/shared'
 
 const MAX_LOGO_BYTES = 2 * 1024 * 1024 // 2MB, as promised in the dashboard UI
 const ALLOWED_TYPES: Record<string, string> = {

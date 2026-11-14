@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { formatMoney } from '@estimator/shared'
+import { formatMoney } from '@qolumns/shared'
 import { toPriceList, applyPriceList, unitWords, type PriceList, type PriceItem } from '@/lib/price-list'
 import { applyCompile, type DraftService } from '@/lib/onboarding-service'
 import { PricingComposer } from '@/components/services/PricingComposer'

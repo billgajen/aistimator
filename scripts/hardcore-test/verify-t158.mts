@@ -3,7 +3,7 @@
 //   npx tsx scripts/hardcore-test/verify-t158.mts
 // With the page checks (tabs, next-step buttons, the tracker, the customer
 // page wording, a phone-width pass) as well:
-//   PLAYWRIGHT_DIR=~/estimator-browser npx tsx scripts/hardcore-test/verify-t158.mts
+//   PLAYWRIGHT_DIR=~/qolumns-browser npx tsx scripts/hardcore-test/verify-t158.mts
 // (playwright lives outside the repo: see scripts/hardcore-test/browser.mjs)
 //
 // 1. the list API: groups, counts in the same request, the default tab, the

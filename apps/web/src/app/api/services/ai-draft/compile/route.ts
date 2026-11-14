@@ -4,9 +4,9 @@ import type {
   ServiceDraftConfig,
   AddonConfig,
   MultiplierConfig,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import { validateAndNormalizeDraftBulk, carryOverSignalSpecs, callGemini, parseGeminiJson } from '../shared'
-import { resolveRegionContext, regionPromptBlock } from '@estimator/shared'
+import { resolveRegionContext, regionPromptBlock } from '@qolumns/shared'
 
 // Vercel function budget: this route runs the full AI pipeline synchronously
 // (Cloudflare Queues needs the paid Workers plan - revisit post-launch)

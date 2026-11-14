@@ -5,8 +5,8 @@ import { createHash } from 'crypto'
 import { sendEmail, isPostmarkConfigured } from '@/lib/postmark'
 import { generateQuoteDeclinedEmailHtml } from '@/lib/email-templates'
 import { resolveBusinessEmail } from '@/lib/business-email'
-import { canCustomerDecide } from '@estimator/shared'
-import type { DeclineQuoteResponse, TenantBranding } from '@estimator/shared'
+import { canCustomerDecide } from '@qolumns/shared'
+import type { DeclineQuoteResponse, TenantBranding } from '@qolumns/shared'
 
 const MAX_REASON_LENGTH = 500
 

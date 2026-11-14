@@ -3,7 +3,7 @@
 import { AcceptanceCard } from '@/components/quotes/AcceptanceCard'
 import type { AcceptanceDetails } from '@/lib/acceptance'
 import { useEffect, useState, useCallback } from 'react'
-import { formatMoney, quoteActions, quoteTurn, quoteTracker, customerFirstName } from '@estimator/shared'
+import { formatMoney, quoteActions, quoteTurn, quoteTracker, customerFirstName } from '@qolumns/shared'
 import { NextStepBox } from '@/components/quotes/NextStepBox'
 import { QuoteTracker } from '@/components/quotes/QuoteTracker'
 import { TurnBadge } from '@/components/quotes/TurnBadge'
@@ -16,7 +16,7 @@ import type {
   QuoteContent,
   AmendmentSummary,
   QuoteFeedback,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 export default function QuoteDetailPage({
   params,

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { parseMoneyInput } from '@estimator/shared'
+import { parseMoneyInput } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
 
 /**

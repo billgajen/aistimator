@@ -1,5 +1,5 @@
 /**
- * API request/response types for the Estimator platform
+ * API request/response types for the Qolumns platform
  */
 
 import type { QuoteListCounts, QuoteListGroup } from './quote-turn'
@@ -122,7 +122,7 @@ export interface QuoteViewBusiness {
 export interface QuoteViewBranding {
   primaryColor?: string
   footerNotes?: string | null
-  /** false on white-label plans (custom_branding) — hides the Aistimator badge */
+  /** false on white-label plans (custom_branding) — hides the Qolumns badge */
   showPoweredBy?: boolean
 }
 
@@ -386,7 +386,7 @@ export interface PlanInfo {
     multipleUsers?: boolean
   }
   stripePriceId?: string
-  /** T-134: plan definitions in @estimator/shared/plans */
+  /** T-134: plan definitions in @qolumns/shared/plans */
   tagline?: string
   annualPriceCents?: number | null
   trialDays?: number | null

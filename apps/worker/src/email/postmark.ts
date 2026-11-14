@@ -5,8 +5,8 @@
  * https://postmarkapp.com/developer/api/email-api
  */
 
-import { emailFromHeader, redactEmails } from '@estimator/shared'
-import type { EmailSender } from '@estimator/shared'
+import { emailFromHeader, redactEmails } from '@qolumns/shared'
+import type { EmailSender } from '@qolumns/shared'
 
 const POSTMARK_API_URL = 'https://api.postmarkapp.com/email'
 

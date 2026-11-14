@@ -17,7 +17,7 @@ import {
   emailFromAddress,
   emailFromHeader,
   emailSenderName,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import { sendEmail } from '@/lib/postmark'
 
 const ADDRESS = 'quotes@mail.example.com'

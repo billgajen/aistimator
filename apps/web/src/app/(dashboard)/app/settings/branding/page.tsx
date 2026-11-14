@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { readableTextOn } from '@/lib/color'
 import { LogoUpload } from '@/components/settings/LogoUpload'
-import type { TenantBranding, TenantTemplate } from '@estimator/shared'
-import { DEFAULT_PRIMARY_COLOR, getRegion, PRODUCT_NAME } from '@estimator/shared'
+import type { TenantBranding, TenantTemplate } from '@qolumns/shared'
+import { DEFAULT_PRIMARY_COLOR, getRegion, PRODUCT_NAME } from '@qolumns/shared'
 
 /**
  * Curated brand colours — trade-friendly, all tested against white and ink

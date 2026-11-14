@@ -7,7 +7,7 @@ import type {
   LearningPatternType,
   AmendmentChange,
   QuotePricing,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 const MIN_PATTERN_FREQUENCY = 3
 const MIN_PATTERN_CONSISTENCY = 0.7

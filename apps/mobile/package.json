@@ -1,5 +1,5 @@
 {
-  "name": "@estimator/mobile",
+  "name": "@qolumns/mobile",
   "version": "0.1.0",
   "private": true,
   "main": "expo-router/entry",
@@ -13,7 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@estimator/shared": "workspace:*",
+    "@qolumns/shared": "workspace:*",
     "@supabase/supabase-js": "^2.44.0",
     "expo": "~58.0.0",
     "expo-constants": "~58.0.15",

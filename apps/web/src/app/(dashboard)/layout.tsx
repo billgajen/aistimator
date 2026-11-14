@@ -3,7 +3,7 @@
 import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useState } from 'react'
-import { PRODUCT_NAME, QUOTE_TURN_COPY } from '@estimator/shared'
+import { PRODUCT_NAME, QUOTE_TURN_COPY } from '@qolumns/shared'
 import { UNFINISHED_CHANGED_EVENT } from '@/lib/unfinished-leads'
 
 /**

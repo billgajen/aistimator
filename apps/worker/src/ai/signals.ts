@@ -18,7 +18,7 @@ import type {
   ExpectedSignalConfig,
   ExtractedSignal,
   ExtractedSignalsV2,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 /**
  * Simplified pricing rules interface for auto-context generation

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { PRODUCT_NAME } from '@estimator/shared'
+import { PRODUCT_NAME } from '@qolumns/shared'
 import { HERO } from '@/lib/marketing/home-copy'
 
 // Force dynamic rendering for auth pages

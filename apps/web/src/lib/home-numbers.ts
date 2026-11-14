@@ -3,8 +3,8 @@
  * Setup tests never count; "requests" are customers' requests (not quotes
  * the business made in its own app). Held leads are requests too.
  */
-import { QUOTE_TURN_COPY } from '@estimator/shared'
-import type { QuoteActivityKind } from '@estimator/shared'
+import { QUOTE_TURN_COPY } from '@qolumns/shared'
+import type { QuoteActivityKind } from '@qolumns/shared'
 import { BUSINESS_SOURCES } from './setup-checklist'
 
 export interface HomeQuoteRow {

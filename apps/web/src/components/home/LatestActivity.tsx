@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { QUOTE_TURN_COPY } from '@estimator/shared'
+import { QUOTE_TURN_COPY } from '@qolumns/shared'
 
 export interface ActivityLine {
   /** "Sarah opened the quote" */

@@ -1,4 +1,4 @@
-import type { AddonConfig, ServiceDraftConfig } from '@estimator/shared'
+import type { AddonConfig, ServiceDraftConfig } from '@qolumns/shared'
 
 /**
  * AI-drafted add-ons ({name, price, description}) → the service's add-on

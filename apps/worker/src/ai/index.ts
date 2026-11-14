@@ -2,7 +2,7 @@
  * AI Module Exports
  *
  * Provider-agnostic AiClient (T-135): the model per task comes from the
- * shared registry (`@estimator/shared` ai-models), overridable by env.
+ * shared registry (`@qolumns/shared` ai-models), overridable by env.
  */
 
 export type { AiClient, ImageInput, GenerationOptions } from './client'

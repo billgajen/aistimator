@@ -4,8 +4,8 @@ import {
   computeCalibration,
   type CalibrationQuoteInput,
   type CalibrationAmendmentInput,
-} from '@estimator/shared'
-import type { QuotePricing } from '@estimator/shared'
+} from '@qolumns/shared'
+import type { QuotePricing } from '@qolumns/shared'
 
 const LOOKBACK_DAYS = 90
 const MAX_QUOTES = 500

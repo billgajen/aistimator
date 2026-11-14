@@ -13,7 +13,7 @@
 import { createHmac } from 'crypto'
 import { NextResponse } from 'next/server'
 import type { createAdminClient } from '@/lib/supabase/server'
-import { demoDailyCap } from '@estimator/shared'
+import { demoDailyCap } from '@qolumns/shared'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -26,8 +26,8 @@ export function demoIpLimit(env: Record<string, string | undefined>): number {
 
 /** A salted hash, never the IP itself */
 export function demoIpHash(ip: string, env: Record<string, string | undefined> = process.env): string {
-  const base = env.TEST_QUOTE_SECRET || env.SUPABASE_SERVICE_ROLE_KEY || 'aistimator-demo'
-  return createHmac('sha256', base).update(`aistimator:demo-ip:v1:${ip}`).digest('hex').slice(0, 32)
+  const base = env.TEST_QUOTE_SECRET || env.SUPABASE_SERVICE_ROLE_KEY || 'qolumns-demo'
+  return createHmac('sha256', base).update(`qolumns:demo-ip:v1:${ip}`).digest('hex').slice(0, 32)
 }
 
 export type DemoDecision = 'ok' | 'daily_cap' | 'ip_limit'

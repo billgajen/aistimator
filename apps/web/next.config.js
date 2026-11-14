@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ['@estimator/shared'],
+  transpilePackages: ['@qolumns/shared'],
   /**
    * T-152: the dashboard menu is Home, Quotes, Prices, Share, Settings.
    * Renamed pages redirect (query string kept, e.g. Stripe's ?success=true).

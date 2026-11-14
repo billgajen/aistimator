@@ -1,16 +1,17 @@
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
+import { PRODUCT_NAME } from '@qolumns/shared'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — Aistimator',
-  description: 'How Aistimator collects, uses and protects personal data.',
+  title: `Privacy Policy — ${PRODUCT_NAME}`,
+  description: `How ${PRODUCT_NAME} collects, uses and protects personal data.`,
 }
 
 const SECTIONS = [
   {
     title: '1. Who this covers',
-    body: 'This policy covers two groups: businesses with an Aistimator account, and their customers who submit enquiries through a widget, quote page or WhatsApp. The business you request a quote from is the controller of your enquiry; we process it on their behalf to produce and deliver the quote.',
+    body: `This policy covers two groups: businesses with a ${PRODUCT_NAME} account, and their customers who submit enquiries through a widget, quote page or WhatsApp. The business you request a quote from is the controller of your enquiry; we process it on their behalf to produce and deliver the quote.`,
   },
   {
     title: '2. What we collect',

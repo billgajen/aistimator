@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { buildTakeoff, buildReference } from '../takeoff'
-import type { PricingTrace, ExtractedSignalsV2, WorkStepConfig } from '@estimator/shared'
+import type { PricingTrace, ExtractedSignalsV2, WorkStepConfig } from '@qolumns/shared'
 
 const WORK_STEPS: WorkStepConfig[] = [
   {
@@ -131,7 +131,7 @@ describe('buildTakeoff', () => {
 describe('T-146: takeoff methods are plain words, never confidence language', () => {
   it('plainSource maps each basis to a plain source', async () => {
     const { plainSource } = await import('../takeoff')
-    const { findConfidenceLanguage } = await import('@estimator/shared')
+    const { findConfidenceLanguage } = await import('@qolumns/shared')
     const sig = (over: Record<string, unknown>) =>
       ({ key: 'k', value: 1, confidence: 0.8, source: 'vision', evidence: 'Measured across 5 independent passes (spread ±8%)', ...over }) as never
     const cases: Array<[unknown, string]> = [

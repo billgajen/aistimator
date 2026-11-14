@@ -3,12 +3,12 @@
  *
  * Every AI consumer in the worker types against `AiClient`, never a concrete
  * provider. `createAiClient(task, env, meter)` resolves the provider + model
- * for a task from the shared registry (`@estimator/shared` ai-models), so the
+ * for a task from the shared registry (`@qolumns/shared` ai-models), so the
  * model per task is switched by env (`AI_MODEL_<TASK>`) with no code change.
  */
 
-import type { AiTask, AiUsageMeter, ModelRoute, ThinkingLevel } from '@estimator/shared'
-import { resolveModelRoute, resolveThinkingLevel } from '@estimator/shared'
+import type { AiTask, AiUsageMeter, ModelRoute, ThinkingLevel } from '@qolumns/shared'
+import { resolveModelRoute, resolveThinkingLevel } from '@qolumns/shared'
 
 export interface ImageInput {
   mimeType: string

@@ -16,7 +16,7 @@ import {
   resolveReferenceObjects,
   US_REGION,
   GB_REGION,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 describe('units (T-133)', () => {
   it('normalizes free-text unit spellings', () => {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, type DragEvent } from 'react'
-import type { ServiceDraftConfig } from '@estimator/shared'
+import type { ServiceDraftConfig } from '@qolumns/shared'
 
 interface ExtractedService {
   name: string

@@ -12,6 +12,8 @@
  * source is linked.
  */
 
+import { PRODUCT_NAME } from '@qolumns/shared'
+
 export interface TradePage {
   slug: string
   /** T-154: the vertical pack this page's template comes from (trades row order) */
@@ -40,7 +42,7 @@ export const TRADES: TradePage[] = [
     packId: 'hvac-replacement-us',
     label: 'HVAC',
     templateName: 'HVAC',
-    metaTitle: 'Instant AC, Heat Pump & Furnace Replacement Estimates | Aistimator',
+    metaTitle: `Instant AC, Heat Pump & Furnace Replacement Estimates | ${PRODUCT_NAME}`,
     metaDescription:
       'Homeowners photograph the rating plate and see a replacement estimate from your own prices straight away. You get the lead and confirm it.',
     eyebrow: 'For HVAC contractors',
@@ -64,7 +66,7 @@ export const TRADES: TradePage[] = [
     packId: 'water-heater-us',
     label: 'Water heaters',
     templateName: 'water heater',
-    metaTitle: 'Instant Water Heater Replacement Quotes | Aistimator',
+    metaTitle: `Instant Water Heater Replacement Quotes | ${PRODUCT_NAME}`,
     metaDescription:
       'Customers photograph the tank label and see a gas, propane or electric replacement estimate from your prices straight away. You confirm it.',
     eyebrow: 'For water heater installers',
@@ -88,7 +90,7 @@ export const TRADES: TradePage[] = [
     packId: 'plumbing-fixtures-us',
     label: 'Plumbing',
     templateName: 'plumbing',
-    metaTitle: 'Instant Plumbing Fixture Quotes — Toilets, Faucets, Disposals | Aistimator',
+    metaTitle: `Instant Plumbing Fixture Quotes — Toilets, Faucets, Disposals | ${PRODUCT_NAME}`,
     metaDescription: 'A clear per-fixture price list your customers can quote themselves, priced from your own flat rates.',
     eyebrow: 'For plumbers',
     headline: 'Instant fixture estimates, in your prices.',
@@ -111,7 +113,7 @@ export const TRADES: TradePage[] = [
     packId: 'electrical-us',
     label: 'Electrical',
     templateName: 'electrical',
-    metaTitle: 'Instant EV Charger & Panel Upgrade Estimates | Aistimator',
+    metaTitle: `Instant EV Charger & Panel Upgrade Estimates | ${PRODUCT_NAME}`,
     metaDescription:
       'EV charger installs and panel upgrades priced from a photo of the panel label and the run length, using your own rates.',
     eyebrow: 'For electricians',
@@ -135,7 +137,7 @@ export const TRADES: TradePage[] = [
     packId: 'garage-doors-us',
     label: 'Garage doors',
     templateName: 'garage door',
-    metaTitle: 'Instant Garage Door & Spring Repair Quotes | Aistimator',
+    metaTitle: `Instant Garage Door & Spring Repair Quotes | ${PRODUCT_NAME}`,
     metaDescription: 'Door replacements and spring repairs priced from size, style and spring count, using your own rates.',
     eyebrow: 'For garage door companies',
     headline: 'Broken spring at 7 a.m.? They see your estimate by 7:01.',
@@ -158,7 +160,7 @@ export const TRADES: TradePage[] = [
     packId: 'painting-decorating-us',
     label: 'Painting',
     templateName: 'painting',
-    metaTitle: 'Instant Interior & Exterior Painting Estimates | Aistimator',
+    metaTitle: `Instant Interior & Exterior Painting Estimates | ${PRODUCT_NAME}`,
     metaDescription:
       'Interiors priced per room and exteriors from photos, as an estimate from your own prices. You get the lead and confirm it.',
     eyebrow: 'For painting contractors',

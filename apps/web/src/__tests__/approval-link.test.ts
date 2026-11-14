@@ -35,7 +35,7 @@ import {
   APPROVAL_LINK_TTL_HOURS,
   APPROVAL_LINK_MAX_ATTEMPTS,
   type ApprovalOutcome,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import { approveByLink, loadApprovalLink } from '@/lib/approval-link'
 import { getScopeLimits } from '@/lib/rate-limit'
 

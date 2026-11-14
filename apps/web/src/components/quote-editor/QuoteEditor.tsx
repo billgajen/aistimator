@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { QuotePricing, QuoteContent, SignalRecommendation, CrossServicePricing } from '@estimator/shared'
+import type { QuotePricing, QuoteContent, SignalRecommendation, CrossServicePricing } from '@qolumns/shared'
 import { useQuotePricing } from './useQuotePricing'
 import LineItemEditor from './LineItemEditor'
 import AddonsEditor from './AddonsEditor'

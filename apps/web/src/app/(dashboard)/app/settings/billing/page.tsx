@@ -1,9 +1,9 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
-import { formatMoney } from '@estimator/shared'
+import { formatMoney } from '@qolumns/shared'
 import { useSearchParams } from 'next/navigation'
-import type { BillingResponse, PlanInfo } from '@estimator/shared'
+import type { BillingResponse, PlanInfo } from '@qolumns/shared'
 
 export default function BillingPage() {
   return (

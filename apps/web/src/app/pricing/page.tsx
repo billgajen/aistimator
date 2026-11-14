@@ -2,10 +2,10 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
-import { offeredPlans, formatMoney, freeOfferLabel, FREE_ALLOWANCE, type PlanDefinition, type PlanChannel } from '@estimator/shared'
+import { offeredPlans, formatMoney, freeOfferLabel, FREE_ALLOWANCE, type PlanDefinition, type PlanChannel, PRODUCT_NAME } from '@qolumns/shared'
 
 export const metadata: Metadata = {
-  title: 'Pricing — Aistimator',
+  title: `Pricing — ${PRODUCT_NAME}`,
   description:
     'Simple monthly plans for service businesses. Instant estimates on your website, by text and on site — in your own prices.',
 }

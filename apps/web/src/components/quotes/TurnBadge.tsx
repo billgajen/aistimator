@@ -1,4 +1,4 @@
-import type { QuoteTurn, QuoteTurnTone } from '@estimator/shared'
+import type { QuoteTurn, QuoteTurnTone } from '@qolumns/shared'
 
 const TONE: Record<QuoteTurnTone, string> = {
   attention: 'bg-tertiary-light text-tertiary',
@@ -11,7 +11,7 @@ const TONE: Record<QuoteTurnTone, string> = {
 
 /**
  * T-158: whose turn it is on a quote. The label and the detail line come from
- * `quoteTurn` in @estimator/shared; nothing is worded here.
+ * `quoteTurn` in @qolumns/shared; nothing is worded here.
  */
 export function TurnBadge({ turn, showDetail = true }: { turn: Pick<QuoteTurn, 'label' | 'detail' | 'tone'>; showDetail?: boolean }) {
   return (

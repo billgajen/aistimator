@@ -11,7 +11,7 @@ import {
   polygonArea,
   computeEstimateGrade,
   type RoomScanPayload,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import { buildTakeoff } from '../takeoff'
 
 // Two rooms: a 4 × 3 m room (2.4 m walls, one door, one window) and a 3 × 3 m room (one door)

@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { findConfidenceLanguage, findConfidenceLanguageInPayload } from '@estimator/shared'
+import { findConfidenceLanguage, findConfidenceLanguageInPayload } from '@qolumns/shared'
 import { approvalBlocker, wordingForApproval } from '@/lib/quote-approval'
 import { quoteTokenFilter, hashToken } from '@/lib/tokens'
 

@@ -2,7 +2,7 @@
 // Run (local stack up: supabase with migration 38, web, worker):
 //   npx tsx scripts/hardcore-test/verify-t157.mts
 // With the page checks (buttons, the customer page, the editor) as well:
-//   PLAYWRIGHT_DIR=~/estimator-browser npx tsx scripts/hardcore-test/verify-t157.mts
+//   PLAYWRIGHT_DIR=~/qolumns-browser npx tsx scripts/hardcore-test/verify-t157.mts
 // (playwright lives outside the repo: see scripts/hardcore-test/browser.mjs)
 // Start the web app with CRON_SECRET=local-cron-t153 (as for verify-t153) so the
 // reminder check can call the daily cron.

@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { quoteTokenFilter } from '@/lib/tokens'
-import { isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange, canCustomerDecide } from '@estimator/shared'
+import { isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange, canCustomerDecide } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
@@ -14,7 +14,7 @@ import type {
   QuoteContent,
   CrossServicePricing,
   SignalRecommendation,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 /**
  * GET /api/public/quotes/:quoteId
@@ -172,7 +172,7 @@ export async function GET(
       website: brandingJson.website ?? null,
     }
 
-    // White-label: Growth/Pro (custom_branding) drop the Aistimator badge
+    // White-label: Growth/Pro (custom_branding) drop the Qolumns badge
     const whiteLabel = await hasCustomBranding(supabase, tenant.id)
 
     const customerView: QuoteViewCustomer = {

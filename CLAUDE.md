@@ -1,6 +1,8 @@
 # CLAUDE.md
 
-## Project: AI Estimate Platform (Web Embed + Hosted Quote Page)
+## Project: Qolumns — AI Estimate Platform (Web Embed + Hosted Quote Page)
+The product is called **Qolumns**. The name lives in `PRODUCT_NAME` (`packages/shared/src/brand.ts`); use the constant, never a typed name. Technical identifiers are lower case: packages are `@qolumns/*`, and the embed's public names are in `EMBED_NAMES`.
+
 You are building a SaaS platform that lets businesses embed an estimate widget on their website. Customers submit details plus photos and documents, and receive a professional quote package via a hosted quote page (mandatory) and optional PDF. The business configures pricing rules, service areas, taxes, branding, and templates in a dashboard. WhatsApp is an additional channel later, not a core dependency for v1.
 
 ## Non negotiable principles

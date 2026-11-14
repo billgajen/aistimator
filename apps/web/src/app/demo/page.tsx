@@ -5,7 +5,7 @@ import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { DemoExperience } from '@/components/demo/DemoExperience'
 import { DeveloperDemo } from '@/components/demo/DeveloperDemo'
 import { demoTenantKey } from '@/lib/demo/demo-tenant'
-import { DEMO_BUSINESS_NAME, PRODUCT_NAME, freeOfferLabel } from '@estimator/shared'
+import { DEMO_BUSINESS_NAME, PRODUCT_NAME, freeOfferLabel } from '@qolumns/shared'
 
 export const dynamic = 'force-dynamic'
 

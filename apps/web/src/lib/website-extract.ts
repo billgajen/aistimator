@@ -168,7 +168,7 @@ async function fetchPage(url: URL): Promise<string | null> {
         redirect: 'manual',
         signal: controller.signal,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; EstimatorBot/1.0; service setup)',
+          'User-Agent': 'Mozilla/5.0 (compatible; qolumns-bot/1.0; service setup)',
           Accept: 'text/html,application/xhtml+xml',
         },
       })

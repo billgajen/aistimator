@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readRepriceInputs, withRepriceSnapshot, type RepriceSnapshot } from '../reprice-snapshot'
-import type { ExtractedSignalsV2 } from '@estimator/shared'
+import type { ExtractedSignalsV2 } from '@qolumns/shared'
 import type { ExtractedSignals } from '../ai/signals'
 
 const structured: ExtractedSignalsV2 = {

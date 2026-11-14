@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { listRegions, customerDecisionWords } from '@estimator/shared'
+import { listRegions, customerDecisionWords } from '@qolumns/shared'
 import { checkContact, contactRequirementOf, descriptionRequired, isPlausiblePhone, usableContact } from '@/lib/contact-rules'
 import { laterProgress, cleanAnswers, cleanAssetIds, completeLeads, hashLeadToken, isLeadProgress, PROGRESS_WORDS } from '@/lib/request-leads'
 import { checkAcceptance, timingLabel, TIMING_CHOICES } from '@/lib/acceptance'

@@ -11,7 +11,7 @@ import {
   computeCalibration,
   type CalibrationQuoteInput,
   type CalibrationAmendmentInput,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 const SVC = 'svc_1'
 

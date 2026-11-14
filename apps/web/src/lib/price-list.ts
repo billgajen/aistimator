@@ -10,7 +10,7 @@
  *
  * The wording here never uses engine terms (work step, signal, multiplier).
  */
-import type { AddonConfig, MultiplierConfig, ServiceDraftConfig, WorkStepConfig } from '@estimator/shared'
+import type { AddonConfig, MultiplierConfig, ServiceDraftConfig, WorkStepConfig } from '@qolumns/shared'
 
 /** The parts of a draft service the price list reads and writes */
 export interface PricedService {

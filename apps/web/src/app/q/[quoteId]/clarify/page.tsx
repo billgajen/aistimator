@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-import type { ClarificationQuestion } from '@estimator/shared'
+import type { ClarificationQuestion } from '@qolumns/shared'
 
 /**
  * Public clarification page for customers to answer questions.

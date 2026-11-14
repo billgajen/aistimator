@@ -12,7 +12,7 @@
  * review), never authoritative pricing.
  */
 
-import type { ServiceDraftConfig, AddonConfig, MultiplierConfig, RegionCode } from '@estimator/shared'
+import type { ServiceDraftConfig, AddonConfig, MultiplierConfig, RegionCode } from '@qolumns/shared'
 
 export interface VerticalPackService {
   name: string

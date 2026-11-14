@@ -10,7 +10,7 @@ import {
   priceDependsOnJobFacts,
   isQuestionWorthAsking,
   type QuantityProvenance,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 const q = (basis: QuantityProvenance['basis'], confidence: number): QuantityProvenance => ({
   signalKey: 'wall_area_sqm',

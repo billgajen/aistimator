@@ -5,8 +5,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { chooseBusinessEmail, redactEmails, roundMoney, splitLabelMath } from '@estimator/shared'
-import type { ExtractedSignalsV2 } from '@estimator/shared'
+import { chooseBusinessEmail, redactEmails, roundMoney, splitLabelMath } from '@qolumns/shared'
+import type { ExtractedSignalsV2 } from '@qolumns/shared'
 import { loadBusinessEmail } from '../business-email'
 import { sendQuoteEmails, sendEstimateShownEmail, sendReviewRequestEmail } from '../email'
 import {

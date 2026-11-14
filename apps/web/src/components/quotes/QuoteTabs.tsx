@@ -1,7 +1,7 @@
 'use client'
 
-import { QUOTE_LIST_TABS, QUOTE_TURN_COPY } from '@estimator/shared'
-import type { QuoteListCounts, QuoteListTab } from '@estimator/shared'
+import { QUOTE_LIST_TABS, QUOTE_TURN_COPY } from '@qolumns/shared'
+import type { QuoteListCounts, QuoteListTab } from '@qolumns/shared'
 
 /**
  * T-158: the quotes list is split by whose turn it is. The row scrolls

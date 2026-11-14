@@ -1,5 +1,5 @@
 import { checkContact, contactRequirementOf, usableContact } from '@/lib/contact-rules'
-import { getRegion } from '@estimator/shared'
+import { getRegion } from '@qolumns/shared'
 import { createAdminClient } from '@/lib/supabase/server'
 import { geminiThinkingConfig, geminiUrlFor } from '@/lib/ai/models'
 import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'

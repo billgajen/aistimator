@@ -5,7 +5,7 @@
  * region only where customers say it differently ("an estimate" / "a quote").
  * Nothing here promises a price or a speed the business hasn't set.
  */
-import { getRegion } from '@estimator/shared'
+import { getRegion } from '@qolumns/shared'
 
 export interface ShareText {
   id: 'google' | 'social_bio' | 'email_signature' | 'text_reply'

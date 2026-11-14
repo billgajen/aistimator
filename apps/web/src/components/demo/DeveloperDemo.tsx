@@ -2,12 +2,12 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { PRODUCT_NAME } from '@estimator/shared'
+import { EMBED_NAMES, PRODUCT_NAME } from '@qolumns/shared'
 
 // Extend Window interface for the widget
 declare global {
   interface Window {
-    EstimatorWidget?: {
+    QolumnsWidget?: {
       init: (config: unknown) => void
       open: () => void
       close: () => void
@@ -295,12 +295,12 @@ function useEmbedCode(placement: Placement, experience: Experience, tenantKey: s
 ></script>`
     } else {
       code = `<!-- ${PRODUCT_NAME} Widget (Inline) -->
-<div id="estimator-widget"></div>
+<div id="${EMBED_NAMES.containerId}"></div>
 <script
   src="${origin}/widget.js"
   data-tenant-key="${key}"
   data-mode="inline"
-  data-container="#estimator-widget"${displayAttr}
+  data-container="#${EMBED_NAMES.containerId}"${displayAttr}
   async
 ></script>`
     }
@@ -319,10 +319,10 @@ function IframeWidget({ tenantKey, mode }: { tenantKey: string; mode?: string })
 
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
-      if (event.data?.type === 'estimator-resize' && event.data?.tenantKey === tenantKey) {
+      if (event.data?.type === EMBED_NAMES.resizeMessage && event.data?.tenantKey === tenantKey) {
         setHeight(event.data.height)
       }
-      if (event.data?.type === 'estimator-submitted') {
+      if (event.data?.type === EMBED_NAMES.submittedMessage) {
         console.log('Quote submitted:', event.data)
       }
     }
@@ -341,11 +341,11 @@ function IframeWidget({ tenantKey, mode }: { tenantKey: string; mode?: string })
 }
 
 function removeFloatingWidget() {
-  document.getElementById('estimator-floating-launcher')?.remove()
-  document.getElementById('estimator-floating-overlay')?.remove()
+  document.getElementById(EMBED_NAMES.launcherId)?.remove()
+  document.getElementById(EMBED_NAMES.overlayId)?.remove()
   document.querySelector('script[src="/widget.js"]')?.remove()
-  if (typeof window !== 'undefined' && window.EstimatorWidget) {
-    delete window.EstimatorWidget
+  if (typeof window !== 'undefined' && window.QolumnsWidget) {
+    delete window.QolumnsWidget
   }
 }
 

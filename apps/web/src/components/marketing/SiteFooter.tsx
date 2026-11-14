@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { freeOfferLabel } from '@estimator/shared'
+import { freeOfferLabel, PRODUCT_NAME } from '@qolumns/shared'
 
 /**
  * Marketing site footer — shared across all public pages.
@@ -12,7 +12,7 @@ export function SiteFooter() {
         <div className="grid gap-10 py-12 sm:grid-cols-4">
           <div className="sm:col-span-2">
             <p className="font-display text-lg font-extrabold tracking-tight text-text-primary">
-              Aistimator
+              {PRODUCT_NAME}
             </p>
             <p className="mt-2 max-w-xs text-sm text-text-secondary">
               Instant, professional quotes for service businesses — measured by AI, priced by you.
@@ -45,7 +45,7 @@ export function SiteFooter() {
           </div>
         </div>
         <p className="pb-8 text-xs text-text-muted">
-          © {new Date().getFullYear()} Aistimator. The AI measures. You set the price.
+          © {new Date().getFullYear()} {PRODUCT_NAME}. The AI measures. You set the price.
         </p>
       </div>
     </footer>

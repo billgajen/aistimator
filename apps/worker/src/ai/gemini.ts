@@ -1,6 +1,6 @@
 /**
  * Gemini client (implements the provider-agnostic AiClient, T-135).
- * The model always comes from the registry (`@estimator/shared` ai-models).
+ * The model always comes from the registry (`@qolumns/shared` ai-models).
  *
  * Handles communication with the Gemini API for:
  * - Vision extraction (signals from images)
@@ -10,8 +10,8 @@
 
 import type { AiClient, GenerationOptions, UsageSink } from './client'
 import { parseModelJson } from './client'
-import type { ModelRoute, ThinkingLevel } from '@estimator/shared'
-import { resolveModelRoute, modelCapabilities, type ModelCapabilities } from '@estimator/shared'
+import type { ModelRoute, ThinkingLevel } from '@qolumns/shared'
+import { resolveModelRoute, modelCapabilities, type ModelCapabilities } from '@qolumns/shared'
 
 export interface GeminiConfig {
   apiKey: string

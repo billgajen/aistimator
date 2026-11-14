@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { formatMoney, getRegion, statusAfterResend, QUOTE_SEND_AGAIN_STATUSES } from '@estimator/shared'
+import { formatMoney, getRegion, statusAfterResend, QUOTE_SEND_AGAIN_STATUSES } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import {
@@ -8,7 +8,7 @@ import {
   generateCustomerEmailHtml,
 } from '@/lib/postmark'
 import { businessReplyTo } from '@/lib/business-email'
-import type { QuotePricing, QuoteStatus, TenantBranding } from '@estimator/shared'
+import type { QuotePricing, QuoteStatus, TenantBranding } from '@qolumns/shared'
 
 /**
  * POST /api/quotes/:quoteId/resend

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import type { AppQuoteView, ClarificationQuestion, QuoteStatus } from '@estimator/shared'
+import type { AppQuoteView, ClarificationQuestion, QuoteStatus } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
 
 type Estimate = NonNullable<AppQuoteView['pricing']['estimate']>

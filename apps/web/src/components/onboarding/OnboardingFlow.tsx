@@ -13,8 +13,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { ServiceDraftConfig, AddonConfig, MultiplierConfig, RegionCode } from '@estimator/shared'
-import { getRegion, currencySymbol as symbolFor } from '@estimator/shared'
+import type { ServiceDraftConfig, AddonConfig, MultiplierConfig, RegionCode } from '@qolumns/shared'
+import { getRegion, currencySymbol as symbolFor } from '@qolumns/shared'
 import { describePricingRules } from '@/lib/pricing-describe'
 import { listPacks, getPack } from '@/lib/vertical-packs'
 import { isUnpriced, servicePayload, type DraftService } from '@/lib/onboarding-service'

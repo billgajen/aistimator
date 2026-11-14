@@ -1,10 +1,10 @@
-import { QUOTE_TURN_COPY } from '@estimator/shared'
-import type { QuoteTrackerStep } from '@estimator/shared'
+import { QUOTE_TURN_COPY } from '@qolumns/shared'
+import type { QuoteTrackerStep } from '@qolumns/shared'
 
 /**
  * T-158: the four steps a quote goes through, replacing the plain timeline.
  * The steps, their labels and their dates come from `quoteTracker` in
- * @estimator/shared. Side by side on a wide screen, stacked on a phone.
+ * @qolumns/shared. Side by side on a wide screen, stacked on a phone.
  */
 export function QuoteTracker({ steps }: { steps: QuoteTrackerStep[] }) {
   return (

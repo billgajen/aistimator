@@ -3,7 +3,7 @@
  * them. T-150: shared by the setup flow and its live check, so "edit a price
  * in setup → the next quote charges it" is tested on the same code path.
  */
-import type { AddonConfig, MultiplierConfig, ServiceDraftConfig } from '@estimator/shared'
+import type { AddonConfig, MultiplierConfig, ServiceDraftConfig } from '@qolumns/shared'
 
 export interface DraftService {
   name: string

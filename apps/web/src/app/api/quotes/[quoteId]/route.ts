@@ -7,7 +7,7 @@ import {
   canEditQuote,
   statusAfterEditAndSend,
   QUOTE_ALREADY_SENT_STATUSES,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import { type NextRequest, NextResponse } from 'next/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import {
@@ -22,7 +22,7 @@ import type {
   UpdateQuoteResponse,
   QuoteDetailResponse,
   AmendmentSummary,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import type {
   QuotePricing,
   QuoteContent,
@@ -30,7 +30,7 @@ import type {
   AmendmentChange,
   TenantBranding,
   QuoteFeedback,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 /** Auth helper — returns user ID + tenant ID or an error response */
 async function getAuthContext(supabase: Awaited<ReturnType<typeof createClient>>) {

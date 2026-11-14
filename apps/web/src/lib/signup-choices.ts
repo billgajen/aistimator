@@ -5,7 +5,7 @@
  * the first dashboard or setup page load copies a valid, offered plan id here
  * for the billing page to pre-select. Checkout is never started from it.
  */
-import { getPlan } from '@estimator/shared'
+import { getPlan } from '@qolumns/shared'
 import type { createClient } from '@/lib/supabase/server'
 
 type UserClient = Awaited<ReturnType<typeof createClient>>

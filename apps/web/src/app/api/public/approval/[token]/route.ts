@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { hashApprovalToken, isApprovalTokenShape, approvalOutcomeCopy, type ApprovalOutcome } from '@estimator/shared'
+import { hashApprovalToken, isApprovalTokenShape, approvalOutcomeCopy, type ApprovalOutcome } from '@qolumns/shared'
 import { createAdminClient } from '@/lib/supabase/server'
 import { approveByLink } from '@/lib/approval-link'
 import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'

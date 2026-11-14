@@ -3,10 +3,10 @@
  * Used by: ai-draft/route.ts, extract-services, extract-pricing, refine
  */
 
-import type { ServiceDraftConfig } from '@estimator/shared'
+import type { ServiceDraftConfig } from '@qolumns/shared'
 import { geminiThinkingConfig, geminiUrlFor } from '@/lib/ai/models'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { extractFormulaIdentifiers, normalizeUnit, regionPromptBlock, resolveRegionContext } from '@estimator/shared'
+import { extractFormulaIdentifiers, normalizeUnit, regionPromptBlock, resolveRegionContext } from '@qolumns/shared'
 
 /**
  * Validate and normalize an AI-generated draft config

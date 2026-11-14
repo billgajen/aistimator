@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { quoteTokenFilter } from '@/lib/tokens'
 import { NextResponse } from 'next/server'
-import { isShownEarly } from '@estimator/shared'
+import { isShownEarly } from '@qolumns/shared'
 import { createHash } from 'crypto'
 import {
   sendEmail,
@@ -9,8 +9,8 @@ import {
 } from '@/lib/postmark'
 import { generateFeedbackNotificationEmailHtml } from '@/lib/email-templates'
 import { resolveBusinessEmail } from '@/lib/business-email'
-import type { SubmitFeedbackRequest, SubmitFeedbackResponse } from '@estimator/shared'
-import type { TenantBranding } from '@estimator/shared'
+import type { SubmitFeedbackRequest, SubmitFeedbackResponse } from '@qolumns/shared'
+import type { TenantBranding } from '@qolumns/shared'
 
 /**
  * POST /api/public/quotes/:quoteId/feedback

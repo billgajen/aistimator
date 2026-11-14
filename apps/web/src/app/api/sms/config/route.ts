@@ -3,7 +3,7 @@
  */
 
 import { NextResponse, type NextRequest } from 'next/server'
-import { getRegion } from '@estimator/shared'
+import { getRegion } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
 import { isSmsTestMode, normalizePhone } from '@/lib/sms'
 

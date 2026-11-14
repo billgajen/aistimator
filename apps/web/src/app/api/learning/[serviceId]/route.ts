@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
-import type { LearningContextResponse, LearningPattern } from '@estimator/shared'
+import type { LearningContextResponse, LearningPattern } from '@qolumns/shared'
 
 /**
  * GET /api/learning/[serviceId]

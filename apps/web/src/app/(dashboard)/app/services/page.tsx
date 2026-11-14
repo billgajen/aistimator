@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, type KeyboardEvent } from 'react'
-import { currencySymbol as sharedCurrencySymbol, getRegion, reviewModeOf } from '@estimator/shared'
-import type { ReviewMode } from '@estimator/shared'
+import { currencySymbol as sharedCurrencySymbol, getRegion, reviewModeOf } from '@qolumns/shared'
+import type { ReviewMode } from '@qolumns/shared'
 import { PageHeader } from '@/components/dashboard/EmptyState'
 import { AIDraftBadge } from '@/components/AIDraftBadge'
 import { WorkStepEditor } from '@/components/WorkStepEditor'
@@ -22,7 +22,7 @@ import type {
   AddonConfig,
   MultiplierConfig,
   PricingRules,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 export const dynamic = 'force-dynamic'
 

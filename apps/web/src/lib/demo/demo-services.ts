@@ -9,7 +9,7 @@
  *
  * Pure. Relative imports only: the seed script loads this with tsx.
  */
-import type { ServiceDraftConfig } from '@estimator/shared'
+import type { ServiceDraftConfig } from '@qolumns/shared'
 import { servicePayload } from '../onboarding-service'
 import { garageDoorsPackUS } from '../vertical-packs/garage-doors-us'
 import { paintingPackUS } from '../vertical-packs/painting-us'

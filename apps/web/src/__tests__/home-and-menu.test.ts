@@ -8,7 +8,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { QUOTE_TURN_COPY, agoWords, quoteActivityLine } from '@estimator/shared'
+import { QUOTE_TURN_COPY, agoWords, quoteActivityLine } from '@qolumns/shared'
 import {
   HOME_ACTIVITY_LIMIT,
   buildHomeActivity,

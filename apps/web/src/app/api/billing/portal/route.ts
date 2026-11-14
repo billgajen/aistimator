@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getStripeClient, isStripeConfigured, createPortalSession } from '@/lib/stripe'
 import { NextResponse } from 'next/server'
-import type { CreatePortalResponse } from '@estimator/shared'
+import type { CreatePortalResponse } from '@qolumns/shared'
 
 /**
  * POST /api/billing/portal

@@ -20,7 +20,7 @@ import type {
   WorkStepConfig,
   ExpectedSignalConfig,
   DocumentType,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 /**
  * Request for AI draft generation

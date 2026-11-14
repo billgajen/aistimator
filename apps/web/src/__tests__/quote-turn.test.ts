@@ -26,8 +26,8 @@ import {
   quoteTurn,
   shortDate,
   whenWords,
-} from '@estimator/shared'
-import type { QuoteStatus, QuoteTurnInput } from '@estimator/shared'
+} from '@qolumns/shared'
+import type { QuoteStatus, QuoteTurnInput } from '@qolumns/shared'
 import { waitingForYou } from '@/lib/home-numbers'
 
 const ALL_STATUSES: QuoteStatus[] = [

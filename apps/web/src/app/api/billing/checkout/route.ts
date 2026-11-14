@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { getPlan, stripePriceIdFor, stripePriceEnvKey, type PlanInterval } from '@estimator/shared'
+import { getPlan, stripePriceIdFor, stripePriceEnvKey, type PlanInterval } from '@qolumns/shared'
 import {
   getStripeClient,
   isStripeConfigured,
@@ -7,7 +7,7 @@ import {
   createCheckoutSession,
 } from '@/lib/stripe'
 import { NextResponse } from 'next/server'
-import type { CreateCheckoutRequest, CreateCheckoutResponse } from '@estimator/shared'
+import type { CreateCheckoutRequest, CreateCheckoutResponse } from '@qolumns/shared'
 
 /**
  * POST /api/billing/checkout

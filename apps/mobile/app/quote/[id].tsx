@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
-import { formatMoney, parseMoneyInput, type AppQuoteView } from '@estimator/shared'
+import { formatMoney, parseMoneyInput, type AppQuoteView } from '@qolumns/shared'
 import { useApi } from '../../src/lib/api-context'
 import { headlinePrice, isPricing, statusLabel } from '../../src/lib/price'
 import { loadQuoteToken } from '../../src/lib/quote-tokens'

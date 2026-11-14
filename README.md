@@ -1,4 +1,4 @@
-# Estimator
+# Qolumns
 
 AI-powered estimate platform that lets businesses embed a quote widget on their website.
 
@@ -17,7 +17,7 @@ AI-powered estimate platform that lets businesses embed a quote widget on their 
 ## Project Structure
 
 ```
-estimator/
+qolumns/
 ├── apps/
 │   ├── web/          # Next.js app (Vercel)
 │   └── worker/       # Cloudflare Worker (queue consumer)

@@ -43,7 +43,7 @@ importers:
 
   apps/mobile:
     dependencies:
-      '@estimator/shared':
+      '@qolumns/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@supabase/supabase-js':
@@ -107,7 +107,7 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.975.0
         version: 3.975.0
-      '@estimator/shared':
+      '@qolumns/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@supabase/ssr':
@@ -171,7 +171,7 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^1.6.0
         version: 1.6.0(zod@3.22.3)
-      '@estimator/shared':
+      '@qolumns/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@supabase/supabase-js':

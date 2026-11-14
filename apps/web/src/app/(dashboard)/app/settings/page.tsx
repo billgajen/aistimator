@@ -3,8 +3,8 @@
 import { CustomerContactSettings } from '@/components/settings/CustomerContactSettings'
 import { contactRequirementOf } from '@/lib/contact-rules'
 import { useState, useEffect, useCallback } from 'react'
-import type { ServiceAreaMode, RegionCode, UnitSystem } from '@estimator/shared'
-import { getRegion, listRegions } from '@estimator/shared'
+import type { ServiceAreaMode, RegionCode, UnitSystem } from '@qolumns/shared'
+import { getRegion, listRegions } from '@qolumns/shared'
 
 export const dynamic = 'force-dynamic'
 

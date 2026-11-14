@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type KeyboardEvent } from 'react'
-import type { ServiceDraftConfig } from '@estimator/shared'
+import type { ServiceDraftConfig } from '@qolumns/shared'
 
 type SuggestedField = ServiceDraftConfig['suggestedFields'][0]
 

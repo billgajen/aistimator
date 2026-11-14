@@ -15,6 +15,8 @@ import { qrMatrix, qrToRgba } from '@/lib/qr'
 
 const ROOT = join(__dirname, '..', '..', '..', '..')
 const MIGRATION = readFileSync(join(ROOT, 'supabase/migrations/00000000000032_quote_link.sql'), 'utf8')
+// T-162: migration 40 adds the product's name and its likely misspelling
+const MIGRATION_40 = readFileSync(join(ROOT, 'supabase/migrations/00000000000040_reserve_qolumns.sql'), 'utf8')
 
 describe('T-149: slugify (mirrors the SQL slugify_business_name)', () => {
   it.each([
@@ -62,12 +64,15 @@ describe('T-149: slug rules', () => {
     for (const word of ['app', 'api', 'admin', 'quote', 'embed', 'share', 'login']) expect(slugProblem(word)).toBe('reserved')
   })
 
-  it('the reserved list is sorted, unique and identical to the migration', () => {
+  it('the reserved list is sorted, unique and identical to the migrations (32 and 40)', () => {
     expect([...RESERVED_SLUGS].sort()).toEqual(RESERVED_SLUGS)
     expect(new Set(RESERVED_SLUGS).size).toBe(RESERVED_SLUGS.length)
-    const block = /RESERVED_SLUGS:BEGIN[\s\S]*?\n([\s\S]*?)--\s*RESERVED_SLUGS:END/.exec(MIGRATION)![1]!
-    const inSql = [...block.matchAll(/\('([a-z0-9-]+)'\)/g)].map((x) => x[1])
-    expect(inSql).toEqual(RESERVED_SLUGS)
+    const words = (sql: string) => {
+      const block = /RESERVED_SLUGS:BEGIN[\s\S]*?\n([\s\S]*?)--\s*RESERVED_SLUGS:END/.exec(sql)![1]!
+      return [...block.matchAll(/\('([a-z0-9-]+)'\)/g)].map((x) => x[1]!)
+    }
+    expect(words(MIGRATION_40)).toEqual(['qolumns', 'qolums'])
+    expect([...words(MIGRATION), ...words(MIGRATION_40)].sort()).toEqual(RESERVED_SLUGS)
   })
 
   it('every reserved word passes the format check (so it is caught as reserved, not as malformed)', () => {
@@ -164,7 +169,7 @@ describe('T-149: embed snippet', () => {
     const base = { appOrigin: 'https://example.test', tenantKey: 'tkey_alpha' } as const
     const inline = embedSnippet({ ...base, placement: 'inline', experience: 'form' })
     expect(inline).toContain('data-tenant-key="tkey_alpha"')
-    expect(inline).toContain('<div id="estimator-widget"></div>')
+    expect(inline).toContain('<div id="qolumns-widget"></div>')
     const floating = embedSnippet({ ...base, placement: 'floating', experience: 'conversational' })
     expect(floating).toContain('data-mode="floating"')
     expect(floating).toContain('data-display-mode="conversational"')

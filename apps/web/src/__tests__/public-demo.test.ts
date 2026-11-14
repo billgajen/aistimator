@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
-import { DEMO_SLUG, DEMO_MAX_PHOTOS, DEMO_CONTACT, demoDailyCap, DEFAULT_DEMO_DAILY_CAP, findConfidenceLanguage } from '@estimator/shared'
+import { DEMO_SLUG, DEMO_MAX_PHOTOS, DEMO_CONTACT, demoDailyCap, DEFAULT_DEMO_DAILY_CAP, findConfidenceLanguage } from '@qolumns/shared'
 import { demoServiceBodies, DEMO_SERVICE_PICKS } from '@/lib/demo/demo-services'
 import { decideDemo, demoIpHash, demoIpLimit, DEFAULT_DEMO_IP_LIMIT_PER_HOUR } from '@/lib/demo/demo-guard'
 import { cleanUpDemoRequests, demoCutoff } from '@/lib/demo/demo-cleanup'
@@ -276,7 +276,7 @@ describe('T-153: the /demo page and links', () => {
     for (const f of ['example-home-services-logo.svg', 'sample-water-heater-label.svg', 'sample-water-heater-label.png']) {
       expect(existsSync(join(ROOT, 'apps/web/public/demo', f))).toBe(true)
     }
-    expect(read('apps/web/public/demo/example-home-services-logo.svg')).toMatch(/Drawn for the Aistimator demo/)
+    expect(read('apps/web/public/demo/example-home-services-logo.svg')).toMatch(/Drawn for the Qolumns demo/)
     expect(read('apps/web/public/demo/sample-water-heater-label.svg')).toMatch(/invented; no real product or photo/)
   })
 })

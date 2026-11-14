@@ -6,7 +6,7 @@
  * quotes within ±10%).
  */
 import { useEffect, useState } from 'react'
-import type { AccuracyGroup, AccuracyReport } from '@estimator/shared'
+import type { AccuracyGroup, AccuracyReport } from '@qolumns/shared'
 
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`
 

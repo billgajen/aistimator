@@ -7,6 +7,7 @@
 // Run it in TEST mode first; it refuses live keys unless --live is passed.
 import Stripe from 'stripe'
 import { offeredPlans, stripePriceEnvKey, type PlanInterval } from '../../../packages/shared/src/plans'
+import { PRODUCT_NAME } from '../../../packages/shared/src/brand'
 
 const key = process.env.STRIPE_SECRET_KEY
 if (!key) throw new Error('Set STRIPE_SECRET_KEY')
@@ -29,7 +30,7 @@ for (const plan of offeredPlans()) {
         const products = await stripe.products.search({ query: `metadata['plan_id']:'${plan.id}'` })
         const product =
           products.data[0] ??
-          (await stripe.products.create({ name: `Aistimator ${plan.name}`, metadata: { plan_id: plan.id } }))
+          (await stripe.products.create({ name: `${PRODUCT_NAME} ${plan.name}`, metadata: { plan_id: plan.id } }))
         price = await stripe.prices.create({
           product: product.id,
           currency: currency.toLowerCase(),

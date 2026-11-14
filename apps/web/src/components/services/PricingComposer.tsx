@@ -9,7 +9,7 @@
  */
 
 import { useState } from 'react'
-import type { ServiceDraftConfig, AddonConfig, MultiplierConfig } from '@estimator/shared'
+import type { ServiceDraftConfig, AddonConfig, MultiplierConfig } from '@qolumns/shared'
 import { describePricingRules, type DescribablePricing } from '@/lib/pricing-describe'
 
 export interface CompileResult {

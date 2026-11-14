@@ -1,5 +1,5 @@
 /**
- * Estimator Queue Consumer Worker
+ * Qolumns queue consumer worker
  *
  * This worker processes quote generation jobs from the Cloudflare Queue.
  * It applies rate limiting, runs AI extraction, applies pricing rules,
@@ -11,6 +11,7 @@ import type { RateLimiter } from './rate-limiter'
 import { getSupabaseClient, updateQuoteStatus } from './supabase'
 import { processQuote } from './quote-processor'
 import { authorizeJobRequest } from './auth'
+import { PRODUCT_NAME } from '@qolumns/shared'
 
 export interface Env {
   // Queue binding (production only — see wrangler.toml)
@@ -281,7 +282,7 @@ export default {
       }
     }
 
-    return new Response('Estimator Worker', { status: 200 })
+    return new Response(`${PRODUCT_NAME} worker`, { status: 200 })
   },
 
   // Queue consumer handler

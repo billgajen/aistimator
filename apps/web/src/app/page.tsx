@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { offeredPlans, formatMoney, freeOfferLabel, FREE_ALLOWANCE } from '@estimator/shared'
+import { offeredPlans, formatMoney, freeOfferLabel, FREE_ALLOWANCE } from '@qolumns/shared'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { ProductStrip } from '@/components/marketing/ProductStrip'

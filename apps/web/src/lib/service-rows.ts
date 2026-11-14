@@ -3,7 +3,7 @@
  * the route (T-153) so the demo seed script creates its services exactly the
  * way the dashboard does. Relative imports only: scripts load this with tsx.
  */
-import type { DocumentType, ServiceMediaConfig, WorkStepConfig, ExpectedSignalConfig, ServiceDraftConfig, AddonConfig, MultiplierConfig } from '@estimator/shared'
+import type { DocumentType, ServiceMediaConfig, WorkStepConfig, ExpectedSignalConfig, ServiceDraftConfig, AddonConfig, MultiplierConfig } from '@qolumns/shared'
 import { normalizeFieldOption } from './field-options'
 
 export interface ServiceCreateBody {

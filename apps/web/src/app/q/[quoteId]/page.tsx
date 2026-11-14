@@ -4,8 +4,8 @@ import { AcceptDetailsForm } from '@/components/quote/AcceptDetailsForm'
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { brandStyleVars } from '@/lib/color'
-import type { QuoteViewResponse, QuoteStatus } from '@estimator/shared'
-import { formatMoney, formatDate, formatNumber, currencySymbol, unitDisplayLabel, isQuoteProcessing, canCustomerDecide, customerDecisionWords, splitLabelMath, PRODUCT_NAME } from '@estimator/shared'
+import type { QuoteViewResponse, QuoteStatus } from '@qolumns/shared'
+import { formatMoney, formatDate, formatNumber, currencySymbol, unitDisplayLabel, isQuoteProcessing, canCustomerDecide, customerDecisionWords, splitLabelMath, PRODUCT_NAME } from '@qolumns/shared'
 
 interface QuotePageProps {
   params: { quoteId: string }

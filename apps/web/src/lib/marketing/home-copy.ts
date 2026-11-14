@@ -7,7 +7,7 @@
  * words, no "exact", no confirmed-quote-in-seconds. Statistics are quoted as
  * their sources state them, each with its link.
  */
-import { FREE_ALLOWANCE, PRODUCT_NAME, freeOfferLabel } from '@estimator/shared'
+import { FREE_ALLOWANCE, PRODUCT_NAME, freeOfferLabel } from '@qolumns/shared'
 
 const FREE = FREE_ALLOWANCE.US!.quotes
 

@@ -7,7 +7,7 @@
  * goes out with the dashboard link only.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { generateApprovalToken, approvalLinkExpiry, approvalLinkUrl } from '@estimator/shared'
+import { generateApprovalToken, approvalLinkExpiry, approvalLinkUrl } from '@qolumns/shared'
 
 export async function issueApprovalLink(
   supabase: SupabaseClient,

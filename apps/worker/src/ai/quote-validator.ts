@@ -26,9 +26,9 @@ import type {
   SignalRecommendation,
   CrossServicePricing,
   ExtractedSignal,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import type { PricingResult } from '../pricing/rules-engine'
-import { roundMoney } from '@estimator/shared'
+import { roundMoney } from '@qolumns/shared'
 import type { QuoteContent } from './wording'
 
 // ============================================================================
@@ -629,7 +629,7 @@ export function applyAutoCorrections(
 // VALIDATION DECISION HELPER
 // ============================================================================
 
-import type { ValidationSettings, ValidationOutcome } from '@estimator/shared'
+import type { ValidationSettings, ValidationOutcome } from '@qolumns/shared'
 
 /**
  * Determine the validation outcome based on settings and issues

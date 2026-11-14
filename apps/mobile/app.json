@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "Aistimator",
-    "slug": "aistimator",
-    "scheme": "aistimator",
+    "name": "Qolumns",
+    "slug": "qolumns",
+    "scheme": "qolumns",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
-      "bundleIdentifier": "com.aistimator.app",
+      "bundleIdentifier": "com.qolumns.app",
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Take photos of the job so it can be priced.",
@@ -15,7 +15,7 @@
       }
     },
     "android": {
-      "package": "com.aistimator.app"
+      "package": "com.qolumns.app"
     },
     "plugins": [
       "expo-router",

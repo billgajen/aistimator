@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { isSyncProcessing, repriceQuoteNow } from '@/lib/queue'
-import { isQuoteProcessing } from '@estimator/shared'
+import { isQuoteProcessing } from '@qolumns/shared'
 
 describe('quote processing mode', () => {
   it('follows SYNC_QUOTE_PROCESSING when set', () => {

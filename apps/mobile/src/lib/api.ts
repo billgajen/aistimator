@@ -14,8 +14,8 @@ import type {
   AppQuoteView,
   CreateQuoteResponse,
   QuotesListResponse,
-} from '@estimator/shared'
-import type { ScanMeasure } from '@estimator/shared'
+} from '@qolumns/shared'
+import type { ScanMeasure } from '@qolumns/shared'
 import type { AppField } from './answers'
 
 export interface ApiErrorBody {

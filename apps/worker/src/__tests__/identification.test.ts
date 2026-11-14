@@ -15,7 +15,7 @@ import {
   type IdentificationSpec,
   type IdentificationDecodeRule,
   type WorkStepConfig,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import {
   identificationTargets,
   identifyFromLabels,

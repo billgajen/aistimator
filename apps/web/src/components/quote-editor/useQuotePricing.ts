@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react'
-import { roundMoney } from '@estimator/shared'
-import type { QuotePricing } from '@estimator/shared'
+import { roundMoney } from '@qolumns/shared'
+import type { QuotePricing } from '@qolumns/shared'
 
 export interface LineItem {
   id: string

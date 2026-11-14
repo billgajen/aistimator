@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { formatMoney, PRODUCT_NAME } from '@estimator/shared'
+import { EMBED_NAMES, formatMoney, PRODUCT_NAME } from '@qolumns/shared'
 import { useSearchParams } from 'next/navigation'
 import { assessImageQuality } from '@/lib/image-quality'
 import { brandStyleVars } from '@/lib/color'
@@ -526,7 +526,7 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
       const height = containerRef.current.scrollHeight
       window.parent.postMessage(
         {
-          type: 'estimator-resize',
+          type: EMBED_NAMES.resizeMessage,
           height: height + 20, // Add padding
           tenantKey,
         },
@@ -668,7 +668,7 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
       if (window.parent !== window) {
         window.parent.postMessage(
           {
-            type: 'estimator-submitted',
+            type: EMBED_NAMES.submittedMessage,
             quoteId: data.quoteId,
             quoteViewUrl: data.quoteViewUrl,
             tenantKey,

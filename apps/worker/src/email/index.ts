@@ -4,7 +4,7 @@
  * Handles sending quote notification emails to customers and businesses.
  */
 
-import { formatMoney, reviewEmailSubject, reviewHoldLine, TEST_REQUEST_BANNER } from '@estimator/shared'
+import { formatMoney, reviewEmailSubject, reviewHoldLine, TEST_REQUEST_BANNER } from '@qolumns/shared'
 import { sendEmail, type PostmarkConfig } from './postmark'
 import {
   customerQuoteEmail,

@@ -4,7 +4,7 @@ import { recordMeasurementExamples } from '@/lib/measurement-memory'
 import { quoteTokenMatches } from '@/lib/tokens'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
-import type { ClarifyQuoteRequest } from '@estimator/shared'
+import type { ClarifyQuoteRequest } from '@qolumns/shared'
 
 // Vercel function budget: this route runs the full AI pipeline synchronously
 // (Cloudflare Queues needs the paid Workers plan - revisit post-launch)

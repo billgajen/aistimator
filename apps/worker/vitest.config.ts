@@ -15,7 +15,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@estimator/shared': path.resolve(__dirname, '../../packages/shared/src'),
+      '@qolumns/shared': path.resolve(__dirname, '../../packages/shared/src'),
     },
   },
 })

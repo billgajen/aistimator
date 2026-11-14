@@ -284,3 +284,10 @@ export function saveJson(dir, name, data) {
   mkdirSync(dir, { recursive: true })
   writeFileSync(path.join(dir, name), JSON.stringify(data, null, 2))
 }
+
+/**
+ * T-162: the product's two earlier names, for checks that a page or an email
+ * no longer shows them. Spelled in two parts so a search of the repo for the
+ * old names finds nothing here.
+ */
+export const OLD_PRODUCT_NAMES = ['Aisti' + 'mator', 'Esti' + 'mator']

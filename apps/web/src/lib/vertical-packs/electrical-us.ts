@@ -9,7 +9,7 @@
  * review before this pack is promoted (OWNER-TODO.md, T-141).
  */
 
-import type { ExpectedSignalConfig } from '@estimator/shared'
+import type { ExpectedSignalConfig } from '@qolumns/shared'
 import type { VerticalPack } from './types'
 
 const PANEL_RATINGS = ['60 A', '100 A', '125 A', '150 A', '200 A'] as const

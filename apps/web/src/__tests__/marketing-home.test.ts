@@ -10,7 +10,7 @@ import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { SUPPORT_EMAIL, PRODUCT_NAME, freeOfferLabel } from '@estimator/shared'
+import { SUPPORT_EMAIL, PRODUCT_NAME, freeOfferLabel } from '@qolumns/shared'
 import { HERO, TRADES_HEADING, STATISTICS, FAQ, ADD_IT, CONTROL, HOW_IT_WORKS } from '@/lib/marketing/home-copy'
 import { FOUNDER, founderReady } from '@/lib/marketing/founder'
 import { FounderNote } from '@/components/marketing/FounderNote'
@@ -225,7 +225,7 @@ describe('T-154: phone menu, buttons, metadata', () => {
     expect(code('app/page.tsx')).toMatch(/title: PAGE_META\.title/)
     expect(existsSync(join(ROOT, WEB, 'app/opengraph-image.tsx'))).toBe(true)
     expect(code('app/opengraph-image.tsx')).toContain('HERO.headline')
-    expect(PRODUCT_NAME).toBe('Aistimator')
+    expect(PRODUCT_NAME).toBe('Qolumns')
   })
 })
 

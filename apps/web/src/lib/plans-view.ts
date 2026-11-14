@@ -3,7 +3,7 @@
  * and the public pricing page, so numbers are never duplicated.
  */
 
-import type { PlanDefinition, PlanInfo } from '@estimator/shared'
+import type { PlanDefinition, PlanInfo } from '@qolumns/shared'
 
 export function toPlanInfo(plan: PlanDefinition, currency = 'USD'): PlanInfo {
   const cur = plan.monthlyPrice[currency] !== undefined ? currency : Object.keys(plan.monthlyPrice)[0] ?? 'USD'

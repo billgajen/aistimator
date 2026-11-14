@@ -4,7 +4,7 @@
  * `isRoomScanSupported()` is false and the app simply hides the option.
  */
 import { requireOptionalNativeModule } from 'expo-modules-core'
-import type { RoomScanRoom } from '@estimator/shared'
+import { PRODUCT_NAME, type RoomScanRoom } from '@qolumns/shared'
 
 interface RoomScanNative {
   isSupported(): boolean
@@ -23,6 +23,6 @@ export function isRoomScanSupported(): boolean {
 
 /** Presents the scanner; resolves with one room's geometry (metres). Rejects on cancel. */
 export async function scanRoom(): Promise<RoomScanRoom> {
-  if (!native) throw new Error('Room scanning needs the Aistimator app build (not Expo Go)')
+  if (!native) throw new Error(`Room scanning needs the ${PRODUCT_NAME} app build (not Expo Go)`)
   return native.scanRoom()
 }

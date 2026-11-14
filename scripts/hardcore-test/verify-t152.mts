@@ -7,7 +7,7 @@
 // Home, the setup logo) are driven by a Playwright pass using browser-input.json.
 import path from 'node:path'
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { ROOT, loadEnv, makeSupabase, sessionCookieHeader, http, expectOk, pollQuote, shortId, saveJson, runStamp } from './lib.mjs'
+import { ROOT, loadEnv, makeSupabase, sessionCookieHeader, http, expectOk, pollQuote, shortId, saveJson, runStamp, OLD_PRODUCT_NAMES } from './lib.mjs'
 import { garageDoorsPackUS } from '../../apps/web/src/lib/vertical-packs/garage-doors-us'
 
 const cfg = loadEnv()
@@ -219,7 +219,7 @@ check('pricing FAQ: 10 in total, not reset monthly', pricing.includes('Can I try
 const landing = text((await page(`${cfg.appUrl}/`)).html)
 check('home page: no "Start free"; the offer instead', !/Start free/.test(landing) && landing.includes('Try it free: 10 quotes, no card'))
 const login = text((await page(`${cfg.appUrl}/login`)).html)
-check('the login page shows the product name', login.includes('Aistimator') && !/>Estimator</.test(login))
+check('the login page shows the product name', login.includes('Qolumns') && !OLD_PRODUCT_NAMES.some((old) => login.includes(old)))
 
 writeFileSync(path.join(outDir, 'browser-input.json'), JSON.stringify({ appUrl: cfg.appUrl, owner: { email: a.email, password: a.password }, slug }, null, 2))
 saveJson(outDir, 'checks.json', checks)

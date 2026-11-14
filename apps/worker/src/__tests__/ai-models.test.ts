@@ -6,7 +6,7 @@ import {
   AiUsageMeter,
   AI_TASKS,
   harnessModel,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import { toClaudeJsonSchema } from '../ai/anthropic'
 import { createAiClient } from '../ai/factory'
 import { parseModelJson } from '../ai/client'
@@ -117,7 +117,7 @@ describe('Claude schema translation (T-135)', () => {
 })
 
 import { vi } from 'vitest'
-import { modelCapabilities, resolveThinkingLevel } from '@estimator/shared'
+import { modelCapabilities, resolveThinkingLevel } from '@qolumns/shared'
 import { GeminiClient, coerceToSchemaRoot, schemaInstruction } from '../ai/gemini'
 
 describe('per-model request capabilities (T-135)', () => {

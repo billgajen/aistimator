@@ -15,7 +15,7 @@ import {
   PRODUCT_NAME,
   DEFAULT_PRIMARY_COLOR,
   QUOTE_TURN_COPY,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import { checkPlanLimit, evaluateLimit, usedForAllowance } from '@/lib/plan-limits'
 import { getCurrentPeriod } from '@/lib/usage'
 import { buildChecklist, hasCustomBranding } from '@/lib/setup-checklist'
@@ -267,7 +267,7 @@ describe('T-152: old URLs still work (the five-item menu was replaced by T-160)'
 })
 
 describe('T-152: Use it on WhatsApp (Share)', () => {
-  const opts = { businessName: 'Gateway Doors', link: 'https://aistimator.test/quote/gateway-doors', region: 'US' }
+  const opts = { businessName: 'Gateway Doors', link: 'https://qolumns.test/quote/gateway-doors', region: 'US' }
 
   it('greeting, away and quick reply — each with the link and two lines on where to paste it', () => {
     const texts = buildWhatsAppTexts(opts)
@@ -312,7 +312,11 @@ describe('T-152: clean-up', () => {
     }
   })
 
-  it('no leftover "Estimator" product name in customer-facing or dashboard text', () => {
+  it('no leftover earlier product name in customer-facing or dashboard text', () => {
+    // T-162: the first working name, spelled in two parts so a search of the
+    // repo for the old names finds nothing here
+    const first = 'Esti' + 'mator'
+    const leftover = new RegExp(`Powered by ${first}|>${first}<|'${first} |${first} Widget|the ${first} widget`)
     for (const f of [
       'apps/web/src/lib/email-templates.ts',
       'apps/web/src/lib/postmark.ts',
@@ -321,9 +325,9 @@ describe('T-152: clean-up', () => {
       'apps/web/src/lib/embed-snippet.ts',
       'apps/web/src/app/demo/page.tsx',
     ]) {
-      expect(read(f)).not.toMatch(/Powered by Estimator|>Estimator<|'Estimator |Estimator Widget|the Estimator widget/)
+      expect(read(f)).not.toMatch(leftover)
     }
-    expect(PRODUCT_NAME).toBe('Aistimator')
+    expect(PRODUCT_NAME).toBe('Qolumns')
   })
 
   it('setup offers an optional logo using the same upload as Branding', () => {

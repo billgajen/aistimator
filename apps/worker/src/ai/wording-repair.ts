@@ -5,11 +5,11 @@
  *
  * The model rewrites the offending sentences only. Whether a rewrite is kept
  * (passes the guard, adds no numbers) is decided by the pure repair in
- * `@estimator/shared` wording-repair, not here.
+ * `@qolumns/shared` wording-repair, not here.
  */
 
-import { CUSTOMER_BANNED_WORDS, CUSTOMER_BANNED_LABELS } from '@estimator/shared'
-import type { OffendingSentence, SentenceRewriter } from '@estimator/shared'
+import { CUSTOMER_BANNED_WORDS, CUSTOMER_BANNED_LABELS } from '@qolumns/shared'
+import type { OffendingSentence, SentenceRewriter } from '@qolumns/shared'
 import type { AiClient } from './client'
 import { parseModelJson } from './client'
 

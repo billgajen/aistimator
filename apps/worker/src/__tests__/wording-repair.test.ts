@@ -10,8 +10,8 @@ import {
   isAcceptableRewrite,
   splitSentences,
   findConfidenceLanguageInPayload,
-} from '@estimator/shared'
-import type { SentenceRewriter } from '@estimator/shared'
+} from '@qolumns/shared'
+import type { SentenceRewriter } from '@qolumns/shared'
 import { createSentenceRewriter, parseRewrites } from '../ai/wording-repair'
 import type { AiClient } from '../ai/client'
 

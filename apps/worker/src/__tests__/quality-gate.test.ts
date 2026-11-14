@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { evaluateQualityGate } from '../agents/quality-gate'
-import type { ExtractedSignalsV2 } from '@estimator/shared'
+import type { ExtractedSignalsV2 } from '@qolumns/shared'
 import type { PricingResult } from '../pricing/rules-engine'
 import type { FusedSignals } from '../agents/types'
 

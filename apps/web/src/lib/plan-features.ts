@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getPlan, type PlanDefinition, type PlanFeatureSet, type PlanChannel } from '@estimator/shared'
+import { getPlan, type PlanDefinition, type PlanFeatureSet, type PlanChannel } from '@qolumns/shared'
 
 /**
- * Plan feature lookups (T-134: from the plan definitions in @estimator/shared,
+ * Plan feature lookups (T-134: from the plan definitions in @qolumns/shared,
  * not the plans table). Fail-safe: any error or no live subscription → null
  * plan → every gated feature off.
  */
@@ -33,7 +33,7 @@ export async function hasPlanChannel(supabase: SupabaseClient, tenantId: string,
 }
 
 /**
- * custom_branding = white-label: the "Prepared with Aistimator" badge is
+ * custom_branding = white-label: the "Prepared with Qolumns" badge is
  * dropped from customer-facing surfaces.
  */
 export async function hasCustomBranding(supabase: SupabaseClient, tenantId: string): Promise<boolean> {

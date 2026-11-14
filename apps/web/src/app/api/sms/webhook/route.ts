@@ -22,7 +22,7 @@ import {
 import { smsChannel } from '@/lib/sms-intake'
 import { runIntake } from '@/lib/messaging/intake-engine'
 import type { InboundMessage, IntakeConversation } from '@/lib/messaging/types'
-import type { WhatsAppIntakeData, WhatsAppIntakeState } from '@estimator/shared'
+import type { WhatsAppIntakeData, WhatsAppIntakeState } from '@qolumns/shared'
 
 export const dynamic = 'force-dynamic'
 

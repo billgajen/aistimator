@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { parseRoomScan, scanAnswers, ROOM_SCAN_FIELD, type AppCreateQuoteRequest, type ExpectedSignalConfig, type ServiceDraftConfig } from '@estimator/shared'
+import { parseRoomScan, scanAnswers, ROOM_SCAN_FIELD, type AppCreateQuoteRequest, type ExpectedSignalConfig, type ServiceDraftConfig } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
 import { createAdminClient } from '@/lib/supabase/server'
 import { createQuoteSubmission } from '@/lib/quote-intake'

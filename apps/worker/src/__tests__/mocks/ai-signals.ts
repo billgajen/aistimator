@@ -5,7 +5,7 @@
  * the quote processing pipeline without calling the actual Gemini API.
  */
 
-import type { ExtractedSignalsV2, ExtractedSignal } from '@estimator/shared'
+import type { ExtractedSignalsV2, ExtractedSignal } from '@qolumns/shared'
 
 /**
  * Creates a mock ExtractedSignalsV2 with specified signals

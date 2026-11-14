@@ -12,7 +12,7 @@ import type {
   MultiplierConfig,
   SuggestedField,
   ExpectedSignalConfig,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 export interface DescribablePricing {
   baseFee: number

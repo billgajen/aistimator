@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { computeAccuracy, type InvoicedQuote } from '@estimator/shared'
+import { computeAccuracy, type InvoicedQuote } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
 
 /**

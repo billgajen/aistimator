@@ -2,9 +2,9 @@
 
 import { WordingRepairCard } from '@/components/quotes/WordingRepairCard'
 import { useEffect, useState, use } from 'react'
-import { formatMoney } from '@estimator/shared'
+import { formatMoney } from '@qolumns/shared'
 import Link from 'next/link'
-import type { Quote, PricingTrace, PricingTraceStep } from '@estimator/shared'
+import type { Quote, PricingTrace, PricingTraceStep } from '@qolumns/shared'
 
 interface QuoteWithService extends Quote {
   service: {

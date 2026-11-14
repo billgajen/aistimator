@@ -30,7 +30,7 @@ import { checkPlanLimit } from '@/lib/plan-limits'
 import { enqueueQuoteJob } from '@/lib/queue'
 import { incrementUsageCounter } from '@/lib/usage'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { WhatsAppConversation, WhatsAppIntakeState, WhatsAppIntakeData } from '@estimator/shared'
+import type { WhatsAppConversation, WhatsAppIntakeState, WhatsAppIntakeData } from '@qolumns/shared'
 
 type Row = Record<string, unknown>
 

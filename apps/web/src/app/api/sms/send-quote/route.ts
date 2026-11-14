@@ -13,7 +13,7 @@
  */
 
 import { NextResponse, type NextRequest } from 'next/server'
-import { getRegion, statusAfterResend, QUOTE_TEXT_LINK_STATUSES, type QuoteStatus } from '@estimator/shared'
+import { getRegion, statusAfterResend, QUOTE_TEXT_LINK_STATUSES, type QuoteStatus } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { normalizePhone, sendSmsChecked } from '@/lib/sms'

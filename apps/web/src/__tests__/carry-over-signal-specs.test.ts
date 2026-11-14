@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { carryOverSignalSpecs } from '@/app/api/services/ai-draft/shared'
-import type { ServiceDraftConfig } from '@estimator/shared'
+import type { ServiceDraftConfig } from '@qolumns/shared'
 
 type Signals = ServiceDraftConfig['expectedSignals']
 

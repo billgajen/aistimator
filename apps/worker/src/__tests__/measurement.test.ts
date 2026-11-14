@@ -14,7 +14,7 @@ import {
   buildMeasurementSystemPrompt,
   type PassMeasurement,
 } from '../ai/measurement'
-import { US_REGION } from '@estimator/shared'
+import { US_REGION } from '@qolumns/shared'
 import type { AiClient } from '../ai/client'
 
 const TARGET = { signalKey: 'wall_area_sqm', description: 'Paintable wall area', unit: 'sqm' }

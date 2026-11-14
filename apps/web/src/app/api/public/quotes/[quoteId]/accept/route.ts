@@ -1,14 +1,14 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { quoteTokenFilter } from '@/lib/tokens'
-import { formatMoney, resolveRegionContext } from '@estimator/shared'
+import { formatMoney, resolveRegionContext } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { sendEmail, isPostmarkConfigured } from '@/lib/postmark'
 import { generateQuoteAcceptedEmailHtml } from '@/lib/email-templates'
 import { checkAcceptance, timingLabel, type AcceptanceDetails } from '@/lib/acceptance'
 import { resolveBusinessEmail } from '@/lib/business-email'
-import { canCustomerDecide } from '@estimator/shared'
-import type { AcceptQuoteResponse, QuotePricing, TenantBranding } from '@estimator/shared'
+import { canCustomerDecide } from '@qolumns/shared'
+import type { AcceptQuoteResponse, QuotePricing, TenantBranding } from '@qolumns/shared'
 
 /**
  * POST /api/public/quotes/:quoteId/accept

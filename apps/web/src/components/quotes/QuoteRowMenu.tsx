@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect } from 'react'
-import { QUOTE_TURN_COPY } from '@estimator/shared'
+import { QUOTE_TURN_COPY } from '@qolumns/shared'
 
 export interface QuoteRowMenuItem {
   key: string

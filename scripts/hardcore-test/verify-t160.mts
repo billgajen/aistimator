@@ -4,7 +4,7 @@
 //   npx tsx scripts/hardcore-test/verify-t160.mts
 // With the page checks as well (the menu on desktop and phone, the banner and
 // badge clearing, Done, Home with data and with none, the sign-in line):
-//   PLAYWRIGHT_DIR=~/estimator-browser npx tsx scripts/hardcore-test/verify-t160.mts
+//   PLAYWRIGHT_DIR=~/qolumns-browser npx tsx scripts/hardcore-test/verify-t160.mts
 // (playwright lives outside the repo: see scripts/hardcore-test/browser.mjs)
 //
 // 1. the renames: /app/services and /app/quote-link are the pages; the old

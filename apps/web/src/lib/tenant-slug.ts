@@ -3,11 +3,13 @@
  *
  * Slugs are generated in the database (migration 32, generate_tenant_slug)
  * so every way a tenant is created gets one. This module is the canonical
- * list of reserved words (the migration carries a copy; a unit test checks
- * they match) and validates a slug the business types when changing it.
+ * list of reserved words (migrations 32 and 40 carry the copy; a unit test
+ * checks they match) and validates a slug the business types when changing it.
+ * T-162: the product's name and its likely misspelling are reserved; the two
+ * earlier names stay reserved.
  */
 
-import { DEMO_SLUG } from '@estimator/shared'
+import { DEMO_SLUG } from '@qolumns/shared'
 
 export const SLUG_MIN_LENGTH = 3
 export const SLUG_MAX_LENGTH = 40
@@ -18,7 +20,7 @@ export const RESERVED_SLUGS: readonly string[] = [
   'billing', 'blog', 'business', 'contact', 'dashboard', 'demo', 'docs', 'embed',
   'estimate', 'estimates', 'estimator', 'example', 'features', 'help', 'home', 'login',
   'logout', 'mail', 'new', 'null', 'official', 'painting', 'pricing', 'privacy',
-  'quote', 'quotes', 'root', 'settings', 'setup', 'share', 'signup', 'static',
+  'qolumns', 'qolums', 'quote', 'quotes', 'root', 'settings', 'setup', 'share', 'signup', 'static',
   'support', 'terms', 'test', 'trades', 'undefined', 'widget', 'www',
 ]
 

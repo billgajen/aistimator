@@ -16,7 +16,7 @@ import {
   getRegion,
   type ApprovalOutcome,
   type ApprovalLinkRow,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import type { createAdminClient } from '@/lib/supabase/server'
 import { approveQuote } from '@/lib/quote-approval'
 

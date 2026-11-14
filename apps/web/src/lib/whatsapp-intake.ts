@@ -5,7 +5,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { WhatsAppConversation } from '@estimator/shared'
+import type { WhatsAppConversation } from '@qolumns/shared'
 import { sendTextMessage, downloadMedia, type WhatsAppConfig, type IncomingMessage } from './whatsapp'
 import { runIntake, shouldStartIntake, type IntakeResult } from './messaging/intake-engine'
 import type { ChannelAdapter } from './messaging/types'

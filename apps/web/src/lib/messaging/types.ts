@@ -7,7 +7,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { RegionDefinition, WhatsAppConversation } from '@estimator/shared'
+import type { RegionDefinition, WhatsAppConversation } from '@qolumns/shared'
 
 export type ChannelName = 'whatsapp' | 'sms'
 

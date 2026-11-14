@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import type { WorkStepConfig, ExpectedSignalConfig, SuggestedField } from '@estimator/shared'
+import type { WorkStepConfig, ExpectedSignalConfig, SuggestedField } from '@qolumns/shared'
 
 /**
  * Work Step Editor Component

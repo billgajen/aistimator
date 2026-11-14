@@ -1,9 +1,9 @@
 import { CONTACT_REQUIREMENTS, type ContactRequirement } from '@/lib/contact-rules'
 import { getPack } from '@/lib/vertical-packs'
 import { createClient } from '@/lib/supabase/server'
-import { getRegion, isRegionCode, isUnitSystem } from '@estimator/shared'
+import { getRegion, isRegionCode, isUnitSystem } from '@qolumns/shared'
 import { type NextRequest, NextResponse } from 'next/server'
-import type { ServiceAreaMode, TenantTemplate } from '@estimator/shared'
+import type { ServiceAreaMode, TenantTemplate } from '@qolumns/shared'
 
 /**
  * GET /api/tenant

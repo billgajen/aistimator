@@ -4,7 +4,7 @@
  * HTML email templates for quote notifications.
  * Uses inline styles for maximum email client compatibility.
  */
-import { PRODUCT_NAME } from '@estimator/shared'
+import { PRODUCT_NAME } from '@qolumns/shared'
 
 export interface CustomerEmailData {
   customerName: string

@@ -1,4 +1,4 @@
-# Aistimator — business app (Expo)
+# Qolumns — business app (Expo)
 
 On-site quoting for the business (T-137): sign in, create a quote with guided photos and the
 service's own questions, watch it price, confirm open questions on site, share the customer link.
@@ -6,7 +6,7 @@ service's own questions, watch it price, confirm open questions on site, share t
 ```bash
 cp .env.example .env      # API URL (use your Mac's LAN IP on a phone), Supabase URL + anon key
 npx expo start            # scan the QR code with Expo Go
-pnpm --filter @estimator/mobile typecheck && pnpm --filter @estimator/mobile test
+pnpm --filter @qolumns/mobile typecheck && pnpm --filter @qolumns/mobile test
 npx expo export --platform ios   # full JS bundle check, no device needed
 ```
 

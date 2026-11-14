@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { PageHeader } from '@/components/dashboard/EmptyState'
-import type { AnalyticsResponse, ServiceCalibration, ServiceBenchmark } from '@estimator/shared'
+import type { AnalyticsResponse, ServiceCalibration, ServiceBenchmark } from '@qolumns/shared'
 import { AccuracyPanel } from '@/components/analytics/AccuracyPanel'
 
 export default function AnalyticsPage() {

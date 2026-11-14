@@ -14,8 +14,8 @@
  */
 
 import { NextResponse } from 'next/server'
-import { statusAfterQuestionAnswered } from '@estimator/shared'
-import type { MarkFeedbackAnsweredResponse, QuoteStatus } from '@estimator/shared'
+import { statusAfterQuestionAnswered } from '@qolumns/shared'
+import type { MarkFeedbackAnsweredResponse, QuoteStatus } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
 
 export const dynamic = 'force-dynamic'

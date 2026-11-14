@@ -2,8 +2,8 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { QUOTE_TURN_COPY } from '@estimator/shared'
-import type { QuoteTurnTone } from '@estimator/shared'
+import { QUOTE_TURN_COPY } from '@qolumns/shared'
+import type { QuoteTurnTone } from '@qolumns/shared'
 import { TurnBadge } from '@/components/quotes/TurnBadge'
 
 export interface WaitingQuote {

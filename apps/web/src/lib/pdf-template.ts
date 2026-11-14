@@ -5,13 +5,13 @@
  * Uses inline styles for consistent rendering across PDF generators.
  */
 
-import { formatMoney } from '@estimator/shared'
+import { formatMoney } from '@qolumns/shared'
 import type {
   QuotePricing,
   QuoteContent,
   TenantBranding,
   TenantTemplate,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 export interface QuotePdfData {
   quoteId: string

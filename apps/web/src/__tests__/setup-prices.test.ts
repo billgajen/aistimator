@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import type { MultiplierConfig } from '@estimator/shared'
+import type { MultiplierConfig } from '@qolumns/shared'
 import { listPacks } from '@/lib/vertical-packs'
 import { toPriceList, applyPriceList, type PricedService } from '@/lib/price-list'
 import { servicePayload, applyCompile, type DraftService } from '@/lib/onboarding-service'

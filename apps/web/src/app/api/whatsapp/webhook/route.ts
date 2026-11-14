@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { verifyWebhookSignature, parseWebhookPayload, decryptToken } from '@/lib/whatsapp'
 import { processIntakeMessage, sendIntakeResponse } from '@/lib/whatsapp-intake'
-import type { WhatsAppConversation, WhatsAppIntakeState, WhatsAppIntakeData } from '@estimator/shared'
+import type { WhatsAppConversation, WhatsAppIntakeState, WhatsAppIntakeData } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'

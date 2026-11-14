@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { QUOTE_GROUP_STATUSES, QUOTE_LIST_GROUPS, defaultQuoteListGroup } from '@estimator/shared'
+import { QUOTE_GROUP_STATUSES, QUOTE_LIST_GROUPS, defaultQuoteListGroup } from '@qolumns/shared'
 import { unfinishedFilter } from '@/lib/unfinished-leads'
-import type { QuoteListCounts, QuoteListGroup, QuoteListItem, QuotesListResponse, QuoteStatus } from '@estimator/shared'
+import type { QuoteListCounts, QuoteListGroup, QuoteListItem, QuotesListResponse, QuoteStatus } from '@qolumns/shared'
 
 const VALID_STATUSES: QuoteStatus[] = [
   'queued',

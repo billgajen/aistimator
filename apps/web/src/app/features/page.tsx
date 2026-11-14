@@ -2,7 +2,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
-import { freeOfferLabel, PRODUCT_NAME } from '@estimator/shared'
+import { freeOfferLabel, PRODUCT_NAME } from '@qolumns/shared'
 
 export const metadata: Metadata = {
   title: `Features — ${PRODUCT_NAME}`,

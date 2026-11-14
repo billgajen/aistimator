@@ -11,7 +11,7 @@ import {
   type TaxConfig,
 } from './rules-engine'
 import { evaluateQualityGate } from '../agents/quality-gate'
-import type { ExtractedSignalsV2 } from '@estimator/shared'
+import type { ExtractedSignalsV2 } from '@qolumns/shared'
 import type { ExtractedSignals } from '../ai/signals'
 
 const signals = (): ExtractedSignals => ({

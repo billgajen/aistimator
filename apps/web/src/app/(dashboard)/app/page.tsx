@@ -1,7 +1,7 @@
 import { syncSelectedPlan } from '@/lib/signup-choices'
 import { createClient } from '@/lib/supabase/server'
 import { headers } from 'next/headers'
-import { QUOTE_GROUP_STATUSES, QUOTE_TURN_COPY, agoWords, formatMoney, getRegion, quoteActivityLine, quoteTurn } from '@estimator/shared'
+import { QUOTE_GROUP_STATUSES, QUOTE_TURN_COPY, agoWords, formatMoney, getRegion, quoteActivityLine, quoteTurn } from '@qolumns/shared'
 import { buildChecklist } from '@/lib/setup-checklist'
 import {
   buildHomeActivity,

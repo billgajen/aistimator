@@ -3,7 +3,7 @@
  * page: a provisional quote shows its range, a final one the exact total.
  */
 
-import { formatMoney, type AppQuoteView } from '@estimator/shared'
+import { formatMoney, type AppQuoteView } from '@qolumns/shared'
 
 export function headlinePrice(q: Pick<AppQuoteView, 'pricing' | 'status'>, locale = 'en-US'): string {
   const { total, currency, estimate } = q.pricing

@@ -2,7 +2,7 @@
  * Additional email templates for the quote editing and feedback flow.
  * Supplements the existing templates in postmark.ts.
  */
-import { PRODUCT_NAME } from '@estimator/shared'
+import { PRODUCT_NAME } from '@qolumns/shared'
 
 function escapeHtml(text: string): string {
   const htmlEntities: Record<string, string> = {

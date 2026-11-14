@@ -8,7 +8,7 @@ import {
   stripePriceIdFor,
   planForStripePrice,
   usageLevel,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import { checkPlanLimit } from '@/lib/plan-limits'
 import { getCurrentPeriod } from '@/lib/usage'
 import { toPlanInfo } from '@/lib/plans-view'

@@ -12,7 +12,7 @@ import {
   enforceEnvelope,
   coerceQuantity,
   type QuantityEnvelopeRule,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 // The painting pack's exterior wall envelope: per storey, [4m×2.3m .. 12m×3.0m]
 const WALL_RULE: QuantityEnvelopeRule = {

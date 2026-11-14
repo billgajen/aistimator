@@ -1,5 +1,5 @@
 /**
- * Estimator Widget Iframe Loader
+ * Qolumns widget iframe loader
  *
  * DEPRECATED: kept for existing customer snippets. New embeds should use
  * widget.js (data-mode="inline"), which supports all mount modes.
@@ -16,12 +16,12 @@
  * ></script>
  *
  * Or manually:
- * <div id="estimator-widget"></div>
+ * <div id="qolumns-widget"></div>
  * <script src="https://your-domain.com/iframe-loader.js"></script>
  * <script>
- *   EstimatorIframe.init({
+ *   QolumnsIframe.init({
  *     tenantKey: 'tkey_xxx',
- *     container: '#estimator-widget'
+ *     container: '#qolumns-widget'
  *   });
  * </script>
  */
@@ -45,15 +45,15 @@
 
   function init(config) {
     if (!config.tenantKey) {
-      console.error('[Estimator] tenantKey is required');
+      console.error('[qolumns] tenantKey is required');
       return;
     }
 
-    var containerId = config.container || '#estimator-widget';
+    var containerId = config.container || '#qolumns-widget';
     var container = document.querySelector(containerId);
 
     if (!container) {
-      console.error('[Estimator] Container not found:', containerId);
+      console.error('[qolumns] Container not found:', containerId);
       return;
     }
 
@@ -102,7 +102,7 @@
     }
 
     // Handle resize
-    if (data.type === 'estimator-resize' && data.tenantKey && data.height) {
+    if (data.type === 'qolumns-resize' && data.tenantKey && data.height) {
       var iframe = iframes[data.tenantKey];
       if (iframe) {
         iframe.style.height = data.height + 'px';
@@ -110,8 +110,8 @@
     }
 
     // Handle submission (optional callback)
-    if (data.type === 'estimator-submitted') {
-      var submitEvent = new CustomEvent('estimator:submitted', {
+    if (data.type === 'qolumns-submitted') {
+      var submitEvent = new CustomEvent('qolumns:submitted', {
         detail: {
           quoteId: data.quoteId,
           quoteViewUrl: data.quoteViewUrl,
@@ -135,7 +135,7 @@
         if (tenantKey) {
           init({
             tenantKey: tenantKey,
-            container: script.getAttribute('data-container') || '#estimator-widget',
+            container: script.getAttribute('data-container') || '#qolumns-widget',
             serviceId: script.getAttribute('data-service-id'),
             displayMode: script.getAttribute('data-display-mode')
           });
@@ -153,7 +153,7 @@
   }
 
   // Expose API
-  window.EstimatorIframe = {
+  window.QolumnsIframe = {
     init: init,
     iframes: iframes
   };

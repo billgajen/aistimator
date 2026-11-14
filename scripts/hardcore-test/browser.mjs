@@ -1,6 +1,6 @@
 // Browser checks (T-154, T-155) need playwright and pngjs, which the repo
 // doesn't depend on. Install them once anywhere outside the repo, e.g.
-//   mkdir -p ~/estimator-browser && cd ~/estimator-browser && npm i playwright pngjs && npx playwright install chromium
+//   mkdir -p ~/qolumns-browser && cd ~/qolumns-browser && npm i playwright pngjs && npx playwright install chromium
 // and point PLAYWRIGHT_DIR at that folder when running a browser verify.
 import { createRequire } from 'node:module'
 import path from 'node:path'

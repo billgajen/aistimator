@@ -4,7 +4,7 @@
  * the field's options. A typo here silently drops a line from every quote.
  */
 import { describe, it, expect } from 'vitest'
-import { extractFormulaIdentifiers } from '@estimator/shared'
+import { extractFormulaIdentifiers } from '@qolumns/shared'
 import { listPacks } from '@/lib/vertical-packs'
 
 for (const pack of listPacks()) {

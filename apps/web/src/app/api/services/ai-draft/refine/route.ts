@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
-import type { ServiceDraftConfig } from '@estimator/shared'
+import type { ServiceDraftConfig } from '@qolumns/shared'
 import { validateAndNormalizeDraft, callGemini, parseGeminiJson, loadTenantRegionBlock } from '../shared'
 
 /**

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { approvalOutcomeCopy, PRODUCT_NAME, type ApprovalOutcome } from '@estimator/shared'
+import { approvalOutcomeCopy, PRODUCT_NAME, type ApprovalOutcome } from '@qolumns/shared'
 import type { ApprovalSummary } from '@/lib/approval-link'
 
 /**

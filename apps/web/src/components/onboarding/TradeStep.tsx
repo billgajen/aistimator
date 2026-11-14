@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import type { RegionCode } from '@estimator/shared'
-import { listRegions } from '@estimator/shared'
+import type { RegionCode } from '@qolumns/shared'
+import { listRegions } from '@qolumns/shared'
 import type { VerticalPack } from '@/lib/vertical-packs/types'
 
 /**

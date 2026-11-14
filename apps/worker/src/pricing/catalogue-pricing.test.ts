@@ -10,7 +10,7 @@ import {
   type PricingRules,
   type TaxConfig,
 } from './rules-engine'
-import type { ExtractedSignalsV2 } from '@estimator/shared'
+import type { ExtractedSignalsV2 } from '@qolumns/shared'
 import type { ExtractedSignals } from '../ai/signals'
 
 const signals = (): ExtractedSignals => ({

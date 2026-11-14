@@ -21,7 +21,7 @@
  *   (`triggerSignal`). Like-for-like replacement; upsizing is a site visit.
  */
 
-import type { ExpectedSignalConfig, WorkStepConfig } from '@estimator/shared'
+import type { ExpectedSignalConfig, WorkStepConfig } from '@qolumns/shared'
 import type { VerticalPack } from './types'
 
 /** Nominal cooling sizes; the "024"…"060" BTU/hr ÷ 1000 codes map onto them */

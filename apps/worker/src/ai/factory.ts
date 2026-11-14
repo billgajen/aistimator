@@ -5,7 +5,7 @@
  * `createGeminiClient` contract (callers already degrade gracefully).
  */
 
-import type { AiTask, AiUsageMeter } from '@estimator/shared'
+import type { AiTask, AiUsageMeter } from '@qolumns/shared'
 import type { AiClient, AiEnv } from './client'
 import { routeFor, thinkingFor, usageSinkFor } from './client'
 import { GeminiClient } from './gemini'

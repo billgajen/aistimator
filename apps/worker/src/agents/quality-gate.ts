@@ -11,7 +11,7 @@
  */
 
 import type { AiClient } from '../ai/client'
-import type { ExtractedSignalsV2, ClarificationQuestion, QualityGateResult } from '@estimator/shared'
+import type { ExtractedSignalsV2, ClarificationQuestion, QualityGateResult } from '@qolumns/shared'
 import type { PricingResult } from '../pricing/rules-engine'
 import type { FusedSignals, SignalConflict } from './types'
 

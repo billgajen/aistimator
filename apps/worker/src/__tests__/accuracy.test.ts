@@ -1,6 +1,6 @@
 /** T-143: estimate accuracy against final invoices (pure stats). */
 import { describe, it, expect } from 'vitest'
-import { computeAccuracy, parseMoneyInput, ACCURACY_TARGETS } from '@estimator/shared'
+import { computeAccuracy, parseMoneyInput, ACCURACY_TARGETS } from '@qolumns/shared'
 
 const q = (serviceName: string, quoted: number, invoiced: number, grade: 'A' | 'B' | 'C' | null = null) => ({ serviceName, quoted, invoiced, grade })
 

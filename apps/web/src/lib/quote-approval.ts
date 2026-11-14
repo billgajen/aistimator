@@ -20,8 +20,8 @@
  *   `approved_via` records which.
  */
 
-import { formatMoney, getRegion, repairCustomerWording, businessPhrasesFrom } from '@estimator/shared'
-import type { QuotePricing, TenantBranding, CustomerWording, WordingRepairRecord, PricingRules, WorkStepConfig } from '@estimator/shared'
+import { formatMoney, getRegion, repairCustomerWording, businessPhrasesFrom } from '@qolumns/shared'
+import type { QuotePricing, TenantBranding, CustomerWording, WordingRepairRecord, PricingRules, WorkStepConfig } from '@qolumns/shared'
 import type { createClient, createAdminClient } from '@/lib/supabase/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { sendEmail, isPostmarkConfigured, generateCustomerEmailHtml } from '@/lib/postmark'

@@ -14,7 +14,7 @@ import type {
   ExtractedSignalsV2,
   WorkStepConfig,
   TakeoffEntry,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 /**
  * Human-facing estimate reference: EST-{year}-{last 6 of the quote id}.

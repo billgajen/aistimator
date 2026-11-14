@@ -45,16 +45,16 @@ import type {
   ServiceConfigForValidation,
   GeneratedQuoteForValidation,
 } from './ai'
-import type { MatchedItem, ExtractedSignalsV2, PricingTrace, ExpectedSignalConfig, LowConfidenceMode, SignalRecommendation, WorkStepConfig, ValidationSettings, ValidationResult, ValidationOutcome, ServiceDraftConfig } from '@estimator/shared'
+import type { MatchedItem, ExtractedSignalsV2, PricingTrace, ExpectedSignalConfig, LowConfidenceMode, SignalRecommendation, WorkStepConfig, ValidationSettings, ValidationResult, ValidationOutcome, ServiceDraftConfig } from '@qolumns/shared'
 import { classify as triageClassify, queryPreviousQuoteCount } from './agents/triage'
 import { initializeFusionFromStructuredSignals } from './agents/signal-fusion'
 import { evaluateQualityGate } from './agents/quality-gate'
 import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
-import type { QualityGateResult, ClarificationQuestion } from '@estimator/shared'
-import { AiUsageMeter } from '@estimator/shared'
+import type { QualityGateResult, ClarificationQuestion } from '@qolumns/shared'
+import { AiUsageMeter } from '@qolumns/shared'
 import { createAiClient } from './ai/factory'
 import type { AiClient } from './ai/client'
-import { computeEnvelope, enforceEnvelope, computeEstimateGrade, capFlatRateGrade, priceDependsOnJobFacts, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue, parseRoomScan, scanAnswers, scanEvidence, summarizeRoomScan, ROOM_SCAN_FIELD, decideReviewHold, reviewModeOf, customerEstimateRange, repairCustomerWording, businessPhrasesFrom } from '@estimator/shared'
+import { computeEnvelope, enforceEnvelope, computeEstimateGrade, capFlatRateGrade, priceDependsOnJobFacts, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue, parseRoomScan, scanAnswers, scanEvidence, summarizeRoomScan, ROOM_SCAN_FIELD, decideReviewHold, reviewModeOf, customerEstimateRange, repairCustomerWording, businessPhrasesFrom } from '@qolumns/shared'
 import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor, DEFAULT_ADJUDICATION_VALUE_THRESHOLD, DEFAULT_ADJUDICATION_TIMEOUT_MS } from './ai/measurement'
 import { formatScopeAnswers } from './ai/scope-answers'
 import { fieldOptions, snapToOption, answersOutsideOptions, type OptionField } from './answer-options'
@@ -62,7 +62,7 @@ import { identificationTargets, identifyFromLabels, applyIdentifications, weaken
 import { buildTakeoff, buildReference } from './takeoff'
 import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing, findLookalikeUnconditionedSteps } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
-import type { CrossServicePricing } from '@estimator/shared'
+import type { CrossServicePricing } from '@qolumns/shared'
 import { createSentenceRewriter } from './ai/wording-repair'
 import { sendQuoteEmails, sendReviewRequestEmail, sendEstimateShownEmail, isEmailConfigured } from './email'
 import { issueApprovalLink } from './approval-link'
@@ -4169,7 +4169,7 @@ import type {
   ValidationInputSnapshot,
   ValidationQuoteSnapshot,
   ValidationCorrections,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 /**
  * Log parameters for validation result

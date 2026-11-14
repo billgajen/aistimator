@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Bricolage_Grotesque, Instrument_Sans, Spline_Sans_Mono } from 'next/font/google'
 import './globals.css'
-import { PRODUCT_NAME } from '@estimator/shared'
+import { PRODUCT_NAME } from '@qolumns/shared'
 
 const bricolage = Bricolage_Grotesque({
   subsets: ['latin'],

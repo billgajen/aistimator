@@ -1,7 +1,7 @@
 'use client'
 
-import { QUOTE_TURN_COPY } from '@estimator/shared'
-import type { QuoteTurn } from '@estimator/shared'
+import { QUOTE_TURN_COPY } from '@qolumns/shared'
+import type { QuoteTurn } from '@qolumns/shared'
 
 const PRIMARY =
   'inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50'
@@ -10,7 +10,7 @@ const SECONDARY =
 
 /**
  * T-158: the top of the quote page. One sentence saying whose turn it is and
- * one main button, both from `quoteTurn` in @estimator/shared. The buttons run
+ * one main button, both from `quoteTurn` in @qolumns/shared. The buttons run
  * the page's existing actions; nothing here decides what is allowed.
  */
 export function NextStepBox({

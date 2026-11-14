@@ -1,6 +1,6 @@
 // T-154 live check: the home page rewrite and the marketing site, at 390 px and 1440 px.
 // Run with the web app up (pnpm dev:web), then:
-//   PLAYWRIGHT_DIR=~/estimator-browser npx tsx scripts/hardcore-test/verify-t154.mts
+//   PLAYWRIGHT_DIR=~/qolumns-browser npx tsx scripts/hardcore-test/verify-t154.mts
 // (playwright and pngjs live outside the repo: see scripts/hardcore-test/browser.mjs)
 //
 // Screenshots go to the results folder for a human look; the checks are the
@@ -89,7 +89,7 @@ const og = await fetch(`${app}/opengraph-image`)
 const ogBytes = og.ok ? (await og.arrayBuffer()).byteLength : 0
 check('the social preview image renders', og.ok && og.headers.get('content-type') === 'image/png' && ogBytes > 5000, ogBytes)
 const head = await (await fetch(`${app}/`)).text()
-check('home <title> and description carry the new message', head.includes('<title>Instant quotes on your website, in your prices — Aistimator</title>') && head.includes('og:image'))
+check('home <title> and description carry the new message', head.includes('<title>Instant quotes on your website, in your prices — Qolumns</title>') && head.includes('og:image'))
 
 await browser.close()
 console.log(`\nScreenshots: ${out}`)

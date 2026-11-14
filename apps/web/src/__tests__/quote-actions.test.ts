@@ -37,7 +37,7 @@ import {
   QUOTE_LINK_STATUSES,
   QUOTE_TEXT_LINK_STATUSES,
   type QuoteStatus,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import { resolveBusinessEmail } from '@/lib/business-email'
 import { quoteTokenFilter, quoteTokenMatches, hashToken } from '@/lib/tokens'
 import { approvedWithoutEmailMessage, copyLinkFallbackMessage } from '@/lib/quote-action-copy'
@@ -626,7 +626,7 @@ describe('T-157: the maths label rule', () => {
 
   it('the customer page and the edit route use the shared helpers', () => {
     const customerPage = code('apps/web/src/app/q/[quoteId]/page.tsx')
-    expect(customerPage).toMatch(/import \{[^}]*splitLabelMath[^}]*\} from '@estimator\/shared'/)
+    expect(customerPage).toMatch(/import \{[^}]*splitLabelMath[^}]*\} from '@qolumns\/shared'/)
     expect(customerPage).not.toMatch(/function splitLabelMath/)
     expect(code('apps/web/src/app/api/quotes/[quoteId]/route.ts')).toContain('dropStaleLabelMath(')
   })

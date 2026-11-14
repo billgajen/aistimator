@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type KeyboardEvent } from 'react'
-import type { ExpectedSignalConfig } from '@estimator/shared'
+import type { ExpectedSignalConfig } from '@qolumns/shared'
 
 /**
  * Expected Signal Editor Component

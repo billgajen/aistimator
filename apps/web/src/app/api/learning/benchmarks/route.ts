@@ -4,8 +4,8 @@ import {
   computeBenchmarks,
   type MyServiceInput,
   type BenchmarkRateInput,
-} from '@estimator/shared'
-import type { PricingRules } from '@estimator/shared'
+} from '@qolumns/shared'
+import type { PricingRules } from '@qolumns/shared'
 
 /**
  * GET /api/learning/benchmarks (T-115)

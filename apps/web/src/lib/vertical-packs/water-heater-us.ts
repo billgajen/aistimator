@@ -16,7 +16,7 @@
  *   identified (or confirmed) values. Tankless conversion is out of scope.
  */
 
-import type { WorkStepConfig } from '@estimator/shared'
+import type { WorkStepConfig } from '@qolumns/shared'
 import type { VerticalPack } from './types'
 
 const CAPACITIES = ['30 gal', '40 gal', '50 gal', '75 gal'] as const

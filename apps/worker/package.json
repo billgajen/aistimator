@@ -1,5 +1,5 @@
 {
-  "name": "@estimator/worker",
+  "name": "@qolumns/worker",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
-    "@estimator/shared": "workspace:*",
+    "@qolumns/shared": "workspace:*",
     "@supabase/supabase-js": "^2.44.0",
     "@upstash/redis": "^1.36.1"
   },

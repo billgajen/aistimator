@@ -1,10 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { getStripeClient, getSubscriptionDetails } from '@/lib/stripe'
 import { toPlanInfo } from '@/lib/plans-view'
-import { getPlan, offeredPlans, freeAllowance, usageLevel } from '@estimator/shared'
+import { getPlan, offeredPlans, freeAllowance, usageLevel } from '@qolumns/shared'
 import { usedForAllowance } from '@/lib/plan-limits'
 import { NextResponse } from 'next/server'
-import type { BillingResponse, PlanInfo, SubscriptionInfo, BillingUsage } from '@estimator/shared'
+import type { BillingResponse, PlanInfo, SubscriptionInfo, BillingUsage } from '@qolumns/shared'
 
 /**
  * GET /api/billing

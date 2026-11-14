@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-na
 import { supabase } from '../src/lib/supabase'
 import { Button, ErrorText, Field, Muted, Screen } from '../src/components/ui'
 import { colors, space } from '../src/theme'
+import { PRODUCT_NAME } from '@qolumns/shared'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -21,7 +22,7 @@ export default function Login() {
   return (
     <Screen>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.wrap}>
-        <Text style={styles.brand}>Aistimator</Text>
+        <Text style={styles.brand}>{PRODUCT_NAME}</Text>
         <Muted>Quote on site. Sign in with your business account.</Muted>
         <View style={{ height: space.xl }} />
         <Field label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" textContentType="username" />

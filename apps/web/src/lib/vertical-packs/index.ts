@@ -6,7 +6,7 @@
  * one line here — no engine changes.
  */
 
-import type { RegionCode } from '@estimator/shared'
+import type { RegionCode } from '@qolumns/shared'
 import type { VerticalPack } from './types'
 import { paintingPack } from './painting'
 import { paintingPackUS } from './painting-us'

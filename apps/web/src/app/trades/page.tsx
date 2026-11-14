@@ -3,9 +3,10 @@ import type { Metadata } from 'next'
 import { TRADES } from '@/lib/marketing/trades'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
+import { PRODUCT_NAME } from '@qolumns/shared'
 
 export const metadata: Metadata = {
-  title: 'Instant Estimates by Trade | Aistimator',
+  title: `Instant Estimates by Trade | ${PRODUCT_NAME}`,
   description: 'Instant, evidence-backed estimates for HVAC, water heaters, plumbing, electrical, garage doors and painting.',
 }
 

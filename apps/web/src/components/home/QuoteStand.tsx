@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { QUOTE_TURN_COPY } from '@estimator/shared'
+import { QUOTE_TURN_COPY } from '@qolumns/shared'
 
 /**
  * T-160: "Where your quotes stand" on Home — three counts by whose turn it

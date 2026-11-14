@@ -16,7 +16,7 @@
  */
 
 import type { AiClient } from './client'
-import { normalizeUnit, unitKind, fromCanonical, getRegion, type ReferenceObject } from '@estimator/shared'
+import { normalizeUnit, unitKind, fromCanonical, getRegion, type ReferenceObject } from '@qolumns/shared'
 
 export interface MeasurementTarget {
   signalKey: string

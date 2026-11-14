@@ -1,4 +1,4 @@
-// Shared types and utilities for the Estimator platform
+// Shared types and utilities for the Qolumns platform
 
 // Re-export database types
 export * from './database.types'

@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
-import { formatMoney, type QuoteListItem } from '@estimator/shared'
+import { formatMoney, type QuoteListItem } from '@qolumns/shared'
 import { useApi } from '../src/lib/api-context'
 import { statusLabel } from '../src/lib/price'
 import { supabase } from '../src/lib/supabase'

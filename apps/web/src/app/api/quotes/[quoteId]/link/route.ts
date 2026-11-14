@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
-import { canCopyQuoteLink } from '@estimator/shared'
+import { canCopyQuoteLink } from '@qolumns/shared'
 
 /**
  * POST /api/quotes/:quoteId/link

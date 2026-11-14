@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og'
-import { PRODUCT_NAME, freeOfferLabel } from '@estimator/shared'
+import { PRODUCT_NAME, freeOfferLabel } from '@qolumns/shared'
 import { HERO } from '@/lib/marketing/home-copy'
 
 /** T-154: the social preview image — the home page's message, in the site's colours */

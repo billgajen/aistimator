@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { MetaPixel } from './MetaPixel'
 import { MobileMenu } from './MobileMenu'
 import { NAV_LINKS, HEADER_SHORT_CTA } from '@/lib/marketing/nav'
-import { freeOfferLabel, PRODUCT_NAME } from '@estimator/shared'
+import { freeOfferLabel, PRODUCT_NAME } from '@qolumns/shared'
 
 /**
  * Marketing site navigation — shared across all public pages.

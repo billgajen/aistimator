@@ -1,4 +1,4 @@
-import { DEMO_BUSINESS_NAME, DEMO_LOGO_PATH, DEMO_PRIMARY_COLOR, formatMoney } from '@estimator/shared'
+import { DEMO_BUSINESS_NAME, DEMO_LOGO_PATH, DEMO_PRIMARY_COLOR, formatMoney } from '@qolumns/shared'
 import type { MarketingExample } from '@/lib/marketing/examples'
 
 const money = (n: number) => formatMoney(n, 'USD', 'en-US')

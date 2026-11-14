@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { planForStripePrice } from '@estimator/shared'
+import { planForStripePrice } from '@qolumns/shared'
 import { getStripeClient } from '@/lib/stripe'
 import { NextResponse } from 'next/server'
 import type Stripe from 'stripe'

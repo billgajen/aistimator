@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { formatMoney } from '@estimator/shared'
+import { formatMoney } from '@qolumns/shared'
 import { useCopy } from '@/components/share/useCopy'
 
 interface TestQuote {

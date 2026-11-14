@@ -23,7 +23,7 @@ import {
   type AddonDetectionContext,
   type PricingResult,
 } from '../pricing/rules-engine'
-import type { PricingTrace } from '@estimator/shared'
+import type { PricingTrace } from '@qolumns/shared'
 import { createMockSignalsV2, createLegacySignals } from './mocks/ai-signals'
 
 // Import fence service fixtures

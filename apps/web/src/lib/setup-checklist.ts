@@ -12,7 +12,7 @@
  * Branding is not a step any more; `hasCustomBranding` drives the tick on the
  * Settings → Branding tab.
  */
-import { DEFAULT_PRIMARY_COLOR } from '@estimator/shared'
+import { DEFAULT_PRIMARY_COLOR } from '@qolumns/shared'
 
 export interface ChecklistInput {
   hasService: boolean

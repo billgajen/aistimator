@@ -2,7 +2,7 @@
  * The widget.js embed snippet (AD-024 loader) — pure. Shared by the Share
  * page and the setup flow's last step.
  */
-import { PRODUCT_NAME } from '@estimator/shared'
+import { EMBED_NAMES, PRODUCT_NAME } from '@qolumns/shared'
 
 /** The widget.js snippet for a placement and experience (AD-024 loader). */
 export function embedSnippet(opts: {
@@ -23,12 +23,12 @@ export function embedSnippet(opts: {
 ></script>`
   }
   return `<!-- ${PRODUCT_NAME} Widget (Inline) -->
-<div id="estimator-widget"></div>
+<div id="${EMBED_NAMES.containerId}"></div>
 <script
   src="${opts.appOrigin}/widget.js"
   data-tenant-key="${opts.tenantKey}"
   data-mode="inline"
-  data-container="#estimator-widget"${displayAttr}
+  data-container="#${EMBED_NAMES.containerId}"${displayAttr}
   async
 ></script>`
 }

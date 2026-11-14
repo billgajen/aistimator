@@ -1,4 +1,4 @@
-# US Launch Plan — Aistimator V4
+# US Launch Plan — Qolumns V4
 
 > **Status:** North star for the next build phase, agreed 2026-11-07. Extends `06-v2-strategy.md`
 > and `07-measurement-engine.md`. Where this file conflicts with them, this file wins.

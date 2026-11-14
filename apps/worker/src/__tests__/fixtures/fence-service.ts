@@ -6,7 +6,7 @@
  * urgent/emergency, and confusing/contradictory customer requests.
  */
 
-import type { WorkStepConfig, AddonConfig, ExpectedSignalConfig } from '@estimator/shared'
+import type { WorkStepConfig, AddonConfig, ExpectedSignalConfig } from '@qolumns/shared'
 import type { PricingRules, TaxConfig, FormAnswer } from '../../pricing/rules-engine'
 import type { TestServiceConfig } from './test-services'
 

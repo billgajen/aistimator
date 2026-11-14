@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
-import type { PricingRules } from '@estimator/shared'
+import type { PricingRules } from '@qolumns/shared'
 
 /**
  * GET /api/services/[id]/pricing

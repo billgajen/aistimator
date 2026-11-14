@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
-import type { TenantBranding, TenantTemplate } from '@estimator/shared'
-import { DEFAULT_PRIMARY_COLOR } from '@estimator/shared'
+import type { TenantBranding, TenantTemplate } from '@qolumns/shared'
+import { DEFAULT_PRIMARY_COLOR } from '@qolumns/shared'
 
 const DEFAULT_BRANDING: TenantBranding = {
   logoAssetId: null,

@@ -20,7 +20,7 @@ import {
   type IdentificationReading,
   type ResolvedIdentification,
   type WorkStepConfig,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 export interface IdentificationTarget {
   signalKey: string

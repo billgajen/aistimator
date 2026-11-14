@@ -8,7 +8,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk'
-import type { ModelRoute } from '@estimator/shared'
+import type { ModelRoute } from '@qolumns/shared'
 import type { AiClient, GenerationOptions, ImageInput, UsageSink } from './client'
 import { parseModelJson } from './client'
 

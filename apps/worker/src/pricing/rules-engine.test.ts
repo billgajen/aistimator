@@ -17,7 +17,7 @@ import {
 import type {
   WorkStepConfig,
   ExtractedSignalsV2,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import type { ExtractedSignals } from '../ai/signals'
 
 // ============================================================================

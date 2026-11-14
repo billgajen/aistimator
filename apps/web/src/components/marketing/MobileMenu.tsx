@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { PRODUCT_NAME, freeOfferLabel } from '@estimator/shared'
+import { PRODUCT_NAME, freeOfferLabel } from '@qolumns/shared'
 import { NAV_LINKS } from '@/lib/marketing/nav'
 import { lockPageScroll } from '@/lib/marketing/scroll-lock'
 

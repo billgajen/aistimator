@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { getRegion, canDownloadQuotePdf } from '@estimator/shared'
+import { getRegion, canDownloadQuotePdf } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
 import { generatePdf, isDocRaptorConfigured } from '@/lib/docraptor'
 import { generateQuotePdfHtml, type QuotePdfData } from '@/lib/pdf-template'
@@ -9,7 +9,7 @@ import type {
   QuoteContent,
   TenantBranding,
   TenantTemplate,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 /**
  * POST /api/quotes/:quoteId/pdf

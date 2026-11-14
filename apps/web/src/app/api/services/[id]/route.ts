@@ -7,7 +7,7 @@ import type {
   WorkStepConfig,
   ExpectedSignalConfig,
   ServiceDraftConfig,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 /**
  * GET /api/services/[id]

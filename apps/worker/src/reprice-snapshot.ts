@@ -14,7 +14,7 @@ import type {
   ExtractedSignalsV2,
   MatchedItem,
   SignalRecommendation,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import type { ExtractedSignals } from './ai/signals'
 import type { QuoteContent } from './ai/wording'
 import type { StageTimings } from './stage-timer'

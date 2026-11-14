@@ -10,7 +10,7 @@
 
 import { GeminiClient } from './gemini'
 import type { AiClient } from './client'
-import type { SignalRecommendation, WorkStepConfig } from '@estimator/shared'
+import type { SignalRecommendation, WorkStepConfig } from '@qolumns/shared'
 
 /**
  * Unused signal detected from extraction

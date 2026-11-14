@@ -10,7 +10,7 @@
  * promoted (OWNER-TODO.md, T-141).
  */
 
-import type { SuggestedField, WorkStepConfig } from '@estimator/shared'
+import type { SuggestedField, WorkStepConfig } from '@qolumns/shared'
 import type { VerticalPack } from './types'
 
 const SUPPLY_FIELD = 'fixture_supply'

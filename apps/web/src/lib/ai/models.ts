@@ -4,7 +4,7 @@
  * (with a warning) instead of failing the request.
  */
 
-import { resolveModelRoute, resolveThinkingLevel, type AiTask } from '@estimator/shared'
+import { resolveModelRoute, resolveThinkingLevel, type AiTask } from '@qolumns/shared'
 
 export const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 

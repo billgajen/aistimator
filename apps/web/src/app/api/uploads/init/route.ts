@@ -1,6 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import type { AssetType } from '@estimator/shared'
+import type { AssetType } from '@qolumns/shared'
 import { generateUploadUrl, isR2Configured } from '@/lib/r2'
 
 interface FileInput {

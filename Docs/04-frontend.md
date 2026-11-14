@@ -201,6 +201,12 @@ email signature and text replies, with no website needed. Renders the same widge
 tagline, colour and the white-label "Powered by" rule. Unknown or inactive → plain 404; a former slug → 308.
 
 ## Embed modes
+Public names of the embed code (T-162; `EMBED_NAMES` in `packages/shared/src/brand.ts`, mirrored by the two static
+loaders): container id `qolumns-widget` · globals `QolumnsWidget` (widget.js) and `QolumnsIframe` (iframe-loader.js) ·
+messages from the embedded page `qolumns-resize` and `qolumns-submitted` · the `qolumns:submitted` event on `document` ·
+floating button `qolumns-floating-launcher` and overlay `qolumns-floating-overlay` · console prefix `[qolumns]`. The file
+names `widget.js` and `iframe-loader.js` are unchanged.
+
 ### A) JS snippet embed (second option since T-149)
 - Business pastes a script snippet.
 - Script loads your widget bundle from CDN and mounts into:

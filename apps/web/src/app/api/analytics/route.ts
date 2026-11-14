@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { checkPlanLimit } from '@/lib/plan-limits'
-import { getPlan } from '@estimator/shared'
-import type { AnalyticsResponse, AnalyticsMetrics, UsageData } from '@estimator/shared'
+import { getPlan } from '@qolumns/shared'
+import type { AnalyticsResponse, AnalyticsMetrics, UsageData } from '@qolumns/shared'
 
 /**
  * GET /api/analytics

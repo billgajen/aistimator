@@ -12,7 +12,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
-      '@estimator/shared': path.resolve(__dirname, '../../packages/shared/src'),
+      '@qolumns/shared': path.resolve(__dirname, '../../packages/shared/src'),
     },
   },
 })

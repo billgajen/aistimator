@@ -9,7 +9,7 @@
  * IMPORTANT: AI does NOT set prices. All pricing is computed from rules.
  */
 
-import { currencySymbol, roundMoney } from '@estimator/shared'
+import { currencySymbol, roundMoney } from '@qolumns/shared'
 import type { ExtractedSignals } from '../ai/signals'
 import type {
   MeasurementModel,
@@ -22,8 +22,8 @@ import type {
   PricingTraceStep,
   ExtractedSignalsV2,
   ExtractedSignal,
-} from '@estimator/shared'
-import { evaluateFormula } from '@estimator/shared'
+} from '@qolumns/shared'
+import { evaluateFormula } from '@qolumns/shared'
 import type { CrossServiceEstimate } from '../ai/cross-service'
 
 /**

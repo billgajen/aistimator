@@ -12,7 +12,7 @@ import {
   findConfidenceLanguage,
   findConfidenceLanguageInPayload,
   REVIEW_MODES,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import { customerQuoteEmail } from '../email/templates'
 
 describe('T-147: service review mode', () => {

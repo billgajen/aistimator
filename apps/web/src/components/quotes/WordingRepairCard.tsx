@@ -3,7 +3,7 @@
  * wording and what was done about them (rewritten, removed, or left for the
  * business to edit). Rendered on the dashboard trace page only.
  */
-import type { WordingRepairRecord } from '@estimator/shared'
+import type { WordingRepairRecord } from '@qolumns/shared'
 
 const PATH_LABEL: Record<WordingRepairRecord['path'], string> = {
   generation: 'When the estimate was written',

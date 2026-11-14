@@ -3,8 +3,8 @@
  *
  * Used for resending quote emails from the dashboard.
  */
-import { PRODUCT_NAME, emailFromHeader, redactEmails } from '@estimator/shared'
-import type { EmailSender } from '@estimator/shared'
+import { PRODUCT_NAME, emailFromHeader, redactEmails } from '@qolumns/shared'
+import type { EmailSender } from '@qolumns/shared'
 
 const POSTMARK_API_URL = 'https://api.postmarkapp.com/email'
 

@@ -3,7 +3,7 @@
  * section; while the note or the name is empty, nothing renders. The support
  * email comes from SUPPORT_EMAIL in packages/shared/src/brand.ts.
  */
-import { SUPPORT_EMAIL } from '@estimator/shared'
+import { SUPPORT_EMAIL } from '@qolumns/shared'
 
 export interface FounderContent {
   name: string

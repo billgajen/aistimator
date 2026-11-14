@@ -3,8 +3,8 @@
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { EstimateWidget } from '@/components/embed/EstimateWidget'
-import { DEMO_CONTACT, DEMO_SAMPLE_PHOTO_PATH, formatMoney, freeOfferLabel, isQuoteProcessing } from '@estimator/shared'
-import type { QuoteViewResponse } from '@estimator/shared'
+import { DEMO_CONTACT, DEMO_SAMPLE_PHOTO_PATH, formatMoney, freeOfferLabel, isQuoteProcessing } from '@qolumns/shared'
+import type { QuoteViewResponse } from '@qolumns/shared'
 import { RECORDED_EXAMPLE, type DemoEstimate } from '@/lib/demo/recorded-example'
 
 const POLL_MS = 1500

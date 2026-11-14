@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { createSignalFusionRecorder, initializeFusionFromStructuredSignals } from '../agents/signal-fusion'
-import type { ExtractedSignalsV2 } from '@estimator/shared'
+import type { ExtractedSignalsV2 } from '@qolumns/shared'
 
 describe('SignalFusionRecorder', () => {
   describe('recordVisionSignals', () => {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { QUOTE_TURN_COPY } from '@estimator/shared'
+import { QUOTE_TURN_COPY } from '@qolumns/shared'
 import { UNFINISHED_CHANGED_EVENT } from '@/lib/unfinished-leads'
 
 export interface UnfinishedLead {

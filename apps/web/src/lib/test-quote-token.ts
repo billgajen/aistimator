@@ -29,7 +29,7 @@ function secret(): string {
   if (explicit) return explicit
   const base = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!base) throw new Error('No secret available for test tokens')
-  return createHmac('sha256', base).update('aistimator:test-quote-token:v1').digest('hex')
+  return createHmac('sha256', base).update('qolumns:test-quote-token:v1').digest('hex')
 }
 
 const b64 = (s: string | Buffer) => Buffer.from(s).toString('base64url')

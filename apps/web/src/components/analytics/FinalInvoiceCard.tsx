@@ -5,7 +5,7 @@
  * truth the accuracy report compares every estimate against.
  */
 import { useState } from 'react'
-import { formatMoney, parseMoneyInput } from '@estimator/shared'
+import { formatMoney, parseMoneyInput } from '@qolumns/shared'
 
 export function FinalInvoiceCard(props: {
   quoteId: string

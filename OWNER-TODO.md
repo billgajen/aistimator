@@ -541,3 +541,80 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
   screenshots of Home, the phone menu and the Unfinished list into its results folder). It joins the regression set:
   run t146 to t160 before a commit or deploy (there is no verify-t159).
 
+
+## T-162 — The product is called Qolumns
+
+Built and checked locally. **Not committed, not deployed.** No domain, address or URL changed: that is the next
+ticket.
+
+- [ ] **Deploy, in this order:**
+  1. migration 40: `bash scripts/deploy-migration-40.sh` (reserves the quote-link names `qolumns` and `qolums`). It
+     first checks that no business holds either word and stops if one does;
+  2. the worker: `cd apps/worker && npx wrangler deploy --env production` (emails then say "Powered by Qolumns"
+     and come from "… via Qolumns");
+  3. the web app: `npx vercel deploy --prod`.
+
+  The order is not fragile: the old web app ignores the two new rows, and worker and web only disagree on the name
+  in an email for the minutes between steps 2 and 3. Nothing else depends on it.
+- [ ] **Try by hand, after the deploy:**
+  1. *Pages.* Home, Pricing, a trade page, Terms, Privacy and the login page say "Qolumns" in the header, the
+     footer ("© 2026 Qolumns.") and the browser tab. Share the home page link in a chat app: the preview image
+     should say Qolumns (previews are cached; a new link such as `/?v=2` forces a fresh one).
+  2. *Dashboard.* The name at the top of the menu is Qolumns.
+  3. *Quote link page.* The website code starts `<!-- Qolumns Widget (Inline) -->` and contains
+     `<div id="qolumns-widget"></div>`.
+  4. *A customer's view.* Open your quote link: "Powered by Qolumns" under the form. Open a quote: "Prepared with
+     Qolumns" at the foot.
+  5. *Emails.* Send yourself a request. The customer email's sender should read "<your business> via Qolumns",
+     the business email's sender "Qolumns", and both say "Powered by Qolumns" at the foot. **The T-159 hand test
+     above was written with the old name: read it as Qolumns.**
+  6. *Website code on a real page* (optional): paste the inline code into any test page. The form should show and
+     grow to its height.
+  7. *Reserved names.* On the Quote link page, under "Change the end of the link", typing `qolumns` or `qolums`
+     should say the word is reserved. (Do not save a change: the link can be changed once.)
+- **What the rename invalidates** (all small):
+  - Someone in the middle of setup's "Try it as your customer" at the moment of the web deploy must press the
+    button again (test tokens last two hours and are signed with a label that changed).
+  - The public demo's hourly per-visitor limit starts fresh for up to an hour after the web deploy.
+  - A development build of the phone app installed under the old id is now a different app: install the new one.
+  - No business has the website code yet, so the old code was not kept working. A page that still carries the old
+    code shows no form.
+
+### Names only you can change (code does not depend on any of them)
+
+- [ ] **Stripe products.** They are still called "Aistimator Starter / Pro / Business" and show on checkout and
+  invoices. Rename each in Stripe → Product catalogue. The setup script names a product only when it creates one,
+  so it will not rename them. Also check the account's public business name and statement descriptor.
+- [ ] **GitHub repo** `billgajen/aistimator`. GitHub → Settings → Repository name. GitHub redirects the old address;
+  afterwards run `git remote set-url origin https://github.com/billgajen/<new-name>.git` on this Mac. The Vercel
+  Git connection follows the rename by itself.
+- [ ] **Supabase project label.** Supabase → Project Settings → General → Name. Display only; the project ref
+  (`ygsuzeveesgrafgpkrev`), keys and URLs do not change. While there, look at Authentication → Emails: the
+  sign-up confirmation email's subject and text are set in Supabase, not in this repo, and may carry the old name.
+- [ ] **Postmark.** The sender name on every email now comes from the code. Check that the Sender Signature's own
+  name and the server's name in Postmark do not show the old name anywhere a customer sees.
+- [ ] **When you create them:** the Apple Developer app record and the EAS project should be made as "Qolumns"
+  with the id `com.qolumns.app`.
+- The folder on this Mac is still `~/Documents/Estimator`. Renaming it is safe for the code, but the local
+  database containers and the assistant's saved notes are keyed on the folder name, so leave it unless it bothers
+  you.
+
+### Infrastructure left with its old name (decide one at a time; none is needed for the name people read)
+
+| What | Name today | What renaming it would involve |
+|---|---|---|
+| Cloudflare worker | `estimator-worker` (`estimator-worker-production.billgajen.workers.dev`) | Changing `name` in `wrangler.toml` deploys a **new** worker at a new address. Then: set its secrets again (`wrangler secret put …`; `wrangler.toml` lists nine), move the `quote-jobs` queue consumer from the old worker to the new one (a queue has one consumer), change `CLOUDFLARE_WORKER_URL` in Vercel and redeploy the web app, check a request prices, delete the old worker. Quotes wait in the queue during the switch. About an hour, with a window where pricing is paused. |
+| R2 bucket | `aistimator-assets` | A bucket cannot be renamed. Create a new one, copy every object (Cloudflare's Super Slurper or `rclone`), change `bucket_name` in `wrangler.toml` (two places) and `R2_BUCKET_NAME` in Vercel, deploy worker and web together, check an old quote's photos still open, then delete the old bucket. The database stores only the path inside the bucket, so no rows change. Photo links already issued stop working at the switch (they last up to an hour). |
+| Queues | `quote-jobs`, `quote-jobs-dlq`, `quote-jobs-local` | Nothing: no old name in them. |
+| Vercel project | `estimator-web` (`estimator-web-phi.vercel.app`) | Renaming the project changes the `.vercel.app` address, which is the app's address today: every quote link, QR code and email link already given out points at it. Do this as part of the domain ticket, where the old address can keep redirecting. |
+| GitHub repo | `billgajen/aistimator` | See the list above. Safe at any time. |
+| Supabase project | ref `ygsuzeveesgrafgpkrev` | The label only (see above). The ref cannot change. |
+
+**One mismatch to settle when the bucket is next touched** (reported, not changed): `apps/web/src/lib/r2.ts` falls
+back to `estimator-assets` when `R2_BUCKET_NAME` is not set, `wrangler.toml` binds `aistimator-assets`, and both
+`.env.example` files say `estimator-assets`. Production sets the variable, so the fallback is not used there, but
+a new environment set up from `.env.example` would point the web app and the worker at different buckets.
+
+- The live check is `scripts/hardcore-test/verify-t162.mts` (add `PLAYWRIGHT_DIR=…` for the pages and the website
+  code in a real browser; it saves screenshots and the four rendered emails into its results folder). It joins the
+  regression set: run t146 to t162 before a commit or deploy (there is no verify-t159 or verify-t161).

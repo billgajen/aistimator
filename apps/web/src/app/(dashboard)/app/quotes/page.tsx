@@ -15,11 +15,11 @@ import {
   quoteTurn,
   QUOTE_LIST_GROUPS,
   QUOTE_TURN_COPY,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import Link from 'next/link'
 import { copyLinkFallbackMessage } from '@/lib/quote-action-copy'
 import { EmptyState, PageHeader } from '@/components/dashboard/EmptyState'
-import type { QuoteListCounts, QuoteListGroup, QuoteListItem, QuoteListTab, QuotesListResponse } from '@estimator/shared'
+import type { QuoteListCounts, QuoteListGroup, QuoteListItem, QuoteListTab, QuotesListResponse } from '@qolumns/shared'
 
 // One grid per row, so the last column has a fixed width: an `auto` column
 // would be sized per row and the columns would not line up. Wide screens only;

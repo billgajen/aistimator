@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getRegion, type AppBootstrapResponse } from '@estimator/shared'
+import { getRegion, type AppBootstrapResponse } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
 
 /**

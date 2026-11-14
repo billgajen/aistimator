@@ -21,7 +21,7 @@ import {
   type PricingResult,
 } from '../pricing/rules-engine'
 import { resolveSignalType } from '../quote-processor'
-import type { ExtractedSignalsV2, PricingTrace } from '@estimator/shared'
+import type { ExtractedSignalsV2, PricingTrace } from '@qolumns/shared'
 import type { ExtractedSignals } from '../ai/signals'
 
 // Import test fixtures and mocks

@@ -15,7 +15,7 @@ import type {
   FusedSignals,
   SignalSource,
 } from './types'
-import type { ExtractedSignal, ExtractedSignalsV2 } from '@estimator/shared'
+import type { ExtractedSignal, ExtractedSignalsV2 } from '@qolumns/shared'
 
 /**
  * Create a SignalFusion recorder that captures provenance during merge.

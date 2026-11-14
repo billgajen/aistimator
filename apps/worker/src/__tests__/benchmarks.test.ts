@@ -13,7 +13,7 @@ import {
   serviceTokens,
   MIN_BENCHMARK_TENANTS,
   type BenchmarkRateInput,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 
 const MY_PAINTING = {
   serviceId: 'svc_1',

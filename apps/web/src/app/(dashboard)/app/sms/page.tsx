@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { PageHeader } from '@/components/dashboard/EmptyState'
-import { PRODUCT_NAME } from '@estimator/shared'
+import { PRODUCT_NAME } from '@qolumns/shared'
 
 interface SmsConfigResponse {
   configured: boolean

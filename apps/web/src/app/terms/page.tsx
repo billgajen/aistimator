@@ -1,16 +1,17 @@
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
+import { PRODUCT_NAME } from '@qolumns/shared'
 
 export const metadata: Metadata = {
-  title: 'Terms of Service — Aistimator',
-  description: 'The terms that govern your use of Aistimator.',
+  title: `Terms of Service — ${PRODUCT_NAME}`,
+  description: `The terms that govern your use of ${PRODUCT_NAME}.`,
 }
 
 const SECTIONS = [
   {
     title: '1. The service',
-    body: 'Aistimator provides software that lets your business collect enquiries (including photos and documents), generate estimates and quotes calculated from pricing rules you configure, and deliver them to your customers via hosted pages, PDF and email. AI is used to extract information from enquiries and draft wording; prices are always calculated from your configuration.',
+    body: `${PRODUCT_NAME} provides software that lets your business collect enquiries (including photos and documents), generate estimates and quotes calculated from pricing rules you configure, and deliver them to your customers via hosted pages, PDF and email. AI is used to extract information from enquiries and draft wording; prices are always calculated from your configuration.`,
   },
   {
     title: '2. Your account',

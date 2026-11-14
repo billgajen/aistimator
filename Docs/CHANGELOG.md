@@ -15,6 +15,152 @@
 
 ## Issues & Resolutions
 
+### 2026-11-14: T-162 — The product is called Qolumns (AD-045)
+
+The product was "Estimator" at first and then "Aistimator". It is now **Qolumns**. This ticket renames it from what
+people read down to the internal names. No domain, address, URL, table, route, env var or queue name changed.
+
+**1. The name people read** is `PRODUCT_NAME = 'Qolumns'` (`packages/shared/src/brand.ts`).
+- Everything that already used the constant followed: the header, the sign-in pages, the dashboard menu, "Powered
+  by" and "Prepared with", the emails, the PDF, the social image (drawn from code, so it regenerated).
+- Typed names replaced with the constant: the titles of Pricing, Privacy, Terms and Trades, the six trade page
+  titles, the footer (name and copyright line), the two legal texts, the mobile sign-in screen, the room-scan
+  message and the Stripe product name.
+- The email sender name is now `"Kent Painters via Qolumns"` to a customer and `"Qolumns"` to the business. The
+  address and reply-to are unchanged.
+- Legal pages: only the product name changed. They name no operating company. "an Aistimator account" became
+  "a Qolumns account".
+- Images: the repo has no favicon, app icon or splash image, and no image with the old name or its initial drawn
+  in. The two demo SVGs only carried the name in a comment.
+
+**2. Internal names**
+- Package scope `@estimator/*` → `@qolumns/*` (226 files: every import, the four `package.json` names, the
+  `next.config.js` transpile list, the two vitest aliases, the root scripts, the lockfile). The root package is
+  `qolumns`. `pnpm install` is clean; the lockfile changed in three lines.
+- Project-name text: file headers in `shared`, the worker's header and its answer at `/` ("Qolumns worker"), the
+  `.env.example` header, the website reader's User-Agent (`qolumns-bot/1.0`).
+- Mobile (`apps/mobile/app.json`): name "Qolumns"; slug and scheme `qolumns`; iOS bundle id and Android package
+  `com.qolumns.app`. The app has never been submitted to a store (no EAS project, no Apple account yet), so no
+  published id changed. The native module is `RoomScan` and did not change.
+- Signing labels: `qolumns:test-quote-token:v1` and `qolumns:demo-ip:v1:`. See "What this invalidates".
+
+**3. The embed code**, renamed cleanly (no business has the code yet; the old names are not kept working):
+
+| | Before | Now |
+|---|---|---|
+| container id | `estimator-widget` | `qolumns-widget` |
+| globals | `EstimatorWidget`, `EstimatorIframe` | `QolumnsWidget`, `QolumnsIframe` |
+| messages from the embedded page | `estimator-resize`, `estimator-submitted` | `qolumns-resize`, `qolumns-submitted` |
+| event on `document` | `estimator:submitted` | `qolumns:submitted` |
+| floating button, overlay | `estimator-floating-launcher`, `-overlay` | `qolumns-floating-launcher`, `-overlay` |
+| console prefix | `[Estimator]` | `[qolumns]` |
+
+The file names `widget.js` and `iframe-loader.js` stay. The names live in `EMBED_NAMES` (`shared/brand.ts`); the
+React side reads them from there, and a unit test holds the two static loaders to the same strings.
+
+**4. Reserved quote-link names.** Migration 40 (`00000000000040_reserve_qolumns.sql`) and `tenant-slug.ts` add
+`qolumns` and `qolums`. Both earlier names stay reserved. The migration stops, changing nothing, if a business
+holds or has held either word. Checked before writing it: no tenant holds either, locally (0 rows) or in
+production (`/quote/qolumns` and `/quote/qolums` both 404, read-only). A business called "Qolumns" gets
+`qolumns-xxxx`.
+
+**5. Left exactly as it was** (the owner decides; what each would involve is in `OWNER-TODO.md`):
+- the Cloudflare worker name `estimator-worker`;
+- the R2 bucket `aistimator-assets`;
+- the queues `quote-jobs`, `quote-jobs-dlq` and `quote-jobs-local` (no old name in them);
+- the Vercel project `estimator-web` and its address;
+- the GitHub repo `billgajen/aistimator`;
+- the Supabase project.
+
+Seen, not changed: `apps/web/src/lib/r2.ts` falls back to `'estimator-assets'` when `R2_BUCKET_NAME` is unset, while
+`wrangler.toml` binds `aistimator-assets`; the two `.env.example` files also say `estimator-assets`. Production
+sets the variable, so the fallback is not used there, but the three spellings disagree.
+
+**What this invalidates**
+- *Test-quote tokens.* The token key is derived from the label (unless `TEST_QUOTE_SECRET` is set), so a setup test
+  token issued before the web deploy stops working after it. Tokens last two hours and are issued when setup's
+  "Try it as your customer" opens, so the effect is: someone in the middle of setup's test at the moment of the
+  deploy presses the button again.
+- *The demo's per-visitor limit.* The visitor hash is salted with the label. For up to an hour after the deploy a
+  visitor who had used the hourly allowance gets it again. The daily cap is not affected. No stored row changes.
+- *Stripe.* The setup script names a product only when it creates one. Products that exist keep "Aistimator …"
+  until renamed in Stripe (owner).
+- *A development build of the mobile app* installed under `com.aistimator.app` is a different app from the new
+  id: install the new build.
+- *Embed code.* None is in use. A page with the old container id gets no form and the console line
+  `[qolumns] Container not found: #qolumns-widget`.
+
+**Docs.** `CLAUDE.md` (the name and where it lives), `README.md`, `apps/mobile/README.md`, `Docs/02-api-contracts.md`
+(sender name), `Docs/04-frontend.md` (the embed's public names), `Docs/09-us-launch-plan.md` (title). History is
+as written: earlier CHANGELOG entries, `tickets/`, past OWNER-TODO sections, the T-161 audit, applied migrations.
+
+**What is left of the earlier names** (`git grep -i "aistimator"`, `git grep -w "Estimator"`, `git grep "@estimator/"`):
+
+| Where | Why it stays |
+|---|---|
+| `Docs/CHANGELOG.md`, `tickets/`, `OWNER-TODO.md`, `Docs/design/audit.md` | history, as written |
+| `supabase/migrations/…0000_setup.sql`, `…0002_core_schema.sql`, `…0032_quote_link.sql` | applied migrations (two comments, one reserved word) |
+| `apps/web/src/lib/tenant-slug.ts` | the reserved list |
+| `apps/worker/wrangler.toml` (two lines) | the R2 bucket name, section 5 |
+| `Docs/06-v2-strategy.md` (two lines) | not the product name: "The World's Best Estimator" is the common noun, and "Instant Estimator" is another company's product |
+| the git remote `billgajen/aistimator` | the GitHub repo, section 5 (not a file) |
+
+In lower case, "estimator" also stays in: `name = "estimator-worker"`, the `r2.ts` fallback and the two
+`.env.example` bucket lines (section 5); the production addresses in `DEPLOY.md` and three test URLs
+(`estimator-web-phi.vercel.app`: the app URL, next ticket); the reserved word; and the common noun in an AI prompt
+("an expert estimator assistant") and in `Docs/07`.
+
+**Regression scripts changed, and only for this rename:**
+- `verify-t152.mts`: the login page check expects "Qolumns" and neither earlier name (it expected "Aistimator").
+- `verify-t154.mts`: the home page title ends "— Qolumns" (it ended "— Aistimator").
+- `lib.mjs`: a list of the two earlier names for such checks.
+- Comments in `browser.mjs` and five scripts suggested a folder `~/estimator-browser` for Playwright; they now say
+  `~/qolumns-browser`. Nothing reads that path.
+
+Unit tests changed the same way: the product name in `dashboard-simplify`, `marketing-home` and `public-demo`; the
+container id and the reserved-list check (now migrations 32 and 40) in `quote-link`; an import pattern in
+`quote-actions`.
+
+**Verified (2026-11-14, local stack with migration 40):**
+- `pnpm install --frozen-lockfile`: clean, lockfile up to date.
+- `pnpm lint` and `pnpm typecheck` (web, worker, mobile, shared) pass. Web build and worker build pass. The built
+  web app contains the earlier names only in the reserved-word list.
+- Unit tests: web 514, worker 499, mobile 11, all pass. New: `apps/web/src/__tests__/rename-qolumns.test.ts` (18):
+  the name and the sender name, the pages using the constant, the mobile ids, the embed names in the constant, the
+  snippet, both loaders and the embedded page, that the old embed names are nowhere, the reserved words and
+  migration 40, the package names, the signing labels, and the exact list of files that may still contain an
+  earlier name (it fails on any other).
+- Migration 40 on the local database: with a business holding `qolums` it stops with "a business already holds or
+  held the quote link name(s): qolums. Nothing was changed." and adds nothing; otherwise it adds the two rows; run
+  again it adds none.
+- `scripts/hardcore-test/verify-t162.mts` with the browser pass: 77/77.
+  - Titles, served HTML and visible text of twelve public pages; the social image; the worker's answer; both sender
+    names; four rendered emails (two to a customer, two to the business), in source and as a browser shows them.
+  - Home, login, the public request page, a customer quote page, dashboard Home, a quote in the dashboard and the
+    Quote link page with both snippets, each showing "Qolumns" and neither earlier name.
+  - The widget from the new snippet on a page served from another origin: inline (the form shows, the frame takes
+    its height, and one real request sent through it arrives as `qolumns:submitted` with the quote, while the old
+    event name does not fire); floating (button, open, `QolumnsWidget.close()` and `.open()`); iframe mode of
+    `widget.js` in the site's own container; the older `iframe-loader.js` with `QolumnsIframe`; and a page with the
+    old container id, which gets no form.
+  - The reserved names through the real route, and a business called "Qolumns" getting `qolumns-cb35`.
+- Regression, t146 to t160, with the browser passes, run after the last code change: 20, 33, 29, 35, 27, 35, 66, 36,
+  26, 46, 31, 96, 116, 96, all pass. (After that run only comments in the harness changed: the suggested Playwright
+  folder name.)
+
+**Deploy order (not done; nothing is committed):** migration 40 (`bash scripts/deploy-migration-40.sh`), then the
+worker, then the web app. The old web app ignores the two new rows, and between the worker and the web deploy only
+the name in an email differs. Hand tests, the infrastructure names left alone and what renaming each would involve,
+and the names only the owner can change (Stripe products, GitHub repo, Supabase project label, Postmark) are in the
+T-162 section of `OWNER-TODO.md`.
+
+**Not checked:**
+- a real email in a real inbox (locally nothing is sent; the tests stop at the header and the rendered HTML);
+- the mobile app on a device or as a native build (typecheck and unit tests only). No native module name changed,
+  so there was nothing to build on the native side;
+- production. Nothing was deployed and nothing was submitted to production. The deploy order and the hand tests
+  are in `OWNER-TODO.md`.
+
 ### 2026-11-14: T-161 — Three design skills installed, current design audited (no visible change)
 
 - **Installed** into `.claude/skills/` (this project only):
@@ -4382,6 +4528,27 @@ if (pricingResult.estimatedTotal <= 0) {
 - deleting a request on "Done" (it is still the business's lead, and a count of them is worth having later);
 - its own page for unfinished requests (the quotes list already has the tab; the menu item opens it);
 - a per-quote lookup for the activity lines (Home must stay a fixed number of queries).
+
+---
+
+### AD-045: The product is called Qolumns, and the name lives in PRODUCT_NAME (T-162)
+
+**Decision:** the product's name is **Qolumns**. Everything a person reads takes it from `PRODUCT_NAME` in `packages/shared/src/brand.ts`: pages, titles, emails and their sender name, the "Powered by" and "Prepared with" lines, the PDF, the social image, the mobile app. Technical identifiers are lower case and are not the display name: the package scope `@qolumns/*`, the root package `qolumns`, the embed's public names (`EMBED_NAMES`: `qolumns-widget`, `qolumns-resize`, `qolumns-submitted`, `qolumns:submitted`, the launcher and overlay ids, the `[qolumns]` console prefix), the mobile slug and scheme, `com.qolumns.app`, and the reserved quote-link names. The two embed globals are `QolumnsWidget` and `QolumnsIframe`.
+
+**Why:** the product had two earlier names and both had leaked into typed strings, package names and public identifiers. One constant for the words and one for the embed's names means the next change is one edit, and a test can tell when a typed name comes back.
+
+**Rules that follow:**
+- Never type the product name in code. Import `PRODUCT_NAME`. A unit test (`rename-qolumns.test.ts`) lists what may still contain an earlier name and fails on anything else.
+- The embed's public names are a contract with a business's website. They live in `EMBED_NAMES`; the two static loaders carry copies that a unit test compares. Changing one is a breaking change for any site that has the code.
+- "estimate" and names like `EstimateWidget` are the product concept, not the brand. They are not renamed.
+- Infrastructure names (worker, bucket, Vercel project, GitHub repo, Supabase project) are the owner's to rename, one at a time, each with its own steps. Code does not assume they match the product name.
+- The product name and its likely misspelling are reserved quote-link names, and earlier product names stay reserved for good.
+
+**Rejected:**
+- keeping the old embed names working beside the new ones (no business has the code; an alias would be a second public contract to keep forever);
+- renaming the worker, the bucket or the Vercel project in the same change (each moves a production address or data; none is needed for the name people read);
+- editing applied migrations or history docs to remove the earlier names (history stays as written);
+- a second constant for a lower-case form of the name (identifiers are their own strings in `EMBED_NAMES`, not derived from the display name).
 
 ---
 

@@ -1,6 +1,6 @@
 // T-155 live check: the home page polish after the T-154 review, at 390 px and 1440 px.
 // Run with the web app up (pnpm dev:web), then:
-//   PLAYWRIGHT_DIR=~/estimator-browser npx tsx scripts/hardcore-test/verify-t155.mts
+//   PLAYWRIGHT_DIR=~/qolumns-browser npx tsx scripts/hardcore-test/verify-t155.mts
 // (playwright and pngjs live outside the repo: see scripts/hardcore-test/browser.mjs)
 //
 // 1. the hero small line; 2. no "in a minute"; 3. the header button on one

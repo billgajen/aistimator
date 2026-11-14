@@ -1,5 +1,5 @@
 /**
- * Estimator Widget Loader (unified, all mount modes)
+ * Qolumns widget loader (unified, all mount modes)
  *
  * A small dependency-free loader. Every mode renders the hosted embed page
  * (/embed/{tenantKey}) in an iframe, so the widget UI always ships with the
@@ -19,9 +19,9 @@
  *   async
  * ></script>
  *
- * Programmatic: EstimatorWidget.init({ tenantKey, mode, ... });
- * Floating mode also exposes EstimatorWidget.open() / .close().
- * Successful submissions dispatch an 'estimator:submitted' CustomEvent
+ * Programmatic: QolumnsWidget.init({ tenantKey, mode, ... });
+ * Floating mode also exposes QolumnsWidget.open() / .close().
+ * Successful submissions dispatch an 'qolumns:submitted' CustomEvent
  * on document with { quoteId, quoteViewUrl, tenantKey }.
  */
 
@@ -74,10 +74,10 @@
   /* ---------- inline / iframe modes: iframe in a host container ---------- */
 
   function initInline(config) {
-    var selector = config.container || '#estimator-widget';
+    var selector = config.container || '#qolumns-widget';
     var container = document.querySelector(selector);
     if (!container) {
-      console.error('[Estimator] Container not found:', selector);
+      console.error('[qolumns] Container not found:', selector);
       return null;
     }
     var iframe = createIframe(config, false);
@@ -95,7 +95,7 @@
 
     var button = document.createElement('button');
     button.type = 'button';
-    button.id = 'estimator-floating-launcher';
+    button.id = 'qolumns-floating-launcher';
     button.setAttribute('aria-label', label);
     button.textContent = label;
     button.style.cssText =
@@ -108,7 +108,7 @@
     button.onmouseleave = function () { button.style.transform = ''; };
 
     var overlay = document.createElement('div');
-    overlay.id = 'estimator-floating-overlay';
+    overlay.id = 'qolumns-floating-overlay';
     overlay.style.cssText =
       'position:fixed;inset:0;z-index:' + (Z_INDEX + 1) + ';display:none;' +
       'background:rgba(27,40,35,0.4);';
@@ -170,14 +170,14 @@
     var data = event.data;
     if (!data || typeof data !== 'object') return;
 
-    if (data.type === 'estimator-resize' && data.tenantKey && data.height) {
+    if (data.type === 'qolumns-resize' && data.tenantKey && data.height) {
       var iframe = inlineIframes[data.tenantKey];
       if (iframe) iframe.style.height = data.height + 'px';
     }
 
-    if (data.type === 'estimator-submitted') {
+    if (data.type === 'qolumns-submitted') {
       document.dispatchEvent(
-        new CustomEvent('estimator:submitted', {
+        new CustomEvent('qolumns:submitted', {
           detail: {
             quoteId: data.quoteId,
             quoteViewUrl: data.quoteViewUrl,
@@ -192,13 +192,13 @@
 
   function init(config) {
     if (!config || !config.tenantKey) {
-      console.error('[Estimator] tenantKey is required');
+      console.error('[qolumns] tenantKey is required');
       return null;
     }
     var mode = config.mode || 'floating';
     if (mode === 'inline' || mode === 'iframe') return initInline(config);
     if (mode === 'floating') return initFloating(config);
-    console.error('[Estimator] Unknown mode:', mode);
+    console.error('[qolumns] Unknown mode:', mode);
     return null;
   }
 
@@ -229,7 +229,7 @@
     autoInit();
   }
 
-  window.EstimatorWidget = {
+  window.QolumnsWidget = {
     init: init,
     open: function () { if (floating) floating.open(); },
     close: function () { if (floating) floating.close(); },

@@ -8,11 +8,11 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getRegion, listRegions, type RegionDefinition } from '@estimator/shared'
+import { getRegion, listRegions, type RegionDefinition } from '@qolumns/shared'
 import type {
   WhatsAppIntakeState,
   WhatsAppIntakeData,
-} from '@estimator/shared'
+} from '@qolumns/shared'
 import { generateQuoteToken, getTokenExpiry } from '../tokens'
 import { uploadToR2, isR2Configured } from '../r2'
 import { enqueueQuoteJob } from '../queue'

@@ -6,7 +6,7 @@
  * built by the shared helper, so a business name is display text only.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { PRODUCT_NAME } from '@estimator/shared'
+import { PRODUCT_NAME } from '@qolumns/shared'
 import { sendEstimateShownEmail, sendQuoteEmails, sendReviewRequestEmail } from '../email'
 import { sendEmail } from '../email/postmark'
 

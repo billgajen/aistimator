@@ -10,14 +10,14 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { evaluateFormula, extractFormulaIdentifiers } from '@estimator/shared'
+import { evaluateFormula, extractFormulaIdentifiers } from '@qolumns/shared'
 import {
   calculatePricingWithTrace,
   type PricingRules,
   type FormAnswer,
   type TaxConfig,
 } from './rules-engine'
-import type { ExtractedSignalsV2 } from '@estimator/shared'
+import type { ExtractedSignalsV2 } from '@qolumns/shared'
 import type { ExtractedSignals } from '../ai/signals'
 
 const signals = (): ExtractedSignals => ({

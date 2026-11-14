@@ -1,6 +1,6 @@
 /**
  * Where emails to the business go (T-157). The rule is `chooseBusinessEmail`
- * in @estimator/shared, the same one the worker applies:
+ * in @qolumns/shared, the same one the worker applies:
  *   the notification email from Settings, else the account email of the
  *   tenant's first user; the demo business emails no one.
  *
@@ -13,7 +13,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { chooseBusinessEmail } from '@estimator/shared'
+import { chooseBusinessEmail } from '@qolumns/shared'
 import { createAdminClient } from './supabase/server'
 
 /** The parts of the client this needs (the fake in tests implements just these) */

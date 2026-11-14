@@ -5,7 +5,7 @@
  * real nameplate photos, OWNER-TODO T-139/T-140).
  */
 import { describe, it, expect } from 'vitest'
-import { resolveIdentification, type ExpectedSignalConfig } from '@estimator/shared'
+import { resolveIdentification, type ExpectedSignalConfig } from '@qolumns/shared'
 import { hvacPackUS } from '@/lib/vertical-packs/hvac-us'
 import { waterHeaterPackUS } from '@/lib/vertical-packs/water-heater-us'
 import { electricalPackUS } from '@/lib/vertical-packs/electrical-us'

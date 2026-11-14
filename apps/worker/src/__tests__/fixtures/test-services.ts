@@ -5,7 +5,7 @@
  * These match the structure used in production.
  */
 
-import type { WorkStepConfig, AddonConfig, ExpectedSignalConfig } from '@estimator/shared'
+import type { WorkStepConfig, AddonConfig, ExpectedSignalConfig } from '@qolumns/shared'
 import type { PricingRules, TaxConfig, FormAnswer } from '../../pricing/rules-engine'
 
 // =============================================================================

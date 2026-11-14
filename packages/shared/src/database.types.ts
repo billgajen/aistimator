@@ -5,7 +5,7 @@ import type { ScanSpec } from './room-scan'
 import type { WordingRepairRecord } from './wording-repair'
 
 /**
- * Database types for the Estimator platform
+ * Database types for the Qolumns platform
  * These types correspond to the Supabase schema
  */
 
