@@ -15,6 +15,38 @@
 
 ## Issues & Resolutions
 
+### 2026-11-14: T-161 — Three design skills installed, current design audited (no visible change)
+
+- **Installed** into `.claude/skills/` (this project only):
+  - `design-taste-frontend` (Leonxlnx/taste-skill `f6b7657`)
+  - `ui-ux-pro-max` (nextlevelbuilder/ui-ux-pro-max-skill `6ae86f6`)
+  - `design-motion-principles` (kylezantos/design-motion-principles `4a9ca87`)
+  - All three are MIT. Repos, commits, licences, prerequisites and the script safety review are in
+    `Docs/design/skills.md`.
+- **How:** the `skills` CLI was run in a scratch repo, because in this repo it also writes `skills-lock.json` at the
+  root. The folders were then copied in, and each is byte-identical to its upstream commit.
+- **Audit:** `Docs/design/audit.md`, with screenshots in `Docs/design/screens/`. It covers the ten findings each for
+  marketing, dashboard and customer pages, every place a picture or short animation would help, every token
+  change a skill asks for (listed, not applied), and where the skills disagree. The test data came from
+  `verify-t160.mts` plus one made-up customer request through the quote link (local only).
+- **Not changed:** no file under `apps/` or `packages/`, no token, colour, font or dependency. No deploy.
+
+**Constraints introduced**
+- taste ships a `Stop` hook (`scripts/gate.mjs`). It does nothing in this repo unless a build is armed.
+  Never run `gate.mjs --start` or `start.mjs deal` here: an armed gate can block turns for minutes, and the deal
+  replaces our tokens.
+- Run ui-ux-pro-max's `--persist` only with `--output-dir Docs/design`.
+- Run the motion audit in terminal mode, not into `motion-audits/`.
+- The skills advise; a token, colour or font change needs its own ticket.
+
+**Found, not fixed (see audit.md):**
+- Services breaks at phone width: the page is 472 px wide and the actions are unreachable.
+- The dashboard never shows the customer's photos.
+- `--color-text-muted` is 2.75–3.13:1.
+- The focus ring is invisible on the juniper band.
+- The customer quote page shows "Viewed" and repeats the price breakdown.
+- "View Your Estimate" opens a new tab.
+
 ### 2026-11-13: T-160 — Sectioned menu, a fuller Home, unfinished requests that clear, sign-in line (Feedback 01) (AD-044)
 
 The owner's feedback: the five-item menu was too thin and "Share" and "Prices" were the wrong words; Home looked empty; the "people started a request" banner never went away and had no permanent place; the sign-in line was weak. No status, price or quote flow changed.

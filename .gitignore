@@ -42,3 +42,6 @@ scripts/hardcore-test/results/
 # Turborepo (if added later)
 .turbo/
 .vercel
+
+# Design skill too large to commit (39 MB); reinstall steps in Docs/design/skills.md (T-161)
+.claude/skills/design-taste-frontend/
