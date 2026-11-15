@@ -54,6 +54,12 @@ For each ticket:
 - Ensure builds run for web and worker packages.
 - Update docs if any contracts or behaviour changes.
 
+### Regression runs
+- Every ticket: its own verify script, `pnpm lint`, `pnpm typecheck`, unit tests and the builds.
+- Marketing, design and copy tickets: also run only the earlier verify scripts that cover the pages changed. Say which you ran.
+- Full regression set: required for any ticket that touches pricing, the quote flow, the worker, emails or a migration; at the end of a batch of design tickets; and before launch.
+- A ticket's prompt can override this either way.
+
 ## Security and privacy basics (v1)
 - Multi tenant isolation. Never allow cross tenant access.
 - Store uploads privately. Public access only via time limited signed URLs or a controlled quote view page.

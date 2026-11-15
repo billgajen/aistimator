@@ -109,7 +109,13 @@ are gone).
 ## Imagery
 
 - **Real product screens at true size** (our own UI, drawn from the real components, never a scaled-down
-  screenshot with unreadable text) **and real photographs only.**
+  screenshot with unreadable text) **and real photographs only.** A screen on a marketing page says the real
+  screen's own words (`lib/marketing/screen-words.ts`) and shows the trade template's own question, label and
+  prices (`lib/marketing/examples.ts`); it is built in `components/marketing/screens/`.
+- **No icon stands in for a screen.** Where the page says the product does something, it shows the screen where
+  the result appears.
+- **A photo we do not have is named, not drawn.** The one photograph we ship is the sample tank label. A form
+  that asks for another label shows "1 photo added" beside the label's name, with no picture (T-167).
 - No stock photograph passed off as a customer, a customer's job or the team. A stand-in photograph, if ever
   used, is listed in the ticket's report as one.
 - No drawn look-alike of a real logo, product or person.
@@ -120,7 +126,8 @@ are gone).
 ## Layout
 
 - **One idea per section.** A section says one thing and shows it.
-- **Neighbouring sections never share a layout.** Three cards in a row is not followed by three cards in a row.
+- **Neighbouring sections never share a layout or a background.** Three cards in a row is not followed by three
+  cards in a row, and paper is not followed by paper (paper, grey, mint and juniper take turns).
 - A marketing page has fewer, fuller sections rather than many short ones. (taste's rule of exactly one or two
   screens per section is not ours; see the rulings.)
 - One main action per screen. A second action is visibly quieter.
@@ -158,7 +165,9 @@ Rules:
    the page was scrolled.
    - **The hero demo** (Home) is the hero entrance: the product shown working, built from the product's own parts
      at true size. It plays once on load, each step a token-length entrance in its turn, the whole run under six
-     seconds, then it stands still on its last state with a small "Play again". It is a picture: a screen reader
+     seconds, then it stands still on its last state with a small "Play again". It shows what the product does, in
+     the product's order: a reading comes back to the customer as a question and is confirmed before the price
+     lands (T-167). It is a picture: a screen reader
      gets one sentence instead. Under reduced motion it shows the finished frames with no movement.
    - **The one moment** sits in its own section and plays once when that section comes into view. Its content is
      on the page from the first paint; it waits only when script has seen that the section is still below the
@@ -188,6 +197,15 @@ Each reads at 4.5:1 or more. Colour is never the only signal: the label says it 
 measurement note). A pill or a small tag is filled yellow. A larger surface that needs the owner (Home's "Needs
 you" tile, the unfinished-requests banner) stays white and carries the yellow behind its count, with the marker:
 the yellow stays within a tenth of the screen.
+
+## What the site may say the AI does
+
+`Docs/design/ai-capabilities.md` is the list of what the AI really does today: each capability, where it lives,
+which trades it applies to, what the customer and the business see, and the evidence that it runs. **A claim on
+the site maps to a row of that list or it does not go on the site** (T-167). The message is "The AI works out the
+job. Your prices work out the cost." No "AI-powered" slogans, no promise of accuracy, none of the words customers
+never see (exact, firm, guaranteed, grades, confidence), and never that the AI sets a price. A trade page claims
+only what the AI does for that trade.
 
 ## The name
 
@@ -233,12 +251,14 @@ The numbers are those of `audit.md`, section 6.
   the default hairline, and the phone menu's dimming layer has no colour. Making the tokens take an alpha would
   switch all 228 on at once and change how many pages look, customer pages included. A unit test stops the number
   growing.
-- **Marketing pages not yet redrawn** (Features, the trade pages): their main button is still juniper and they
-  still use the small three-frame strip. They get the yellow call to action and real screens in their own ticket.
+- **Features' hero and the closing bands are words only** (taste's `text-only`), and a trade page's three feature
+  cards and its "Tell it your prices" band have no screen. (Features and the trade pages were redrawn in T-167:
+  real screens, the yellow call to action.)
 - **Butter outside measurement.** Notice banners (the demo note, the test-request note, the plan-usage banner),
   the "Test" tag and the "Most popular" pill still use butter or tape. They move to `tertiary` when their page is
   redesigned.
 - **Shadows outside the scale.** 21 uses of Tailwind's own `shadow`, `shadow-sm` and `shadow-2xl`.
 - **Containers.** Trade pages use `max-w-5xl` for some sections; the FAQ and closing bands are narrower.
-- **The product frames** on marketing pages use two corner sizes of their own (`ProductStrip`).
+- **The product frames** (`ProductStrip`, two corner sizes of their own) are on no marketing page since T-167;
+  only `/design` still shows them. It can go when `/design` shows a current screen.
 - **Field focus.** Fields remove the outline and rely on a border colour change plus the (default blue) halo.

@@ -6,13 +6,14 @@ import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { FounderNote } from '@/components/marketing/FounderNote'
 import { HeroDemo } from '@/components/marketing/home/HeroDemo'
 import { SetupSteps } from '@/components/marketing/home/SetupSteps'
+import { WhatItNotices } from '@/components/marketing/home/WhatItNotices'
 import { PriceSentence } from '@/components/marketing/home/PriceSentence'
 import { AddItAnywhere } from '@/components/marketing/home/AddItAnywhere'
 import { listPacks } from '@/lib/vertical-packs'
 import { templateTrades, tradeHref } from '@/lib/marketing/trades'
 import { marketingExample } from '@/lib/marketing/examples'
 import { MAIN_CTA, QUIET_BUTTON, QUIET_LINK } from '@/lib/marketing/cta'
-import { HERO, HERO_DEMO, TRADES_HEADING, OTHER_TRADES, SETUP, CONTROL, STATISTICS, ADD_IT, PRICING_HEADING, FAQ, FINAL_CTA, FINAL_QUIET_LINK, PAGE_META } from '@/lib/marketing/home-copy'
+import { HERO, HERO_DEMO, MESSAGE_LINE, NOTICES, OTHER_TRADES, SETUP, CONTROL, STATISTICS, ADD_IT, PRICING_HEADING, FAQ, FINAL_CTA, FINAL_QUIET_LINK, PAGE_META } from '@/lib/marketing/home-copy'
 
 export const metadata: Metadata = {
   title: PAGE_META.title,
@@ -28,13 +29,14 @@ const WRAP = 'mx-auto max-w-container px-4 sm:px-6'
  * T-165 home page: show the product, do not describe it (Docs/design/system.md
  * decides the look; audit.md sections 1 and 4 say what was missing).
  *
- * One idea per section, and no two neighbours share a layout:
- *   1 hero: the words, the one yellow button, and the product demo (three screens)
- *   2 trades: a slim line of links
- *   3 set up in minutes: three steps, each beside its screen, alternating sides
- *   4 your prices: a sentence that turns into price lines (the one moment)
- *   5 what homeowners want: three big figures, no boxes
- *   6 add it anywhere: a QR code, the quote page on a phone, the form on a website
+ * One idea per section, and no two neighbours share a layout or a background
+ * (T-167 order):
+ *   1 hero (paper): the words, the one yellow button, and the product demo
+ *   2 what homeowners want (grey): three large figures, one to a row
+ *   3 what it notices (paper): the message line and four examples, each with its real screen
+ *   4 your prices (mint): a sentence that turns into price lines (the one moment)
+ *   5 set up in minutes (paper): three steps beside their screens; the trade links sit in step 1
+ *   6 add it anywhere (grey): a QR code, the quote page on a phone, the form on a website
  *   7 plans: three cards, each with its own button
  *   8 questions: a narrow column
  *   9 who is behind this (when filled in)
@@ -82,6 +84,8 @@ export default function HomePage() {
               question: HERO_DEMO.question,
               answer: HERO_DEMO.answer,
               photo: { src: HERO_DEMO.photoSrc, alt: HERO_DEMO.photoAlt, label: HERO_DEMO.photoLabel },
+              // T-167: the reading is the water heater template's own (examples.ts): 50 gal, from the tank's rating label
+              reading: example.reading ?? { value: '', readFrom: '' },
               customerName: example.customerName,
               sheet: {
                 businessName: DEMO_BUSINESS_NAME,
@@ -103,40 +107,41 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 2. Trades: a slim line */}
-      <section className="border-y border-border bg-surface py-6">
-        <div className={`${WRAP} flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6`}>
-          {/* a label for the line of links, not a heading: it is smaller than any heading on the page */}
-          <p className="shrink-0 font-display text-base font-bold text-text-primary" id="trades-label">{TRADES_HEADING}</p>
-          <ul className="flex flex-wrap gap-2" aria-labelledby="trades-label" data-testid="trades-row">
-            {trades.map((t) => (
-              <li key={t.slug}>
-                <Link href={tradeHref(t)} className="inline-flex min-h-[44px] items-center rounded-full border border-field bg-white px-4 text-sm font-semibold text-text-primary hover:border-primary">
-                  {t.label}
-                </Link>
-              </li>
+      {/* 2. What homeowners want: the second thing a visitor sees. Three large figures, one to a row, sources kept */}
+      <section className="border-y border-border bg-surface py-16 sm:py-24" data-testid="homeowners">
+        <div className={WRAP}>
+          <h2 className={H2}>What homeowners want</h2>
+          <div className="mt-8 divide-y divide-border-strong border-y border-border-strong sm:mt-10" data-testid="statistics">
+            {STATISTICS.map((s) => (
+              <figure key={s.url} className="grid gap-4 py-8 md:grid-cols-[minmax(0,16rem)_1fr] md:items-center md:gap-12 md:py-10 lg:grid-cols-[minmax(0,20rem)_1fr]">
+                <p className="figure text-display-lg font-medium leading-none text-primary lg:text-display-xl">{s.figure}</p>
+                <div>
+                  <blockquote className="max-w-2xl text-lg text-text-primary sm:text-xl">{s.text}</blockquote>
+                  <figcaption className="mt-3 text-sm text-text-secondary">
+                    Source:{' '}
+                    <a href={s.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center font-semibold text-primary underline underline-offset-2 sm:min-h-0">
+                      {s.source}
+                    </a>
+                  </figcaption>
+                </div>
+              </figure>
             ))}
-            <li>
-              <Link href="/signup" className="inline-flex min-h-[44px] items-center rounded-full border border-dashed border-field px-4 text-sm font-medium text-text-secondary hover:border-primary">
-                {OTHER_TRADES}
-              </Link>
-            </li>
-          </ul>
+          </div>
         </div>
       </section>
 
-      {/* 3. Set up in minutes */}
-      <section className={`${WRAP} py-16 sm:py-20`} data-testid="setup">
-        <h2 className={H2}>{SETUP.heading}</h2>
-        <p className="mt-3 max-w-2xl text-text-secondary">{SETUP.lead}</p>
-        <SetupSteps
-          steps={SETUP.steps}
-          screenLabels={SETUP.screens}
-          trades={trades.map((t) => t.label)}
-          chosenTrade={trades.find((t) => t.slug === HERO_DEMO.trade)?.label ?? trades[0]?.label ?? ''}
-          serviceName={example.serviceName}
-          prices={example.lines}
-          quoteLink={quoteLink}
+      {/* 3. What it notices: the message, and four real examples each with its real screen (T-167) */}
+      <section className={`${WRAP} py-16 sm:py-24`} data-testid="notices">
+        <div className="max-w-3xl">
+          <h2 className={H2}>{NOTICES.heading}</h2>
+          <p className="mt-4 font-display text-2xl font-bold text-text-primary sm:text-3xl" data-testid="message-line">{MESSAGE_LINE}</p>
+        </div>
+        <WhatItNotices
+          examples={NOTICES.examples}
+          heater={example}
+          painting={marketingExample('painting')}
+          range={HERO_DEMO.rangeBeforeConfirming}
+          business={{ name: DEMO_BUSINESS_NAME, primaryColor: DEMO_PRIMARY_COLOR }}
         />
       </section>
 
@@ -159,23 +164,20 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 5. What homeowners want: big figures, sources kept */}
-      <section className={`${WRAP} py-16 sm:py-20`}>
-        <h2 className={H2}>What homeowners want</h2>
-        <div className="mt-10 grid gap-10 md:grid-cols-3 md:gap-0 md:divide-x md:divide-border" data-testid="statistics">
-          {STATISTICS.map((s) => (
-            <figure key={s.url} className="md:px-8 md:first:pl-0 md:last:pr-0">
-              <p className="figure text-display-md font-medium text-primary lg:text-display-xl">{s.figure}</p>
-              <blockquote className="mt-3 text-base text-text-primary">{s.text}</blockquote>
-              <figcaption className="mt-3 text-xs text-text-muted">
-                Source:{' '}
-                <a href={s.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center font-semibold text-primary underline underline-offset-2 sm:min-h-0">
-                  {s.source}
-                </a>
-              </figcaption>
-            </figure>
-          ))}
-        </div>
+      {/* 5. Set up in minutes: the trade pages are linked from step 1 */}
+      <section className={`${WRAP} py-16 sm:py-20`} data-testid="setup">
+        <h2 className={H2}>{SETUP.heading}</h2>
+        <p className="mt-3 max-w-2xl text-text-secondary">{SETUP.lead}</p>
+        <SetupSteps
+          steps={SETUP.steps}
+          screenLabels={SETUP.screens}
+          trades={trades.map((t) => t.label)}
+          chosenTrade={trades.find((t) => t.slug === HERO_DEMO.trade)?.label ?? trades[0]?.label ?? ''}
+          serviceName={example.serviceName}
+          prices={example.lines}
+          quoteLink={quoteLink}
+          tradeLinks={[...trades.map((t) => ({ label: t.label, href: tradeHref(t) })), { label: OTHER_TRADES, href: '/signup', other: true }]}
+        />
       </section>
 
       {/* 6. Add it anywhere */}

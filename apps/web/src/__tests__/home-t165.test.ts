@@ -72,10 +72,14 @@ describe('T-165: the home page', () => {
   const home = code('app/page.tsx')
 
   it('has its sections in this order, one idea each', () => {
-    const order = ['data-testid="hero"', 'data-testid="trades-row"', 'data-testid="setup"', 'data-testid="control"', 'data-testid="statistics"', '<AddItAnywhere', 'data-testid="plans"', 'data-testid="faq"', '<FounderNote', 'data-testid="closing"', '<SiteFooter']
+    // T-167: the figures are second, "What it notices" is third, and the trade
+    // links moved from a row of their own into step 1 of "Set up in minutes"
+    const order = ['data-testid="hero"', 'data-testid="statistics"', 'data-testid="notices"', 'data-testid="control"', 'data-testid="setup"', '<AddItAnywhere', 'data-testid="plans"', 'data-testid="faq"', '<FounderNote', 'data-testid="closing"', '<SiteFooter']
     const at = order.map((mark) => home.indexOf(mark))
     expect(at.every((i) => i > 0)).toBe(true)
     expect([...at].sort((a, b) => a - b)).toEqual(at)
+    expect(home).not.toContain('data-testid="trades-row"')
+    expect(code('components/marketing/home/SetupSteps.tsx')).toContain('data-testid="trades-row"')
     // "How it works" repeated the hero in words: it is gone
     expect(home).not.toMatch(/How it works|HOW_IT_WORKS|ProductStrip/)
   })
@@ -135,7 +139,9 @@ describe('T-165: the home page', () => {
 
   it('your prices: a sentence of two prices and the two price lines it becomes; the minimum is not an item', () => {
     expect(CONTROL.sentence.map((p) => p.words).join(' ')).toBe('$375 per room, heavy prep adds $250.')
-    expect(code('app/features/page.tsx')).toContain('$375 per room, heavy prep adds')
+    // T-167: Features uses the same two-price sentence (its words live in features-copy.ts)
+    expect(code('lib/marketing/features-copy.ts')).toContain('“$375 per room, heavy prep adds $250.”')
+    expect(code('lib/marketing/features-copy.ts')).not.toMatch(/minimum job/i)
     expect(CONTROL.sentence.map((p) => p.line.label)).toEqual(['Per room', 'Heavy prep'])
     expect(CONTROL.sentence.map((p) => p.line.amount)).toEqual(['$375.00', '+ $250.00'])
     // a minimum charge is a floor, not an item: no line, no highlighted row

@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { MAIN_CTA } from '@/lib/marketing/cta'
+import { PRICING_AI_FAQ, PRICING_DEMO_LINKS } from '@/lib/marketing/site-copy'
 import { offeredPlans, formatMoney, freeOfferLabel, FREE_ALLOWANCE, type PlanDefinition, type PlanChannel, PRODUCT_NAME } from '@qolumns/shared'
 
 export const metadata: Metadata = {
@@ -18,15 +19,15 @@ const OFFERED = offeredPlans()
 const FREE_QUOTES = FREE_ALLOWANCE.US!.quotes
 
 const CHANNEL_LABEL: Record<PlanChannel, string> = {
-  widget: 'Website widget & AI chat',
+  widget: 'Website widget',
   sms: 'Quoting by text (SMS)',
   whatsapp: 'WhatsApp quoting',
   mobile_app: 'On-site app for your phone',
 }
 
 function planBullets(plan: PlanDefinition): string[] {
-  const bullets = [...plan.channels.map((c) => CHANNEL_LABEL[c]), 'Hosted estimate pages']
-  if (plan.features.custom_branding) bullets.push('Your branding on every estimate')
+  const bullets = [...plan.channels.map((c) => CHANNEL_LABEL[c]), PRICING_DEMO_LINKS.hostedPages]
+  if (plan.features.custom_branding) bullets.push(PRICING_DEMO_LINKS.branding)
   if (plan.features.calibration_insights) bullets.push('Accuracy insights from finished jobs')
   if (plan.features.lidar_scanning) bullets.push('LiDAR room scanning on site')
   if (plan.features.multiple_users) bullets.push('Multiple team members')
@@ -49,10 +50,7 @@ const FAQS = [
     q: 'What happens when I hit my monthly limit?',
     a: 'You never lose a customer. New requests are saved as leads and the customer is told you’ll send their estimate shortly; you can upgrade and price them with one click. There are no surprise per-estimate charges. You’ll see a warning in your dashboard at 80%.',
   },
-  {
-    q: 'Does the AI decide my prices?',
-    a: 'No — this is the one rule we never break. The AI measures the job; the price is calculated from rates you configure. You can review every quote before it sends if you want to.',
-  },
+  PRICING_AI_FAQ,
   {
     q: 'When do I start paying?',
     a: `When you pick a plan. Your ${FREE_QUOTES} free quotes need no card. Your setup and quote history carry straight over.`,
@@ -143,7 +141,14 @@ export default function PricingPage() {
                 {plan.features.map((feature) => (
                   <li key={feature} className="flex gap-2">
                     <span aria-hidden="true" className={plan.highlight ? 'text-white/60' : 'text-secondary'}>✓</span>
-                    {feature}
+                    {/* T-167: these two are shown, not only told: they open the live demo */}
+                    {feature === PRICING_DEMO_LINKS.hostedPages || feature === PRICING_DEMO_LINKS.branding ? (
+                      <Link href={PRICING_DEMO_LINKS.href} className="underline underline-offset-2" data-testid="plan-demo-link">
+                        {feature}
+                      </Link>
+                    ) : (
+                      feature
+                    )}
                   </li>
                 ))}
               </ul>

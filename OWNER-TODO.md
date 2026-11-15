@@ -806,3 +806,64 @@ Live since 2026-11-15 14:17 UTC. No price changes.
   row; it can ride with whichever choice you make above.
 - Run t146 to t165 before a commit or deploy, as before. There is no verify-t166: there is nothing for a real
   request to reach.
+
+## T-167 — Say what the AI does, and show it
+
+Built and checked locally. **Not committed. Not deployed to production.** A preview only:
+`https://estimator-7ic2l2j2m-gajendrans-projects-1a87e0b4.vercel.app`
+
+About the preview (the same as T-165's): Vercel asks you to log in to your Vercel account first, and the preview
+has no database, so you cannot sign in on it and "Try it as a customer" shows an error there (which also means
+Pricing's two new links lead to an error on the preview only). Home, Features, Pricing and the trade pages work.
+
+- [ ] **Deploy when you are happy:** web only (`npx vercel deploy --prod`). No worker change and no migration.
+  Then delete this preview.
+- **The message is on the site:** "The AI works out the job. Your prices work out the cost." Home has a new line
+  under the headline, one new beat in the demo (the label is read, the customer taps "Yes, 50 gal is right", the
+  price lands) and a new section, "What it notices". Features and the six trade pages show real screens.
+- **What the AI really does is written down** in `Docs/design/ai-capabilities.md`. The site may only claim what is
+  on that list, and a test fails if it claims more. To claim something new later, add it to the list first, with
+  the evidence that it runs.
+- [ ] **Look at it, on your phone and on a computer:**
+  1. *Home:* the line under the headline; the demo (it should show the question and the pressed "Yes" before the
+     price); the three figures straight after the hero; "What it notices" with its four screens; the trade pills
+     under "Choose your trade"; no trades row under the hero.
+  2. *Features:* the message as the headline, five steps each with its screen, step 05 "Track".
+  3. *A trade page with a label* (water heaters, HVAC, electrical): the form and the reading beside the headline.
+  4. *Painting:* the wall area "From your photos". *Plumbing and garage doors:* no claim that anything is read
+     from a photo.
+  5. *Pricing:* "Hosted estimate pages" and "Your branding on every estimate" open the demo.
+- [ ] **Photographs to supply** (none were added; a real one beats a screen in each of these places). They must be
+  yours or licensed, never stock passed off as a customer's job:
+  - *Water heaters:* a real tank rating label, sharp and square on (it would replace the drawn sample label), and
+    a tank where it stands in a garage or closet.
+  - *HVAC:* the rating plate on an outdoor unit with the model number readable, a furnace's plate inside its
+    front panel, and an outdoor unit in place. (Today the HVAC page names the photo and shows none.)
+  - *Electrical:* the label inside a panel door showing the amps, and a finished Level 2 charger on a garage wall.
+    (Today the page names the photo and shows none.)
+  - *Painting:* a house front as a customer would photograph it, with the front door in the shot (the door is
+    what the wall is measured against), and a finished room.
+  - *Plumbing:* a fitted toilet or faucet, and a close shot of a shut-off valve.
+  - *Garage doors:* the springs above a door seen from inside the garage, and a finished door.
+  - *Home:* a homeowner looking at a quote on a phone, for "What homeowners want".
+- **Follow-ups found here:**
+  - [ ] **Tidy the "What we saw" line on the real customer page** (your note; for the customer pages ticket). On
+    the question screen a customer reads, for example, `What we saw: Read from the tank's rating label (photo 1):
+    "CAPACITY 50 U.S. GAL MODEL NO. EX-50-NG-DEMO" → 50 gal (capacity printed on the label)`. It is written for
+    us, not for a homeowner. The demo leaves it out.
+  - [ ] The customer's question itself starts with the template's description ("Capacity of the existing water
+    heater tank: we read 50 gal…"). The marketing screens show the shorter sentence you approved; the real page
+    could say the same.
+  - [ ] The question page's heading is "Quick questions about your quote" and its intro says "to finalize your
+    quote". At that point the customer has an estimate, not a quote.
+  - [ ] **Pricing's plan lines** still include "Accuracy insights from finished jobs" and "LiDAR room scanning on
+    site". The first is a feature name, not a promise, but it sits close to one; the second is the on-site app,
+    which new businesses are not offered. They come from the plans, so they were not changed here.
+  - [ ] **Label reading asks every time.** In every recorded run the sample label was read correctly and the
+    customer was still asked to confirm it. That is the safe behaviour and the site now describes it. If you
+    want a clear reading to price straight away, that is a pricing-flow decision and its own ticket.
+  - [ ] The old three small frames (`ProductStrip`) are on no marketing page now; only `/design` still shows them.
+  - [ ] Features' hero and the closing bands are words only, and a trade page's three feature cards have no
+    picture. A photograph from the list above would fill them.
+  - [ ] `service-match` (checking that a described job fits the chosen service) is in the inventory but on no
+    page: it has no log, so it has not been seen working. Worth a live check before it is ever claimed.

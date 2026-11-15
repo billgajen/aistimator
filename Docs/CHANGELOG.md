@@ -15,6 +15,197 @@
 
 ## Issues & Resolutions
 
+### 2026-11-15: Regression runs: which checks a ticket needs (the owner's rule, added with T-167)
+
+**Problem:** every ticket ran the whole regression set (verify-t146 to the newest: 18 scripts, about 25 minutes,
+most of them sending real requests through the local pipeline), including tickets that changed only words and
+pictures on marketing pages.
+
+**The rule, now in `CLAUDE.md` under Quality gates ("Regression runs"):**
+- Every ticket: its own verify script, `pnpm lint`, `pnpm typecheck`, unit tests and the builds.
+- Marketing, design and copy tickets: also run only the earlier verify scripts that cover the pages changed, and
+  say which were run.
+- The full regression set is required for any ticket that touches pricing, the quote flow, the worker, emails
+  or a migration; at the end of a batch of design tickets; and before launch.
+- A ticket's prompt can override this either way.
+
+**Which scripts cover which pages** (for choosing "the scripts that cover the pages changed"):
+- Marketing pages (Home, Features, Pricing, trade pages, the header, footer and phone menu): `verify-t154`,
+  `verify-t155`, `verify-t165`, `verify-t167`; the public-page list and `/design` in `verify-t162` and
+  `verify-t164`; the free-offer wording on Home and Pricing in `verify-t152`; `/demo` in `verify-t153`.
+- The dashboard: `verify-t152` (Home, setup), `verify-t158` and `verify-t160` (quotes, menu), `verify-t164`
+  (tokens, status colours).
+- Customer pages and the quote flow: `verify-t146` to `verify-t151`, `verify-t156`, `verify-t157`, and the
+  minimum-charge section of `verify-t165`.
+- The regression set is still verify-t146 onward (there is no t159, t161, t163 or t166); t127 to t143 stay
+  historical.
+
+T-167 itself ran the full set before this rule existed (all 18 passed).
+
+### 2026-11-15: T-167 — Say what the AI does, and show it (Features, trade pages, two additions to Home)
+
+**Problem:** the site said what the AI does not do (set prices) and never what it does, so the product read as a
+quote form with a price list. Features was five steps of four text boxes each, with no screen. The trade pages had
+an empty right half in the hero and three grey cards for "How the price is set".
+
+**The message, in the owner's words:** "The AI works out the job. Your prices work out the cost."
+
+**1. The inventory came first** (`Docs/design/ai-capabilities.md`)
+- What the AI really does today, from the code and from what the pipeline has produced: each capability, where it
+  lives, which trades it applies to, what the customer and the business see, and the evidence. After T-166 (a
+  ticket written about code that could never run), a row needs proof that it runs, not only that it exists: the
+  counts are from the local database (1,876 quotes).
+- **What may be claimed:** label reading (water heaters, HVAC and electrical only), wall area from photos
+  (exterior painting only), a reading shown back to the customer to confirm, a range and one question when
+  something is unclear, an extra added from the customer's own words at the business's price, the scope written
+  in plain words, a price sentence turned into a price list.
+- **What may not:** the quote checker (it changes nothing and shows nowhere, AD-049); cross-service suggestions
+  (ran on 543 quotes, stored none); learning from the business's edits (its table is empty); counting catalogue
+  items in photos (no template uses it); the chat form (developer view only); quoting inside a WhatsApp
+  conversation; any accuracy figure; anything that says the AI prices.
+- **Found by running it:** the product does not go from a label photo straight to a price. The demo's own sample
+  label, through the real local pipeline, read "50 gal" and "Natural gas", showed a range of $1,890 to $2,410 and
+  asked the customer to confirm the capacity; all 17 earlier recorded runs that returned a result did the same.
+  So the demo's new beat is "reads, the customer confirms, the price lands" (the owner agreed).
+- **A unit test holds the site to the list** (`ai-claims-t167.test.ts`). Every sentence that says what the product
+  reads, measures, notices or works out is written through `says([...rows], text)`
+  (`lib/marketing/ai-claims.ts`). The test fails when such a sentence is not written that way, when it names a row
+  that is not claimable, when a trade page claims what the inventory does not give that trade, when "AI" is typed
+  on a public page outside the copy files, and when a product screen on a marketing page says words the real
+  screen does not.
+
+**2. Home** (two additions, a new order, and the trades row moved; nothing else redesigned)
+- Under the headline: "The AI reads your customer's answers and photos and works out the job. The price comes
+  from your own price list, and you confirm it."
+- **The demo's one new beat:** after the photo, the question "We read 50 gal from the tank's rating label. Is
+  that right?" and the pressed "Yes, 50 gal is right", on the customer's own question screen; then the price. The
+  run is 5.7 s (under six). The "What we saw" detail line is left out of the demo (the owner's choice).
+- **"What it notices"**, before "Your prices": the message line and four examples, each beside the real screen
+  where the result appears: a label read and confirmed; walls measured from photos; an extra added from the
+  customer's words; a range and one question. No icons. Nothing moves there (Home keeps one moment).
+- **Order** (the owner's): hero, the three figures, What it notices, Your prices, Set up in minutes, Add it
+  anywhere, plans, questions, the closing band. Backgrounds alternate (paper, grey, paper, mint, paper, grey,
+  paper, grey, juniper), so no two neighbours share one.
+- **The trades row is gone.** The trade links are pills inside step 1 of "Set up in minutes" ("Choose your
+  trade"), ending with "Other trades: describe your prices in plain English". No heading beside them.
+- **The three figures** are now second, one to a row: an 80 px figure, lines no wider than 672 px, sources at 14 px
+  and linked.
+
+**3. Features:** leads with the message line. Each of the five steps has its real screen in place of four text
+boxes (the form on a phone; a photo with what was read from it; the price setup; the quote page; Home's
+numbers), and no two neighbours are laid out alike. One yellow button in the hero and one in the closing band.
+Decided by the owner: step 05 is "Track" (it was "Learn: your corrections improve the next estimate", true only of
+confirmed photo measurements); "or a chat" is gone; the price sentence matches Home's (no "minimum job $400").
+
+**4. Trade pages** (one template, six trades): the hero's right half is the trade's own request form, asking
+the template's own question, and what is read for it. "How the price is set" is three steps on real screens,
+alternating sides. Each page claims only what the AI does for its trade; the HVAC, water heater and electrical
+ledes now say the reading is checked with the customer. The main button is yellow. **Only one photograph
+exists** (the sample tank label we ship), so the other label trades' forms name the photo without picturing it:
+no stock image and no drawn look-alike.
+
+**5. Pricing:** "Hosted estimate pages" and "Your branding on every estimate" link to the live demo.
+
+**Older claims that did not match the inventory, corrected**
+- The footer said "measured by AI, priced by you" and "The AI measures. You set the price." on every page.
+  Measuring from photos is one trade. Both lines now carry the message.
+- Pricing listed "Website widget & AI chat" on every plan: the chat form is not offered to businesses. It is
+  "Website widget". Its answer "The AI measures the job" is "The AI works out the job".
+- `/demo` said "one quick question to firm this up": "firm" is a word customers never see. It is "to settle it".
+- Each trade page's "Your prices set the estimate, never the AI" is the message line.
+
+**How the screens are built:** `components/marketing/screens/ProductScreens.tsx` reproduces the real screens'
+markup (the customer's question screen, the estimate's measurement block, its price breakdown with an added
+line, the range, setup's price check, Home's numbers), with the real screens' words from
+`lib/marketing/screen-words.ts` (a unit test checks each against the product's source) and the trade templates'
+own questions, labels and prices from `lib/marketing/examples.ts` (it throws if a template has no such label,
+field or extra). Nothing fetches and no button acts.
+
+**Not changed:** prices, the quote flow, routes, the dashboard, the customer pages. No dependency added. No
+photograph added. Motion is CSS only, from the tokens.
+
+**Checkers**
+- **taste (`consistency.mjs`), four widths, before (T-161) and after:**
+
+  | | Features before | Features after | Trade (painting) before | Trade after |
+  |---|---|---|---|---|
+  | `no-visual` (a section with no picture or screen) | 5 | **0** | 2 | 2 |
+  | `text-only` | 7 | 8 | 11 | 8 |
+  | `card-visual` (a card with no visual) | 0 | 0 | 8 | 3 |
+  | `card-layout` | pass | pass | pass | pass |
+  | `moment-none` | 1 | 0 | 1 | 0 |
+  | `tap-size` | 3 | 0 | 3 | 0 |
+  | `skip-link` | 1 | 0 | 1 | 0 |
+  | all FAIL / WARN | 152 / 34 | 155 / 41 | 135 / 33 | 141 / 36 |
+
+  - Features' `text-only` is now two sections at four widths: its hero (words and two buttons) and the closing
+    band.
+  - The trade page's remaining `no-visual` is its row of three feature cards (two widths), and its `text-only` is
+    the "Tell it your prices" band and the closing band.
+  - **Neighbouring layouts:** the checker's own check needs taste's markup and cannot run on ours (as in T-165).
+    Measured in `verify-t167.mts` instead. Before: Features was the same layout five times (words left, four
+    boxes right) and the trade page two rows of three cards. After: on Features no two neighbouring steps are
+    alike at either width, and on each trade page the three "How the price is set" steps alternate sides.
+  - The totals rose a little because the pages are longer and the checker counts its one-section-per-screen rule
+    per section and per width (`system.md` does not adopt it), and `button-styles` rose (8 to 12, 1 to 9): the
+    header's juniper "Try it free" and the hero's yellow button are one action in two styles on the first screen,
+    as on Home.
+- **ui-ux-pro-max web checklist, Features and the water heaters page, 390 and 1440:**
+  - Pass on both: one `h1` and no level skipped, every control named, every picture described (five on Features,
+    four on the trade page), no sideways scroll, nothing under 12 px outside a product screen, a skip link, two
+    yellow buttons on the page.
+  - Fail, not from this ticket: the estimate document's small labels on the business's green ("Your quote" 3.35:1,
+    "Reviewed and confirmed by…" 4.27:1; a T-165 follow-up); at 1440 the header and footer text links are under
+    24 px tall (shared by every marketing page).
+  - One false alarm: the skip link, which is only on screen when focused.
+
+**Regression scripts changed, and only for this ticket:**
+- `verify-t155.mts`: the three small frames are gone from the trade pages, so its six "three frames, the same
+  height" checks per width now check that the frames are gone and the page shows its own screens; its "reworded
+  lines" check on Features (four text-box lines and the "Learn" sentence) now checks five steps with five screens
+  and that those lines are gone; the trade page's small line is the message. 44 checks, as before.
+- `verify-t165.mts`: nothing in it failed on the new Home. Two checks were added so it holds the new order and
+  the trade links' new place. 121 checks, was 117.
+- Unit tests: `home-t165.test.ts` (the section order; the Features sentence lives in `features-copy.ts`),
+  `marketing-home.test.ts` (the hero's line; the trades heading is gone; the trade pages' buttons and small
+  line; the Features assertions are the approved five steps; five more files in the banned-words scan).
+- `verify-t154`, `verify-t164` and the other scripts needed no change.
+
+**Constraints introduced**
+- A claim on the site maps to a row of `ai-capabilities.md`, written through `says`. To claim something new, add
+  the row first, with its evidence.
+- "AI" is typed only in the marketing copy files.
+- A marketing screen takes its words from `screen-words.ts` and its figures from `examples.ts`.
+- Neighbouring sections of a marketing page share neither a layout nor a background (`system.md`).
+
+**Verified (2026-11-15, local stack):**
+- `pnpm lint`, `pnpm typecheck`, the web build and the worker build (a dry run) pass. No dependency added.
+- Unit tests: web 628 (was 595), worker 519, mobile 11, all pass. New: `ai-claims-t167.test.ts` (28).
+- `scripts/hardcore-test/verify-t167.mts` with the browser pass at 390 and 1440: **167/167**. Every marketing page
+  loads with no banned word, slogan or promise of accuracy, and none says the AI sets a price. Home: the demo's
+  beat is in its place (photo, the question, "Yes", the price, Sent), it plays once and ends still, and under
+  reduced motion it shows its finished screens at once; the sections are in the new order and no two neighbours
+  share a background; the figures are 80 px with lines of 672 px at most and 14 px linked sources; the trade
+  links are seven pills inside step 1; "What it notices" has four real screens, no icons and nothing moving; one
+  yellow button per screen. Features: the message as its headline, five steps with five screens, no two
+  neighbours alike. Each of the six trade pages: its own form beside the headline, three steps on real screens,
+  the reading shown only where the template reads a label and the measurement only on painting, the yellow main
+  button. Pricing's two lines link to `/demo`.
+- Regression, t146 to t165, with the browser passes: 20, 33, 29, 35, 27, 35, 66, 36, 26, 44, 31, 96, 116, 96, 77, 78,
+  121, all pass.
+- The demo's sample label was run once through the real local pipeline for the inventory (the example business,
+  18 seconds). No other request was sent for this ticket; `verify-t167` sends none.
+
+**Not committed. Not deployed to production.** A preview only: `https://estimator-7ic2l2j2m-gajendrans-projects-1a87e0b4.vercel.app`
+(`dpl_8ExeQC6JmqKbENcJwWs1MvgpKRe1`, built from the uncommitted working tree, the same way as T-165: no
+`--prod`, placeholder settings for that one deployment, no real key). Production still serves the T-165 web
+deployment.
+
+What does not work on the preview, because of preview settings (as in T-165): Vercel asks you to log in first;
+the Preview environment has no database, so signing in, "Try it as a customer" (`/demo`) and quote links do not
+work there, and Pricing's two new links lead to that broken `/demo`. Home, Features, Pricing, the trade pages
+and `/design` do work. The QR code and quote link shown point at production's example quote page.
+
 ### 2026-11-15: T-166 — The quote checker flags, it never corrects (AD-049)
 
 The ticket began as "a step added by the quote checker counts toward the minimum, not on top of it". Reading the

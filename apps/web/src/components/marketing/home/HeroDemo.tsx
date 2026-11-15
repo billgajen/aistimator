@@ -6,6 +6,7 @@ import { EstimateSheet, type EstimateSheetData } from '@/components/quote/Estima
 import { TurnBadge } from '@/components/quotes/TurnBadge'
 import { Button } from '@/components/ui/Button'
 import { RequestFormScreen } from './RequestFormScreen'
+import { QuestionScreen } from '@/components/marketing/screens/ProductScreens'
 
 /**
  * T-165: the hero's product demo (system.md, Motion: "the hero demo").
@@ -13,9 +14,11 @@ import { RequestFormScreen } from './RequestFormScreen'
  * Three screens at true size, built from the product's own parts: the request
  * form in the business's colour, the estimate document (EstimateSheet, the
  * quote page's own parts) and the owner's "Waiting for you" row (TurnBadge,
- * Button). It plays once on load: the customer answers and adds a photo, the
- * tape rule is drawn out and the price lands, then Approve & send is pressed
- * and turns to Sent. Then it stands still on that last state.
+ * Button). It plays once on load: the customer answers and adds a photo; the
+ * capacity read from the photo is shown back to them and they press "Yes"
+ * (T-167: the product confirms a reading before it prices, so the demo does
+ * too); the tape rule is drawn out and the price lands; then Approve & send
+ * is pressed and turns to Sent. Then it stands still on that last state.
  *
  * The motion is CSS only (globals.css, demo-*): each element waits for its
  * turn in `--at`. "Play again" mounts the screens afresh, which starts the
@@ -23,18 +26,22 @@ import { RequestFormScreen } from './RequestFormScreen'
  * once, so the three finished screens show with no movement.
  */
 
-/** When each thing happens, in ms from the start. The whole run is about 5.5 s. */
+/** When each thing happens, in ms from the start. The whole run is about 5.8 s (system.md: under six). */
 export const DEMO_TIMELINE = {
-  answer: 500,
-  photo: 1200,
-  ask: 1900,
-  tape: 2300,
-  lines: 2600,
-  total: 3100,
-  lead: 3700,
-  approve: 4700,
-  sent: 4900,
-  confirmed: 5100,
+  answer: 400,
+  photo: 1000,
+  ask: 1500,
+  /** T-167: the reading comes back as a question… */
+  read: 1900,
+  /** …and the customer presses "Yes" */
+  yes: 2600,
+  tape: 2900,
+  lines: 3100,
+  total: 3600,
+  lead: 4100,
+  approve: 5000,
+  sent: 5200,
+  confirmed: 5400,
 } as const
 /** The last thing to finish: the confirmed line, plus its entrance */
 export const DEMO_LENGTH_MS = DEMO_TIMELINE.confirmed + 300
@@ -46,6 +53,8 @@ export interface HeroDemoContent {
   question: string
   answer: string
   photo: { src: string; alt: string; label: string }
+  /** T-167: what the product read from that photo, shown back to the customer to confirm */
+  reading: { value: string; readFrom: string }
   customerName: string
   sheet: EstimateSheetData
   frames: readonly [string, string, string]
@@ -80,6 +89,19 @@ export function HeroDemo({ content }: { content: HeroDemoContent }) {
             photoStyle={at(T.photo)}
             buttonClassName="demo-press"
             buttonStyle={at(T.ask)}
+          />
+          {/* T-167: the reading, on the customer's own question screen, and their "Yes" */}
+          <QuestionScreen
+            value={content.reading.value}
+            readFrom={content.reading.readFrom}
+            primaryColor={sheet.primaryColor}
+            stacked
+            className="demo-in mt-4"
+            style={at(T.read)}
+            yesClassName="demo-press"
+            yesStyle={at(T.yes)}
+            chosenClassName="demo-in"
+            chosenStyle={at(T.yes + 150)}
           />
         </Frame>
 

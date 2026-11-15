@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { freeOfferLabel, PRODUCT_NAME } from '@qolumns/shared'
 import { Wordmark } from '@/components/brand/Wordmark'
+import { FOOTER } from '@/lib/marketing/site-copy'
 
 /**
  * Marketing site footer — shared across all public pages.
@@ -18,9 +19,7 @@ export function SiteFooter() {
             <p>
               <Wordmark className="text-lg" />
             </p>
-            <p className="mt-2 max-w-xs text-sm text-text-secondary">
-              Instant, professional quotes for service businesses — measured by AI, priced by you.
-            </p>
+            <p className="mt-2 max-w-xs text-sm text-text-secondary">{FOOTER.tagline}</p>
           </div>
 
           <div>
@@ -49,7 +48,7 @@ export function SiteFooter() {
           </div>
         </div>
         <p className="pb-8 text-xs text-text-muted">
-          © {new Date().getFullYear()} {PRODUCT_NAME}. The AI measures. You set the price.
+          © {new Date().getFullYear()} {PRODUCT_NAME}. {FOOTER.closing}
         </p>
       </div>
     </footer>

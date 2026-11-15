@@ -30,7 +30,8 @@ export function RequestFormScreen({
   serviceName: string
   question: string
   answer: string
-  photo?: { src: string; alt: string; label: string } | null
+  /** T-167: with no `src` the photo is named, not pictured (we draw no look-alike of a real label) */
+  photo?: { src?: string; alt?: string; label: string } | null
   buttonLabel?: string
   answerClassName?: string
   photoClassName?: string
@@ -64,9 +65,11 @@ export function RequestFormScreen({
           <p className="mt-4 text-sm font-semibold text-text-primary">{photo.label}</p>
           <div className="mt-2 flex min-h-[88px] items-center gap-3 rounded-xl border border-dashed border-field bg-background p-2">
             <span className={`flex items-center gap-3 ${photoClassName}`} style={photoStyle} data-testid="demo-photo">
-              {/* eslint-disable-next-line @next/next/no-img-element -- a small file shipped in public/ */}
-              <img src={photo.src} alt={photo.alt} width={96} height={72} className="h-[72px] w-24 rounded-lg border border-border object-cover" />
-              <span className="text-sm text-text-secondary">
+              {photo.src ? (
+                // eslint-disable-next-line @next/next/no-img-element -- a small file shipped in public/
+                <img src={photo.src} alt={photo.alt ?? ''} width={96} height={72} className="h-[72px] w-24 rounded-lg border border-border object-cover" />
+              ) : null}
+              <span className={`text-sm text-text-secondary ${photo.src ? '' : 'px-2'}`}>
                 <span className="figure">1</span> photo added
               </span>
             </span>

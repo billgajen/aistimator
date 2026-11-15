@@ -7,6 +7,7 @@ import { MinimumNote } from '@/components/quote/MinimumNote'
 import { DEMO_CONTACT, DEMO_SAMPLE_PHOTO_PATH, formatMoney, freeOfferLabel, isQuoteProcessing, splitMinimum } from '@qolumns/shared'
 import type { QuoteViewResponse } from '@qolumns/shared'
 import { RECORDED_EXAMPLE, type DemoEstimate } from '@/lib/demo/recorded-example'
+import { DEMO_NOTE, DEMO_QUESTION_NOTE } from '@/lib/marketing/site-copy'
 
 const POLL_MS = 1500
 const POLL_LIMIT_MS = 180_000
@@ -171,9 +172,9 @@ function EstimateCard({ estimate, recorded }: { estimate: DemoEstimate; recorded
         </span>
       </div>
       {estimate.needsAnswer && (
-        <p className="mt-2 text-sm text-text-secondary">The business would ask you one quick question to firm this up.</p>
+        <p className="mt-2 text-sm text-text-secondary">{DEMO_QUESTION_NOTE}</p>
       )}
-      <p className="mt-4 text-xs text-text-muted">An example business with example prices. Every price comes from the business&apos;s own rates, never from the AI.</p>
+      <p className="mt-4 text-xs text-text-muted">{DEMO_NOTE}</p>
       {estimate.quoteViewUrl && (
         <a href={estimate.quoteViewUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-sm font-semibold text-primary hover:underline">
           Open the full estimate page

@@ -1,152 +1,169 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { DEMO_BUSINESS_NAME, DEMO_LOGO_PATH, DEMO_PRIMARY_COLOR, DEMO_SLUG, QUOTE_TURN_COPY, freeOfferLabel } from '@qolumns/shared'
+import { HOME_WINDOW_DAYS } from '@/lib/home-numbers'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
-import { freeOfferLabel, PRODUCT_NAME } from '@qolumns/shared'
+import { RequestFormScreen } from '@/components/marketing/home/RequestFormScreen'
+import { EstimateSheet } from '@/components/quote/EstimateSheet'
+import { Picture, PhoneFrame, QuestionScreen, PriceCheckScreen, NumbersScreen } from '@/components/marketing/screens/ProductScreens'
+import { marketingExample } from '@/lib/marketing/examples'
+import { MAIN_CTA, QUIET_BUTTON, QUIET_LINK } from '@/lib/marketing/cta'
+import { HERO_DEMO } from '@/lib/marketing/home-copy'
+import { FEATURES_META, FEATURES_HERO, FEATURE_STEPS, FEATURES_PRICE_EXAMPLE, FEATURES_NUMBERS_EXAMPLE, FEATURES_CLOSING, type FeatureStep } from '@/lib/marketing/features-copy'
 
 export const metadata: Metadata = {
-  title: `Features — ${PRODUCT_NAME}`,
-  description:
-    'How customers get an estimate from your prices at once: your quote link, guided questions and photos, your own price list, and an estimate page you confirm before they accept.',
+  title: FEATURES_META.title,
+  description: FEATURES_META.description,
 }
 
-/**
- * The page follows the product's actual steps, from a customer's request to an
- * accepted quote. T-154: plain words only; every claim matches the live
- * product (no grades, no engine words, no "exact").
- */
-const STAGES = [
-  {
-    number: '01',
-    name: 'Ask',
-    headline: 'Meet the customer where they already are.',
-    body: 'Share your own quote link and QR code, send it in WhatsApp, or add it to your website as a step-by-step form or a chat. Each service asks only the questions that set its price, and asks for the photos it needs, with checks that catch blurry or dark shots before they waste anyone’s time.',
-    details: [
-      'Your quote link and QR code, no website needed',
-      'On your website: a step-by-step form or a chat',
-      'Questions and photo checklists per service',
-      'Contact details first, so a half-finished request is still your lead',
-    ],
-  },
-  {
-    number: '02',
-    name: 'Read the job',
-    headline: 'It reads the details that set your price.',
-    body: 'The AI reads what matters from the answers and photos: how many rooms, the size on a rating plate, the capacity on a tank label, the wall area of a house. When something isn’t clear, it doesn’t guess: the customer sees a range and is asked one quick question.',
-    details: [
-      'Sizes read from labels and rating plates',
-      'Rooms, fixtures and quantities from the customer’s answers',
-      'A range and one question when something is unclear',
-      'See the working behind every sent estimate',
-    ],
-  },
-  {
-    number: '03',
-    name: 'Price',
-    headline: 'Plain English in. Your prices out.',
-    body: 'You describe your pricing the way you’d tell a new hire: “$375 per room, heavy prep adds $250, minimum job $400.” It becomes your price list, shown back to you in plain English. The AI reads the job; the price only ever comes from the prices you set. Change a price by typing a sentence; the next estimate uses it.',
-    details: [
-      'Plain-English price setup, no formulas to learn',
-      'Extras, adjustments, minimums and service areas',
-      'Ready-made templates for common trades',
-      'See the working behind every sent estimate',
-    ],
-  },
-  {
-    number: '04',
-    name: 'Confirm',
-    headline: 'An estimate page, and you have the last word.',
-    body: 'Your customer gets a page in your branding with the estimate for their job, straight away. By default they can accept once you’ve confirmed it: one tap on Approve & send. You choose per service: show the estimate and confirm, hold it until you approve, or send automatically. They can accept, ask a question or decline, and it shows in your dashboard straight away.',
-    details: [
-      'Estimate page in your branding',
-      'Three ways to send, chosen per service',
-      'Accept, ask a question or decline, shown in your dashboard',
-      'Estimates expire automatically',
-    ],
-  },
-  {
-    number: '05',
-    name: 'Learn',
-    headline: 'Your corrections improve the next estimate.',
-    body: 'When you correct an estimate or a customer confirms a measurement, that service’s future estimates use it. Your dashboard shows which services win work and where requests stall.',
-    details: [
-      'Learns from your own corrections, per service',
-      'Requests, estimates sent, accepted and value',
-      'Unfinished requests listed with call and email buttons',
-    ],
-  },
-]
+const WRAP = 'mx-auto max-w-container px-4 sm:px-6'
 
+/**
+ * T-167: the Features page shows the product (system.md, Imagery and Layout;
+ * audit.md finding 1 and section 4, item 7). It leads with the message line
+ * and follows the product's five steps, each with its real screen at true
+ * size in place of four text boxes:
+ *   01 Ask      the request form on a phone                 words left, screen right
+ *   02 Read     a photo and what was read from it           screen left, words right
+ *   03 Price    a price sentence and the list it becomes    one centred column
+ *   04 Confirm  the customer's quote page                   words left, screen right, on grey
+ *   05 Track    Home's numbers for the last 30 days         words above a full-width screen
+ * No two neighbouring steps share a layout. One yellow button per screen: the
+ * hero's and the closing band's. Nothing moves but the hero's one entrance.
+ * Copy: lib/marketing/features-copy.ts. Prices: the trade templates' own
+ * (lib/marketing/examples.ts).
+ */
 export default function FeaturesPage() {
+  const heater = marketingExample(HERO_DEMO.trade)
+  const appOrigin = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
+  const address = `${appOrigin}/quote/${DEMO_SLUG}`.replace(/^https?:\/\//, '')
+  const N = QUOTE_TURN_COPY.home.numbers
+  const E = FEATURES_NUMBERS_EXAMPLE
+  const step = (id: FeatureStep['id']) => FEATURE_STEPS.find((s) => s.id === id)!
+
+  const form = (
+    <RequestFormScreen
+      businessName={DEMO_BUSINESS_NAME}
+      logoUrl={DEMO_LOGO_PATH}
+      primaryColor={DEMO_PRIMARY_COLOR}
+      serviceName={heater.serviceName}
+      question={HERO_DEMO.question}
+      answer={HERO_DEMO.answer}
+      photo={{ src: HERO_DEMO.photoSrc, alt: '', label: HERO_DEMO.photoLabel }}
+      className="shadow-warm-md"
+    />
+  )
+
   return (
     <main className="min-h-screen overflow-x-clip bg-background">
       <SiteNav />
 
-      <section className="mx-auto max-w-4xl px-4 pb-8 pt-12 text-center sm:px-6 sm:pt-16">
-        <h1 className="font-display text-4xl font-extrabold tracking-tight text-text-primary sm:text-5xl">
-          From a customer’s question to a yes.
-        </h1>
-        <p className="mx-auto mt-4 max-w-2xl text-lg text-text-secondary">
-          Five steps between a request and an accepted quote. {PRODUCT_NAME} runs them, in your prices, and you
-          confirm before your customer accepts.
-        </p>
-      </section>
-
-      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <div className="space-y-20">
-          {STAGES.map((stage) => (
-            <div key={stage.number}>
-              <div className="tape-rule" />
-              <div className="mt-8 grid items-start gap-8 lg:grid-cols-5">
-                <div className="lg:col-span-2">
-                  <p className="figure text-sm text-tape">{stage.number}</p>
-                  <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-text-muted">
-                    {stage.name}
-                  </p>
-                  <h2 className="mt-3 font-display text-2xl font-extrabold tracking-tight text-text-primary sm:text-3xl">
-                    {stage.headline}
-                  </h2>
-                </div>
-                <div className="lg:col-span-3">
-                  <p className="leading-relaxed text-text-secondary">{stage.body}</p>
-                  <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-                    {stage.details.map((detail) => (
-                      <li
-                        key={detail}
-                        className="rounded-xl border border-border bg-white px-4 py-3 text-sm text-text-primary"
-                      >
-                        {detail}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          ))}
+      {/* Hero: the message line, and the page's one yellow button above the fold */}
+      <section className={`${WRAP} pb-14 pt-10 sm:pb-20 sm:pt-16`} data-testid="hero">
+        <div className="animate-fade-in-up max-w-4xl">
+          <h1 className="font-display text-display-sm font-extrabold text-text-primary sm:text-display-md lg:text-display-lg" data-testid="message-line">
+            {FEATURES_HERO.headline}
+          </h1>
+          <p className="mt-5 max-w-2xl text-lg text-text-secondary">{FEATURES_HERO.lead}</p>
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Link href="/signup" className={MAIN_CTA} data-testid="hero-signup" data-cta="main">
+              {freeOfferLabel()}
+            </Link>
+            <Link href="/demo" className={QUIET_BUTTON} data-testid="hero-demo">
+              Try it as a customer
+            </Link>
+          </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="bg-primary py-16 text-white">
-        <div className="mx-auto max-w-3xl px-6 text-center">
-          <h2 className="font-display text-3xl font-extrabold tracking-tight">
-            See it price one of your jobs.
-          </h2>
-          <p className="mx-auto mt-3 max-w-xl text-white/80">
-            The fastest way to judge it: set up your prices and send yourself a test quote.
-          </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-4">
-            <Link
-              href="/signup"
-              className="rounded-lg bg-white px-8 py-3.5 text-sm font-semibold text-primary transition-colors hover:bg-mint"
-            >
+      {/* 01 Ask: words left, the form on a phone right */}
+      <section className="border-t border-border" data-testid="feature-step" data-step="ask">
+        <div className={`${WRAP} grid items-center gap-10 py-16 sm:py-20 lg:grid-cols-[1fr_minmax(0,24rem)] lg:gap-20`}>
+          <Words step={step('ask')} />
+          <Picture label={step('ask').screen} testId="feature-screen">
+            <PhoneFrame address={address}>{form}</PhoneFrame>
+          </Picture>
+        </div>
+      </section>
+
+      {/* 02 Read the job: the photo and what was read from it left, words right, on mint */}
+      <section className="bg-mint" data-testid="feature-step" data-step="read">
+        <div className={`${WRAP} grid items-center gap-10 py-16 sm:py-20 lg:grid-cols-2 lg:gap-20`}>
+          <Picture label={step('read').screen} className="mx-auto w-full max-w-md lg:order-1 lg:mx-0" testId="feature-screen">
+            {/* eslint-disable-next-line @next/next/no-img-element -- the sample label shipped in public/demo */}
+            <img src={HERO_DEMO.photoSrc} alt="" width={1000} height={750} className="w-full rounded-2xl border border-border shadow-warm-md" />
+            {heater.reading ? (
+              <QuestionScreen value={heater.reading.value} readFrom={heater.reading.readFrom} primaryColor={DEMO_PRIMARY_COLOR} className="-mt-6 ml-6 sm:ml-12" />
+            ) : null}
+          </Picture>
+          <Words step={step('read')} className="lg:order-2" />
+        </div>
+      </section>
+
+      {/* 03 Price: one centred column, the sentence and the list it becomes */}
+      <section data-testid="feature-step" data-step="price">
+        <div className={`${WRAP} py-16 text-center sm:py-20`}>
+          <Words step={step('price')} className="mx-auto max-w-2xl" centred />
+          <Picture label={step('price').screen} className="mx-auto mt-10 max-w-lg" testId="feature-screen">
+            <PriceCheckScreen serviceName={FEATURES_PRICE_EXAMPLE.service} sentence={FEATURES_PRICE_EXAMPLE.sentence} prices={[...FEATURES_PRICE_EXAMPLE.list]} />
+          </Picture>
+        </div>
+      </section>
+
+      {/* 04 Confirm: words left, the customer's quote page right, on grey */}
+      <section className="border-y border-border bg-surface" data-testid="feature-step" data-step="confirm">
+        <div className={`${WRAP} grid items-start gap-10 py-16 sm:py-20 lg:grid-cols-[minmax(0,26rem)_1fr] lg:gap-20`}>
+          <Words step={step('confirm')} className="lg:sticky lg:top-28" />
+          <Picture label={step('confirm').screen} className="mx-auto w-full max-w-lg lg:mx-0 lg:justify-self-end" testId="feature-screen">
+            <EstimateSheet
+              confirmed
+              data={{
+                businessName: DEMO_BUSINESS_NAME,
+                logoUrl: DEMO_LOGO_PATH,
+                customerName: heater.customerName,
+                reference: 'EST-2026-0142',
+                lines: heater.lines,
+                total: heater.total,
+                currency: 'USD',
+                locale: 'en-US',
+                primaryColor: DEMO_PRIMARY_COLOR,
+              }}
+            />
+          </Picture>
+        </div>
+      </section>
+
+      {/* 05 Track: words above, Home's numbers across the full width */}
+      <section data-testid="feature-step" data-step="track">
+        <div className={`${WRAP} py-16 sm:py-20`}>
+          <Words step={step('track')} className="max-w-2xl" />
+          <Picture label={step('track').screen} className="mt-10" testId="feature-screen">
+            <NumbersScreen
+              title={N.title(HOME_WINDOW_DAYS)}
+              note={N.note(HOME_WINDOW_DAYS)}
+              numbers={[
+                { title: N.requests, value: E.requests.value, change: N.up(E.requests.up) },
+                { title: N.sent, value: E.sent.value, change: N.up(E.sent.up) },
+                { title: N.accepted, value: E.accepted.value, change: N.up(E.accepted.up) },
+                { title: N.valueAccepted, value: E.valueAccepted.value, change: N.up(E.valueAccepted.up) },
+              ]}
+            />
+          </Picture>
+        </div>
+      </section>
+
+      {/* The closing band: one yellow button and one quiet link */}
+      <section className="bg-primary py-16 text-white" data-testid="closing">
+        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
+          <h2 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">{FEATURES_CLOSING.heading}</h2>
+          <p className="mx-auto mt-3 max-w-xl text-on-primary/80">{FEATURES_CLOSING.lead}</p>
+          <div className="mt-8 flex flex-col items-center gap-2">
+            <Link href="/signup" className={MAIN_CTA} data-testid="closing-signup" data-cta="main">
               {freeOfferLabel()}
             </Link>
-            <Link
-              href="/pricing"
-              className="rounded-lg border border-white/30 px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
-            >
-              See pricing
+            <Link href="/pricing" className={`${QUIET_LINK} text-white`}>
+              {FEATURES_CLOSING.quietLink}
             </Link>
           </div>
         </div>
@@ -154,5 +171,18 @@ export default function FeaturesPage() {
 
       <SiteFooter />
     </main>
+  )
+}
+
+function Words({ step, className = '', centred = false }: { step: FeatureStep; className?: string; centred?: boolean }) {
+  return (
+    <div className={className}>
+      <p className="text-text-muted">
+        <span className="figure text-sm font-medium">{step.number}</span>
+        <span className="ml-3 text-xs font-semibold uppercase tracking-widest">{step.name}</span>
+      </p>
+      <h2 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">{step.headline}</h2>
+      <p className={`mt-4 text-lg leading-relaxed text-text-secondary ${centred ? '' : 'max-w-xl'}`}>{step.body}</p>
+    </div>
   )
 }

@@ -19,7 +19,8 @@ const { check, finish } = checker()
 const OFFER = 'Try it free: 10 quotes, no card'
 /** Content-to-button spacing is 12 px; the frames' contents differ a little by trade */
 const MAX_GAP = 64
-// T-165: the home page's hero is now the product demo (verify-t165); the strip is on the trade pages
+// T-165: the home page's hero is now the product demo (verify-t165).
+// T-167: the trade pages lost the strip too; these are still the trade pages checked below
 const STRIP_PAGES = ['/painting', '/trades/hvac', '/trades/water-heaters', '/trades/plumbing', '/trades/electrical', '/trades/garage-doors']
 
 const browser = await chromium.launch()
@@ -73,19 +74,22 @@ for (const [label, ctx] of [['390 px', phone], ['1440 px', desk]] as const) {
     check('390 px: the main hero button is still above the fold', cta.y + cta.height <= 844, Math.round(cta.y + cta.height))
   }
 
-  // 5. the product frames, home and every trade page
+  // 5. T-167: the three small frames are gone from the trade pages too (each
+  // now shows its own real screens; verify-t167 checks them). What is kept
+  // here: no trade page still has the old strip.
   for (const route of STRIP_PAGES) {
     if (route !== '/') await p.goto(`${app}${route}`, { waitUntil: 'networkidle' })
     const f = await frames(p)
-    const heights = new Set(f.map((x) => x.height))
-    check(`${label} ${route}: three frames, the same height, button under the content`, f.length === 3 && Math.max(...f.map((x) => x.height)) - Math.min(...f.map((x) => x.height)) <= 1 && f.every((x) => x.gap <= MAX_GAP && x.overflow <= 0), { heights: [...heights], gaps: f.map((x) => x.gap) })
+    check(`${label} ${route}: the three small frames are gone; the page shows its own screens`, f.length === 0 && (await p.locator('[data-product-screen]').count()) >= 4, { frames: f.length })
   }
 
-  // 7. the features promises, reworded to what is live
+  // 7. the features promises match what is live. T-167: each step shows its
+  // real screen in place of four text boxes, so the boxes' lines are gone,
+  // and step 05 is "Track" (the old "Learn" claimed more than is live).
   await p.goto(`${app}/features`, { waitUntil: 'networkidle' })
   const feat = await p.locator('main').innerText()
-  const wantFeat = ['Estimate page in your branding', 'Estimates expire automatically', 'See the working behind every sent estimate', 'Your dashboard shows which services win work and where requests stall.']
-  check(`${label} /features: the reworded lines`, wantFeat.every((s) => feat.includes(s)) && (feat.match(/See the working behind every sent estimate/g) ?? []).length === 2, wantFeat.filter((s) => !feat.includes(s)))
+  const goneFeat = ['Estimate page in your branding', 'Estimates expire automatically', 'Your dashboard shows which services win work and where requests stall.', 'Learns from your own corrections']
+  check(`${label} /features: five steps with their screens; the text boxes and the "Learn" claim are gone`, (await p.locator('[data-testid=feature-step]').count()) === 5 && (await p.locator('[data-testid=feature-screen]').count()) === 5 && goneFeat.every((s) => !feat.includes(s)) && feat.includes('See what’s winning work.'), goneFeat.filter((s) => feat.includes(s)))
   const OLD_CLAIMS = /\bPDFs?\b|remind|price comparison|compare with similar|anonymi[sz]ed|every quantity was worked out|working visible/i
   const claimHits: string[] = []
   for (const route of ['/', '/features', '/pricing', '/trades', ...STRIP_PAGES.filter((r) => r !== '/')]) {
@@ -99,7 +103,8 @@ for (const [label, ctx] of [['390 px', phone], ['1440 px', desk]] as const) {
 
   // trade pages keep their own small line
   await p.goto(`${app}/trades/hvac`, { waitUntil: 'networkidle' })
-  check(`${label} trade page keeps "No website needed."`, (await p.getByTestId('hero').innerText()).includes('Your prices set the estimate, never the AI. No website needed.'))
+  // T-167: the line now carries the message, and still ends "No website needed."
+  check(`${label} trade page keeps "No website needed."`, (await p.getByTestId('hero').innerText()).includes('The AI works out the job. Your prices work out the cost. No website needed.'))
 
   // no sideways scroll anywhere
   const sideways: string[] = []

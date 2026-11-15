@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { formatMoney } from '@qolumns/shared'
 import { Button } from '@/components/ui/Button'
 import { QrSvg } from '@/components/marketing/QrSvg'
@@ -7,6 +8,10 @@ import { QrSvg } from '@/components/marketing/QrSvg'
  * on, drawn at true size from the product's own parts (the trade templates,
  * the template's own prices, the real QR encoder). The rows alternate sides,
  * so no two neighbours share a layout.
+ *
+ * T-167: the links to the trade pages live here, under step 1 ("Choose your
+ * trade"), as pills on a line that wraps; the last pill is "Other trades".
+ * (They were a row of their own under the hero.)
  */
 export function SetupSteps({
   steps,
@@ -16,6 +21,7 @@ export function SetupSteps({
   serviceName,
   prices,
   quoteLink,
+  tradeLinks,
 }: {
   steps: ReadonlyArray<{ title: string; text: string }>
   /** each screen is a picture of the product: what a screen reader hears for it */
@@ -25,6 +31,8 @@ export function SetupSteps({
   serviceName: string
   prices: Array<{ label: string; amount: number }>
   quoteLink: string
+  /** T-167: the trade pages, linked from step 1; the last one is "Other trades" */
+  tradeLinks: ReadonlyArray<{ label: string; href: string; other?: boolean }>
 }) {
   const screens = [
     <TradeScreen key="trade" trades={trades} chosen={chosenTrade} />,
@@ -39,6 +47,20 @@ export function SetupSteps({
             <p className="figure text-sm font-medium text-text-muted">0{i + 1}</p>
             <h3 className="mt-1 font-display text-2xl font-bold text-text-primary sm:text-3xl">{step.title}</h3>
             <p className="mt-3 max-w-md text-text-secondary">{step.text}</p>
+            {i === 0 ? (
+              <ul className="mt-5 flex max-w-xl flex-wrap gap-2" data-testid="trades-row">
+                {tradeLinks.map((t) => (
+                  <li key={t.href + t.label}>
+                    <Link
+                      href={t.href}
+                      className={`motion-press inline-flex min-h-[44px] items-center rounded-full border px-4 text-sm ${t.other ? 'border-dashed border-field font-medium text-text-secondary' : 'border-field bg-white font-semibold text-text-primary'} hover:border-primary`}
+                    >
+                      {t.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
           <div role="img" aria-label={screenLabels[i]} {...({ inert: '' } as object)} className={i % 2 === 1 ? 'lg:order-1' : ''}>
             {screens[i]}

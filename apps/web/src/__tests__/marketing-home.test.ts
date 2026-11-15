@@ -11,7 +11,7 @@ import { join } from 'path'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { SUPPORT_EMAIL, PRODUCT_NAME, freeOfferLabel } from '@qolumns/shared'
-import { HERO, TRADES_HEADING, STATISTICS, FAQ, ADD_IT, CONTROL, SETUP } from '@/lib/marketing/home-copy'
+import { HERO, OTHER_TRADES, STATISTICS, FAQ, ADD_IT, CONTROL, SETUP } from '@/lib/marketing/home-copy'
 import { FOUNDER, founderReady } from '@/lib/marketing/founder'
 import { FounderNote } from '@/components/marketing/FounderNote'
 import { NAV_LINKS, HEADER_SHORT_CTA } from '@/lib/marketing/nav'
@@ -45,6 +45,12 @@ const MARKETING_FILES = [
   'components/marketing/SiteFooter.tsx',
   'lib/marketing/home-copy.ts',
   'lib/marketing/trades.ts',
+  // T-167: the copy files and screens added with "What it notices", Features and the trade pages
+  'lib/marketing/features-copy.ts',
+  'lib/marketing/site-copy.ts',
+  'lib/marketing/screen-words.ts',
+  'components/marketing/home/WhatItNotices.tsx',
+  'components/marketing/screens/ProductScreens.tsx',
   '../../../packages/shared/src/plans.ts',
 ]
 
@@ -71,15 +77,18 @@ describe('T-154: no grades, seals or engine words on the marketing site', () => 
 describe('T-154: the approved copy', () => {
   it('the hero says what it is', () => {
     expect(HERO.headline).toBe('Instant quotes on your website, in your prices.')
-    expect(HERO.subline).toBe('Customers answer a few questions and send photos. They see an estimate from your prices straight away. You get the lead, and you confirm it.')
-    expect(TRADES_HEADING).toBe('Ready-made templates for your trade')
+    // T-167 (the owner's wording): what the AI does in one plain sentence, then where the price comes from
+    expect(HERO.subline).toBe('The AI reads your customer’s answers and photos and works out the job. The price comes from your own price list, and you confirm it.')
+    // T-167: the trades row and its heading are gone; the links sit in step 1 of "Set up in minutes", ending with this pill
+    expect(OTHER_TRADES).toBe('Other trades: describe your prices in plain English')
   })
 
   it('T-155: the small line under the hero buttons doesn’t contradict "on your website"', () => {
     expect(HERO.smallLine).toBe('For contractors and home-service businesses. No website? Use your quote link.')
     expect(code('app/page.tsx')).toContain('{HERO.smallLine}')
-    // trade pages keep their own line
-    expect(code('components/marketing/TradeLanding.tsx')).toContain('Your prices set the estimate, never the AI. No website needed.')
+    // trade pages keep their own line (T-167: it carries the message; its words live in site-copy.ts)
+    expect(code('components/marketing/TradeLanding.tsx')).toContain('{TRADE_SMALL_LINE}')
+    expect(code('lib/marketing/site-copy.ts')).toContain('The AI works out the job. Your prices work out the cost. No website needed.')
   })
 
   it('T-155: no time promise in the "add it" heading', () => {
@@ -211,9 +220,12 @@ describe('T-154: phone menu, buttons, metadata', () => {
   })
 
   it('every primary button leads to signup or the demo', () => {
-    const trade = [...code('components/marketing/TradeLanding.tsx').matchAll(/<Link href="([^"]+)"[^>]*min-h-\[48px\]/g)].map((m) => m[1])
-    expect(trade.length).toBeGreaterThanOrEqual(2)
-    for (const h of trade) expect(['/signup', '/demo']).toContain(h)
+    // T-167: the trade pages' buttons come from lib/marketing/cta.ts too (48 px tall, there);
+    // the yellow one is the main call to action: the hero's and the closing band's
+    const tradePage = code('components/marketing/TradeLanding.tsx')
+    const trade = [...tradePage.matchAll(/<Link href="([^"]+)" className=\{(?:`\$\{)?(?:MAIN_CTA|QUIET_BUTTON)/g)].map((m) => m[1])
+    expect(trade).toEqual(['/signup', '/demo', '/signup'])
+    expect([...tradePage.matchAll(/<Link href="([^"]+)" className=\{(?:`\$\{)?MAIN_CTA/g)].map((m) => m[1])).toEqual(['/signup', '/signup'])
     // T-165: the home page's buttons come from lib/marketing/cta.ts. The yellow
     // one (MAIN_CTA) is the main call to action: the hero's and the closing band's.
     const home = code('app/page.tsx')
@@ -310,19 +322,26 @@ describe('T-155: the product frames and the social image', () => {
 })
 
 describe('T-155: features promises match what is live (item 7 decision)', () => {
-  const features = code('app/features/page.tsx')
+  // T-167: the Features page's words moved to features-copy.ts, and each step shows its real screen
+  // in place of its four text boxes, so the boxes' lines ("Estimate page in your branding", …) are gone
+  const features = code('app/features/page.tsx') + code('lib/marketing/features-copy.ts')
 
-  it('the four lines read as decided', () => {
-    expect(features).toContain("'Estimate page in your branding',")
-    expect(features).toContain("'Estimates expire automatically',")
-    expect(features.match(/'See the working behind every sent estimate'/g)).toHaveLength(2)
-    expect(features).toContain('Your dashboard shows which services win work and where requests stall.')
-    // the rest of section 05 stays
-    for (const kept of ['Learns from your own corrections, per service', 'Requests, estimates sent, accepted and value', 'Unfinished requests listed with call and email buttons']) expect(features).toContain(kept)
+  it('T-167: the five steps as the owner approved them; no claim that is not live', () => {
+    for (const step of ['Ask', 'Read the job', 'Price', 'Confirm', 'Track']) expect(features).toContain(`name: '${step}'`)
+    // step 05 was "Learn: your corrections improve the next estimate", true only of confirmed photo measurements
+    expect(features).not.toMatch(/Learns? from|corrections improve|which services win work and where requests stall/)
+    expect(features).toContain('See what’s winning work.')
+    // the chat form is not offered to businesses
+    expect(features).not.toMatch(/\bchat\b/i)
+    expect(code('app/pricing/page.tsx')).not.toMatch(/AI chat/)
+    // the price sentence matches Home's: two prices, no minimum
+    expect(features).not.toMatch(/minimum job/i)
+    // five steps, five screens, no row of text boxes
+    expect((code('app/features/page.tsx').match(/testId="feature-screen"/g) ?? []).length).toBe(5)
   })
 
   it('no PDF, reminder, price-comparison or every-quantity claim on the marketing pages', () => {
-    const pages = ['app/page.tsx', 'app/features/page.tsx', 'app/pricing/page.tsx', 'app/trades/page.tsx', 'app/painting/page.tsx', 'components/marketing/TradeLanding.tsx', 'components/marketing/ProductStrip.tsx', 'lib/marketing/home-copy.ts', 'lib/marketing/trades.ts']
+    const pages = ['app/page.tsx', 'app/features/page.tsx', 'lib/marketing/features-copy.ts', 'lib/marketing/site-copy.ts', 'app/pricing/page.tsx', 'app/trades/page.tsx', 'app/painting/page.tsx', 'components/marketing/TradeLanding.tsx', 'components/marketing/ProductStrip.tsx', 'lib/marketing/home-copy.ts', 'lib/marketing/trades.ts']
     for (const f of pages) {
       expect(code(f), f).not.toMatch(/\bPDFs?\b|remind|price comparison|compare with similar|anonymi[sz]ed|every quantity was worked out|working visible/i)
     }

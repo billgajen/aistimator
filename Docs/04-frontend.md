@@ -28,34 +28,66 @@ Next.js deployed on Vercel. All frontend surfaces and API routes are served from
 
 ## Frontend surfaces
 ### 1) Marketing site
-Home page (T-165; `Docs/design/system.md` decides the look), top to bottom, one idea per section and no two
-neighbours sharing a layout:
-1. **Hero:** "Instant quotes on your website, in your prices.", the sub-line, the one yellow button ("Try it free:
-   10 quotes, no card") and a quiet "Try it as a customer". Under it the **product demo** (`HeroDemo`): three screens
-   at true size built from the product's own parts (the request form, the estimate document `EstimateSheet`, the
-   owner's row with `TurnBadge` and `Button`), in the example business's colour. It plays once on load: the customer
-   answers and adds a photo, the tape rule is drawn and the price lands, Approve & send turns to Sent. Then it
-   stands still, with "Play again". Reduced motion shows the finished frames. On a phone the screens stack.
-2. **Trades:** a slim line of links from the pack registry, plus "Other trades".
-3. **Set up in minutes:** choose your trade, check your prices, share your link, each beside its screen,
-   alternating sides. (It replaced "How it works", which repeated the hero in words.)
-4. **Your prices. You stay in control.:** a plain-English price sentence and the price list it becomes (the page's
-   one moment, `PriceSentence`), then the three control points in one column. Two prices, two lines ("$375 per
-   room, heavy prep adds $250."). A minimum charge is never one of the lines: it is a floor, not an item.
-5. **What homeowners want:** three big figures in their sources' words, each linked. No boxes.
-6. **Add it anywhere:** the real QR code for a real quote page, that page on a phone, and the same form on a
-   business's website.
-7. **Plans** from `plans.ts`, each card with its own "Choose <plan>" button.
-8. **Questions** (the FAQ), a narrow column.
-9. **Who is behind this** (only when `lib/marketing/founder.ts` is filled in).
-10. **The closing band:** one yellow button and one quiet link.
+**The message (T-167):** "The AI works out the job. Your prices work out the cost." The site used to say only what
+the AI does not do (set prices). It now says what it does, and shows it on real screens. Every such sentence is
+written through `says(…)` (`lib/marketing/ai-claims.ts`) and rests on a row of `Docs/design/ai-capabilities.md`,
+the list of what the AI really does today; a unit test fails on a claim with no matching row, and on a trade page
+that claims what its template does not do. The words "AI" and what it does are typed only in the copy files
+(`lib/marketing/home-copy.ts`, `features-copy.ts`, `trades.ts`, `site-copy.ts`), never in a component.
 
-Copy lives in `lib/marketing/home-copy.ts`; the buttons in `lib/marketing/cta.ts` (`MAIN_CTA` is the yellow one: one
-per screen). Still screens are pictures to a screen reader (`role="img"` with a description). Trade pages and
-Features keep the earlier three-frame strip (`ProductStrip`, priced from the pack through
-`lib/marketing/examples.ts`) until their own ticket. Marketing copy rules: no grades, no engine words, no "exact",
-no time promises ("60 seconds", "in a minute"), no confirmed-quote-in-seconds, nothing not live for a new business
-(a unit test scans every page).
+Home page (T-165, reordered in T-167; `Docs/design/system.md` decides the look), top to bottom, one idea per
+section, and no two neighbours sharing a layout or a background:
+1. **Hero** (paper): "Instant quotes on your website, in your prices.", then one line on what the AI does and where
+   the price comes from, the one yellow button ("Try it free: 10 quotes, no card") and a quiet "Try it as a
+   customer". Under it the **product demo** (`HeroDemo`): three screens at true size built from the product's own
+   parts, in the example business's colour. It plays once on load: the customer answers and adds a photo; **the
+   capacity read from the photo comes back as a question and the customer presses "Yes, 50 gal is right"** (T-167:
+   the product confirms a reading before it prices, so the demo does too); the tape rule is drawn and the price
+   lands; Approve & send turns to Sent. Under six seconds, then still, with "Play again". Reduced motion shows the
+   finished frames. On a phone the screens stack.
+2. **What homeowners want** (grey): three large figures, one to a row, in their sources' words, each linked.
+3. **What it notices** (paper): the message line and four examples, each beside the real screen where the result
+   appears (`WhatItNotices`): a label read and confirmed, walls measured from photos, an extra added from the
+   customer's own words, a range and one question. No icons. Nothing moves.
+4. **Your prices. You stay in control.** (mint): a plain-English price sentence and the price list it becomes (the
+   page's one moment, `PriceSentence`), then the three control points in one column. Two prices, two lines. A
+   minimum charge is never one of the lines: it is a floor, not an item.
+5. **Set up in minutes** (paper): choose your trade, check your prices, share your link, each beside its screen,
+   alternating sides. **The links to the trade pages are pills under step 1**, on a line that wraps, ending with
+   "Other trades: describe your prices in plain English". (They were a row of their own under the hero.)
+6. **Add it anywhere** (grey): the real QR code for a real quote page, that page on a phone, and the same form on
+   a business's website.
+7. **Plans** (paper) from `plans.ts`, each card with its own "Choose <plan>" button.
+8. **Questions** (grey), a narrow column.
+9. **Who is behind this** (only when `lib/marketing/founder.ts` is filled in).
+10. **The closing band** (juniper): one yellow button and one quiet link.
+
+Features (T-167): leads with the message line and follows the product's five steps, each with its real screen in
+place of four text boxes, no two neighbours laid out alike: 01 Ask (the form on a phone), 02 Read the job (a photo
+and what was read from it), 03 Price (a price sentence and the list it becomes), 04 Confirm (the customer's quote
+page), 05 Track (Home's numbers for the last 30 days; it was "Learn", which claimed more than is live). One yellow
+button in the hero and one in the closing band.
+
+Trade pages (`TradeLanding`, T-167): the hero's right half is that trade's own request form (its template's own
+question) and, where the template reads a label or measures from photos, what is read for it. "How the price is
+set" is three steps, each on its real screen, alternating sides (it was three grey cards). A page claims only what
+the AI does for its trade: label reading on water heaters, HVAC and electrical; wall area from photos on painting;
+neither on plumbing or garage doors. The one photograph is the sample tank label we ship; any other label is
+named in the form ("Rating plate · 1 photo added"), not drawn. The main button is yellow.
+
+Product screens on marketing pages are built in `components/marketing/screens/ProductScreens.tsx` from the real
+screens' markup, with the real screens' words (`lib/marketing/screen-words.ts`, checked against the product's
+source by a unit test) and the trade templates' own questions, labels and prices (`lib/marketing/examples.ts`).
+The old three-frame strip (`ProductStrip`) is no longer on any marketing page; only `/design` still shows it.
+
+Pricing (T-167): "Hosted estimate pages" and "Your branding on every estimate" link to the live demo. The plan
+line "Website widget & AI chat" is "Website widget" (the chat form is not offered to businesses).
+
+Copy lives in the files above; the buttons in `lib/marketing/cta.ts` (`MAIN_CTA` is the yellow one: one per
+screen). Still screens are pictures to a screen reader (`role="img"` with a description). Marketing copy rules: no
+grades, no engine words, no "exact", "firm" or "guaranteed", no slogan ("AI-powered"), no promise of accuracy, no
+time promises ("60 seconds", "in a minute"), no confirmed-quote-in-seconds, nothing not live for a new business,
+and never that the AI sets a price (unit tests and `verify-t167` scan every page).
 
 **One free offer (T-165):** 10 priced quotes free, no card. No plan has a trial; a plan is paid from the day it is
 chosen. No page says "trial".

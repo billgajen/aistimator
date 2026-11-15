@@ -8,18 +8,28 @@
  * their sources state them, each with its link.
  */
 import { FREE_ALLOWANCE, PRODUCT_NAME, freeOfferLabel } from '@qolumns/shared'
+import { says } from './ai-claims'
+
+/**
+ * T-167: the message. The site said what the AI does not do (set prices) and
+ * never what it does. Both halves, in the owner's words.
+ */
+export const MESSAGE_LINE = says(['photo-notes', 'pricing-engine'], 'The AI works out the job. Your prices work out the cost.')
 
 const FREE = FREE_ALLOWANCE.US!.quotes
 
 export const HERO = {
   headline: 'Instant quotes on your website, in your prices.',
-  subline:
-    'Customers answer a few questions and send photos. They see an estimate from your prices straight away. You get the lead, and you confirm it.',
+  /** T-167: what the AI does, in one plain sentence, then where the price comes from */
+  subline: says(
+    ['photo-notes', 'pricing-engine'],
+    'The AI reads your customer’s answers and photos and works out the job. The price comes from your own price list, and you confirm it.'
+  ),
   smallLine: 'For contractors and home-service businesses. No website? Use your quote link.',
   frames: ['Your customer asks', 'They see your price', 'You confirm it'] as const,
 }
 
-export const TRADES_HEADING = 'Ready-made templates for your trade'
+/** T-167: the last pill of the trade links inside "Choose your trade" (the standalone trades row is gone) */
 export const OTHER_TRADES = 'Other trades: describe your prices in plain English'
 
 /**
@@ -36,9 +46,16 @@ export const HERO_DEMO = {
   photoSrc: '/demo/sample-water-heater-label.png',
   photoAlt: 'A sample photo of a water heater’s rating label',
   playAgain: 'Play again',
+  /**
+   * T-167: what the product returned for this sample label at the template's
+   * prices, on the local stack (Docs/design/ai-capabilities.md, section 6): it
+   * read 50 gal and natural gas, and until the customer confirmed the reading
+   * it showed this range. The demo shows the reading and the customer's "Yes".
+   */
+  rangeBeforeConfirming: { low: 1890, high: 2410 },
   /** Each screen is a picture of the product: what a screen reader hears for it */
   screens: [
-    'The request form on a business’s quote page: the customer has answered where the water heater is and added a photo of its rating label.',
+    'The request form on a business’s quote page: the customer has answered where the water heater is and added a photo of its rating label. Under it, the question the customer is asked next: the capacity, 50 gallons, was read from the label, and the customer has answered that it is right.',
     'The customer’s estimate: a total worked out from the business’s prices, with each line of the price shown.',
     'The business’s dashboard: the new request with its price, approved and sent to the customer.',
   ],
@@ -62,7 +79,7 @@ export const SETUP = {
     },
     {
       title: 'Check your prices',
-      text: 'Each template starts with typical prices. Change them to yours; every estimate is worked out from them.',
+      text: says(['pricing-engine'], 'Each template starts with typical prices. Change them to yours; every estimate is worked out from them.'),
     },
     {
       title: 'Share your link',
@@ -88,7 +105,7 @@ export const CONTROL = {
   points: [
     {
       title: 'Only your prices',
-      text: 'Every price comes from what you set. The AI reads the job details; it never picks a price.',
+      text: says(['photo-notes', 'pricing-engine'], 'Every price comes from what you set. The AI reads the job details; it never picks a price.'),
     },
     {
       title: 'You confirm first',
@@ -97,6 +114,45 @@ export const CONTROL = {
     {
       title: 'Three ways to send, per service',
       text: 'Show the estimate, then confirm (the default). Hold it until you approve. Or send automatically.',
+    },
+  ],
+} as const
+
+/**
+ * T-167: "What it notices". Four things the product does with a request, each
+ * beside the real screen where the result appears. Every sentence rests on a
+ * row of Docs/design/ai-capabilities.md (`says`). The figures in the screens
+ * are the templates' own prices (lib/marketing/examples.ts).
+ */
+export const NOTICES = {
+  heading: 'What it notices',
+  examples: [
+    {
+      id: 'label',
+      title: 'A label, read',
+      text: says(
+        ['label-reading', 'confirm-question'],
+        'It reads the capacity and fuel off a tank label, the size off a rating plate, the rating off a panel. Then it checks the reading with your customer.'
+      ),
+      screen: 'The question a customer is asked after sending a photo of a tank label: the capacity that was read from it, with “Yes, 50 gal is right” chosen.',
+    },
+    {
+      id: 'walls',
+      title: 'Walls, measured from photos',
+      text: says(['photo-measurement'], 'For exterior painting it works out the wall area from your customer’s photos, using a door as its ruler.'),
+      screen: 'Part of an estimate: the exterior walls priced by the square foot, with the area marked as worked out from the customer’s photos.',
+    },
+    {
+      id: 'extra',
+      title: 'An extra your customer asked for',
+      text: says(['extras-from-description'], 'When they write “and the trim too”, it adds your trim line, at your price.'),
+      screen: 'The price breakdown of an estimate: the trim line carries a note that it was added from the customer’s description.',
+    },
+    {
+      id: 'range',
+      title: 'When it can’t tell, it asks',
+      text: says(['range-and-question', 'pricing-engine'], 'Your customer sees a range and one quick question. Their answer sets the estimate, from your prices.'),
+      screen: 'An estimate shown as a range, with a button to confirm one detail.',
     },
   ],
 } as const

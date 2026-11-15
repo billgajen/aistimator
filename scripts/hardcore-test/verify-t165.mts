@@ -339,6 +339,11 @@ if (!process.env.PLAYWRIGHT_DIR) {
     check(`${width}: "Add it anywhere" shows a QR code, the quote page on a phone and the form on a website`, (await p.locator('[data-testid=add-it] [data-testid=qr-svg]').count()) === 1 && (await p.locator('[data-testid=add-it-phone] [data-testid=request-form-screen]').count()) === 1 && (await p.locator('[data-testid=add-it-site] [data-testid=request-form-screen]').count()) === 1)
     const stats = await p.locator('[data-testid=statistics] figure').evaluateAll((els) => els.map((el) => ({ size: parseFloat(getComputedStyle(el.querySelector('p')!).fontSize), source: el.querySelector('a')?.getAttribute('href') ?? '' })))
     check(`${width}: three big figures, each with its source still linked`, stats.length === 3 && stats.every((s) => s.size >= 52 && s.source.startsWith('https://')), stats.map((s) => s.size))
+    // T-167: the order of Home changed, and the trades row moved into step 1 of "Set up in minutes"
+    const order = await p.locator('main > section').evaluateAll((els) => els.map((el) => el.getAttribute('data-testid') ?? el.querySelector('h2')?.textContent ?? '').filter(Boolean))
+    check(`${width}: the sections are in the T-167 order: hero, the figures, "What it notices", your prices, setup, add it anywhere, plans, questions, the closing band`, JSON.stringify(order) === JSON.stringify(['hero', 'homeowners', 'notices', 'control', 'setup', 'Add it anywhere', 'plans', 'Questions', 'closing']), order)
+    const pills = await p.locator('[data-testid=setup-step]').first().locator('[data-testid=trades-row] a').allInnerTexts()
+    check(`${width}: the trade links sit inside "Choose your trade", ending with "Other trades"; there is no trades row of its own`, (await p.locator('[data-testid=trades-row]').count()) === 1 && pills.length === 7 && pills[6]!.trim() === 'Other trades: describe your prices in plain English', pills.length)
 
     // the one moment: the price lines land when the section comes into view, and stay
     await p.locator('[data-testid=price-sentence]').scrollIntoViewIfNeeded()

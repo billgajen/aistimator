@@ -4,13 +4,13 @@
  * same ones a new business starts with, so a visual can never show a number
  * the product wouldn't produce. Pure; a unit test resolves every example.
  */
-import type { VerticalPack } from '@/lib/vertical-packs/types'
-import { garageDoorsPackUS } from '@/lib/vertical-packs/garage-doors-us'
-import { waterHeaterPackUS } from '@/lib/vertical-packs/water-heater-us'
-import { paintingPackUS } from '@/lib/vertical-packs/painting-us'
-import { hvacPackUS } from '@/lib/vertical-packs/hvac-us'
-import { plumbingPackUS } from '@/lib/vertical-packs/plumbing-us'
-import { electricalPackUS } from '@/lib/vertical-packs/electrical-us'
+import type { VerticalPack } from '../vertical-packs/types'
+import { garageDoorsPackUS } from '../vertical-packs/garage-doors-us'
+import { waterHeaterPackUS } from '../vertical-packs/water-heater-us'
+import { paintingPackUS } from '../vertical-packs/painting-us'
+import { hvacPackUS } from '../vertical-packs/hvac-us'
+import { plumbingPackUS } from '../vertical-packs/plumbing-us'
+import { electricalPackUS } from '../vertical-packs/electrical-us'
 
 export interface MarketingExample {
   serviceName: string
@@ -22,6 +22,21 @@ export interface MarketingExample {
   lines: Array<{ label: string; amount: number }>
   total: number
   customerName: string
+  /**
+   * T-167: what the product reads off the customer's photo for this trade: a
+   * value of a signal the template identifies from a label, and where the
+   * template says it is read from. Null for a trade whose template reads no
+   * label (Docs/design/ai-capabilities.md, section 5).
+   */
+  reading: { value: string; readFrom: string } | null
+  /** T-167: the question the trade page's form shows: one of the template's own fields, with one of its own answers */
+  form: { question: string; answer: string }
+  /** T-167: the service's starting prices as the template sets them (setup's "Check your prices"), the first five */
+  priceList: Array<{ label: string; amount: number }>
+  /** T-167: a quantity the template has measured from photos, priced at the template's rate (painting only) */
+  measured: { item: string; quantity: number; unit: string; rate: number; amount: number } | null
+  /** T-167: an extra the template sells that a customer's own words can add, at the template's price */
+  extra: { label: string; amount: number; phrase: string } | null
 }
 
 interface Pick {
@@ -34,6 +49,14 @@ interface Pick {
   steps: Array<{ name: string; prefix?: boolean; qty?: number; label?: string }>
   baseFee?: boolean
   customerName: string
+  /** T-167: the template's own question shown on the trade page's form, and one of its own answers */
+  form?: { fieldId: string; answer: string }
+  /** T-167: the value read from the label in this example (must be one the template allows) */
+  reads?: string
+  /** T-167: a photo-measured step of one of the pack's services, and the quantity shown */
+  measured?: { service: string; step: string; quantity: number }
+  /** T-167: an add-on of one of the pack's services, and words of the customer's that trigger it */
+  extra?: { service: string; addon: string; phrase: string }
 }
 
 function build(p: Pick): MarketingExample {
@@ -47,6 +70,42 @@ function build(p: Pick): MarketingExample {
   })
   if (p.baseFee && svc.draft.pricing.baseFee > 0) lines.push({ label: 'Visit and setup', amount: svc.draft.pricing.baseFee })
   const subtotal = lines.reduce((sum, l) => sum + l.amount, 0)
+
+  // T-167: the form's question is one of the template's own fields
+  let form = { question: p.question, answer: p.answer }
+  if (p.form) {
+    const field = (svc.draft.suggestedFields ?? []).find((f) => f.fieldId === p.form!.fieldId)
+    if (!field || (field.options && !field.options.includes(p.form.answer))) throw new Error(`"${p.service}" has no field ${p.form.fieldId} that can answer "${p.form.answer}"`)
+    form = { question: field.label, answer: p.form.answer }
+  }
+
+  // T-167: the label this template reads, from its own identification rules
+  let reading: MarketingExample['reading'] = null
+  if (p.reads) {
+    const signal = (svc.draft.expectedSignals ?? []).find((es) => es.identify?.readFrom && es.possibleValues?.includes(p.reads!))
+    if (!signal?.identify) throw new Error(`"${p.service}" reads no label that can say "${p.reads}"`)
+    reading = { value: p.reads, readFrom: signal.identify.readFrom }
+  }
+
+  // T-167: a step the template measures from photos, at the template's rate
+  let measured: MarketingExample['measured'] = null
+  if (p.measured) {
+    const from = p.pack.services.find((s) => s.name === p.measured!.service)
+    const step = from?.draft.pricing.workSteps.find((s) => s.name === p.measured!.step)
+    if (!step || step.quantitySource?.type !== 'ai_signal') throw new Error(`"${p.measured.step}" is not measured from photos in ${p.measured.service}`)
+    measured = { item: step.name, quantity: p.measured.quantity, unit: step.unitLabel ?? '', rate: step.defaultCost, amount: Math.round(step.defaultCost * p.measured.quantity * 100) / 100 }
+  }
+
+  // T-167: an extra the template sells, which the customer's own words can add
+  let extra: MarketingExample['extra'] = null
+  if (p.extra) {
+    const from = p.pack.services.find((s) => s.name === p.extra!.service)
+    const addon = from?.addons?.find((a) => a.label === p.extra!.addon)
+    const heard = addon?.triggerKeywords?.some((k) => p.extra!.phrase.toLowerCase().includes(k.toLowerCase()))
+    if (!addon || !heard) throw new Error(`"${p.extra.addon}" is not an extra of ${p.extra.service} that "${p.extra.phrase}" asks for`)
+    extra = { label: addon.label, amount: addon.price, phrase: p.extra.phrase }
+  }
+
   return {
     serviceName: svc.name,
     question: p.question,
@@ -55,6 +114,11 @@ function build(p: Pick): MarketingExample {
     lines,
     total: Math.max(subtotal, svc.draft.pricing.minimumCharge ?? 0),
     customerName: p.customerName,
+    reading,
+    form,
+    priceList: svc.draft.pricing.workSteps.slice(0, 5).map((s) => ({ label: s.name, amount: s.defaultCost })),
+    measured,
+    extra,
   }
 }
 
@@ -76,6 +140,8 @@ const PICKS: Record<string, Pick> = {
     photo: 'Tank label',
     steps: [{ name: 'Drain, removal and haul-away' }, { name: '50 gal tank water heater' }, { name: 'Natural gas connection and venting' }],
     customerName: 'Priya S.',
+    reads: '50 gal',
+    form: { fieldId: 'heater_location', answer: 'Garage' },
   },
   painting: {
     pack: paintingPackUS,
@@ -86,6 +152,8 @@ const PICKS: Record<string, Pick> = {
     steps: [{ name: 'Walls & ceilings', qty: 2, label: 'Walls & ceilings, 2 rooms' }],
     baseFee: true,
     customerName: 'Alex R.',
+    measured: { service: 'Exterior Painting', step: 'Exterior walls', quantity: 920 },
+    extra: { service: 'Interior Painting', addon: 'Trim, doors & baseboards', phrase: 'and the trim too' },
   },
   hvac: {
     pack: hvacPackUS,
@@ -95,6 +163,8 @@ const PICKS: Record<string, Pick> = {
     photo: 'Rating plate',
     steps: [{ name: 'Removal, recovery and disposal' }, { name: '3 ton', prefix: true }],
     customerName: 'Chris D.',
+    reads: '3 ton',
+    form: { fieldId: 'indoor_location', answer: 'Basement' },
   },
   plumbing: {
     pack: plumbingPackUS,
@@ -113,6 +183,8 @@ const PICKS: Record<string, Pick> = {
     photo: 'Panel label',
     steps: [{ name: 'Level 2 charger installation' }],
     customerName: 'Taylor B.',
+    reads: '200 A',
+    form: { fieldId: 'charger_supply', answer: 'Please supply one' },
   },
 }
 
