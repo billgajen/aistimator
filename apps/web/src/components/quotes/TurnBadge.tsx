@@ -1,5 +1,6 @@
 import type { QuoteTurn } from '@qolumns/shared'
 import { STATUS_TONE } from '@/lib/status-tone'
+import { NeedsYouDot } from './NeedsYouDot'
 
 /**
  * T-158: whose turn it is on a quote. The label and the detail line come from
@@ -14,6 +15,7 @@ export function TurnBadge({ turn, showDetail = true }: { turn: Pick<QuoteTurn, '
         data-testid="turn-label"
         data-tone={turn.tone}
       >
+        {turn.tone === 'attention' && <NeedsYouDot className="mr-1.5" />}
         {turn.label}
       </span>
       {showDetail && turn.detail && (

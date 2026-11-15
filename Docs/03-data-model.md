@@ -100,6 +100,8 @@ The generated quote record for delivery and tracking.
 
 Money in `pricing_json` (T-157): every `breakdown[].amount` has at most 2 decimals, rounded half away from zero where the line is created (`roundMoney` in `packages/shared/src/money.ts`), and `subtotal` is the sum of the rounded lines. Quotes stored before T-157 may hold unrounded amounts (622.8000000000001); there is no data migration, the editor and the edit route round them on the next save.
 
+The minimum charge in `pricing_json` (T-165, AD-048): when a job's lines total less than the business's minimum charge, the difference is one entry of `breakdown`: `{ "label": "Minimum charge applied", "amount": 25, "kind": "minimum", "minimumCharge": 400 }`. It is the only entry with a `kind`. The lines plus that entry equal `subtotal`. It is never shown as a line: read a breakdown through `splitMinimum` (`packages/shared/src/minimum-charge.ts`), which gives the job's lines and the minimum that applied (or null). At or above the minimum there is no such entry. Quotes stored before T-165 hold the same top-up as an unmarked line with that label (or one line "Minimum charge"), and the sentence "Minimum charge of … applied" among `notes`; they are read the same way, with no data migration.
+
 ### quote_feedback
 A customer's question on a quote (migration 17). Older rows may be review requests (`approval_request`), which customers can no longer send from the page.
 - id

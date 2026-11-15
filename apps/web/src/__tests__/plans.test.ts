@@ -23,9 +23,9 @@ describe('plan definitions — one source (T-134)', () => {
     expect(offered.map((p) => p.quoteLimit)).toEqual([50, 200, 600])
   })
 
-  it('prices annual at 10 × monthly (two months free) and trials only Pro', () => {
+  it('prices annual at 10 × monthly (two months free), and no plan has a trial (T-165: one free offer)', () => {
     for (const p of offeredPlans()) expect(p.annualPrice?.USD).toBe((p.monthlyPrice.USD ?? 0) * 10)
-    expect(offeredPlans().filter((p) => p.trialDays).map((p) => [p.id, p.trialDays])).toEqual([['plan_us_pro', 14]])
+    expect(offeredPlans().filter((p) => p.trialDays).map((p) => [p.id, p.trialDays])).toEqual([])
   })
 
   it('keeps legacy plans (existing subscribers) with their limits and overage', () => {
@@ -57,7 +57,7 @@ describe('plan definitions — one source (T-134)', () => {
 
   it('maps a definition to the API shape without re-typing numbers', () => {
     const info = toPlanInfo(getPlan('plan_us_pro')!)
-    expect(info).toMatchObject({ priceCents: 9900, annualPriceCents: 99000, monthlyEstimateLimit: 200, trialDays: 14, overagePriceCents: null })
+    expect(info).toMatchObject({ priceCents: 9900, annualPriceCents: 99000, monthlyEstimateLimit: 200, trialDays: null, overagePriceCents: null })
     expect(PLANS.length).toBeGreaterThan(3)
   })
 })

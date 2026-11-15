@@ -191,6 +191,10 @@ export interface QuoteViewResponse {
     amount: number
     autoRecommended?: boolean
     recommendationReason?: string
+    /** T-165: 'minimum' on the one entry that tops the job up to the business's minimum charge (never shown as a line) */
+    kind?: 'minimum'
+    /** T-165: on that entry, the business's minimum charge when the quote was priced */
+    minimumCharge?: number
   }>
   notes: QuoteContent
   validUntil?: string

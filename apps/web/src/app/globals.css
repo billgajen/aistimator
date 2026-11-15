@@ -53,15 +53,13 @@
     --color-border-strong: #CFCBBD;
     --color-field: #808781;          /* the edge of a field or an outlined control: 3:1 or more on paper, grey cards and white */
 
-    /* Accent: about a tenth of a screen (the main button, one highlighted
-       word, "needs you"). Orange until the owner chooses on /design; the
-       other two candidates are the [data-accent] blocks below. Never text on
-       paper: text on the fill is on-accent, text on the tint is accent-ink. */
-    --color-accent: #F26B2A;
-    --color-accent-tint: #FDE7DD;
-    --color-accent-line: #F7C7AF;
-    --color-accent-ink: #91431B;
-    --color-on-accent: #1B2823;
+    /* Accent: yellow (the owner's choice, T-165). About a tenth of a screen:
+       the one main button of a marketing screen, one highlighted word, and
+       "needs you". Always the strong yellow with dark text on it, never a
+       pale tint (a pale yellow reads as butter, which is for measurement),
+       and never the colour of text on paper. */
+    --color-accent: #FFC53D;
+    --color-on-accent: #1B2823;      /* text and the thin edge on the accent */
 
     /* Keyboard focus: ink on light grounds; flipped on juniper, a business's
        brand colour and ink (see the rules after the utilities) */
@@ -73,6 +71,7 @@
     --motion-press: 90ms;
     --motion-menu: 200ms;
     --motion-enter: 250ms;
+    --motion-draw: 800ms;                           /* the tape rule drawn out: the home demo's one flourish */
     --ease-move: cubic-bezier(0.2, 0.8, 0.2, 1);    /* something that moves or changes */
     --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);   /* something arriving and settling */
 
@@ -93,29 +92,6 @@
   ::selection {
     background: var(--color-butter);
     color: var(--color-ink);
-  }
-
-  /* The two other accent candidates. On any element: it and everything in it. */
-  [data-accent='orange'] {
-    --color-accent: #F26B2A;
-    --color-accent-tint: #FDE7DD;
-    --color-accent-line: #F7C7AF;
-    --color-accent-ink: #91431B;
-    --color-on-accent: #1B2823;
-  }
-  [data-accent='tomato'] {
-    --color-accent: #E8412C;
-    --color-accent-tint: #FBE1DD;
-    --color-accent-line: #F4B9AF;
-    --color-accent-ink: #8C2C1C;
-    --color-on-accent: #140806;
-  }
-  [data-accent='yellow'] {
-    --color-accent: #FFC53D;
-    --color-accent-tint: #FFEFC2;
-    --color-accent-line: #FED574;
-    --color-accent-ink: #765A1D;
-    --color-on-accent: #1B2823;
   }
 
   :focus-visible {
@@ -321,3 +297,48 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ------------------------------------------------------------
+   The home page's product demo and its one moment (T-165;
+   system.md, Motion). Each element waits for its turn (--at),
+   then arrives with the entrance token. Transform and opacity
+   only. Everything fills both ways, so before its turn an element
+   holds its first frame and afterwards its last: the demo ends
+   still. Under reduced motion the global rule ends every one at
+   once, which shows the finished frames.
+   ------------------------------------------------------------ */
+@keyframes demo-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes demo-pop {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes demo-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes demo-press {
+  0%, 100% { transform: none; }
+  50% { transform: translateY(1px) scale(0.97); }
+}
+/* The tape drawn out: a cover in the panel's own colour slides off it */
+@keyframes demo-draw {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+.demo-in { animation: demo-in var(--motion-enter) var(--ease-enter) var(--at, 0ms) both; }
+.demo-pop { animation: demo-pop var(--motion-enter) var(--ease-enter) var(--at, 0ms) both; }
+.demo-out { animation: demo-out var(--motion-hover-out) var(--ease-move) var(--at, 0ms) both; }
+.demo-press { animation: demo-press calc(var(--motion-press) * 2) var(--ease-move) var(--at, 0ms) both; }
+.demo-tape-cover {
+  position: absolute;
+  inset: 0;
+  background: var(--color-primary);
+  transform-origin: right center;
+  animation: demo-draw var(--motion-draw) var(--ease-enter) var(--at, 0ms) both;
+}
+/* A moment that has not played yet: its lines wait (set by script only when
+   motion is allowed and the section is still below the screen) */
+[data-moment='waiting'] .moment-line { opacity: 0; }

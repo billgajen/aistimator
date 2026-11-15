@@ -5,11 +5,12 @@
 design skills only advise. The tokens are in `apps/web/src/app/globals.css` and `apps/web/tailwind.config.ts`, and a
 unit test (`design-tokens.test.ts`) holds their contrast ratios and the source rules.
 
-- **/design** (not linked, noindex): the tokens and the real components as they render, with an accent switch
-  (tomato, orange, yellow; orange is the default), both wordmarks, the type, radius and shadow scales, the five status
-  colours, a sample marketing band, a sample dashboard row and the motion tokens. It is where the owner chooses the
-  accent and the wordmark. No real page uses the accent yet, except the "needs you" tint.
-- **Status colours** are by whose turn it is (`lib/status-tone.ts`): needs you = the accent tint, waiting and working
+- **/design** (not linked, noindex): the tokens and the real components as they render: the palette, the wordmark,
+  the type, radius and shadow scales, the five status colours, a sample marketing band, a sample dashboard row and
+  the motion tokens. T-165: the owner chose yellow and the text wordmark, so the accent switch and the second
+  wordmark are gone.
+- **Status colours** are by whose turn it is (`lib/status-tone.ts`): needs you = the strong yellow with a small dark
+  marker (T-165; never a pale tint), waiting and working
   = neutral, accepted = green, closed = grey, failed = red. Butter is for measurement only.
 - **Focus:** one ring colour (`--color-focus`): ink on light grounds, light inside a juniper or brand-coloured
   surface. Controls that draw their focus with Tailwind's `ring` use the same colour.
@@ -27,20 +28,43 @@ Next.js deployed on Vercel. All frontend surfaces and API routes are served from
 
 ## Frontend surfaces
 ### 1) Marketing site
-Home page (T-154), top to bottom: hero ("Instant quotes on your website, in your prices.", sub-line, "Try it free: 10
-quotes, no card" + "Try it as a customer", and a three-frame strip drawn from our own UI with the demo business's
-branding) · trades row from the pack registry + "Other trades" · How it works (3 steps) · "Your prices. You stay in
-control." · What homeowners want (three statistics in their sources' words, each linked) · Add it anywhere · plans
-from `plans.ts` · FAQ · "Who is behind this" (only when `lib/marketing/founder.ts` is filled in) · final call to action.
-The line under the hero buttons: "For contractors and home-service businesses. No website? Use your quote link." (trade
-pages keep their own line). Copy lives in `lib/marketing/home-copy.ts`. Trade pages use the same hero with a
-trade-specific strip priced from the pack (`lib/marketing/examples.ts`); the three frames are one height, with each
-button just under its content. Marketing copy rules: no grades, no engine words, no "exact", no time promises ("60
-seconds", "in a minute"), no confirmed-quote-in-seconds, nothing not live for a new business (a unit test scans every
-page).
+Home page (T-165; `Docs/design/system.md` decides the look), top to bottom, one idea per section and no two
+neighbours sharing a layout:
+1. **Hero:** "Instant quotes on your website, in your prices.", the sub-line, the one yellow button ("Try it free:
+   10 quotes, no card") and a quiet "Try it as a customer". Under it the **product demo** (`HeroDemo`): three screens
+   at true size built from the product's own parts (the request form, the estimate document `EstimateSheet`, the
+   owner's row with `TurnBadge` and `Button`), in the example business's colour. It plays once on load: the customer
+   answers and adds a photo, the tape rule is drawn and the price lands, Approve & send turns to Sent. Then it
+   stands still, with "Play again". Reduced motion shows the finished frames. On a phone the screens stack.
+2. **Trades:** a slim line of links from the pack registry, plus "Other trades".
+3. **Set up in minutes:** choose your trade, check your prices, share your link, each beside its screen,
+   alternating sides. (It replaced "How it works", which repeated the hero in words.)
+4. **Your prices. You stay in control.:** a plain-English price sentence and the price list it becomes (the page's
+   one moment, `PriceSentence`), then the three control points in one column. Two prices, two lines ("$375 per
+   room, heavy prep adds $250."). A minimum charge is never one of the lines: it is a floor, not an item.
+5. **What homeowners want:** three big figures in their sources' words, each linked. No boxes.
+6. **Add it anywhere:** the real QR code for a real quote page, that page on a phone, and the same form on a
+   business's website.
+7. **Plans** from `plans.ts`, each card with its own "Choose <plan>" button.
+8. **Questions** (the FAQ), a narrow column.
+9. **Who is behind this** (only when `lib/marketing/founder.ts` is filled in).
+10. **The closing band:** one yellow button and one quiet link.
 
-Header and phone menu (T-155): below `md` the header button reads "Try it free" on one line; from `md` up, and on every
-in-page button, "Try it free: 10 quotes, no card". The phone menu (`MobileMenu`) opens full screen over the page (a
+Copy lives in `lib/marketing/home-copy.ts`; the buttons in `lib/marketing/cta.ts` (`MAIN_CTA` is the yellow one: one
+per screen). Still screens are pictures to a screen reader (`role="img"` with a description). Trade pages and
+Features keep the earlier three-frame strip (`ProductStrip`, priced from the pack through
+`lib/marketing/examples.ts`) until their own ticket. Marketing copy rules: no grades, no engine words, no "exact",
+no time promises ("60 seconds", "in a minute"), no confirmed-quote-in-seconds, nothing not live for a new business
+(a unit test scans every page).
+
+**One free offer (T-165):** 10 priced quotes free, no card. No plan has a trial; a plan is paid from the day it is
+chosen. No page says "trial".
+
+Every marketing page starts with a "Skip to content" link, and footer links are 44 px tall on a phone. The wordmark
+is the name in the display font, drawn by one component (`components/brand/Wordmark.tsx`).
+
+Header and phone menu (T-155, T-165): the header button reads "Try it free" on one line at every width (T-165; from
+`md` up it used to carry the full offer). Every in-page button reads "Try it free: 10 quotes, no card". The phone menu (`MobileMenu`) opens full screen over the page (a
 modal dialog, the page behind locked from scrolling), with Features, Pricing, Trades, Try it as a customer, Log in and
 one "Try it free: 10 quotes, no card" button. It closes on a link, the X or Escape, and focus goes back to the menu
 button (on the next page's button after a link).
@@ -126,7 +150,8 @@ four numbers without a change line. Setup tests are in none of the counts. On a 
 this order; the three counts stack and the four numbers sit two by two.
 
 Sign-in and sign-up (T-160) show the home page's headline under the product name (`HERO.headline` in
-`lib/marketing/home-copy.ts`), so they always match the home page.
+`lib/marketing/home-copy.ts`), so they always match the home page. T-165: at desktop width the login page shows a real estimate
+document (`EstimateSheet`) beside the form; sign-up keeps one column. The email field has `autocomplete="email"`.
 
 Quote link page (T-149 + T-152; "Share" until T-160): quote link · QR code · where to put it · **Use it on WhatsApp** ("Send on WhatsApp" via
 wa.me with the link; greeting, away and quick-reply texts for the WhatsApp Business app with where to paste them;
@@ -178,6 +203,19 @@ Quote page (/app/quotes/[quoteId], T-158):
   service that sends without review) · Customer opened · Customer accepted. Done steps show their date; "Customer
   declined" or "Expired" is the final step instead; "Paid <date>" is a second line under step four. Steps stack on a
   phone.
+
+The minimum charge on a quote (T-165, AD-048). It is a floor, not an item. Every screen that lists a quote's price
+lines reads the breakdown through `splitMinimum` and shows the job's real lines, then one note above the total,
+"Minimum charge of $400.00 applied" (`components/quote/MinimumNote.tsx`; the business's own amount and currency).
+Nothing shows when the job is at or above the minimum.
+- Shown that way on: the customer quote page (/q/[quoteId]), the PDF, the dashboard quote page, the pricing trace
+  (the step and the summary), the demo's estimate, setup's test quote, and the price preview in the service
+  editor's "Test & Publish" step. Emails show the total only.
+- Quote editor: the minimum is not an editable line. Under the lines: "Lines $375.00", the note with what it adds
+  ("+ $25.00") and a "Remove" button, then Subtotal and Total. The figures update as lines are edited: below the
+  minimum the subtotal stays at the minimum; at or above it the note goes and the subtotal follows the lines.
+  "Remove" takes the minimum off that quote ("Undo" until saved); it stays removed afterwards, whatever is edited.
+  A quote that carries no minimum shows none of this and never gains a minimum from an edit.
 
 Key screens:
 - Home setup checklist (T-152) and the guided test in setup (T-150)

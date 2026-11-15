@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { QUOTE_TURN_COPY } from '@qolumns/shared'
-import { NEEDS_YOU_SURFACE } from '@/lib/status-tone'
+import { NEEDS_YOU_MARK } from '@/lib/status-tone'
+import { NeedsYouDot } from '@/components/quotes/NeedsYouDot'
 
 /**
  * T-160: "Where your quotes stand" on Home — three counts by whose turn it
@@ -23,9 +24,9 @@ export function QuoteStand({
   const T = QUOTE_TURN_COPY.tabs
   const S = QUOTE_TURN_COPY.home.stand
   const tiles = [
-    { key: 'needs_you', label: T.needs_you, count: needsYou, note: null as string | null, tone: needsYou > 0 ? NEEDS_YOU_SURFACE : 'bg-white' },
-    { key: 'waiting', label: T.waiting, count: waiting, note: null as string | null, tone: 'bg-white' },
-    { key: 'accepted', label: T.accepted, count: accepted, note: S.acceptedNote, tone: 'bg-white' },
+    { key: 'needs_you', label: T.needs_you, count: needsYou, note: null as string | null, tone: 'bg-white', needsYou: needsYou > 0 },
+    { key: 'waiting', label: T.waiting, count: waiting, note: null as string | null, tone: 'bg-white', needsYou: false },
+    { key: 'accepted', label: T.accepted, count: accepted, note: S.acceptedNote, tone: 'bg-white', needsYou: false },
   ]
   return (
     <section className="mb-8" data-testid="home-stand">
@@ -44,8 +45,14 @@ export function QuoteStand({
                 <span className="block text-sm font-semibold text-text-primary">{tile.label}</span>
                 {tile.note && <span className="block text-xs text-text-muted">{tile.note}</span>}
               </span>
-              <span className="figure text-3xl font-medium tracking-tight text-text-primary sm:mt-2 sm:text-4xl" data-testid="stand-count">
-                {tile.count}
+              {/* T-165: when something needs the owner, the count sits on the strong yellow, with the marker */}
+              <span
+                className={`figure inline-flex items-center text-3xl font-medium tracking-tight sm:mt-2 sm:text-4xl ${tile.needsYou ? `rounded-xl px-3 py-0.5 ${NEEDS_YOU_MARK}` : 'text-text-primary'}`}
+                data-testid="stand-mark"
+                data-needs-you={tile.needsYou}
+              >
+                {tile.needsYou && <NeedsYouDot className="mr-2" />}
+                <span data-testid="stand-count">{tile.count}</span>
               </span>
             </Link>
           ))}

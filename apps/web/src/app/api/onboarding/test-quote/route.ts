@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { currentTenant } from '@/lib/current-tenant'
+import { splitMinimum } from '@qolumns/shared'
 
 /**
  * GET /api/onboarding/test-quote?since=<ISO time>
@@ -24,7 +25,10 @@ export async function GET(request: Request) {
     .limit(1)
   const quote = data?.[0]
   if (!quote) return NextResponse.json({ quote: null })
-  const pricing = (quote.pricing_json ?? {}) as { currency?: string; subtotal?: number; taxAmount?: number; taxLabel?: string; total?: number; breakdown?: Array<{ label?: string; description?: string; amount: number }> }
+  const pricing = (quote.pricing_json ?? {}) as { currency?: string; subtotal?: number; taxAmount?: number; taxLabel?: string; total?: number; breakdown?: Array<{ label?: string; description?: string; amount: number; kind?: string; minimumCharge?: number }> }
+  const { lines, minimum } = splitMinimum(
+    (pricing.breakdown ?? []).map((l) => ({ ...l, label: l.label ?? l.description ?? '', amount: Number(l.amount) || 0 }))
+  )
   return NextResponse.json({
     quote: {
       id: quote.id,
@@ -35,7 +39,9 @@ export async function GET(request: Request) {
       taxAmount: pricing.taxAmount ?? 0,
       taxLabel: pricing.taxLabel ?? null,
       total: pricing.total ?? 0,
-      lines: (pricing.breakdown ?? []).map((l) => ({ label: l.label ?? l.description ?? '', amount: l.amount })),
+      lines: lines.map((l) => ({ label: l.label, amount: l.amount })),
+      // The minimum charge is a floor, not an item: sent apart from the lines, shown as a note
+      minimumCharge: minimum?.minimumCharge ?? null,
       scopeSummary: (quote.content_json as { scopeSummary?: string } | null)?.scopeSummary ?? null,
     },
   })

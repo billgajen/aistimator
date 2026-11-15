@@ -29,7 +29,8 @@ const smallTargets = (p: Page) =>
     [...document.querySelectorAll<HTMLElement>('main a, main button, nav a, nav button')]
       .filter((el) => {
         const r = el.getBoundingClientRect()
-        return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden' && el.closest('[aria-hidden="true"]') === null
+        // T-165: not the skip link (shown only when focused), and not a button inside a picture of the product (role="img", inert)
+        return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden' && el.closest('[aria-hidden="true"]') === null && el.closest('[role="img"]') === null && !el.classList.contains('sr-only')
       })
       .filter((el) => el.getBoundingClientRect().height < 40 && !el.closest('footer, figcaption, blockquote, p'))
       .map((el) => `${(el.textContent ?? '').trim().slice(0, 30)} (${Math.round(el.getBoundingClientRect().height)}px)`)

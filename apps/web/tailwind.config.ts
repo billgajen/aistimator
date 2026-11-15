@@ -65,13 +65,9 @@ const config: Config = {
         mint: 'var(--color-mint)',
         butter: 'var(--color-butter)',
         tape: 'var(--color-tape)',
-        // Accent (system.md): the fill, its tint, text on the tint, text on the fill
-        accent: {
-          DEFAULT: 'var(--color-accent)',
-          tint: 'var(--color-accent-tint)',
-          line: 'var(--color-accent-line)',
-          ink: 'var(--color-accent-ink)',
-        },
+        // Accent (system.md): the strong yellow, and the dark text and edge on it.
+        // There is no tint: a pale yellow would read as butter.
+        accent: 'var(--color-accent)',
         'on-accent': 'var(--color-on-accent)',
         focus: 'var(--color-focus)',
       },

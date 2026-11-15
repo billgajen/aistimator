@@ -52,6 +52,7 @@ export * from './money'
 export * from './business-email'
 // T-159: the From header on every email
 export * from './email-from'
+export * from './minimum-charge'
 
 // ID prefixes for stable, readable IDs
 export const ID_PREFIXES = {

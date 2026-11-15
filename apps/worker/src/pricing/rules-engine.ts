@@ -9,7 +9,7 @@
  * IMPORTANT: AI does NOT set prices. All pricing is computed from rules.
  */
 
-import { currencySymbol, roundMoney } from '@qolumns/shared'
+import { currencySymbol, roundMoney, MINIMUM_ENTRY_KIND, MINIMUM_ENTRY_LABEL, minimumChargeNote, minimumTopUp } from '@qolumns/shared'
 import type { ExtractedSignals } from '../ai/signals'
 import type {
   MeasurementModel,
@@ -113,6 +113,10 @@ export interface PricingResult {
     autoRecommended?: boolean
     /** Reason for auto-recommendation */
     recommendationReason?: string
+    /** T-165: 'minimum' on the one entry that tops the job up to the minimum charge */
+    kind?: 'minimum'
+    /** T-165: on that entry, the business's minimum charge */
+    minimumCharge?: number
   }>
   /** Confidence level (0-1), affects whether range is shown */
   confidence: number
@@ -163,240 +167,6 @@ export interface ServiceContext {
   name: string
   /** What's included in the service scope */
   scopeIncludes?: string[]
-}
-
-/**
- * Calculate pricing from rules, signals, and answers
- */
-export function calculatePricing(
-  rules: PricingRules,
-  signals: ExtractedSignals,
-  answers: FormAnswer[],
-  taxConfig: TaxConfig,
-  currency: string,
-  jobData?: JobData,
-  addonContext?: AddonDetectionContext,
-  aiDetectedAddonIds?: Set<string>,
-  serviceContext?: ServiceContext,
-  aiAddonDetectionRan?: boolean
-): PricingResult {
-  const breakdown: PricingResult['breakdown'] = []
-  const notes: string[] = []
-  let subtotal = 0
-
-  // T-157: every line amount is rounded where it is created, and the subtotal
-  // is the sum of the rounded lines, so the lines always add up.
-
-  // 1. Start with base fee
-  if (rules.baseFee > 0) {
-    const baseFee = roundMoney(rules.baseFee)
-    breakdown.push({ label: 'Base fee', amount: baseFee })
-    subtotal += baseFee
-  }
-
-  // 1.5 Process matched inventory items (for rental/event businesses)
-  if (jobData?.matchedItems && jobData.matchedItems.length > 0) {
-    for (const item of jobData.matchedItems) {
-      const lineAmount = roundMoney(item.quantity * item.pricePerUnit)
-      const label = `${item.quantity} × ${item.catalogName} @ ${formatCurrency(item.pricePerUnit, currency)}`
-      breakdown.push({
-        label,
-        amount: lineAmount,
-        autoRecommended: true,
-        recommendationReason: item.description
-          ? `Detected: ${item.description}`
-          : `Detected in photos: ${item.itemType}`,
-      })
-      subtotal += lineAmount
-    }
-
-    // Add note about AI-detected items
-    if (jobData.matchedItems.some((item) => item.confidence < 0.8)) {
-      notes.push('Some item quantities are estimated from photos')
-    }
-  }
-
-  // 2. Apply measurement model (per-unit pricing)
-  const measurementModel = rules.measurementModel
-  if (measurementModel?.type === 'per_unit' && measurementModel.pricePerUnit > 0) {
-    // Determine quantity with priority: customer-stated (from notes) > form-input > AI-detected
-    let quantity: number | undefined
-    let quantitySource: 'customer_notes' | 'form' | 'ai' | undefined
-
-    if (signals.customerStatedQuantity && signals.customerStatedQuantity > 0) {
-      // Customer explicitly mentioned a number in their description
-      quantity = signals.customerStatedQuantity
-      quantitySource = 'customer_notes'
-    } else if (jobData?.quantity && jobData.quantity > 0) {
-      // Customer entered quantity in form field
-      quantity = jobData.quantity
-      quantitySource = 'form'
-    } else if (signals.dimensions?.value) {
-      // AI detected from photos
-      quantity = signals.dimensions.value
-      quantitySource = 'ai'
-    }
-
-    // Flag discrepancy if customer stated differs from AI detected
-    if (signals.customerStatedQuantity && signals.dimensions?.value) {
-      const customerQty = signals.customerStatedQuantity
-      const aiQty = signals.dimensions.value
-      if (customerQty !== aiQty) {
-        notes.push(`Customer mentioned ${customerQty} items, photos show ${aiQty} - using customer's count`)
-      }
-    }
-
-    if (quantity) {
-      const unitAmount = roundMoney(quantity * measurementModel.pricePerUnit)
-      const unitLabel = measurementModel.unitLabel || getDefaultUnitLabel(measurementModel.unit)
-      const label = `${quantity} ${unitLabel} × ${formatCurrency(measurementModel.pricePerUnit, currency)}`
-      breakdown.push({ label, amount: unitAmount })
-      subtotal += unitAmount
-
-      if (quantitySource === 'ai' && signals.dimensions?.isEstimate) {
-        notes.push('Quantity is estimated from photos')
-      }
-    } else {
-      notes.push('Per-unit pricing requires quantity - using base fee only')
-    }
-  }
-
-  // Legacy unit pricing support (deprecated)
-  if (!measurementModel && rules.unitPricing && signals.dimensions) {
-    const unitAmount = roundMoney(signals.dimensions.value * rules.unitPricing.pricePerUnit)
-    const label = `${signals.dimensions.value} ${signals.dimensions.unit} × ${formatCurrency(rules.unitPricing.pricePerUnit, currency)}/${rules.unitPricing.unit}`
-    breakdown.push({ label, amount: unitAmount })
-    subtotal += unitAmount
-
-    if (signals.dimensions.isEstimate) {
-      notes.push('Area is estimated from photos')
-    }
-  }
-
-  // 3. Apply addons based on signals, answers, and keyword matching
-  const recommendedAddons: RecommendedAddon[] = []
-
-  // Build searchable text from project description and form answers
-  const searchableText = buildSearchableText(addonContext)
-
-  for (const addon of rules.addons) {
-    const addonMatch = shouldApplyAddon(addon, signals, answers, searchableText, aiDetectedAddonIds, serviceContext, aiAddonDetectionRan)
-    if (addonMatch.apply) {
-      const addonAmount = roundMoney(addon.price)
-      breakdown.push({
-        label: addon.label,
-        amount: addonAmount,
-        autoRecommended: addonMatch.autoRecommended,
-        recommendationReason: addonMatch.reason,
-      })
-      subtotal += addonAmount
-
-      // Track recommended addons for display
-      if (addonMatch.autoRecommended) {
-        recommendedAddons.push({
-          id: addon.id,
-          label: addon.label,
-          price: addon.price,
-          reason: addonMatch.reason || 'Recommended based on project details',
-          source: addonMatch.source || 'keyword',
-        })
-      }
-    }
-  }
-
-  // 4. Apply multipliers from form answers - show each as separate line item
-  let runningSubtotal = subtotal
-
-  for (const mult of rules.multipliers) {
-    if (shouldApplyMultiplier(mult, answers, runningSubtotal)) {
-      // The adjustment is a line: round it, then add the rounded line
-      const adjustmentAmount = roundMoney(runningSubtotal * (mult.multiplier - 1))
-      if (adjustmentAmount !== 0) {
-        // Generate descriptive label from the condition if none provided
-        const label = mult.label || generateMultiplierLabel(mult, answers)
-        breakdown.push({ label, amount: adjustmentAmount })
-        runningSubtotal = roundMoney(runningSubtotal + adjustmentAmount)
-      }
-    }
-  }
-
-  // Note: Automatic complexity multiplier was removed.
-  // If a business wants complexity-based pricing, they can configure it as a multiplier rule with trigger conditions.
-
-  // Note: Automatic access difficulty multiplier was removed.
-  // Businesses can configure access-based pricing as work steps with trigger conditions if needed.
-
-  // Update subtotal with all multipliers applied
-  subtotal = runningSubtotal
-
-  // 5. Apply minimum charge
-  if (rules.minimumCharge > 0 && subtotal < rules.minimumCharge) {
-    notes.push(`Minimum charge of ${formatCurrency(rules.minimumCharge, currency)} applied`)
-    subtotal = roundMoney(rules.minimumCharge)
-    // Replace breakdown with minimum charge
-    breakdown.length = 0
-    breakdown.push({ label: 'Minimum charge', amount: subtotal })
-  }
-
-  // The sum of the rounded lines (rounded once more only to clear float dust)
-  subtotal = roundMoney(subtotal)
-
-  // 6. Calculate tax
-  // ISSUE-8 FIX: Use proper rounding to avoid penny discrepancies
-  // First calculate actual tax amount (rate is stored as percentage, e.g., 20 for 20%)
-  // Then round to 2 decimal places
-  let taxAmount = 0
-  if (taxConfig.enabled && taxConfig.rate) {
-    const rawTax = subtotal * (taxConfig.rate / 100)
-    taxAmount = Math.round(rawTax * 100) / 100
-  }
-
-  // 7. Calculate total
-  const total = Math.round((subtotal + taxAmount) * 100) / 100
-
-  // 8. Calculate confidence and range
-  const confidence = signals.confidence
-  let range: PricingResult['range'] | undefined
-
-  if (confidence < 0.7) {
-    // Low confidence - show a range
-    const variancePercent = confidence < 0.4 ? 0.3 : 0.15
-    range = {
-      low: Math.round(total * (1 - variancePercent) * 100) / 100,
-      high: Math.round(total * (1 + variancePercent) * 100) / 100,
-    }
-    notes.push('Price shown as range due to limited information')
-  }
-
-  // 9. Add site visit note based on rules or signals
-  const shouldRecommendSiteVisit = evaluateSiteVisitRules(
-    rules.siteVisitRules,
-    signals,
-    total
-  )
-
-  if (shouldRecommendSiteVisit || signals.siteVisitRecommended) {
-    notes.push(signals.siteVisitReason || 'Site visit recommended for accurate quote')
-  }
-
-  // Add any warnings from signals
-  for (const warning of signals.warnings) {
-    notes.push(warning)
-  }
-
-  return {
-    currency,
-    subtotal,
-    taxLabel: taxConfig.enabled ? taxConfig.label : undefined,
-    taxRate: taxConfig.enabled ? taxConfig.rate : undefined,
-    taxAmount,
-    total,
-    breakdown,
-    confidence,
-    range,
-    notes,
-    recommendedAddons: recommendedAddons.length > 0 ? recommendedAddons : undefined,
-  }
 }
 
 /**
@@ -2100,20 +1870,23 @@ export function calculatePricingWithTrace(
   // Note: Automatic access difficulty multiplier was removed.
   // Businesses can configure access-based pricing as work steps with trigger conditions if needed.
 
-  // 7. Minimum charge. The subtotal is the sum of the rounded lines.
+  // 7. Minimum charge: a floor, not an item (T-165). It applies only when the
+  // job's own lines total less than it. The lines stay as they are; the
+  // difference is one entry, marked as the minimum, so the lines and that
+  // entry still add up to the subtotal. Renderers show it as a note
+  // (shared/minimum-charge.ts), never as a line, so it is not put among the
+  // quote's notes as well.
   let subtotal = runningTotal
-  if (rules.minimumCharge > 0 && subtotal < rules.minimumCharge) {
-    notes.push(`Minimum charge of ${formatCurrency(rules.minimumCharge, currency)} applied`)
+  const topUp = minimumTopUp(subtotal, rules.minimumCharge)
+  if (topUp > 0) {
     minimumApplied = true
-
-    // The top-up is a line too: the lines then add up to the minimum
     const minimumCharge = roundMoney(rules.minimumCharge)
     traceSteps.push({
       type: 'minimum',
-      description: 'Minimum charge applied',
+      description: MINIMUM_ENTRY_LABEL,
       signalsUsed: [],
       calculation: `Subtotal ${subtotal} < minimum ${rules.minimumCharge}`,
-      amount: roundMoney(minimumCharge - subtotal),
+      amount: topUp,
       runningTotal: minimumCharge,
     })
 
@@ -2178,6 +1951,8 @@ export function calculatePricingWithTrace(
         amount: step.amount,
         autoRecommended: addon ? true : undefined,
         recommendationReason: addon?.reason,
+        // T-165: the minimum top-up is marked, and carries the minimum it tops up to
+        ...(step.type === 'minimum' ? { kind: MINIMUM_ENTRY_KIND, minimumCharge: roundMoney(rules.minimumCharge) } : {}),
       }
     })
 
@@ -2298,11 +2073,12 @@ export function calculateCrossServicePricing(
     )
   }
 
-  // Apply minimum charge if subtotal is below it
-  if (rules.minimumCharge > 0 && subtotal < rules.minimumCharge) {
+  // The minimum charge is a floor (T-165), as on the main path: the lines
+  // stay, and the note says the minimum was applied. Nothing when the lines
+  // total the minimum or more.
+  if (minimumTopUp(subtotal, rules.minimumCharge) > 0) {
     subtotal = rules.minimumCharge
-    breakdown.length = 0
-    breakdown.push(`Minimum charge: ${formatCurrency(rules.minimumCharge, currency)}`)
+    breakdown.push(minimumChargeNote(formatCurrency(rules.minimumCharge, currency)))
   }
 
   // Round subtotal

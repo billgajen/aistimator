@@ -1,11 +1,13 @@
 'use client'
 
 import { AcceptDetailsForm } from '@/components/quote/AcceptDetailsForm'
+import { Money, SectionLabel } from '@/components/quote/document-parts'
+import { MinimumNote } from '@/components/quote/MinimumNote'
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { brandStyleVars } from '@/lib/color'
 import type { QuoteViewResponse, QuoteStatus } from '@qolumns/shared'
-import { formatMoney, formatDate, formatNumber, currencySymbol, unitDisplayLabel, isQuoteProcessing, canCustomerDecide, customerDecisionWords, splitLabelMath, PRODUCT_NAME } from '@qolumns/shared'
+import { formatMoney, formatDate, formatNumber, unitDisplayLabel, isQuoteProcessing, canCustomerDecide, customerDecisionWords, splitLabelMath, PRODUCT_NAME, splitMinimum, withoutMinimumNote, isMinimumEntry, crossServiceLine } from '@qolumns/shared'
 
 interface QuotePageProps {
   params: { quoteId: string }
@@ -271,6 +273,14 @@ export default function QuotePage({ params }: QuotePageProps) {
   // T-133: tenant locale for money and dates (legacy quotes without one render as before)
   const locale = quote.locale || 'en-GB'
   const brandVars = brandStyleVars(branding?.primaryColor)
+  // T-165: the minimum charge is a floor, not an item. The customer sees the
+  // job's real lines, then one note above the total when the minimum applied;
+  // nothing when it did not. (shared/minimum-charge.ts; it also reads quotes
+  // stored with the top-up as a line, and drops the sentence the engine used
+  // to repeat among the notes.)
+  const { lines: priceLines, minimum: minimumApplied } = splitMinimum(pricing.breakdown)
+  const pricingNotes = withoutMinimumNote(pricing.notes)
+  const takeoffRows = (takeoff ?? []).filter((entry) => !isMinimumEntry({ label: entry.item }))
   const showAcceptButton = acceptQuoteEnabled !== false
   // T-147: the estimate is shown while the business reviews it — Accept is
   // locked until they confirm; asking a question stays available
@@ -379,9 +389,9 @@ export default function QuotePage({ params }: QuotePageProps) {
               )}
             </div>
 
-            {pricing.notes && pricing.notes.length > 0 && (
+            {pricingNotes.length > 0 && (
               <div className="px-6 sm:px-10 py-6">
-                {pricing.notes.map((note, i) => (
+                {pricingNotes.map((note, i) => (
                   <p key={i} className="text-xs text-text-muted mb-1">
                     {note}
                   </p>
@@ -457,9 +467,9 @@ export default function QuotePage({ params }: QuotePageProps) {
             <section className="mb-8">
               <SectionLabel>Price breakdown</SectionLabel>
 
-              {pricing.breakdown && pricing.breakdown.length > 0 && (
+              {priceLines.length > 0 && (
                 <div className="space-y-2.5 mb-5">
-                  {pricing.breakdown.map((item, index) => {
+                  {priceLines.map((item, index) => {
                     const [labelMain, labelMath] = splitLabelMath(item.label)
                     return (
                     <div key={index}>
@@ -480,7 +490,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                       )}
                     </div>
                   )})}
-                  {pricing.breakdown.some((item) => item.autoRecommended) && (
+                  {priceLines.some((item) => item.autoRecommended) && (
                     <p className="text-xs text-text-muted pt-1">
                       Items marked &quot;added for you&quot; came from your description or photos —
                       ask us to remove any you don&apos;t need.
@@ -489,11 +499,11 @@ export default function QuotePage({ params }: QuotePageProps) {
                 </div>
               )}
 
-              {pricing.notes && pricing.notes.length > 0 && (
+              {pricingNotes.length > 0 && (
                 <div className="bg-butter/50 border border-tape/30 rounded-xl px-4 py-3.5 mb-5">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-tertiary mb-1.5">Worth knowing</p>
                   <ul className="text-[13px] leading-relaxed text-tertiary space-y-1.5">
-                    {pricing.notes.map((note, index) => (
+                    {pricingNotes.map((note, index) => (
                       <li key={index}>{note}</li>
                     ))}
                   </ul>
@@ -501,6 +511,7 @@ export default function QuotePage({ params }: QuotePageProps) {
               )}
 
               <div className="border-t border-border pt-4 space-y-2">
+                <MinimumNote minimumCharge={minimumApplied?.minimumCharge} currency={pricing.currency} locale={locale} />
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Subtotal</span>
                   <span className="figure text-text-primary">
@@ -530,7 +541,7 @@ export default function QuotePage({ params }: QuotePageProps) {
             </section>
 
             {/* Measurement & takeoff */}
-            {takeoff && takeoff.length > 0 && (
+            {takeoffRows.length > 0 && (
               <section className="mb-8">
                 <div className="rounded-2xl border border-tape/40 bg-butter/40 overflow-hidden">
                   <div className="px-5 pt-4 pb-3">
@@ -541,7 +552,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                   </div>
                   <div className="tape-rule mx-5" />
                   <div className="px-5 py-4 space-y-4">
-                    {takeoff.map((entry, index) => (
+                    {takeoffRows.map((entry, index) => (
                       <div key={index}>
                         <div className="flex items-baseline gap-2 text-sm">
                           <span className="font-medium text-text-primary">{entry.item}</span>
@@ -622,7 +633,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                       {service.breakdown && service.breakdown.length > 0 && (
                         <div className="text-xs text-text-muted space-y-0.5">
                           {service.breakdown.map((line, i) => (
-                            <div key={i}>{line}</div>
+                            <div key={i}>{crossServiceLine(line)}</div>
                           ))}
                         </div>
                       )}
@@ -1033,39 +1044,6 @@ function RangeScale({
         />
       </div>
     </div>
-  )
-}
-
-function SectionLabel({ children, tone }: { children: React.ReactNode; tone?: 'brand' | 'tape' }) {
-  const color = tone === 'brand' ? 'text-primary' : tone === 'tape' ? 'text-tertiary' : 'text-text-muted'
-  return (
-    <h3 className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${color} mb-3`}>
-      {children}
-    </h3>
-  )
-}
-
-/** Money with lighter pence — how fine documents set figures. */
-function Money({
-  amount,
-  currency,
-  locale,
-  emphasize,
-}: {
-  amount: number
-  currency: string
-  locale: string
-  emphasize?: boolean
-}) {
-  const symbol = currencySymbol(currency, locale)
-  const [whole, pence] = amount.toFixed(2).split('.')
-  const wholeFormatted = Number(whole).toLocaleString(locale)
-  return (
-    <span className="whitespace-nowrap">
-      <span className={emphasize ? 'text-on-primary/60' : ''}>{symbol}</span>
-      {wholeFormatted}
-      <span className={emphasize ? 'text-[0.55em] align-super text-on-primary/60' : 'text-[0.7em]'}>.{pence}</span>
-    </span>
   )
 }
 

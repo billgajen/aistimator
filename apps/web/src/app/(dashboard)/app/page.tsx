@@ -18,6 +18,8 @@ import { unfinishedFilter } from '@/lib/unfinished-leads'
 import { appOriginFrom } from '@/lib/tenant-site'
 import { WaitingForYou, type WaitingQuote } from '@/components/home/WaitingForYou'
 import { QuoteStand } from '@/components/home/QuoteStand'
+import { NeedsYouDot } from '@/components/quotes/NeedsYouDot'
+import { NEEDS_YOU_MARK } from '@/lib/status-tone'
 import { LatestActivity, type ActivityLine } from '@/components/home/LatestActivity'
 import { HomeQuoteLink } from '@/components/home/HomeQuoteLink'
 import { checkPlanLimit } from '@/lib/plan-limits'
@@ -264,11 +266,16 @@ export default async function DashboardPage() {
       {(unfinishedCount ?? 0) > 0 && (
         <Link
           href="/app/quotes?filter=unfinished"
-          className="mb-8 flex items-center justify-between gap-3 rounded-xl border border-accent-line bg-accent-tint px-5 py-4 text-sm text-text-primary hover:border-accent"
+          className="mb-8 flex items-center justify-between gap-3 rounded-xl border border-border bg-white px-5 py-4 text-sm text-text-primary shadow-warm-md hover:border-field"
           data-testid="unfinished-count"
         >
-          <span>
-            <span className="figure text-lg font-bold">{unfinishedCount}</span> {U.banner(unfinishedCount ?? 0)}
+          <span className="flex min-w-0 items-center gap-3">
+            {/* T-165: the strong yellow behind the count, with the marker: "needs you" */}
+            <span className={`figure inline-flex shrink-0 items-center rounded-lg px-2.5 py-1 text-lg font-bold ${NEEDS_YOU_MARK}`} data-testid="unfinished-count-figure">
+              <NeedsYouDot className="mr-1.5" />
+              {unfinishedCount}
+            </span>
+            <span>{U.banner(unfinishedCount ?? 0)}</span>
           </span>
           <span className="shrink-0 font-semibold text-primary">{U.bannerButton}</span>
         </Link>

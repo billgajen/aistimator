@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
+import { MAIN_CTA } from '@/lib/marketing/cta'
 import { offeredPlans, formatMoney, freeOfferLabel, FREE_ALLOWANCE, type PlanDefinition, type PlanChannel, PRODUCT_NAME } from '@qolumns/shared'
 
 export const metadata: Metadata = {
@@ -13,7 +14,6 @@ export const metadata: Metadata = {
 // T-134: every number on this page comes from the plan definitions
 // (packages/shared/src/plans.ts) — nothing is duplicated here.
 const OFFERED = offeredPlans()
-const TRIAL_PLAN = OFFERED.find((p) => p.trialDays)
 // T-152: the free allowance for new businesses — counted in total, never resets
 const FREE_QUOTES = FREE_ALLOWANCE.US!.quotes
 
@@ -54,10 +54,8 @@ const FAQS = [
     a: 'No — this is the one rule we never break. The AI measures the job; the price is calculated from rates you configure. You can review every quote before it sends if you want to.',
   },
   {
-    q: 'How does the free trial work?',
-    a: TRIAL_PLAN
-      ? `${TRIAL_PLAN.name} comes with a ${TRIAL_PLAN.trialDays}-day free trial. A card is required to start; you won’t be charged until the trial ends, and you can cancel before then.`
-      : 'Pick a plan when you’re ready — your setup and quote history carry straight over.',
+    q: 'When do I start paying?',
+    a: `When you pick a plan. Your ${FREE_QUOTES} free quotes need no card. Your setup and quote history carry straight over.`,
   },
   {
     q: 'Is there annual billing?',
@@ -83,16 +81,13 @@ export default function PricingPage() {
           no commission, no per-lead fees.
         </p>
         <p className="mt-5">
-          <Link
-            href="/signup"
-            className="inline-flex items-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-          >
+          {/* T-165: the one yellow call to action of this screen */}
+          <Link href="/signup" className={MAIN_CTA} data-cta="main">
             {freeOfferLabel()}
           </Link>
         </p>
         <p className="mt-3 text-sm text-text-muted">
-          {FREE_QUOTES} priced quotes in total, then pick a plan.
-          {TRIAL_PLAN ? ` ${TRIAL_PLAN.trialDays}-day free trial on ${TRIAL_PLAN.name}.` : ''} Pay yearly, get two months free.
+          {FREE_QUOTES} priced quotes in total, then pick a plan. Pay yearly, get two months free.
         </p>
       </section>
 
@@ -106,7 +101,7 @@ export default function PricingPage() {
               estimates: def.quoteLimit.toLocaleString('en-US'),
               features: planBullets(def),
               highlight: Boolean(def.recommended),
-              cta: def.trialDays ? `Start ${def.trialDays}-day trial` : `Choose ${def.name}`,
+              cta: `Choose ${def.name}`,
               annual: def.annualPrice?.USD ? dollars(def.annualPrice.USD) : null,
             }
             return (
@@ -195,11 +190,8 @@ export default function PricingPage() {
         <p className="mt-3 text-text-secondary">
           Describe your rates in plain English and send yourself a test quote — it takes about 5 minutes.
         </p>
-        <Link
-          href="/signup"
-          className="mt-6 inline-block rounded-lg bg-primary px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
-        >
-          {TRIAL_PLAN ? `Start your ${TRIAL_PLAN.trialDays}-day trial` : 'Get started'}
+        <Link href="/signup" className={`${MAIN_CTA} mt-6`} data-cta="main">
+          {freeOfferLabel()}
         </Link>
       </section>
 

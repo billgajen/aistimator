@@ -13,18 +13,14 @@ import { TurnBadge } from '@/components/quotes/TurnBadge'
 /**
  * T-164: the design system as it renders (Docs/design/system.md decides).
  * Everything here is a real token or a real component; nothing is styled
- * for this page alone. The accent switch sets data-accent on the page, which
- * is all a real page would need to change accent.
+ * for this page alone. T-165: the owner chose yellow and the text wordmark,
+ * so the accent switch and the second wordmark are gone.
  */
-
-export const ACCENTS = ['tomato', 'orange', 'yellow'] as const
-export type Accent = (typeof ACCENTS)[number]
-export const DEFAULT_ACCENT: Accent = 'orange'
 
 const PALETTE: Array<{ group: string; note: string; tokens: Array<[name: string, cssVar: string]> }> = [
   { group: 'Paper', note: 'The ground of every page.', tokens: [['background', '--color-background'], ['surface', '--color-surface'], ['mist', '--color-mist'], ['mint', '--color-mint']] },
   { group: 'Juniper', note: 'The main colour: the brand, links, the standard button.', tokens: [['primary', '--color-primary'], ['primary-hover', '--color-primary-hover'], ['primary-light', '--color-primary-light']] },
-  { group: 'Accent', note: 'About a tenth of a screen: the main button, one highlighted word, "needs you".', tokens: [['accent', '--color-accent'], ['accent-tint', '--color-accent-tint'], ['accent-line', '--color-accent-line'], ['accent-ink', '--color-accent-ink'], ['on-accent', '--color-on-accent']] },
+  { group: 'Accent', note: 'Yellow, about a tenth of a screen: the main button of a marketing screen, one highlighted word, "needs you". Always with dark text on it; there is no pale tint.', tokens: [['accent', '--color-accent'], ['on-accent', '--color-on-accent']] },
   { group: 'Ink', note: 'Text. Never pure black.', tokens: [['ink', '--color-ink'], ['text-secondary', '--color-text-secondary'], ['text-muted', '--color-text-muted']] },
   { group: 'Lines', note: 'border is decoration; field is the edge of a field or an outlined control.', tokens: [['border', '--color-border'], ['border-strong', '--color-border-strong'], ['field', '--color-field']] },
   { group: 'Meaning', note: 'Green for done, amber for a warning, red for a failure. Each with its tint and its line.', tokens: [['secondary', '--color-secondary'], ['secondary-light', '--color-secondary-light'], ['tertiary', '--color-tertiary'], ['tertiary-light', '--color-tertiary-light'], ['danger', '--color-danger'], ['danger-light', '--color-danger-light']] },
@@ -88,7 +84,6 @@ function Section({ id, title, lead, children }: { id: string; title: string; lea
 }
 
 export function DesignPreview({ productScreen }: { productScreen: React.ReactNode }) {
-  const [accent, setAccent] = useState<Accent>(DEFAULT_ACCENT)
   const [values, setValues] = useState<Record<string, string>>({})
   const [menuOpen, setMenuOpen] = useState(false)
   const [entered, setEntered] = useState(0)
@@ -102,57 +97,33 @@ export function DesignPreview({ productScreen }: { productScreen: React.ReactNod
     for (const { tokens } of PALETTE) for (const [, cssVar] of tokens) read[cssVar] = style.getPropertyValue(cssVar).trim()
     for (const [, cssVar] of MOTION) read[cssVar] = style.getPropertyValue(cssVar).trim()
     setValues(read)
-  }, [accent])
+  }, [])
 
   return (
-    <main ref={root} data-accent={accent} data-testid="design-preview" className="min-h-screen bg-background text-text-primary">
+    <main ref={root} data-testid="design-preview" className="min-h-screen bg-background text-text-primary">
       <div className="mx-auto max-w-container px-4 pb-20 sm:px-6">
         <header className="py-10 sm:py-14">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">Design system preview</p>
           <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight text-text-primary">Tokens and components, as they render</h1>
           <p className="mt-3 max-w-2xl text-text-secondary">
-            Everything on this page is a real token or a real component. Choose an accent and a wordmark; nothing here changes a real page.
+            Everything on this page is a real token or a real component. The accent is yellow and the wordmark is the name in the display font.
           </p>
-
-          <fieldset className="mt-8" data-testid="accent-switch">
-            <legend className="text-sm font-semibold text-text-primary">Accent</legend>
-            <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Accent colour">
-              {ACCENTS.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  role="radio"
-                  aria-checked={accent === name}
-                  data-testid={`accent-${name}`}
-                  onClick={() => setAccent(name)}
-                  className={`motion-press inline-flex min-h-[44px] items-center gap-2 rounded-lg border px-4 text-sm font-semibold capitalize ${
-                    accent === name ? 'border-ink bg-white text-text-primary' : 'border-field bg-background text-text-secondary'
-                  }`}
-                >
-                  <span data-accent={name} className="h-4 w-4 rounded-full bg-accent" aria-hidden="true" />
-                  {name}
-                  {name === DEFAULT_ACCENT && <span className="font-normal text-text-muted">(default)</span>}
-                </button>
-              ))}
-            </div>
-          </fieldset>
         </header>
 
-        <Section id="wordmark" title="Wordmark" lead="The name in the display font, two ways. Real pages keep the current text logo until one is chosen.">
+        <Section id="wordmark" title="Wordmark" lead="The name as text, in the display font. The header, the footer, the sign-in pages and the dashboard all draw it with this one component.">
           <div className="grid gap-4 sm:grid-cols-2">
-            {(['capital', 'lower'] as const).map((form) => (
-              <Card key={form} className="bg-white p-8">
-                <Wordmark form={form} className="text-display-sm sm:text-display-md" />
-                <p className="mt-4 text-sm text-text-secondary">{form === 'capital' ? 'As written' : 'All lower case'}</p>
-                <div className="mt-6 flex items-center gap-6 rounded-xl bg-primary p-5">
-                  <Wordmark form={form} className="text-2xl text-white" />
-                </div>
-              </Card>
-            ))}
+            <Card className="bg-white p-8">
+              <Wordmark className="text-display-sm sm:text-display-md" />
+              <p className="mt-4 text-sm text-text-secondary">On paper</p>
+            </Card>
+            <div className="flex flex-col justify-between rounded-xl bg-primary p-8">
+              <Wordmark className="text-display-sm text-white sm:text-display-md" />
+              <p className="mt-4 text-sm text-on-primary/80">On juniper</p>
+            </div>
           </div>
         </Section>
 
-        <Section id="palette" title="Colour" lead="Paper, juniper and one accent. Butter and tape are for measurement only.">
+        <Section id="palette" title="Colour" lead="Paper, juniper and the yellow accent. Butter and tape are for measurement only.">
           <div className="space-y-8">
             {PALETTE.map(({ group, note, tokens }) => (
               <div key={group}>
@@ -273,7 +244,7 @@ export function DesignPreview({ productScreen }: { productScreen: React.ReactNod
           </div>
         </Section>
 
-        <Section id="marketing-band" title="A marketing band" lead="A headline with one highlighted word, the main button, and a real product screen at its own size.">
+        <Section id="marketing-band" title="A marketing band" lead="A headline with one highlighted word, the one yellow button (dark text, a thin dark edge), and a real product screen.">
           <div className="rounded-2xl bg-white p-6 shadow-warm-md sm:p-10" data-testid="marketing-band">
             <h3 className="max-w-3xl font-display text-display-sm font-extrabold text-text-primary sm:text-display-md lg:text-display-lg">
               Instant quotes, in{' '}

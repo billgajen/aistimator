@@ -95,7 +95,9 @@ export const PLANS: PlanDefinition[] = [
     channels: ['widget', 'sms', 'whatsapp', 'mobile_app'],
     features: { ...BASE_FEATURES, custom_branding: true, calibration_insights: true },
     overageEnabled: false,
-    trialDays: 14,
+    // T-165 (owner's decision): no trial. The one free offer is the free
+    // allowance (FREE_ALLOWANCE): 10 priced quotes, no card. A plan is paid
+    // from the day it is chosen.
     offered: true,
     recommended: true,
   },

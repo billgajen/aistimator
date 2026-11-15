@@ -617,6 +617,10 @@ export interface QuotePricing {
     autoRecommended?: boolean
     /** Reason for auto-recommendation */
     recommendationReason?: string
+    /** T-165: 'minimum' on the one entry that tops the job up to the business's minimum charge (never shown as a line) */
+    kind?: 'minimum'
+    /** T-165: on that entry, the business's minimum charge when the quote was priced */
+    minimumCharge?: number
   }>
   /** Pricing notes - warnings, site visit recommendations, etc. */
   notes?: string[]

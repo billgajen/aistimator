@@ -679,3 +679,88 @@ No page was redesigned; pages changed only where a token changed.
 - The live check is `scripts/hardcore-test/verify-t164.mts` (add `PLAYWRIGHT_DIR=…`; almost all of it is the
   browser pass; it saves `/design` at both widths with each accent into its results folder). It joins the
   regression set: run t146 to t164 before a commit or deploy (there is no verify-t159, t161 or t163).
+
+## T-165 — Home page that shows the product; yellow accent; one free offer
+
+Built and checked locally. **Not committed. Not deployed to production.** A preview only:
+`https://estimator-6onwa5v0e-gajendrans-projects-1a87e0b4.vercel.app`
+
+About the preview:
+- Vercel will ask you to log in to your Vercel account first. That is its protection for previews.
+- The preview has **no database** (Vercel's Preview environment has no settings; they exist for Production only).
+  So on the preview you can look at Home, Login, Pricing and `/design`, but you cannot sign in, and "Try it as a
+  customer" and quote links show an error there. That is the preview, not the code.
+- [ ] If you want previews that work fully in future, add the Production variables to the Preview environment in
+  Vercel → Settings → Environment Variables (ideally pointing at a separate test database, not the live one).
+
+Your choices from T-164 are in: the accent is yellow, and the wordmark is the name "Qolumns" in the display font.
+(The "Choose on the preview page" item in the T-164 section above is done.)
+
+- [ ] **Look at the preview, on your phone and on a computer:**
+  1. *The demo at the top.* It plays once when the page opens: the customer answers and adds a photo, the tape
+     measure draws out and the price lands, then Approve & send is pressed and turns to "Sent". It then stays
+     still. Press "Play again". On a phone the three screens are one under another; nothing swipes sideways.
+  2. *One yellow button per screen.* "Try it free: 10 quotes, no card" at the top and in the green band at the
+     bottom. Every other button is quieter. Dark text and a thin dark edge on the yellow.
+  3. *Set up in minutes:* three steps, each with its screen. *Your prices:* a price sentence that turns into a
+     price list when you scroll to it ("Show it again" replays it). *What homeowners want:* three big figures with
+     their sources. *Add it anywhere:* a QR code (point your phone's camera at it: on the live site it opens the
+     example business's quote page), that page on a phone, and the form on a website.
+  4. *Plans:* each card has its own button.
+  5. *Login:* on a computer, an example estimate sits beside the form. Your browser should offer to fill in your
+     email.
+  6. *Reduce motion* (Accessibility settings): the demo shows its finished screens and nothing moves.
+- [ ] **In the dashboard** (after signing in): "Needs your approval" is strong yellow with a small dark dot, not a
+  pale colour. On Home the "Needs you" count sits on yellow. No dashboard button is yellow.
+- **The pricing decision you made (recorded as AD-047):** the 14-day trial on Pro is removed. There is one free
+  offer everywhere: 10 quotes, no card. From the production deploy onward, a business that picks any plan pays from
+  that day.
+  - [ ] Nothing needs changing in Stripe: the trial was added by our checkout, not stored on the Stripe prices.
+    Worth a look anyway: Stripe → Product catalogue, that no price has its own trial set.
+  - Anyone already in a trial keeps it to its end date.
+  - The billing page (Settings → Billing) should show "Select Plan" on Pro, with no trial line.
+- **The minimum charge is a floor, not an item** (your change to this ticket; recorded as AD-048). Built and
+  checked locally. **It is not on the preview above**: the preview was made before this change and you asked for
+  no deploy, so the preview's home page still shows three price lines.
+  - Home: the sentence is "$375 per room, heavy prep adds $250." and the price list has two lines.
+  - Estimates: when a job comes to less than a business's minimum charge, the customer sees the job's real lines,
+    then "Minimum charge of $400.00 applied" above the total. At the minimum or above it, nothing about a minimum
+    shows anywhere. No total changed.
+  - **The worker must be deployed together with the web app** for this (the pricing engine lives in the worker).
+    Either order is safe: the web app reads quotes made by the old and the new engine alike.
+  - [ ] After the deploy, try it by hand: give a test service a minimum charge above its smallest job, send a
+    small request through your quote link, and look at (1) the customer's quote page, (2) the quote in the
+    dashboard, (3) the PDF, (4) More → Pricing trace. Each should list the real line and show the note once, with
+    no "Minimum charge applied" line.
+  - [ ] Then press Edit on that quote: raise the line a little (the note's "+ $…" shrinks and the total does not
+    move), raise it past the minimum (the note goes), lower it again (the note is back). "Remove" takes the
+    minimum off that quote for good; "Undo" brings it back until you save.
+  - Quotes already sent keep their totals and now show the note instead of the line, with no change to stored
+    data.
+  - Worth knowing: once a quote is saved with its lines at or above the minimum, it no longer carries a minimum,
+    so lowering its lines in a later edit does not bring one back.
+  - Worth knowing: the Pricing trace page (quotes list → More → Pricing trace) did not open at all before this
+    (an error page). That was an older fault, fixed here.
+  - [ ] **A pricing question for you (not changed here):** after pricing, the quote checker can add a work step
+    the engine missed. When the job was below the minimum, it adds the step on top of the minimum: a $375 job
+    with a $400 minimum that gains a $100 step becomes $500 ($375 + $100 + the $25 top-up), not $475. It worked
+    this way before too. Fixing it changes a total, so it needs your decision and its own ticket.
+  - [ ] The Features page still quotes "$375 per room, heavy prep adds $250, minimum job $400." as something you
+    can tell the system. It is not shown as a price line there, so it was left. Say if you want it to match Home.
+- Worth knowing:
+  - The demo's screens are built from the product's own parts (the estimate document's pieces, the status label,
+    the buttons, the QR encoder) at their real size, in the example business's green. The request form in the demo
+    is a copy of the real form's layout, not the live form: the live one needs a real business behind it.
+  - The small photo in the demo is the sample label the "Try it as a customer" page already uses. No photographs
+    were added in this ticket.
+  - Features and the trade pages are **not** redesigned yet (next ticket). They still have a green main button
+    and the three small frames.
+- **Follow-ups found here:**
+  - [ ] On the customer's quote page, the small labels on the coloured price panel ("Your quote", "Reviewed and
+    confirmed by…") are white at 60% and 75%. On the example business's green that is 3.4:1 and 4.3:1, under the
+    4.5:1 rule. It depends on each business's colour. It is the quote page's own style, so it was not changed here.
+  - [ ] The login form's fields are 38 px tall and "Sign up" is a small text link (part of the tap-size follow-up
+    in the T-164 section).
+- The live check is `scripts/hardcore-test/verify-t165.mts` (add `PLAYWRIGHT_DIR=…`; it saves the home page, the
+  demo's last state, login and the dashboard into its results folder). It joins the regression set: run t146 to
+  t165 before a commit or deploy (there is no verify-t159, t161 or t163).

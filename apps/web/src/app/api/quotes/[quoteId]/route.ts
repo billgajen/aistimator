@@ -4,6 +4,7 @@ import {
   resolveRegionContext,
   roundMoney,
   dropStaleLabelMath,
+  editedBreakdown,
   canEditQuote,
   statusAfterEditAndSend,
   QUOTE_ALREADY_SENT_STATUSES,
@@ -378,10 +379,17 @@ export async function PATCH(
       .map((step) => step.description)
       .filter((d): d is string => typeof d === 'string')
     const pricing = { ...body.pricing_json }
-    pricing.breakdown = dropStaleLabelMath(
+    // T-165: the minimum charge is a floor, not an item. A quote that carries
+    // one keeps it only as the marked entry, worked out again here from the
+    // lines that were sent (never the amount the client sent); a quote
+    // without one never gets one (shared/minimum-charge.ts).
+    pricing.breakdown = editedBreakdown(
       beforePricing?.breakdown ?? [],
-      body.pricing_json.breakdown.map((item) => ({ ...item, amount: roundMoney(Number(item.amount)) })),
-      generatedLabels
+      dropStaleLabelMath(
+        beforePricing?.breakdown ?? [],
+        body.pricing_json.breakdown.map((item) => ({ ...item, amount: roundMoney(Number(item.amount)) })),
+        generatedLabels
+      )
     )
     pricing.subtotal = roundMoney(pricing.breakdown.reduce((sum, item) => sum + item.amount, 0))
 

@@ -15,7 +15,7 @@ animations. Never a PDF look, never overdone.
 
 ## Colour
 
-Paper, juniper and one accent.
+Paper, juniper and one accent: yellow.
 
 | Role | Token (Tailwind name) | Value | Used for |
 |---|---|---|---|
@@ -25,11 +25,8 @@ Paper, juniper and one accent.
 | | `mist`, `mint` | `#EAEFF5`, `#DFEDE5` | quiet pastel surfaces |
 | Juniper | `primary` | `#205E56` | the brand, links, the standard button |
 | | `primary-hover`, `primary-light` | `#174741`, `#DFEDE5` | |
-| Accent | `accent` | orange `#F26B2A` (default) | the fill: the main button, one highlighted word |
-| | `accent-tint` | `#FDE7DD` | the "needs you" tint |
-| | `accent-line` | `#F7C7AF` | the edge of a box in the tint |
-| | `accent-ink` | `#91431B` | text on the tint |
-| | `on-accent` | `#1B2823` | text on the fill |
+| Accent | `accent` | yellow `#FFC53D` | the main button of a marketing screen, one highlighted word, "needs you" |
+| | `on-accent` | `#1B2823` (ink) | text on the yellow, and its thin edge; 9.7:1 |
 | Ink | `ink` / `text-primary` | `#1B2823` | text; never pure black |
 | | `text-secondary` | `#4F5D57` | supporting text |
 | | `text-muted` | `#626C66` | small notes, times; 4.5:1 on paper, grey cards and white |
@@ -43,14 +40,17 @@ Paper, juniper and one accent.
 
 Rules:
 
-1. **The accent is about a tenth of a screen:** the one main button, one highlighted word in a headline, and
-   "needs you" markers. If a screen has more accent than that, something is wrong.
-2. **The accent is never text on paper.** Orange on paper is 2.9:1 and yellow 1.5:1. A highlighted word is the
-   accent *behind* the word, with `on-accent` text. Text on the tint is `accent-ink`.
-3. **White is never button text on an accent** (3.0:1 on orange, 4.0:1 on tomato, 1.6:1 on yellow). Use
-   `on-accent`.
+1. **The accent is about a tenth of a screen:** the one main button of a marketing screen, one highlighted word
+   in a headline, and "needs you" markers. If a screen has more yellow than that, something is wrong.
+2. **The accent is never text on paper** (yellow on paper is 1.5:1). A highlighted word is the yellow *behind* the
+   word, with `on-accent` text.
+3. **The yellow always carries dark text** (`on-accent`), never white (1.6:1). **A yellow button has a thin dark
+   edge** (`border border-on-accent`), because yellow alone barely stands off paper. On a marketing page the one
+   main call to action of a screen is yellow (`MAIN_CTA` in `lib/marketing/cta.ts`); every other button keeps its
+   quieter style. **Dashboard buttons are never yellow.**
+   **There is no pale yellow tint.** A pale yellow reads as butter.
 4. **Butter and tape are for measurement only:** the takeoff, grades, ranges, the tape rule. A warning is
-   `tertiary`. "Needs you" is the accent tint.
+   `tertiary`. "Needs you" is the strong yellow with its small dark marker (Status colours).
 5. **No dark panels, no glass, no gradients.** The dark code block on the Quote link page is the one dark surface.
 6. **Never choose a colour from a skill's catalogue,** and never write a raw Tailwind palette colour
    (`text-red-500`, `bg-zinc-50`). Every colour is one of the tokens above. A unit test fails on a raw one.
@@ -61,14 +61,8 @@ Rules:
 8. **The customer's pages keep the business's own colour.** The request form and the quote page are coloured by
    the business's brand colour (`primary` is overridden there). Our accent never appears on them.
 
-**Accent candidates** (the owner chooses on `/design`; orange until then). Set `data-accent` on an element to
-switch it and everything inside it.
-
-| | Fill | Tint | Text on tint | Text on fill | Note |
-|---|---|---|---|---|---|
-| tomato | `#E8412C` | `#FBE1DD` | `#8C2C1C` | `#140806` | button text must be near-black: white is 4.0:1 and ink 3.8:1 |
-| orange | `#F26B2A` | `#FDE7DD` | `#91431B` | `#1B2823` (ink) | ink on the fill is 5.0:1 |
-| yellow | `#FFC53D` | `#FFEFC2` | `#765A1D` | `#1B2823` (ink) | its tint is close to butter, which is reserved for measurement |
+The owner chose yellow in T-165 (tomato and orange were the other candidates; they and the `data-accent` switch
+are gone).
 
 ## Type
 
@@ -147,8 +141,12 @@ Tokens (CSS variables; Tailwind `duration-*` and `ease-*` names in brackets):
 | `--ease-move` (`ease-move`) | `cubic-bezier(0.2, 0.8, 0.2, 1)` | anything that moves or changes |
 | `--ease-enter` (`ease-enter`) | `cubic-bezier(0.22, 1, 0.36, 1)` | an entrance settling |
 
+| `--motion-draw` | 800 ms | the tape rule drawn out: the hero demo's one flourish, nowhere else |
+
 Ready-made classes: `motion-press` (a control that answers the pointer), `motion-menu` (a menu; set
-`data-open="true"`), `animate-fade-in-up` (an entrance: opacity and a 6 px rise, once).
+`data-open="true"`), `animate-fade-in-up` (an entrance: opacity and a 6 px rise, once), and for the hero demo and
+the moment `demo-in`, `demo-pop`, `demo-out`, `demo-press` and `demo-tape-cover`, each waiting for its turn in
+`--at`.
 
 Rules:
 
@@ -158,6 +156,13 @@ Rules:
    list. Nothing on an action taken hundreds of times a day, nothing started from the keyboard.
 3. **Marketing: one hero entrance** (once, on load) **and at most one moment per page.** Nothing appears because
    the page was scrolled.
+   - **The hero demo** (Home) is the hero entrance: the product shown working, built from the product's own parts
+     at true size. It plays once on load, each step a token-length entrance in its turn, the whole run under six
+     seconds, then it stands still on its last state with a small "Play again". It is a picture: a screen reader
+     gets one sentence instead. Under reduced motion it shows the finished frames with no movement.
+   - **The one moment** sits in its own section and plays once when that section comes into view. Its content is
+     on the page from the first paint; it waits only when script has seen that the section is still below the
+     screen and motion is allowed. It can be played again by a button.
 4. **Customer pages:** a short entrance on the estimate arriving, and feedback. The wait is the tape rule being
    drawn (`tape-measuring`), never a pulse.
 5. **An exit is quicker than its entrance.**
@@ -171,7 +176,7 @@ By whose turn it is (`packages/shared/src/quote-turn.ts`); the map is `apps/web/
 
 | Whose turn | Colour | Classes |
 |---|---|---|
-| Needs you | the accent tint | `bg-accent-tint text-accent-ink` |
+| Needs you | the strong yellow, dark text, and a small dark marker (`<NeedsYouDot />`) | `bg-accent text-on-accent` |
 | Waiting for the customer; working out the price | neutral, cool | `bg-mist text-text-secondary` |
 | Accepted, paid | green | `bg-secondary-light text-secondary` |
 | Closed (declined, expired) | grey | `border border-border bg-surface text-text-muted` |
@@ -179,10 +184,15 @@ By whose turn it is (`packages/shared/src/quote-turn.ts`); the map is `apps/web/
 
 Each reads at 4.5:1 or more. Colour is never the only signal: the label says it in words.
 
+"Needs you" is always the strong yellow with the marker, never a pale tint (it would be taken for butter, a
+measurement note). A pill or a small tag is filled yellow. A larger surface that needs the owner (Home's "Needs
+you" tile, the unfinished-requests banner) stays white and carries the yellow behind its count, with the marker:
+the yellow stays within a tenth of the screen.
+
 ## The name
 
-The name is `PRODUCT_NAME` (`packages/shared/src/brand.ts`). Two wordmarks are drawn on `/design`, "Qolumns" and
-"qolumns", in the display font, for the owner to choose. Until then real pages keep the text logo they have.
+The name is `PRODUCT_NAME` (`packages/shared/src/brand.ts`). The wordmark is that name as text in the display
+font, extra-bold (the owner's choice, T-165). One component draws it everywhere: `components/brand/Wordmark.tsx`.
 
 ## Which skill leads where
 
@@ -202,11 +212,13 @@ The numbers are those of `audit.md`, section 6.
    no. Customer pages: only the estimate arriving.
 2. **Hover on cards.** A linked card or a button answers the pointer with `motion-press` (1 px, not taste's lift
    on everything). No hover scale on images. A card that is not a link does not move.
-3. **Durations.** Ours: 150, 120, 90, 200 and 250 ms. taste's 700 ms heading lines and 600 ms image settle are
-   not used; a hero entrance is built from 250 ms steps and finishes within a second.
+3. **Durations.** Ours: 150, 120, 90, 200 and 250 ms, and 800 ms for the tape rule being drawn. taste's 700 ms
+   heading lines and 600 ms image settle are not used. A hero demo is a run of 250 ms steps, under six seconds in
+   all.
 4. **Springs and bounce.** None. Both curves end without passing their mark.
 5. **Blur on enter.** None. Transform and opacity only.
-6. **Stagger.** Allowed only inside the hero entrance. No list staggers in, and nothing appears on scroll.
+6. **Stagger.** Allowed only inside the hero demo and the one moment. No list staggers in, and nothing else
+   appears on scroll.
 7. **Look and palette.** Ours, as written above. No skill's palette, font pairing or style (glass, gradients).
 8. **Page length.** One idea per section and fuller sections, but not taste's fixed one-or-two-screens rule.
 9. **Dark surfaces.** None.
@@ -221,6 +233,8 @@ The numbers are those of `audit.md`, section 6.
   the default hairline, and the phone menu's dimming layer has no colour. Making the tokens take an alpha would
   switch all 228 on at once and change how many pages look, customer pages included. A unit test stops the number
   growing.
+- **Marketing pages not yet redrawn** (Features, the trade pages): their main button is still juniper and they
+  still use the small three-frame strip. They get the yellow call to action and real screens in their own ticket.
 - **Butter outside measurement.** Notice banners (the demo note, the test-request note, the plan-usage banner),
   the "Test" tag and the "Most popular" pill still use butter or tape. They move to `tertiary` when their page is
   redesigned.

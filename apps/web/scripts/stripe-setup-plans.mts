@@ -4,6 +4,9 @@
 //   STRIPE_SECRET_KEY=sk_test_... (cd apps/web && npx tsx scripts/stripe-setup-plans.mts)
 //
 // Idempotent: prices are found by lookup_key before anything is created.
+// T-165: no plan has a trial. A price is a plain recurring price, and checkout
+// charges from the day a plan is chosen (the free offer is the free allowance,
+// which never touches Stripe). Nothing here sets or expects a trial period.
 // Run it in TEST mode first; it refuses live keys unless --live is passed.
 import Stripe from 'stripe'
 import { offeredPlans, stripePriceEnvKey, type PlanInterval } from '../../../packages/shared/src/plans'

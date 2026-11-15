@@ -15,6 +15,275 @@
 
 ## Issues & Resolutions
 
+### 2026-11-15: T-165 — Home page that shows the product; yellow accent; one free offer; the minimum charge is a floor (AD-047, AD-048)
+
+The owner keeps the look (paper, juniper, the same fonts) and found it good but boring. The home page now shows the
+product instead of describing it. `Docs/design/system.md` was changed first, then the tokens, then the page.
+
+**1. A pricing decision by the owner: the trial is gone (AD-047)**
+- **What was there:** the Pro plan had `trialDays: 14`. Checkout passed it to Stripe as a 14-day trial (card
+  required, once per business), the billing page showed "14-day free trial" and "Start 14-day trial", and Pricing
+  mentioned it in three places. So there were two free offers: 10 quotes with no card, and 14 days on Pro with a
+  card. The ticket said to stop if a trial was really configured; it was, so the owner was asked and chose to
+  remove it.
+- **Now:** no plan has a trial (`packages/shared/src/plans.ts`). Checkout takes the trial only from the plan, so it
+  sends none and **a plan is paid from the day it is chosen**. The billing page words a trial only from a plan that
+  has one, so it says nothing. Pricing: the Pro button is "Choose Pro", the closing button is the free offer, the
+  line under the hero no longer mentions a trial, and the FAQ "How does the free trial work?" is "When do I start
+  paying?". Every page says one thing: 10 quotes free, no card.
+- **Not changed:** prices, limits, the free allowance, and a subscription that is already in a trial (its status
+  and "Trial ends" date still show; Stripe ends it as it would have).
+- The Stripe setup script creates plain recurring prices and never set a trial (the trial was applied at
+  checkout); it now says so. Nothing needs changing in Stripe.
+
+**2. The owner's design choices** (`system.md` updated first)
+- **Accent: yellow `#FFC53D`**, the default token. Tomato, orange and the `data-accent` switch are gone, and so are
+  the tint, line and tint-text tokens: there is no pale yellow, because it reads as butter.
+- **"Needs you" is the strong yellow with a small dark marker** (`NeedsYouDot`), wherever it shows: the status
+  pill, the menu's count, the "Started, didn't finish" tag. Home's "Needs you" tile and the unfinished-requests
+  banner stay white and carry the yellow behind their count, so yellow stays within a tenth of the screen.
+- **The yellow button** has dark text and a thin dark edge (`MAIN_CTA`, `lib/marketing/cta.ts`; `Button`'s `accent`
+  variant). On Home and Pricing the one main call to action of a screen is yellow; the header button and every
+  other button keep their style. Dashboard buttons did not change.
+- **The wordmark** is the name as text in the display font, drawn by one component in the header, the footer, the
+  sign-in pages and the dashboard.
+
+**3. Home, section by section** (one idea each; no two neighbours share a layout)
+1. **Hero:** the words, the yellow button, and a product demo (`HeroDemo`): three screens at true size, in the
+   example business's colour. The customer answers a question and adds a photo; the tape rule is drawn out and the
+   price lands; Approve & send is pressed and turns to Sent. It plays once on load (about 5.5 s), then stands still
+   on its last state, with "Play again". CSS only, from the motion tokens; reduced motion shows the finished
+   screens. On a phone the screens stack; there is no sideways strip.
+2. **Trades:** a slim line.
+3. **Set up in minutes** (it replaced "How it works", which repeated the hero): choose your trade, check your
+   prices, share your link, each beside its screen, alternating sides.
+4. **Your prices. You stay in control.:** a plain-English price sentence and the price list it becomes, the page's
+   one moment. It is on the page from the first paint and plays once when the section comes into view. The
+   sentence is two prices, "$375 per room, heavy prep adds $250.", and the list has two lines. It had a third,
+   highlighted "Minimum job $400.00" row; that is gone, because a minimum charge is a floor, not an item (item 5).
+5. **What homeowners want:** three big figures, sources kept and linked.
+6. **Add it anywhere:** the real QR code for the example business's real quote page, that page on a phone, and the
+   same form on a website.
+7. **Plans:** each card has its own button.
+8. **Questions**, 9. the founder note (when filled in), 10. **the closing band:** one yellow button and one quiet
+   link (it had three button styles).
+
+**How "real" the screens are.** The live request form and the live quote page fetch data, so they cannot be placed
+on a marketing page as they are. The screens are built from what can be shared:
+- the estimate document uses the quote page's own parts: `Money` and `SectionLabel` were moved, unchanged, from
+  `app/q/[quoteId]/page.tsx` to `components/quote/document-parts.tsx`, and both the quote page and the new
+  `EstimateSheet` import them;
+- the owner's row uses the real `TurnBadge` and `Button`; the QR code comes from the real encoder (`lib/qr`) and
+  opens the example business's real quote page;
+- the request form (`RequestFormScreen`) repeats the widget's markup and sizes; it is not the widget.
+The question, its answer and the photo's name are the water-heater template's own, and the prices come from that
+template. The one image is the sample label the live demo already offers (drawn for it; no real product). No
+photograph, stock image or gradient was added.
+
+**4. Login and small fixes:** at desktop width the login page shows the estimate document beside the form (sign-up
+keeps one column); the email and password fields have `autocomplete`; every marketing page starts with "Skip to
+content"; footer links are 44 px tall on a phone. Still screens are pictures to a screen reader (`role="img"` with a
+description), which is also what lets taste's checker see them.
+
+**5. The minimum charge is a floor, not an item (AD-048)** (a change to this ticket before it was committed)
+- **What was wrong:** a business's minimum charge was shown as if it were something the customer bought. The home
+  page listed it as a third price line. On a real estimate the engine stored the top-up as an ordinary line,
+  "Minimum charge applied $25.00", so the customer quote page, the PDF and the dashboard listed it among the
+  job's lines; the same sentence was stored among the quote's notes too, so it showed a second time under "Worth
+  knowing", and the takeoff had a row for it. An older calculator deleted every line and left one line "Minimum
+  charge". The cross-service suggestion replaced its lines with "Minimum charge: $400.00".
+- **Root cause:** the top-up had no identity. It was one more `{label, amount}` in `pricing_json.breakdown`, so
+  every renderer treated it as a line, and the engine applied the minimum in three places in three ways.
+- **Now, one rule in one place** (`packages/shared/src/minimum-charge.ts`: the marker, the wording and the
+  arithmetic):
+  - The minimum applies only when the job's own lines total **less** than the business's minimum charge
+    (`minimumTopUp`). At the minimum or above it, nothing about a minimum is stored or shown anywhere.
+  - When it applies the lines stay as they are, and the difference is **one entry of the breakdown marked
+    `kind: 'minimum'`**, carrying `minimumCharge`. Lines + that entry = subtotal, so the T-157 rule holds.
+  - No renderer shows that entry as a line. Each shows the job's real lines, then one note above the total:
+    **"Minimum charge of $400.00 applied"**, with the business's own amount and currency (`minimumChargeNote`;
+    on pages, the `MinimumNote` component). That is the customer quote page, the PDF, the dashboard quote page,
+    the pricing trace (the step and the summary), the demo's estimate, setup's test quote, and the price preview
+    in the service editor's "Test & Publish" step (it listed a "Minimum Charge Adjustment" line, worked out by
+    its own comparison; it now uses `minimumTopUp` and shows the note). Emails show only the total and needed no
+    change. The sentence is no longer added to the notes, and the takeoff has no row for it.
+  - **The engine (worker):** the main path (`calculatePricingWithTrace`) marks the entry and stops adding the
+    note. The cross-service path keeps its lines and adds the sentence after them. The older calculator
+    (`calculatePricing`) was dead code, called only by one unit test; it is **removed**, with that test.
+  - **Stored quotes need no migration.** An entry stored before this change (an unmarked line "Minimum charge
+    applied", or the single line "Minimum charge") is read as the same entry (`isMinimumEntry`, `splitMinimum`);
+    its minimum is what the lines and the top-up add up to. The stored copy of the sentence among the notes is
+    left out when notes are shown (`withoutMinimumNote`).
+  - **AD-001: no price changed.** Subtotal, tax and total are identical before and after in every case (unit
+    tests compare each against the rule written out by hand: the larger of the lines and the minimum). The one
+    difference in stored data: a minimum set with more than two decimals that differed from the lines by less
+    than a cent used to store a top-up line of 0.00; now it stores none. The total is the same.
+- **The quote editor** (the owner's decision): the minimum is not an editable line. Under the lines the editor
+  shows what they come to, the note with what it adds ("+ $25.00") and the subtotal, and all three update as the
+  lines change, so the business sees why the total has not moved. Lines at or above the minimum: the note goes
+  and the total follows the lines; below it again: the note is back. **"Remove"** takes the minimum off that
+  quote (with "Undo" until it is saved); it then stays removed whatever is edited, including after a save. Only
+  a quote that already carries a minimum is affected; a quote without one never gets one from the editor.
+- **Saving (`PUT /api/quotes/:quoteId`, `editedBreakdown`):** the server works the top-up out again from the
+  lines that were sent and the minimum stored on the quote; it never trusts the amount or the minimum a client
+  sends. No entry when the lines total the minimum or more, when the editor sent none (removed), or when the
+  stored quote carries none. In what the editor sends only the marker counts, so a line the business typed is
+  theirs whatever it says. Because a saved quote with no entry carries no minimum, a quote saved above its
+  minimum no longer has one if its lines are lowered in a later edit.
+- **Found on the way and fixed: the pricing trace page never opened.** It read its address with `use(params)`,
+  which this Next.js version (14) rejects, so `/app/quotes/<id>/trace` answered 500 ("An unsupported type was
+  passed to use()"). It is the same in the last commit. It now reads it the way the quote page beside it does.
+  The note could not be shown or checked on a page that did not open.
+- **Found and not changed** (it would change totals, which this change must not do): when the quote checker
+  adds a missed work step after pricing (`ai/quote-validator.ts`, `add_work_step`), it adds the step's amount to
+  the subtotal and leaves the minimum entry as it was. A job at $375 with a $400 minimum that gains a $100 step
+  becomes $500 ($375 + $100 + the $25 top-up), not $475. It did this before too; the $25 then showed as a line,
+  and now the note reads "Minimum charge of $400.00 applied" over a $500 total. It needs its own ticket and a
+  pricing decision (see `OWNER-TODO.md`).
+- **Not changed:** the Features page still quotes a business saying "…minimum job $400." It is describing what
+  you can tell the system (it becomes the minimum charge setting), not a price line, so it was left; the home
+  page was the request.
+
+**Checkers**
+- **taste (`consistency.mjs`), Home and Login, before (T-161) and after:** 
+  | | Home before | Home after | Login before | Login after |
+  |---|---|---|---|---|
+  | `no-visual` (a section with no picture or screen) | 10 | **0** | 5 | 3 |
+  | `text-only` | 20 | 20 | 0 | 0 |
+  | `card-visual` (a card with no visual) | 12 | 4 | 0 | 0 |
+  | `card-layout` | pass | pass | pass | pass |
+  | `focus-visible` | 2 | 0 | 1 | 0 |
+  | `tap-size` | 5 | 0 | 5 | 5 |
+  | `skip-link` | 1 | 0 | 1 | 1 |
+  | `moment-none` (no moment on the page) | 1 | 0 | 1 | 1 |
+  | all FAIL / WARN | 191 / 61 | 197 / 85 | 24 / 9 | 25 / 10 |
+
+  - `no-visual` reached 0 only once the still screens were marked as pictures (`role="img"`): the checker does not
+    count plain HTML as a visual. The first run after the redesign still said 9.
+  - `text-only` did not move: it is the same five sections at four widths (Your prices, What homeowners want,
+    the plans, Questions, the closing band). They are text by nature; "Your prices" is a moment made of type.
+  - **Neighbouring layouts:** the checker's own check for this (`check.mjs`) needs taste's page markup and cannot
+    run on ours; `card-layout` passes before and after. Measured in `verify-t165.mts` instead: before, five
+    sections were a row of equal boxes and three neighbouring pairs were alike (How it works, Your prices and What
+    homeowners want; Add it anywhere and the plans). After: one section is a row of equal boxes (the plans) and
+    no neighbouring pair is alike.
+  - The totals went up because the page is longer and the checker counts its one-section-per-screen rule
+    (`section-height`, `one-section`) per section and per width; `system.md` does not adopt that rule.
+  - New complaints, left as they are: `button-styles` 9 → 13 (the header's juniper "Try it free" and the hero's
+    yellow one are the same action in two styles on the first screen; the ticket keeps every button but the main
+    one in its style); `heading-scale` 5 → 20 in the last run, because the 16 px trades label was an `h2` smaller
+    than the step titles. It is now a label, not a heading; the checker was not run again after that.
+  - Login: `no-visual` stays at 768 and 390, where the form is alone by design; `skip-link` stays (one form, no
+    header).
+- **ui-ux-pro-max web checklist, Home and Login:** run on the final build at 390 and 1440.
+  - Pass on both pages: one `h1` and no level skipped, every field labelled, no image without a description (nine
+    pictures on Home, one on Login), no sideways scroll, nothing under 12 px outside a product screen, a skip link
+    on Home, the email field autofills.
+  - Found and fixed while running it: a heading level skipped by the estimate document's "Price breakdown" (an
+    `h3`; now plain text where the document is a picture), an 11 px label in the price list, a QR code with an
+    empty description.
+  - Fail, not changed (the product's own, see `OWNER-TODO.md`): on the estimate document's coloured panel "Your
+    quote" is 3.35:1 and "Reviewed and confirmed by…" 4.27:1 on the example business's green (white at 60% and
+    75%, the customer quote page's own style); the login form's fields are 38 px tall, its button 40 px and "Sign
+    up" an 18 px text link (the 44 px rule, already a follow-up from T-164).
+  - One false alarm: a link inside a closed FAQ answer is counted as having no name.
+
+**Constraints introduced**
+- One free offer. A trial comes back only by a decision that changes `plans.ts`, this entry and AD-047.
+- The accent is yellow, always with dark text, never a tint; "needs you" always carries the marker.
+- One yellow call to action per marketing screen; none in the dashboard.
+- The minimum charge is never a line (AD-048). Anything that lists a quote's breakdown reads it through
+  `splitMinimum`; the sentence and the marker exist only in `packages/shared/src/minimum-charge.ts` (a unit test
+  fails on a second copy of the wording). The engine compares to the minimum only through `minimumTopUp`.
+- Features and the trade pages were not redesigned (next ticket): they keep the three-frame strip and a juniper
+  main button.
+
+**Regression scripts changed, and only for this ticket:** 
+- `verify-t154.mts`: the tap-target check skips the skip link (shown only when focused) and buttons inside a
+  picture of the product (`role="img"`, inert).
+- `verify-t155.mts`: the home page left the list of pages checked for the three equal frames (its hero is the demo
+  now; the trade pages still have the strip), and the phone-menu check looks under the demo instead of the strip.
+  44 checks, was 46.
+- `verify-t164.mts`: one accent (yellow) instead of three with a switch; "needs you" is the strong yellow, and
+  Home's "Needs you" tile is white with its count on yellow; one wordmark. 78 checks, was 100.
+- Unit tests: `plans.test.ts` (no plan has a trial), `marketing-home.test.ts` (the setup steps replace "How it
+  works"; the home buttons come from `cta.ts`), `design-tokens.test.ts` (yellow, no tint, the marker).
+- `verify-t160.mts` needed no change: the count's own markup was kept as it reads it.
+- For the minimum charge (item 5): `verify-t165.mts` gained section 7 (below), and its price-sentence check
+  expects two lines and no word "minimum". The door service in that script now has a $100 minimum, so its quote
+  is a real "above the minimum" case. `home-t165.test.ts` expects the two-price sentence.
+  `quote-actions-t157.test.ts` lost the one test of the removed calculator. No other regression script changed.
+- For the header label (item 6): `verify-t155.mts` expects "Try it free" at both widths (it expected the full
+  offer at 1440), `verify-t165.mts` checks the header and hero labels, and two unit tests were updated
+  (`marketing-home.test.ts`, `dashboard-simplify.test.ts`: the header is the short form; every in-page button
+  keeps `freeOfferLabel()`).
+
+**6. The header button reads "Try it free" at every width** (the owner's change, before the commit). From `md` up
+it read "Try it free: 10 quotes, no card", the same words as the hero's yellow button beside it. The header now
+says the short form everywhere (`HEADER_SHORT_CTA`, as it already did on a phone); the hero button, the closing
+band, the phone menu, Pricing and the trade pages keep the full offer. Checked after this change: lint,
+typecheck, unit tests (web 595, worker 509, mobile 11), `verify-t165` 117/117, `verify-t154` 26/26,
+`verify-t155` 44/44.
+
+**Verified (2026-11-15, local stack), after the minimum-charge change:**
+- `pnpm lint`, `pnpm typecheck`, the web build and the worker build (a dry run) pass. No dependency added.
+- Unit tests: web 595, worker 509, mobile 11, all pass. New for the minimum charge:
+  `apps/worker/src/__tests__/minimum-charge-t165.test.ts` (11: both engine paths below, equal, above and one cent
+  either side; totals against the rule written out by hand over 48 cases; the takeoff; the removed calculator) and
+  `apps/web/src/__tests__/minimum-charge-t165.test.ts` (31: the shared rule, quotes stored the old way, the note
+  component, the PDF, the demo, the editor, the save rule, each page's source, one copy of the wording).
+- `scripts/hardcore-test/verify-t165.mts` with the browser pass: **115/115** (was 74). New, section 7: a job of one
+  room at $375 for a business with a $400 minimum goes through the real pipeline and is stored as the line ($375)
+  plus one marked entry ($25, minimum $400), subtotal and total $400, no sentence among the notes. The customer
+  page, the dashboard quote page and the pricing trace each show the real line and the note once, below the lines
+  and above the total, with no "Minimum charge applied" row and no $25.00 amount. A door at $1,400 with a $100
+  minimum shows the word "minimum" nowhere on any of the three. The same small quote rewritten in the database
+  to the old stored shape shows the same note on both pages. In the editor: the minimum is not a line; raising
+  the line to $390 leaves the subtotal at $400 and the note adds $10; $450 removes the note and the subtotal
+  follows; $380 brings it back; saved, it is stored as $380 plus a marked $20. "Remove" takes it off, a later edit
+  does not bring it back, it is stored as the line alone ($370), it is still gone when the editor is opened
+  again, and the customer page then says nothing about a minimum. A quote without a minimum gains none from an
+  edit.
+- Regression, t146 to t164, with the browser passes, run again after this change: 20, 33, 29, 35, 27, 35, 66, 36,
+  26, 44, 31, 96, 116, 96, 77, 78, all pass.
+- Two requests per run of `verify-t165` went through the real pipeline. Test names are made up (Marlo Finch,
+  Odalys Brandt, Fernhill Doors).
+- **Not committed, not deployed.** The preview below was built before this change and still shows three price
+  lines on Home. **When this ships, the worker must be deployed with the web app** (the engine is in the worker).
+  Either order is safe: the web app reads quotes from the old and the new engine alike, and the old web app
+  shows a new quote's entry as the line it always showed.
+
+**Verified (2026-11-15, local stack), before the minimum-charge change:**
+- `pnpm install --frozen-lockfile` clean (no dependency added). `pnpm lint`, `pnpm typecheck`, the web build and the
+  worker build pass.
+- Unit tests: web 564, worker 499, mobile 11, all pass. New: `apps/web/src/__tests__/home-t165.test.ts` (21).
+- `scripts/hardcore-test/verify-t165.mts` with the browser pass at 390 and 1440: 74/74. The demo starts with no
+  price and nothing sent, ends on its last state, is unchanged and still 2.5 s later, and "Play again" runs it
+  once more; with reduced motion the finished screens show at once; nothing scrolls sideways and on a phone the
+  screens stack; one yellow call to action per screen on Home and Pricing; no neighbouring sections alike; login's
+  document at desktop width only; the skip link; 44 px footer links; in the dashboard "Needs your approval" is
+  `#FFC53D` with dark text and the marker, and no dashboard button is yellow; no page and no billing screen says
+  "14-day" or "trial".
+- Regression, t146 to t164, with the browser passes: 20, 33, 29, 35, 27, 35, 66, 36, 26, 44, 31, 96, 116, 96, 77, 78,
+  all pass (t154, t155, t160, t164 and t165 run again after the last change to the page).
+- One request per script run went through the real pipeline. Test names are made up (Marlo Finch, Fernhill
+  Doors).
+
+**Not committed. Not deployed to production.** A preview only: `https://estimator-6onwa5v0e-gajendrans-projects-1a87e0b4.vercel.app`
+(`dpl_HCXv5oWre6VKQrRZx77K1BuU9boQ`, built from the uncommitted working tree).
+
+What does not work on the preview, because of preview settings:
+- **Vercel asks you to log in** before it shows a preview (Deployment Protection). Production is not affected.
+- **The Preview environment has no variables at all** (they are set for Production only), so the first preview
+  build failed with "Missing Supabase environment variables". This preview was built with placeholder values for
+  that one deployment (nothing was stored in the project, and no real key was used). It therefore has **no
+  database**: signing in, the dashboard, "Try it as a customer" (`/demo`, 500) and any quote link
+  (`/quote/…`, 500) do not work there. Home, Login (the page, not signing in), Pricing, Features, the trade pages
+  and `/design` do.
+- The QR code and the quote link shown on the preview point at production's example quote page.
+- So the dashboard changes ("needs you" in yellow, the billing page) cannot be seen on the preview: they were
+  checked locally, and the screenshots are in the verify script's results folder.
+
 ### 2026-11-14: T-164 — Design foundations: one design file, fixed tokens, a preview page (AD-046)
 
 Before any page is redesigned, the rules are written down once and the tokens the T-161 audit found wrong are fixed.
@@ -4737,6 +5006,44 @@ if (pricingResult.estimatedTotal <= 0) {
 - a codemod of every field's border class (the class strings live in shared constants; one CSS rule reaches all of them and cannot outrank focus or error borders);
 - a motion library (CSS did everything this ticket needed);
 - applying the accent to real pages before the owner has chosen it.
+
+---
+
+### AD-047: One free offer: no trial (the owner's pricing decision, T-165)
+
+**Decision:** the only free offer is the free allowance: 10 priced quotes in total, with no card (AD-039). No plan has a trial. A plan is paid from the day it is chosen. Every page, the pricing FAQ and the billing page say the same thing.
+
+**Why:** there were two free offers with different rules (10 quotes without a card; 14 days of Pro with a card), and every button on the site promised the first while Pricing also sold the second. A reader could not tell which they were getting. The owner chose one.
+
+**Rules that follow:**
+- The trial is data, not wording: `trialDays` on a plan in `packages/shared/src/plans.ts`. Checkout, the billing page and Pricing read it from there, so with no plan carrying it, none of them can offer one. Do not type trial wording into a page.
+- A subscription already in a trial is left alone: its status and end date still show, and Stripe ends it as it would have.
+- A unit test fails if a plan gains a trial or a marketing page says "trial".
+
+**Rejected:**
+- keeping the trial but not advertising it (the billing page would still offer it, so the site and the app would disagree);
+- wording both offers as two steps (still two offers);
+- removing the trial mechanism from checkout (it is small, tested and driven by the plan data; a future decision can turn it on again in one place).
+
+### AD-048: The minimum charge is a floor, not an item (T-165)
+
+**Decision:** a business's minimum charge is the least a job can cost, not something the customer buys. It applies only when the job's own lines total less than it. It is stored as one entry of `pricing_json.breakdown` marked `kind: 'minimum'` (with `minimumCharge`), so the lines and that entry add up to the subtotal (T-157), and it is shown everywhere as one note above the total, "Minimum charge of $400.00 applied", never as a line. At the minimum or above it, nothing about a minimum is stored or shown.
+
+**Why:** shown as a line, the minimum reads as a charge for nothing ("Minimum charge applied $25.00"), and on the home page as a third price. As a note it says what happened: the job came to less than this business's minimum.
+
+**Rules that follow:**
+- One place for the marker, the wording and the arithmetic: `packages/shared/src/minimum-charge.ts`. The engine, the save route, the editor and every renderer use it. No amount and no second copy of the sentence anywhere else (unit test).
+- Anything that lists a breakdown reads it through `splitMinimum` (lines, and the minimum that applied or null). A new renderer that maps `pricing.breakdown` directly would show the entry as a line again.
+- The entry stays in the breakdown rather than in a field of its own: `subtotal = sum(breakdown)` is relied on by the save route, the editor and the T-157 checks, and stored quotes already have it there.
+- Old quotes are read, not migrated: an unmarked line labelled "Minimum charge applied" or "Minimum charge" is the same entry.
+- Prices are untouched (AD-001): the change is how the top-up is stored and shown, never what the total is.
+- In the editor the floor follows the edits, and the business can remove it from one quote; removed stays removed. Only a quote that already carries a minimum has one. The server recomputes the top-up on save and never trusts a client's amount.
+
+**Rejected:**
+- hiding the line and showing nothing (the customer would see lines that do not add up to the total);
+- a separate `pricing_json.minimum` field with the top-up left out of the breakdown (breaks subtotal = sum of the breakdown for every reader, old and new, and would need a data migration);
+- re-applying the business's current minimum to any edited quote (it would add a minimum to quotes that never had one, and change the price of an old quote when the business later changes its setting);
+- a locked minimum the business cannot remove from a quote (the owner chose "Remove").
 
 ---
 

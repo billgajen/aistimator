@@ -6,9 +6,10 @@
 // (playwright lives outside the repo: see scripts/hardcore-test/browser.mjs)
 //
 // 1. /design: served, not indexed, linked from nowhere;
-// 2. (browser) /design at 390 and 1440 with each accent: nothing scrolls
-//    sideways, the accent recolours the page, button text and pill text read
-//    at 4.5:1 as the browser paints them, both wordmarks, every section;
+// 2. (browser) /design at 390 and 1440: nothing scrolls sideways, the accent
+//    (yellow since T-165) is on the button, the highlighted word and "needs
+//    you", button text and pill text read at 4.5:1 as the browser paints
+//    them, the wordmark, every section;
 // 3. (browser) the focus ring, tabbing through real pages: 3:1 or more
 //    against what is behind it, on paper and on juniper;
 // 4. (browser) the token fixes on real pages: muted text, field edges, the
@@ -41,11 +42,10 @@ const section = (title: string) => console.log(`\n── ${title} ──`)
 const origin = new URL(cfg.appUrl).origin
 
 // The tokens as system.md states them
-const ACCENTS = {
-  tomato: { fill: '#E8412C', tint: '#FBE1DD' },
-  orange: { fill: '#F26B2A', tint: '#FDE7DD' },
-  yellow: { fill: '#FFC53D', tint: '#FFEFC2' },
-} as const
+// T-165: the owner chose yellow. There is one accent, no switch and no tint:
+// "needs you" is the strong yellow itself.
+const ACCENTS = { yellow: { fill: '#FFC53D' } } as const
+const YELLOW = ACCENTS.yellow.fill
 const BUTTER = '#F7E9C6'
 const JUNIPER = '#205E56'
 const MUTED = '#626C66'
@@ -201,18 +201,16 @@ if (!process.env.PLAYWRIGHT_DIR) {
     p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
     await p.goto(`${cfg.appUrl}/design`)
     await settle(p)
-    check(`${width}: orange is the accent the page opens with`, (await p.getAttribute('[data-testid=design-preview]', 'data-accent')) === 'orange' && (await p.getAttribute('[data-testid=accent-orange]', 'aria-checked')) === 'true')
+    check(`${width}: the accent is decided: there is no switch on the page`, (await p.locator('[data-testid=accent-switch]').count()) === 0 && (await p.getAttribute('[data-testid=design-preview]', 'data-accent')) === null)
     const present = await p.evaluate(() => ['wordmark', 'palette', 'type', 'shape', 'components', 'marketing-band', 'dashboard-row', 'motion'].filter((id) => !document.querySelector(`[data-testid=section-${id}]`)))
     check(`${width}: every section is there (wordmark, palette, type, shape, components, marketing band, dashboard row, motion)`, present.length === 0, present)
-    check(`${width}: both wordmarks are drawn, in the display font`,
-      (await p.locator('[data-testid=wordmark-capital]').first().innerText()) === 'Qolumns' && (await p.locator('[data-testid=wordmark-lower]').first().innerText()) === 'qolumns' && /Bricolage/i.test(await style(p, '[data-testid=wordmark-capital]', 'font-family')),
-      await style(p, '[data-testid=wordmark-capital]', 'font-family'))
+    check(`${width}: the wordmark is the name, in the display font`,
+      (await p.locator('[data-testid=section-wordmark] [data-testid=wordmark]').first().innerText()) === 'Qolumns' && /Bricolage/i.test(await style(p, '[data-testid=section-wordmark] [data-testid=wordmark]', 'font-family')),
+      await style(p, '[data-testid=section-wordmark] [data-testid=wordmark]', 'font-family'))
     check(`${width}: the marketing band shows a real product screen (the three frames of the home page)`, (await p.locator('[data-testid=marketing-band] [data-testid=product-frame]').count()) === 3)
     check(`${width}: five status colours`, (await p.locator('[data-testid=status-pills] [data-testid=turn-label]').count()) === 5)
 
     for (const [name, want] of Object.entries(ACCENTS)) {
-      await p.click(`[data-testid=accent-${name}]`)
-      await p.waitForTimeout(250)
       const fill = await style(p, '[data-testid=button-accent]', 'background-color')
       const onFill = await style(p, '[data-testid=button-accent]', 'color')
       const mark = await style(p, '[data-testid=highlight]', 'background-color')
@@ -220,12 +218,12 @@ if (!process.env.PLAYWRIGHT_DIR) {
       const pillText = await style(p, '[data-testid=status-attention] [data-testid=turn-label]', 'color')
       const rowPill = await style(p, '[data-testid=dashboard-row] [data-testid=turn-label]', 'background-color')
       const swatch = (await p.locator('[data-testid=swatch-accent] .figure').innerText()).toUpperCase()
-      check(`${width}, ${name}: the switch recolours the page (button, highlighted word, "needs you", the swatch's value)`,
-        hexOf(fill) === want.fill && hexOf(mark) === want.fill && hexOf(pillBg) === want.tint && hexOf(rowPill) === want.tint && swatch === want.fill,
+      check(`${width}, ${name}: the accent is on the button, the highlighted word, "needs you" and the swatch`,
+        hexOf(fill) === want.fill && hexOf(mark) === want.fill && hexOf(pillBg) === want.fill && hexOf(rowPill) === want.fill && swatch === want.fill,
         { fill: hexOf(fill), mark: hexOf(mark), pill: hexOf(pillBg), swatch })
       check(`${width}, ${name}: button text on the accent reads at 4.5:1 as painted`, contrast(onFill, fill) >= 4.5, contrast(onFill, fill))
       check(`${width}, ${name}: the highlighted word reads at 4.5:1`, contrast(await style(p, '[data-testid=highlight]', 'color'), mark) >= 4.5, contrast(await style(p, '[data-testid=highlight]', 'color'), mark))
-      check(`${width}, ${name}: "needs you" text on its tint reads at 4.5:1, and the tint is not butter`, contrast(pillText, pillBg) >= 4.5 && hexOf(pillBg) !== BUTTER, contrast(pillText, pillBg))
+      check(`${width}, ${name}: "needs you" text on the yellow reads at 4.5:1, and it is not butter`, contrast(pillText, pillBg) >= 4.5 && hexOf(pillBg) !== BUTTER, contrast(pillText, pillBg))
       const sideways = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
       check(`${width}, ${name}: nothing scrolls sideways`, sideways <= 1, sideways)
       await shot(p, `design-${width}-${name}`)
@@ -240,9 +238,6 @@ if (!process.env.PLAYWRIGHT_DIR) {
     check(`${width}: a field's edge reads at 3:1 against the card it sits on`, contrast(fieldEdge, await groundOf(p, '[data-testid=sample-input]')) >= 3 && hexOf(fieldEdge) === FIELD, { edge: hexOf(fieldEdge), ratio: contrast(fieldEdge, await groundOf(p, '[data-testid=sample-input]')) })
     const outline = await style(p, '[data-testid=button-outline]', 'border-top-color')
     check(`${width}: an outlined button's edge reads at 3:1 too`, contrast(outline, await groundOf(p, '[data-testid=button-outline]')) >= 3, hexOf(outline))
-    const smallTaps = await p.evaluate(() => [...document.querySelectorAll('[data-testid=accent-switch] button')].filter((el) => el.getBoundingClientRect().height < 44).length)
-    check(`${width}: the accent switch's buttons are 44 px tall`, smallTaps === 0)
-
     // the menu, on its tokens
     const closed = await p.locator('[data-testid=motion-menu]').evaluate((el) => ({ v: getComputedStyle(el).visibility, o: getComputedStyle(el).opacity }))
     await p.click('[data-testid=motion-menu-button]')
@@ -374,7 +369,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
     await settle(p)
     await p.locator('[data-testid=turn-label]').first().waitFor({ timeout: 20_000 })
     const pill = { bg: await style(p, '[data-testid=turn-label]', 'background-color'), text: await style(p, '[data-testid=turn-label]', 'color'), tone: await p.getAttribute('[data-testid=turn-label]', 'data-tone') }
-    check('quotes list: "Needs your approval" is the accent tint (orange), not butter, and reads at 4.5:1', pill.tone === 'attention' && hexOf(pill.bg) === ACCENTS.orange.tint && hexOf(pill.bg) !== BUTTER && contrast(pill.text, pill.bg) >= 4.5, { bg: hexOf(pill.bg), ratio: contrast(pill.text, pill.bg) })
+    check('quotes list: "Needs your approval" is the strong yellow, not butter, and reads at 4.5:1', pill.tone === 'attention' && hexOf(pill.bg) === YELLOW && hexOf(pill.bg) !== BUTTER && contrast(pill.text, pill.bg) >= 4.5, { bg: hexOf(pill.bg), ratio: contrast(pill.text, pill.bg) })
     const detail = await style(p, '[data-testid=turn-detail]', 'color')
     check('quotes list: the muted detail line ("Received today") reads at 4.5:1', hexOf(detail) === MUTED && contrast(detail, await groundOf(p, '[data-testid=turn-detail]')) >= 4.5, { colour: hexOf(detail), ratio: contrast(detail, await groundOf(p, '[data-testid=turn-detail]')) })
     const search = p.locator('input[type=search], input[placeholder*="Search"]').first()
@@ -385,9 +380,10 @@ if (!process.env.PLAYWRIGHT_DIR) {
     await p.goto(`${cfg.appUrl}/app`)
     await settle(p)
     const tile = await style(p, '[data-testid=stand-tile][data-group=needs_you]', 'background-color')
-    check('Home: the "Needs you" tile is the accent tint, not butter', hexOf(tile) === ACCENTS.orange.tint, hexOf(tile))
+    const tileCount = await style(p, '[data-testid=stand-tile][data-group=needs_you] [data-testid=stand-mark]', 'background-color')
+    check('Home: the "Needs you" tile is white, with its count on the strong yellow (T-165), not butter', hexOf(tile) === '#FFFFFF' && hexOf(tileCount) === YELLOW, { tile: hexOf(tile), count: hexOf(tileCount) })
     const homePill = await style(p, '[data-testid=turn-label]', 'background-color')
-    check('Home: the "Waiting for you" row’s pill is the accent tint too', hexOf(homePill) === ACCENTS.orange.tint, hexOf(homePill))
+    check('Home: the "Waiting for you" row’s pill is the strong yellow too', hexOf(homePill) === YELLOW, hexOf(homePill))
     const butterLeft = await p.evaluate((butter) => [...document.querySelectorAll('[data-testid=turn-label], [data-testid=stand-tile], [data-testid=nav-badge]')].filter((el) => {
       const [r, g, b] = getComputedStyle(el).backgroundColor.match(/\d+/g)!.map(Number)
       return '#' + [r, g, b].map((n) => n!.toString(16).padStart(2, '0')).join('').toUpperCase() === butter
@@ -458,7 +454,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
     const hexes = new Set(colours.map((c) => hexOf(c)))
     const brand = DEFAULT_PRIMARY_COLOR.toUpperCase()
     check('the quote page’s price panel is the business’s brand colour', hexes.has(brand), brand)
-    check('…and none of our accent colours is painted on it', !Object.values(ACCENTS).some((accent) => hexes.has(accent.fill) || hexes.has(accent.tint)))
+    check('…and none of our accent colours is painted on it', !hexes.has(YELLOW))
     await shot(p, 'customer-quote-390')
     await ctx.close()
   }

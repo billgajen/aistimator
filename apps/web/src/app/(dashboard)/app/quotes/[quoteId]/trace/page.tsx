@@ -1,8 +1,8 @@
 'use client'
 
 import { WordingRepairCard } from '@/components/quotes/WordingRepairCard'
-import { useEffect, useState, use } from 'react'
-import { formatMoney } from '@qolumns/shared'
+import { useEffect, useState } from 'react'
+import { formatMoney, minimumChargeNote, MINIMUM_ENTRY_LABEL } from '@qolumns/shared'
 import Link from 'next/link'
 import type { Quote, PricingTrace, PricingTraceStep } from '@qolumns/shared'
 
@@ -24,9 +24,12 @@ interface QuoteWithService extends Quote {
 export default function PricingTracePage({
   params,
 }: {
-  params: Promise<{ quoteId: string }>
+  params: { quoteId: string }
 }) {
-  const { quoteId } = use(params)
+  // T-165: this page read its address with `use(params)`, which this Next.js
+  // version rejects ("An unsupported type was passed to use()"), so it never
+  // opened. It reads it the way the quote page beside it does.
+  const { quoteId } = params
   const [quote, setQuote] = useState<QuoteWithService | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -123,7 +126,7 @@ export default function PricingTracePage({
       case 'multiplier':
         return 'Multiplier'
       case 'minimum':
-        return 'Minimum Charge'
+        return 'A floor, not a line: added to reach your minimum charge'
       case 'tax':
         return 'Tax'
       default:
@@ -151,6 +154,9 @@ export default function PricingTracePage({
   }
 
   const trace = quote.pricing_trace_json as PricingTrace | null
+  // T-165: the minimum charge the engine applied, as the one sentence (null when it did not apply)
+  const minimumStep = trace?.trace.find((step) => step.type === 'minimum' && step.amount > 0)
+  const minimumNote = minimumStep ? minimumChargeNote(formatCurrency(minimumStep.runningTotal)) : null
 
   return (
     <div className="space-y-6">
@@ -222,7 +228,10 @@ export default function PricingTracePage({
                 <div className="flex-1">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="font-medium text-text-primary">{step.description}</p>
+                      {/* T-165: the minimum is a floor, shown as the note every other page shows */}
+                      <p className="font-medium text-text-primary" data-testid={step.type === 'minimum' ? 'minimum-note' : undefined}>
+                        {step.type === 'minimum' ? minimumChargeNote(formatCurrency(step.runningTotal)) : step.description}
+                      </p>
                       <p className="text-xs text-text-muted">{getStepTypeLabel(step.type)}</p>
                     </div>
                     <div className="text-right">
@@ -297,7 +306,7 @@ export default function PricingTracePage({
                 )}
                 {trace.summary.minimumApplied && (
                   <div className="flex justify-between col-span-2">
-                    <span className="text-tertiary">Minimum charge applied</span>
+                    <span className="text-tertiary">{minimumNote ?? MINIMUM_ENTRY_LABEL}</span>
                   </div>
                 )}
                 {trace.summary.taxAmount > 0 && (

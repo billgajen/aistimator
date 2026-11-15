@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { MetaPixel } from './MetaPixel'
 import { MobileMenu } from './MobileMenu'
 import { NAV_LINKS, HEADER_SHORT_CTA } from '@/lib/marketing/nav'
-import { freeOfferLabel, PRODUCT_NAME } from '@qolumns/shared'
+import { Wordmark } from '@/components/brand/Wordmark'
 
 /**
  * Marketing site navigation — shared across all public pages.
@@ -10,12 +10,23 @@ import { freeOfferLabel, PRODUCT_NAME } from '@qolumns/shared'
  */
 export function SiteNav() {
   return (
+    <>
+    {/* T-165: the first thing Tab reaches on every marketing page. It lands on
+        the marker after the header, so it works without each page naming its
+        content. */}
+    <a
+      href="#content"
+      className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-text-primary focus:shadow-warm-lg"
+      data-testid="skip-link"
+    >
+      Skip to content
+    </a>
     <nav className="sticky top-0 z-40 border-b border-border bg-background" aria-label="Site">
       {/* T-144: marketing pages only (SiteNav is never rendered in the app or on quote pages) */}
       <MetaPixel />
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4">
-        <Link href="/" className="inline-flex min-h-[44px] items-center font-display text-lg font-extrabold tracking-tight text-text-primary">
-          {PRODUCT_NAME}
+        <Link href="/" className="inline-flex min-h-[44px] items-center">
+          <Wordmark className="text-xl" />
         </Link>
 
         <div className="hidden items-center gap-6 md:flex">
@@ -33,18 +44,20 @@ export function SiteNav() {
           >
             Log in
           </Link>
-          {/* T-155: below md the header says only "Try it free", on one line */}
+          {/* T-165: the header button says only "Try it free" at every width, on one
+              line. The full offer is the hero's (and each page's own) button. */}
           <Link
             href="/signup"
             className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-lg bg-primary px-4 py-2 text-center text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
             data-testid="nav-signup"
           >
-            <span className="md:hidden">{HEADER_SHORT_CTA}</span>
-            <span className="hidden md:inline">{freeOfferLabel()}</span>
+            {HEADER_SHORT_CTA}
           </Link>
           <MobileMenu />
         </div>
       </div>
     </nav>
+    <span id="content" tabIndex={-1} className="block outline-none" />
+    </>
   )
 }

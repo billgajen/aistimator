@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { formatMoney } from '@qolumns/shared'
+import { MinimumNote } from '@/components/quote/MinimumNote'
 import { useCopy } from '@/components/share/useCopy'
 
 interface TestQuote {
@@ -15,6 +16,7 @@ interface TestQuote {
   taxLabel: string | null
   total: number
   lines: Array<{ label: string; amount: number }>
+  minimumCharge?: number | null
   scopeSummary: string | null
 }
 
@@ -160,7 +162,13 @@ export function TestQuoteStep({
                   </li>
                 )}
               </ul>
-              <p className="mt-2 flex justify-between border-t border-border pt-3 font-semibold text-text-primary">
+              <MinimumNote
+                minimumCharge={quote.minimumCharge}
+                currency={quote.currency || fallbackCurrency}
+                locale={locale}
+                className="mt-2 border-t border-border pt-3 text-sm text-text-secondary"
+              />
+              <p className={`flex justify-between font-semibold text-text-primary ${quote.minimumCharge ? 'mt-1' : 'mt-2 border-t border-border pt-3'}`}>
                 <span>Total</span>
                 <span className="figure" data-testid="test-estimate-total">{money(quote.total)}</span>
               </p>

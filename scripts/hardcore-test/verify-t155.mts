@@ -19,7 +19,8 @@ const { check, finish } = checker()
 const OFFER = 'Try it free: 10 quotes, no card'
 /** Content-to-button spacing is 12 px; the frames' contents differ a little by trade */
 const MAX_GAP = 64
-const STRIP_PAGES = ['/', '/painting', '/trades/hvac', '/trades/water-heaters', '/trades/plumbing', '/trades/electrical', '/trades/garage-doors']
+// T-165: the home page's hero is now the product demo (verify-t165); the strip is on the trade pages
+const STRIP_PAGES = ['/painting', '/trades/hvac', '/trades/water-heaters', '/trades/plumbing', '/trades/electrical', '/trades/garage-doors']
 
 const browser = await chromium.launch()
 const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
@@ -62,7 +63,7 @@ for (const [label, ctx] of [['390 px', phone], ['1440 px', desk]] as const) {
 
   // 3. the header button
   const header = (await p.getByTestId('nav-signup').innerText()).trim()
-  const want = label === '390 px' ? 'Try it free' : OFFER
+  const want = 'Try it free' // T-165: at every width (it was the full offer on a computer)
   check(`${label} header button reads "${want}", on one line`, header === want && (await lines(p, 'nav-signup')) === 1, { header, lines: await lines(p, 'nav-signup') })
   check(`${label} hero button keeps the full offer`, (await p.getByTestId('hero-signup').innerText()).trim() === OFFER)
 
@@ -132,7 +133,7 @@ const covered = await p.evaluate(() => {
 check('menu: nothing of the page shows at any point (hero buttons, frames, content)', covered.leaks === 0 && covered.opaque, covered)
 check('menu: the hero buttons and product frames are under it', await p.evaluate(() => {
   const panel = document.querySelector('[data-testid="site-menu"]')!
-  return ['hero-signup', 'hero-demo', 'product-strip'].every((id) => {
+  return ['hero-signup', 'hero-demo', 'hero-demo-stage'].every((id) => {
     const el = document.querySelector(`[data-testid="${id}"]`)!
     const r = el.getBoundingClientRect()
     const x = Math.min(Math.max(r.left + 10, 1), 389), y = Math.min(Math.max(r.top + 10, 1), 843)

@@ -134,13 +134,17 @@ describe('T-152: the free allowance is 10 quotes in total', () => {
     for (const f of [
       'apps/web/src/app/page.tsx',
       'apps/web/src/app/features/page.tsx',
-      'apps/web/src/components/marketing/SiteNav.tsx',
       'apps/web/src/components/marketing/SiteFooter.tsx',
       'apps/web/src/components/marketing/TradeLanding.tsx',
     ]) {
       expect(read(f)).not.toMatch(/Start free/)
       expect(read(f)).toContain('freeOfferLabel()')
     }
+    // T-165: the header button is the short form of the same offer, "Try it free", at every width
+    const nav = read('apps/web/src/components/marketing/SiteNav.tsx')
+    expect(nav).not.toMatch(/Start free/)
+    expect(nav).toContain('{HEADER_SHORT_CTA}')
+    expect(read('apps/web/src/lib/marketing/nav.ts')).toContain("HEADER_SHORT_CTA = 'Try it free'")
   })
 })
 

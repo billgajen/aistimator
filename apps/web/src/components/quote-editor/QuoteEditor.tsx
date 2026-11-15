@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { MinimumNote } from '@/components/quote/MinimumNote'
 import type { QuotePricing, QuoteContent, SignalRecommendation, CrossServicePricing } from '@qolumns/shared'
 import { useQuotePricing } from './useQuotePricing'
 import LineItemEditor from './LineItemEditor'
@@ -37,6 +38,11 @@ export default function QuoteEditor({
 }: QuoteEditorProps) {
   const {
     items,
+    linesTotal,
+    minimum,
+    minimumRemoved,
+    removeMinimum,
+    restoreMinimum,
     subtotal,
     taxAmount,
     taxLabel,
@@ -216,6 +222,48 @@ export default function QuoteEditor({
 
         {/* Totals preview */}
         <div className="mt-4 pt-4 border-t border-border space-y-2">
+          {/* T-165: the minimum charge is a floor, not a line. While the lines
+              total less than it, the note says so and shows what it adds, so
+              the business sees why the total has not moved. */}
+          <div aria-live="polite">
+            {minimum && (
+              <div data-testid="editor-minimum">
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-secondary">Lines</span>
+                  <span className="text-text-primary" data-testid="editor-lines-total">{symbol}{linesTotal.toFixed(2)}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+                  <MinimumNote minimumCharge={minimum.minimumCharge} currency={currency} />
+                  <span className="flex flex-shrink-0 items-center gap-2">
+                    <span className="text-text-primary" data-testid="editor-minimum-amount">+ {symbol}{minimum.topUp.toFixed(2)}</span>
+                    <button
+                      type="button"
+                      onClick={removeMinimum}
+                      className="h-9 rounded-lg border border-border px-3 text-xs font-medium text-text-secondary transition-colors hover:text-text-primary"
+                      data-testid="editor-minimum-remove"
+                    >
+                      Remove
+                    </button>
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-text-muted">
+                  The lines come to less than your minimum charge, so the total stays at the minimum. Remove it to charge the lines only on this quote.
+                </p>
+              </div>
+            )}
+            {minimumRemoved && (
+              <p className="flex items-center justify-between gap-3 text-xs text-text-muted" data-testid="editor-minimum-removed">
+                <span>Minimum charge removed from this quote. The total follows the lines.</span>
+                <button
+                  type="button"
+                  onClick={restoreMinimum}
+                  className="h-9 flex-shrink-0 px-2 font-medium text-text-secondary underline transition-colors hover:text-text-primary"
+                >
+                  Undo
+                </button>
+              </p>
+            )}
+          </div>
           <div className="flex justify-between text-sm">
             <span className="text-text-secondary">Subtotal</span>
             <span className="text-text-primary">{symbol}{subtotal.toFixed(2)}</span>

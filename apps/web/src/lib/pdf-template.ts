@@ -5,7 +5,7 @@
  * Uses inline styles for consistent rendering across PDF generators.
  */
 
-import { formatMoney } from '@qolumns/shared'
+import { formatMoney, splitMinimum, minimumChargeNote } from '@qolumns/shared'
 import type {
   QuotePricing,
   QuoteContent,
@@ -82,8 +82,11 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
   }
 
   // Line items / pricing breakdown
-  if (template.showLineItems && pricing.breakdown && pricing.breakdown.length > 0) {
-    const lineItemsHtml = pricing.breakdown
+  // T-165: the minimum charge is a floor, not an item: the job's real lines,
+  // then one note when the minimum applied (shared/minimum-charge.ts)
+  const { lines: priceLines, minimum: minimumApplied } = splitMinimum(pricing.breakdown)
+  if (template.showLineItems && (priceLines.length > 0 || minimumApplied)) {
+    const lineItemsHtml = priceLines
       .map(
         (item) => `
           <tr>
@@ -108,6 +111,7 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
             ${lineItemsHtml}
           </tbody>
         </table>
+        ${minimumApplied ? `<p style="margin: 12px 0 0 0; font-size: 13px; color: #374151;">${escapeHtml(minimumChargeNote(formatCurrency(minimumApplied.minimumCharge, pricing.currency, locale)))}</p>` : ''}
       </div>
     `)
   }

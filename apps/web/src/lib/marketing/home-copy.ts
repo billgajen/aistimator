@@ -22,23 +22,69 @@ export const HERO = {
 export const TRADES_HEADING = 'Ready-made templates for your trade'
 export const OTHER_TRADES = 'Other trades: describe your prices in plain English'
 
-export const HOW_IT_WORKS = [
-  {
-    title: 'Your customer asks.',
-    text: 'From your quote link, your website or a QR code: a few questions about the job and a photo or two.',
-  },
-  {
-    title: 'They see your price.',
-    text: 'Worked out from the prices you set. When something needs checking, they see a range and one quick question.',
-  },
-  {
-    title: 'You confirm it.',
-    text: 'You get the lead with the price. One tap on Approve & send, and they can accept.',
-  },
-] as const
+/**
+ * T-165: the hero's product demo. The question, its answer and the photo's
+ * name are the water-heater template's own (lib/vertical-packs); the prices
+ * come from the same template through lib/marketing/examples.ts.
+ */
+export const HERO_DEMO = {
+  trade: 'water-heaters',
+  question: 'Where is the water heater?',
+  answer: 'Garage',
+  photoLabel: 'Tank rating label',
+  /** The sample label the live demo offers (public/demo), drawn for it; no real product */
+  photoSrc: '/demo/sample-water-heater-label.png',
+  photoAlt: 'A sample photo of a water heater’s rating label',
+  playAgain: 'Play again',
+  /** Each screen is a picture of the product: what a screen reader hears for it */
+  screens: [
+    'The request form on a business’s quote page: the customer has answered where the water heater is and added a photo of its rating label.',
+    'The customer’s estimate: a total worked out from the business’s prices, with each line of the price shown.',
+    'The business’s dashboard: the new request with its price, approved and sent to the customer.',
+  ],
+  sent: 'Sent',
+} as const
+
+/** T-165: replaces "How it works", which repeated the hero in words */
+export const SETUP = {
+  /** What a screen reader hears for each step's screen */
+  screens: [
+    'The first setup screen: a list of trades to choose from, with Water heaters chosen.',
+    'The second setup screen: the template’s starting prices, each one editable.',
+    'The quote link screen: your link with a Copy button, and its QR code.',
+  ],
+  heading: 'Set up in minutes',
+  lead: 'Three steps, and the last one is sharing a link.',
+  steps: [
+    {
+      title: 'Choose your trade',
+      text: 'Start from a ready-made template with the usual services and questions. Any other trade: describe what you do in plain English.',
+    },
+    {
+      title: 'Check your prices',
+      text: 'Each template starts with typical prices. Change them to yours; every estimate is worked out from them.',
+    },
+    {
+      title: 'Share your link',
+      text: 'You get your own quote page and a QR code. Put the link anywhere your customers already find you.',
+    },
+  ],
+} as const
 
 export const CONTROL = {
   heading: 'Your prices. You stay in control.',
+  /**
+   * T-165: a plain-English price sentence, and the price lines it becomes.
+   * Two prices, two lines. A minimum charge is not among them: it is a floor,
+   * not an item, so it is never shown as a line of a price list.
+   */
+  sentenceLead: 'Tell it your prices the way you’d tell a new hire:',
+  sentence: [
+    { words: '$375 per room,', line: { label: 'Per room', amount: '$375.00' } },
+    { words: 'heavy prep adds $250.', line: { label: 'Heavy prep', amount: '+ $250.00' } },
+  ],
+  listTitle: 'Your price list',
+  replay: 'Show it again',
   points: [
     {
       title: 'Only your prices',
@@ -86,7 +132,17 @@ export const STATISTICS: Statistic[] = [
 
 export const ADD_IT = {
   heading: 'Add it anywhere',
-  lead: 'No website needed. Share your quote link anywhere your customers already find you.',
+  lead: 'No website needed. Share your quote link anywhere your customers already find you: a text, a WhatsApp chat, your Google profile.',
+  /** T-165: the three things shown, each as its real screen */
+  screens: {
+    page: 'A phone showing a business’s quote page, with its request form.',
+    site: 'A business’s own website, with the same request form on the page.',
+  },
+  shown: {
+    qr: { title: 'A QR code', text: 'For your van, cards and invoices.' },
+    page: { title: 'Your own quote page', text: 'A link you can send anywhere.' },
+    site: { title: 'On your website', text: 'The same form, on your own page.' },
+  },
   ways: [
     { title: 'Quote link', text: 'Your own page, for example /quote/your-business.' },
     { title: 'QR code', text: 'Print it on your van, cards or invoices.' },
@@ -130,6 +186,8 @@ export const FAQ = [
 ] as const
 
 export const FINAL_CTA = 'Your next customer could have your price tonight.'
+/** T-165: the closing band has one button and one quiet link */
+export const FINAL_QUIET_LINK = 'Or try it as a customer first'
 
 export const PAGE_META = {
   title: `Instant quotes on your website, in your prices — ${PRODUCT_NAME}`,

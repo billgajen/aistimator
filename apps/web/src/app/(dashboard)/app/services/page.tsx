@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, type KeyboardEvent } from 'react'
-import { currencySymbol as sharedCurrencySymbol, getRegion, reviewModeOf } from '@qolumns/shared'
+import { currencySymbol as sharedCurrencySymbol, getRegion, reviewModeOf, minimumTopUp, minimumChargeNote } from '@qolumns/shared'
 import type { ReviewMode } from '@qolumns/shared'
 import { PageHeader } from '@/components/dashboard/EmptyState'
 import { AIDraftBadge } from '@/components/AIDraftBadge'
@@ -389,6 +389,8 @@ export default function ServicesPage() {
     lineItems: Array<{ name: string; amount: number; calculation: string; quantitySource?: string }>
     subtotal: number
     warnings: string[]
+    /** T-165: the minimum charge, when the lines came to less and it applied (shown as a note, not a line) */
+    minimumCharge: number | null
   } | null>(null)
 
   const fetchServices = useCallback(async () => {
@@ -716,19 +718,12 @@ export default function ServicesPage() {
     }
     subtotal += multiplierAdjustment
 
-    // Apply minimum charge
-    if (formData.minimumCharge > 0 && subtotal < formData.minimumCharge) {
-      const adjustment = formData.minimumCharge - subtotal
-      lineItems.push({
-        name: 'Minimum Charge Adjustment',
-        amount: adjustment,
-        calculation: `Minimum $${formData.minimumCharge.toFixed(2)}`,
-        quantitySource: 'constant',
-      })
-      subtotal = formData.minimumCharge
-    }
+    // T-165: the minimum charge is a floor, not an item. Below it the lines
+    // stay as they are, the total is the minimum, and a note says so.
+    const minimumApplies = minimumTopUp(subtotal, formData.minimumCharge) > 0
+    if (minimumApplies) subtotal = formData.minimumCharge
 
-    setSimulatorResult({ lineItems, subtotal, warnings })
+    setSimulatorResult({ lineItems, subtotal, warnings, minimumCharge: minimumApplies ? formData.minimumCharge : null })
   }
 
 
@@ -1926,6 +1921,11 @@ export default function ServicesPage() {
                             <p className="text-sm text-text-muted">No pricing items configured.</p>
                           )}
                           <div className="mt-2 border-t border-border pt-2">
+                            {simulatorResult.minimumCharge !== null && (
+                              <p className="mb-1 text-sm text-text-secondary" data-testid="minimum-note">
+                                {minimumChargeNote(currencySymbol + simulatorResult.minimumCharge.toFixed(2))}
+                              </p>
+                            )}
                             <div className="flex items-center justify-between font-medium">
                               <span className="text-text-primary">Total</span>
                               <span className="text-lg text-text-primary">${simulatorResult.subtotal.toFixed(2)}</span>

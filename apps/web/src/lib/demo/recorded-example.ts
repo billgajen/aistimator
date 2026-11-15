@@ -11,6 +11,8 @@ export interface DemoEstimate {
   currency: string
   locale: string
   lines: Array<{ label: string; amount: number }>
+  /** The business's minimum charge, when the job's lines came to less and it was applied (shown as a note) */
+  minimumCharge?: number | null
   taxLabel: string | null
   taxAmount: number
   total: number

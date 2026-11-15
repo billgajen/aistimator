@@ -6,6 +6,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import { PRODUCT_NAME, QUOTE_TURN_COPY } from '@qolumns/shared'
 import { UNFINISHED_CHANGED_EVENT } from '@/lib/unfinished-leads'
 import { NEEDS_YOU_MARK } from '@/lib/status-tone'
+import { Wordmark } from '@/components/brand/Wordmark'
 
 /**
  * Dashboard shell — "the studio desk", panel edition.
@@ -41,9 +42,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Wordmark */}
       <div className="px-5 pt-5 pb-4">
         <Link href="/app" className="group inline-block">
-          <span className="font-display text-[22px] font-bold tracking-tight text-text-primary">
-            {PRODUCT_NAME}
-          </span>
+          <Wordmark className="text-[22px]" />
           <div className="tape-rule mt-1.5 w-24 opacity-50 group-hover:opacity-90 transition-opacity" />
         </Link>
       </div>

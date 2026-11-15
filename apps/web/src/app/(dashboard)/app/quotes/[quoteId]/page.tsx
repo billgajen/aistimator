@@ -3,8 +3,9 @@
 import { AcceptanceCard } from '@/components/quotes/AcceptanceCard'
 import type { AcceptanceDetails } from '@/lib/acceptance'
 import { useEffect, useState, useCallback } from 'react'
-import { formatMoney, quoteActions, quoteTurn, quoteTracker, customerFirstName } from '@qolumns/shared'
+import { formatMoney, quoteActions, quoteTurn, quoteTracker, customerFirstName, splitMinimum } from '@qolumns/shared'
 import { NextStepBox } from '@/components/quotes/NextStepBox'
+import { MinimumNote } from '@/components/quote/MinimumNote'
 import { QuoteTracker } from '@/components/quotes/QuoteTracker'
 import { TurnBadge } from '@/components/quotes/TurnBadge'
 import { approvedWithoutEmailMessage, copyLinkFallbackMessage } from '@/lib/quote-action-copy'
@@ -220,6 +221,8 @@ export default function QuoteDetailPage({
   const { quote, service, amendments, feedback } = data
   const pricing = quote.pricing_json as QuotePricing
   const content = quote.content_json as QuoteContent
+  // T-165: the minimum charge is a floor, not an item: the job's lines, then a note
+  const { lines: priceLines, minimum: minimumApplied } = splitMinimum(pricing.breakdown)
   const customer = quote.customer_json as { name: string; email: string; phone?: string }
   const pendingFeedback = feedback.filter((f) => f.status === 'pending')
   // T-157: a button only shows when it will work. These are the rules the
@@ -459,7 +462,7 @@ export default function QuoteDetailPage({
       {/* Pricing */}
       <Section title="Pricing">
         <div className="space-y-2">
-          {pricing.breakdown.map((item, index) => (
+          {priceLines.map((item, index) => (
             <div key={index} className="flex justify-between text-sm">
               <span className="text-text-secondary">
                 {item.label}
@@ -474,6 +477,7 @@ export default function QuoteDetailPage({
           ))}
         </div>
         <div className="border-t border-border mt-4 pt-4 space-y-2">
+          <MinimumNote minimumCharge={minimumApplied?.minimumCharge} currency={pricing.currency} />
           <div className="flex justify-between text-sm">
             <span className="text-text-secondary">Subtotal</span>
             <span className="text-text-primary">{formatCurrency(pricing.subtotal, pricing.currency)}</span>

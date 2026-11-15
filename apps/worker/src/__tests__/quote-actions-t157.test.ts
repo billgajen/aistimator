@@ -10,7 +10,6 @@ import type { ExtractedSignalsV2 } from '@qolumns/shared'
 import { loadBusinessEmail } from '../business-email'
 import { sendQuoteEmails, sendEstimateShownEmail, sendReviewRequestEmail } from '../email'
 import {
-  calculatePricing,
   calculatePricingWithTrace,
   type PricingRules,
   type FormAnswer,
@@ -325,25 +324,5 @@ describe('T-157: the engine rounds every line where it is created', () => {
     expect(result.subtotal).toBe(1050)
     expect(result.taxAmount).toBe(210)
     expect(result.total).toBe(1260)
-  })
-
-  it('the legacy calculator follows the same rule', () => {
-    vi.spyOn(console, 'log').mockImplementation(() => undefined)
-    const legacy = calculatePricing(
-      rules({
-        baseFee: 10.005,
-        measurementModel: { type: 'per_unit', unit: 'sqm', pricePerUnit: 18 } as never,
-        multipliers: [{ when: { fieldId: 'access', equals: 'hard' }, multiplier: 1.175, label: 'Difficult access' } as never],
-      }),
-      signals(),
-      [{ fieldId: 'access', value: 'hard' }],
-      noTax,
-      'GBP',
-      { quantity: 34.6 }
-    )
-    for (const line of legacy.breakdown) expect(twoDecimals(line.amount), `${line.label}: ${line.amount}`).toBe(true)
-    expect(legacy.breakdown[0]!.amount).toBe(10.01)
-    expect(legacy.breakdown[1]!.amount).toBe(622.8)
-    expect(sum(legacy.breakdown)).toBe(legacy.subtotal)
   })
 })

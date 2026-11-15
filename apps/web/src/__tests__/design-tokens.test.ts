@@ -16,7 +16,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { QuoteTurnTone } from '@qolumns/shared'
 import config from '../../tailwind.config'
-import { NEEDS_YOU_MARK, NEEDS_YOU_SURFACE, STATUS_TONE, STATUS_TONE_TOKENS } from '@/lib/status-tone'
+import { NEEDS_YOU_MARK, STATUS_TONE, STATUS_TONE_TOKENS } from '@/lib/status-tone'
 
 const ROOT = join(__dirname, '..', '..', '..', '..')
 const WEB = join(ROOT, 'apps/web/src')
@@ -33,8 +33,6 @@ function block(selector: string): Record<string, string> {
   return Object.fromEntries([...body.matchAll(/(--[a-z0-9-]+):\s*([^;]+);/g)].map((m) => [m[1]!, m[2]!.trim()]))
 }
 const ROOT_TOKENS = block(':root')
-const ACCENTS = ['orange', 'tomato', 'yellow'] as const
-const accentTokens = (name: (typeof ACCENTS)[number]) => ({ ...ROOT_TOKENS, ...block(`[data-accent='${name}']`) })
 
 const WHITE = '#FFFFFF'
 const hex = (tokens: Record<string, string>, name: string): string => {
@@ -75,12 +73,9 @@ describe('T-164: contrast, from the values in globals.css', () => {
     }
   })
 
-  it('every status pill reads at 4.5:1, with each accent', () => {
-    for (const accent of ACCENTS) {
-      const tokens = accentTokens(accent)
-      for (const [tone, [text, ground]] of Object.entries(STATUS_TONE_TOKENS)) {
-        expect(ratio(tokens, text, ground), `${tone} with ${accent}`).toBeGreaterThanOrEqual(TEXT)
-      }
+  it('every status pill reads at 4.5:1', () => {
+    for (const [tone, [text, ground]] of Object.entries(STATUS_TONE_TOKENS)) {
+      expect(ratio(ROOT_TOKENS, text, ground), tone).toBeGreaterThanOrEqual(TEXT)
     }
   })
 
@@ -109,32 +104,34 @@ describe('T-164: contrast, from the values in globals.css', () => {
     expect(selector.replace(/:where\((?:[^()]|\([^()]*\))*\)/g, '')).toBe('.border-border,')
   })
 
-  it('three accent candidates, orange the default, with the values the owner was shown', () => {
-    expect(hex(accentTokens('tomato'), '--color-accent').toUpperCase()).toBe('#E8412C')
-    expect(hex(accentTokens('orange'), '--color-accent').toUpperCase()).toBe('#F26B2A')
-    expect(hex(accentTokens('yellow'), '--color-accent').toUpperCase()).toBe('#FFC53D')
-    for (const name of ['--color-accent', '--color-accent-tint', '--color-accent-line', '--color-accent-ink', '--color-on-accent']) {
-      expect(ROOT_TOKENS[name], name).toBe(block(`[data-accent='orange']`)[name])
-    }
+  it('the accent is yellow (T-165, the owner’s choice), with dark text on it and no pale tint', () => {
+    expect(hex(ROOT_TOKENS, '--color-accent').toUpperCase()).toBe('#FFC53D')
+    expect(hex(ROOT_TOKENS, '--color-on-accent').toUpperCase()).toBe('#1B2823')
+    expect(ratio(ROOT_TOKENS, '--color-on-accent', '--color-accent')).toBeGreaterThanOrEqual(TEXT)
+    // the other candidates and the tint are gone: a pale yellow would read as butter
+    expect(CSS).not.toMatch(/data-accent/)
+    for (const gone of ['--color-accent-tint', '--color-accent-line', '--color-accent-ink']) expect(CSS).not.toContain(gone)
+    expect(sources().filter(([, src]) => /accent-(tint|line|ink)\b|data-accent/.test(src)).map(([f]) => f)).toEqual([])
   })
 
-  it('each accent: button text on the fill, and text on the tint, read at 4.5:1', () => {
-    for (const accent of ACCENTS) {
-      const tokens = accentTokens(accent)
-      expect(ratio(tokens, '--color-on-accent', '--color-accent'), `on-accent, ${accent}`).toBeGreaterThanOrEqual(TEXT)
-      expect(ratio(tokens, '--color-accent-ink', '--color-accent-tint'), `accent-ink on tint, ${accent}`).toBeGreaterThanOrEqual(TEXT)
-      expect(ratio(tokens, '--color-text-primary', '--color-accent-tint'), `ink on tint, ${accent}`).toBeGreaterThanOrEqual(TEXT)
-    }
+  it('white never passes as button text on the accent, and the accent never passes as text on paper', () => {
+    expect(contrast(WHITE, hex(ROOT_TOKENS, '--color-accent'))).toBeLessThan(TEXT)
+    expect(ratio(ROOT_TOKENS, '--color-accent', '--color-background')).toBeLessThan(EDGE)
+    expect(sources().filter(([, src]) => /(?<![\w-])text-accent(?![\w-])/.test(src)).map(([f]) => f)).toEqual([])
   })
 
-  it('white never passes as button text on an accent, which is why on-accent exists', () => {
-    for (const accent of ACCENTS) expect(contrast(WHITE, hex(accentTokens(accent), '--color-accent')), accent).toBeLessThan(TEXT)
+  it('the yellow button has dark text and a thin dark edge, on marketing pages and in the Button component', () => {
+    const cta = readFileSync(join(WEB, 'lib/marketing/cta.ts'), 'utf8')
+    expect(cta).toMatch(/MAIN_CTA = `\$\{BASE\} border border-on-accent bg-accent text-on-accent`/)
+    expect(readFileSync(join(WEB, 'components/ui/Button.tsx'), 'utf8')).toContain("'border border-on-accent bg-accent text-on-accent hover:opacity-90'")
+    // the dashboard does not use the yellow button
+    expect(sources().filter(([f, src]) => f.startsWith('app/(dashboard)') && /variant="accent"|MAIN_CTA/.test(src)).map(([f]) => f)).toEqual([])
   })
 
   it('the focus ring: ink on light grounds, light on juniper and ink, 3:1 or more', () => {
     expect(CSS).toMatch(/:focus-visible \{\s*outline: 2px solid var\(--color-focus\);\s*outline-offset: 2px;/)
     expect(ROOT_TOKENS['--color-focus']).toBe('var(--color-ink)')
-    for (const ground of ['--color-background', '--color-surface', WHITE, '--color-mint', '--color-mist', '--color-butter', '--color-accent-tint', '--color-primary-light']) {
+    for (const ground of ['--color-background', '--color-surface', WHITE, '--color-mint', '--color-mist', '--color-butter', '--color-accent', '--color-primary-light']) {
       expect(ratio(ROOT_TOKENS, '--color-focus', ground), ground).toBeGreaterThanOrEqual(EDGE)
     }
     // inside a juniper or brand-coloured surface the ring takes the colour that reads on it
@@ -152,9 +149,9 @@ describe('T-164: contrast, from the values in globals.css', () => {
 })
 
 describe('T-164: status colours by whose turn it is', () => {
-  it('needs you is the accent tint, waiting neutral, accepted green, closed grey, failed red', () => {
+  it('needs you is the strong yellow, waiting neutral, accepted green, closed grey, failed red', () => {
     expect(STATUS_TONE).toEqual({
-      attention: 'bg-accent-tint text-accent-ink',
+      attention: 'bg-accent text-on-accent',
       waiting: 'bg-mist text-text-secondary',
       working: 'bg-mist text-text-secondary',
       good: 'bg-secondary-light text-secondary',
@@ -163,16 +160,19 @@ describe('T-164: status colours by whose turn it is', () => {
     } satisfies Record<QuoteTurnTone, string>)
   })
 
-  it('"needs you" never uses butter, tape or amber, wherever it is marked', () => {
-    for (const cls of [STATUS_TONE.attention, NEEDS_YOU_MARK, NEEDS_YOU_SURFACE]) expect(cls).not.toMatch(/butter|tape|tertiary/)
-    for (const f of ['components/quotes/TurnBadge.tsx', 'components/home/QuoteStand.tsx']) {
-      expect(readFileSync(join(WEB, f), 'utf8'), f).not.toMatch(/butter|tape|tertiary/)
+  it('"needs you" is the strong yellow with the small marker, never butter, tape, amber or a tint, wherever it is marked', () => {
+    expect(NEEDS_YOU_MARK).toBe('bg-accent text-on-accent')
+    for (const f of ['components/quotes/TurnBadge.tsx', 'components/home/QuoteStand.tsx', 'components/quotes/NeedsYouDot.tsx']) {
+      expect(readFileSync(join(WEB, f), 'utf8'), f).not.toMatch(/bg-butter|bg-tape|tertiary/)
     }
-    // the menu's count, the "New" tag and Home's unfinished-requests banner
+    // the marker goes with the yellow: the pill, the "Started, didn't finish" tag, Home's tile and Home's banner
+    expect(readFileSync(join(WEB, 'components/quotes/TurnBadge.tsx'), 'utf8')).toContain("turn.tone === 'attention' && <NeedsYouDot")
+    expect(readFileSync(join(WEB, 'components/quotes/UnfinishedLeads.tsx'), 'utf8')).toMatch(/\$\{NEEDS_YOU_MARK\}`\}>\s*<NeedsYouDot/)
+    expect(readFileSync(join(WEB, 'components/home/QuoteStand.tsx'), 'utf8')).toMatch(/tile\.needsYou && <NeedsYouDot/)
+    const home = readFileSync(join(WEB, 'app/(dashboard)/app/page.tsx'), 'utf8')
+    expect(home).toMatch(/\$\{NEEDS_YOU_MARK\}`\} data-testid="unfinished-count-figure">\s*<NeedsYouDot/)
+    expect(home).not.toContain('bg-butter px-5')
     expect(readFileSync(join(WEB, 'app/(dashboard)/layout.tsx'), 'utf8')).toMatch(/px-2 py-0\.5 text-xs font-semibold \$\{NEEDS_YOU_MARK\}/)
-    expect(readFileSync(join(WEB, 'components/quotes/UnfinishedLeads.tsx'), 'utf8')).toMatch(/font-semibold \$\{NEEDS_YOU_MARK\}/)
-    expect(readFileSync(join(WEB, 'components/quotes/UnfinishedLeads.tsx'), 'utf8')).not.toContain('bg-butter')
-    expect(readFileSync(join(WEB, 'app/(dashboard)/app/page.tsx'), 'utf8')).toContain('border-accent-line bg-accent-tint')
   })
 
   it('the class of every tone matches the token pair the contrast test measures', () => {
@@ -297,7 +297,7 @@ describe('T-164: colours come from our tokens', () => {
 
   it('the Tailwind config names every token the system uses', () => {
     const colors = config.theme!.extend!.colors as Record<string, unknown>
-    expect(colors.accent).toEqual({ DEFAULT: 'var(--color-accent)', tint: 'var(--color-accent-tint)', line: 'var(--color-accent-line)', ink: 'var(--color-accent-ink)' })
+    expect(colors.accent).toBe('var(--color-accent)')
     expect(colors['on-accent']).toBe('var(--color-on-accent)')
     expect(colors.field).toBe('var(--color-field)')
     expect(colors.focus).toBe('var(--color-focus)')
@@ -369,8 +369,8 @@ describe('T-164: the preview page and the design file', () => {
     expect(readFileSync(join(WEB, 'app/design/page.tsx'), 'utf8')).toContain("from '@/components/marketing/ProductStrip'")
     // no colour written by hand: every colour is a token
     expect(preview).not.toMatch(/#[0-9A-Fa-f]{3,8}\b/)
-    expect(preview).toContain("export const ACCENTS = ['tomato', 'orange', 'yellow'] as const")
-    expect(preview).toContain("export const DEFAULT_ACCENT: Accent = 'orange'")
+    // T-165: the owner chose; there is no accent switch and one wordmark
+    expect(preview).not.toMatch(/accent-switch|ACCENTS|form=/)
   })
 
   it('Docs/design/system.md exists, says it decides, and CLAUDE.md points to it', () => {

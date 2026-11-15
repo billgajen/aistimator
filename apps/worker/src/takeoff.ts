@@ -165,11 +165,8 @@ export function buildTakeoff(opts: {
       }
 
       case 'minimum': {
-        entries.push({
-          item: step.description || 'Minimum charge',
-          amount: step.amount,
-          method: 'Minimum job value',
-        })
+        // T-165: the minimum charge is a floor, not a part of the job. It is
+        // shown as a note above the total, never as a row of the takeoff.
         break
       }
 

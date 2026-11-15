@@ -5,7 +5,6 @@
  */
 
 export {
-  calculatePricing,
   calculatePricingWithTrace,
   getDefaultPricingRules,
   calculateCrossServicePricing,

@@ -7,5 +7,5 @@ export const NAV_LINKS = [
   { href: '/login', label: 'Log in' },
 ] as const
 
-/** T-155: the header button's words below md (desktop and in-page buttons say freeOfferLabel()) */
+/** The header button's words at every width (T-165; T-155 had it below md only). In-page buttons say freeOfferLabel(). */
 export const HEADER_SHORT_CTA = 'Try it free'

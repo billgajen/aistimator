@@ -11,7 +11,7 @@ import { join } from 'path'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { SUPPORT_EMAIL, PRODUCT_NAME, freeOfferLabel } from '@qolumns/shared'
-import { HERO, TRADES_HEADING, STATISTICS, FAQ, ADD_IT, CONTROL, HOW_IT_WORKS } from '@/lib/marketing/home-copy'
+import { HERO, TRADES_HEADING, STATISTICS, FAQ, ADD_IT, CONTROL, SETUP } from '@/lib/marketing/home-copy'
 import { FOUNDER, founderReady } from '@/lib/marketing/founder'
 import { FounderNote } from '@/components/marketing/FounderNote'
 import { NAV_LINKS, HEADER_SHORT_CTA } from '@/lib/marketing/nav'
@@ -110,7 +110,7 @@ describe('T-154: the approved copy', () => {
   })
 
   it('whenever the owner confirms "every" estimate, it says "by default" (a service can send on its own)', () => {
-    const texts = [...FAQ.map((f) => f.a), ...CONTROL.points.map((p) => p.text), ...HOW_IT_WORKS.map((s) => s.text), ...TRADES.flatMap((t) => [t.lede, ...t.features.map((f) => f.text), ...t.howPriced.map((h) => h.text)])]
+    const texts = [...FAQ.map((f) => f.a), ...CONTROL.points.map((p) => p.text), ...SETUP.steps.map((s) => s.text), ...TRADES.flatMap((t) => [t.lede, ...t.features.map((f) => f.text), ...t.howPriced.map((h) => h.text)])]
     for (const t of texts) {
       if (/\b(check|confirm|approve)s?\b[^.]*\bevery\b|\bevery (estimate|quote)\b[^.]*\b(check|confirm|approve)/i.test(t)) expect(t).toMatch(/by default/)
     }
@@ -211,14 +211,15 @@ describe('T-154: phone menu, buttons, metadata', () => {
   })
 
   it('every primary button leads to signup or the demo', () => {
-    for (const f of ['app/page.tsx', 'components/marketing/TradeLanding.tsx']) {
-      const hrefs = [...code(f).matchAll(/<Link href="([^"]+)"[^>]*min-h-\[48px\]/g)].map((m) => m[1])
-      expect(hrefs.length).toBeGreaterThanOrEqual(2)
-      for (const h of hrefs) expect(['/signup', '/demo']).toContain(h)
-    }
+    const trade = [...code('components/marketing/TradeLanding.tsx').matchAll(/<Link href="([^"]+)"[^>]*min-h-\[48px\]/g)].map((m) => m[1])
+    expect(trade.length).toBeGreaterThanOrEqual(2)
+    for (const h of trade) expect(['/signup', '/demo']).toContain(h)
+    // T-165: the home page's buttons come from lib/marketing/cta.ts. The yellow
+    // one (MAIN_CTA) is the main call to action: the hero's and the closing band's.
     const home = code('app/page.tsx')
-    expect(home).toMatch(/href="\/signup" className=\{primaryButton\}/)
-    expect(home).toMatch(/href="\/demo" className=\{secondaryButton\}/)
+    expect([...home.matchAll(/<Link href="([^"]+)" className=\{MAIN_CTA\}/g)].map((m) => m[1])).toEqual(['/signup', '/signup'])
+    expect(home).toMatch(/href="\/demo" className=\{QUIET_BUTTON\}/)
+    expect(code('lib/marketing/cta.ts')).toMatch(/const BASE = '[^']*min-h-\[48px\]/)
   })
 
   it('the page title, description and social image carry the new message', () => {
@@ -229,12 +230,13 @@ describe('T-154: phone menu, buttons, metadata', () => {
   })
 })
 
-describe('T-155: the phone header button', () => {
-  it('says only "Try it free" below md, the full offer from md up', () => {
+describe('T-155, T-165: the header button', () => {
+  it('says only "Try it free", at every width (T-165; it was the full offer from md up)', () => {
     expect(HEADER_SHORT_CTA).toBe('Try it free')
     const nav = code('components/marketing/SiteNav.tsx')
-    expect(nav).toMatch(/<span className="md:hidden">\{HEADER_SHORT_CTA\}<\/span>/)
-    expect(nav).toMatch(/<span className="hidden md:inline">\{freeOfferLabel\(\)\}<\/span>/)
+    expect(nav).toMatch(/data-testid="nav-signup"\s*>\s*\{HEADER_SHORT_CTA\}\s*<\/Link>/)
+    expect(nav).not.toContain('freeOfferLabel')
+    expect(nav).not.toContain('md:hidden')
     // one line, never wrapped into a two-line pill
     expect(nav).toMatch(/href="\/signup"\s+className="[^"]*whitespace-nowrap/)
     expect(freeOfferLabel()).toBe('Try it free: 10 quotes, no card')

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { QUOTE_TURN_COPY } from '@qolumns/shared'
 import { UNFINISHED_CHANGED_EVENT } from '@/lib/unfinished-leads'
 import { NEEDS_YOU_MARK } from '@/lib/status-tone'
+import { NeedsYouDot } from './NeedsYouDot'
 
 export interface UnfinishedLead {
   leadId: string
@@ -26,6 +27,7 @@ export interface UnfinishedLead {
 export function UnfinishedBadge() {
   return (
     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${NEEDS_YOU_MARK}`}>
+      <NeedsYouDot className="mr-1.5" />
       Started, didn&apos;t finish
     </span>
   )

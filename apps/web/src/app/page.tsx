@@ -1,14 +1,18 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { offeredPlans, formatMoney, freeOfferLabel, FREE_ALLOWANCE } from '@qolumns/shared'
+import { DEMO_BUSINESS_NAME, DEMO_LOGO_PATH, DEMO_PRIMARY_COLOR, DEMO_SLUG, offeredPlans, formatMoney, freeOfferLabel, FREE_ALLOWANCE } from '@qolumns/shared'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
-import { ProductStrip } from '@/components/marketing/ProductStrip'
 import { FounderNote } from '@/components/marketing/FounderNote'
+import { HeroDemo } from '@/components/marketing/home/HeroDemo'
+import { SetupSteps } from '@/components/marketing/home/SetupSteps'
+import { PriceSentence } from '@/components/marketing/home/PriceSentence'
+import { AddItAnywhere } from '@/components/marketing/home/AddItAnywhere'
 import { listPacks } from '@/lib/vertical-packs'
 import { templateTrades, tradeHref } from '@/lib/marketing/trades'
 import { marketingExample } from '@/lib/marketing/examples'
-import { HERO, TRADES_HEADING, OTHER_TRADES, HOW_IT_WORKS, CONTROL, STATISTICS, ADD_IT, PRICING_HEADING, FAQ, FINAL_CTA, PAGE_META } from '@/lib/marketing/home-copy'
+import { MAIN_CTA, QUIET_BUTTON, QUIET_LINK } from '@/lib/marketing/cta'
+import { HERO, HERO_DEMO, TRADES_HEADING, OTHER_TRADES, SETUP, CONTROL, STATISTICS, ADD_IT, PRICING_HEADING, FAQ, FINAL_CTA, FINAL_QUIET_LINK, PAGE_META } from '@/lib/marketing/home-copy'
 
 export const metadata: Metadata = {
   title: PAGE_META.title,
@@ -17,60 +21,103 @@ export const metadata: Metadata = {
   twitter: { card: 'summary_large_image', title: PAGE_META.title, description: PAGE_META.description },
 }
 
-const primaryButton =
-  'inline-flex min-h-[48px] items-center justify-center rounded-lg bg-primary px-6 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-primary-hover'
-const secondaryButton =
-  'inline-flex min-h-[48px] items-center justify-center rounded-lg border border-border bg-surface px-6 py-3 text-center text-sm font-semibold text-text-primary transition-colors hover:border-border-strong'
+const H2 = 'font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl'
+const WRAP = 'mx-auto max-w-container px-4 sm:px-6'
 
 /**
- * T-154 home page: say what it is, show it working, earn trust.
- * Copy: lib/marketing/home-copy.ts. Visuals: our own UI (ProductStrip).
+ * T-165 home page: show the product, do not describe it (Docs/design/system.md
+ * decides the look; audit.md sections 1 and 4 say what was missing).
+ *
+ * One idea per section, and no two neighbours share a layout:
+ *   1 hero: the words, the one yellow button, and the product demo (three screens)
+ *   2 trades: a slim line of links
+ *   3 set up in minutes: three steps, each beside its screen, alternating sides
+ *   4 your prices: a sentence that turns into price lines (the one moment)
+ *   5 what homeowners want: three big figures, no boxes
+ *   6 add it anywhere: a QR code, the quote page on a phone, the form on a website
+ *   7 plans: three cards, each with its own button
+ *   8 questions: a narrow column
+ *   9 who is behind this (when filled in)
+ *  10 the closing band: one button and one quiet link
+ * Copy: lib/marketing/home-copy.ts. Screens: the product's own parts, at true size.
  */
 export default function HomePage() {
-  const example = marketingExample()
+  const example = marketingExample(HERO_DEMO.trade)
   const trades = templateTrades(listPacks('US').filter((p) => p.region === 'US').map((p) => p.id))
   const free = FREE_ALLOWANCE.US!.quotes
+  const appOrigin = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
+  const quoteLink = `${appOrigin}/quote/${DEMO_SLUG}`
+  const form = {
+    businessName: DEMO_BUSINESS_NAME,
+    logoUrl: DEMO_LOGO_PATH,
+    primaryColor: DEMO_PRIMARY_COLOR,
+    serviceName: example.serviceName,
+    question: HERO_DEMO.question,
+    answer: HERO_DEMO.answer,
+  }
 
   return (
     <main className="min-h-screen overflow-x-clip bg-background">
       <SiteNav />
 
       {/* 1. Hero */}
-      <section className="mx-auto max-w-6xl px-4 pb-14 pt-8 sm:px-6 sm:pt-14" data-testid="hero">
+      <section className={`${WRAP} pb-16 pt-8 sm:pt-14`} data-testid="hero">
         <div className="max-w-3xl">
-          <h1 className="font-display text-[2.15rem] font-extrabold leading-[1.08] tracking-tight text-text-primary sm:text-5xl lg:text-6xl">
-            {HERO.headline}
-          </h1>
+          <h1 className="font-display text-display-sm font-extrabold text-text-primary sm:text-display-md lg:text-display-lg">{HERO.headline}</h1>
           <p className="mt-4 max-w-2xl text-base text-text-secondary sm:text-lg">{HERO.subline}</p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link href="/signup" className={primaryButton} data-testid="hero-signup">
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Link href="/signup" className={MAIN_CTA} data-testid="hero-signup" data-cta="main">
               {freeOfferLabel()}
             </Link>
-            <Link href="/demo" className={secondaryButton} data-testid="hero-demo">
+            <Link href="/demo" className={QUIET_BUTTON} data-testid="hero-demo">
               Try it as a customer
             </Link>
           </div>
           <p className="mt-3 text-xs text-text-muted">{HERO.smallLine}</p>
         </div>
-        <div className="mt-10">
-          <ProductStrip example={example} captions={HERO.frames} />
+        <div className="mt-10 lg:mt-12">
+          <HeroDemo
+            content={{
+              serviceName: example.serviceName,
+              question: HERO_DEMO.question,
+              answer: HERO_DEMO.answer,
+              photo: { src: HERO_DEMO.photoSrc, alt: HERO_DEMO.photoAlt, label: HERO_DEMO.photoLabel },
+              customerName: example.customerName,
+              sheet: {
+                businessName: DEMO_BUSINESS_NAME,
+                logoUrl: DEMO_LOGO_PATH,
+                customerName: example.customerName,
+                reference: 'EST-2026-0142',
+                lines: example.lines,
+                total: example.total,
+                currency: 'USD',
+                locale: 'en-US',
+                primaryColor: DEMO_PRIMARY_COLOR,
+              },
+              frames: HERO.frames,
+              playAgain: HERO_DEMO.playAgain,
+              sent: HERO_DEMO.sent,
+              screens: HERO_DEMO.screens,
+            }}
+          />
         </div>
       </section>
 
-      {/* 2. Trades */}
-      <section className="border-y border-border bg-surface py-10">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <h2 className="font-display text-xl font-bold text-text-primary sm:text-2xl">{TRADES_HEADING}</h2>
-          <ul className="mt-4 flex flex-wrap gap-2" data-testid="trades-row">
+      {/* 2. Trades: a slim line */}
+      <section className="border-y border-border bg-surface py-6">
+        <div className={`${WRAP} flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6`}>
+          {/* a label for the line of links, not a heading: it is smaller than any heading on the page */}
+          <p className="shrink-0 font-display text-base font-bold text-text-primary" id="trades-label">{TRADES_HEADING}</p>
+          <ul className="flex flex-wrap gap-2" aria-labelledby="trades-label" data-testid="trades-row">
             {trades.map((t) => (
               <li key={t.slug}>
-                <Link href={tradeHref(t)} className="inline-flex min-h-[44px] items-center rounded-full border border-border bg-white px-4 text-sm font-semibold text-text-primary hover:border-primary">
+                <Link href={tradeHref(t)} className="inline-flex min-h-[44px] items-center rounded-full border border-field bg-white px-4 text-sm font-semibold text-text-primary hover:border-primary">
                   {t.label}
                 </Link>
               </li>
             ))}
             <li>
-              <Link href="/signup" className="inline-flex min-h-[44px] items-center rounded-full border border-dashed border-border px-4 text-sm font-medium text-text-secondary hover:border-primary">
+              <Link href="/signup" className="inline-flex min-h-[44px] items-center rounded-full border border-dashed border-field px-4 text-sm font-medium text-text-secondary hover:border-primary">
                 {OTHER_TRADES}
               </Link>
             </li>
@@ -78,49 +125,51 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 3. How it works */}
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">How it works</h2>
-        <ol className="mt-8 grid gap-5 md:grid-cols-3">
-          {HOW_IT_WORKS.map((step, i) => (
-            <li key={step.title} className="rounded-2xl border border-border bg-white p-5">
-              <StepIcon index={i} />
-              <h3 className="mt-3 font-display text-lg font-bold text-text-primary">
-                <span className="figure mr-2 text-primary">{i + 1}</span>
-                {step.title}
-              </h3>
-              <p className="mt-1 text-sm text-text-secondary">{step.text}</p>
-            </li>
-          ))}
-        </ol>
+      {/* 3. Set up in minutes */}
+      <section className={`${WRAP} py-16 sm:py-20`} data-testid="setup">
+        <h2 className={H2}>{SETUP.heading}</h2>
+        <p className="mt-3 max-w-2xl text-text-secondary">{SETUP.lead}</p>
+        <SetupSteps
+          steps={SETUP.steps}
+          screenLabels={SETUP.screens}
+          trades={trades.map((t) => t.label)}
+          chosenTrade={trades.find((t) => t.slug === HERO_DEMO.trade)?.label ?? trades[0]?.label ?? ''}
+          serviceName={example.serviceName}
+          prices={example.lines}
+          quoteLink={quoteLink}
+        />
       </section>
 
-      {/* 4. Control */}
-      <section className="bg-mint py-16">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">{CONTROL.heading}</h2>
-          <div className="mt-8 grid gap-5 md:grid-cols-3">
+      {/* 4. Your prices: the one moment */}
+      <section className="bg-mint py-16 sm:py-20" data-testid="control">
+        <div className={WRAP}>
+          <h2 className={`${H2} text-center`}>{CONTROL.heading}</h2>
+          <div className="mt-10">
+            <PriceSentence lead={CONTROL.sentenceLead} parts={CONTROL.sentence} listTitle={CONTROL.listTitle} replay={CONTROL.replay} />
+          </div>
+          {/* One column, like the rest of this section: the next section is a row of three */}
+          <ul className="mx-auto mt-10 max-w-xl divide-y divide-primary border-y border-primary" data-testid="control-points">
             {CONTROL.points.map((p) => (
-              <div key={p.title} className="rounded-2xl bg-white p-5 shadow-warm">
+              <li key={p.title} className="py-4">
                 <h3 className="font-display text-base font-bold text-text-primary">{p.title}</h3>
                 <p className="mt-1 text-sm text-text-secondary">{p.text}</p>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       </section>
 
-      {/* 5. What homeowners want */}
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">What homeowners want</h2>
-        <div className="mt-8 grid gap-5 md:grid-cols-3" data-testid="statistics">
+      {/* 5. What homeowners want: big figures, sources kept */}
+      <section className={`${WRAP} py-16 sm:py-20`}>
+        <h2 className={H2}>What homeowners want</h2>
+        <div className="mt-10 grid gap-10 md:grid-cols-3 md:gap-0 md:divide-x md:divide-border" data-testid="statistics">
           {STATISTICS.map((s) => (
-            <figure key={s.url} className="rounded-2xl border border-border bg-white p-5">
-              <p className="figure text-4xl font-medium text-primary">{s.figure}</p>
-              <blockquote className="mt-2 text-sm text-text-primary">{s.text}</blockquote>
+            <figure key={s.url} className="md:px-8 md:first:pl-0 md:last:pr-0">
+              <p className="figure text-display-md font-medium text-primary lg:text-display-xl">{s.figure}</p>
+              <blockquote className="mt-3 text-base text-text-primary">{s.text}</blockquote>
               <figcaption className="mt-3 text-xs text-text-muted">
                 Source:{' '}
-                <a href={s.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary underline underline-offset-2">
+                <a href={s.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center font-semibold text-primary underline underline-offset-2 sm:min-h-0">
                   {s.source}
                 </a>
               </figcaption>
@@ -130,35 +179,35 @@ export default function HomePage() {
       </section>
 
       {/* 6. Add it anywhere */}
-      <section className="border-y border-border bg-surface py-16">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">{ADD_IT.heading}</h2>
+      <section className="border-y border-border bg-surface py-16 sm:py-20">
+        <div className={WRAP}>
+          <h2 className={H2}>{ADD_IT.heading}</h2>
           <p className="mt-3 max-w-2xl text-text-secondary">{ADD_IT.lead}</p>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {ADD_IT.ways.map((w) => (
-              <div key={w.title} className="rounded-2xl bg-white p-5 shadow-warm">
-                <h3 className="font-display text-base font-bold text-text-primary">{w.title}</h3>
-                <p className="mt-1 text-sm text-text-secondary">{w.text}</p>
-              </div>
-            ))}
-          </div>
+          <AddItAnywhere shown={ADD_IT.shown} screenLabels={ADD_IT.screens} quoteLink={quoteLink} form={form} />
         </div>
       </section>
 
-      {/* 7. Pricing */}
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">{PRICING_HEADING}</h2>
+      {/* 7. Plans */}
+      <section className={`${WRAP} py-16 sm:py-20`} data-testid="plans">
+        <h2 className={H2}>{PRICING_HEADING}</h2>
         <p className="mt-3 text-text-secondary">
           <span className="figure">{free}</span> priced quotes free in total, no card.
         </p>
         <div className="mt-8 grid gap-5 sm:grid-cols-3">
           {offeredPlans().map((def) => (
-            <div key={def.id} className={`rounded-2xl p-6 ${def.recommended ? 'bg-primary text-white shadow-warm-lg' : 'border border-border bg-white'}`}>
-              <p className={`text-sm font-semibold ${def.recommended ? 'text-white/80' : 'text-text-secondary'}`}>{def.name}</p>
+            <div key={def.id} className={`flex flex-col rounded-2xl p-6 ${def.recommended ? 'bg-primary text-white shadow-warm-lg' : 'border border-border bg-white'}`} data-testid="plan-card">
+              <p className={`text-sm font-semibold ${def.recommended ? 'text-on-primary/80' : 'text-text-secondary'}`}>{def.name}</p>
               <p className="figure mt-2 text-3xl font-medium">{formatMoney((def.monthlyPrice.USD ?? 0) / 100, 'USD', 'en-US', { decimals: 0 })}</p>
-              <p className={`mt-1 text-xs ${def.recommended ? 'text-white/70' : 'text-text-muted'}`}>
+              <p className={`mt-1 text-xs ${def.recommended ? 'text-on-primary/70' : 'text-text-muted'}`}>
                 per month · {def.quoteLimit.toLocaleString('en-US')} quotes a month
               </p>
+              <Link
+                href={`/signup?plan=${def.id}`}
+                className={`motion-press mt-6 inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 text-sm font-semibold ${def.recommended ? 'bg-white text-primary hover:bg-mint' : 'border border-field bg-background text-text-primary hover:bg-surface'}`}
+                data-testid="plan-button"
+              >
+                Choose {def.name}
+              </Link>
             </div>
           ))}
         </div>
@@ -169,10 +218,10 @@ export default function HomePage() {
         </p>
       </section>
 
-      {/* 8. FAQ */}
+      {/* 8. Questions */}
       <section className="border-t border-border bg-surface py-16">
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
-          <h2 className="font-display text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">Questions</h2>
+          <h2 className={H2}>Questions</h2>
           <div className="mt-6 divide-y divide-border rounded-2xl border border-border bg-white" data-testid="faq">
             {FAQ.map((f) => (
               <details key={f.q} className="group px-5">
@@ -200,16 +249,16 @@ export default function HomePage() {
       {/* 9. Who is behind this (renders nothing until lib/marketing/founder.ts is filled in) */}
       <FounderNote />
 
-      {/* 10. Final call to action */}
-      <section className="bg-primary py-16 text-white">
+      {/* 10. The closing band: one button style and one quiet link */}
+      <section className="bg-primary py-16 text-white" data-testid="closing">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
           <h2 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">{FINAL_CTA}</h2>
-          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link href="/signup" className="inline-flex min-h-[48px] items-center justify-center rounded-lg bg-white px-6 py-3 text-sm font-semibold text-primary hover:bg-mint">
+          <div className="mt-8 flex flex-col items-center gap-2">
+            <Link href="/signup" className={MAIN_CTA} data-testid="closing-signup" data-cta="main">
               {freeOfferLabel()}
             </Link>
-            <Link href="/demo" className="inline-flex min-h-[48px] items-center justify-center rounded-lg border border-white/40 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10">
-              Try it as a customer
+            <Link href="/demo" className={`${QUIET_LINK} text-white`} data-testid="closing-demo">
+              {FINAL_QUIET_LINK}
             </Link>
           </div>
         </div>
@@ -217,21 +266,5 @@ export default function HomePage() {
 
       <SiteFooter />
     </main>
-  )
-}
-
-/** Small line icons for the three steps (ask, price, confirm) */
-function StepIcon({ index }: { index: number }) {
-  const paths = [
-    'M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
-    'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
-    'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
-  ]
-  return (
-    <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-mint text-primary" aria-hidden="true">
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
-        <path strokeLinecap="round" strokeLinejoin="round" d={paths[index]} />
-      </svg>
-    </span>
   )
 }

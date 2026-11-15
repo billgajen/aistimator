@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
-import { roundMoney } from '@qolumns/shared'
+import { roundMoney, splitMinimum, minimumTopUp, minimumEntry, withoutMinimumNote } from '@qolumns/shared'
 import type { QuotePricing } from '@qolumns/shared'
 
 export interface LineItem {
@@ -20,10 +20,21 @@ interface UseQuotePricingOptions {
  * stored before the engine rounded its lines (18 x 34.6 = 622.8000000000001):
  * they are rounded as they load, so nothing raw reaches the screen or the save.
  * The server rounds again on save; it also drops stale label maths there.
+ *
+ * T-165: the minimum charge is a floor, not an item. A quote that carries a
+ * minimum does not show it among the lines: `items` are the job's own lines,
+ * and the floor is kept beside them. As the lines change, the top-up is worked
+ * out again (`minimum.topUp`), so the subtotal stays at the minimum while the
+ * lines total less, and follows the lines once they total more. The business
+ * can remove the floor from this quote (`removeMinimum`); it then stays
+ * removed whatever they edit. A quote that carries no minimum never gets one.
  */
 export function useQuotePricing({ initialPricing, currency }: UseQuotePricingOptions) {
+  const [loaded] = useState(() => splitMinimum(initialPricing.breakdown))
+  // The business's minimum charge on this quote; null when it carries none or it was removed
+  const [floor, setFloor] = useState<number | null>(loaded.minimum?.minimumCharge ?? null)
   const [items, setItems] = useState<LineItem[]>(() =>
-    initialPricing.breakdown.map((b, i) => ({
+    loaded.lines.map((b, i) => ({
       id: `item-${i}`,
       label: b.label,
       amount: roundMoney(b.amount),
@@ -31,7 +42,8 @@ export function useQuotePricing({ initialPricing, currency }: UseQuotePricingOpt
       recommendationReason: b.recommendationReason,
     }))
   )
-  const [pricingNotes, setPricingNotes] = useState<string[]>(initialPricing.notes || [])
+  // The engine used to repeat the minimum sentence among the notes: it is shown once, by the total
+  const [pricingNotes, setPricingNotes] = useState<string[]>(() => withoutMinimumNote(initialPricing.notes))
   const [availableAddons, setAvailableAddonsRaw] = useState(() =>
     (initialPricing.availableAddons || []).map((a) => ({ ...a, price: roundMoney(a.price) }))
   )
@@ -43,10 +55,17 @@ export function useQuotePricing({ initialPricing, currency }: UseQuotePricingOpt
   const taxRate = initialPricing.taxRate || 0
   const taxLabel = initialPricing.taxLabel || 'Tax'
 
-  const subtotal = useMemo(
+  const linesTotal = useMemo(
     () => roundMoney(items.reduce((sum, item) => sum + item.amount, 0)),
     [items]
   )
+  const topUp = floor === null ? 0 : minimumTopUp(linesTotal, floor)
+  const subtotal = roundMoney(linesTotal + topUp)
+  /** The floor as the editor shows it: null when none applies right now */
+  const minimum = floor !== null && topUp > 0 ? { minimumCharge: floor, topUp } : null
+  const minimumRemoved = loaded.minimum !== null && floor === null
+  const removeMinimum = useCallback(() => setFloor(null), [])
+  const restoreMinimum = useCallback(() => setFloor(loaded.minimum?.minimumCharge ?? null), [loaded])
 
   const taxAmount = useMemo(
     () => (taxRate > 0 ? Math.round(subtotal * (taxRate / 100) * 100) / 100 : 0),
@@ -98,19 +117,28 @@ export function useQuotePricing({ initialPricing, currency }: UseQuotePricingOpt
       taxRate: taxRate > 0 ? taxRate : undefined,
       taxAmount,
       total,
-      breakdown: items.map((item) => ({
-        label: item.label,
-        amount: item.amount,
-        ...(item.autoRecommended && { autoRecommended: true }),
-        ...(item.recommendationReason && { recommendationReason: item.recommendationReason }),
-      })),
+      breakdown: [
+        ...items.map((item) => ({
+          label: item.label,
+          amount: item.amount,
+          ...(item.autoRecommended && { autoRecommended: true }),
+          ...(item.recommendationReason && { recommendationReason: item.recommendationReason }),
+        })),
+        // The top-up is its own entry, marked as the minimum, so lines + entry = subtotal
+        ...(floor !== null && topUp > 0 ? [minimumEntry(topUp, floor)] : []),
+      ],
       notes: pricingNotes.length > 0 ? pricingNotes : undefined,
       availableAddons: availableAddons.length > 0 ? availableAddons : undefined,
     }
-  }, [currency, subtotal, taxLabel, taxRate, taxAmount, total, items, pricingNotes, availableAddons])
+  }, [currency, subtotal, taxLabel, taxRate, taxAmount, total, items, pricingNotes, availableAddons, floor, topUp])
 
   return {
     items,
+    linesTotal,
+    minimum,
+    minimumRemoved,
+    removeMinimum,
+    restoreMinimum,
     subtotal,
     taxAmount,
     taxLabel,

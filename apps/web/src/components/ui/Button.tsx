@@ -21,10 +21,11 @@ const variantStyles: Record<ButtonVariant, string> = {
     'bg-danger text-white hover:bg-danger/90 focus:ring-danger/30',
   outline:
     'border border-border bg-surface text-text-primary hover:bg-background focus:ring-primary/20',
-  // T-164: the one main action of a screen (system.md, Colour). Not used on
-  // real pages yet; the owner picks the accent on /design first.
+  // T-165: the yellow button: dark text and a thin dark edge (system.md,
+  // Colour). The one main call to action of a marketing screen. Dashboard
+  // buttons do not use it.
   accent:
-    'bg-accent text-on-accent hover:opacity-90 focus:ring-accent',
+    'border border-on-accent bg-accent text-on-accent hover:opacity-90',
 }
 
 const sizeStyles: Record<ButtonSize, string> = {

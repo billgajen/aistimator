@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { EstimateWidget } from '@/components/embed/EstimateWidget'
-import { DEMO_CONTACT, DEMO_SAMPLE_PHOTO_PATH, formatMoney, freeOfferLabel, isQuoteProcessing } from '@qolumns/shared'
+import { MinimumNote } from '@/components/quote/MinimumNote'
+import { DEMO_CONTACT, DEMO_SAMPLE_PHOTO_PATH, formatMoney, freeOfferLabel, isQuoteProcessing, splitMinimum } from '@qolumns/shared'
 import type { QuoteViewResponse } from '@qolumns/shared'
 import { RECORDED_EXAMPLE, type DemoEstimate } from '@/lib/demo/recorded-example'
 
@@ -12,12 +13,15 @@ const POLL_LIMIT_MS = 180_000
 
 /** The estimate the visitor got, in the shape this page shows */
 export function toDemoEstimate(q: QuoteViewResponse, quoteViewUrl: string | null, serviceName: string | null): DemoEstimate {
+  // The minimum charge is a floor, not an item: the job's lines, then a note
+  const { lines, minimum } = splitMinimum(q.pricing.breakdown)
   return {
     businessName: q.business.name,
     serviceName,
     currency: q.pricing.currency,
     locale: q.locale ?? 'en-US',
-    lines: (q.pricing.breakdown ?? []).map((b) => ({ label: b.label, amount: b.amount })),
+    lines: lines.map((b) => ({ label: b.label, amount: b.amount })),
+    minimumCharge: minimum?.minimumCharge ?? null,
     taxLabel: q.pricing.taxAmount > 0 ? q.pricing.taxLabel ?? 'Tax' : null,
     taxAmount: q.pricing.taxAmount,
     total: q.pricing.total,
@@ -152,7 +156,13 @@ function EstimateCard({ estimate, recorded }: { estimate: DemoEstimate; recorded
           </li>
         )}
       </ul>
-      <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-border pt-3">
+      <MinimumNote
+        minimumCharge={estimate.minimumCharge}
+        currency={estimate.currency}
+        locale={estimate.locale}
+        className="mt-3 border-t border-border pt-3 text-sm text-text-secondary"
+      />
+      <div className={`flex items-baseline justify-between gap-4 ${estimate.minimumCharge ? 'mt-2' : 'mt-3 border-t border-border pt-3'}`}>
         <span className="font-semibold text-text-primary">Estimate</span>
         <span className="figure text-2xl font-medium text-text-primary" data-testid="demo-total">
           {estimate.range && estimate.needsAnswer
