@@ -742,10 +742,12 @@ free" at every width; the hero button keeps "Try it free: 10 quotes, no card".
     so lowering its lines in a later edit does not bring one back.
   - Worth knowing: the Pricing trace page (quotes list → More → Pricing trace) did not open at all before this
     (an error page). That was an older fault, fixed here.
-  - [ ] **A pricing question for you (not changed here):** after pricing, the quote checker can add a work step
-    the engine missed. When the job was below the minimum, it adds the step on top of the minimum: a $375 job
-    with a $400 minimum that gains a $100 step becomes $500 ($375 + $100 + the $25 top-up), not $475. It worked
-    this way before too. Fixing it changes a total, so it needs your decision and its own ticket.
+  - [x] **Correction: the "$375 job becomes $500" case was never reachable.** This item used to say that the
+    quote checker adds a missed work step on top of the minimum, so a $375 job with a $400 minimum that gains a
+    $100 step becomes $500, and that it had always worked that way. That was wrong. The code for it existed, but
+    the checker has had no way to trigger it since February 2026, and no quote was ever priced like that (0 of
+    1,543 checker runs locally, 0 of 5 in production). There was no pricing question to answer. The unused code
+    is removed in T-166 (see that section).
   - [ ] The Features page still quotes "$375 per room, heavy prep adds $250, minimum job $400." as something you
     can tell the system. It is not shown as a price line there, so it was left. Say if you want it to match Home.
 - Worth knowing:
@@ -765,3 +767,39 @@ free" at every width; the hero button keeps "Try it free: 10 quotes, no card".
 - The live check is `scripts/hardcore-test/verify-t165.mts` (add `PLAYWRIGHT_DIR=…`; it saves the home page, the
   demo's last state, login and the dashboard into its results folder). It joins the regression set: run t146 to
   t165 before a commit or deploy (there is no verify-t159, t161 or t163).
+
+## T-166 — The quote checker flags, it never corrects
+
+Built and checked locally. **Not committed, not deployed.** No price changes.
+
+- **A correction to what you were told in T-165.** The "$375 job becomes $500" case was never reachable. The code
+  for it existed, but the quote checker has had no way to trigger it since February 2026. No quote was ever
+  priced that way: 0 of 1,543 checker runs on this computer had a fix applied, and 0 of 5 in production (counted
+  read-only on 15 November 2026). The T-165 notes above and in the CHANGELOG now say so.
+- **What you chose (recorded as AD-049):** the unused code is deleted. The checker reads a priced quote and
+  reports issues. It cannot change a price, a line, a note or any wording. A test fails if that ever stops being
+  true.
+- **The label "auto-corrected"** in the checker's log meant: an issue was found, nothing was corrected, and the
+  quote went on without being held. It is renamed "passed with issues".
+- [ ] **Deploy, in this order** (when you ask for it):
+  1. the worker: `cd apps/worker && npx wrangler deploy --env production`
+  2. migration 41: `bash scripts/deploy-migration-41.sh` (renames the old label on 4 production log rows and
+     updates two column comments; it touches no quote, price or setting, and stops if any row has a correction
+     recorded)
+  3. the web app does **not** need deploying: nothing it runs changed.
+- [ ] **Hand test after the deploy:** send two ordinary requests through your quote link, one small and one
+  larger. Each should be priced exactly as before, line by line. Nothing should look different anywhere: this
+  ticket removes code that never ran.
+- [ ] **A decision for you: should the checker's findings hold a quote?** Today they do not. Every business
+  starts with the setting "auto-correct" for critical, high and medium issues, and no screen lets anyone change
+  it. Since nothing is corrected, that setting means the issue is written to a log no screen shows, and the
+  quote goes on. On this computer about 1 run in 8 (203 of 1,543) found such an issue; in production 4 of the 5
+  logged runs did. (I did not look at each business's settings row in production, only at the log.) The choices:
+  - leave it (the checker is a log only);
+  - hold those quotes for your approval (more quotes will wait for you; this needs a ticket, and a look at how
+    often the checker is right);
+  - show the findings to the business on the quote without holding it (a ticket).
+- [ ] Smaller: the stored setting is still named "auto-correct". Renaming it rewrites every business's settings
+  row; it can ride with whichever choice you make above.
+- Run t146 to t165 before a commit or deploy, as before. There is no verify-t166: there is nothing for a real
+  request to reach.

@@ -15,6 +15,100 @@
 
 ## Issues & Resolutions
 
+### 2026-11-15: T-166 — The quote checker flags, it never corrects (AD-049)
+
+The ticket began as "a step added by the quote checker counts toward the minimum, not on top of it". Reading the
+code showed the case could not happen, and the owner chose to remove the code instead of fixing it.
+
+**What was wrong**
+- T-165 reported that the quote checker (`apps/worker/src/ai/quote-validator.ts`) adds a missed work step on top
+  of an applied minimum: "$375 with a $400 minimum that gains a $100 step becomes $500". **That was never
+  reachable**, and the T-165 entry and `OWNER-TODO.md` are corrected (the old wording is struck through there).
+- The checker held a function, `applyAutoCorrections`, that could change a priced quote: add a work step (at a
+  quantity the model chose), remove an add-on, add and remove pricing notes, and rewrite scope text, exclusions,
+  "potential work" and cross-service suggestions. Its arithmetic did have the faults described: a step went on
+  top of the minimum, and a removed add-on could leave a total under the minimum.
+- None of it ran. Each correction needs an `autoFix` instruction in the model's reply. On 14 February 2026 (commit
+  `cf80553`, "Switch quote-validator to generateWithSchema") the reply became a fixed format with no `autoFix`
+  field, and the part of the prompt that described it was deleted. From then on the function skipped every issue.
+- **The data agrees.** Local log (`quote_validation_logs`): 1,543 checker runs, 203 with the outcome
+  `auto_corrected`, **0 with a fix applied**. Production, read-only count on 2026-11-15: **5 runs, 4
+  `auto_corrected`, 0 with a fix applied** (rows from 2026-11-08 and 2026-11-09).
+
+**Root cause of the wrong report:** the function was read and its call site was seen in the live pipeline, and
+that was taken as "it runs". Whether the data it needs can ever arrive was not checked. The check that settles
+such a claim is the log, not the code: one count would have shown it.
+
+**What changed (worker and shared types; the web app's behaviour is untouched)**
+- `applyAutoCorrections`, `AutoCorrectionResult` and every correction action are deleted, with the worker code
+  that applied their result to the quote and the shared types that described them (`AutoFixAction`,
+  `AutoFixDetails`, `ValidationIssue.autoFix`, `ValidationCorrections`).
+- The wording corrections (scope text, exclusions, potential work, cross-service) went with the price
+  corrections. They were unreachable in the same way, they lived in the same function, and the decision is that
+  the checker never corrects. The wording guard that does run (T-148, `repairCustomerWording`) is separate and
+  unchanged.
+- The worker hands the checker a **copy** of the priced quote, and takes back one thing: whether the quote is
+  held for the business to review. The checker's reply is rebuilt from the fields it may return, so nothing
+  else in a reply travels on.
+- **The label `auto_corrected`.** It meant: the checker found an issue; the business's setting for that
+  severity was `auto_correct`; nothing was corrected; and the quote went on as priced, **not held for review**.
+  It is renamed `passed_with_issues`. Migration 41 renames the old log rows and updates the two column
+  comments (`scripts/deploy-migration-41.sh`; it stops if any row has a correction recorded).
+- **Not changed, on purpose:** which quotes are held. Every mapping from setting to "held or not" is what it was
+  (unit test). The checker's prompt and reply format are untouched, so its findings are what they were; the
+  reply still carries `autoFixable`, the model's own opinion, which is logged and acted on by nothing. The log
+  column `corrections_applied` stays (applied migrations are not edited); it is always null.
+- **No price changed (AD-001).** Before any code was touched, the totals of 261 existing pricing cases were
+  recorded from the old code, engine then old checker (`apps/worker/src/__tests__/fixtures/t166-totals-before.json`;
+  the old checker changed 0 of them). The new code gives the same subtotal, tax, total and line amounts for all
+  261, engine alone and engine then checker, under every setting, with a reply that asks for every old
+  correction.
+
+**Found, for the owner to decide (not changed):**
+- **By default the checker's findings reach no one.** A business is created with the setting `auto_correct` for
+  critical, high and medium issues (the database default since migration 12). With no correction, that means an
+  issue is written to the log and the quote goes on. No screen reads that log. A quote is held for review on the
+  checker's account only when a business's setting says `flag_for_review` or `block`, and no screen or API in the
+  web app sets that, so a business has the default unless its row was changed by hand in the database
+  (production's rows were not looked at). So "the checker flags issues for review" is true of the code and, as
+  far as the code can show, of no business today. Locally 203 of 1,543 runs (13%) found such issues and held
+  nothing; in production 4 of 5. Making those quotes wait for approval changes how many
+  quotes a business must approve by hand, so it is a decision, not a fix.
+- The stored setting is still named `auto_correct`. Renaming it means rewriting every business's settings row.
+- A re-price after a customer's answer does not run the checker again; it keeps the first pass's review
+  decision. Unchanged.
+
+**Constraints introduced**
+- AD-049: the checker returns issues and a review decision, never a price, a line, a note or wording.
+  `checker-t166.test.ts` fails if the checker's file writes to a quote, if the worker's checker block assigns
+  anything but the review decision, or if a reply's instruction survives.
+- A claim that the product "does X" needs the run that shows it, not only the code that could.
+
+**Tests**
+- New: `apps/worker/src/__tests__/checker-t166.test.ts` (10) and the case list
+  `fixtures/pricing-cases.ts` (261 cases: home cleaning, painting, the fence service and the per-room example,
+  each with its form answers, three tax settings and three minimum charges).
+- The guard was proved: with one line added that lets the checker write a total, two of its tests fail.
+- No existing test changed. No regression script changed. There is no `verify-t166.mts`: no real request can
+  reach code that no longer exists, and the owner dropped that criterion.
+
+**Verified (2026-11-15, local stack):**
+- `pnpm lint`, `pnpm typecheck`, the web build and the worker build (a dry run) pass. No dependency added.
+- Unit tests: web 595, worker 519 (509 + 10), mobile 11, all pass.
+- Before and after: all 261 cases give the recorded subtotal, tax, total and line amounts.
+- Regression, t146 to t165, with the browser passes, on the new worker: 20, 33, 29, 35, 27, 35, 66, 36, 26, 44,
+  31, 96, 116, 96, 77, 78, 117, all pass.
+- The checker's log during that run (62 real pipeline runs): 58 `passed`, 4 `passed_with_issues`, none with a
+  correction, none held. Migration 41 was then applied to the local database: the 203 old `auto_corrected` rows
+  read `passed_with_issues`, none is left under the old name, a second run changes nothing, and both column
+  comments are updated.
+- Production was read, not written: one count of the checker's log (5 runs, 4 `auto_corrected`, 0 with a fix).
+
+**Not committed, not deployed.** Deploy order when asked: the worker, then migration 41
+(`bash scripts/deploy-migration-41.sh`). The web app does not need deploying: nothing it runs changed (only
+shared types the worker uses). Until migration 41 runs, production's 4 old rows keep the old label; nothing
+reads them.
+
 ### 2026-11-15: T-165 — Home page that shows the product; yellow accent; one free offer; the minimum charge is a floor (AD-047, AD-048)
 
 The owner keeps the look (paper, juniper, the same fonts) and found it good but boring. The home page now shows the
@@ -134,12 +228,21 @@ description), which is also what lets taste's checker see them.
   which this Next.js version (14) rejects, so `/app/quotes/<id>/trace` answered 500 ("An unsupported type was
   passed to use()"). It is the same in the last commit. It now reads it the way the quote page beside it does.
   The note could not be shown or checked on a page that did not open.
-- **Found and not changed** (it would change totals, which this change must not do): when the quote checker
+- **Correction (T-166, 2026-11-15): the next paragraph was wrong when it was written.** It said the quote checker
+  adds a missed work step on top of an applied minimum, so that "a job at $375 with a $400 minimum that gains a
+  $100 step becomes $500", and that "it did this before too". **That case was never reachable.** The code that
+  would do it existed, and its arithmetic was as described, but the checker's reply has had no field to carry
+  such an instruction since 14 February 2026 (commit `cf80553`), so the code skipped every issue. No quote was
+  ever priced that way: 0 of 1,543 checker runs in the local log and 0 of 5 in production's had a fix applied. The
+  claim came from reading the function without checking that anything could call it with the data it needed.
+  T-166 removes that code (AD-049). The original wording is kept below, struck through, so the record shows
+  what was said.
+- ~~**Found and not changed** (it would change totals, which this change must not do): when the quote checker
   adds a missed work step after pricing (`ai/quote-validator.ts`, `add_work_step`), it adds the step's amount to
   the subtotal and leaves the minimum entry as it was. A job at $375 with a $400 minimum that gains a $100 step
   becomes $500 ($375 + $100 + the $25 top-up), not $475. It did this before too; the $25 then showed as a line,
   and now the note reads "Minimum charge of $400.00 applied" over a $500 total. It needs its own ticket and a
-  pricing decision (see `OWNER-TODO.md`).
+  pricing decision (see `OWNER-TODO.md`).~~
 - **Not changed:** the Features page still quotes a business saying "…minimum job $400." It is describing what
   you can tell the system (it becomes the minimum charge setting), not a price line, so it was left; the home
   page was the request.
@@ -5070,6 +5173,25 @@ if (pricingResult.estimatedTotal <= 0) {
 - a separate `pricing_json.minimum` field with the top-up left out of the breakdown (breaks subtotal = sum of the breakdown for every reader, old and new, and would need a data migration);
 - re-applying the business's current minimum to any edited quote (it would add a minimum to quotes that never had one, and change the price of an old quote when the business later changes its setting);
 - a locked minimum the business cannot remove from a quote (the owner chose "Remove").
+
+### AD-049: The quote checker flags, it never corrects (T-166)
+
+**Decision:** the AI quote checker (`apps/worker/src/ai/quote-validator.ts`) reads a priced quote and returns issues. It never changes the quote: not the price, a line, the minimum, tax, a pricing note, the scope text, exclusions, suggestions or cross-service estimates. The one thing its findings can change is whether the quote is held for the business to review.
+
+**Why:** this is AD-001 applied to the checker. AD-001 says the AI does not set prices; all pricing comes from the business's configuration through the rules engine. A checker that adds a work step at a quantity it chose, or removes an add-on the engine applied, is the AI setting the price after the engine has finished, and outside the engine's rules (it added on top of the minimum instead of counting toward it). The code for that existed and had been unreachable since February 2026; a dormant path that can change prices is one reply-format change away from running. When the checker is right that something is missing, the fix belongs in the business's configuration (it already reports a suggested config fix) or with the business, who can edit the quote.
+
+**Rules that follow:**
+- The checker's file exports three things: run the check, decide the outcome, default settings. It has no function that takes or returns a corrected quote.
+- The worker gives the checker a copy of the quote. In the checker's block the worker assigns only the check's result, its outcome and the review decision.
+- The checker's reply is rebuilt field by field; an unknown field (an instruction, a replacement price) is dropped.
+- Outcomes are `passed`, `passed_with_issues`, `sent_for_review`, `blocked`. There is no "corrected" outcome. The stored setting value `auto_correct` is a legacy name for "log the issues and let the quote go on".
+- The deterministic wording guard (T-148) is not the checker and is not affected: it repairs banned customer words by fixed rules, never a price.
+- Anything that would let the checker change a quote again needs a decision that changes this entry and AD-001.
+
+**Rejected:**
+- fixing the order (work the minimum out after the checker's step): it repairs arithmetic in code that should not exist;
+- switching the corrections back on with the order fixed: the AI would choose steps and quantities on real quotes;
+- keeping the wording corrections and deleting only the price ones: they were equally unreachable, shared the function, and "flags, never corrects" is simpler to hold to than "corrects words but not prices".
 
 ---
 

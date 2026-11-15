@@ -53,6 +53,8 @@
      rules produce the value (AD-032). Identified values select steps via `triggerSignal`; they
      grade B until confirmed, and unknown ones are asked (with the allowed values as options)
    - recommendations, wording and cross-service detection run in parallel, then validation
+     (the AI quote checker). The checker flags, it never corrects (T-166, AD-049): it is given a copy of
+     the priced quote and its findings can only hold the quote for the business to review
    - if the quote needs a customer answer, it stops at `awaiting_clarification` with the
      provisional range and saves a reprice snapshot (first-pass AI outputs in `signals_json._reprice`)
    - per-stage timings and AI calls per task are stored in `pricing_trace_json.timings` / `.aiUsage`

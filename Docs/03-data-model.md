@@ -112,6 +112,16 @@ A customer's question on a quote (migration 17). Older rows may be review reques
 - status (pending | acknowledged | resolved): `acknowledged` = the business pressed "Mark as answered" (T-157); `resolved` = the business edited the quote and sent it
 - created_at
 
+### quote_validation_logs (migration 12; T-166, migration 41)
+One row per run of the AI quote checker: the quote as priced, the issues found, and what they led to.
+Business screens do not read it.
+- outcome: `passed` | `passed_with_issues` | `sent_for_review` | `blocked`. `passed_with_issues` = issues were
+  found and logged and the quote went on as priced, not held (it was called `auto_corrected` before T-166;
+  nothing was ever corrected, and migration 41 renames the old rows).
+- corrections_applied: unused, always null. The checker never corrects a quote (AD-049).
+- `tenants.validation_settings` decides what each severity leads to. The stored value `auto_correct` (the
+  default) is a legacy name for "log the issues and let the quote go on".
+
 ### request_leads (T-151, migration 34; T-160, migration 39)
 A request saved the moment the customer gives their contact details, before they finish. Not a quote: it never
 runs AI, never counts toward usage, and is not in the quote pipeline (AD-038).

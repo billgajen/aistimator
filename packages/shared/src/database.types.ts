@@ -1077,49 +1077,6 @@ export type ValidationIssueCategory =
 export type ValidationIssueSeverity = 'critical' | 'high' | 'medium' | 'low'
 
 /**
- * Auto-fix action types
- */
-export type AutoFixAction =
-  | 'add_work_step'
-  | 'remove_scope_text'
-  | 'add_scope_exclusion'
-  | 'remove_potential_work'
-  | 'remove_cross_service'
-  | 'remove_addon'
-  | 'remove_note'
-  | 'add_note'
-  | 'flag_only'
-
-/**
- * Auto-fix details for different action types
- */
-export interface AutoFixDetails {
-  action: AutoFixAction
-  details: {
-    // For add_work_step
-    workStepId?: string
-    quantity?: number
-    // For remove_scope_text
-    pattern?: string
-    replacement?: string
-    // For add_scope_exclusion
-    text?: string
-    // For remove_potential_work
-    itemIndex?: number
-    // For remove_cross_service
-    serviceId?: string
-    // For remove_addon
-    addonId?: string
-    // For remove_note / add_note
-    noteIndex?: number
-    noteText?: string
-    position?: 'start' | 'end'
-    // For flag_only
-    reason?: string
-  }
-}
-
-/**
  * Individual validation issue found during quote validation
  */
 export interface ValidationIssue {
@@ -1137,10 +1094,12 @@ export interface ValidationIssue {
   found: string
   /** What was expected based on config/request */
   expected: string
-  /** Whether this issue can be auto-fixed */
+  /**
+   * The checker's own opinion that the issue could be fixed mechanically. It is
+   * only logged: nothing acts on it, and the checker never corrects a quote
+   * (T-166, AD-049). Kept because the checker's reply format still asks for it.
+   */
   autoFixable: boolean
-  /** Auto-fix details if fixable */
-  autoFix?: AutoFixDetails
   /** Suggested config fix if this is a configuration issue */
   suggestedConfigFix?: string
 }
@@ -1222,17 +1181,14 @@ export interface ValidationQuoteSnapshot {
 }
 
 /**
- * Corrections that were applied to the quote
+ * What the checker's findings led to (T-166, AD-049: it flags, it never corrects).
+ * - `passed`: no issue, or only issues the settings let through.
+ * - `passed_with_issues`: issues were found and logged, and the quote went on
+ *   as priced, not held. (Called `auto_corrected` before T-166. Nothing was
+ *   ever corrected under that name; migration 41 renames the old log rows.)
+ * - `sent_for_review`, `blocked`: the quote is held for the business to review.
  */
-export interface ValidationCorrections {
-  appliedFixes: string[]
-  correctedQuote?: Partial<ValidationQuoteSnapshot>
-}
-
-/**
- * Validation outcome types
- */
-export type ValidationOutcome = 'auto_corrected' | 'sent_for_review' | 'passed' | 'blocked'
+export type ValidationOutcome = 'passed_with_issues' | 'sent_for_review' | 'passed' | 'blocked'
 
 /**
  * Review outcome types
@@ -1251,7 +1207,6 @@ export interface QuoteValidationLog {
   inputSnapshot: ValidationInputSnapshot
   originalQuoteSnapshot: ValidationQuoteSnapshot
   validationResult: ValidationResult
-  correctionsApplied?: ValidationCorrections
   outcome: ValidationOutcome
   reviewedBy?: string
   reviewOutcome?: ReviewOutcome
@@ -1261,7 +1216,12 @@ export interface QuoteValidationLog {
 }
 
 /**
- * Validation action when issues are found
+ * Validation action when issues are found.
+ *
+ * `auto_correct` is a stored name, kept because it is in every business's
+ * `tenants.validation_settings` (the database default since migration 12).
+ * Nothing is corrected (T-166, AD-049): it means "log the issues and let the
+ * quote go on as priced" (outcome `passed_with_issues`).
  */
 export type ValidationAction = 'auto_correct' | 'flag_for_review' | 'block' | 'pass_with_warning' | 'ignore'
 

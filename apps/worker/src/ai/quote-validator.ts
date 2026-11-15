@@ -2,8 +2,15 @@
  * Quote Validator
  *
  * Comprehensive validation system for generated quotes.
- * Catches issues before quotes reach customers, provides auto-correction,
- * and logs for continuous improvement.
+ * Catches issues before quotes reach customers and logs them.
+ *
+ * T-166 (AD-049): the checker FLAGS, it never corrects. It reads the priced
+ * quote and returns issues; nothing here returns or changes a price, a line,
+ * a note or any wording. What an issue leads to is decided by
+ * `determineValidationOutcome`: the quote is held for the business to review,
+ * or it goes on as priced. (Until T-166 this file also held code that could
+ * add a work step or remove an add-on. It had been unreachable since the reply
+ * format lost its `autoFix` field in February 2026, and is removed.)
  *
  * Validation Categories:
  * 1. Pricing Completeness - Form fields used, work steps triggered, expected total
@@ -28,7 +35,6 @@ import type {
   ExtractedSignal,
 } from '@qolumns/shared'
 import type { PricingResult } from '../pricing/rules-engine'
-import { roundMoney } from '@qolumns/shared'
 import type { QuoteContent } from './wording'
 
 // ============================================================================
@@ -62,6 +68,7 @@ export interface ServiceConfigForValidation {
  * Generated quote data for validation
  */
 export interface GeneratedQuoteForValidation {
+  /** Read only: the checker is given a copy and never returns pricing (T-166) */
   pricing: PricingResult
   content: QuoteContent
   signalRecommendations?: SignalRecommendation[]
@@ -379,6 +386,25 @@ function getDefaultValidationResult(actualTotal: number): ValidationResult {
 }
 
 /**
+ * One issue, rebuilt from the fields the checker may return. Anything else in
+ * the model's reply is dropped here, so no instruction to change the quote
+ * (the old `autoFix`) can travel past this point (T-166).
+ */
+function issueFromReply(issue: ValidationIssue): ValidationIssue {
+  return {
+    id: issue.id,
+    category: issue.category,
+    severity: issue.severity,
+    check: issue.check,
+    description: issue.description,
+    found: issue.found,
+    expected: issue.expected,
+    autoFixable: issue.autoFixable === true,
+    ...(typeof issue.suggestedConfigFix === 'string' && issue.suggestedConfigFix ? { suggestedConfigFix: issue.suggestedConfigFix } : {}),
+  }
+}
+
+/**
  * Normalize and validate the result from Gemini
  */
 function normalizeValidationResult(result: ValidationResult, actualTotal: number): ValidationResult {
@@ -386,7 +412,7 @@ function normalizeValidationResult(result: ValidationResult, actualTotal: number
   const normalized: ValidationResult = {
     overallStatus: result.overallStatus || 'PASS',
     confidenceScore: typeof result.confidenceScore === 'number' ? result.confidenceScore : 0.5,
-    issues: Array.isArray(result.issues) ? result.issues : [],
+    issues: Array.isArray(result.issues) ? result.issues.map(issueFromReply) : [],
     summary: result.summary || {
       criticalCount: 0,
       highCount: 0,
@@ -425,214 +451,23 @@ function normalizeValidationResult(result: ValidationResult, actualTotal: number
 }
 
 // ============================================================================
-// AUTO-CORRECTION
-// ============================================================================
-
-/**
- * Result of applying auto-corrections
- */
-export interface AutoCorrectionResult {
-  correctedPricing: PricingResult
-  correctedContent: QuoteContent
-  correctedRecommendations?: SignalRecommendation[]
-  correctedCrossServices?: CrossServicePricing[]
-  appliedFixes: string[]
-}
-
-/**
- * Apply auto-corrections to the quote based on validation issues
- */
-export function applyAutoCorrections(
-  quote: GeneratedQuoteForValidation,
-  issues: ValidationIssue[],
-  serviceConfig: ServiceConfigForValidation
-): AutoCorrectionResult {
-  const appliedFixes: string[] = []
-
-  // Deep clone the quote data
-  const correctedPricing: PricingResult = JSON.parse(JSON.stringify(quote.pricing))
-  const correctedContent: QuoteContent = JSON.parse(JSON.stringify(quote.content))
-  const correctedRecommendations = quote.signalRecommendations
-    ? JSON.parse(JSON.stringify(quote.signalRecommendations)) as SignalRecommendation[]
-    : undefined
-  let correctedCrossServices = quote.crossServicePricing
-    ? JSON.parse(JSON.stringify(quote.crossServicePricing)) as CrossServicePricing[]
-    : undefined
-
-  for (const issue of issues) {
-    if (!issue.autoFixable || !issue.autoFix) continue
-
-    switch (issue.autoFix.action) {
-      case 'add_work_step': {
-        const { workStepId, quantity } = issue.autoFix.details
-        if (!workStepId) continue
-
-        const workStep = (serviceConfig.workSteps || []).find(ws => ws.id === workStepId)
-        if (!workStep) {
-          console.log(`[Validator] Cannot auto-fix: work step ${workStepId} not found in config`)
-          continue
-        }
-
-        const qty = quantity || 1
-        // T-157: a line amount is rounded where it is created, and the
-        // subtotal stays the sum of the rounded lines
-        const amount = roundMoney(workStep.defaultCost * qty)
-        correctedPricing.breakdown.push({
-          label: workStep.name,
-          amount,
-        })
-        correctedPricing.subtotal = roundMoney(correctedPricing.subtotal + amount)
-
-        // Recalculate tax if applicable
-        if (correctedPricing.taxRate) {
-          const rawTax = correctedPricing.subtotal * (correctedPricing.taxRate / 100)
-          correctedPricing.taxAmount = Math.round(rawTax * 100) / 100
-        }
-
-        correctedPricing.total = roundMoney(correctedPricing.subtotal + correctedPricing.taxAmount)
-
-        appliedFixes.push(`Added ${workStep.name}: £${amount}`)
-        break
-      }
-
-      case 'remove_scope_text': {
-        const { pattern, replacement } = issue.autoFix.details
-        if (!pattern || !correctedContent.scopeSummary) continue
-
-        const before = correctedContent.scopeSummary
-        correctedContent.scopeSummary = correctedContent.scopeSummary.replace(
-          new RegExp(pattern, 'gi'),
-          replacement || ''
-        )
-
-        if (before !== correctedContent.scopeSummary) {
-          appliedFixes.push(`Removed "${pattern}" from scope`)
-        }
-        break
-      }
-
-      case 'add_scope_exclusion': {
-        const { text } = issue.autoFix.details
-        if (!text) continue
-
-        if (!correctedContent.exclusions) {
-          correctedContent.exclusions = []
-        }
-
-        if (!correctedContent.exclusions.includes(text)) {
-          correctedContent.exclusions.push(text)
-          appliedFixes.push(`Added exclusion: "${text}"`)
-        }
-        break
-      }
-
-      case 'remove_potential_work': {
-        const { itemIndex } = issue.autoFix.details
-        if (typeof itemIndex !== 'number' || !correctedRecommendations) continue
-
-        if (itemIndex >= 0 && itemIndex < correctedRecommendations.length) {
-          const removed = correctedRecommendations.splice(itemIndex, 1)
-          appliedFixes.push(`Removed potential work: "${removed[0]?.workDescription}"`)
-        }
-        break
-      }
-
-      case 'remove_cross_service': {
-        const { serviceId } = issue.autoFix.details
-        if (!serviceId || !correctedCrossServices) continue
-
-        const before = correctedCrossServices.length
-        correctedCrossServices = correctedCrossServices.filter(cs => cs.serviceId !== serviceId)
-
-        if (correctedCrossServices.length < before) {
-          appliedFixes.push(`Removed cross-service suggestion: ${serviceId}`)
-        }
-        break
-      }
-
-      case 'remove_addon': {
-        const { addonId } = issue.autoFix.details
-        if (!addonId) continue
-
-        const removedItems = correctedPricing.breakdown.filter(b =>
-          b.label.toLowerCase().includes(addonId.toLowerCase())
-        )
-
-        if (removedItems.length > 0) {
-          correctedPricing.breakdown = correctedPricing.breakdown.filter(b =>
-            !b.label.toLowerCase().includes(addonId.toLowerCase())
-          )
-
-          // Recalculate totals
-          const removedAmount = removedItems.reduce((sum, item) => sum + item.amount, 0)
-          correctedPricing.subtotal -= removedAmount
-
-          if (correctedPricing.taxRate) {
-            const rawTax = correctedPricing.subtotal * (correctedPricing.taxRate / 100)
-            correctedPricing.taxAmount = Math.round(rawTax * 100) / 100
-          }
-
-          correctedPricing.total = correctedPricing.subtotal + correctedPricing.taxAmount
-
-          appliedFixes.push(`Removed addon: ${addonId}`)
-        }
-        break
-      }
-
-      case 'remove_note': {
-        const { noteIndex } = issue.autoFix.details
-        if (typeof noteIndex !== 'number') continue
-
-        if (correctedPricing.notes && noteIndex >= 0 && noteIndex < correctedPricing.notes.length) {
-          const removed = correctedPricing.notes.splice(noteIndex, 1)
-          appliedFixes.push(`Removed note: "${removed[0]?.substring(0, 50)}..."`)
-        }
-        break
-      }
-
-      case 'add_note': {
-        const { noteText, position } = issue.autoFix.details
-        if (!noteText) continue
-
-        if (!correctedPricing.notes) {
-          correctedPricing.notes = []
-        }
-
-        if (position === 'start') {
-          correctedPricing.notes.unshift(noteText)
-        } else {
-          correctedPricing.notes.push(noteText)
-        }
-
-        appliedFixes.push(`Added note: "${noteText.substring(0, 50)}..."`)
-        break
-      }
-
-      case 'flag_only': {
-        // Just log, don't modify
-        appliedFixes.push(`Flagged for review: ${issue.description}`)
-        break
-      }
-    }
-  }
-
-  return {
-    correctedPricing,
-    correctedContent,
-    correctedRecommendations,
-    correctedCrossServices,
-    appliedFixes,
-  }
-}
-
-// ============================================================================
 // VALIDATION DECISION HELPER
 // ============================================================================
 
 import type { ValidationSettings, ValidationOutcome } from '@qolumns/shared'
 
 /**
- * Determine the validation outcome based on settings and issues
+ * Determine the validation outcome based on settings and issues.
+ *
+ * It decides one thing: is the quote held for the business to review
+ * (`sent_for_review`, `blocked`) or does it go on as priced (`passed`,
+ * `passed_with_issues`). It never changes the quote.
+ *
+ * `auto_correct` is the name stored in every business's settings (the
+ * database default since migration 12). Nothing is corrected (AD-049): it
+ * means "log the issues and let the quote go on", and its outcome is
+ * `passed_with_issues` (called `auto_corrected` before T-166, when 203 local
+ * and 4 production runs carried that label with no fix applied).
  */
 export function determineValidationOutcome(
   result: ValidationResult,
@@ -662,7 +497,7 @@ export function determineValidationOutcome(
       case 'flag_for_review':
         return { outcome: 'sent_for_review', needsReview: true, statusOverride: 'pending_review' }
       case 'auto_correct':
-        return { outcome: 'auto_corrected', needsReview: false }
+        return { outcome: 'passed_with_issues', needsReview: false }
       default:
         return { outcome: 'sent_for_review', needsReview: true, statusOverride: 'pending_review' }
     }
@@ -676,11 +511,11 @@ export function determineValidationOutcome(
       case 'flag_for_review':
         return { outcome: 'sent_for_review', needsReview: true, statusOverride: 'pending_review' }
       case 'auto_correct':
-        return { outcome: 'auto_corrected', needsReview: false }
+        return { outcome: 'passed_with_issues', needsReview: false }
       case 'pass_with_warning':
         return { outcome: 'passed', needsReview: false }
       default:
-        return { outcome: 'auto_corrected', needsReview: false }
+        return { outcome: 'passed_with_issues', needsReview: false }
     }
   }
 
@@ -690,12 +525,12 @@ export function determineValidationOutcome(
       case 'flag_for_review':
         return { outcome: 'sent_for_review', needsReview: true, statusOverride: 'pending_review' }
       case 'auto_correct':
-        return { outcome: 'auto_corrected', needsReview: false }
+        return { outcome: 'passed_with_issues', needsReview: false }
       case 'pass_with_warning':
       case 'ignore':
         return { outcome: 'passed', needsReview: false }
       default:
-        return { outcome: 'auto_corrected', needsReview: false }
+        return { outcome: 'passed_with_issues', needsReview: false }
     }
   }
 

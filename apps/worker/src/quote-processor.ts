@@ -29,7 +29,6 @@ import {
   generateSignalRecommendations,
   findUnusedSignals,
   validateQuote,
-  applyAutoCorrections,
   determineValidationOutcome,
   getDefaultValidationSettings,
 } from './ai'
@@ -1874,10 +1873,13 @@ export async function processQuote(
     console.log(`[Processor] Fallback mode: ${fallbackResult.mode}, status: ${finalStatus}`)
   }
 
-  // 4.7 Validate quote and apply corrections
+  // 4.7 Check the quote. T-166 (AD-049): the checker flags, it never corrects.
+  // It is handed a copy of the priced quote, and the only thing its answer
+  // can change is whether the quote is held for the business to review
+  // (`finalStatus`). The price, the lines, the notes and the wording are what
+  // the engine and the wording step produced.
   let validationResult: ValidationResult | undefined
   let validationOutcome: ValidationOutcome = 'passed'
-  let validationAppliedFixes: string[] = []
 
   // Get validation settings from tenant (or use defaults)
   const validationSettings: ValidationSettings = (tenant as unknown as { validation_settings?: ValidationSettings }).validation_settings
@@ -1912,13 +1914,14 @@ export async function processQuote(
       }
 
       // Build quote data for validation
-      const quoteForValidation: GeneratedQuoteForValidation = {
+      // A copy: nothing the checker does can reach the quote that is stored
+      const quoteForValidation: GeneratedQuoteForValidation = structuredClone({
         pricing,
         content,
         signalRecommendations,
         crossServicePricing,
         structuredSignals: structuredSignals || undefined,
-      }
+      })
 
       // Run validation
       validationResult = await timer.time('validation', () => validateQuote(
@@ -1944,26 +1947,6 @@ export async function processQuote(
           validationRequiresReview = outcomeDecision.statusOverride === 'pending_review'
           console.log(`[Processor] Status overridden by validation: ${finalStatus}`)
         }
-
-        // Apply auto-corrections if outcome allows
-        if (validationOutcome === 'auto_corrected' && validationResult.summary.autoFixableCount > 0) {
-          const corrections = applyAutoCorrections(quoteForValidation, validationResult.issues, serviceConfigForValidation)
-          validationAppliedFixes = corrections.appliedFixes
-
-          // Update pricing and content with corrections
-          Object.assign(pricing, corrections.correctedPricing)
-          Object.assign(content, corrections.correctedContent)
-
-          if (corrections.correctedRecommendations) {
-            signalRecommendations = corrections.correctedRecommendations
-          }
-          if (corrections.correctedCrossServices) {
-            crossServicePricing.length = 0
-            crossServicePricing.push(...corrections.correctedCrossServices)
-          }
-
-          console.log(`[Processor] Applied ${validationAppliedFixes.length} auto-corrections: ${validationAppliedFixes.join(', ')}`)
-        }
       }
 
       // Log validation to database (async, don't block)
@@ -1988,7 +1971,6 @@ export async function processQuote(
           crossServices: crossServicePricing,
         },
         validationResult,
-        correctionsApplied: validationAppliedFixes.length > 0 ? { appliedFixes: validationAppliedFixes } : undefined,
         outcome: validationOutcome,
       }).catch(err => {
         console.error('[Processor] Failed to log validation result:', err)
@@ -4168,7 +4150,6 @@ function convertFormValueToSignal(
 import type {
   ValidationInputSnapshot,
   ValidationQuoteSnapshot,
-  ValidationCorrections,
 } from '@qolumns/shared'
 
 /**
@@ -4181,7 +4162,6 @@ interface LogValidationParams {
   inputSnapshot: ValidationInputSnapshot
   originalQuoteSnapshot: ValidationQuoteSnapshot
   validationResult: ValidationResult
-  correctionsApplied?: ValidationCorrections
   outcome: ValidationOutcome
 }
 
@@ -4200,7 +4180,6 @@ async function logValidationResult(
     inputSnapshot,
     originalQuoteSnapshot,
     validationResult,
-    correctionsApplied,
     outcome,
   } = params
 
@@ -4223,7 +4202,7 @@ async function logValidationResult(
       input_snapshot: inputSnapshot,
       original_quote_snapshot: originalQuoteSnapshot,
       validation_result: validationResult,
-      corrections_applied: correctionsApplied || null,
+      // corrections_applied stays null: the checker never corrects (T-166, AD-049)
       outcome,
       config_suggestions: configSuggestions.length > 0 ? configSuggestions : null,
     })

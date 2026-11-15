@@ -1,0 +1,2579 @@
+{
+ "home cleaning / basic / uk vat / minimum 75": {
+  "subtotal": 320,
+  "taxAmount": 64,
+  "total": 384,
+  "lines": [
+   25,
+   140,
+   90,
+   65
+  ]
+ },
+ "home cleaning / basic / uk vat / minimum 0": {
+  "subtotal": 320,
+  "taxAmount": 64,
+  "total": 384,
+  "lines": [
+   25,
+   140,
+   90,
+   65
+  ]
+ },
+ "home cleaning / basic / uk vat / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 10000,
+  "total": 60000,
+  "lines": [
+   25,
+   140,
+   90,
+   65,
+   49680
+  ]
+ },
+ "home cleaning / basic / no tax / minimum 75": {
+  "subtotal": 320,
+  "taxAmount": 0,
+  "total": 320,
+  "lines": [
+   25,
+   140,
+   90,
+   65
+  ]
+ },
+ "home cleaning / basic / no tax / minimum 0": {
+  "subtotal": 320,
+  "taxAmount": 0,
+  "total": 320,
+  "lines": [
+   25,
+   140,
+   90,
+   65
+  ]
+ },
+ "home cleaning / basic / no tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 0,
+  "total": 50000,
+  "lines": [
+   25,
+   140,
+   90,
+   65,
+   49680
+  ]
+ },
+ "home cleaning / basic / us sales tax / minimum 75": {
+  "subtotal": 320,
+  "taxAmount": 26.4,
+  "total": 346.4,
+  "lines": [
+   25,
+   140,
+   90,
+   65
+  ]
+ },
+ "home cleaning / basic / us sales tax / minimum 0": {
+  "subtotal": 320,
+  "taxAmount": 26.4,
+  "total": 346.4,
+  "lines": [
+   25,
+   140,
+   90,
+   65
+  ]
+ },
+ "home cleaning / basic / us sales tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 4125,
+  "total": 54125,
+  "lines": [
+   25,
+   140,
+   90,
+   65,
+   49680
+  ]
+ },
+ "home cleaning / add-on keywords / uk vat / minimum 75": {
+  "subtotal": 280,
+  "taxAmount": 56,
+  "total": 336,
+  "lines": [
+   25,
+   105,
+   45,
+   65,
+   25,
+   15
+  ]
+ },
+ "home cleaning / add-on keywords / uk vat / minimum 0": {
+  "subtotal": 280,
+  "taxAmount": 56,
+  "total": 336,
+  "lines": [
+   25,
+   105,
+   45,
+   65,
+   25,
+   15
+  ]
+ },
+ "home cleaning / add-on keywords / uk vat / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 10000,
+  "total": 60000,
+  "lines": [
+   25,
+   105,
+   45,
+   65,
+   25,
+   15,
+   49720
+  ]
+ },
+ "home cleaning / add-on keywords / no tax / minimum 75": {
+  "subtotal": 280,
+  "taxAmount": 0,
+  "total": 280,
+  "lines": [
+   25,
+   105,
+   45,
+   65,
+   25,
+   15
+  ]
+ },
+ "home cleaning / add-on keywords / no tax / minimum 0": {
+  "subtotal": 280,
+  "taxAmount": 0,
+  "total": 280,
+  "lines": [
+   25,
+   105,
+   45,
+   65,
+   25,
+   15
+  ]
+ },
+ "home cleaning / add-on keywords / no tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 0,
+  "total": 50000,
+  "lines": [
+   25,
+   105,
+   45,
+   65,
+   25,
+   15,
+   49720
+  ]
+ },
+ "home cleaning / add-on keywords / us sales tax / minimum 75": {
+  "subtotal": 280,
+  "taxAmount": 23.1,
+  "total": 303.1,
+  "lines": [
+   25,
+   105,
+   45,
+   65,
+   25,
+   15
+  ]
+ },
+ "home cleaning / add-on keywords / us sales tax / minimum 0": {
+  "subtotal": 280,
+  "taxAmount": 23.1,
+  "total": 303.1,
+  "lines": [
+   25,
+   105,
+   45,
+   65,
+   25,
+   15
+  ]
+ },
+ "home cleaning / add-on keywords / us sales tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 4125,
+  "total": 54125,
+  "lines": [
+   25,
+   105,
+   45,
+   65,
+   25,
+   15,
+   49720
+  ]
+ },
+ "home cleaning / cross-service / uk vat / minimum 75": {
+  "subtotal": 240,
+  "taxAmount": 48,
+  "total": 288,
+  "lines": [
+   25,
+   105,
+   45,
+   65
+  ]
+ },
+ "home cleaning / cross-service / uk vat / minimum 0": {
+  "subtotal": 240,
+  "taxAmount": 48,
+  "total": 288,
+  "lines": [
+   25,
+   105,
+   45,
+   65
+  ]
+ },
+ "home cleaning / cross-service / uk vat / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 10000,
+  "total": 60000,
+  "lines": [
+   25,
+   105,
+   45,
+   65,
+   49760
+  ]
+ },
+ "home cleaning / cross-service / no tax / minimum 75": {
+  "subtotal": 240,
+  "taxAmount": 0,
+  "total": 240,
+  "lines": [
+   25,
+   105,
+   45,
+   65
+  ]
+ },
+ "home cleaning / cross-service / no tax / minimum 0": {
+  "subtotal": 240,
+  "taxAmount": 0,
+  "total": 240,
+  "lines": [
+   25,
+   105,
+   45,
+   65
+  ]
+ },
+ "home cleaning / cross-service / no tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 0,
+  "total": 50000,
+  "lines": [
+   25,
+   105,
+   45,
+   65,
+   49760
+  ]
+ },
+ "home cleaning / cross-service / us sales tax / minimum 75": {
+  "subtotal": 240,
+  "taxAmount": 19.8,
+  "total": 259.8,
+  "lines": [
+   25,
+   105,
+   45,
+   65
+  ]
+ },
+ "home cleaning / cross-service / us sales tax / minimum 0": {
+  "subtotal": 240,
+  "taxAmount": 19.8,
+  "total": 259.8,
+  "lines": [
+   25,
+   105,
+   45,
+   65
+  ]
+ },
+ "home cleaning / cross-service / us sales tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 4125,
+  "total": 54125,
+  "lines": [
+   25,
+   105,
+   45,
+   65,
+   49760
+  ]
+ },
+ "home cleaning / minimal / uk vat / minimum 75": {
+  "subtotal": 170,
+  "taxAmount": 34,
+  "total": 204,
+  "lines": [
+   25,
+   35,
+   45,
+   65
+  ]
+ },
+ "home cleaning / minimal / uk vat / minimum 0": {
+  "subtotal": 170,
+  "taxAmount": 34,
+  "total": 204,
+  "lines": [
+   25,
+   35,
+   45,
+   65
+  ]
+ },
+ "home cleaning / minimal / uk vat / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 10000,
+  "total": 60000,
+  "lines": [
+   25,
+   35,
+   45,
+   65,
+   49830
+  ]
+ },
+ "home cleaning / minimal / no tax / minimum 75": {
+  "subtotal": 170,
+  "taxAmount": 0,
+  "total": 170,
+  "lines": [
+   25,
+   35,
+   45,
+   65
+  ]
+ },
+ "home cleaning / minimal / no tax / minimum 0": {
+  "subtotal": 170,
+  "taxAmount": 0,
+  "total": 170,
+  "lines": [
+   25,
+   35,
+   45,
+   65
+  ]
+ },
+ "home cleaning / minimal / no tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 0,
+  "total": 50000,
+  "lines": [
+   25,
+   35,
+   45,
+   65,
+   49830
+  ]
+ },
+ "home cleaning / minimal / us sales tax / minimum 75": {
+  "subtotal": 170,
+  "taxAmount": 14.03,
+  "total": 184.03,
+  "lines": [
+   25,
+   35,
+   45,
+   65
+  ]
+ },
+ "home cleaning / minimal / us sales tax / minimum 0": {
+  "subtotal": 170,
+  "taxAmount": 14.03,
+  "total": 184.03,
+  "lines": [
+   25,
+   35,
+   45,
+   65
+  ]
+ },
+ "home cleaning / minimal / us sales tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 4125,
+  "total": 54125,
+  "lines": [
+   25,
+   35,
+   45,
+   65,
+   49830
+  ]
+ },
+ "home cleaning / form override / uk vat / minimum 75": {
+  "subtotal": 928.13,
+  "taxAmount": 185.63,
+  "total": 1113.76,
+  "lines": [
+   25,
+   175,
+   135,
+   65,
+   45,
+   50,
+   123.75,
+   154.69,
+   154.69
+  ]
+ },
+ "home cleaning / form override / uk vat / minimum 0": {
+  "subtotal": 928.13,
+  "taxAmount": 185.63,
+  "total": 1113.76,
+  "lines": [
+   25,
+   175,
+   135,
+   65,
+   45,
+   50,
+   123.75,
+   154.69,
+   154.69
+  ]
+ },
+ "home cleaning / form override / uk vat / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 10000,
+  "total": 60000,
+  "lines": [
+   25,
+   175,
+   135,
+   65,
+   45,
+   50,
+   123.75,
+   154.69,
+   154.69,
+   49071.87
+  ]
+ },
+ "home cleaning / form override / no tax / minimum 75": {
+  "subtotal": 928.13,
+  "taxAmount": 0,
+  "total": 928.13,
+  "lines": [
+   25,
+   175,
+   135,
+   65,
+   45,
+   50,
+   123.75,
+   154.69,
+   154.69
+  ]
+ },
+ "home cleaning / form override / no tax / minimum 0": {
+  "subtotal": 928.13,
+  "taxAmount": 0,
+  "total": 928.13,
+  "lines": [
+   25,
+   175,
+   135,
+   65,
+   45,
+   50,
+   123.75,
+   154.69,
+   154.69
+  ]
+ },
+ "home cleaning / form override / no tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 0,
+  "total": 50000,
+  "lines": [
+   25,
+   175,
+   135,
+   65,
+   45,
+   50,
+   123.75,
+   154.69,
+   154.69,
+   49071.87
+  ]
+ },
+ "home cleaning / form override / us sales tax / minimum 75": {
+  "subtotal": 928.13,
+  "taxAmount": 76.57,
+  "total": 1004.7,
+  "lines": [
+   25,
+   175,
+   135,
+   65,
+   45,
+   50,
+   123.75,
+   154.69,
+   154.69
+  ]
+ },
+ "home cleaning / form override / us sales tax / minimum 0": {
+  "subtotal": 928.13,
+  "taxAmount": 76.57,
+  "total": 1004.7,
+  "lines": [
+   25,
+   175,
+   135,
+   65,
+   45,
+   50,
+   123.75,
+   154.69,
+   154.69
+  ]
+ },
+ "home cleaning / form override / us sales tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 4125,
+  "total": 54125,
+  "lines": [
+   25,
+   175,
+   135,
+   65,
+   45,
+   50,
+   123.75,
+   154.69,
+   154.69,
+   49071.87
+  ]
+ },
+ "painting / basic / uk vat / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 30,
+  "total": 180,
+  "lines": [
+   50,
+   15,
+   45,
+   40
+  ]
+ },
+ "painting / basic / uk vat / minimum 0": {
+  "subtotal": 110,
+  "taxAmount": 22,
+  "total": 132,
+  "lines": [
+   50,
+   15,
+   45
+  ]
+ },
+ "painting / basic / uk vat / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 10000,
+  "total": 60000,
+  "lines": [
+   50,
+   15,
+   45,
+   49890
+  ]
+ },
+ "painting / basic / no tax / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 0,
+  "total": 150,
+  "lines": [
+   50,
+   15,
+   45,
+   40
+  ]
+ },
+ "painting / basic / no tax / minimum 0": {
+  "subtotal": 110,
+  "taxAmount": 0,
+  "total": 110,
+  "lines": [
+   50,
+   15,
+   45
+  ]
+ },
+ "painting / basic / no tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 0,
+  "total": 50000,
+  "lines": [
+   50,
+   15,
+   45,
+   49890
+  ]
+ },
+ "painting / basic / us sales tax / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 12.38,
+  "total": 162.38,
+  "lines": [
+   50,
+   15,
+   45,
+   40
+  ]
+ },
+ "painting / basic / us sales tax / minimum 0": {
+  "subtotal": 110,
+  "taxAmount": 9.08,
+  "total": 119.08,
+  "lines": [
+   50,
+   15,
+   45
+  ]
+ },
+ "painting / basic / us sales tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 4125,
+  "total": 54125,
+  "lines": [
+   50,
+   15,
+   45,
+   49890
+  ]
+ },
+ "painting / minimal / uk vat / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 30,
+  "total": 180,
+  "lines": [
+   50,
+   15,
+   45,
+   40
+  ]
+ },
+ "painting / minimal / uk vat / minimum 0": {
+  "subtotal": 110,
+  "taxAmount": 22,
+  "total": 132,
+  "lines": [
+   50,
+   15,
+   45
+  ]
+ },
+ "painting / minimal / uk vat / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 10000,
+  "total": 60000,
+  "lines": [
+   50,
+   15,
+   45,
+   49890
+  ]
+ },
+ "painting / minimal / no tax / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 0,
+  "total": 150,
+  "lines": [
+   50,
+   15,
+   45,
+   40
+  ]
+ },
+ "painting / minimal / no tax / minimum 0": {
+  "subtotal": 110,
+  "taxAmount": 0,
+  "total": 110,
+  "lines": [
+   50,
+   15,
+   45
+  ]
+ },
+ "painting / minimal / no tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 0,
+  "total": 50000,
+  "lines": [
+   50,
+   15,
+   45,
+   49890
+  ]
+ },
+ "painting / minimal / us sales tax / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 12.38,
+  "total": 162.38,
+  "lines": [
+   50,
+   15,
+   45,
+   40
+  ]
+ },
+ "painting / minimal / us sales tax / minimum 0": {
+  "subtotal": 110,
+  "taxAmount": 9.08,
+  "total": 119.08,
+  "lines": [
+   50,
+   15,
+   45
+  ]
+ },
+ "painting / minimal / us sales tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 4125,
+  "total": 54125,
+  "lines": [
+   50,
+   15,
+   45,
+   49890
+  ]
+ },
+ "painting / no answers / uk vat / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 30,
+  "total": 180,
+  "lines": [
+   50,
+   15,
+   45,
+   40
+  ]
+ },
+ "painting / no answers / uk vat / minimum 0": {
+  "subtotal": 110,
+  "taxAmount": 22,
+  "total": 132,
+  "lines": [
+   50,
+   15,
+   45
+  ]
+ },
+ "painting / no answers / uk vat / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 10000,
+  "total": 60000,
+  "lines": [
+   50,
+   15,
+   45,
+   49890
+  ]
+ },
+ "painting / no answers / no tax / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 0,
+  "total": 150,
+  "lines": [
+   50,
+   15,
+   45,
+   40
+  ]
+ },
+ "painting / no answers / no tax / minimum 0": {
+  "subtotal": 110,
+  "taxAmount": 0,
+  "total": 110,
+  "lines": [
+   50,
+   15,
+   45
+  ]
+ },
+ "painting / no answers / no tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 0,
+  "total": 50000,
+  "lines": [
+   50,
+   15,
+   45,
+   49890
+  ]
+ },
+ "painting / no answers / us sales tax / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 12.38,
+  "total": 162.38,
+  "lines": [
+   50,
+   15,
+   45,
+   40
+  ]
+ },
+ "painting / no answers / us sales tax / minimum 0": {
+  "subtotal": 110,
+  "taxAmount": 9.08,
+  "total": 119.08,
+  "lines": [
+   50,
+   15,
+   45
+  ]
+ },
+ "painting / no answers / us sales tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 4125,
+  "total": 54125,
+  "lines": [
+   50,
+   15,
+   45,
+   49890
+  ]
+ },
+ "fence / minimal / uk vat / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 30,
+  "total": 180,
+  "lines": [
+   75,
+   18.75,
+   56.25
+  ]
+ },
+ "fence / minimal / uk vat / minimum 0": {
+  "subtotal": 93.75,
+  "taxAmount": 18.75,
+  "total": 112.5,
+  "lines": [
+   75,
+   18.75
+  ]
+ },
+ "fence / minimal / uk vat / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 10000,
+  "total": 60000,
+  "lines": [
+   75,
+   18.75,
+   49906.25
+  ]
+ },
+ "fence / minimal / no tax / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 0,
+  "total": 150,
+  "lines": [
+   75,
+   18.75,
+   56.25
+  ]
+ },
+ "fence / minimal / no tax / minimum 0": {
+  "subtotal": 93.75,
+  "taxAmount": 0,
+  "total": 93.75,
+  "lines": [
+   75,
+   18.75
+  ]
+ },
+ "fence / minimal / no tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 0,
+  "total": 50000,
+  "lines": [
+   75,
+   18.75,
+   49906.25
+  ]
+ },
+ "fence / minimal / us sales tax / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 12.38,
+  "total": 162.38,
+  "lines": [
+   75,
+   18.75,
+   56.25
+  ]
+ },
+ "fence / minimal / us sales tax / minimum 0": {
+  "subtotal": 93.75,
+  "taxAmount": 7.73,
+  "total": 101.48,
+  "lines": [
+   75,
+   18.75
+  ]
+ },
+ "fence / minimal / us sales tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 4125,
+  "total": 54125,
+  "lines": [
+   75,
+   18.75,
+   49906.25
+  ]
+ },
+ "fence / detailed / uk vat / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 30,
+  "total": 180,
+  "lines": [
+   75,
+   15,
+   60
+  ]
+ },
+ "fence / detailed / uk vat / minimum 0": {
+  "subtotal": 90,
+  "taxAmount": 18,
+  "total": 108,
+  "lines": [
+   75,
+   15
+  ]
+ },
+ "fence / detailed / uk vat / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 10000,
+  "total": 60000,
+  "lines": [
+   75,
+   15,
+   49910
+  ]
+ },
+ "fence / detailed / no tax / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 0,
+  "total": 150,
+  "lines": [
+   75,
+   15,
+   60
+  ]
+ },
+ "fence / detailed / no tax / minimum 0": {
+  "subtotal": 90,
+  "taxAmount": 0,
+  "total": 90,
+  "lines": [
+   75,
+   15
+  ]
+ },
+ "fence / detailed / no tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 0,
+  "total": 50000,
+  "lines": [
+   75,
+   15,
+   49910
+  ]
+ },
+ "fence / detailed / us sales tax / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 12.38,
+  "total": 162.38,
+  "lines": [
+   75,
+   15,
+   60
+  ]
+ },
+ "fence / detailed / us sales tax / minimum 0": {
+  "subtotal": 90,
+  "taxAmount": 7.43,
+  "total": 97.43,
+  "lines": [
+   75,
+   15
+  ]
+ },
+ "fence / detailed / us sales tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 4125,
+  "total": 54125,
+  "lines": [
+   75,
+   15,
+   49910
+  ]
+ },
+ "fence / price sensitive / uk vat / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 30,
+  "total": 180,
+  "lines": [
+   75,
+   75
+  ]
+ },
+ "fence / price sensitive / uk vat / minimum 0": {
+  "subtotal": 75,
+  "taxAmount": 15,
+  "total": 90,
+  "lines": [
+   75
+  ]
+ },
+ "fence / price sensitive / uk vat / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 10000,
+  "total": 60000,
+  "lines": [
+   75,
+   49925
+  ]
+ },
+ "fence / price sensitive / no tax / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 0,
+  "total": 150,
+  "lines": [
+   75,
+   75
+  ]
+ },
+ "fence / price sensitive / no tax / minimum 0": {
+  "subtotal": 75,
+  "taxAmount": 0,
+  "total": 75,
+  "lines": [
+   75
+  ]
+ },
+ "fence / price sensitive / no tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 0,
+  "total": 50000,
+  "lines": [
+   75,
+   49925
+  ]
+ },
+ "fence / price sensitive / us sales tax / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 12.38,
+  "total": 162.38,
+  "lines": [
+   75,
+   75
+  ]
+ },
+ "fence / price sensitive / us sales tax / minimum 0": {
+  "subtotal": 75,
+  "taxAmount": 6.19,
+  "total": 81.19,
+  "lines": [
+   75
+  ]
+ },
+ "fence / price sensitive / us sales tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 4125,
+  "total": 54125,
+  "lines": [
+   75,
+   49925
+  ]
+ },
+ "fence / urgent / uk vat / minimum 150": {
+  "subtotal": 180,
+  "taxAmount": 36,
+  "total": 216,
+  "lines": [
+   75,
+   45,
+   24,
+   36
+  ]
+ },
+ "fence / urgent / uk vat / minimum 0": {
+  "subtotal": 180,
+  "taxAmount": 36,
+  "total": 216,
+  "lines": [
+   75,
+   45,
+   24,
+   36
+  ]
+ },
+ "fence / urgent / uk vat / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 10000,
+  "total": 60000,
+  "lines": [
+   75,
+   45,
+   24,
+   36,
+   49820
+  ]
+ },
+ "fence / urgent / no tax / minimum 150": {
+  "subtotal": 180,
+  "taxAmount": 0,
+  "total": 180,
+  "lines": [
+   75,
+   45,
+   24,
+   36
+  ]
+ },
+ "fence / urgent / no tax / minimum 0": {
+  "subtotal": 180,
+  "taxAmount": 0,
+  "total": 180,
+  "lines": [
+   75,
+   45,
+   24,
+   36
+  ]
+ },
+ "fence / urgent / no tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 0,
+  "total": 50000,
+  "lines": [
+   75,
+   45,
+   24,
+   36,
+   49820
+  ]
+ },
+ "fence / urgent / us sales tax / minimum 150": {
+  "subtotal": 180,
+  "taxAmount": 14.85,
+  "total": 194.85,
+  "lines": [
+   75,
+   45,
+   24,
+   36
+  ]
+ },
+ "fence / urgent / us sales tax / minimum 0": {
+  "subtotal": 180,
+  "taxAmount": 14.85,
+  "total": 194.85,
+  "lines": [
+   75,
+   45,
+   24,
+   36
+  ]
+ },
+ "fence / urgent / us sales tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 4125,
+  "total": 54125,
+  "lines": [
+   75,
+   45,
+   24,
+   36,
+   49820
+  ]
+ },
+ "fence / confusing / uk vat / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 30,
+  "total": 180,
+  "lines": [
+   75,
+   8,
+   12.45,
+   9.55,
+   45
+  ]
+ },
+ "fence / confusing / uk vat / minimum 0": {
+  "subtotal": 105,
+  "taxAmount": 21,
+  "total": 126,
+  "lines": [
+   75,
+   8,
+   12.45,
+   9.55
+  ]
+ },
+ "fence / confusing / uk vat / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 10000,
+  "total": 60000,
+  "lines": [
+   75,
+   8,
+   12.45,
+   9.55,
+   49895
+  ]
+ },
+ "fence / confusing / no tax / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 0,
+  "total": 150,
+  "lines": [
+   75,
+   8,
+   12.45,
+   9.55,
+   45
+  ]
+ },
+ "fence / confusing / no tax / minimum 0": {
+  "subtotal": 105,
+  "taxAmount": 0,
+  "total": 105,
+  "lines": [
+   75,
+   8,
+   12.45,
+   9.55
+  ]
+ },
+ "fence / confusing / no tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 0,
+  "total": 50000,
+  "lines": [
+   75,
+   8,
+   12.45,
+   9.55,
+   49895
+  ]
+ },
+ "fence / confusing / us sales tax / minimum 150": {
+  "subtotal": 150,
+  "taxAmount": 12.38,
+  "total": 162.38,
+  "lines": [
+   75,
+   8,
+   12.45,
+   9.55,
+   45
+  ]
+ },
+ "fence / confusing / us sales tax / minimum 0": {
+  "subtotal": 105,
+  "taxAmount": 8.66,
+  "total": 113.66,
+  "lines": [
+   75,
+   8,
+   12.45,
+   9.55
+  ]
+ },
+ "fence / confusing / us sales tax / minimum 50000": {
+  "subtotal": 50000,
+  "taxAmount": 4125,
+  "total": 54125,
+  "lines": [
+   75,
+   8,
+   12.45,
+   9.55,
+   49895
+  ]
+ },
+ "rooms / one room step / 1 room(s) / uk vat / minimum 0": {
+  "subtotal": 375,
+  "taxAmount": 75,
+  "total": 450,
+  "lines": [
+   375
+  ]
+ },
+ "rooms / one room step / 1 room(s) / no tax / minimum 0": {
+  "subtotal": 375,
+  "taxAmount": 0,
+  "total": 375,
+  "lines": [
+   375
+  ]
+ },
+ "rooms / one room step / 1 room(s) / us sales tax / minimum 0": {
+  "subtotal": 375,
+  "taxAmount": 30.94,
+  "total": 405.94,
+  "lines": [
+   375
+  ]
+ },
+ "rooms / one room step / 2 room(s) / uk vat / minimum 0": {
+  "subtotal": 750,
+  "taxAmount": 150,
+  "total": 900,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 2 room(s) / no tax / minimum 0": {
+  "subtotal": 750,
+  "taxAmount": 0,
+  "total": 750,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 2 room(s) / us sales tax / minimum 0": {
+  "subtotal": 750,
+  "taxAmount": 61.88,
+  "total": 811.88,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 3 room(s) / uk vat / minimum 0": {
+  "subtotal": 1125,
+  "taxAmount": 225,
+  "total": 1350,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 3 room(s) / no tax / minimum 0": {
+  "subtotal": 1125,
+  "taxAmount": 0,
+  "total": 1125,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 3 room(s) / us sales tax / minimum 0": {
+  "subtotal": 1125,
+  "taxAmount": 92.81,
+  "total": 1217.81,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 1 room(s) / uk vat / minimum 100": {
+  "subtotal": 375,
+  "taxAmount": 75,
+  "total": 450,
+  "lines": [
+   375
+  ]
+ },
+ "rooms / one room step / 1 room(s) / no tax / minimum 100": {
+  "subtotal": 375,
+  "taxAmount": 0,
+  "total": 375,
+  "lines": [
+   375
+  ]
+ },
+ "rooms / one room step / 1 room(s) / us sales tax / minimum 100": {
+  "subtotal": 375,
+  "taxAmount": 30.94,
+  "total": 405.94,
+  "lines": [
+   375
+  ]
+ },
+ "rooms / one room step / 2 room(s) / uk vat / minimum 100": {
+  "subtotal": 750,
+  "taxAmount": 150,
+  "total": 900,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 2 room(s) / no tax / minimum 100": {
+  "subtotal": 750,
+  "taxAmount": 0,
+  "total": 750,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 2 room(s) / us sales tax / minimum 100": {
+  "subtotal": 750,
+  "taxAmount": 61.88,
+  "total": 811.88,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 3 room(s) / uk vat / minimum 100": {
+  "subtotal": 1125,
+  "taxAmount": 225,
+  "total": 1350,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 3 room(s) / no tax / minimum 100": {
+  "subtotal": 1125,
+  "taxAmount": 0,
+  "total": 1125,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 3 room(s) / us sales tax / minimum 100": {
+  "subtotal": 1125,
+  "taxAmount": 92.81,
+  "total": 1217.81,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 1 room(s) / uk vat / minimum 374.99": {
+  "subtotal": 375,
+  "taxAmount": 75,
+  "total": 450,
+  "lines": [
+   375
+  ]
+ },
+ "rooms / one room step / 1 room(s) / no tax / minimum 374.99": {
+  "subtotal": 375,
+  "taxAmount": 0,
+  "total": 375,
+  "lines": [
+   375
+  ]
+ },
+ "rooms / one room step / 1 room(s) / us sales tax / minimum 374.99": {
+  "subtotal": 375,
+  "taxAmount": 30.94,
+  "total": 405.94,
+  "lines": [
+   375
+  ]
+ },
+ "rooms / one room step / 2 room(s) / uk vat / minimum 374.99": {
+  "subtotal": 750,
+  "taxAmount": 150,
+  "total": 900,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 2 room(s) / no tax / minimum 374.99": {
+  "subtotal": 750,
+  "taxAmount": 0,
+  "total": 750,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 2 room(s) / us sales tax / minimum 374.99": {
+  "subtotal": 750,
+  "taxAmount": 61.88,
+  "total": 811.88,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 3 room(s) / uk vat / minimum 374.99": {
+  "subtotal": 1125,
+  "taxAmount": 225,
+  "total": 1350,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 3 room(s) / no tax / minimum 374.99": {
+  "subtotal": 1125,
+  "taxAmount": 0,
+  "total": 1125,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 3 room(s) / us sales tax / minimum 374.99": {
+  "subtotal": 1125,
+  "taxAmount": 92.81,
+  "total": 1217.81,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 1 room(s) / uk vat / minimum 375": {
+  "subtotal": 375,
+  "taxAmount": 75,
+  "total": 450,
+  "lines": [
+   375
+  ]
+ },
+ "rooms / one room step / 1 room(s) / no tax / minimum 375": {
+  "subtotal": 375,
+  "taxAmount": 0,
+  "total": 375,
+  "lines": [
+   375
+  ]
+ },
+ "rooms / one room step / 1 room(s) / us sales tax / minimum 375": {
+  "subtotal": 375,
+  "taxAmount": 30.94,
+  "total": 405.94,
+  "lines": [
+   375
+  ]
+ },
+ "rooms / one room step / 2 room(s) / uk vat / minimum 375": {
+  "subtotal": 750,
+  "taxAmount": 150,
+  "total": 900,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 2 room(s) / no tax / minimum 375": {
+  "subtotal": 750,
+  "taxAmount": 0,
+  "total": 750,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 2 room(s) / us sales tax / minimum 375": {
+  "subtotal": 750,
+  "taxAmount": 61.88,
+  "total": 811.88,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 3 room(s) / uk vat / minimum 375": {
+  "subtotal": 1125,
+  "taxAmount": 225,
+  "total": 1350,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 3 room(s) / no tax / minimum 375": {
+  "subtotal": 1125,
+  "taxAmount": 0,
+  "total": 1125,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 3 room(s) / us sales tax / minimum 375": {
+  "subtotal": 1125,
+  "taxAmount": 92.81,
+  "total": 1217.81,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 1 room(s) / uk vat / minimum 375.01": {
+  "subtotal": 375.01,
+  "taxAmount": 75,
+  "total": 450.01,
+  "lines": [
+   375,
+   0.01
+  ]
+ },
+ "rooms / one room step / 1 room(s) / no tax / minimum 375.01": {
+  "subtotal": 375.01,
+  "taxAmount": 0,
+  "total": 375.01,
+  "lines": [
+   375,
+   0.01
+  ]
+ },
+ "rooms / one room step / 1 room(s) / us sales tax / minimum 375.01": {
+  "subtotal": 375.01,
+  "taxAmount": 30.94,
+  "total": 405.95,
+  "lines": [
+   375,
+   0.01
+  ]
+ },
+ "rooms / one room step / 2 room(s) / uk vat / minimum 375.01": {
+  "subtotal": 750,
+  "taxAmount": 150,
+  "total": 900,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 2 room(s) / no tax / minimum 375.01": {
+  "subtotal": 750,
+  "taxAmount": 0,
+  "total": 750,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 2 room(s) / us sales tax / minimum 375.01": {
+  "subtotal": 750,
+  "taxAmount": 61.88,
+  "total": 811.88,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 3 room(s) / uk vat / minimum 375.01": {
+  "subtotal": 1125,
+  "taxAmount": 225,
+  "total": 1350,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 3 room(s) / no tax / minimum 375.01": {
+  "subtotal": 1125,
+  "taxAmount": 0,
+  "total": 1125,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 3 room(s) / us sales tax / minimum 375.01": {
+  "subtotal": 1125,
+  "taxAmount": 92.81,
+  "total": 1217.81,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 1 room(s) / uk vat / minimum 400": {
+  "subtotal": 400,
+  "taxAmount": 80,
+  "total": 480,
+  "lines": [
+   375,
+   25
+  ]
+ },
+ "rooms / one room step / 1 room(s) / no tax / minimum 400": {
+  "subtotal": 400,
+  "taxAmount": 0,
+  "total": 400,
+  "lines": [
+   375,
+   25
+  ]
+ },
+ "rooms / one room step / 1 room(s) / us sales tax / minimum 400": {
+  "subtotal": 400,
+  "taxAmount": 33,
+  "total": 433,
+  "lines": [
+   375,
+   25
+  ]
+ },
+ "rooms / one room step / 2 room(s) / uk vat / minimum 400": {
+  "subtotal": 750,
+  "taxAmount": 150,
+  "total": 900,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 2 room(s) / no tax / minimum 400": {
+  "subtotal": 750,
+  "taxAmount": 0,
+  "total": 750,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 2 room(s) / us sales tax / minimum 400": {
+  "subtotal": 750,
+  "taxAmount": 61.88,
+  "total": 811.88,
+  "lines": [
+   750
+  ]
+ },
+ "rooms / one room step / 3 room(s) / uk vat / minimum 400": {
+  "subtotal": 1125,
+  "taxAmount": 225,
+  "total": 1350,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 3 room(s) / no tax / minimum 400": {
+  "subtotal": 1125,
+  "taxAmount": 0,
+  "total": 1125,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 3 room(s) / us sales tax / minimum 400": {
+  "subtotal": 1125,
+  "taxAmount": 92.81,
+  "total": 1217.81,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 1 room(s) / uk vat / minimum 750.5": {
+  "subtotal": 750.5,
+  "taxAmount": 150.1,
+  "total": 900.6,
+  "lines": [
+   375,
+   375.5
+  ]
+ },
+ "rooms / one room step / 1 room(s) / no tax / minimum 750.5": {
+  "subtotal": 750.5,
+  "taxAmount": 0,
+  "total": 750.5,
+  "lines": [
+   375,
+   375.5
+  ]
+ },
+ "rooms / one room step / 1 room(s) / us sales tax / minimum 750.5": {
+  "subtotal": 750.5,
+  "taxAmount": 61.92,
+  "total": 812.42,
+  "lines": [
+   375,
+   375.5
+  ]
+ },
+ "rooms / one room step / 2 room(s) / uk vat / minimum 750.5": {
+  "subtotal": 750.5,
+  "taxAmount": 150.1,
+  "total": 900.6,
+  "lines": [
+   750,
+   0.5
+  ]
+ },
+ "rooms / one room step / 2 room(s) / no tax / minimum 750.5": {
+  "subtotal": 750.5,
+  "taxAmount": 0,
+  "total": 750.5,
+  "lines": [
+   750,
+   0.5
+  ]
+ },
+ "rooms / one room step / 2 room(s) / us sales tax / minimum 750.5": {
+  "subtotal": 750.5,
+  "taxAmount": 61.92,
+  "total": 812.42,
+  "lines": [
+   750,
+   0.5
+  ]
+ },
+ "rooms / one room step / 3 room(s) / uk vat / minimum 750.5": {
+  "subtotal": 1125,
+  "taxAmount": 225,
+  "total": 1350,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 3 room(s) / no tax / minimum 750.5": {
+  "subtotal": 1125,
+  "taxAmount": 0,
+  "total": 1125,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 3 room(s) / us sales tax / minimum 750.5": {
+  "subtotal": 1125,
+  "taxAmount": 92.81,
+  "total": 1217.81,
+  "lines": [
+   1125
+  ]
+ },
+ "rooms / one room step / 1 room(s) / uk vat / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 400,
+  "total": 2400,
+  "lines": [
+   375,
+   1625
+  ]
+ },
+ "rooms / one room step / 1 room(s) / no tax / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 0,
+  "total": 2000,
+  "lines": [
+   375,
+   1625
+  ]
+ },
+ "rooms / one room step / 1 room(s) / us sales tax / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 165,
+  "total": 2165,
+  "lines": [
+   375,
+   1625
+  ]
+ },
+ "rooms / one room step / 2 room(s) / uk vat / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 400,
+  "total": 2400,
+  "lines": [
+   750,
+   1250
+  ]
+ },
+ "rooms / one room step / 2 room(s) / no tax / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 0,
+  "total": 2000,
+  "lines": [
+   750,
+   1250
+  ]
+ },
+ "rooms / one room step / 2 room(s) / us sales tax / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 165,
+  "total": 2165,
+  "lines": [
+   750,
+   1250
+  ]
+ },
+ "rooms / one room step / 3 room(s) / uk vat / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 400,
+  "total": 2400,
+  "lines": [
+   1125,
+   875
+  ]
+ },
+ "rooms / one room step / 3 room(s) / no tax / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 0,
+  "total": 2000,
+  "lines": [
+   1125,
+   875
+  ]
+ },
+ "rooms / one room step / 3 room(s) / us sales tax / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 165,
+  "total": 2165,
+  "lines": [
+   1125,
+   875
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / uk vat / minimum 0": {
+  "subtotal": 625,
+  "taxAmount": 125,
+  "total": 750,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / no tax / minimum 0": {
+  "subtotal": 625,
+  "taxAmount": 0,
+  "total": 625,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / us sales tax / minimum 0": {
+  "subtotal": 625,
+  "taxAmount": 51.56,
+  "total": 676.56,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / uk vat / minimum 0": {
+  "subtotal": 1000,
+  "taxAmount": 200,
+  "total": 1200,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / no tax / minimum 0": {
+  "subtotal": 1000,
+  "taxAmount": 0,
+  "total": 1000,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / us sales tax / minimum 0": {
+  "subtotal": 1000,
+  "taxAmount": 82.5,
+  "total": 1082.5,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / uk vat / minimum 0": {
+  "subtotal": 1375,
+  "taxAmount": 275,
+  "total": 1650,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / no tax / minimum 0": {
+  "subtotal": 1375,
+  "taxAmount": 0,
+  "total": 1375,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / us sales tax / minimum 0": {
+  "subtotal": 1375,
+  "taxAmount": 113.44,
+  "total": 1488.44,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / uk vat / minimum 100": {
+  "subtotal": 625,
+  "taxAmount": 125,
+  "total": 750,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / no tax / minimum 100": {
+  "subtotal": 625,
+  "taxAmount": 0,
+  "total": 625,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / us sales tax / minimum 100": {
+  "subtotal": 625,
+  "taxAmount": 51.56,
+  "total": 676.56,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / uk vat / minimum 100": {
+  "subtotal": 1000,
+  "taxAmount": 200,
+  "total": 1200,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / no tax / minimum 100": {
+  "subtotal": 1000,
+  "taxAmount": 0,
+  "total": 1000,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / us sales tax / minimum 100": {
+  "subtotal": 1000,
+  "taxAmount": 82.5,
+  "total": 1082.5,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / uk vat / minimum 100": {
+  "subtotal": 1375,
+  "taxAmount": 275,
+  "total": 1650,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / no tax / minimum 100": {
+  "subtotal": 1375,
+  "taxAmount": 0,
+  "total": 1375,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / us sales tax / minimum 100": {
+  "subtotal": 1375,
+  "taxAmount": 113.44,
+  "total": 1488.44,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / uk vat / minimum 374.99": {
+  "subtotal": 625,
+  "taxAmount": 125,
+  "total": 750,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / no tax / minimum 374.99": {
+  "subtotal": 625,
+  "taxAmount": 0,
+  "total": 625,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / us sales tax / minimum 374.99": {
+  "subtotal": 625,
+  "taxAmount": 51.56,
+  "total": 676.56,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / uk vat / minimum 374.99": {
+  "subtotal": 1000,
+  "taxAmount": 200,
+  "total": 1200,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / no tax / minimum 374.99": {
+  "subtotal": 1000,
+  "taxAmount": 0,
+  "total": 1000,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / us sales tax / minimum 374.99": {
+  "subtotal": 1000,
+  "taxAmount": 82.5,
+  "total": 1082.5,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / uk vat / minimum 374.99": {
+  "subtotal": 1375,
+  "taxAmount": 275,
+  "total": 1650,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / no tax / minimum 374.99": {
+  "subtotal": 1375,
+  "taxAmount": 0,
+  "total": 1375,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / us sales tax / minimum 374.99": {
+  "subtotal": 1375,
+  "taxAmount": 113.44,
+  "total": 1488.44,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / uk vat / minimum 375": {
+  "subtotal": 625,
+  "taxAmount": 125,
+  "total": 750,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / no tax / minimum 375": {
+  "subtotal": 625,
+  "taxAmount": 0,
+  "total": 625,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / us sales tax / minimum 375": {
+  "subtotal": 625,
+  "taxAmount": 51.56,
+  "total": 676.56,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / uk vat / minimum 375": {
+  "subtotal": 1000,
+  "taxAmount": 200,
+  "total": 1200,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / no tax / minimum 375": {
+  "subtotal": 1000,
+  "taxAmount": 0,
+  "total": 1000,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / us sales tax / minimum 375": {
+  "subtotal": 1000,
+  "taxAmount": 82.5,
+  "total": 1082.5,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / uk vat / minimum 375": {
+  "subtotal": 1375,
+  "taxAmount": 275,
+  "total": 1650,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / no tax / minimum 375": {
+  "subtotal": 1375,
+  "taxAmount": 0,
+  "total": 1375,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / us sales tax / minimum 375": {
+  "subtotal": 1375,
+  "taxAmount": 113.44,
+  "total": 1488.44,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / uk vat / minimum 375.01": {
+  "subtotal": 625,
+  "taxAmount": 125,
+  "total": 750,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / no tax / minimum 375.01": {
+  "subtotal": 625,
+  "taxAmount": 0,
+  "total": 625,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / us sales tax / minimum 375.01": {
+  "subtotal": 625,
+  "taxAmount": 51.56,
+  "total": 676.56,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / uk vat / minimum 375.01": {
+  "subtotal": 1000,
+  "taxAmount": 200,
+  "total": 1200,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / no tax / minimum 375.01": {
+  "subtotal": 1000,
+  "taxAmount": 0,
+  "total": 1000,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / us sales tax / minimum 375.01": {
+  "subtotal": 1000,
+  "taxAmount": 82.5,
+  "total": 1082.5,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / uk vat / minimum 375.01": {
+  "subtotal": 1375,
+  "taxAmount": 275,
+  "total": 1650,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / no tax / minimum 375.01": {
+  "subtotal": 1375,
+  "taxAmount": 0,
+  "total": 1375,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / us sales tax / minimum 375.01": {
+  "subtotal": 1375,
+  "taxAmount": 113.44,
+  "total": 1488.44,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / uk vat / minimum 400": {
+  "subtotal": 625,
+  "taxAmount": 125,
+  "total": 750,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / no tax / minimum 400": {
+  "subtotal": 625,
+  "taxAmount": 0,
+  "total": 625,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / us sales tax / minimum 400": {
+  "subtotal": 625,
+  "taxAmount": 51.56,
+  "total": 676.56,
+  "lines": [
+   375,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / uk vat / minimum 400": {
+  "subtotal": 1000,
+  "taxAmount": 200,
+  "total": 1200,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / no tax / minimum 400": {
+  "subtotal": 1000,
+  "taxAmount": 0,
+  "total": 1000,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / us sales tax / minimum 400": {
+  "subtotal": 1000,
+  "taxAmount": 82.5,
+  "total": 1082.5,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / uk vat / minimum 400": {
+  "subtotal": 1375,
+  "taxAmount": 275,
+  "total": 1650,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / no tax / minimum 400": {
+  "subtotal": 1375,
+  "taxAmount": 0,
+  "total": 1375,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / us sales tax / minimum 400": {
+  "subtotal": 1375,
+  "taxAmount": 113.44,
+  "total": 1488.44,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / uk vat / minimum 750.5": {
+  "subtotal": 750.5,
+  "taxAmount": 150.1,
+  "total": 900.6,
+  "lines": [
+   375,
+   250,
+   125.5
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / no tax / minimum 750.5": {
+  "subtotal": 750.5,
+  "taxAmount": 0,
+  "total": 750.5,
+  "lines": [
+   375,
+   250,
+   125.5
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / us sales tax / minimum 750.5": {
+  "subtotal": 750.5,
+  "taxAmount": 61.92,
+  "total": 812.42,
+  "lines": [
+   375,
+   250,
+   125.5
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / uk vat / minimum 750.5": {
+  "subtotal": 1000,
+  "taxAmount": 200,
+  "total": 1200,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / no tax / minimum 750.5": {
+  "subtotal": 1000,
+  "taxAmount": 0,
+  "total": 1000,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / us sales tax / minimum 750.5": {
+  "subtotal": 1000,
+  "taxAmount": 82.5,
+  "total": 1082.5,
+  "lines": [
+   750,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / uk vat / minimum 750.5": {
+  "subtotal": 1375,
+  "taxAmount": 275,
+  "total": 1650,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / no tax / minimum 750.5": {
+  "subtotal": 1375,
+  "taxAmount": 0,
+  "total": 1375,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / us sales tax / minimum 750.5": {
+  "subtotal": 1375,
+  "taxAmount": 113.44,
+  "total": 1488.44,
+  "lines": [
+   1125,
+   250
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / uk vat / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 400,
+  "total": 2400,
+  "lines": [
+   375,
+   250,
+   1375
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / no tax / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 0,
+  "total": 2000,
+  "lines": [
+   375,
+   250,
+   1375
+  ]
+ },
+ "rooms / room and prep / 1 room(s) / us sales tax / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 165,
+  "total": 2165,
+  "lines": [
+   375,
+   250,
+   1375
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / uk vat / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 400,
+  "total": 2400,
+  "lines": [
+   750,
+   250,
+   1000
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / no tax / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 0,
+  "total": 2000,
+  "lines": [
+   750,
+   250,
+   1000
+  ]
+ },
+ "rooms / room and prep / 2 room(s) / us sales tax / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 165,
+  "total": 2165,
+  "lines": [
+   750,
+   250,
+   1000
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / uk vat / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 400,
+  "total": 2400,
+  "lines": [
+   1125,
+   250,
+   625
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / no tax / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 0,
+  "total": 2000,
+  "lines": [
+   1125,
+   250,
+   625
+  ]
+ },
+ "rooms / room and prep / 3 room(s) / us sales tax / minimum 2000": {
+  "subtotal": 2000,
+  "taxAmount": 165,
+  "total": 2165,
+  "lines": [
+   1125,
+   250,
+   625
+  ]
+ }
+}

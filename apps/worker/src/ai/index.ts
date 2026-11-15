@@ -48,7 +48,6 @@ export type { UnusedSignal, RecommendationContext, FormAnswerForFiltering, Widge
 
 export {
   validateQuote,
-  applyAutoCorrections,
   determineValidationOutcome,
   getDefaultValidationSettings,
 } from './quote-validator'
@@ -56,5 +55,4 @@ export type {
   CustomerRequestContext,
   ServiceConfigForValidation,
   GeneratedQuoteForValidation,
-  AutoCorrectionResult,
 } from './quote-validator'
