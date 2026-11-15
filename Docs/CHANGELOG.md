@@ -196,15 +196,56 @@ photograph added. Motion is CSS only, from the tokens.
 - The demo's sample label was run once through the real local pipeline for the inventory (the example business,
   18 seconds). No other request was sent for this ticket; `verify-t167` sends none.
 
-**Not committed. Not deployed to production.** A preview only: `https://estimator-7ic2l2j2m-gajendrans-projects-1a87e0b4.vercel.app`
-(`dpl_8ExeQC6JmqKbENcJwWs1MvgpKRe1`, built from the uncommitted working tree, the same way as T-165: no
-`--prod`, placeholder settings for that one deployment, no real key). Production still serves the T-165 web
-deployment.
+**Deployed 2026-11-15 15:52 UTC** (commit `e114e7d`): web only (`npx vercel deploy --prod`, deployment
+`dpl_ByP5uW3i3ReEgv124X9psAfxxpuw`, Ready and serving `estimator-web-phi.vercel.app`). No worker deploy and no
+migration: nothing under `apps/worker` or `packages` changed. `pnpm lint`, `pnpm typecheck` and the unit tests
+(web 628, worker 519, mobile 11) passed again before the commit. The only change after the verification above
+was the "Regression runs" rule in `CLAUDE.md` and this file.
 
-What does not work on the preview, because of preview settings (as in T-165): Vercel asks you to log in first;
-the Preview environment has no database, so signing in, "Try it as a customer" (`/demo`) and quote links do not
-work there, and Pricing's two new links lead to that broken `/demo`. Home, Features, Pricing, the trade pages
-and `/design` do work. The QR code and quote link shown point at production's example quote page.
+Live checks, read-only, 14 of 14 (nothing was submitted to production; in the browser pass every third-party
+request and every request that was not a GET was blocked, and the pages attempted none):
+- `/`, `/features`, `/pricing` and each of the six trade pages: 200.
+- Home at 1440 and 390: the sections are in the new order (hero, the figures, What it notices, Your prices, Set
+  up in minutes, Add it anywhere, plans, questions, the closing band); the seven trade pills are inside "Choose
+  your trade", ending with "Other trades", and there is no trades row of its own; the new line, the message and
+  the demo's question are on the page.
+- None of 13 marketing pages contains "exact", "firm", "guaranteed" or "AI chat".
+- Pricing's "Hosted estimate pages" and "Your branding on every estimate" each open `/demo`, which shows the
+  example business's form (its settings request answers 200) with no error.
+- The public quote API with a made-up id and token: 404.
+
+**A check that was wrong, not the site:** the first run of the two "opens the demo" checks failed. A link inside
+the site moves without a page load, so there was no HTTP status for the check to read, and it counted the form's
+controls before the form had loaded. Opened by hand in the same script, `/demo` was fine (200, the form, no
+error). The check now waits for the form and reads the form's own settings request; both pass.
+
+**Not checked in production:** the demo's motion (checked on the local stack by `verify-t167`), and anything
+signed in. Nothing signed in changed in this ticket.
+
+**The previews are deleted:** the T-167 preview (`dpl_8ExeQC6JmqKbENcJwWs1MvgpKRe1`, built from the uncommitted
+working tree the same way as T-165: no `--prod`, placeholder settings for that one deployment, no real key) and
+the failed preview attempt left over from T-165 (`dpl_GYfgvuLrtnNkfcEiwMD8x6xQcTq4`, status Error). Vercel now
+lists production deployments only. For the next preview: Vercel asks you to log in first, and the Preview
+environment has no database, so signing in, `/demo` and quote links do not work on a preview.
+
+**Can the full regression set run faster?** Measured on this ticket's run: 18 scripts one after another took about
+23 minutes (the longest: `verify-t157` 171 s, `verify-t156` 112 s, `verify-t158` 101 s, `verify-t148` and
+`verify-t165` 100 s each, `verify-t153` 94 s). All 18 send real requests through the local pipeline and nine drive
+a browser. Each script makes its own business, so most do not share data, and local rate limiting is off (no
+Redis configured), so several could run at once. Not tried. What stands in the way, and what it would take:
+- `verify-t153` uses the one shared demo business (its daily cap, its per-address limit, and it deletes old demo
+  requests), and `verify-t153` and `verify-t157` call the cron route, which acts on every business. Those two
+  run alone, after the rest.
+- `verify-t165` and `verify-t167` time an animation in steps of 200 ms, and `verify-t153` checks "under 30
+  seconds". Under load they can fail when nothing is wrong, so they also run alone.
+- More requests at once means more AI calls at once: a stalled call is already retried once by the scripts;
+  with three lanes it would happen more often.
+- The dev server builds each page on its first visit. Running the scripts against a built app
+  (`next build`, then `next start`) would steady the timings and shorten every page load.
+- So: a small runner (`scripts/hardcore-test/run-regression.mjs`) with three lanes for the independent scripts,
+  then the four above one at a time, re-running any failure alone before calling it a failure. A rough estimate
+  is 10 to 12 minutes instead of 23. It needs its own ticket, and three clean runs against the one-at-a-time
+  results before it is trusted. With the "Regression runs" rule above, the full set is also needed less often.
 
 ### 2026-11-15: T-166 — The quote checker flags, it never corrects (AD-049)
 

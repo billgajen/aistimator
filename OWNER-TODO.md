@@ -809,15 +809,22 @@ Live since 2026-11-15 14:17 UTC. No price changes.
 
 ## T-167 — Say what the AI does, and show it
 
-Built and checked locally. **Not committed. Not deployed to production.** A preview only:
-`https://estimator-7ic2l2j2m-gajendrans-projects-1a87e0b4.vercel.app`
-
-About the preview (the same as T-165's): Vercel asks you to log in to your Vercel account first, and the preview
-has no database, so you cannot sign in on it and "Try it as a customer" shows an error there (which also means
-Pricing's two new links lead to an error on the preview only). Home, Features, Pricing and the trade pages work.
-
-- [ ] **Deploy when you are happy:** web only (`npx vercel deploy --prod`). No worker change and no migration.
-  Then delete this preview.
+- [x] **Deployed 2026-11-15 15:52 UTC** (commit `e114e7d`): web only (`dpl_ByP5uW3i3ReEgv124X9psAfxxpuw`, serving
+  `estimator-web-phi.vercel.app`). No worker change and no migration. Checked live, signed out and read-only
+  (nothing was submitted): Home, Features, Pricing and the six trade pages load; Home is in the new order with
+  the trade pills inside "Choose your trade"; no marketing page says "exact", "firm", "guaranteed" or "AI chat";
+  Pricing's two links open the demo with no error; the quote API answers 404 to a made-up link.
+- The preview and the failed preview left over from T-165 are both **deleted**. Vercel lists production
+  deployments only.
+- **A rule you added, now in `CLAUDE.md`:** which checks a ticket needs ("Regression runs"). Marketing, design
+  and copy tickets run their own script and only the earlier scripts that cover the pages changed; the full set
+  is for pricing, the quote flow, the worker, emails, migrations, the end of a batch of design tickets, and
+  before launch.
+- [ ] **Running the full regression set faster** (your question; not built). It takes about 23 minutes one
+  script after another. Running three at once looks safe for most of it, with four scripts kept on their own
+  (the demo business, the cron route, and the two that time an animation), and would take roughly 10 to 12
+  minutes. It needs a small runner script and three clean trial runs, so it is a ticket of its own. Details in
+  `Docs/CHANGELOG.md`, T-167.
 - **The message is on the site:** "The AI works out the job. Your prices work out the cost." Home has a new line
   under the headline, one new beat in the demo (the label is read, the customer taps "Yes, 50 gal is right", the
   price lands) and a new section, "What it notices". Features and the six trade pages show real screens.
