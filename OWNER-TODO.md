@@ -682,21 +682,24 @@ No page was redesigned; pages changed only where a token changed.
 
 ## T-165 — Home page that shows the product; yellow accent; one free offer
 
-Built and checked locally. **Not committed. Not deployed to production.** A preview only:
-`https://estimator-6onwa5v0e-gajendrans-projects-1a87e0b4.vercel.app`
-
-About the preview:
-- Vercel will ask you to log in to your Vercel account first. That is its protection for previews.
-- The preview has **no database** (Vercel's Preview environment has no settings; they exist for Production only).
-  So on the preview you can look at Home, Login, Pricing and `/design`, but you cannot sign in, and "Try it as a
-  customer" and quote links show an error there. That is the preview, not the code.
+- [x] **Deployed 2026-11-15 12:31 UTC** (commit `b0a9b82`): the worker first (`estimator-worker-production`,
+  version `f5a37a7d-04ab-4ad6-b87c-9b68613b62a7`), then the web app (`dpl_DwHWYJtixuzPKN9KRsYYeqSBfNP5`, serving
+  `estimator-web-phi.vercel.app`). No migration. Checked live, signed out and read-only (nothing was submitted):
+  all twelve public pages load and none says "14-day" or "trial"; on Home the header button reads "Try it free",
+  the hero has one yellow button with the full offer, the price example has two lines and no minimum, and the
+  quote link shown is the live site's; `/design` shows one accent; the worker's health check answers; the quote
+  API answers 404 to a made-up link.
+- The preview (`estimator-6onwa5v0e-…`) is **deleted**. One earlier preview attempt that failed to build
+  (`estimator-hz87ot4ta-…`, status Error, serves nothing) is still listed in Vercel; delete it there if you like.
 - [ ] If you want previews that work fully in future, add the Production variables to the Preview environment in
   Vercel → Settings → Environment Variables (ideally pointing at a separate test database, not the live one).
+  Without them a preview has no database: you cannot sign in on it, and quote links show an error.
 
 Your choices from T-164 are in: the accent is yellow, and the wordmark is the name "Qolumns" in the display font.
-(The "Choose on the preview page" item in the T-164 section above is done.)
+(The "Choose on the preview page" item in the T-164 section above is done.) The header button reads "Try it
+free" at every width; the hero button keeps "Try it free: 10 quotes, no card".
 
-- [ ] **Look at the preview, on your phone and on a computer:**
+- [ ] **Look at the live site, on your phone and on a computer:**
   1. *The demo at the top.* It plays once when the page opens: the customer answers and adds a photo, the tape
      measure draws out and the price lands, then Approve & send is pressed and turns to "Sent". It then stays
      still. Press "Play again". On a phone the three screens are one under another; nothing swipes sideways.
@@ -719,16 +722,14 @@ Your choices from T-164 are in: the accent is yellow, and the wordmark is the na
     Worth a look anyway: Stripe → Product catalogue, that no price has its own trial set.
   - Anyone already in a trial keeps it to its end date.
   - The billing page (Settings → Billing) should show "Select Plan" on Pro, with no trial line.
-- **The minimum charge is a floor, not an item** (your change to this ticket; recorded as AD-048). Built and
-  checked locally. **It is not on the preview above**: the preview was made before this change and you asked for
-  no deploy, so the preview's home page still shows three price lines.
+- **The minimum charge is a floor, not an item** (your change to this ticket; recorded as AD-048). Live since
+  the deploy above (worker and web app).
   - Home: the sentence is "$375 per room, heavy prep adds $250." and the price list has two lines.
   - Estimates: when a job comes to less than a business's minimum charge, the customer sees the job's real lines,
     then "Minimum charge of $400.00 applied" above the total. At the minimum or above it, nothing about a minimum
     shows anywhere. No total changed.
-  - **The worker must be deployed together with the web app** for this (the pricing engine lives in the worker).
-    Either order is safe: the web app reads quotes made by the old and the new engine alike.
-  - [ ] After the deploy, try it by hand: give a test service a minimum charge above its smallest job, send a
+  - The worker was deployed together with the web app for this (the pricing engine lives in the worker).
+  - [ ] Try it by hand (it could not be checked live without sending a real request): give a test service a minimum charge above its smallest job, send a
     small request through your quote link, and look at (1) the customer's quote page, (2) the quote in the
     dashboard, (3) the PDF, (4) More → Pricing trace. Each should list the real line and show the note once, with
     no "Minimum charge applied" line.

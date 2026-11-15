@@ -248,10 +248,9 @@ typecheck, unit tests (web 595, worker 509, mobile 11), `verify-t165` 117/117, `
   26, 44, 31, 96, 116, 96, 77, 78, all pass.
 - Two requests per run of `verify-t165` went through the real pipeline. Test names are made up (Marlo Finch,
   Odalys Brandt, Fernhill Doors).
-- **Not committed, not deployed.** The preview below was built before this change and still shows three price
-  lines on Home. **When this ships, the worker must be deployed with the web app** (the engine is in the worker).
-  Either order is safe: the web app reads quotes from the old and the new engine alike, and the old web app
-  shows a new quote's entry as the line it always showed.
+- **The worker is deployed with the web app for this** (the engine is in the worker). Either order is safe: the
+  web app reads quotes from the old and the new engine alike, and the old web app shows a new quote's entry as
+  the line it always showed.
 
 **Verified (2026-11-15, local stack), before the minimum-charge change:**
 - `pnpm install --frozen-lockfile` clean (no dependency added). `pnpm lint`, `pnpm typecheck`, the web build and the
@@ -269,10 +268,37 @@ typecheck, unit tests (web 595, worker 509, mobile 11), `verify-t165` 117/117, `
 - One request per script run went through the real pipeline. Test names are made up (Marlo Finch, Fernhill
   Doors).
 
-**Not committed. Not deployed to production.** A preview only: `https://estimator-6onwa5v0e-gajendrans-projects-1a87e0b4.vercel.app`
-(`dpl_HCXv5oWre6VKQrRZx77K1BuU9boQ`, built from the uncommitted working tree).
+**Deployed 2026-11-15 12:31 UTC** (commit `b0a9b82`), in this order:
+1. the worker: `cd apps/worker && npx wrangler deploy --env production` (`estimator-worker-production`, version
+   `f5a37a7d-04ab-4ad6-b87c-9b68613b62a7`);
+2. the web app: `npx vercel deploy --prod` (`dpl_DwHWYJtixuzPKN9KRsYYeqSBfNP5`, Ready and serving
+   `estimator-web-phi.vercel.app`).
 
-What does not work on the preview, because of preview settings:
+No migration. Before the commit, after the header label change (item 6): `pnpm lint`, `pnpm typecheck` and the unit
+tests (web 595, worker 509, mobile 11) passed, and `verify-t165` (117/117), `verify-t154` (26/26) and `verify-t155`
+(44/44) were run again on the local stack. The full regression run above was before that one-label change.
+
+Live checks, read-only (nothing was submitted to production; third-party requests were blocked in the browser
+pass), 16 of 16:
+- `/`, `/login`, `/pricing` and the other nine public pages: 200. None contains "14-day" or "trial".
+- Home at 1440 and 390: the header button reads "Try it free" and is juniper; the hero has one yellow button,
+  "Try it free: 10 quotes, no card"; the price example has two lines ($375.00, + $250.00) and the section does not
+  say "minimum"; the quote link shown is `estimator-web-phi.vercel.app/quote/example-home-services`, and the page
+  has no "localhost".
+- `/design`: 200, one accent swatch (`#FFC53D`), no accent switch.
+- Worker `/health`: 200. The public quote API with a made-up id and token: 404.
+
+**Not checked in production:** anything signed in (the dashboard's yellow "needs you", the billing page, the
+quote editor), and a real quote under a minimum charge on the customer page, the PDF and the pricing trace. Those
+need a real request, which the live checks must not send; they were checked on the local stack and are the hand
+tests in `OWNER-TODO.md`.
+
+**The preview is deleted** (`dpl_HCXv5oWre6VKQrRZx77K1BuU9boQ`, `estimator-6onwa5v0e-…`; the Vercel CLI asks for the
+deployment's name to confirm a deletion, `--yes` is not enough). It was built from the uncommitted working tree
+before the minimum-charge change. The first preview attempt, which failed to build (`estimator-hz87ot4ta-…`,
+Error), was left; it serves nothing.
+
+What did not work on that preview, because of preview settings (kept for the next time a preview is made):
 - **Vercel asks you to log in** before it shows a preview (Deployment Protection). Production is not affected.
 - **The Preview environment has no variables at all** (they are set for Production only), so the first preview
   build failed with "Missing Supabase environment variables". This preview was built with placeholder values for
