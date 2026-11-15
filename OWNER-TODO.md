@@ -770,7 +770,7 @@ free" at every width; the hero button keeps "Try it free: 10 quotes, no card".
 
 ## T-166 — The quote checker flags, it never corrects
 
-Built and checked locally. **Not committed, not deployed.** No price changes.
+Live since 2026-11-15 14:17 UTC. No price changes.
 
 - **A correction to what you were told in T-165.** The "$375 job becomes $500" case was never reachable. The code
   for it existed, but the quote checker has had no way to trigger it since February 2026. No quote was ever
@@ -781,13 +781,16 @@ Built and checked locally. **Not committed, not deployed.** No price changes.
   true.
 - **The label "auto-corrected"** in the checker's log meant: an issue was found, nothing was corrected, and the
   quote went on without being held. It is renamed "passed with issues".
-- [ ] **Deploy, in this order** (when you ask for it):
-  1. the worker: `cd apps/worker && npx wrangler deploy --env production`
-  2. migration 41: `bash scripts/deploy-migration-41.sh` (renames the old label on 4 production log rows and
-     updates two column comments; it touches no quote, price or setting, and stops if any row has a correction
-     recorded)
-  3. the web app does **not** need deploying: nothing it runs changed.
-- [ ] **Hand test after the deploy:** send two ordinary requests through your quote link, one small and one
+- [x] **Deploy, in this order:** done 2026-11-15 14:17 UTC (commit `79ac663`).
+  1. the worker (`estimator-worker-production`, version `b288ae8c-7de3-41cd-a3b5-3655fd3b1a02`);
+  2. migration 41 (`bash scripts/deploy-migration-41.sh`): the 4 old log rows now read "passed with issues",
+     none is left under the old label, and no row has a correction recorded. It touched no quote, price or
+     setting.
+  3. the web app was not deployed: nothing it runs changed.
+  Either order would have worked (the label is plain text in the database, with no rule on its values); the
+  worker went first so no new row is written under the old label. Checked live, read-only: the worker's health
+  check and the home page answer, and the quote API answers 404 to a made-up link.
+- [ ] **Hand test:** send two ordinary requests through your quote link, one small and one
   larger. Each should be priced exactly as before, line by line. Nothing should look different anywhere: this
   ticket removes code that never ran.
 - [ ] **A decision for you: should the checker's findings hold a quote?** Today they do not. Every business

@@ -104,10 +104,33 @@ such a claim is the log, not the code: one count would have shown it.
   comments are updated.
 - Production was read, not written: one count of the checker's log (5 runs, 4 `auto_corrected`, 0 with a fix).
 
-**Not committed, not deployed.** Deploy order when asked: the worker, then migration 41
-(`bash scripts/deploy-migration-41.sh`). The web app does not need deploying: nothing it runs changed (only
-shared types the worker uses). Until migration 41 runs, production's 4 old rows keep the old label; nothing
-reads them.
+**Deployed 2026-11-15 14:17 UTC** (commit `79ac663`), in this order:
+1. the worker: `cd apps/worker && npx wrangler deploy --env production` (`estimator-worker-production`, version
+   `b288ae8c-7de3-41cd-a3b5-3655fd3b1a02`);
+2. migration 41: `bash scripts/deploy-migration-41.sh` (production was at 40; the script found 5 runs, 4 to
+   rename, 0 with a correction recorded; after it, 0 rows under the old label, 4 under the new, latest
+   `00000000000041`).
+
+The web app was **not** deployed. Nothing under `apps/web` changed, and the one shared file that changed
+(`packages/shared/src/database.types.ts`) changed only type definitions, which compile to nothing; production
+still serves the T-165 deployment (`dpl_DwHWYJtixuzPKN9KRsYYeqSBfNP5`). `pnpm lint` and `pnpm typecheck` passed
+again before the commit; no code changed after the verification above.
+
+**The order was checked before deploying, and either order would have worked.** In production
+`quote_validation_logs.outcome` is plain `text` (not null, default `'passed'`) with no check constraint, and the
+table has no trigger, so the new worker can write `passed_with_issues` before migration 41 (it did so locally:
+4 rows before the migration was applied there). Migration 41 changes no schema, so the old worker would have
+kept working after it, writing the old label. Worker first was used because it leaves no row written under
+the old label after the rename. The log insert is also not allowed to fail a quote in either worker.
+
+Live checks, read-only (nothing was submitted to production):
+- Worker `/health`: 200. `/`: 200. The public quote API with a made-up id and token: 404.
+- Production's checker log: `passed` 1, `passed_with_issues` 4, `auto_corrected` 0; no row has a correction
+  recorded.
+
+**Not checked in production:** a real request through the new worker. That needs a real submission, which the
+live checks must not make; it is the hand test in `OWNER-TODO.md`. The same worker code ran 62 real pipeline
+requests on the local stack in the regression run above.
 
 ### 2026-11-15: T-165 — Home page that shows the product; yellow accent; one free offer; the minimum charge is a floor (AD-047, AD-048)
 
