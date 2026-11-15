@@ -20,10 +20,10 @@ const FREE = FREE_ALLOWANCE.US!.quotes
 
 export const HERO = {
   headline: 'Instant quotes on your website, in your prices.',
-  /** T-167: what the AI does, in one plain sentence, then where the price comes from */
+  /** T-167: what the AI does, in one plain sentence, then where the price comes from (T-168: the owner's wording) */
   subline: says(
     ['photo-notes', 'pricing-engine'],
-    'The AI reads your customer’s answers and photos and works out the job. The price comes from your own price list, and you confirm it.'
+    'The AI reads what your customer tells you and the photos they send, and works out the job. The price comes from your own price list, and you confirm it.'
   ),
   smallLine: 'For contractors and home-service businesses. No website? Use your quote link.',
   frames: ['Your customer asks', 'They see your price', 'You confirm it'] as const,
@@ -33,9 +33,26 @@ export const HERO = {
 export const OTHER_TRADES = 'Other trades: describe your prices in plain English'
 
 /**
- * T-165: the hero's product demo. The question, its answer and the photo's
- * name are the water-heater template's own (lib/vertical-packs); the prices
- * come from the same template through lib/marketing/examples.ts.
+ * The hero's product demo. T-168: three frames of the same height, one idea
+ * each, for the example business's simplest job (the template's own question
+ * and price, through lib/marketing/examples.ts: the default example).
+ */
+export const HERO_DEMO_FRAMES = {
+  playAgain: 'Play again',
+  /** Under the estimate: why Accept is locked (`{business}` is the example business) */
+  acceptNote: (business: string) => `${business} confirms it, then you can accept.`,
+  /** Each frame is a picture of the product: what a screen reader hears for it */
+  screens: [
+    'The request form on a business’s quote page: one question, answered, and the button “Get my estimate”.',
+    'The customer’s estimate: the price of the job from the business’s prices and its total, with the Accept button locked until the business confirms it.',
+    'The business’s dashboard, “Waiting for you”: the new request with its price and the button “Approve & send”.',
+  ],
+} as const
+
+/**
+ * The water-heater example the rest of Home is built on ("What it notices",
+ * "Set up in minutes", "Add it anywhere"): the template's own question and
+ * answer, and the sample label the live demo offers.
  */
 export const HERO_DEMO = {
   trade: 'water-heaters',
@@ -45,21 +62,13 @@ export const HERO_DEMO = {
   /** The sample label the live demo offers (public/demo), drawn for it; no real product */
   photoSrc: '/demo/sample-water-heater-label.png',
   photoAlt: 'A sample photo of a water heater’s rating label',
-  playAgain: 'Play again',
   /**
    * T-167: what the product returned for this sample label at the template's
    * prices, on the local stack (Docs/design/ai-capabilities.md, section 6): it
    * read 50 gal and natural gas, and until the customer confirmed the reading
-   * it showed this range. The demo shows the reading and the customer's "Yes".
+   * it showed this range. "What it notices" shows the reading and the range.
    */
   rangeBeforeConfirming: { low: 1890, high: 2410 },
-  /** Each screen is a picture of the product: what a screen reader hears for it */
-  screens: [
-    'The request form on a business’s quote page: the customer has answered where the water heater is and added a photo of its rating label. Under it, the question the customer is asked next: the capacity, 50 gallons, was read from the label, and the customer has answered that it is right.',
-    'The customer’s estimate: a total worked out from the business’s prices, with each line of the price shown.',
-    'The business’s dashboard: the new request with its price, approved and sent to the customer.',
-  ],
-  sent: 'Sent',
 } as const
 
 /** T-165: replaces "How it works", which repeated the hero in words */

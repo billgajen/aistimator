@@ -82,5 +82,10 @@ the example business's Water Heater Replacement on the local stack (2026-11-15, 
 
 It did not price the job outright, and neither did any of the 17 earlier runs of `verify-t153` that returned a
 result (each gave the same range and a question): the reading is confirmed first. So
-a demo that shows the photo followed at once by a price leaves out a step the product takes. The demo's reading
-beat shows the reading and the customer's "Yes".
+a demo that shows the photo followed at once by a price leaves out a step the product takes. T-167's hero demo
+therefore showed the reading and the customer's "Yes".
+
+**T-168:** the hero demo no longer shows a photo or a reading at all. It is three short frames about a job with
+no photo (one question, one price line from the example business's price list, one lead to approve), so it makes
+no claim about reading anything. The reading and the customer's "Yes" are shown in "What it notices" on Home, on
+Features and on the trade pages that have a label, with the sample label above.

@@ -874,3 +874,25 @@ Live since 2026-11-15 14:17 UTC. No price changes.
     picture. A photograph from the list above would fill them.
   - [ ] `service-match` (checking that a described job fits the chosen service) is in the inventory but on no
     page: it has no log, so it has not been seen working. Worth a live check before it is ever claimed.
+
+## T-168 — Hero photo, the three-frame demo, three-column figures
+
+- **Hero option b is the hero** (your choice): a painter on a porch checking a phone. The switch and the other
+  three photographs are removed.
+- **The photograph was made by an image model** (Google's `gemini-3-pro-image`) and its right edge was cut off,
+  because a tape measure there carried made-up lettering. The record is in `Docs/design/photos.md`. The rules for
+  such photographs are in `Docs/design/system.md`: a scene, never a customer; never beside a review or a figure
+  about real users; no brands, no text or screens drawn by the model. A real photograph of your own would still
+  beat it.
+- [ ] **Look at it, on your phone and on a computer:**
+  1. *Computer:* the photograph behind the hero, fading into the page under the words; the three frames half on
+     it; the headline and the line under it easy to read.
+  2. *Phone:* the photograph as a block above the headline, nothing written over it.
+  3. *Tablet width (between a phone and a laptop):* the photograph is a wide block above the headline. It is
+     tall there; say if you want it shorter.
+  4. *The demo:* three frames of one height. It stops with Accept locked and "Approve & send" showing; it no
+     longer turns to "Sent". Say if you want the press back.
+  5. *What homeowners want:* three columns side by side, one column on a phone.
+- [ ] **Three framed screens, then three columns of figures.** Both are in threes now, by your two instructions.
+  They differ (framed screens on paper, open columns on grey) and the design file records it; say if it reads
+  as repetition.

@@ -221,13 +221,35 @@ if (!process.env.PLAYWRIGHT_DIR) {
   /** What the demo looks like right now: is each late element in, and is anything still moving? */
   const demoState = (p: Page) => p.evaluate(() => {
     // (no named helper in here: the page cannot run the wrapper tsx puts around one)
-    const o = ['demo-answer', 'demo-photo', 'estimate-total', 'demo-lead', 'demo-sent', 'demo-confirmed'].map((id) => Number(getComputedStyle(document.querySelector(`[data-testid=${id}]`)!).opacity))
+    // T-168: three frames of one height. The late things are the answer, the total and the lead.
+    const o = ['demo-answer', 'estimate-total', 'demo-lead'].map((id) => Number(getComputedStyle(document.querySelector(`[data-testid=${id}]`)!).opacity))
     const stage = document.querySelector('[data-testid=hero-demo-stage]')!
     const moving = document.getAnimations().filter((an) => an.playState === 'running' && stage.contains((an.effect as KeyframeEffect | null)?.target ?? null)).length
     const cover = getComputedStyle(document.querySelector('[data-testid=demo-tape-cover]')!).transform
-    return { answer: o[0]!, photo: o[1]!, total: o[2]!, lead: o[3]!, sent: o[4]!, confirmed: o[5]!, tapeCovered: !/^matrix\(0,/.test(cover), moving }
+    return { answer: o[0]!, total: o[1]!, lead: o[2]!, tapeCovered: !/^matrix\(0,/.test(cover), moving }
   })
-  const done = (s: Awaited<ReturnType<typeof demoState>>) => s.answer === 1 && s.photo === 1 && s.total === 1 && s.lead === 1 && s.sent === 1 && s.confirmed === 1 && !s.tapeCovered && s.moving === 0
+  const done = (s: Awaited<ReturnType<typeof demoState>>) => s.answer === 1 && s.total === 1 && s.lead === 1 && !s.tapeCovered && s.moving === 0
+  const HOME = `${cfg.appUrl}/`
+
+  // ==================================================================
+  section('2a. The three demo frames are the same height at every width (T-168)')
+  // ==================================================================
+  for (const width of [390, 768, 1024, 1280, 1440, 1920]) {
+    const ctx = await contextFor(null, { width, height: 900, reducedMotion: 'reduce' })
+    const p = await ctx.newPage()
+    await p.goto(HOME, { waitUntil: 'domcontentloaded' })
+    await p.locator('[data-testid=demo-lead]').waitFor({ state: 'attached', timeout: 30_000 })
+    await p.waitForTimeout(300)
+    const cards = await p.locator('[data-testid=demo-card]').evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return { left: Math.round(r.left), top: Math.round(r.top + window.scrollY), width: Math.round(r.width), height: Math.round(r.height) } }))
+    const sameHeight = cards.length === 3 && Math.max(...cards.map((c) => c.height)) - Math.min(...cards.map((c) => c.height)) <= 1
+    const sideBySide = cards.length === 3 && cards[0]!.top === cards[1]!.top && cards[1]!.top === cards[2]!.top && cards[0]!.left < cards[1]!.left && cards[1]!.left < cards[2]!.left
+    const stacked = cards.length === 3 && cards[0]!.top < cards[1]!.top && cards[1]!.top < cards[2]!.top && cards.every((c) => c.left === cards[0]!.left)
+    check(`${width}: three frames, all ${cards[0]?.height} px tall, ${width >= 768 ? 'side by side' : 'one under another'}`, sameHeight && (width >= 768 ? sideBySide : stacked), cards.map((c) => [c.width, c.height]))
+    // nothing inside a frame is cut off or spills out of it
+    const spills = await p.locator('[data-testid=demo-card]').evaluateAll((els) => els.filter((el) => { const box = el.getBoundingClientRect(); return [...el.querySelectorAll('*')].some((child) => { const r = child.getBoundingClientRect(); return r.width > 0 && (r.right > box.right + 1 || r.bottom > box.bottom + 1 || r.left < box.left - 1) }) }).length)
+    check(`${width}: nothing spills out of a frame`, spills === 0, spills)
+    await ctx.close()
+  }
 
   for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     // ==================================================================
@@ -238,28 +260,35 @@ if (!process.env.PLAYWRIGHT_DIR) {
     const errors: string[] = []
     p.on('pageerror', (e) => errors.push(String(e)))
     p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
-    await p.goto(`${cfg.appUrl}/`, { waitUntil: 'domcontentloaded' })
-    await p.locator('[data-testid=demo-sent]').waitFor({ state: 'attached', timeout: 30_000 })
+    await p.goto(HOME, { waitUntil: 'domcontentloaded' })
+    await p.locator('[data-testid=demo-lead]').waitFor({ state: 'attached', timeout: 30_000 })
     const early = await demoState(p)
-    check(`${width}: at the start the price has not landed and nothing is sent yet`, early.total < 0.5 && early.lead < 0.5 && early.sent < 0.5 && early.tapeCovered && early.moving > 0, early)
-    await p.waitForTimeout(3300)
+    check(`${width}: at the start the price has not landed and no lead has arrived`, early.total < 0.5 && early.lead < 0.5 && early.tapeCovered && early.moving > 0, early)
+    await p.waitForTimeout(1300)
     const middle = await demoState(p)
-    check(`${width}: part-way, the customer has answered and added the photo, and the price is landing or has landed; nothing is sent yet`, middle.answer === 1 && middle.photo === 1 && middle.sent < 1, middle)
-    await p.waitForTimeout(3700)
+    check(`${width}: part-way, the customer has answered; the lead has not arrived yet`, middle.answer === 1 && middle.lead < 1, middle)
+    await p.waitForTimeout(3200)
     const end = await demoState(p)
-    check(`${width}: it ends on its last state: the price is in, the tape is drawn, Approve & send has turned to Sent, the quote is confirmed`, done(end), end)
+    check(`${width}: it ends on its last state: the answer is in, the tape is drawn, the price has landed, the lead is waiting`, done(end), end)
     await p.waitForTimeout(2500)
     const later = await demoState(p)
     check(`${width}: it played once: later it is the same, and nothing is moving`, done(later) && JSON.stringify(later) === JSON.stringify(end), later)
-    check(`${width}: the last frames read "Sent", "Your quote" and "Reviewed and confirmed"`, (await p.locator('[data-testid=demo-sent]').innerText()).includes('Sent') && (await p.locator('[data-testid=demo-confirmed]').innerText()).startsWith('Reviewed and confirmed by'))
+    // T-168: one idea in each frame, and the play ends on the frames as they are described
+    const frameText = await p.locator('[data-testid=demo-card]').evaluateAll((els) => els.map((el) => (el as HTMLElement).innerText.replace(/\s+/g, ' ').trim()))
+    check(`${width}: frame 1 is one question with its answer and "Get my estimate"`, frameText.length === 3 && frameText[0]!.includes('Get my estimate') && (await p.locator('[data-testid=demo-card]').first().locator('[data-testid=demo-answer]').count()) === 1 && (frameText[0]!.match(/\?/g) ?? []).length === 1, frameText[0])
+    const priceLines = await p.locator('[data-testid=demo-card]').nth(1).locator('li').count()
+    check(`${width}: frame 2 is a short estimate (one or two lines and the total), then the locked "Accept"`, priceLines >= 1 && priceLines <= 2 && /\$[\d,]+\.\d\d/.test(await p.locator('[data-testid=estimate-total]').innerText()) && (await p.locator('[data-testid=demo-accept]').innerText()).trim() === 'Accept' && (await p.locator('button[data-testid=demo-accept]').count()) === 0, { priceLines, text: frameText[1] })
+    check(`${width}: frame 3 is "Waiting for you" with one lead, its price and "Approve & send"`, frameText[2]!.startsWith('Waiting for you') && (await p.locator('[data-testid=demo-owner] [data-testid=demo-lead]').count()) === 1 && /\$[\d,]+\.\d\d/.test(await p.locator('[data-testid=demo-lead]').innerText()) && (await p.locator('[data-testid=demo-approve]').innerText()).trim() === 'Approve & send', frameText[2])
+    const heroText = (await p.locator('[data-testid=hero]').innerText()).replace(/\s+/g, ' ')
+    check(`${width}: the hero has no label-reading step and no photo field ("We read…" lives in "What it notices")`, !/We read|Is that right|rating label/i.test(heroText) && (await p.locator('[data-testid=hero] [data-testid=question-screen]').count()) === 0 && (await p.locator('[data-testid=hero] [data-testid=demo-photo]').count()) === 0 && (await p.locator('[data-testid=notices] [data-testid=question-screen]').count()) === 1)
     await shot(p, `home-${width}-demo-end`, false)
 
     await p.locator('[data-testid=demo-replay]').scrollIntoViewIfNeeded()
     await p.click('[data-testid=demo-replay]')
     await p.waitForTimeout(250)
     const again = await demoState(p)
-    check(`${width}: "Play again" starts it once more`, again.total < 0.5 && again.sent < 0.5 && again.moving > 0, again)
-    await p.waitForTimeout(7000)
+    check(`${width}: "Play again" starts it once more`, again.total < 0.5 && again.lead < 0.5 && again.moving > 0, again)
+    await p.waitForTimeout(4500)
     check(`${width}: …and it stops on the last state again`, done(await demoState(p)))
 
     // ==================================================================
@@ -275,12 +304,44 @@ if (!process.env.PLAYWRIGHT_DIR) {
     } else {
       check(`${width}: the three frames sit side by side at true size (each over 320 px wide)`, frames.length === 3 && frames[0]!.left < frames[1]!.left && frames[1]!.left < frames[2]!.left && frames.every((f) => f.width >= 320) && strip === 0, frames)
     }
+    // T-168: the hero photograph (option b)
+    const photo = await p.evaluate(async () => {
+      const box = document.querySelector('[data-testid=hero-photo]')
+      const img = box?.querySelector('img')
+      if (!box || !img) return null
+      if (!img.complete) await img.decode().catch(() => undefined)
+      const r = box.getBoundingClientRect()
+      const h1 = document.querySelector('[data-testid=hero] h1')!.getBoundingClientRect()
+      const line = document.querySelector('[data-testid=hero] h1 + p')!.getBoundingClientRect()
+      const card = document.querySelector('[data-testid=demo-card]')!.getBoundingClientRect()
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize)
+      // where the fade stops being solid paper: the gutter, the container's inset, 36rem of text, 1.5rem more
+      const solidTo = Math.max((innerWidth - 72 * rem) / 2, 0) + 1.5 * rem + 36 * rem + 1.5 * rem
+      return {
+        loaded: img.complete && img.naturalWidth > 0, file: (img.currentSrc.split('/').pop() ?? ''), alt: img.alt, attrs: `${img.getAttribute('width')}x${img.getAttribute('height')}`,
+        priority: img.getAttribute('fetchpriority'), loading: img.getAttribute('loading'),
+        position: getComputedStyle(box).position, left: Math.round(r.left), width: Math.round(r.width), top: Math.round(r.top + scrollY), bottom: Math.round(r.bottom + scrollY),
+        h1Top: Math.round(h1.top + scrollY), lineRight: Math.round(line.right), solidTo: Math.round(solidTo),
+        onPhoto: Math.round(((r.bottom - card.top) / card.height) * 100) / 100,
+        captions: document.querySelectorAll('[data-testid=hero-photo] figcaption, [data-testid=hero-photo] + figcaption').length,
+      }
+    })
+    check(`${width}: the hero photograph has loaded, full width, with alt text, fixed dimensions and high priority`, !!photo && photo.loaded && /^hero-b-(1200|2400)\.webp$/.test(photo.file) && photo.alt.length > 40 && photo.attrs === '2400x1451' && photo.priority === 'high' && photo.loading === 'eager' && photo.left === 0 && photo.width === width && photo.captions === 0, photo)
+    if (width < 1280) {
+      check(`${width}: the photograph is a block of its own above the headline, never behind text`, !!photo && photo.position === 'static' && photo.bottom <= photo.h1Top, photo && { bottom: photo.bottom, h1Top: photo.h1Top })
+    } else {
+      check(`${width}: the photograph is the hero band's background; the line under the headline sits on solid paper`, !!photo && photo.position === 'absolute' && photo.top <= photo.h1Top && photo.bottom > photo.h1Top && photo.lineRight <= photo.solidTo, photo && { lineRight: photo.lineRight, solidTo: photo.solidTo })
+      check(`${width}: the three frames sit half on the photograph and half on the page`, !!photo && photo.onPhoto >= 0.45 && photo.onPhoto <= 0.55, photo?.onPhoto)
+    }
+    check(`${width}: there is no hero switch and no preview script on the page`, (await p.locator('[data-testid=hero-switch], .hero-switch, [data-hero], [data-hero-photo]').count()) === 0 && !(await p.content()).includes('currentScript'))
+    const cardHeights = await p.locator('[data-testid=demo-card]').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)))
+    check(`${width}: the three frames are the same height`, cardHeights.length === 3 && Math.max(...cardHeights) - Math.min(...cardHeights) <= 1, cardHeights)
     const sizes = await p.evaluate(() => ({
       field: parseFloat(getComputedStyle(document.querySelector('[data-testid=demo-answer]')!).fontSize),
       total: parseFloat(getComputedStyle(document.querySelector('[data-testid=estimate-total]')!).fontSize),
       smallest: Math.min(...[...document.querySelectorAll('[data-testid=hero-demo-frames] *')].filter((el) => [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent!.trim())).map((el) => parseFloat(getComputedStyle(el).fontSize))),
     }))
-    check(`${width}: the screens are at true size (field text 15 px, the total 48 px, nothing under 11 px)`, sizes.field >= 15 && sizes.total >= 48 && sizes.smallest >= 11, sizes)
+    check(`${width}: the frames read easily (answer text 14 px, the total 24 px, nothing under 12 px)`, sizes.field >= 14 && sizes.total >= 24 && sizes.smallest >= 12, sizes)
 
     // ==================================================================
     section(`4. Calls to action and sections at ${width}`)
@@ -321,7 +382,9 @@ if (!process.env.PLAYWRIGHT_DIR) {
           const equal = widths.every((w) => Math.abs(w - widths[0]!) < 12)
           const wide = widths.reduce((s, w) => s + w, 0) > innerWidth * 0.55
           if (sameRow && wide && kids.length >= best.cols) {
-            const boxed = kids.every((k) => { const cs = getComputedStyle(k); return cs.borderTopWidth !== '0px' || cs.boxShadow !== 'none' || !/rgba\(0, 0, 0, 0\)/.test(cs.backgroundColor) })
+            // a column is a box when it, or the one thing that fills it, has an edge, a shadow or a fill
+            // (T-168: a demo frame is a caption over a framed screen; the frame is what the eye sees)
+            const boxed = kids.every((k) => [k, ...[...k.children].filter((c) => { const a = c.getBoundingClientRect(); const b = k.getBoundingClientRect(); return a.width >= b.width * 0.9 && a.height >= b.height * 0.6 })].some((el) => { const cs = getComputedStyle(el); return cs.borderTopWidth !== '0px' || cs.boxShadow !== 'none' || !/rgba\(0, 0, 0, 0\)/.test(cs.backgroundColor) }))
             best = { cols: kids.length, kind: `${equal ? 'equal' : 'unequal'}-${boxed ? 'boxes' : 'open'}` }
           }
         }
@@ -329,16 +392,21 @@ if (!process.env.PLAYWRIGHT_DIR) {
       }))
       const repeats = shapes.filter((s, i) => i > 0 && s === shapes[i - 1] && !s.startsWith('1 '))
       check(`${width}: no two neighbouring sections share a layout`, shapes.length >= 8 && repeats.length === 0, shapes)
-      const boxRows = shapes.filter((s) => /^[34] equal-boxes$/.test(s)).length
-      check(`${width}: at most one section is a row of equal boxes (it was five)`, boxRows <= 1, boxRows)
+      // T-168 (the owner's choice): the hero demo is three framed screens of one height again, so two sections
+      // are rows of equal boxes: the hero and the plans. They are far apart, and the figures between the hero and
+      // the next section are open columns on grey, not boxes.
+      const boxRows = shapes.map((s, i) => (/^[34] equal-boxes$/.test(s) ? i : -1)).filter((i) => i >= 0)
+      check(`${width}: two sections are rows of equal boxes, the hero's three frames and the plans, and they are not neighbours (it was five)`, boxRows.length === 2 && boxRows[0] === 0 && boxRows[1]! - boxRows[0]! > 1 && shapes[1] === '3 equal-open', { boxRows, shapes })
     }
     check(`${width}: each plan card has its own button`, (await p.locator('[data-testid=plan-card]').count()) === 3 && (await p.locator('[data-testid=plan-card] [data-testid=plan-button]').count()) === 3)
     const closing = await p.locator('[data-testid=closing] a').evaluateAll((els) => els.map((el) => ({ text: (el as HTMLElement).innerText.trim(), boxed: getComputedStyle(el).backgroundColor !== 'rgba(0, 0, 0, 0)' })))
     check(`${width}: the closing band has one button and one quiet link`, closing.length === 2 && closing.filter((c) => c.boxed).length === 1 && closing[1]!.text === 'Or try it as a customer first', closing)
     check(`${width}: "Set up in minutes" shows three steps, each with its screen; "How it works" is gone`, (await p.locator('[data-testid=setup-step]').count()) === 3 && (await p.locator('[data-testid^=setup-screen-]').count()) === 3 && !(await p.locator('main').innerText()).includes('How it works'))
     check(`${width}: "Add it anywhere" shows a QR code, the quote page on a phone and the form on a website`, (await p.locator('[data-testid=add-it] [data-testid=qr-svg]').count()) === 1 && (await p.locator('[data-testid=add-it-phone] [data-testid=request-form-screen]').count()) === 1 && (await p.locator('[data-testid=add-it-site] [data-testid=request-form-screen]').count()) === 1)
-    const stats = await p.locator('[data-testid=statistics] figure').evaluateAll((els) => els.map((el) => ({ size: parseFloat(getComputedStyle(el.querySelector('p')!).fontSize), source: el.querySelector('a')?.getAttribute('href') ?? '' })))
-    check(`${width}: three big figures, each with its source still linked`, stats.length === 3 && stats.every((s) => s.size >= 52 && s.source.startsWith('https://')), stats.map((s) => s.size))
+    const stats = await p.locator('[data-testid=statistics] figure').evaluateAll((els) => els.map((el) => ({ size: parseFloat(getComputedStyle(el.querySelector('p')!).fontSize), source: el.querySelector('a')?.getAttribute('href') ?? '', top: Math.round(el.getBoundingClientRect().top), left: Math.round(el.getBoundingClientRect().left) })))
+    const inColumns = stats.length === 3 && Math.abs(stats[0]!.top - stats[1]!.top) < 4 && Math.abs(stats[1]!.top - stats[2]!.top) < 4 && stats[0]!.left < stats[1]!.left && stats[1]!.left < stats[2]!.left
+    const inOneColumn = stats.length === 3 && stats[0]!.top < stats[1]!.top && stats[1]!.top < stats[2]!.top && stats.every((x) => x.left === stats[0]!.left)
+    check(`${width}: three big figures ${width >= 768 ? 'in three columns side by side' : 'in one column'}, each with its source still linked`, stats.length === 3 && stats.every((x) => x.size >= 52 && x.source.startsWith('https://')) && (width >= 768 ? inColumns : inOneColumn), stats.map((x) => [x.size, x.left]))
     // T-167: the order of Home changed, and the trades row moved into step 1 of "Set up in minutes"
     const order = await p.locator('main > section').evaluateAll((els) => els.map((el) => el.getAttribute('data-testid') ?? el.querySelector('h2')?.textContent ?? '').filter(Boolean))
     check(`${width}: the sections are in the T-167 order: hero, the figures, "What it notices", your prices, setup, add it anywhere, plans, questions, the closing band`, JSON.stringify(order) === JSON.stringify(['hero', 'homeowners', 'notices', 'control', 'setup', 'Add it anywhere', 'plans', 'Questions', 'closing']), order)
@@ -358,7 +426,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
     const footLinks = await p.locator('footer a').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)))
     if (width < 500) check(`${width}: every footer link is 44 px tall`, footLinks.length === 13 && Math.min(...footLinks) >= 44, Math.min(...footLinks))
     // a fresh load, so Tab starts from the top of the page
-    await p.goto(`${cfg.appUrl}/`, { waitUntil: 'domcontentloaded' })
+    await p.goto(HOME, { waitUntil: 'domcontentloaded' })
     await p.locator('[data-testid=skip-link]').waitFor({ state: 'attached' })
     await p.keyboard.press('Tab')
     const first = await p.evaluate(() => ({ text: (document.activeElement as HTMLElement).innerText, visible: document.activeElement!.getBoundingClientRect().width > 40 }))
@@ -371,8 +439,8 @@ if (!process.env.PLAYWRIGHT_DIR) {
     // ---- reduced motion: the finished frames, still
     const calm = await contextFor(null, { width, height, reducedMotion: 'reduce' })
     const c = await calm.newPage()
-    await c.goto(`${cfg.appUrl}/`, { waitUntil: 'domcontentloaded' })
-    await c.locator('[data-testid=demo-sent]').waitFor({ state: 'attached', timeout: 30_000 })
+    await c.goto(HOME, { waitUntil: 'domcontentloaded' })
+    await c.locator('[data-testid=demo-lead]').waitFor({ state: 'attached', timeout: 30_000 })
     await c.waitForTimeout(400)
     const still = await demoState(c)
     check(`${width}, reduced motion: the finished frames show at once, with no movement`, done(still), still)

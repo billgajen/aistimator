@@ -84,9 +84,11 @@ describe('T-165: the home page', () => {
     expect(home).not.toMatch(/How it works|HOW_IT_WORKS|ProductStrip/)
   })
 
-  it('the hero demo: the customer answers and adds a photo, the price lands, Approve & send turns to Sent, in that order', () => {
+  // T-168: the demo is three frames of one height again (the look before T-165): the answer arrives and the
+  // button is pressed, the price lands, the lead arrives for the business. It ends on "Approve & send", not "Sent".
+  it('the hero demo: the customer answers, the price lands, the lead reaches the business, in that order', () => {
     const T = DEMO_TIMELINE
-    const order = [T.answer, T.photo, T.ask, T.tape, T.lines, T.total, T.lead, T.approve, T.sent, T.confirmed]
+    const order = [T.answer, T.ask, T.tape, T.lines, T.total, T.lead]
     expect([...order].sort((a, b) => a - b)).toEqual(order)
     // it plays once and is over within six seconds
     expect(DEMO_LENGTH_MS).toBeLessThanOrEqual(6000)
@@ -98,7 +100,10 @@ describe('T-165: the home page', () => {
 
   it('the demo is built from the product’s own parts, in the example business’s colour', () => {
     const demo = code('components/marketing/home/HeroDemo.tsx')
-    for (const part of ["from '@/components/quote/EstimateSheet'", "from '@/components/quotes/TurnBadge'", "from '@/components/ui/Button'"]) expect(demo).toContain(part)
+    // T-168: the short estimate in the middle frame is drawn in the demo itself; the status label and the button are the product's
+    for (const part of ["from '@/components/quotes/TurnBadge'", "from '@/components/ui/Button'", "from '@/lib/color'"]) expect(demo).toContain(part)
+    expect(demo).toContain('brandStyleVars(content.primaryColor)')
+    expect(demo).not.toMatch(/\b(bg|text|border)-(accent|on-accent)\b/)
     // the estimate document's parts are the quote page's own, moved to one file
     expect(code('app/q/[quoteId]/page.tsx')).toContain("import { Money, SectionLabel } from '@/components/quote/document-parts'")
     expect(code('components/quote/EstimateSheet.tsx')).toContain("import { Money, SectionLabel } from './document-parts'")
@@ -168,7 +173,9 @@ describe('T-165: the home page', () => {
     expect(closing).toMatch(/className=\{`\$\{QUIET_LINK\} text-white`\}/)
   })
 
-  it('no photographs, stock images or gradients were added', () => {
+  // T-168: the hero now has one photograph (HeroPhoto, recorded in Docs/design/photos.md) and its fade into
+  // paper, both outside these files. Nothing else was added.
+  it('no stock images or gradients in the page and its sections', () => {
     for (const f of ['app/page.tsx', 'components/marketing/home/HeroDemo.tsx', 'components/marketing/home/SetupSteps.tsx', 'components/marketing/home/AddItAnywhere.tsx', 'components/marketing/home/PriceSentence.tsx', 'components/marketing/home/RequestFormScreen.tsx']) {
       expect(code(f), f).not.toMatch(/gradient|backdrop-blur|\.jpe?g|unsplash|picsum/)
     }

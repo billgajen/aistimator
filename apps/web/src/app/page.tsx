@@ -7,13 +7,14 @@ import { FounderNote } from '@/components/marketing/FounderNote'
 import { HeroDemo } from '@/components/marketing/home/HeroDemo'
 import { SetupSteps } from '@/components/marketing/home/SetupSteps'
 import { WhatItNotices } from '@/components/marketing/home/WhatItNotices'
+import { HeroPhoto } from '@/components/marketing/home/HeroPhoto'
 import { PriceSentence } from '@/components/marketing/home/PriceSentence'
 import { AddItAnywhere } from '@/components/marketing/home/AddItAnywhere'
 import { listPacks } from '@/lib/vertical-packs'
 import { templateTrades, tradeHref } from '@/lib/marketing/trades'
 import { marketingExample } from '@/lib/marketing/examples'
 import { MAIN_CTA, QUIET_BUTTON, QUIET_LINK } from '@/lib/marketing/cta'
-import { HERO, HERO_DEMO, MESSAGE_LINE, NOTICES, OTHER_TRADES, SETUP, CONTROL, STATISTICS, ADD_IT, PRICING_HEADING, FAQ, FINAL_CTA, FINAL_QUIET_LINK, PAGE_META } from '@/lib/marketing/home-copy'
+import { HERO, HERO_DEMO, HERO_DEMO_FRAMES, MESSAGE_LINE, NOTICES, OTHER_TRADES, SETUP, CONTROL, STATISTICS, ADD_IT, PRICING_HEADING, FAQ, FINAL_CTA, FINAL_QUIET_LINK, PAGE_META } from '@/lib/marketing/home-copy'
 
 export const metadata: Metadata = {
   title: PAGE_META.title,
@@ -31,8 +32,8 @@ const WRAP = 'mx-auto max-w-container px-4 sm:px-6'
  *
  * One idea per section, and no two neighbours share a layout or a background
  * (T-167 order):
- *   1 hero (paper): the words, the one yellow button, and the product demo
- *   2 what homeowners want (grey): three large figures, one to a row
+ *   1 hero (paper): the words, the one yellow button, and the product demo (three frames of one height, T-168)
+ *   2 what homeowners want (grey): three large figures in three columns (T-168), one column on a phone
  *   3 what it notices (paper): the message line and four examples, each with its real screen
  *   4 your prices (mint): a sentence that turns into price lines (the one moment)
  *   5 set up in minutes (paper): three steps beside their screens; the trade links sit in step 1
@@ -44,7 +45,10 @@ const WRAP = 'mx-auto max-w-container px-4 sm:px-6'
  * Copy: lib/marketing/home-copy.ts. Screens: the product's own parts, at true size.
  */
 export default function HomePage() {
+  // the water-heater example the sections below are built on, and the hero demo's own short example
+  // (the default one: one question, one price line)
   const example = marketingExample(HERO_DEMO.trade)
+  const demo = marketingExample()
   const trades = templateTrades(listPacks('US').filter((p) => p.region === 'US').map((p) => p.id))
   const free = FREE_ALLOWANCE.US!.quotes
   const appOrigin = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
@@ -58,72 +62,75 @@ export default function HomePage() {
     answer: HERO_DEMO.answer,
   }
 
+  // the hero's words and its demo: the same in production and on a hero-test preview
+  const heroBody = (
+    <>
+      <div className="max-w-3xl">
+        <h1 className="font-display text-display-sm font-extrabold text-text-primary sm:text-display-md lg:text-display-lg">{HERO.headline}</h1>
+        <p className="mt-4 max-w-2xl text-base text-text-secondary sm:text-lg">{HERO.subline}</p>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Link href="/signup" className={MAIN_CTA} data-testid="hero-signup" data-cta="main">
+            {freeOfferLabel()}
+          </Link>
+          <Link href="/demo" className={QUIET_BUTTON} data-testid="hero-demo">
+            Try it as a customer
+          </Link>
+        </div>
+        <p className="hero-small-line mt-3 text-xs text-text-muted">{HERO.smallLine}</p>
+      </div>
+      <div className="mt-10 lg:mt-12">
+        <HeroDemo
+          content={{
+            businessName: DEMO_BUSINESS_NAME,
+            logoUrl: DEMO_LOGO_PATH,
+            primaryColor: DEMO_PRIMARY_COLOR,
+            serviceName: demo.serviceName,
+            question: demo.question,
+            answer: demo.answer,
+            customerName: demo.customerName,
+            lines: demo.lines,
+            total: demo.total,
+            currency: 'USD',
+            locale: 'en-US',
+            frames: HERO.frames,
+            playAgain: HERO_DEMO_FRAMES.playAgain,
+            acceptNote: HERO_DEMO_FRAMES.acceptNote(DEMO_BUSINESS_NAME),
+            screens: HERO_DEMO_FRAMES.screens,
+          }}
+        />
+      </div>
+      
+    </>
+  )
+
   return (
     <main className="min-h-screen overflow-x-clip bg-background">
       <SiteNav />
 
-      {/* 1. Hero */}
-      <section className={`${WRAP} pb-16 pt-8 sm:pt-14`} data-testid="hero">
-        <div className="max-w-3xl">
-          <h1 className="font-display text-display-sm font-extrabold text-text-primary sm:text-display-md lg:text-display-lg">{HERO.headline}</h1>
-          <p className="mt-4 max-w-2xl text-base text-text-secondary sm:text-lg">{HERO.subline}</p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Link href="/signup" className={MAIN_CTA} data-testid="hero-signup" data-cta="main">
-              {freeOfferLabel()}
-            </Link>
-            <Link href="/demo" className={QUIET_BUTTON} data-testid="hero-demo">
-              Try it as a customer
-            </Link>
-          </div>
-          <p className="mt-3 text-xs text-text-muted">{HERO.smallLine}</p>
-        </div>
-        <div className="mt-10 lg:mt-12">
-          <HeroDemo
-            content={{
-              serviceName: example.serviceName,
-              question: HERO_DEMO.question,
-              answer: HERO_DEMO.answer,
-              photo: { src: HERO_DEMO.photoSrc, alt: HERO_DEMO.photoAlt, label: HERO_DEMO.photoLabel },
-              // T-167: the reading is the water heater template's own (examples.ts): 50 gal, from the tank's rating label
-              reading: example.reading ?? { value: '', readFrom: '' },
-              customerName: example.customerName,
-              sheet: {
-                businessName: DEMO_BUSINESS_NAME,
-                logoUrl: DEMO_LOGO_PATH,
-                customerName: example.customerName,
-                reference: 'EST-2026-0142',
-                lines: example.lines,
-                total: example.total,
-                currency: 'USD',
-                locale: 'en-US',
-                primaryColor: DEMO_PRIMARY_COLOR,
-              },
-              frames: HERO.frames,
-              playAgain: HERO_DEMO.playAgain,
-              sent: HERO_DEMO.sent,
-              screens: HERO_DEMO.screens,
-            }}
-          />
-        </div>
+      {/* 1. Hero. T-168: a band with the hero photograph. On a computer the photograph is the band's background,
+          fading into paper under the words, and the demo frames sit half on it; on a phone it is a block of its
+          own above the headline (globals.css, "hero photograph"). */}
+      <section className="hero-band" data-testid="hero">
+        <HeroPhoto />
+        <div className={`${WRAP} hero-inner pb-16 pt-8 sm:pt-14`}>{heroBody}</div>
       </section>
 
-      {/* 2. What homeowners want: the second thing a visitor sees. Three large figures, one to a row, sources kept */}
-      <section className="border-y border-border bg-surface py-16 sm:py-24" data-testid="homeowners">
+      {/* 2. What homeowners want: the second thing a visitor sees. T-168: three columns side by side again
+          (the large figure, the short line under it, then its source); one column on a phone */}
+      <section className="border-y border-border bg-surface py-16 sm:py-20" data-testid="homeowners">
         <div className={WRAP}>
           <h2 className={H2}>What homeowners want</h2>
-          <div className="mt-8 divide-y divide-border-strong border-y border-border-strong sm:mt-10" data-testid="statistics">
+          <div className="mt-10 grid gap-10 md:grid-cols-3 md:gap-0 md:divide-x md:divide-border-strong" data-testid="statistics">
             {STATISTICS.map((s) => (
-              <figure key={s.url} className="grid gap-4 py-8 md:grid-cols-[minmax(0,16rem)_1fr] md:items-center md:gap-12 md:py-10 lg:grid-cols-[minmax(0,20rem)_1fr]">
-                <p className="figure text-display-lg font-medium leading-none text-primary lg:text-display-xl">{s.figure}</p>
-                <div>
-                  <blockquote className="max-w-2xl text-lg text-text-primary sm:text-xl">{s.text}</blockquote>
-                  <figcaption className="mt-3 text-sm text-text-secondary">
-                    Source:{' '}
-                    <a href={s.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center font-semibold text-primary underline underline-offset-2 sm:min-h-0">
-                      {s.source}
-                    </a>
-                  </figcaption>
-                </div>
+              <figure key={s.url} className="md:px-8 md:first:pl-0 md:last:pr-0">
+                <p className="figure text-display-md font-medium leading-none text-primary lg:text-display-xl">{s.figure}</p>
+                <blockquote className="mt-4 text-base text-text-primary">{s.text}</blockquote>
+                <figcaption className="mt-3 text-xs text-text-secondary">
+                  Source:{' '}
+                  <a href={s.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center font-semibold text-primary underline underline-offset-2 sm:min-h-0">
+                    {s.source}
+                  </a>
+                </figcaption>
               </figure>
             ))}
           </div>

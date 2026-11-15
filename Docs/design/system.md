@@ -52,6 +52,7 @@ Rules:
 4. **Butter and tape are for measurement only:** the takeoff, grades, ranges, the tape rule. A warning is
    `tertiary`. "Needs you" is the strong yellow with its small dark marker (Status colours).
 5. **No dark panels, no glass, no gradients.** The dark code block on the Quote link page is the one dark surface.
+   The one gradient allowed is a scene photograph fading into paper where words sit beside it (Imagery, T-168).
 6. **Never choose a colour from a skill's catalogue,** and never write a raw Tailwind palette colour
    (`text-red-500`, `bg-zinc-50`). Every colour is one of the tokens above. A unit test fails on a raw one.
 7. **Do not write an opacity modifier on a colour token** (`border-danger/30`, `ring-primary/20`). The tokens are
@@ -109,12 +110,14 @@ are gone).
 ## Imagery
 
 - **Real product screens at true size** (our own UI, drawn from the real components, never a scaled-down
-  screenshot with unreadable text) **and real photographs only.** A screen on a marketing page says the real
+  screenshot with unreadable text), **real photographs, and scene photographs made with an image model under the
+  rules below.** A screen on a marketing page says the real
   screen's own words (`lib/marketing/screen-words.ts`) and shows the trade template's own question, label and
   prices (`lib/marketing/examples.ts`); it is built in `components/marketing/screens/`.
 - **No icon stands in for a screen.** Where the page says the product does something, it shows the screen where
   the result appears.
-- **A photo we do not have is named, not drawn.** The one photograph we ship is the sample tank label. A form
+- **A photo we do not have is named, not drawn.** The photographs we ship are the sample tank label and Home's
+  hero photograph (a scene, T-168). A form
   that asks for another label shows "1 photo added" beside the label's name, with no picture (T-167).
 - No stock photograph passed off as a customer, a customer's job or the team. A stand-in photograph, if ever
   used, is listed in the ticket's report as one.
@@ -123,11 +126,35 @@ are gone).
   from screen readers.
 - Photographs of a job on a customer's page come from that customer or that business, never from us.
 
+### Scene photographs made with an image model (T-168)
+
+Allowed on marketing pages, under these rules. Each one is recorded in `Docs/design/photos.md` (the model, the
+prompt, what was kept and what was rejected).
+
+- **They show situations, never a named or implied customer.** A contractor by a van is a scene; it is never "one
+  of our customers", a member of the team, or a job we priced.
+- **Never beside a review, a quote or a figure about real users.** Nothing near the picture may make it read as
+  evidence.
+- **No visible brand names or logos**, on a vehicle, clothing, a tool or a device.
+- **No text and no phone or tablet screen drawn by the image model.** Where a screen is needed, our real screens
+  go on top, in code.
+- **Real alt text** that says what the picture shows. **No caption.**
+- **Rejected on sight:** a malformed hand or face, readable text, a logo, a likeness to a recognisable person.
+- **One art direction, for every one of them:** documentary style, natural daylight, American homes and streets,
+  calm and warm, our paper and juniper tones, with at most one small yellow object (a tape measure or a hi-vis
+  detail). No studio look. No posed smile at the camera.
+- **Beside words:** the photograph fades into paper so the words stay dark on light. The fade is to the paper
+  token, and body text reaches 4.5:1 against the picture at its worst point (measured, not judged by eye). On a
+  phone a photograph is a block of its own, never behind text.
+- The image has fixed dimensions, so nothing moves when it arrives; a hero image loads with priority.
+
 ## Layout
 
 - **One idea per section.** A section says one thing and shows it.
 - **Neighbouring sections never share a layout or a background.** Three cards in a row is not followed by three
-  cards in a row, and paper is not followed by paper (paper, grey, mint and juniper take turns).
+  cards in a row, and paper is not followed by paper (paper, grey, mint and juniper take turns). (Home, T-168:
+  the hero's three framed screens on paper are followed by three open columns of figures on grey, divided by
+  rules. Both are in threes by the owner's choice; they differ in what a column is and in background.)
 - A marketing page has fewer, fuller sections rather than many short ones. (taste's rule of exactly one or two
   screens per section is not ours; see the rulings.)
 - One main action per screen. A second action is visibly quieter.
@@ -163,11 +190,15 @@ Rules:
    list. Nothing on an action taken hundreds of times a day, nothing started from the keyboard.
 3. **Marketing: one hero entrance** (once, on load) **and at most one moment per page.** Nothing appears because
    the page was scrolled.
-   - **The hero demo** (Home) is the hero entrance: the product shown working, built from the product's own parts
-     at true size. It plays once on load, each step a token-length entrance in its turn, the whole run under six
-     seconds, then it stands still on its last state with a small "Play again". It shows what the product does, in
-     the product's order: a reading comes back to the customer as a question and is confirmed before the price
-     lands (T-167). It is a picture: a screen reader
+   - **The hero demo** (Home) is the hero entrance: the product shown working, in **three frames of the same
+     height, side by side, one idea each** (T-168, the owner's choice): the customer's question with its answer and
+     "Get my estimate"; a short estimate (a line or two, the total, the locked Accept); "Waiting for you" with one
+     lead, its price and "Approve & send". The frames are built from the product's own parts and words at readable
+     sizes (nothing under 12 px); they are short pictures of a screen, not whole screens, and they keep one height
+     at every width (stacked on a phone). It plays once on load, each step a token-length entrance in its turn, the
+     whole run under six seconds, then it stands still on its last state with a small "Play again". The demo does
+     not show a reading from a photo: that step is shown, in the product's order, in "What it notices" (T-167's
+     reading beat left the hero in T-168). It is a picture: a screen reader
      gets one sentence instead. Under reduced motion it shows the finished frames with no movement.
    - **The one moment** sits in its own section and plays once when that section comes into view. Its content is
      on the page from the first paint; it waits only when script has seen that the section is still below the
@@ -245,6 +276,7 @@ The numbers are those of `audit.md`, section 6.
     minus what this file overrules. Its app checklist (safe areas, Dynamic Type) is for the mobile app.
 
 ## Known gaps (not fixed by T-164; each needs its own ticket)
+
 
 - **Opacity modifiers on tokens do nothing.** 228 classes such as `ring-primary/30`, `border-danger/30` and
   `bg-ink/40` write no CSS. Fields therefore show Tailwind's default blue focus halo, tinted borders fall back to

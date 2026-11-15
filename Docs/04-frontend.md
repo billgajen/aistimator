@@ -39,13 +39,21 @@ Home page (T-165, reordered in T-167; `Docs/design/system.md` decides the look),
 section, and no two neighbours sharing a layout or a background:
 1. **Hero** (paper): "Instant quotes on your website, in your prices.", then one line on what the AI does and where
    the price comes from, the one yellow button ("Try it free: 10 quotes, no card") and a quiet "Try it as a
-   customer". Under it the **product demo** (`HeroDemo`): three screens at true size built from the product's own
-   parts, in the example business's colour. It plays once on load: the customer answers and adds a photo; **the
-   capacity read from the photo comes back as a question and the customer presses "Yes, 50 gal is right"** (T-167:
-   the product confirms a reading before it prices, so the demo does too); the tape rule is drawn and the price
-   lands; Approve & send turns to Sent. Under six seconds, then still, with "Play again". Reduced motion shows the
-   finished frames. On a phone the screens stack.
-2. **What homeowners want** (grey): three large figures, one to a row, in their sources' words, each linked.
+   customer". Under it the **product demo** (`HeroDemo`, T-168): **three frames of the same height, side by
+   side, one idea each**, built from the product's own parts in the example business's colour. 1 "Your customer
+   asks": one question with its answer and "Get my estimate". 2 "They see your price": a short estimate (a line
+   or two and the total) and the locked Accept. 3 "You confirm it": "Waiting for you" with one lead, its price and
+   "Approve & send". It plays once on load (the answer, the tape rule and the price, the lead), about 3.4 seconds,
+   then stands still on those three frames, with "Play again". Reduced motion shows the finished frames. On a
+   phone the frames stack, still one height. The label-reading step T-167 added is no longer in the hero; "What
+   it notices" shows it.
+   **The hero photograph (T-168):** a painter on a porch checking a phone, a scene photograph made with an image
+   model (`HeroPhoto`, `lib/marketing/hero-photo.ts`, `public/photos/hero-b-*.webp`, styles in `globals.css`;
+   the record is `Docs/design/photos.md`). From 1280 px up it is the hero band's full-width background, fading
+   into paper on the left under the words, and the three frames sit half on it; below that it is a block of its
+   own above the headline, never behind text. It has fixed dimensions and loads with high priority.
+2. **What homeowners want** (grey): three large figures in three columns side by side (the figure, the short line
+   under it, then its linked source), one column on a phone (T-168; T-167 had them one to a row).
 3. **What it notices** (paper): the message line and four examples, each beside the real screen where the result
    appears (`WhatItNotices`): a label read and confirmed, walls measured from photos, an extra added from the
    customer's own words, a range and one question. No icons. Nothing moves.

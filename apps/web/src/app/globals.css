@@ -342,3 +342,42 @@
 /* A moment that has not played yet: its lines wait (set by script only when
    motion is allowed and the section is still below the screen) */
 [data-moment='waiting'] .moment-line { opacity: 0; }
+
+/* ------------------------------------------------------------
+   The home page's hero photograph (T-168; system.md, Imagery).
+   Below 1280 px it is a block of its own above the headline,
+   never behind text. From 1280 px it is the hero band's
+   full-width background: it fades into paper on the left, where
+   the words are, and the three demo frames sit half on it.
+   The fade is the one gradient the design system allows.
+   ------------------------------------------------------------ */
+.hero-band { position: relative; }
+.hero-photo { width: 100%; aspect-ratio: 3 / 2; overflow: hidden; background: var(--color-surface); }
+.hero-photo img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: var(--focus); }
+.hero-photo-fade { display: none; }
+@media (min-width: 640px) and (max-width: 1279px) {
+  .hero-photo { aspect-ratio: 2 / 1; }
+}
+@media (min-width: 1280px) {
+  /* --hero-edge: where the line under the headline ends (the page gutter, the container's own inset, then
+     36rem of text). --hero-under: from the band's bottom up to the middle of the three demo frames (the
+     band's 4rem of padding, the 4rem "Play again" row, and half of a 23.5rem frame). */
+  .hero-band {
+    --hero-edge: calc(max((100vw - 72rem) / 2, 0px) + 1.5rem + 36rem);
+    --hero-under: 19.75rem;
+  }
+  .hero-photo { position: absolute; top: 0; left: 0; right: 0; bottom: var(--hero-under); aspect-ratio: auto; }
+  .hero-photo img { object-position: right var(--band-y); }
+  /* solid paper to just past the end of the line under the headline, so that line is never on the picture */
+  .hero-photo-fade {
+    display: block;
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, var(--color-background) 0, var(--color-background) calc(var(--hero-edge) + 1.5rem), rgb(250 249 246 / 0) calc(var(--hero-edge) + 19rem));
+  }
+  .hero-inner { position: relative; }
+  .hero-band h1 + p { max-width: 36rem; }
+  .hero-band .hero-small-line { color: var(--color-text-secondary); }
+  /* a frame's label sits on the picture here, so it gets its own white ground */
+  .hero-band .demo-caption { align-self: flex-start; background: #fff; border-radius: 9999px; padding: 4px 14px 4px 4px; box-shadow: 0 1px 2px rgb(27 40 35 / 0.12); }
+}

@@ -205,17 +205,18 @@ describe('T-167: the message, the demo beat and "What it notices"', () => {
     expect(section).not.toMatch(/demo-in|animate-|useEffect|IntersectionObserver/)
   })
 
-  it('the demo beat: the reading comes back as a question and the customer presses "Yes", before the price lands', () => {
+  // T-168: the label-reading step left the hero demo (three frames of one height again). The AI's reading is
+  // shown in "What it notices", which is where the question and the customer's "Yes" now live.
+  it('the reading is shown in "What it notices", not in the hero demo', () => {
     const T = DEMO_TIMELINE
-    expect(T.photo).toBeLessThan(T.read)
-    expect(T.read).toBeLessThan(T.yes)
-    expect(T.yes).toBeLessThan(T.tape)
+    expect(Object.keys(T)).toEqual(['answer', 'ask', 'tape', 'lines', 'total', 'lead'])
     expect(T.tape).toBeLessThan(T.total)
     // system.md: the whole run is under six seconds
     expect(DEMO_LENGTH_MS).toBeLessThan(6000)
     const demo = code('apps/web/src/components/marketing/home/HeroDemo.tsx')
-    expect(demo).toContain('<QuestionScreen')
-    // the owner left the "What we saw" detail line out of the demo
+    expect(demo).not.toContain('QuestionScreen')
+    expect(code('apps/web/src/components/marketing/home/WhatItNotices.tsx')).toContain('<QuestionScreen')
+    // the owner left the "What we saw" detail line out of the marketing screens
     expect(code('apps/web/src/components/marketing/screens/ProductScreens.tsx')).not.toMatch(/What we saw/)
     // the reading is the water heater template's own, and the range is what the product returned for the sample label
     expect(marketingExample(HERO_DEMO.trade).reading?.value).toBe('50 gal')

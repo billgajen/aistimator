@@ -63,7 +63,7 @@ for (const pathname of MARKETING_PAGES) {
 check(`all ${MARKETING_PAGES.length} marketing pages load, with no banned word, slogan or promise of accuracy`, pageProblems.length === 0, pageProblems)
 check('no page says the AI sets, prices or calculates anything', aiSetsPrice.length === 0, aiSetsPrice)
 const homeText = visibleText(await (await fetch(`${cfg.appUrl}/`)).text())
-check('Home: the line under the headline says what the AI does, then where the price comes from', homeText.includes('The AI reads your customer’s answers and photos and works out the job. The price comes from your own price list, and you confirm it.') && HERO.subline.startsWith('The AI reads'))
+check('Home: the line under the headline says what the AI does, then where the price comes from', homeText.includes('The AI reads what your customer tells you and the photos they send, and works out the job. The price comes from your own price list, and you confirm it.') && HERO.subline.startsWith('The AI reads'))
 check('Home, Features and a trade page each carry the message line', homeText.includes(MESSAGE_LINE) && visibleText(await (await fetch(`${cfg.appUrl}/features`)).text()).includes(MESSAGE_LINE) && visibleText(await (await fetch(`${cfg.appUrl}/trades/water-heaters`)).text()).includes(MESSAGE_LINE))
 const demoHtml = await (await fetch(`${cfg.appUrl}/demo`)).text()
 check('/demo no longer says "to firm this up"', !/firm this up/i.test(demoHtml))
@@ -99,13 +99,15 @@ if (!process.env.PLAYWRIGHT_DIR) {
     p.locator('a, button').evaluateAll((els, yellow) => els.filter((el) => { const m = getComputedStyle(el).backgroundColor.match(/\d+/g) ?? []; return '#' + m.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, '0')).join('').toUpperCase() === yellow }).map((el) => ({ text: (el as HTMLElement).innerText.trim(), href: el.getAttribute('href'), id: el.getAttribute('data-testid') })), YELLOW)
   /** The demo right now: is each thing in, and is anything in it still moving? */
   const demoState = (p: Page) => p.evaluate(() => {
-    const o = ['demo-answer', 'demo-photo', 'question-screen', 'question-yes', 'estimate-total', 'demo-lead', 'demo-sent', 'demo-confirmed'].map((id) => Number(getComputedStyle(document.querySelector(`[data-testid=hero-demo-stage] [data-testid=${id}]`)!).opacity))
+    // T-168: three frames of one height; the label-reading step left the hero
+    const o = ['demo-answer', 'estimate-total', 'demo-lead'].map((id) => Number(getComputedStyle(document.querySelector(`[data-testid=hero-demo-stage] [data-testid=${id}]`)!).opacity))
     const stage = document.querySelector('[data-testid=hero-demo-stage]')!
     const moving = document.getAnimations().filter((an) => an.playState === 'running' && stage.contains((an.effect as KeyframeEffect | null)?.target ?? null)).length
-    return { answer: o[0]!, photo: o[1]!, question: o[2]!, yes: o[3]!, total: o[4]!, lead: o[5]!, sent: o[6]!, confirmed: o[7]!, moving }
+    return { answer: o[0]!, total: o[1]!, lead: o[2]!, moving }
   })
   type Demo = Awaited<ReturnType<typeof demoState>>
-  const finished = (s: Demo) => s.answer === 1 && s.photo === 1 && s.question === 1 && s.yes === 1 && s.total === 1 && s.lead === 1 && s.sent === 1 && s.confirmed === 1 && s.moving === 0
+  const finished = (s: Demo) => s.answer === 1 && s.total === 1 && s.lead === 1 && s.moving === 0
+  const HOME = `${cfg.appUrl}/`
   /** Each section of a page: its background as painted, and the widest row's shape */
   const sectionsOf = (p: Page) =>
     p.locator('main > section').evaluateAll((els) =>
@@ -124,29 +126,32 @@ if (!process.env.PLAYWRIGHT_DIR) {
     const p = await ctx.newPage()
     const errors: string[] = []
     p.on('pageerror', (e) => errors.push(String(e)))
-    await p.goto(`${cfg.appUrl}/`, { waitUntil: 'domcontentloaded' })
-    await p.locator('[data-testid=hero-demo-stage] [data-testid=question-yes]').waitFor({ state: 'attached', timeout: 30_000 })
+    await p.goto(HOME, { waitUntil: 'domcontentloaded' })
+    await p.locator('[data-testid=hero-demo-stage] [data-testid=demo-lead]').waitFor({ state: 'attached', timeout: 30_000 })
     const early = await demoState(p)
-    check(`${width}: at the start nothing has been read and no price has landed`, early.question < 0.5 && early.yes < 0.5 && early.total < 0.5 && early.sent < 0.5 && early.moving > 0, early)
-    // sample the run: the question must be in before the price is, and "Yes" chosen before the price lands
+    check(`${width}: at the start no price has landed and no lead has arrived`, early.total < 0.5 && early.lead < 0.5 && early.moving > 0, early)
+    // sample the run: the customer's answer, then the price, then the lead for the business
     const samples: Demo[] = []
-    for (let i = 0; i < 28; i++) {
+    for (let i = 0; i < 20; i++) {
       await p.waitForTimeout(200)
       samples.push(await demoState(p))
     }
     const firstAt = (pick: (s: Demo) => number) => samples.findIndex((s) => pick(s) > 0.5)
-    const order = { photo: firstAt((s) => s.photo), question: firstAt((s) => s.question), yes: firstAt((s) => s.yes), total: firstAt((s) => s.total), sent: firstAt((s) => s.sent) }
-    check(`${width}: the new beat is in its place: photo, then the reading as a question, then "Yes", then the price, then Sent`, order.photo >= 0 && order.photo <= order.question && order.question < order.yes && order.yes <= order.total && order.total < order.sent, order)
-    await p.waitForTimeout(1500)
+    const order = { answer: firstAt((s) => s.answer), total: firstAt((s) => s.total), lead: firstAt((s) => s.lead) }
+    check(`${width}: the demo runs in order: the answer, then the price, then the lead`, order.answer >= 0 && order.answer < order.total && order.total < order.lead, order)
+    await p.waitForTimeout(1200)
     const end = await demoState(p)
-    check(`${width}: it ends on its last state, the reading confirmed and the quote sent, with nothing moving`, finished(end), end)
+    check(`${width}: it ends on its last state, the three frames complete, with nothing moving`, finished(end), end)
     await p.waitForTimeout(2500)
     const later = await demoState(p)
     check(`${width}: it played once: later it is the same`, finished(later) && JSON.stringify(later) === JSON.stringify(end), later)
-    const beat = await p.locator('[data-testid=hero-demo-stage] [data-testid=question-screen]').innerText()
-    check(`${width}: the beat shows the question and the pressed "Yes, 50 gal is right", and no "What we saw" line`, beat.includes('We read 50 gal from the tank\'s rating label. Is that right?') && beat.includes('Yes, 50 gal is right') && !/What we saw/.test(await p.locator('[data-testid=hero]').innerText()), beat.replace(/\s+/g, ' '))
-    const chosen = await p.locator('[data-testid=hero-demo-stage] [data-testid=question-yes]').evaluate((el) => getComputedStyle(el).backgroundColor)
-    check(`${width}: "Yes" is shown chosen (the product's green), not yellow`, /223, 237, 229|rgb\(2\d\d, 2\d\d, 2\d\d\)/.test(chosen) && !/255, 197, 61/.test(chosen), chosen)
+    // T-168: the reading left the hero; "What it notices" shows it
+    const heroText = (await p.locator('[data-testid=hero]').innerText()).replace(/\s+/g, ' ')
+    check(`${width}: the hero demo has no label-reading step, and no "What we saw" line`, !/We read|Is that right|What we saw/.test(heroText) && (await p.locator('[data-testid=hero] [data-testid=question-screen]').count()) === 0 && (await p.locator('[data-testid=hero] [data-testid=question-yes]').count()) === 0, heroText.slice(0, 200))
+    const cards = await p.locator('[data-testid=hero] [data-testid=demo-card]').evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return { top: Math.round(r.top + window.scrollY), left: Math.round(r.left), height: Math.round(r.height) } }))
+    check(`${width}: the demo is three frames of the same height, ${width >= 768 ? 'side by side' : 'one under another'}`, cards.length === 3 && Math.max(...cards.map((c) => c.height)) - Math.min(...cards.map((c) => c.height)) <= 1 && (width >= 768 ? cards[0]!.top === cards[2]!.top && cards[0]!.left < cards[1]!.left && cards[1]!.left < cards[2]!.left : cards[0]!.top < cards[1]!.top && cards[1]!.top < cards[2]!.top), cards)
+    const chosen = await p.locator('[data-testid=notices] [data-testid=question-yes]').evaluate((el) => getComputedStyle(el).backgroundColor)
+    check(`${width}: in "What it notices", "Yes" is shown chosen (the product's green), not yellow`, /223, 237, 229|rgb\(2\d\d, 2\d\d, 2\d\d\)/.test(chosen) && !/255, 197, 61/.test(chosen), chosen)
     check(`${width}: no page error on Home`, errors.length === 0, errors)
     await shot(p, `home-${width}-demo-end`, false)
 
@@ -154,9 +159,12 @@ if (!process.env.PLAYWRIGHT_DIR) {
     check(`${width}: the sections are in the T-167 order`, JSON.stringify(sections.map((s) => s.id)) === JSON.stringify(['hero', 'homeowners', 'notices', 'control', 'setup', 'Add it anywhere', 'plans', 'Questions', 'closing']), sections.map((s) => s.id))
     const sameBackground = sections.filter((s, i) => i > 0 && s.bg === sections[i - 1]!.bg).map((s) => s.id)
     check(`${width}: no two neighbouring sections share a background`, sameBackground.length === 0, sections.map((s) => s.bg))
-    // the figures are the second thing a visitor sees
-    const stats = await p.locator('[data-testid=statistics] figure').evaluateAll((els) => els.map((el) => ({ size: parseFloat(getComputedStyle(el.querySelector('p')!).fontSize), lineWidth: Math.round(el.querySelector('blockquote')!.getBoundingClientRect().width), source: el.querySelector('a')?.getAttribute('href') ?? '', sourceSize: parseFloat(getComputedStyle(el.querySelector('figcaption')!).fontSize), top: Math.round(el.getBoundingClientRect().top) })))
-    check(`${width}: three large figures, one to a row, with short lines and readable, linked sources`, stats.length === 3 && stats.every((s) => s.size >= 64 && s.lineWidth <= 680 && s.sourceSize >= 14 && s.source.startsWith('https://')) && stats[0]!.top < stats[1]!.top && stats[1]!.top < stats[2]!.top, stats.map((s) => [s.size, s.lineWidth, s.sourceSize]))
+    // the figures are the second thing a visitor sees. T-168: back to three columns side by side (the large
+    // figure, the short line under it, then its source); one column on a phone
+    const stats = await p.locator('[data-testid=statistics] figure').evaluateAll((els) => els.map((el) => { const fig = el.querySelector('p')!.getBoundingClientRect(); const line = el.querySelector('blockquote')!.getBoundingClientRect(); const src = el.querySelector('figcaption')!.getBoundingClientRect(); return { size: parseFloat(getComputedStyle(el.querySelector('p')!).fontSize), lineWidth: Math.round(line.width), source: el.querySelector('a')?.getAttribute('href') ?? '', sourceSize: parseFloat(getComputedStyle(el.querySelector('figcaption')!).fontSize), top: Math.round(el.getBoundingClientRect().top), left: Math.round(el.getBoundingClientRect().left), stacked: fig.bottom <= line.top + 1 && line.bottom <= src.top + 1 } }))
+    const sideBySide = stats.length === 3 && Math.abs(stats[0]!.top - stats[1]!.top) < 4 && Math.abs(stats[1]!.top - stats[2]!.top) < 4 && stats[0]!.left < stats[1]!.left && stats[1]!.left < stats[2]!.left
+    const oneColumn = stats.length === 3 && stats[0]!.top < stats[1]!.top && stats[1]!.top < stats[2]!.top && stats.every((s) => s.left === stats[0]!.left)
+    check(`${width}: three large figures${width >= 768 ? ' in three columns side by side' : ', one column on a phone'}: the figure, the short line under it, then its linked source`, stats.length === 3 && stats.every((s) => s.size >= 52 && s.stacked && s.lineWidth <= 680 && s.sourceSize >= 12 && s.source.startsWith('https://')) && (width >= 768 ? sideBySide : oneColumn), stats.map((s) => [s.size, s.lineWidth, s.sourceSize, s.left]))
     check(`${width}: there is no standalone trades row, and no heading beside the pills`, (await p.locator('[data-testid=trades-row]').count()) === 1 && (await p.locator('#trades-label').count()) === 0 && !(await p.locator('main').innerText()).includes('Ready-made templates for your trade'))
     const pills = await p.locator('[data-testid=setup-step]').first().locator('[data-testid=trades-row] a').evaluateAll((els) => els.map((el) => ({ text: (el as HTMLElement).innerText.trim(), href: el.getAttribute('href'), h: Math.round(el.getBoundingClientRect().height), lines: new Set([...el.getClientRects()].map((r) => Math.round(r.top))).size })))
     check(`${width}: the trade links are pills inside "Choose your trade", each linking to its page, the last one "Other trades"`, pills.length === 7 && pills.slice(0, 6).every((x) => x.href === '/painting' || (x.href ?? '').startsWith('/trades/')) && pills[6]!.text === 'Other trades: describe your prices in plain English' && pills[6]!.href === '/signup' && pills.every((x) => x.h >= 44), pills.map((x) => x.text))
@@ -181,11 +189,11 @@ if (!process.env.PLAYWRIGHT_DIR) {
     // reduced motion: the finished frames at once, nothing moving
     const still = await contextFor({ width, height, reducedMotion: 'reduce' })
     const r = await still.newPage()
-    await r.goto(`${cfg.appUrl}/`, { waitUntil: 'domcontentloaded' })
-    await r.locator('[data-testid=hero-demo-stage] [data-testid=question-yes]').waitFor({ state: 'attached', timeout: 30_000 })
+    await r.goto(HOME, { waitUntil: 'domcontentloaded' })
+    await r.locator('[data-testid=hero-demo-stage] [data-testid=demo-lead]').waitFor({ state: 'attached', timeout: 30_000 })
     await r.waitForTimeout(400)
     const reduced = await demoState(r)
-    check(`${width}, reduced motion: the demo shows its finished screens at once, the reading and "Yes" included, and nothing moves`, finished(reduced), reduced)
+    check(`${width}, reduced motion: the demo shows its three finished frames at once, and nothing moves`, finished(reduced), reduced)
     await still.close()
 
     // ====================================================================

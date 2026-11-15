@@ -15,6 +15,135 @@
 
 ## Issues & Resolutions
 
+### 2026-11-15: T-168 — Hero photo, the three-frame demo, three-column figures, a clearer line under the headline
+
+**Status: shipped with hero option b** (the owner's choice after comparing four on a preview). The preview
+switch and the other three photographs were removed before the commit; sections 4 and 7 below describe the
+preview test as it was, and section 9 what was shipped.
+
+**What the owner asked for:** try a photograph behind the hero, four options to choose from on a preview; a new
+line under the headline; "What homeowners want" back to three columns; and (added mid-ticket) the hero demo back
+to three frames of one height.
+
+**1. The line under the headline** (`home-copy.ts`, `HERO.subline`)
+- "The AI reads what your customer tells you and the photos they send, and works out the job. The price comes
+  from your own price list, and you confirm it." Its claims are the same two as before (`photo-notes`,
+  `pricing-engine`), so the inventory did not change.
+
+**2. "What homeowners want": three columns again** (`app/page.tsx`)
+- The large figure, the short line under it, then its linked source; side by side from 768 px, one column on a
+  phone. Still the second section, still on grey.
+
+**3. The hero demo: three frames of one height** (`HeroDemo.tsx`; the owner's addition)
+- 1 "Your customer asks": one question with its answer, and "Get my estimate". 2 "They see your price": one or two
+  lines, the total, the locked Accept. 3 "You confirm it": "Waiting for you", one lead, its price, "Approve & send".
+- The example is the default one (`marketingExample()`: garage door springs, one line, $375.00), from the example
+  business's own price list. Nothing in the demo is typed in the component.
+- **The label-reading step is gone from the hero** (T-167 added it). The reading and the customer's "Yes" are
+  shown in "What it notices". The demo no longer shows a photo, so it makes no claim about reading one
+  (`ai-capabilities.md` section 6 says so).
+- **Where the play ends (a decision to check):** on the three frames exactly as described: Accept locked,
+  "Approve & send" shown and not pressed. T-165's ending ("Sent", "Reviewed and confirmed") is removed, because
+  the frames were described with the button, not its result.
+- One play of about 3.4 s (`DEMO_TIMELINE`: answer, the button press, the tape rule, the lines, the total, the
+  lead), then still, with "Play again". Reduced motion shows the finished frames.
+- Equal height: one grid (`auto-rows-fr` when stacked, one row of three from 768 px); each card fills its frame.
+  Measured: 377 px at 390, 1280, 1440 and 1920; 450 px at 768; 393 px at 1024.
+
+**4. The hero photo test** (`HeroPhotos.tsx`, `lib/marketing/hero-photos.ts`, `public/photos/`)
+- **Preview builds only.** `HERO_PREVIEW = NEXT_PUBLIC_HERO_PREVIEW === '1' && VERCEL_ENV !== 'production'`. The
+  home page has one branch on it; the photographs, the script that reads `?hero=`, the styles and the switch are
+  all rendered inside that branch by the preview's own component. Nothing is in `globals.css`.
+- **Checked on a production build:** Home's HTML has no `hero-photo`, `data-hero`, `/photos/hero-`,
+  `hero-switch`, `hero-band` or script, and no static chunk mentions them.
+- `?hero=a|b|c|d` picks the photograph; `?hero=none` is the hero as production has it. A small fixed strip of
+  links switches between them.
+- Layout: from 1280 px the photograph is the hero band's full-width background, with a fade into paper that
+  starts after the end of the line under the headline, so that line sits wholly on paper; the three frames sit
+  half on the photograph (measured share 0.5). Below 1280 px the photograph is a block of its own above the
+  headline, never behind words. The `<img>` has its width and height; the default option loads eagerly with high
+  priority, the others lazily.
+- The fade is a CSS gradient to the paper token: the one gradient `system.md` now allows.
+
+**5. The photographs** (`Docs/design/photos.md` has the prompts and the full record)
+- Model `gemini-3-pro-image`, from `HERO_IMAGE_MODEL` (default documented in the script), through the Gemini
+  API's interactions endpoint; Google's docs checked 2026-11-15. **9 of 12 calls used.**
+- Rejected: a-1 (head cut off), a-2 (lettering on the tape measure's label), c-1 (a phone screen drawn by the
+  model), c-2 (subject under the headline), d-1 (head cut off, tablet screen visible). None in the repo.
+- Kept: a-3, b-1, c-3, d-2, with three changes made in code and recorded: a is cut above a pocket patch that
+  looked like a brand mark; **b is cut to remove a tape measure whose label had garbled lettering; c has the same
+  kind of label painted out** (the plain upper half of the tape measure's face mirrored over it), because c had
+  no attempts left. These two were found on a second look at full size, after the first pass had kept them.
+- WebP, 2400 px wide: 82, 119, 145 and 87 KB (limit 300); 1200 px versions 26 to 38 KB.
+
+**6. Contrast, measured** (the words made transparent, then the darkest pixel behind each line of text)
+- Body line under the headline: **6.57:1** for every option at 1280, 1440 and 1920 (it is on paper throughout).
+- Small line under the buttons: 6.57:1. Headline, worst case: **9.4:1** (option a at 1280).
+- Below 1280 px no text is over a photograph.
+
+**7. A bug found and fixed while checking**
+- **What broke:** the switch's script first wrote the chosen option on `<html>`. React logged "Extra attributes
+  from the server: data-hero" on every load of the preview (verify-t165's "no error in the console" caught it).
+- **Root cause:** an attribute written before hydration on an element React owns.
+- **Fix:** the option is written on the hero band itself, which carries `suppressHydrationWarning`; nothing
+  outside the hero is touched. A unit test stops it going back on `<html>`.
+
+**8. The layout checker in verify-t165 was corrected, and one check changed on purpose**
+- It classified the hero's frames as "open columns" because it looked only at the outer list item, not the
+  framed card that fills it, so the hero and the figures read as the same layout. It now treats a column as a box
+  when it, or the one thing that fills it, has an edge, a shadow or a fill. Result: hero "3 equal-boxes", figures
+  "3 equal-open".
+- **Changed on purpose:** "at most one section is a row of equal boxes" is now "two: the hero's three frames and
+  the plans, and they are not neighbours". That is a direct result of the owner's choice of three framed
+  screens in the hero; `system.md` records it.
+
+**9. What was shipped (after the owner chose b)**
+- `HeroPhoto.tsx` and `lib/marketing/hero-photo.ts` replace `HeroPhotos.tsx` and `hero-photos.ts`: one photograph,
+  no flag, no script, no switch, no `suppressHydrationWarning`. The styles moved into `globals.css` ("hero
+  photograph"), unchanged in what they do.
+- `public/photos/` holds `hero-b-2400.webp` (2400 x 1451, 119 KB), `hero-b-1200.webp` (38 KB) and
+  `hero-sizes.json`. The files of a, c and d are gone; `Docs/design/photos.md` keeps their record.
+- The hero is the band on every build. Measured with b: body line and small line 6.57:1, headline 10.14:1 at
+  1440; the frames half on the photograph (0.5); on a phone the photograph ends 32 px above the headline; no
+  layout shift while loading (0 at 1440 and at 390).
+- verify-t165 gained checks for it (loaded, full width, alt text, fixed dimensions, high priority; above the
+  headline under 1280 px; behind the words with the line on solid paper from 1280 px; no switch on the page) and
+  both scripts load Home as `/` again.
+- `home-t165.test.ts`: the test "no photographs, stock images or gradients were added" is now "no stock images or
+  gradients in the page and its sections": Home has one photograph by the owner's decision.
+
+**Architectural decisions**
+- No new AD. `system.md` changed: Imagery allows scene photographs made with an image model, under rules; one art
+  direction; the photo fade is the one allowed gradient; the hero demo is three frames of one height.
+
+**Constraints introduced**
+- A scene photograph is never placed beside a review, a quote or a figure about real users, never shows a brand,
+  a logo, or text or a screen drawn by the model, and is recorded in `Docs/design/photos.md`.
+- Home has one photograph, the hero's. Another needs its own entry in `Docs/design/photos.md`.
+- Rejected candidates are written outside the repo (the generator's default folder is in the system temp
+  directory).
+
+**Relation to other fixes**
+- T-165 (the hero demo, the layout rules) and T-167 (the reading beat, the figures one to a row): both are
+  changed here by the owner's instruction; their verify scripts are updated, not weakened elsewhere.
+- AD-001 holds: the demo's price is the example business's own price line.
+
+**Checks** (the "Regression runs" rule: a marketing and design ticket, so the scripts that cover Home)
+- As shipped: `verify-t165` 148/148 and `verify-t167` 169/169 on the local stack. Not run: the rest of the
+  regression set (no pricing, quote flow, worker, email or migration change).
+- `pnpm lint` and `pnpm typecheck` pass. Unit tests: web 637, worker 519, mobile 11, all passing.
+- Web build passes. The worker was not changed and was not rebuilt.
+- No `verify-t168` script (the owner's prompt named the checks to run): the hero's checks are in `verify-t165`,
+  and the unit test `hero-t168.test.ts` covers the files, the record, the demo and the figures.
+
+**Files**
+- New: `apps/web/src/lib/marketing/hero-photo.ts`, `apps/web/src/components/marketing/home/HeroPhoto.tsx`,
+  `apps/web/public/photos/` (two WebP files and `hero-sizes.json`), `scripts/design/generate-hero-photos.mjs`,
+  `scripts/design/photos-to-webp.mjs`, `Docs/design/photos.md`, `apps/web/src/__tests__/hero-t168.test.ts`.
+- Changed: `app/page.tsx`, `globals.css`, `HeroDemo.tsx`, `home-copy.ts`, three unit tests, `verify-t165.mts`,
+  `verify-t167.mts`,
+  `Docs/design/system.md`, `Docs/design/ai-capabilities.md`, `Docs/04-frontend.md`, `OWNER-TODO.md`.
+
 ### 2026-11-15: Regression runs: which checks a ticket needs (the owner's rule, added with T-167)
 
 **Problem:** every ticket ran the whole regression set (verify-t146 to the newest: 18 scripts, about 25 minutes,

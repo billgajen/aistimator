@@ -2,165 +2,143 @@
 
 import { useState, type CSSProperties } from 'react'
 import { QUOTE_TURN_COPY, formatMoney } from '@qolumns/shared'
-import { EstimateSheet, type EstimateSheetData } from '@/components/quote/EstimateSheet'
+import { brandStyleVars } from '@/lib/color'
 import { TurnBadge } from '@/components/quotes/TurnBadge'
 import { Button } from '@/components/ui/Button'
-import { RequestFormScreen } from './RequestFormScreen'
-import { QuestionScreen } from '@/components/marketing/screens/ProductScreens'
 
 /**
- * T-165: the hero's product demo (system.md, Motion: "the hero demo").
+ * The hero's product demo (system.md, Motion: "the hero demo").
  *
- * Three screens at true size, built from the product's own parts: the request
- * form in the business's colour, the estimate document (EstimateSheet, the
- * quote page's own parts) and the owner's "Waiting for you" row (TurnBadge,
- * Button). It plays once on load: the customer answers and adds a photo; the
- * capacity read from the photo is shown back to them and they press "Yes"
- * (T-167: the product confirms a reading before it prices, so the demo does
- * too); the tape rule is drawn out and the price lands; then Approve & send
- * is pressed and turns to Sent. Then it stands still on that last state.
+ * T-168: three frames of the same height, side by side, one idea each (the
+ * clean look the home page had before T-165, at the design system's type
+ * sizes and with its motion):
+ *   1 "Your customer asks"   one question with its answer, and "Get my estimate"
+ *   2 "They see your price"  a short estimate: a line or two, the total, the locked Accept
+ *   3 "You confirm it"       "Waiting for you": one lead, its price, "Approve & send"
+ * (T-165 had three full-size screens of different heights, and T-167 added a
+ * label-reading step to the first. The AI's reading is shown in "What it
+ * notices" instead.)
  *
- * The motion is CSS only (globals.css, demo-*): each element waits for its
- * turn in `--at`. "Play again" mounts the screens afresh, which starts the
- * CSS again. Under reduced motion the global rule ends every animation at
- * once, so the three finished screens show with no movement.
+ * It plays once on load: the answer arrives and the button is pressed; the
+ * tape rule is drawn out and the price lands; the lead arrives for the
+ * business. Then it stands still on that last state, which is the three
+ * frames as described above. "Play again" mounts the frames afresh, which
+ * starts the CSS again. Under reduced motion the global rule ends every
+ * animation at once, so the finished frames show with no movement.
+ *
+ * The frames are the same height at every width: side by side from `md` up,
+ * one under another on a phone (never a sideways strip).
  */
 
-/** When each thing happens, in ms from the start. The whole run is about 5.8 s (system.md: under six). */
+/** When each thing happens, in ms from the start. The whole run is about 3.4 s (system.md: under six). */
 export const DEMO_TIMELINE = {
   answer: 400,
-  photo: 1000,
-  ask: 1500,
-  /** T-167: the reading comes back as a question… */
-  read: 1900,
-  /** …and the customer presses "Yes" */
-  yes: 2600,
-  tape: 2900,
-  lines: 3100,
-  total: 3600,
-  lead: 4100,
-  approve: 5000,
-  sent: 5200,
-  confirmed: 5400,
+  ask: 1100,
+  tape: 1500,
+  lines: 1700,
+  total: 2200,
+  lead: 2900,
 } as const
-/** The last thing to finish: the confirmed line, plus its entrance */
-export const DEMO_LENGTH_MS = DEMO_TIMELINE.confirmed + 300
+/** The last thing to finish: the lead, plus its entrance */
+export const DEMO_LENGTH_MS = DEMO_TIMELINE.lead + 300
 
 const at = (ms: number): CSSProperties => ({ '--at': `${ms}ms` } as CSSProperties)
 
 export interface HeroDemoContent {
+  businessName: string
+  logoUrl: string
+  /** The example business's colour: a customer's screen is in the business's colour, never ours */
+  primaryColor: string
   serviceName: string
   question: string
   answer: string
-  photo: { src: string; alt: string; label: string }
-  /** T-167: what the product read from that photo, shown back to the customer to confirm */
-  reading: { value: string; readFrom: string }
   customerName: string
-  sheet: EstimateSheetData
+  /** One or two lines: the hero shows a short estimate, not a long breakdown */
+  lines: Array<{ label: string; amount: number }>
+  total: number
+  currency: string
+  locale: string
   frames: readonly [string, string, string]
   playAgain: string
-  sent: string
-  /** what a screen reader hears for each of the three screens */
+  /** Under the estimate: why Accept is locked */
+  acceptNote: string
+  /** what a screen reader hears for each of the three frames */
   screens: readonly [string, string, string]
 }
 
 export function HeroDemo({ content }: { content: HeroDemoContent }) {
   const [run, setRun] = useState(0)
   const T = DEMO_TIMELINE
-  const { sheet } = content
-  const total = formatMoney(sheet.total, sheet.currency, sheet.locale)
+  const money = (n: number) => formatMoney(n, content.currency, content.locale)
+  const brand = brandStyleVars(content.primaryColor)
 
   return (
     <div data-testid="hero-demo-stage" data-run={run}>
-      {/* Each screen is a picture of the product (role="img"): a screen reader hears its description, not the parts */}
-      <ol key={run} className="grid gap-8 lg:grid-cols-3 lg:gap-6" data-testid="hero-demo-frames">
+      {/* Each frame is a picture of the product (role="img"): a screen reader hears its description, not the parts.
+          auto-rows-fr keeps the three the same height when they stack, as the grid row does when they sit side by side. */}
+      <ol key={run} className="demo-frames grid auto-rows-fr gap-6 md:grid-cols-3 md:gap-5" data-testid="hero-demo-frames">
         <Frame step={1} title={content.frames[0]} label={content.screens[0]}>
-          <RequestFormScreen
-            businessName={sheet.businessName}
-            logoUrl={sheet.logoUrl}
-            primaryColor={sheet.primaryColor}
-            serviceName={content.serviceName}
-            question={content.question}
-            answer={content.answer}
-            photo={content.photo}
-            answerClassName="demo-in"
-            answerStyle={at(T.answer)}
-            photoClassName="demo-pop"
-            photoStyle={at(T.photo)}
-            buttonClassName="demo-press"
-            buttonStyle={at(T.ask)}
-          />
-          {/* T-167: the reading, on the customer's own question screen, and their "Yes" */}
-          <QuestionScreen
-            value={content.reading.value}
-            readFrom={content.reading.readFrom}
-            primaryColor={sheet.primaryColor}
-            stacked
-            className="demo-in mt-4"
-            style={at(T.read)}
-            yesClassName="demo-press"
-            yesStyle={at(T.yes)}
-            chosenClassName="demo-in"
-            chosenStyle={at(T.yes + 150)}
-          />
+          <div className="flex flex-1 flex-col" style={brand}>
+            <BusinessHeader name={content.businessName} logoUrl={content.logoUrl} />
+            <div className="mt-4 rounded-xl border border-border bg-white p-4">
+              <p className="text-xs font-semibold text-text-secondary">{content.serviceName}</p>
+              <p className="mt-2 text-sm font-semibold text-text-primary">{content.question}</p>
+              <div className="mt-2 flex min-h-[44px] items-center rounded-lg border border-field bg-background px-3 text-sm text-text-primary">
+                <span className="demo-in" style={at(T.answer)} data-testid="demo-answer">{content.answer}</span>
+              </div>
+            </div>
+            <div className="mt-auto pt-4">
+              <div className="demo-press rounded-lg bg-primary py-3 text-center text-sm font-semibold text-on-primary" style={at(T.ask)}>
+                Get my estimate
+              </div>
+            </div>
+          </div>
         </Frame>
 
         <Frame step={2} title={content.frames[1]} label={content.screens[1]}>
-          <EstimateSheet
-            data={sheet}
-            totalClassName="demo-in"
-            totalStyle={at(T.total)}
-            lineClassName={() => 'demo-in'}
-            lineStyle={(i) => at(T.lines + i * 150)}
-            tapeCover={<span className="demo-tape-cover" style={at(T.tape)} data-testid="demo-tape-cover" />}
-            label={
-              // T-158's wording: an estimate until the business confirms it, then "Your quote"
-              <span className="grid">
-                <span className="demo-out col-start-1 row-start-1" style={at(T.confirmed)}>Your estimate</span>
-                <span className="demo-in col-start-1 row-start-1" style={at(T.confirmed)}>Your quote</span>
-              </span>
-            }
-            note={
-              <span className="mt-4 grid max-w-sm text-[13px] leading-snug text-on-primary/75">
-                <span className="demo-out col-start-1 row-start-1" style={at(T.confirmed)}>
-                  This is an estimate based on your photos and details. {sheet.businessName} will review and confirm it.
-                </span>
-                <span className="demo-in col-start-1 row-start-1" style={at(T.confirmed)} data-testid="demo-confirmed">
-                  Reviewed and confirmed by {sheet.businessName}.
-                </span>
-              </span>
-            }
-          />
+          <div className="flex flex-1 flex-col" style={brand}>
+            <BusinessHeader name={content.businessName} logoUrl={content.logoUrl} />
+            <div className="mt-4 rounded-xl border border-border bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-tertiary">Your estimate</p>
+              <ul className="mt-2 space-y-1.5 text-sm">
+                {content.lines.map((line, i) => (
+                  <li key={line.label} className="demo-in flex justify-between gap-3" style={at(T.lines + i * 150)}>
+                    <span className="min-w-0 text-text-secondary">{line.label}</span>
+                    <span className="figure shrink-0 text-text-primary">{money(line.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="relative mt-3 overflow-hidden">
+                <div className="tape-rule" aria-hidden="true" />
+                <span className="demo-tape-cover" style={{ ...at(T.tape), background: '#fff' }} data-testid="demo-tape-cover" />
+              </div>
+              <div className="mt-3 flex items-baseline justify-between gap-3">
+                <span className="text-sm font-semibold text-text-primary">Estimate</span>
+                <span className="demo-in figure text-2xl font-medium text-text-primary" style={at(T.total)} data-testid="estimate-total">{money(content.total)}</span>
+              </div>
+            </div>
+            <p className="mt-3 text-xs leading-snug text-text-muted">{content.acceptNote}</p>
+            <div className="mt-auto pt-4">
+              <div className="rounded-lg border border-border bg-surface py-3 text-center text-sm font-semibold text-text-muted" data-testid="demo-accept">Accept</div>
+            </div>
+          </div>
         </Frame>
 
         <Frame step={3} title={content.frames[2]} label={content.screens[2]}>
-          <div className="rounded-3xl bg-white p-6 text-left shadow-warm-lg" data-testid="demo-owner">
-            <div className="flex items-baseline justify-between gap-3">
-              <p className="font-display text-lg font-bold text-text-primary">{QUOTE_TURN_COPY.home.title}</p>
+          <div className="flex flex-1 flex-col" data-testid="demo-owner">
+            <p className="font-display text-base font-bold text-text-primary">{QUOTE_TURN_COPY.home.title}</p>
+            <div className="demo-in mt-4 rounded-xl border border-border bg-white p-4" style={at(T.lead)} data-testid="demo-lead">
+              <p className="truncate text-sm font-semibold text-text-primary">{content.customerName}</p>
+              <p className="truncate text-xs text-text-secondary">{content.serviceName} · just now</p>
+              <div className="mt-2">
+                <TurnBadge turn={{ label: QUOTE_TURN_COPY.labels.needsApproval, detail: '', tone: 'attention' }} showDetail={false} />
+              </div>
+              <p className="figure mt-2 text-2xl font-medium text-text-primary">{money(content.total)}</p>
             </div>
-            <div className="demo-in mt-4 rounded-2xl border border-border p-4" style={at(T.lead)} data-testid="demo-lead">
-              <p className="font-medium text-text-primary">{content.customerName}</p>
-              <p className="text-sm text-text-secondary">{content.serviceName} · just now</p>
-              <div className="mt-3 grid">
-                <span className="demo-out col-start-1 row-start-1" style={at(T.sent)}>
-                  <TurnBadge turn={{ label: QUOTE_TURN_COPY.labels.needsApproval, detail: '', tone: 'attention' }} showDetail={false} />
-                </span>
-                <span className="demo-in col-start-1 row-start-1" style={at(T.sent)}>
-                  <TurnBadge turn={{ label: QUOTE_TURN_COPY.labels.waiting, detail: '', tone: 'waiting' }} showDetail={false} />
-                </span>
-              </div>
-              <p className="figure mt-3 text-2xl font-medium text-text-primary">{total}</p>
-              <div className="mt-4 grid">
-                <span className="demo-out col-start-1 row-start-1" style={at(T.sent)}>
-                  <Button tabIndex={-1} className="demo-press w-full" style={at(T.approve)}>
-                    Approve &amp; send
-                  </Button>
-                </span>
-                <span className="demo-in col-start-1 row-start-1 inline-flex min-h-[40px] items-center justify-center rounded-lg bg-secondary-light text-sm font-semibold text-secondary" style={at(T.sent)} data-testid="demo-sent">
-                  <span aria-hidden="true" className="mr-1.5">✓</span>
-                  {content.sent}
-                </span>
-              </div>
+            <div className="mt-auto pt-4">
+              <Button tabIndex={-1} className="w-full" data-testid="demo-approve">
+                Approve &amp; send
+              </Button>
             </div>
           </div>
         </Frame>
@@ -186,14 +164,26 @@ export function HeroDemo({ content }: { content: HeroDemoContent }) {
 function Frame({ step, title, label, children }: { step: number; title: string; label: string; children: React.ReactNode }) {
   return (
     <li className="flex min-w-0 flex-col" data-testid="demo-frame">
-      <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-text-primary">
+      <p className="demo-caption mb-3 flex items-center gap-2 text-sm font-semibold text-text-primary">
         <span className="figure inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-white">{step}</span>
         {title}
       </p>
-      {/* a picture: nothing in it can be focused or pressed */}
-      <div role="img" aria-label={label} {...({ inert: '' } as object)}>
-        {children}
+      <div role="img" aria-label={label} {...({ inert: '' } as object)} className="flex flex-1 flex-col rounded-3xl border border-border bg-white p-2 text-left shadow-warm-lg" data-testid="demo-card">
+        <div className="flex flex-1 flex-col rounded-2xl bg-background p-4">{children}</div>
       </div>
     </li>
+  )
+}
+
+function BusinessHeader({ name, logoUrl }: { name: string; logoUrl: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-tertiary">Instant estimate</p>
+        <p className="truncate font-display text-base font-bold text-text-primary">{name}</p>
+      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element -- a small SVG shipped in public/ */}
+      <img src={logoUrl} alt="" className="h-8 w-auto shrink-0" />
+    </div>
   )
 }
