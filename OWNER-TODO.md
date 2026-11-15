@@ -877,6 +877,11 @@ Live since 2026-11-15 14:17 UTC. No price changes.
 
 ## T-168 — Hero photo, the three-frame demo, three-column figures
 
+- [x] **Deployed 2026-11-15 17:27 UTC** (commit `fd72403`): web only (`dpl_4bHfcStiezRGpxxQLGbxQC7EFFV3`, serving
+  `estimator-web-phi.vercel.app`). No worker change and no migration. Checked live, signed out and read-only
+  (nothing was submitted): the home page loads; the photograph loads behind the hero on a computer and sits above
+  the headline on a phone; there is no switcher; the page does not jump while it loads.
+- The preview is **deleted**. Vercel lists production deployments only.
 - **Hero option b is the hero** (your choice): a painter on a porch checking a phone. The switch and the other
   three photographs are removed.
 - **The photograph was made by an image model** (Google's `gemini-3-pro-image`) and its right edge was cut off,

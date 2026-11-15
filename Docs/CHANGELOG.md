@@ -21,6 +21,20 @@
 switch and the other three photographs were removed before the commit; sections 4 and 7 below describe the
 preview test as it was, and section 9 what was shipped.
 
+**Deployed 2026-11-15 17:27 UTC** (commit `fd72403`): web only (`npx vercel deploy --prod`, deployment
+`dpl_4bHfcStiezRGpxxQLGbxQC7EFFV3`, serving `estimator-web-phi.vercel.app`). No worker change and no migration.
+Live checks, signed out and read-only (the page was loaded; nothing was submitted):
+- `/` returns 200 and carries the new line under the headline.
+- At 1440 the hero photograph (`hero-b-2400.webp`) has loaded and is the hero band's full-width background, with
+  the three frames half on it (0.5). Contrast against the live page: line under the headline 6.57:1, small line
+  6.57:1, headline 10.14:1.
+- At 390 the photograph (`hero-b-1200.webp`) is a block that ends 32 px above the headline; nothing is written
+  over it.
+- No switcher, no `data-hero` and no preview script in the live HTML; `/photos/hero-a-2400.webp` answers 404.
+- The page does not jump while loading: layout shift 0 at 1440 and at 390, measured from the first paint for
+  five seconds. No page error, no sideways scroll.
+The T-168 preview (`dpl_59E6uGkpQtcmVDCjCMLHFW4CwccT`) is deleted; Vercel lists production deployments only.
+
 **What the owner asked for:** try a photograph behind the hero, four options to choose from on a preview; a new
 line under the headline; "What homeowners want" back to three columns; and (added mid-ticket) the hero demo back
 to three frames of one height.
