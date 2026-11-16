@@ -23,6 +23,20 @@ section 2.
 
 **No migration and no worker change.** The live deploy is web only.
 
+**Deployed 2026-11-16 10:57 UTC** (commit `4915e9d`): web only (`npx vercel deploy --prod`, deployment
+`dpl_81qyt3LxSpF3jMo75M9b31UtHgpf`, target production, serving `estimator-web-phi.vercel.app`). No worker deploy
+and no migration. Live checks, signed out and read-only (nothing was submitted):
+- `/` and `/login` return 200. The home page demo carries the whole business name ("Example Home Services").
+- `/app` signed out: 307 to `/login?next=%2Fapp`.
+- the photo route (`/api/quotes/:quoteId/photos/:assetId`) signed out: 401 `UNAUTHORIZED`, and no address.
+- the public quote API: 404 `QUOTE_NOT_FOUND` for a made-up token, 401 `MISSING_TOKEN` with none.
+
+Not proven in production: the signed-in dashboard screens (the panel, the photos, the small lines, Services on a
+phone). A read-only, signed-out check cannot open them; they passed on the local stack (`verify-t169` 150/150) and
+are the look-at list in `OWNER-TODO.md`.
+
+The T-169 preview (`dpl_3zfXUMCfvFzapop9QKGphembjrks`) is deleted, as the owner asked.
+
 **What the owner asked for:** show on the dashboard what the AI understood for a quote and the customer's photos;
 fix the phone layout and readability findings of `Docs/design/audit.md` section 2; one small chart on Home; and the
 cut-off business name in the home page demo.
