@@ -112,7 +112,8 @@ export function HeroDemo({ content }: { content: HeroDemoContent }) {
                 <div className="tape-rule" aria-hidden="true" />
                 <span className="demo-tape-cover" style={{ ...at(T.tape), background: '#fff' }} data-testid="demo-tape-cover" />
               </div>
-              <div className="mt-3 flex items-baseline justify-between gap-3">
+              {/* T-169: in a narrow frame the total takes its own line instead of running past the card's edge */}
+              <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-3">
                 <span className="text-sm font-semibold text-text-primary">Estimate</span>
                 <span className="demo-in figure text-2xl font-medium text-text-primary" style={at(T.total)} data-testid="estimate-total">{money(content.total)}</span>
               </div>
@@ -126,7 +127,7 @@ export function HeroDemo({ content }: { content: HeroDemoContent }) {
 
         <Frame step={3} title={content.frames[2]} label={content.screens[2]}>
           <div className="flex flex-1 flex-col" data-testid="demo-owner">
-            <p className="font-display text-base font-bold text-text-primary">{QUOTE_TURN_COPY.home.title}</p>
+            <p className="font-display text-base font-bold leading-tight text-text-primary" data-testid="demo-frame-header">{QUOTE_TURN_COPY.home.title}</p>
             <div className="demo-in mt-4 rounded-xl border border-border bg-white p-4" style={at(T.lead)} data-testid="demo-lead">
               <p className="truncate text-sm font-semibold text-text-primary">{content.customerName}</p>
               <p className="truncate text-xs text-text-secondary">{content.serviceName} · just now</p>
@@ -177,10 +178,13 @@ function Frame({ step, title, label, children }: { step: number; title: string; 
 
 function BusinessHeader({ name, logoUrl }: { name: string; logoUrl: string }) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <div className="min-w-0">
+    // T-169: the name is never cut ("Example Home Servi…"). Where a frame is too narrow for the name beside
+    // the logo, the logo moves to a line of its own above it (wrap-reverse) and the name may take two lines.
+    // Both customer frames carry the same header, so they stay the same height.
+    <div className="flex flex-wrap-reverse items-end justify-between gap-2" data-testid="demo-frame-header">
+      <div className="min-w-[9.5rem] flex-1">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-tertiary">Instant estimate</p>
-        <p className="truncate font-display text-base font-bold text-text-primary">{name}</p>
+        <p className="text-balance font-display text-base font-bold leading-tight text-text-primary" data-testid="demo-business-name">{name}</p>
       </div>
       {/* eslint-disable-next-line @next/next/no-img-element -- a small SVG shipped in public/ */}
       <img src={logoUrl} alt="" className="h-8 w-auto shrink-0" />

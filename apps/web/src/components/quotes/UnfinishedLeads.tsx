@@ -160,12 +160,12 @@ export function UnfinishedLeads({ onChange }: { onChange?: () => void }) {
           </div>
           <div className="mt-3 flex flex-wrap gap-2 sm:mt-0">
             {lead.customerPhone && (
-              <a href={`tel:${lead.customerPhone.replace(/[^0-9+]/g, '')}`} className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">
+              <a href={`tel:${lead.customerPhone.replace(/[^0-9+]/g, '')}`} className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">
                 Call {lead.customerPhone}
               </a>
             )}
             {lead.customerEmail && (
-              <a href={`mailto:${lead.customerEmail}`} className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-semibold text-text-primary hover:bg-surface">
+              <a href={`mailto:${lead.customerEmail}`} className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-semibold text-text-primary hover:bg-surface">
                 Email {lead.customerEmail}
               </a>
             )}
@@ -173,7 +173,7 @@ export function UnfinishedLeads({ onChange }: { onChange?: () => void }) {
               type="button"
               onClick={() => markDone(lead)}
               disabled={busy === lead.leadId}
-              className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-semibold text-text-primary hover:bg-surface disabled:opacity-50"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-semibold text-text-primary hover:bg-surface disabled:opacity-50"
               data-testid="unfinished-done"
             >
               {busy === lead.leadId ? U.doneSaving : U.done}

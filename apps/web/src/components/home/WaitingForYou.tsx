@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { QUOTE_TURN_COPY } from '@qolumns/shared'
 import type { QuoteTurnTone } from '@qolumns/shared'
 import { TurnBadge } from '@/components/quotes/TurnBadge'
+import { QuoteThumb } from '@/components/quotes/CustomerPhotos'
 
 export interface WaitingQuote {
   id: string
@@ -20,6 +21,8 @@ export interface WaitingQuote {
   action: 'approve' | 'open'
   /** The words on the button for an `open` row */
   buttonLabel: string
+  /** T-169: the first photo the customer sent (a path that needs the business's sign-in), or null */
+  photoUrl?: string | null
 }
 
 /**
@@ -69,11 +72,14 @@ export function WaitingForYou({ quotes }: { quotes: WaitingQuote[] }) {
               data-testid="waiting-quote"
               data-action={q.action}
             >
-              <Link href={`/app/quotes/${q.id}`} className="min-w-0 hover:underline">
-                <p className="truncate font-semibold text-text-primary">{q.customerName}</p>
-                <p className="truncate text-sm text-text-secondary">
-                  {q.serviceName} · {q.createdLabel}
-                </p>
+              <Link href={`/app/quotes/${q.id}`} className="flex min-h-[44px] min-w-0 items-center gap-3 hover:underline">
+                {q.photoUrl && <QuoteThumb url={q.photoUrl} customerName={q.customerName} />}
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold text-text-primary">{q.customerName}</span>
+                  <span className="block truncate text-sm text-text-secondary">
+                    {q.serviceName} · {q.createdLabel}
+                  </span>
+                </span>
               </Link>
               <div className="flex shrink-0 flex-wrap items-center gap-3">
                 <TurnBadge turn={{ label: q.label, tone: q.tone, detail: '' }} showDetail={false} />
@@ -87,14 +93,14 @@ export function WaitingForYou({ quotes }: { quotes: WaitingQuote[] }) {
                     type="button"
                     onClick={() => approve(q)}
                     disabled={st.busy}
-                    className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+                    className="inline-flex min-h-[44px] items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50 sm:min-h-[40px]"
                   >
                     {st.busy ? QUOTE_TURN_COPY.pageButtons.approving : QUOTE_TURN_COPY.pageButtons.approve}
                   </button>
                 ) : (
                   <Link
                     href={`/app/quotes/${q.id}`}
-                    className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+                    className="inline-flex min-h-[44px] items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover sm:min-h-[40px]"
                   >
                     {q.buttonLabel}
                   </Link>

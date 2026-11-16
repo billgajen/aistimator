@@ -381,3 +381,16 @@
   /* a frame's label sits on the picture here, so it gets its own white ground */
   .hero-band .demo-caption { align-self: flex-start; background: #fff; border-radius: 9999px; padding: 4px 14px 4px 4px; box-shadow: 0 1px 2px rgb(27 40 35 / 0.12); }
 }
+
+/* ---- T-169: the larger view of a customer's photo (dashboard quote page) ----
+   The browser's own modal dialog. The page behind is dimmed with ink, so the
+   picture stands out; nothing here moves (system.md: dashboard, feedback only). */
+dialog.photo-viewer {
+  margin: auto;
+  max-height: calc(100dvh - 1.5rem);
+  overflow: auto;
+  color: var(--color-text-primary);
+}
+dialog.photo-viewer::backdrop {
+  background: rgb(27 40 35 / 0.6);
+}

@@ -939,10 +939,10 @@ export default function ServicesPage() {
         title="Services"
         description="Your services and what you charge for each"
         actions={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => setShowBulkUpload(true)}
-              className="inline-flex items-center rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+              className="inline-flex min-h-[44px] items-center rounded-lg border border-field bg-background px-4 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary"
             >
               <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -951,9 +951,9 @@ export default function ServicesPage() {
             </button>
             <button
               onClick={openCreateModal}
-              className="inline-flex items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+              className="inline-flex min-h-[44px] items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
             >
-              <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -981,7 +981,7 @@ export default function ServicesPage() {
             <div className="ml-3">
               <p className="text-sm text-danger">{error}</p>
             </div>
-            <button onClick={() => setError(null)} className="ml-auto text-danger hover:text-danger">
+            <button onClick={() => setError(null)} aria-label="Dismiss this message" className="-my-2 ml-auto inline-flex h-11 w-11 items-center justify-center text-danger hover:text-danger">
               <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fillRule="evenodd"
@@ -1029,76 +1029,77 @@ export default function ServicesPage() {
           </button>
         </div>
       ) : (
-        /* Services list */
-        <div className="overflow-hidden rounded-xl border border-border bg-background">
-          <table className="min-w-full">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-widest text-text-muted">
-                  Service
-                </th>
-                <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-widest text-text-muted">
-                  Document Type
-                </th>
-                <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-widest text-text-muted">
-                  Status
-                </th>
-                <th className="px-6 py-4 text-right text-[11px] font-bold uppercase tracking-widest text-text-muted">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {services.map((service) => (
-                <tr key={service.id} className={`transition-colors hover:bg-surface ${!service.active ? 'opacity-60' : ''}`}>
-                  <td className="whitespace-nowrap px-6 py-5">
-                    <div className="flex items-center gap-2">
-                      <div className="font-semibold text-text-primary">{service.name}</div>
-                      {service.draft_config && <AIDraftBadge compact />}
-                    </div>
-                    {service.description && (
-                      <div className="mt-0.5 max-w-xs truncate text-sm text-text-muted">{service.description}</div>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-5 text-sm text-text-secondary">
-                    {DOCUMENT_TYPES.find((d) => d.value === service.document_type_default)?.label ||
-                      service.document_type_default}
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-5">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                        service.active
-                          ? 'bg-secondary-light text-secondary'
-                          : 'border border-border text-text-muted'
-                      }`}
-                    >
-                      {service.active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-5 text-right">
-                    <button
-                      onClick={() => openEditModal(service)}
-                      className="mr-4 text-sm font-medium text-text-primary underline-offset-4 hover:underline"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => toggleActive(service)}
-                      className="mr-4 text-sm font-medium text-text-secondary underline-offset-4 hover:text-text-primary hover:underline"
-                    >
-                      {service.active ? 'Disable' : 'Enable'}
-                    </button>
-                    <button
-                      onClick={() => deleteService(service)}
-                      className="text-sm font-medium text-danger underline-offset-4 hover:underline"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        /* Services list. T-169: one row per service that stacks on a phone, so
+           Edit, Disable and Delete are always on screen. Delete sits apart
+           from the other two, behind a rule, and is the only red one. */
+        <div className="rounded-xl border border-border bg-background">
+          <div className="hidden border-b border-border px-6 py-4 text-xs font-bold uppercase tracking-widest text-text-muted md:grid md:grid-cols-[minmax(0,1fr)_9rem_6rem_auto] md:gap-x-6" aria-hidden="true">
+            <span>Service</span>
+            <span>Document type</span>
+            <span>Status</span>
+            <span className="w-[17rem] text-right">Actions</span>
+          </div>
+        <ul className="divide-y divide-border" data-testid="services-list">
+          {services.map((service) => (
+            <li
+              key={service.id}
+              className="flex flex-col gap-3 px-4 py-4 md:grid md:grid-cols-[minmax(0,1fr)_9rem_6rem_auto] md:items-center md:gap-x-6 md:px-6"
+              data-testid="service-row"
+              data-active={service.active ? 'true' : 'false'}
+            >
+              <div className={`min-w-0 ${!service.active ? 'opacity-60' : ''}`}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-text-primary">{service.name}</span>
+                  {service.draft_config && <AIDraftBadge compact />}
+                </div>
+                {service.description && <p className="mt-0.5 truncate text-sm text-text-muted">{service.description}</p>}
+              </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-secondary md:contents">
+                <span>
+                  {DOCUMENT_TYPES.find((d) => d.value === service.document_type_default)?.label || service.document_type_default}
+                </span>
+                <span>
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      service.active ? 'bg-secondary-light text-secondary' : 'border border-border text-text-muted'
+                    }`}
+                  >
+                    {service.active ? 'Active' : 'Inactive'}
+                  </span>
+                </span>
+              </div>
+              <div className="flex items-center gap-2 md:w-[17rem] md:justify-end">
+                <button
+                  onClick={() => openEditModal(service)}
+                  aria-label={`Edit ${service.name}`}
+                  className="inline-flex min-h-[44px] items-center rounded-lg border border-field bg-background px-4 text-sm font-semibold text-text-primary transition-colors hover:bg-surface md:min-h-[36px] md:px-3"
+                  data-testid="service-edit"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => toggleActive(service)}
+                  aria-label={`${service.active ? 'Disable' : 'Enable'} ${service.name}`}
+                  className="inline-flex min-h-[44px] items-center rounded-lg border border-field bg-background px-4 text-sm font-semibold text-text-secondary transition-colors hover:bg-surface hover:text-text-primary md:min-h-[36px] md:px-3"
+                  data-testid="service-toggle"
+                >
+                  {service.active ? 'Disable' : 'Enable'}
+                </button>
+                {/* Delete: pushed to the far side, behind a rule */}
+                <span className="ml-auto flex items-center border-l border-border-strong pl-3 md:ml-2">
+                  <button
+                    onClick={() => deleteService(service)}
+                    aria-label={`Delete ${service.name}`}
+                    className="inline-flex min-h-[44px] items-center rounded-lg px-3 text-sm font-semibold text-danger transition-colors hover:bg-danger-light md:min-h-[36px]"
+                    data-testid="service-delete"
+                  >
+                    Delete
+                  </button>
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
         </div>
       )}
 

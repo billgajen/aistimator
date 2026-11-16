@@ -50,7 +50,7 @@ export function FinalInvoiceCard(props: {
   }
 
   return (
-    <div className="mb-6 bg-surface border border-border rounded-lg p-5">
+    <div className="mb-6 rounded-2xl border border-border bg-background p-5" data-testid="final-invoice">
       <h3 className="text-sm font-semibold text-text-primary mb-1">Final invoice</h3>
       <p className="text-xs text-text-muted mb-3">
         What you finally charged for this job. It measures how close your estimates are (Analytics → Estimate accuracy).

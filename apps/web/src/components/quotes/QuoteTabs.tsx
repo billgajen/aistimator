@@ -28,7 +28,7 @@ export function QuoteTabs({
               role="tab"
               aria-selected={selected}
               onClick={() => onSelect(tab)}
-              className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-semibold transition-colors ${
+              className={`-mb-px flex min-h-[44px] items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-semibold transition-colors ${
                 selected ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary'
               }`}
               data-testid={`tab-${tab}`}

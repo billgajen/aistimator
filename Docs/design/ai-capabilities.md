@@ -13,6 +13,14 @@ timings, from 2026-09-24). Production's own numbers were not read for this list.
 Every amount comes from the business's own configuration through the pricing engine. The site never says or
 implies otherwise.
 
+**Where the business sees it (T-169).** The dashboard quote page has a panel, "What Qolumns understood", that
+lists what the rows below produced for that quote and nothing else: label readings with the words read, a
+quantity measured from photos, notes from photos, an extra picked up from the customer's words, work that may also
+be needed, and the question asked and the answer. A quote the AI produced nothing for has no panel. The lines are
+built by `apps/web/src/lib/quote-understanding.ts` from the quote's stored signals, takeoff, questions and
+answers; none carries an amount. The quote checker's findings can show there too, as "Worth checking", but that
+group is **switched off** (`SHOW_WORTH_CHECKING`, section 4's `checker` row says why).
+
 ## 1. What it reads from a job (claimable)
 
 | id | What it does | When it runs | What the customer sees | What the business sees | Code | Evidence |
@@ -47,7 +55,7 @@ implies otherwise.
 
 | id | Why not |
 |---|---|
-| `checker` | The AI quote checker reads every priced quote and logs issues. It changes nothing (AD-049), and today its findings hold no quote and are shown on no screen. There is nothing here a business would notice. |
+| `checker` | The AI quote checker reads every priced quote and logs issues. It changes nothing (AD-049) and its findings hold no quote. T-169 built a "Worth checking" group for them on the dashboard quote page, and the owner shipped it **switched off** (`SHOW_WORTH_CHECKING` in `apps/web/src/lib/quote-understanding.ts`): no business sees a finding today. **Not claimable:** the checker is not told the business's minimum charge, base fee, tax or currency, so it reports the minimum and the tax as fees nobody configured (locally 18 of 217 runs with a finding name the minimum charge), and a wrong note is worse than none. It needs its own worker ticket before the group is switched on or a page may mention it. |
 | `cross-service-suggestions` | Code exists to notice another of the business's services in the customer's words and estimate it. It ran on 543 quotes and stored a suggestion on **none**. |
 | `learning-from-edits` | Code exists to learn wording habits from the business's edits. Its table (`tenant_learning_context`) is empty: it has never produced anything. The Features page's "Your corrections improve the next estimate" is true only of confirmed measurements (`measurement-memory`). |
 | `inventory-from-photos` | Counting catalogue items in photos exists in code. No template uses it and it has never run in a timed quote. |

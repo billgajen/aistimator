@@ -30,7 +30,7 @@ export function LatestActivity({ lines, hasQuotes }: { lines: ActivityLine[]; ha
             <li key={index} data-testid="activity-line" data-kind={line.kind}>
               <Link
                 href={line.href}
-                className="flex flex-col gap-0.5 py-2.5 hover:underline sm:flex-row sm:items-baseline sm:justify-between sm:gap-4"
+                className="flex min-h-[44px] flex-col justify-center gap-0.5 py-2.5 hover:underline sm:flex-row sm:items-center sm:justify-between sm:gap-4"
               >
                 <span className="min-w-0 text-sm font-medium text-text-primary">{line.text}</span>
                 <span className="shrink-0 text-xs text-text-muted">{line.when}</span>

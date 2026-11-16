@@ -8,14 +8,19 @@ import {
   changeWords,
   compareHomeNumbers,
   homeNumbers,
+  homeSeries,
+  seriesSummary,
   waitingForYou,
   WAITING_FOR_YOU_STATUSES,
   HOME_WINDOW_DAYS,
   type HomeQuestionRow,
   type HomeQuoteRow,
+  type NumberChange,
 } from '@/lib/home-numbers'
 import { unfinishedFilter } from '@/lib/unfinished-leads'
 import { appOriginFrom } from '@/lib/tenant-site'
+import { assetIdsOf, firstPhotoUrls } from '@/lib/quote-photos'
+import { Sparkline, TrendMark } from '@/components/home/Sparkline'
 import { WaitingForYou, type WaitingQuote } from '@/components/home/WaitingForYou'
 import { QuoteStand } from '@/components/home/QuoteStand'
 import { NeedsYouDot } from '@/components/quotes/NeedsYouDot'
@@ -108,7 +113,7 @@ export default async function DashboardPage() {
     supabase
       .from('quotes')
       // T-160: the exact count is the "Needs you" number (the rows are capped at 25)
-      .select('id, status, created_at, customer_json, pricing_json, content_json, is_test, services!service_id (name)', { count: 'exact' })
+      .select('id, status, created_at, customer_json, pricing_json, content_json, is_test, services!service_id (name), request:quote_requests!quote_request_id (asset_ids)', { count: 'exact' })
       .eq('tenant_id', profile.tenant_id)
       .in('status', [...WAITING_FOR_YOU_STATUSES])
       .eq('is_test', false)
@@ -168,7 +173,7 @@ export default async function DashboardPage() {
     redirect('/app/onboarding')
   }
 
-  const waiting: WaitingQuote[] = waitingForYou(
+  const waitingRows = waitingForYou(
     (waitingResult.data ?? []) as unknown as Array<{
       id: string
       status: string
@@ -178,8 +183,16 @@ export default async function DashboardPage() {
       content_json: { limitHold?: boolean } | null
       is_test: boolean | null
       services: { name?: string } | Array<{ name?: string }> | null
+      request?: unknown
     }>
-  ).map((q) => {
+  )
+  // T-169: one small photo per waiting row, when the customer sent any (one query, this tenant only)
+  const waitingPhotos = await firstPhotoUrls(
+    supabase,
+    profile.tenant_id,
+    waitingRows.map((q) => ({ quoteId: q.id, assetIds: assetIdsOf(q.request) }))
+  )
+  const waiting: WaitingQuote[] = waitingRows.map((q) => {
     const service = Array.isArray(q.services) ? q.services[0] : q.services
     const total = q.pricing_json?.total ?? 0
     // T-158: the same label and next step the quotes list shows
@@ -200,6 +213,7 @@ export default async function DashboardPage() {
       tone: turn.tone,
       action: turn.action === 'approve' ? 'approve' : 'open',
       buttonLabel: turn.buttonLabel ?? '',
+      photoUrl: waitingPhotos.get(q.id) ?? null,
     }
   })
 
@@ -221,6 +235,8 @@ export default async function DashboardPage() {
   const numbers = homeNumbers(recentRows, since)
   const changes = compareHomeNumbers(numbers, homeNumbers(recentRows, sinceBefore, since))
   const money = (amount: number) => formatMoney(amount, currency, locale, { decimals: 0 })
+  // T-169: the same numbers in 5-day steps across both periods, for the small line under each
+  const series = changes ? homeSeries(recentRows, sinceBefore, now) : null
 
   // d. where the quotes stand
   const hasQuotes = (anyQuoteResult.count ?? 0) > 0
@@ -341,7 +357,7 @@ export default async function DashboardPage() {
                 href={step.href}
                 data-testid={`checklist-${step.id}`}
                 data-done={step.completed ? 'true' : 'false'}
-                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                className={`flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                   step.completed ? 'bg-mint text-primary' : 'bg-surface text-text-secondary hover:text-text-primary'
                 }`}
               >
@@ -379,20 +395,20 @@ export default async function DashboardPage() {
 
       {/* g. Four numbers for the last 30 days, each against the 30 days before */}
       <section data-testid="home-numbers">
-        <div className="mb-3 flex items-baseline justify-between gap-3">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <h2 className="font-display text-lg font-bold text-text-primary">{N.title(HOME_WINDOW_DAYS)}</h2>
             {changes && <p className="text-xs text-text-muted" data-testid="numbers-note">{N.note(HOME_WINDOW_DAYS)}</p>}
           </div>
-          <Link href="/app/analytics" className="text-sm font-semibold text-primary hover:underline">
+          <Link href="/app/analytics" className="inline-flex min-h-[44px] shrink-0 items-center text-sm font-semibold text-primary hover:underline sm:min-h-[24px]">
             {N.all}
           </Link>
         </div>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard title={N.requests} value={numbers.requests.toString()} change={changes && changeWords(changes.requests)} />
-          <StatCard title={N.sent} value={numbers.sent.toString()} change={changes && changeWords(changes.sent)} />
-          <StatCard title={N.accepted} value={numbers.accepted.toString()} change={changes && changeWords(changes.accepted)} />
-          <StatCard title={N.valueAccepted} value={money(numbers.valueAccepted)} change={changes && changeWords(changes.valueAccepted, money)} />
+          <StatCard title={N.requests} value={numbers.requests.toString()} change={changes?.requests} points={series?.requests} />
+          <StatCard title={N.sent} value={numbers.sent.toString()} change={changes?.sent} points={series?.sent} />
+          <StatCard title={N.accepted} value={numbers.accepted.toString()} change={changes?.accepted} points={series?.accepted} />
+          <StatCard title={N.valueAccepted} value={money(numbers.valueAccepted)} change={changes?.valueAccepted} points={series?.valueAccepted} format={money} />
         </div>
       </section>
     </div>
@@ -410,7 +426,7 @@ function UsageBanner({ tone, title, text, cta }: { tone: 'warn' | 'danger'; titl
         </div>
         <Link
           href="/app/settings/billing"
-          className={`inline-flex shrink-0 items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 ${
+          className={`inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 ${
             danger ? 'bg-danger' : 'bg-primary'
           }`}
         >
@@ -421,17 +437,32 @@ function UsageBanner({ tone, title, text, cta }: { tone: 'warn' | 'danger'; titl
   )
 }
 
-function StatCard({ title, value, change }: { title: string; value: string; change?: string | null }) {
+function StatCard({
+  title,
+  value,
+  change,
+  points,
+  format,
+}: {
+  title: string
+  value: string
+  change?: NumberChange | null
+  points?: number[] | null
+  format?: (n: number) => string
+}) {
   return (
-    <div className="rounded-2xl bg-white shadow-warm-md p-6" data-testid="home-number">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">{title}</p>
+    <div className="rounded-2xl bg-white shadow-warm-md p-4 sm:p-6" data-testid="home-number">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">{title}</p>
       <p className="figure mt-3 text-2xl font-medium tracking-tight text-text-primary sm:text-4xl">{value}</p>
-      {/* T-160: against the 30 days before */}
+      {/* T-160: against the 30 days before. T-169: with a mark that is a shape, so the direction never rests on colour */}
       {change && (
-        <p className="mt-1 text-xs text-text-muted" data-testid="number-change">
-          {change}
+        <p className="mt-1 flex items-center gap-1.5 text-xs text-text-secondary" data-testid="number-change" data-direction={change.direction}>
+          <TrendMark direction={change.direction} />
+          {changeWords(change, format)}
         </p>
       )}
+      {/* T-169: the last 60 days in 5-day steps; the 30 days before in grey, the last 30 in juniper */}
+      {points && points.some((n) => n > 0) && <Sparkline points={points} summary={seriesSummary(points, HOME_WINDOW_DAYS, undefined, format)} />}
     </div>
   )
 }

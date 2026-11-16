@@ -57,7 +57,7 @@ export function SharePageClient(props: {
       />
 
       <details className="group rounded-xl bg-surface p-6 shadow-warm">
-        <summary className="flex cursor-pointer list-none items-center gap-2 text-lg font-medium text-text-primary">
+        <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-2 text-lg font-medium text-text-primary">
           <svg className="h-4 w-4 text-text-muted transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>

@@ -901,3 +901,30 @@ Live since 2026-11-15 14:17 UTC. No price changes.
 - [ ] **Three framed screens, then three columns of figures.** Both are in threes now, by your two instructions.
   They differ (framed screens on paper, open columns on grey) and the design file records it; say if it reads
   as repetition.
+
+## T-169 — Dashboard: what the AI understood, the customer's photos, the phone layout
+
+- **Not committed and not on production.** A preview exists (behind your Vercel login):
+  `https://estimator-m0si27trm-gajendrans-projects-1a87e0b4.vercel.app`
+  **The dashboard cannot be opened on it** (previews have no database, so nobody can sign in). On the preview you
+  can see the home page demo only. The dashboard screens are in the screenshots from the local run.
+- **The live deploy is web only:** no migration, no worker change.
+- [ ] **Decide about "Worth checking" before this goes live.** The quote checker is not told a business's minimum
+  charge, base fee, tax or currency. So it can write a wrong note: on a real test quote with a $400 minimum it
+  wrote "an unconfigured minimum charge of £25 was added". That one kind is now left out, because the quote
+  itself proves it wrong. The same gap on taxed quotes is not filtered: a business that charges tax can see "the
+  total does not match the lines". Your choices: (a) ship as it is; (b) ship without the "Worth checking" group
+  until a worker ticket tells the checker those four things; (c) do that worker ticket first. I recommend (c) or
+  (b): a warning that is sometimes wrong teaches people to ignore it.
+- [ ] **Look at it, on your phone and on a computer** (after it is live, or ask for a screen share of the local
+  stack):
+  1. *A quote with a photo:* the photo at the top of "What Qolumns understood", tap to enlarge, then what was
+     read, the question and the answer, then the price in large figures.
+  2. *A plain quote:* no panel at all.
+  3. *Home:* a small photo on a waiting row; the small line and the up or down mark under "Last 30 days".
+  4. *Services on your phone:* Edit, Disable and Delete on every row, Delete set apart.
+- [ ] **The small photos are the full uploads** (a few hundred KB each). If the lists feel slow on a phone, a
+  worker ticket can store a small copy at upload.
+- [ ] **The home page demo** at tablet width: the logo sits above the business name there, so nothing is cut.
+  The frames are 16 px taller on a computer because the name takes two lines beside the logo.
+- The preview stays until you say to delete it.

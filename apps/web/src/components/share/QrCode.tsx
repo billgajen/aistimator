@@ -48,7 +48,7 @@ export function QrCode({ value, fileName }: { value: string; fileName: string })
         <button
           type="button"
           onClick={download}
-          className="mt-3 inline-flex items-center rounded-lg border border-border bg-background px-3.5 py-2 text-sm font-semibold text-text-primary hover:bg-surface"
+          className="mt-3 inline-flex min-h-[44px] items-center rounded-lg border border-border bg-background px-3.5 py-2 text-sm font-semibold text-text-primary hover:bg-surface"
         >
           Download PNG
         </button>

@@ -12,7 +12,7 @@ export interface QuoteRowMenuItem {
   onSelect?: () => void
 }
 
-const ITEM = 'block w-full px-4 py-2.5 text-left text-sm text-text-primary hover:bg-surface disabled:opacity-50'
+const ITEM = 'flex min-h-[44px] w-full items-center px-4 py-2.5 text-left text-sm text-text-primary hover:bg-surface disabled:opacity-50'
 
 /**
  * T-158: the "More" menu on a quotes list row. Every action has words; the
@@ -59,7 +59,7 @@ export function QuoteRowMenu({
         disabled={busy}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-text-primary transition-colors hover:bg-surface disabled:opacity-50"
+        className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-text-primary transition-colors hover:bg-surface disabled:opacity-50"
         data-testid="more-button"
       >
         {QUOTE_TURN_COPY.more.button}

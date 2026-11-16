@@ -164,7 +164,8 @@ menu badge count only people not seen yet, so both clear and come back only for 
 
 Home, top to bottom (T-152, T-160):
 1. "Waiting for you": what waits for the owner, newest first (not a test, not a held lead). Quotes awaiting approval
-   (priced) show customer, service, price and Approve & send. T-158: customer questions ("Customer asked a question",
+   (priced) show customer, service, price and Approve & send. T-169: a row shows one small photo (48 px) when the
+   customer sent any. T-158: customer questions ("Customer asked a question",
    button "Answer question") and requests that could not be priced ("Could not be priced", button "Contact customer")
    are listed too, with the labels the quotes list uses; their button opens the quote. The count reads "3 need you".
    Hidden when empty.
@@ -182,7 +183,11 @@ Home, top to bottom (T-152, T-160):
 7. "Your quote link": the link with Copy and Open, and "QR code and website form" to the Quote link page. Beside
    Latest activity on a wide screen, under it on a phone.
 8. "Last 30 days": requests, estimates sent, accepted, value accepted, each with "up 3", "down 1" or "same" against
-   the 30 days before. "See all numbers" → Analytics.
+   the 30 days before. "See all numbers" → Analytics. T-169: the words carry a mark that is a shape (a triangle
+   pointing up or down, a short bar for "same"), so the direction never rests on colour, and a figure with anything
+   in either period has a small line under it (`components/home/Sparkline.tsx`): the last 60 days in 5-day steps,
+   the 30 days before in grey and the last 30 in juniper, starting at zero. It is hidden from screen readers, who
+   get the twelve numbers as a sentence. Nothing moves.
 
 A business with no quotes yet sees one line in 5 ("No quotes yet. When a customer sends a request, you will see here
 whose turn it is.") and in 6 ("Nothing has happened yet. New requests, opens and answers will show here."), and the
@@ -192,6 +197,15 @@ this order; the three counts stack and the four numbers sit two by two.
 Sign-in and sign-up (T-160) show the home page's headline under the product name (`HERO.headline` in
 `lib/marketing/home-copy.ts`), so they always match the home page. T-165: at desktop width the login page shows a real estimate
 document (`EstimateSheet`) beside the form; sign-up keeps one column. The email field has `autocomplete="email"`.
+
+Services (T-169): each service is a row that stacks on a phone, so Edit, Disable and Delete are always on screen
+(the table cut its last columns off at 390 px, and the page scrolled sideways). Delete sits apart from the other
+two, behind a rule, and is the only red one. Each of the three names its service for a screen reader. The page
+header's actions wrap under the title on a narrow screen (`components/ui/PageHeader.tsx`, every dashboard page).
+
+Tap targets (T-169, `system.md` Layout): on a phone the controls of Home, Quotes, the quote page, Services and
+Quote link are 44 px tall or more, and no control anywhere on them is under 24 px. Icon-only buttons have names
+(the back arrow, the form builder's move, remove and dismiss buttons).
 
 Quote link page (T-149 + T-152; "Share" until T-160): quote link · QR code · where to put it · **Use it on WhatsApp** ("Send on WhatsApp" via
 wa.me with the link; greeting, away and quick-reply texts for the WhatsApp Business app with where to paste them;
@@ -231,15 +245,34 @@ Quotes list (/app/quotes, T-158):
   T-157 rule its route applies. No icon-only actions.
 - A grid from the `xl` breakpoint; below it each row stacks.
 
-Quote page (/app/quotes/[quoteId], T-158):
-- Header: the label, then Edit, Send again, Copy link and Text link by the T-157 rules.
+Quote page (/app/quotes/[quoteId], T-158; one order since T-169). Top to bottom: **the next step** (white, the
+one main button), **what Qolumns understood** (on mist, with the customer's photos), **the price** (white; the
+total first, in the mono figure at 36 px, then the lines, the grade), then **the rest** in one quiet card divided
+by rules (progress, scope, assumptions, exclusions, notes, business notes, customer, versions) and the final
+invoice. It was eight grey boxes of the same weight.
+- **"What Qolumns understood"** (T-169, `components/quotes/UnderstoodPanel.tsx`; the lines are built on the server
+  by `lib/quote-understanding.ts` from what the pipeline stored for that quote). It lists only what the AI
+  produced: a label it read with the words it read ("From the tank's rating label: 50 gal", "It read “CAPACITY 50
+  U.S. GAL” in photo 1."), a quantity measured from the photos, a note about what the photos show; an extra picked
+  up from the customer's words ("Added at your price."); work the customer may also need, with no price; the
+  question the customer was asked and their answer. The quote checker's findings can show under "Worth checking",
+  with "An automatic check noted these. It changed nothing on the quote." (AD-049), but **that group is switched
+  off** (`SHOW_WORTH_CHECKING` in `lib/quote-understanding.ts`) until the checker is told the business's minimum
+  charge, base fee, tax and currency. No line carries an amount of the AI's (AD-001). **When the AI produced nothing there is no panel**, no heading and no empty state.
+- **The customer's photos** (T-169, `components/quotes/CustomerPhotos.tsx`) sit at the top of the panel (on their
+  own when there is no panel): small pictures, each a named button, that open larger in the browser's modal dialog
+  (focus held inside, Escape closes, focus returns, arrow keys and two buttons move between photos). A photo's
+  address is `/api/quotes/:quoteId/photos/:assetId`, which needs the business's sign-in and redirects to a signed
+  address that lasts five minutes. The quotes list and Home's "Waiting for you" show the first photo at 48 px.
+- Header: a named back arrow (44 px), the label, then Edit, Send again, Copy link and Text link by the T-157 rules.
 - "Next step" box: one sentence and one main button from the shared map. Approve & send (awaiting approval), Edit
   quote (no price yet), Price this request + Upgrade plan (held by the plan limit; this replaced the "Lead saved"
   box), Send again (unopened for 3 days, or expired), Email and Call links (accepted, a customer question, could not
   be priced; each only when the detail exists), or no button with "Nothing for you to do. Waiting for …". A button
   that is the next step is in the box and not in the header as well.
-- An open customer question, with "Mark as answered", sits directly under the box.
-- "Progress": four steps replacing the timeline. Request received · You approved (or "Sent automatically" for a
+- An open customer question, with "Mark as answered", sits directly under the box. What the customer sees while
+  the quote waits for approval is a second line inside the box.
+- "Progress": four steps replacing the timeline (the first part of "the rest" since T-169). Request received · You approved (or "Sent automatically" for a
   service that sends without review) · Customer opened · Customer accepted. Done steps show their date; "Customer
   declined" or "Expired" is the final step instead; "Paid <date>" is a second line under step four. Steps stack on a
   phone.

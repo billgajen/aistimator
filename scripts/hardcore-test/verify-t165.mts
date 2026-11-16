@@ -543,7 +543,8 @@ if (!process.env.PLAYWRIGHT_DIR) {
   const showsTheNote = async (p: Page, where: string) => {
     const shown = await priceOn(p)
     const lineTop = await topOf(p, /^Rooms/)
-    const totalTop = await topOf(p, /^Total$/)
+    // T-169: the dashboard quote page also shows the total above the lines; the note sits above the total row under them
+    const totalTop = (await p.getByText(/^Total$/).last().boundingBox())?.y ?? -1
     check(`${where}: the job’s real line ($375.00) is shown`, /Rooms/.test(shown.body) && shown.body.includes('$375.00'))
     check(`${where}: one note, "${NOTE}", below the lines and above the total`, shown.notes.length === 1 && shown.notes[0] === NOTE && shown.noteTop > lineTop && shown.noteTop < totalTop, { notes: shown.notes, lineTop, noteTop: shown.noteTop, totalTop })
     check(`${where}: the minimum is not a line (no "Minimum charge applied" row, no $25.00 amount) and the sentence appears once`, !shown.body.includes('Minimum charge applied') && !shown.body.includes('$25.00') && shown.body.split(NOTE).length === 2, shown.body.match(/.{0,40}\$25\.00.{0,20}/)?.[0])

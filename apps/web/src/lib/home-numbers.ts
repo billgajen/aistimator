@@ -123,6 +123,43 @@ export function changeWords(change: NumberChange, format: (by: number) => string
 }
 
 // ---------------------------------------------------------------------------
+// T-169: the same four numbers in steps, for the small line under each
+// ---------------------------------------------------------------------------
+
+/** How many days one point of the line covers: 12 points across the two periods */
+export const HOME_SERIES_STEP_DAYS = 5
+
+/**
+ * Each number in equal steps from `from` to `to`, oldest first. The first
+ * half is the period before, the second half the current one, counted by the
+ * same rules as `homeNumbers` (so the points of a half add up to its figure).
+ */
+export function homeSeries(
+  rows: HomeQuoteRow[] | null | undefined,
+  from: Date,
+  to: Date,
+  stepDays: number = HOME_SERIES_STEP_DAYS
+): Record<keyof HomeNumbers, number[]> {
+  const out: Record<keyof HomeNumbers, number[]> = { requests: [], sent: [], accepted: [], valueAccepted: [] }
+  const step = stepDays * 24 * 60 * 60 * 1000
+  for (let start = from.getTime(); start < to.getTime(); start += step) {
+    const n = homeNumbers(rows, new Date(start), new Date(Math.min(start + step, to.getTime())))
+    out.requests.push(n.requests)
+    out.sent.push(n.sent)
+    out.accepted.push(n.accepted)
+    out.valueAccepted.push(Math.round(n.valueAccepted))
+  }
+  return out
+}
+
+/** What a screen reader hears instead of the line: both periods' points, in words */
+export function seriesSummary(points: number[], days: number, stepDays: number = HOME_SERIES_STEP_DAYS, format: (n: number) => string = String): string {
+  const half = Math.floor(points.length / 2)
+  const say = (part: number[]) => part.map(format).join(', ')
+  return `In ${stepDays}-day steps. The ${days} days before: ${say(points.slice(0, half))}. The last ${days} days: ${say(points.slice(half))}.`
+}
+
+// ---------------------------------------------------------------------------
 // T-160: latest activity, from timestamps the quotes already carry
 // ---------------------------------------------------------------------------
 

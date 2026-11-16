@@ -22,7 +22,7 @@ export function HomeQuoteLink({ link }: { link: string }) {
         <button
           type="button"
           onClick={() => copy('home-link', link)}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover"
         >
           {copiedId === 'home-link' ? Q.copied : Q.copy}
         </button>
@@ -30,12 +30,12 @@ export function HomeQuoteLink({ link }: { link: string }) {
           href={link}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-text-primary hover:bg-surface"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-text-primary hover:bg-surface"
         >
           {Q.open}
         </a>
       </div>
-      <Link href="/app/quote-link" className="mt-4 inline-block text-sm font-semibold text-primary hover:underline">
+      <Link href="/app/quote-link" className="mt-2 inline-flex min-h-[44px] items-center sm:min-h-[24px] text-sm font-semibold text-primary hover:underline">
         {Q.more}
       </Link>
     </section>

@@ -5,10 +5,12 @@ import type { QuoteTrackerStep } from '@qolumns/shared'
  * T-158: the four steps a quote goes through, replacing the plain timeline.
  * The steps, their labels and their dates come from `quoteTracker` in
  * @qolumns/shared. Side by side on a wide screen, stacked on a phone.
+ * T-169: it has no box of its own; it is the first part of the quote page's
+ * "rest" card.
  */
 export function QuoteTracker({ steps }: { steps: QuoteTrackerStep[] }) {
   return (
-    <section className="mb-6 rounded-lg border border-border bg-surface p-5" data-testid="quote-tracker">
+    <section className="p-5" data-testid="quote-tracker">
       <h3 className="mb-4 text-sm font-semibold text-text-primary">{QUOTE_TURN_COPY.tracker.title}</h3>
       <ol className="grid gap-4 sm:grid-cols-4">
         {steps.map((step, index) => (

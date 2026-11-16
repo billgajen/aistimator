@@ -292,7 +292,7 @@ export function FormFieldsBuilder() {
             <div className="ml-3">
               <p className="text-sm text-danger">{error}</p>
             </div>
-            <button onClick={() => setError(null)} className="ml-auto text-danger hover:text-danger">
+            <button onClick={() => setError(null)} aria-label="Dismiss this message" className="-my-2 ml-auto inline-flex h-11 w-11 items-center justify-center text-danger hover:text-danger">
               <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fillRule="evenodd"
@@ -317,7 +317,7 @@ export function FormFieldsBuilder() {
             </div>
             <button
               onClick={() => setShowAddField(true)}
-              className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
+              className="inline-flex min-h-[44px] items-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
             >
               <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -340,7 +340,7 @@ export function FormFieldsBuilder() {
               </p>
               <button
                 onClick={() => setShowAddField(true)}
-                className="mt-4 inline-flex items-center text-sm font-medium text-primary hover:text-primary"
+                className="mt-2 inline-flex min-h-[44px] items-center text-sm font-medium text-primary hover:text-primary"
               >
                 <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -360,7 +360,8 @@ export function FormFieldsBuilder() {
                     <button
                       onClick={() => moveField(index, 'up')}
                       disabled={index === 0}
-                      className="text-text-muted hover:text-text-secondary disabled:opacity-30"
+                      aria-label={`Move ${field.label} up`}
+                      className="inline-flex h-7 w-11 items-center justify-center rounded-md text-text-muted hover:bg-surface hover:text-text-secondary disabled:opacity-30"
                     >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -369,7 +370,8 @@ export function FormFieldsBuilder() {
                     <button
                       onClick={() => moveField(index, 'down')}
                       disabled={index === config.fields.length - 1}
-                      className="text-text-muted hover:text-text-secondary disabled:opacity-30"
+                      aria-label={`Move ${field.label} down`}
+                      className="inline-flex h-7 w-11 items-center justify-center rounded-md text-text-muted hover:bg-surface hover:text-text-secondary disabled:opacity-30"
                     >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -415,7 +417,8 @@ export function FormFieldsBuilder() {
                     </button>
                     <button
                       onClick={() => removeField(index)}
-                      className="text-text-muted hover:text-danger"
+                      aria-label={`Remove ${field.label}`}
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-md text-text-muted hover:bg-danger-light hover:text-danger"
                     >
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

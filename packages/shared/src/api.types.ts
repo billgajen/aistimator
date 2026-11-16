@@ -328,6 +328,8 @@ export interface QuoteListItem {
   expiresAt?: string | null
   /** T-158: saved but not priced, because the plan limit was reached */
   held?: boolean
+  /** T-169: the first photo the customer sent, as a path on our own site that needs the business's sign-in (null when there is none) */
+  photoUrl?: string | null
 }
 
 export interface QuotesListResponse {
@@ -557,6 +559,45 @@ export interface QuoteDetailResponse {
   feedback: QuoteFeedback[]
   /** T-157: the tenant has an active SMS number, so "Text link" can work */
   smsActive?: boolean
+  /** T-169: the photos the customer sent, in the order they sent them */
+  photos?: QuotePhoto[]
+  /** T-169: what the AI produced for this quote, worded for the business (web: lib/quote-understanding.ts) */
+  understanding?: QuoteUnderstanding
+}
+
+/**
+ * T-169: one of the customer's photos. `url` is a path on our own site
+ * (/api/quotes/:quoteId/photos/:assetId) that checks the business's sign-in
+ * and then redirects to a short-lived signed URL. It is never a storage URL.
+ */
+export interface QuotePhoto {
+  id: string
+  url: string
+}
+
+/** T-169: one line of "What Qolumns understood" */
+export interface UnderstoodItem {
+  text: string
+  /** A quieter second line: the words it read, how it measured */
+  detail?: string
+}
+
+export interface UnderstoodQuestion {
+  question: string
+  /** null while the customer has not answered */
+  answer: string | null
+}
+
+/** T-169: what the AI produced for one quote. Every list can be empty; nothing is ever padded. */
+export interface QuoteUnderstanding {
+  photos: UnderstoodItem[]
+  words: UnderstoodItem[]
+  alsoNoted: UnderstoodItem[]
+  asked: UnderstoodQuestion[]
+  /** The quote checker's findings. Notes only: the checker changes nothing (AD-049). */
+  checks: UnderstoodItem[]
+  /** The quote's total has changed since the checker read it */
+  checksBeforeChange: boolean
 }
 
 /** T-157: POST /api/quotes/:quoteId/feedback/:feedbackId/answered */

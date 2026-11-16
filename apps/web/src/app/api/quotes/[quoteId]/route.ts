@@ -18,6 +18,8 @@ import {
 } from '@/lib/postmark'
 import { generateRevisedQuoteEmailHtml } from '@/lib/email-templates'
 import { businessReplyTo } from '@/lib/business-email'
+import { assetIdsOf, quotePhotos } from '@/lib/quote-photos'
+import { quoteUnderstanding, SHOW_WORTH_CHECKING } from '@/lib/quote-understanding'
 import type {
   UpdateQuoteRequest,
   UpdateQuoteResponse,
@@ -92,7 +94,8 @@ export async function GET(
           description,
           work_steps,
           expected_signals
-        )
+        ),
+        request:quote_requests!quote_request_id (asset_ids)
       `)
       .eq('id', quoteId)
       .eq('tenant_id', auth.tenantId)
@@ -107,7 +110,10 @@ export async function GET(
 
     // Fetch amendments and feedback in parallel, plus (T-157) whether the
     // tenant has an active SMS number: "Text link" only shows when it can work
-    const [amendmentsResult, feedbackResult, smsResult] = await Promise.all([
+    // T-169: the customer's photos, and the newest run of the quote checker
+    // that found something. Both are read for this tenant only. The checker's
+    // log is read only while "Worth checking" is switched on (it is off).
+    const [amendmentsResult, feedbackResult, smsResult, photos, checkerResult] = await Promise.all([
       supabase
         .from('quote_amendments')
         .select('id, version, source, changes_json, created_at, amended_by')
@@ -125,7 +131,33 @@ export async function GET(
         .select('is_active')
         .eq('tenant_id', auth.tenantId)
         .maybeSingle(),
+      quotePhotos(supabase, auth.tenantId, quoteId, assetIdsOf((quote as { request?: unknown }).request)),
+      SHOW_WORTH_CHECKING
+        ? supabase
+            .from('quote_validation_logs')
+            .select('issues:validation_result->issues, checked_total:original_quote_snapshot->total')
+            .eq('quote_id', quoteId)
+            .eq('tenant_id', auth.tenantId)
+            .neq('outcome', 'passed')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
     ])
+
+    // T-169: what the AI produced for this quote, worded for the business.
+    // Built here so the page never reads the checker's log or the raw signals.
+    const checkerRow = checkerResult.data as { issues?: unknown; checked_total?: unknown } | null
+    const understanding = quoteUnderstanding({
+      photoCount: photos.length,
+      signals: quote.signals_json,
+      content: quote.content_json,
+      pricing: quote.pricing_json,
+      questions: (quote as { clarification_questions_json?: unknown }).clarification_questions_json,
+      answers: (quote as { clarification_answers_json?: unknown }).clarification_answers_json,
+      expectedSignals: (quote.service as { expected_signals?: unknown } | null)?.expected_signals,
+      checker: checkerRow ? { issues: checkerRow.issues, checkedTotal: checkerRow.checked_total } : null,
+    })
 
     const amendments: AmendmentSummary[] = (amendmentsResult.data || []).map(
       (a: { id: string; version: number; source: string; changes_json: unknown[]; created_at: string; amended_by: string }) => ({
@@ -179,6 +211,8 @@ export async function GET(
       amendments,
       feedback,
       smsActive: (smsResult.data as { is_active?: boolean } | null)?.is_active === true,
+      photos,
+      understanding,
     }
 
     return NextResponse.json(response)

@@ -125,6 +125,13 @@ are gone).
 - **No visible caption** under a picture. Every meaningful image has real alt text; decorative ones are hidden
   from screen readers.
 - Photographs of a job on a customer's page come from that customer or that business, never from us.
+- **A customer's photos on the dashboard** (T-169) are small pictures that open larger in a modal dialog with no
+  animation. They are served only to the signed-in business that owns the quote, by a signed address that lasts
+  minutes.
+- **A small line under a figure** (Home's "Last 30 days", T-169): one line, the earlier period in `field` grey and
+  the current one in juniper, starting at zero, with no axis and no animation. It is hidden from screen readers,
+  who get the numbers as a sentence. A direction ("up", "down", "same") is always words plus a shape, never a
+  colour alone.
 
 ### Scene photographs made with an image model (T-168)
 
@@ -159,7 +166,11 @@ prompt, what was kept and what was rejected).
   screens per section is not ours; see the rulings.)
 - One main action per screen. A second action is visibly quieter.
 - Phone first. Nothing scrolls sideways at 390 px; content does not swipe sideways as its only way to be read.
-- Tap targets are 44 px on a phone. Controls are never closer than 8 px.
+- Tap targets are 44 px on a phone. Controls are never closer than 8 px. Nothing a person can press is under
+  24 px at any width. A destructive action sits apart from the others (a rule and a wider gap), never beside them.
+- **The dashboard quote page reads in one order** (T-169): the next step, what the AI understood (with the
+  customer's photos), the price, then the rest in one card divided by rules. The total is the mono figure at
+  `text-4xl`. A new block on that page goes into one of those four, not into a box of its own.
 
 ## Motion
 

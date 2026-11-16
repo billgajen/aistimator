@@ -30,7 +30,7 @@ export function EmbedCodeCard({
   const mailto = webPersonMailto({ businessName, link, embedCode: code, region })
 
   const pill = (active: boolean) =>
-    `rounded-xl px-3 py-1.5 text-sm font-medium ${active ? 'bg-mint text-primary' : 'bg-background text-text-secondary hover:bg-mist'}`
+    `inline-flex min-h-[44px] items-center rounded-xl px-3 py-1.5 text-sm font-medium ${active ? 'bg-mint text-primary' : 'bg-background text-text-secondary hover:bg-mist'}`
 
   return (
     <section className="rounded-xl bg-surface p-6 shadow-warm">
@@ -62,13 +62,13 @@ export function EmbedCodeCard({
         <button
           type="button"
           onClick={() => copy('embed', code, { shareEvent: false })}
-          className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-text-primary hover:bg-surface"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-text-primary hover:bg-surface"
         >
           {copiedId === 'embed' ? 'Copied' : 'Copy code'}
         </button>
         <a
           href={mailto}
-          className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-text-primary hover:bg-surface"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-text-primary hover:bg-surface"
           data-testid="web-person-mailto"
         >
           Send to my web person
@@ -77,7 +77,7 @@ export function EmbedCodeCard({
           href={`/demo?tenantKey=${encodeURIComponent(tenantKey)}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-lg px-4 py-2 text-sm font-semibold text-text-secondary underline underline-offset-2 hover:text-text-primary"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-text-secondary underline underline-offset-2 hover:text-text-primary"
         >
           Preview on a demo page
         </a>

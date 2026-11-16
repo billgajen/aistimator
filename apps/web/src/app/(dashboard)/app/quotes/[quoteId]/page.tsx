@@ -11,6 +11,8 @@ import { TurnBadge } from '@/components/quotes/TurnBadge'
 import { approvedWithoutEmailMessage, copyLinkFallbackMessage } from '@/lib/quote-action-copy'
 import Link from 'next/link'
 import { FinalInvoiceCard } from '@/components/analytics/FinalInvoiceCard'
+import { UnderstoodPanel } from '@/components/quotes/UnderstoodPanel'
+import { Money } from '@/components/quote/document-parts'
 import type {
   QuoteDetailResponse,
   QuotePricing,
@@ -224,6 +226,8 @@ export default function QuoteDetailPage({
   // T-165: the minimum charge is a floor, not an item: the job's lines, then a note
   const { lines: priceLines, minimum: minimumApplied } = splitMinimum(pricing.breakdown)
   const customer = quote.customer_json as { name: string; email: string; phone?: string }
+  // T-169: the big total is set like the customer's page sets it; the browser's locale, as the rest of the dashboard (T-133)
+  const moneyLocale = typeof navigator !== 'undefined' ? navigator.language : 'en-US'
   const pendingFeedback = feedback.filter((f) => f.status === 'pending')
   // T-157: a button only shows when it will work. These are the rules the
   // routes behind the buttons apply (packages/shared/src/quote-status.ts).
@@ -286,20 +290,34 @@ export default function QuoteDetailPage({
     )
   }
 
+  // T-169: the main controls are 44 px tall on a phone (system.md, Layout)
+  const HEADER_BUTTON = 'inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 text-sm font-semibold transition-colors disabled:opacity-50 sm:min-h-[40px]'
+  const QUIET = `${HEADER_BUTTON} border border-field bg-background text-text-primary hover:bg-surface`
+
+  /*
+   * T-169: the page reads top to bottom in one order (it was eight grey boxes
+   * of the same weight):
+   *   1 the next step            white, the one main button
+   *   2 what the AI understood   on mist, with the customer's photos
+   *   3 the price                white, the total in the figure style the customer sees
+   *   4 the rest                 one quiet card, divided by rules
+   */
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2">
           <Link
             href="/app/quotes"
-            className="text-text-secondary hover:text-text-primary transition-colors"
+            aria-label="Back to quotes"
+            className="-ml-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
+            data-testid="back-to-quotes"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </Link>
-          <div>
+          <div className="min-w-0">
             <h1 className="font-display text-2xl font-extrabold text-text-primary">
               Quote for {customer.name}
               {(quote as { is_test?: boolean }).is_test && (
@@ -317,10 +335,7 @@ export default function QuoteDetailPage({
           <TurnBadge turn={turn} showDetail={false} />
           {/* T-158: a button that is the next step sits in the Next step box, not here as well */}
           {canEdit && turn.action !== 'add_price' && (
-            <button
-              onClick={() => setEditMode(true)}
-              className="px-4 py-2 text-sm font-semibold text-text-primary bg-background border border-border rounded-lg hover:bg-surface transition-colors"
-            >
+            <button onClick={() => setEditMode(true)} className={QUIET}>
               Edit
             </button>
           )}
@@ -328,29 +343,19 @@ export default function QuoteDetailPage({
             <button
               onClick={handleResend}
               disabled={resending}
-              className="px-4 py-2 text-sm font-semibold text-white bg-primary rounded-lg hover:bg-primary-hover disabled:opacity-50 transition-colors"
+              className={`${HEADER_BUTTON} bg-primary text-white hover:bg-primary-hover`}
               data-testid="send-again"
             >
               {resending ? 'Sending…' : 'Send again'}
             </button>
           )}
           {actions.copyLink && (
-            <button
-              onClick={handleCopyLink}
-              disabled={copying}
-              className="px-4 py-2 text-sm font-semibold text-text-primary bg-background border border-border rounded-lg hover:bg-surface disabled:opacity-50 transition-colors"
-              data-testid="copy-link"
-            >
+            <button onClick={handleCopyLink} disabled={copying} className={QUIET} data-testid="copy-link">
               {copying ? 'Copying…' : 'Copy link'}
             </button>
           )}
           {actions.textLink && (
-            <button
-              onClick={handleTextLink}
-              disabled={texting}
-              className="px-4 py-2 text-sm font-semibold text-text-primary bg-background border border-border rounded-lg hover:bg-surface disabled:opacity-50 transition-colors"
-              data-testid="text-link"
-            >
+            <button onClick={handleTextLink} disabled={texting} className={QUIET} data-testid="text-link">
               {texting ? 'Texting…' : 'Text link'}
             </button>
           )}
@@ -364,7 +369,7 @@ export default function QuoteDetailPage({
           data-testid="action-note"
           className={`mb-6 break-words rounded-lg border px-4 py-3 text-sm ${
             actionNote.tone === 'error'
-              ? 'border-danger/20 bg-danger-light text-danger'
+              ? 'border-danger-line bg-danger-light text-danger'
               : 'border-border bg-surface text-text-secondary'
           }`}
         >
@@ -372,7 +377,7 @@ export default function QuoteDetailPage({
         </p>
       )}
 
-      {/* T-158: whose turn it is, in one sentence, with the one main button */}
+      {/* 1. T-158: whose turn it is, in one sentence, with the one main button */}
       <NextStepBox
         turn={turn}
         firstName={customerFirstName(customer?.name)}
@@ -386,17 +391,21 @@ export default function QuoteDetailPage({
         onPrice={handlePriceHeldLead}
         resending={resending}
         onSendAgain={handleResend}
+        note={
+          awaitingApproval
+            ? (quote as { review_hold?: string | null }).review_hold === 'shown'
+              ? 'The customer can already see this as an estimate. They can accept it once you approve.'
+              : 'The customer sees “Your estimate is being prepared” and no price until you approve.'
+            : null
+        }
       />
 
-      {/* Open customer questions (and old review requests, which customers can no longer send) */}
+      {/* Open customer questions (and old review requests, which customers can no longer send): part of the next step */}
       {pendingFeedback.length > 0 && (
         <div className="mb-6 space-y-3">
           {pendingFeedback.map((fb) => (
-            <div
-              key={fb.id}
-              className="bg-tertiary-light border border-tertiary/20 rounded-lg p-4"
-            >
-              <div className="flex items-start justify-between gap-4">
+            <div key={fb.id} className="rounded-2xl border border-tertiary-line bg-tertiary-light p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-semibold uppercase text-tertiary">
@@ -414,7 +423,7 @@ export default function QuoteDetailPage({
                 <button
                   onClick={() => handleMarkAnswered(fb.id)}
                   disabled={answering === fb.id}
-                  className="px-3 py-1.5 text-xs font-medium text-text-secondary border border-border rounded-lg hover:bg-background disabled:opacity-50 transition-colors whitespace-nowrap"
+                  className={`${QUIET} whitespace-nowrap bg-white`}
                   data-testid="mark-answered"
                 >
                   {answering === fb.id ? 'Saving…' : 'Mark as answered'}
@@ -425,52 +434,38 @@ export default function QuoteDetailPage({
         </div>
       )}
 
-      {/* T-158: the four steps, replacing the plain timeline */}
-      <QuoteTracker steps={trackerSteps} />
-
-      {/* T-147: what the customer sees while this waits for approval */}
-      {awaitingApproval && (
-        <p className="mb-6 rounded-lg border border-border bg-surface px-4 py-3 text-sm text-text-secondary">
-          {(quote as { review_hold?: string | null }).review_hold === 'shown'
-            ? 'The customer can already see this as an estimate. They can accept it once you approve.'
-            : 'The customer sees “Your estimate is being prepared” and no price until you approve.'}
-        </p>
-      )}
-
-      {/* T-151: what the customer told you when accepting */}
+      {/* T-151: what the customer told you when accepting (it is what you act on next) */}
       {acceptance && <AcceptanceCard details={acceptance} />}
 
-      {/* Business notes */}
-      {quote.business_notes && (
-        <div className="mb-6 bg-surface border border-border rounded-lg p-4">
-          <h3 className="text-xs font-semibold uppercase text-text-muted mb-2">Business Notes</h3>
-          <p className="text-sm text-text-primary whitespace-pre-wrap">{quote.business_notes}</p>
-          <p className="text-xs text-text-muted mt-2">Only visible to you</p>
+      {/* 2. T-169: what the AI understood, with the customer's photos. Nothing when it produced nothing. */}
+      <UnderstoodPanel understanding={data.understanding} photos={data.photos ?? []} customerName={customer.name} />
+
+      {/* 3. The price: the total first, in the figure style the customer's page uses */}
+      <section className="mb-6 rounded-2xl border border-border bg-white p-5 shadow-warm-md" aria-labelledby="pricing-title" data-testid="pricing">
+        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+          <div>
+            <h2 id="pricing-title" className="text-xs font-semibold uppercase tracking-[0.14em] text-text-secondary">
+              Pricing
+            </h2>
+            <p className="mt-1 text-sm text-text-secondary">
+              {pricing.taxAmount > 0 ? `Total, with ${pricing.taxLabel || 'tax'}` : 'Total'}
+            </p>
+          </div>
+          <p className="figure text-4xl font-medium tracking-tight text-text-primary" data-testid="quote-total">
+            <Money amount={pricing.total} currency={pricing.currency} locale={moneyLocale} />
+          </p>
         </div>
-      )}
-
-      {/* Scope of work */}
-      {content.scopeSummary && (
-        <Section title="Scope of Work">
-          <p className="text-sm text-text-secondary">{content.scopeSummary}</p>
-        </Section>
-      )}
-
-      {/* T-146: grade and confidence are business-only — the customer never sees them */}
-      {pricing.estimate && <EstimateGradePanel estimate={pricing.estimate} currency={pricing.currency} gate={quote.quality_gate_json as { action?: string; reason?: string } | null} awaitingApproval={awaitingApproval} />}
-
-      {/* Pricing */}
-      <Section title="Pricing">
-        <div className="space-y-2">
+        <div className="tape-rule mt-4 opacity-60" aria-hidden="true" />
+        <div className="mt-4 space-y-2">
           {priceLines.map((item, index) => (
-            <div key={index} className="flex justify-between text-sm">
-              <span className="text-text-secondary">
+            <div key={index} className="flex justify-between gap-4 text-sm" data-testid="price-line">
+              <span className="min-w-0 text-text-secondary">
                 {item.label}
                 {item.autoRecommended && (
                   <span className="ml-2 text-xs text-secondary">(auto-recommended)</span>
                 )}
               </span>
-              <span className="text-text-primary font-medium">
+              <span className="figure shrink-0 font-medium text-text-primary">
                 {formatCurrency(item.amount, pricing.currency)}
               </span>
             </div>
@@ -478,25 +473,91 @@ export default function QuoteDetailPage({
         </div>
         <div className="border-t border-border mt-4 pt-4 space-y-2">
           <MinimumNote minimumCharge={minimumApplied?.minimumCharge} currency={pricing.currency} />
-          <div className="flex justify-between text-sm">
+          <div className="flex justify-between gap-4 text-sm">
             <span className="text-text-secondary">Subtotal</span>
-            <span className="text-text-primary">{formatCurrency(pricing.subtotal, pricing.currency)}</span>
+            <span className="figure text-text-primary">{formatCurrency(pricing.subtotal, pricing.currency)}</span>
           </div>
           {pricing.taxAmount > 0 && (
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between gap-4 text-sm">
               <span className="text-text-secondary">
                 {pricing.taxLabel || 'Tax'}
                 {pricing.taxRate ? ` (${pricing.taxRate}%)` : ''}
               </span>
-              <span className="text-text-primary">{formatCurrency(pricing.taxAmount, pricing.currency)}</span>
+              <span className="figure text-text-primary">{formatCurrency(pricing.taxAmount, pricing.currency)}</span>
             </div>
           )}
-          <div className="flex justify-between text-base font-semibold pt-2 border-t border-border">
+          <div className="flex justify-between gap-4 border-t border-border pt-2 text-base font-semibold">
             <span className="text-text-primary">Total</span>
-            <span className="text-text-primary">{formatCurrency(pricing.total, pricing.currency)}</span>
+            <span className="figure text-text-primary">{formatCurrency(pricing.total, pricing.currency)}</span>
           </div>
         </div>
-      </Section>
+        {/* T-146: grade and confidence are business-only — the customer never sees them. It is about the price, so it sits with it. */}
+        {pricing.estimate && (
+          <EstimateGradePanel
+            estimate={pricing.estimate}
+            currency={pricing.currency}
+            gate={quote.quality_gate_json as { action?: string; reason?: string } | null}
+            awaitingApproval={awaitingApproval}
+          />
+        )}
+      </section>
+
+      {/* 4. The rest: one card, divided by rules */}
+      <section className="mb-6 divide-y divide-border rounded-2xl border border-border bg-background" aria-label="The rest of this quote" data-testid="quote-rest">
+        {/* T-158: the four steps, replacing the plain timeline */}
+        <QuoteTracker steps={trackerSteps} />
+
+        {content.scopeSummary && (
+          <Section title="Scope of Work">
+            <p className="text-sm text-text-secondary">{content.scopeSummary}</p>
+          </Section>
+        )}
+
+        {content.assumptions && content.assumptions.length > 0 && (
+          <Section title="Assumptions">
+            <ul className="list-disc list-inside text-sm text-text-secondary space-y-1">
+              {content.assumptions.map((item, i) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ul>
+          </Section>
+        )}
+
+        {content.exclusions && content.exclusions.length > 0 && (
+          <Section title="Exclusions">
+            <ul className="list-disc list-inside text-sm text-text-secondary space-y-1">
+              {content.exclusions.map((item, i) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ul>
+          </Section>
+        )}
+
+        {content.notes && (
+          <Section title="Notes">
+            <p className="text-sm text-text-secondary">{content.notes}</p>
+          </Section>
+        )}
+
+        {quote.business_notes && (
+          <Section title="Business notes">
+            <p className="text-sm text-text-primary whitespace-pre-wrap">{quote.business_notes}</p>
+            <p className="text-xs text-text-muted mt-2">Only visible to you</p>
+          </Section>
+        )}
+
+        <Section title="Customer">
+          <div className="text-sm space-y-1">
+            <p className="text-text-primary font-medium">{customer.name}</p>
+            <p className="text-text-secondary">{customer.email}</p>
+            {customer.phone && <p className="text-text-secondary">{customer.phone}</p>}
+          </div>
+        </Section>
+
+        {amendments.length > 0 && (
+          <VersionHistory amendments={amendments} currentVersion={quote.version} createdAt={quote.created_at} />
+        )}
+      </section>
 
       {/* T-143: final invoice (accuracy ground truth) */}
       {['sent', 'viewed', 'accepted', 'paid', 'expired', 'declined'].includes(quote.status) && (
@@ -509,57 +570,15 @@ export default function QuoteDetailPage({
           recordedAt={quote.final_invoice_recorded_at ?? null}
         />
       )}
-
-      {/* Assumptions */}
-      {content.assumptions && content.assumptions.length > 0 && (
-        <Section title="Assumptions">
-          <ul className="list-disc list-inside text-sm text-text-secondary space-y-1">
-            {content.assumptions.map((item, i) => (
-              <li key={i}>{item}</li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {/* Exclusions */}
-      {content.exclusions && content.exclusions.length > 0 && (
-        <Section title="Exclusions">
-          <ul className="list-disc list-inside text-sm text-text-secondary space-y-1">
-            {content.exclusions.map((item, i) => (
-              <li key={i}>{item}</li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {/* Notes */}
-      {content.notes && (
-        <Section title="Notes">
-          <p className="text-sm text-text-secondary">{content.notes}</p>
-        </Section>
-      )}
-
-      {/* Version history */}
-      {amendments.length > 0 && (
-        <VersionHistory amendments={amendments} currentVersion={quote.version} createdAt={quote.created_at} />
-      )}
-
-      {/* Customer info */}
-      <Section title="Customer">
-        <div className="text-sm space-y-1">
-          <p className="text-text-primary font-medium">{customer.name}</p>
-          <p className="text-text-secondary">{customer.email}</p>
-          {customer.phone && <p className="text-text-secondary">{customer.phone}</p>}
-        </div>
-      </Section>
     </div>
   )
 }
 
+/** One part of "the rest": a title and its content, inside the divided card */
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mb-6 bg-surface border border-border rounded-lg p-5">
-      <h3 className="text-sm font-semibold text-text-primary mb-3">{title}</h3>
+    <div className="p-5">
+      <h3 className="text-sm font-semibold text-text-primary mb-2">{title}</h3>
       {children}
     </div>
   )
@@ -577,19 +596,21 @@ function VersionHistory({
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <div className="mb-6 bg-surface border border-border rounded-lg p-5">
+    <div className="p-5">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between w-full text-left"
+        aria-expanded={expanded}
+        className="-my-2 flex min-h-[44px] w-full items-center justify-between text-left"
       >
         <h3 className="text-sm font-semibold text-text-primary">
           Version History ({currentVersion} version{currentVersion > 1 ? 's' : ''})
         </h3>
         <svg
-          className={`w-4 h-4 text-text-muted transition-transform ${expanded ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 text-text-muted ${expanded ? 'rotate-180' : ''}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
+          aria-hidden="true"
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -728,10 +749,11 @@ function EstimateGradePanel({
   gate: { action?: string; reason?: string } | null | undefined
   awaitingApproval: boolean
 }) {
+  // Butter is for measurement: a grade is one (system.md, Colour)
   const tone =
-    estimate.grade === 'A' ? 'border-primary/20 bg-mint' : estimate.grade === 'B' ? 'border-tape/40 bg-butter/40' : 'border-danger/30 bg-danger-light'
+    estimate.grade === 'A' ? 'border-border bg-mint' : estimate.grade === 'B' ? 'border-border bg-butter' : 'border-danger-line bg-danger-light'
   return (
-    <div className={`mb-6 rounded-lg border p-4 ${tone}`}>
+    <div className={`mt-5 rounded-xl border p-4 ${tone}`} data-testid="estimate-grade">
       <div className="flex items-start gap-4">
         <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-full border-2 border-current text-primary">
           <span className="font-display text-lg font-bold leading-none">{estimate.grade}</span>

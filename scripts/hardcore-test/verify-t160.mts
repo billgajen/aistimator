@@ -276,8 +276,9 @@ check('…worded "Sarah accepted the quote", "Sarah asked a question", "Sarah op
 check('…each with how long ago ("just now" or minutes for today’s, "3 hours ago" for the decline)', activityLines.slice(0, 5).every((l) => /(just now|\d+ minutes? ago)$/.test(l.words)) && activityLines[5]!.words.endsWith('3 hours ago'), activityLines.map((l) => l.words.split(' ').slice(-3).join(' ')))
 check('…each linking to its quote', activityLines.slice(0, 5).every((l) => l.href === `/app/quotes/${q1.id}`) && activityLines[5]!.href === `/app/quotes/${declined}`)
 check('…with no "his" or "her", and nothing from the test quote', !/\b(his|her)\b/i.test(text(block(home, 'home-activity'))) && !home.includes('Tess'))
+// T-169: a figure may carry a small line (a sparkline) after its words; a card's words end where the line begins
 const numbersBlock = block(home, 'home-numbers')
-const numberCards = [...numbersBlock.matchAll(/data-testid="home-number">([\s\S]*?)<\/div>/g)].map((m) => text(m[1]!).trim())
+const numberCards = [...numbersBlock.matchAll(/data-testid="home-number">([\s\S]*?)(?:<div[^>]*data-testid="sparkline"|<\/div>)/g)].map((m) => text(m[1]!).trim())
 const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`
 check('Last 30 days: Requests 4, Estimates sent 3, Accepted 1, Value accepted (the real quote’s total)',
   numberCards.length === 4 && numberCards[0]!.startsWith('Requests 4') && numberCards[1]!.startsWith('Estimates sent 3') && numberCards[2]!.startsWith('Accepted 1') && numberCards[3]!.startsWith(`Value accepted ${money(total)}`), numberCards)
@@ -285,7 +286,7 @@ check('…each against the 30 days before: "up 3", "up 2", "same", "same"', numb
 // a bigger job accepted in the period before: the value goes down by a money amount
 const bigBefore = await copyOf(q1.id, 'Piper Before', { status: 'accepted', created_at: ago(50 * DAY), approved_at: ago(50 * DAY), sent_at: ago(50 * DAY), viewed_at: ago(48 * DAY), accepted_at: ago(45 * DAY), pricing_json: { ...(await fullRow(q1.id)).pricing_json, total: total + 1200 } })
 void bigBefore
-const numberCards2 = [...block((await page(`${cfg.appUrl}/app`, a.cookie)).html, 'home-numbers').matchAll(/data-testid="home-number">([\s\S]*?)<\/div>/g)].map((m) => text(m[1]!).trim())
+const numberCards2 = [...block((await page(`${cfg.appUrl}/app`, a.cookie)).html, 'home-numbers').matchAll(/data-testid="home-number">([\s\S]*?)(?:<div[^>]*data-testid="sparkline"|<\/div>)/g)].map((m) => text(m[1]!).trim())
 check('…and money changes read "down $2,600" (and counts follow: accepted "down 1")', numberCards2[3]!.endsWith(`down ${money(total + 1200)}`) && numberCards2[2]!.endsWith('down 1') && numberCards2[0]!.endsWith('up 2'), numberCards2)
 const linkBlock = block(home, 'home-quote-link')
 check('Your quote link: the link, Copy, Open, and "QR code and website form" to the Quote link page', text(linkBlock).includes('Your quote link') && linkBlock.includes(`/quote/${a.slug}`) && />Copy</.test(linkBlock) && />Open</.test(linkBlock) && /href="\/app\/quote-link"[^>]*>QR code and website form</.test(linkBlock))

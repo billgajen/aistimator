@@ -93,7 +93,7 @@ export function QuoteLinkCard({
           <button
             type="button"
             onClick={() => copy('link', link)}
-            className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover"
           >
             {copiedId === 'link' ? 'Copied' : 'Copy'}
           </button>
@@ -101,7 +101,7 @@ export function QuoteLinkCard({
             href={link}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-semibold text-text-primary hover:bg-surface"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-semibold text-text-primary hover:bg-surface"
           >
             Open
           </a>
@@ -115,7 +115,7 @@ export function QuoteLinkCard({
             setDraft(slug)
             setEditing(true)
           }}
-          className="mt-3 text-sm text-text-secondary underline underline-offset-2 hover:text-text-primary"
+          className="inline-flex min-h-[44px] items-center sm:min-h-[24px] mt-3 text-sm text-text-secondary underline underline-offset-2 hover:text-text-primary"
         >
           Change the end of the link
         </button>
@@ -133,7 +133,7 @@ export function QuoteLinkCard({
               id="slug-input"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               autoComplete="off"
               spellCheck={false}
             />
@@ -153,14 +153,14 @@ export function QuoteLinkCard({
               type="button"
               onClick={save}
               disabled={!canSave || saving}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover disabled:opacity-50"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save new link'}
             </button>
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-secondary hover:bg-surface"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-secondary hover:bg-surface"
             >
               Cancel
             </button>

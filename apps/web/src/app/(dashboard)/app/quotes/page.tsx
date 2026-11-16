@@ -4,6 +4,7 @@ import { UnfinishedLeads } from '@/components/quotes/UnfinishedLeads'
 import { QuoteTabs } from '@/components/quotes/QuoteTabs'
 import { QuoteRowMenu, type QuoteRowMenuItem } from '@/components/quotes/QuoteRowMenu'
 import { TurnBadge } from '@/components/quotes/TurnBadge'
+import { QuoteThumb } from '@/components/quotes/CustomerPhotos'
 import { Suspense, useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -319,7 +320,8 @@ function QuotesList() {
         <input
           type="text"
           placeholder="Search by customer name or email..."
-          className="w-full max-w-md rounded-xl border border-border bg-surface px-4 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          aria-label="Search quotes by customer name or email"
+          className="min-h-[44px] w-full max-w-md rounded-xl border border-border bg-surface px-4 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -398,13 +400,17 @@ function QuotesList() {
                     data-quote-id={quote.quoteId}
                     data-group={turn.group}
                   >
-                    <div className="min-w-0">
-                      <Link href={href} className="block truncate text-sm font-semibold text-text-primary hover:underline">
-                        {quote.customerName}
-                        {quote.isTest && <TestBadge />}
-                      </Link>
-                      {quote.customerEmail && <div className="truncate text-sm text-text-secondary">{quote.customerEmail}</div>}
-                    </div>
+                    {/* T-169: the whole name block is the link (44 px tall), with one small photo when the customer sent any */}
+                    <Link href={href} className="group flex min-h-[44px] min-w-0 items-center gap-3">
+                      {quote.photoUrl && <QuoteThumb url={quote.photoUrl} customerName={quote.customerName} />}
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-text-primary group-hover:underline">
+                          {quote.customerName}
+                          {quote.isTest && <TestBadge />}
+                        </span>
+                        {quote.customerEmail && <span className="block truncate text-sm text-text-secondary">{quote.customerEmail}</span>}
+                      </span>
+                    </Link>
                     <div className="min-w-0 truncate text-sm text-text-primary">{quote.serviceName}</div>
                     <div className="figure text-sm font-medium text-text-primary">
                       {quote.total > 0 ? formatCurrency(quote.total, quote.currency) : '—'}
@@ -416,7 +422,7 @@ function QuotesList() {
                           type="button"
                           onClick={() => handleResendEmail(quote.quoteId)}
                           disabled={busy}
-                          className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+                          className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
                           data-testid="next-step-button"
                         >
                           {busy ? QUOTE_TURN_COPY.pageButtons.sendingAgain : turn.buttonLabel}
@@ -424,7 +430,7 @@ function QuotesList() {
                       ) : turn.action ? (
                         <Link
                           href={href}
-                          className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+                          className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
                           data-testid="next-step-button"
                         >
                           {turn.buttonLabel}
@@ -452,7 +458,7 @@ function QuotesList() {
               <button
                 onClick={() => fetchQuotes(nextCursor, true)}
                 disabled={loadingMore}
-                className="px-4 py-2 text-sm font-medium text-primary hover:text-primary-hover disabled:opacity-50 transition-colors"
+                className="inline-flex min-h-[44px] items-center justify-center px-4 py-2 text-sm font-medium text-primary hover:text-primary-hover disabled:opacity-50 transition-colors"
               >
                 {loadingMore ? (
                   <span className="flex items-center gap-2">

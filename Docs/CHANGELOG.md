@@ -15,6 +15,186 @@
 
 ## Issues & Resolutions
 
+### 2026-11-15: T-169 — Dashboard: what the AI understood, the customer's photos, and the phone layout
+
+**Status: built; the owner chose to ship it without the "Worth checking" group (2026-11-16).** The group is
+behind one flag, `SHOW_WORTH_CHECKING` in `apps/web/src/lib/quote-understanding.ts`, and the flag is off. See
+section 2.
+
+**No migration and no worker change.** The live deploy is web only.
+
+**What the owner asked for:** show on the dashboard what the AI understood for a quote and the customer's photos;
+fix the phone layout and readability findings of `Docs/design/audit.md` section 2; one small chart on Home; and the
+cut-off business name in the home page demo.
+
+**1. "What Qolumns understood"** (`lib/quote-understanding.ts`, `components/quotes/UnderstoodPanel.tsx`)
+- A panel near the top of the quote page, before the pricing. It lists only what the pipeline stored for that
+  quote: a label reading with the words read ("From the tank's rating label: 50 gal", "It read “CAPACITY 50 U.S.
+  GAL” in photo 1."); a quantity measured from the photos, named from the service's own signal; notes about what
+  the photos show (at most four, only when there are photos, never a bare "12 sqm"); an extra the engine added
+  because the customer's words asked for it ("Added at your price."); work that may also be needed, with no
+  price; the question the customer was asked and their answer; and the quote checker's findings, "Worth checking".
+- **Nothing is made up.** The lines are built by one pure function from `signals_json`, `content_json.takeoff`,
+  `content_json.signalRecommendations`, `pricing_json.breakdown`, the clarification questions and answers, and
+  the checker's log. A customer's own form answers are not "the AI's reading". When every list is empty the page
+  renders no panel, no heading and no empty state.
+- **No amount of the AI's is ever shown (AD-001).** An extra is named without its price; the checker's `found`,
+  `expected` and suggested fix (which can name a total) are never sent to the page.
+- **The checker's findings were already stored per quote**: `quote_validation_logs` has `quote_id` and a
+  tenant read policy, and the worker writes a row for every priced quote. So no migration was needed. The web app
+  reads the newest row that found something, for the caller's tenant; it never writes the log.
+- **AD-049 holds:** showing a finding changes nothing. Under the heading the panel says "An automatic check noted
+  these. It changed nothing on the quote.", and when the quote's total is no longer the total the checker read
+  (an answer re-priced it, or the business edited it): "These were noted on the first price. The quote has
+  changed since."
+
+**2. A problem found while checking, and what was done about it**
+- **What showed:** `verify-t165` runs a real quote for a business with a $400 minimum charge. Its quote page now
+  said, under "Worth checking": "An unconfigured fee/line item 'Minimum charge applied: £25' was added to the
+  quote pricing breakdown. The business configuration has no minimum charge rule or fee defined." That is false:
+  the minimum is the business's own setting, and the business is in dollars.
+- **Root cause:** the checker's prompt (`apps/worker/src/ai/quote-validator.ts`) lists the service's work steps,
+  extras and adjustments. It is not given the minimum charge, the base fee, the tax or the currency. So it calls
+  the minimum an invented fee, and on a taxed quote it reports that the total does not match the lines. Nobody
+  saw this before because no screen showed the checker's findings.
+- **Done here (web only, the checker untouched as the ticket requires):** a finding the quote itself proves
+  wrong is not shown. When the breakdown carries the engine's own minimum entry (`splitMinimum`), a finding that
+  talks about a minimum, or comes from the checker's "invented fee" check, is dropped
+  (`contradictedByTheQuote`). Nothing else is filtered.
+- **Not fixed, for the owner to decide:** the same gap on taxed quotes. Locally 364 findings are stored on 204
+  quotes; 119 of them are on quotes with tax, and 47 of those say the total does not match or is too high. The
+  code cannot prove each of those wrong, so they are shown as written. The real fix is a worker ticket: tell the
+  checker the minimum charge, base fee, tax and currency. Until then "Worth checking" can carry a wrong note for
+  a business that charges tax. `ai-capabilities.md` keeps the checker under "do not claim" for this reason.
+- **The owner's decision (2026-11-16): ship without the group.** `SHOW_WORTH_CHECKING` (one constant in
+  `lib/quote-understanding.ts`) is `false`. With it off the builder makes no finding, the quote API does not read
+  `quote_validation_logs` for the page, and so the panel never renders the group; a quote whose only AI output
+  is a checker finding has no panel. Everything else in the panel is as described in section 1. The checker
+  still runs and logs every priced quote exactly as before (AD-049 untouched). The group's rules, the guard
+  above included, stay in the code and are held by unit tests that switch it on for the test.
+- **To switch it on:** first the worker ticket that tells the checker the minimum charge, base fee, tax and
+  currency (`OWNER-TODO.md`), then set the constant to `true`. `verify-t169` reads the constant and checks
+  whichever state it finds.
+
+**3. The customer's photos** (`components/quotes/CustomerPhotos.tsx`, `lib/quote-photos.ts`,
+`api/quotes/[quoteId]/photos/[assetId]`)
+- At the top of the panel (on their own when there is no panel): small pictures, each a button named "Photo 2 of
+  3. Open larger.", that open in the browser's own modal dialog. Focus goes into it and stays there, Escape
+  closes it, focus returns to the picture; arrow keys and two buttons move between photos. Nothing animates.
+- **Signed addresses only, as before.** The page is given a path on our own site. The new route checks the
+  sign-in, that the quote is the caller's tenant's, that the asset is one of that quote's request, and that the
+  asset row is the same tenant's and an image; then it redirects to a signed address that lasts 300 seconds.
+  Anything else is 404, the same answer as an id that does not exist. It uses the signed-in user's database
+  client (row policies apply), never the service role. Neither the key nor the signed address is logged; an
+  error logs its name only.
+- Home's "Waiting for you" rows and the quotes list show the first photo at 48 px. One query per page finds the
+  photos for all its rows.
+- **A cost to know:** the small pictures are the full uploads (locally 338 KB on average, 3.1 MB at most),
+  loaded lazily. There is no thumbnail copy. If the list feels slow on a phone, the worker can store a small copy
+  at upload; that is a worker ticket.
+
+**4. The quote page reads in one order** (`app/(dashboard)/app/quotes/[quoteId]/page.tsx`)
+- It was eight grey boxes of the same weight (audit 2.4). Now: the next step (white, the one main button; what
+  the customer sees meanwhile is a second line in it), what Qolumns understood (on mist), the price (white), and
+  the rest in one quiet card divided by rules (progress, scope, assumptions, exclusions, notes, business notes,
+  customer, versions), then the final invoice.
+- **The price stands out:** the total leads the pricing card in the mono figure at 36 px, set the way the
+  customer's page sets it (`Money`), with the lines under it at 14 px in the same figure face. The internal grade
+  sits inside the pricing card, since it is about the price.
+- The back arrow has a name ("Back to quotes") and is 44 px. The header buttons are 44 px on a phone.
+- Three classes that wrote no CSS (`border-danger/20`, `border-primary/25`, `border-tertiary/20`) were replaced
+  by their `-line` tokens on this page.
+
+**5. Services on a phone** (`app/(dashboard)/app/services/page.tsx`, `components/ui/PageHeader.tsx`)
+- **What broke (audit 2.1):** the header's two buttons pushed the page to 472 px at 390, and the table cut its
+  Actions column off, so Edit, Disable and Delete could not be reached on a phone.
+- **Fix:** the page header lets its actions wrap under the title (every dashboard page gets this). The list is
+  rows that stack on a phone, not a table. Edit and Disable are outlined buttons; Delete is pushed to the far
+  side behind a rule and is the only red one. All three are 44 px on a phone and each names its service.
+
+**6. Names and tap targets** (audit 2.6 and 2.7)
+- Measured in the browser at 390: no control under 44 px on Home, Quotes, the quote page, Services and Quote
+  link, and none under 24 px at either width. Before: 21 of 34 on Home, 29 of 30 on Quotes, 32 of 34 on Quote
+  link.
+- The two "buttons with no name" on Quote link are in the form builder under "Advanced": the move up, move down,
+  remove and dismiss buttons are icons only. They have names now ("Move Door size up", "Remove Door size").
+
+**7. One small chart on Home** (`components/home/Sparkline.tsx`, `lib/home-numbers.ts`)
+- Each "Last 30 days" figure with anything in either period has a small line: the last 60 days in 5-day steps,
+  the 30 days before in grey (`field`) and the last 30 in juniper, starting at zero, ending in a dot. Its points
+  add up to the two figures the words compare (unit test). It is hidden from screen readers, who get the twelve
+  numbers as a sentence. No axis, no animation.
+- "up 2", "down 1" and "same" carry a shape (a triangle up or down, a short bar), in the text's own colour: the
+  direction never rests on colour.
+- **Analytics' raw `bg-blue-500` was already gone** (T-164 replaced it with `bg-primary`). A unit test now holds
+  that page to tokens.
+
+**8. The home page demo's frame headers** (`components/marketing/home/HeroDemo.tsx`)
+- **What broke:** the business name was cut ("Example Home Servi…") because the name shared a line with the logo
+  and was set to truncate.
+- **Fix:** the name is never cut. Where a frame is too narrow for the name beside the logo, the logo takes a line
+  of its own above it and the name may take two lines; both customer frames share the header, so the three
+  frames keep one height at every width checked, 390 to 1920 (393 px at 390, 1280 and 1440; 510 px at 768;
+  413 px at 1024; they were 377, 450 and 393).
+- **Found at 768 px and fixed with it:** the estimate's total ran past its card's edge. It now takes its own
+  line in a narrow frame.
+
+**Architectural decisions**
+- No new AD. `system.md` gained: the quote page's one order; nothing under 24 px and a destructive action set
+  apart; a customer's photos on the dashboard; a small line under a figure.
+
+**Constraints introduced**
+- "What Qolumns understood" shows only stored output of the pipeline. A new line needs a stored field behind it
+  and a row in `ai-capabilities.md`.
+- No line of the panel carries an amount of the AI's, and the checker's `expected` and suggested fix never reach
+  the page.
+- A dashboard photo is served only through `/api/quotes/:quoteId/photos/:assetId`. No storage address or key
+  goes to the page or to a log.
+- The web app never writes `quote_validation_logs`, and reads it for the quote page only while
+  `SHOW_WORTH_CHECKING` is on. It is off; it goes on only after the checker is told the minimum charge, base
+  fee, tax and currency.
+
+**Relation to other fixes**
+- AD-001 and AD-049: nothing in this ticket writes a quote. `verify-t169` compares the stored quote before and
+  after a finding is logged and read, and before and after its photos are opened.
+- T-166 (the checker flags, never corrects): its findings still reach no one, because the group that would show
+  them is switched off. The gap in what the checker is told (section 2) is new knowledge from building it.
+- T-165 (the minimum is a floor, not an item): its script caught the false "unconfigured minimum" note. Its check
+  for where the note sits now reads the total row under the lines (the page also shows the total above them).
+- T-160: its script reads a figure card's words up to the small line.
+- T-168: the demo's three frames keep one height; `verify-t165` and `verify-t167` still pass.
+
+**Checks** (the "Regression runs" rule: no migration, so the scripts that cover the pages changed)
+- `verify-t169` 150/150 on the local stack with "Worth checking" switched off (2026-11-16; it was 149/149 with
+  the group showing). With it off the script checks that a quote with a stored finding gets no finding from the
+  API and shows no such group, heading or finding on the page. It runs a real water heater request with the sample label photo
+  through the real pipeline (the label was read, the customer was asked and answered, the quote was re-priced),
+  and a real garage door request with no photo; the cases that must be exact (a quote with no AI output, a
+  detected extra, a checker finding) are copies with stored fields set by hand, as `verify-t160` does. It
+  covers the panel present and absent, another business (404 for the quote and the photo; "not found" on the
+  page), the photo route, the larger view from the keyboard, Home and the quotes list thumbnails, the small
+  lines, Services, names and tap targets at 390 and 1440, the demo headers at six widths, and that the web
+  server's log holds no signed address and no customer email.
+- Earlier scripts run because they cover the pages changed: `verify-t152` 66/66, `verify-t157` 96/96, `verify-t158` 116/116, `verify-t160` 96/96, `verify-t164` 78/78, and for the home page demo `verify-t165` 148/148 and `verify-t167` 169/169. On the first pass `verify-t165` failed 4 (the false minimum note of section 2, and its own lookup of the total) and `verify-t160` failed 2 (its reading of a figure card); after the changes above both pass in full.
+- Not run: the rest of the regression set (no pricing, quote flow, worker, email or migration change).
+- `pnpm lint` and `pnpm typecheck` pass. Unit tests: web 680, worker 519, mobile 11, all passing (run again
+  after the flag).
+- Web and worker builds passed before the flag. After it: lint, typecheck, unit tests and `verify-t169`, as the
+  owner asked; the earlier scripts were not run again (the flag removes one group from one page).
+
+**Files**
+- New: `apps/web/src/lib/quote-understanding.ts`, `apps/web/src/lib/quote-photos.ts`,
+  `apps/web/src/app/api/quotes/[quoteId]/photos/[assetId]/route.ts`,
+  `apps/web/src/components/quotes/UnderstoodPanel.tsx`, `apps/web/src/components/quotes/CustomerPhotos.tsx`,
+  `apps/web/src/components/home/Sparkline.tsx`, `apps/web/src/__tests__/dashboard-t169.test.ts`,
+  `scripts/hardcore-test/verify-t169.mts`.
+- Changed: the dashboard quote page, Home, the quotes list, Services, `NextStepBox`, `QuoteTracker`,
+  `WaitingForYou`, `HomeQuoteLink`, `LatestActivity`, `QuoteTabs`, `QuoteRowMenu`, `UnfinishedLeads`,
+  `FinalInvoiceCard`, `PageHeader`, the Quote link components, `HeroDemo`, `home-numbers.ts`, `globals.css`,
+  `api/quotes/route.ts`, `api/quotes/[quoteId]/route.ts`, `packages/shared/src/api.types.ts`, `verify-t160.mts`,
+  `verify-t165.mts`, `Docs/02-api-contracts.md`, `Docs/04-frontend.md`, `Docs/design/system.md`,
+  `Docs/design/ai-capabilities.md`, `OWNER-TODO.md`.
+
 ### 2026-11-15: T-168 — Hero photo, the three-frame demo, three-column figures, a clearer line under the headline
 
 **Status: shipped with hero option b** (the owner's choice after comparing four on a preview). The preview

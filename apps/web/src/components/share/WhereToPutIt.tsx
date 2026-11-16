@@ -21,7 +21,7 @@ export function WhereToPutIt({ texts }: { texts: ShareText[] }) {
               <button
                 type="button"
                 onClick={() => copy(t.id, t.text)}
-                className="shrink-0 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-text-primary hover:bg-background"
+                className="inline-flex min-h-[44px] items-center justify-center shrink-0 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-text-primary hover:bg-background"
               >
                 {copiedId === t.id ? 'Copied' : 'Copy'}
               </button>

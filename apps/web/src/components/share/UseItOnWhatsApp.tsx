@@ -34,7 +34,7 @@ export function UseItOnWhatsApp(props: { businessName: string; link: string; reg
               body: JSON.stringify({ event: 'copied' }),
             }).catch(() => undefined)
           }}
-          className="inline-flex shrink-0 items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-hover"
+          className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-hover"
         >
           Send on WhatsApp
         </a>
@@ -53,7 +53,7 @@ export function UseItOnWhatsApp(props: { businessName: string; link: string; reg
               <button
                 type="button"
                 onClick={() => copy(`wa_${t.id}`, t.text)}
-                className="shrink-0 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-text-primary hover:bg-background"
+                className="inline-flex min-h-[44px] items-center justify-center shrink-0 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-text-primary hover:bg-background"
               >
                 {copiedId === `wa_${t.id}` ? 'Copied' : 'Copy'}
               </button>
@@ -65,7 +65,7 @@ export function UseItOnWhatsApp(props: { businessName: string; link: string; reg
         ))}
       </ul>
 
-      <Link href="/app/whatsapp" className="mt-4 inline-block text-sm font-semibold text-primary hover:underline">
+      <Link href="/app/whatsapp" className="inline-flex min-h-[44px] items-center sm:min-h-[24px] mt-4 text-sm font-semibold text-primary hover:underline">
         Connect your WhatsApp number for full in-chat quoting (advanced)
       </Link>
     </section>

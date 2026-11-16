@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { QUOTE_GROUP_STATUSES, QUOTE_LIST_GROUPS, defaultQuoteListGroup } from '@qolumns/shared'
 import { unfinishedFilter } from '@/lib/unfinished-leads'
+import { assetIdsOf, firstPhotoUrls } from '@/lib/quote-photos'
 import type { QuoteListCounts, QuoteListGroup, QuoteListItem, QuotesListResponse, QuoteStatus } from '@qolumns/shared'
 
 const VALID_STATUSES: QuoteStatus[] = [
@@ -164,7 +165,8 @@ export async function GET(request: Request) {
         services!service_id (
           id,
           name
-        )
+        ),
+        request:quote_requests!quote_request_id (asset_ids)
       `)
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
@@ -204,6 +206,13 @@ export async function GET(request: Request) {
     const hasMore = quotes && quotes.length > limit
     const items = quotes?.slice(0, limit) || []
 
+    // T-169: one small photo per row, when the customer sent any (one query for the page)
+    const photoUrls = await firstPhotoUrls(
+      supabase,
+      tenantId,
+      items.map((quote) => ({ quoteId: quote.id, assetIds: assetIdsOf((quote as { request?: unknown }).request) }))
+    )
+
     // Transform to response format
     const responseItems: QuoteListItem[] = items.map((quote) => {
       const customer = quote.customer_json as { name: string; email: string } | null
@@ -227,6 +236,7 @@ export async function GET(request: Request) {
         declinedAt: row.declined_at ?? null,
         expiresAt: row.token_expires_at ?? null,
         held: row.held === true,
+        photoUrl: photoUrls.get(quote.id) ?? null,
         total: pricing?.total || 0,
         currency: pricing?.currency || 'GBP',
       }
