@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { EMBED_NAMES, formatMoney, PRODUCT_NAME } from '@qolumns/shared'
+import { EMBED_NAMES, formatMoney, PRODUCT_NAME, splitMinimum } from '@qolumns/shared'
 import { useSearchParams } from 'next/navigation'
 import { assessImageQuality } from '@/lib/image-quality'
 import { brandStyleVars } from '@/lib/color'
@@ -11,6 +11,8 @@ import { useUnfinishedLead } from '@/components/embed/useUnfinishedLead'
 import { ContactStep } from '@/components/embed/steps/ContactStep'
 import { QuestionsStep } from '@/components/embed/steps/QuestionsStep'
 import { JobDetailsStep } from '@/components/embed/steps/JobDetailsStep'
+import { StepHeadingLevel, StepTitle } from '@/components/embed/StepTitle'
+import { MinimumNote } from '@/components/quote/MinimumNote'
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
 
@@ -727,23 +729,27 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
   }
 
   return (
+    <StepHeadingLevel.Provider value={hosted ? 'h2' : 'h3'}>
     <div
       ref={containerRef}
-      className={`${hosted ? 'min-h-screen' : 'min-h-full'} bg-background font-body p-3 sm:px-6 sm:py-10`}
+      // T-171: on a phone the form runs edge to edge on white, with no floating card and no empty paper
+      // under it; from 640 px it is the card on paper it was
+      className={`${hosted ? 'min-h-screen' : 'min-h-full'} bg-white font-body sm:bg-background sm:px-6 sm:py-10`}
       style={brandStyleVars(widgetData?.branding?.primaryColor)}
+      data-testid="request-form"
     >
       {testToken && (
-        <p className="max-w-xl mx-auto mb-3 rounded-xl border border-tape/50 bg-butter px-4 py-2.5 text-center text-sm text-text-primary" role="note">
+        <p className="mx-3 mt-3 max-w-xl rounded-xl border border-tape/50 bg-butter px-4 py-2.5 text-center text-sm text-text-primary sm:mx-auto sm:mb-3 sm:mt-0" role="note">
           Test mode: this is how your customers see your quote page. This request won&apos;t count toward your plan.
         </p>
       )}
-      <div className="max-w-xl mx-auto bg-white rounded-3xl border border-border shadow-warm-lg overflow-hidden pb-2">
-      {/* Widget letterhead — shown in both form and conversational modes */}
+      <div className="bg-white pb-2 sm:mx-auto sm:max-w-xl sm:overflow-hidden sm:rounded-3xl sm:border sm:border-border sm:shadow-warm-lg" data-testid="form-card">
+      {/* Widget letterhead — shown in both form and conversational modes. T-171: on the quote link page it is
+          the page's h1 (the page had none); inside a business's own page it stays an h2. */}
       {widgetData && step !== 'loading' && step !== 'error' && step !== 'success' && (
-        <div className="flex items-start justify-between gap-4 px-6 pt-6">
+        <div className="flex items-start justify-between gap-4 px-4 pt-5 sm:px-6 sm:pt-6">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-tertiary mb-0.5">Instant estimate</p>
-            <h2 className="font-display text-lg font-bold text-text-primary leading-tight">{widgetData.tenantName}</h2>
+            <Letterhead as={hosted ? 'h1' : 'h2'} name={widgetData.tenantName} />
             {widgetData.branding?.tagline && (
               <p className="mt-0.5 text-xs text-text-muted">{widgetData.branding.tagline}</p>
             )}
@@ -796,7 +802,6 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
       {/* Standard form steps — only shown when NOT in conversational mode */}
       {displayMode !== 'conversational' && step === 'service' && widgetData && (
         <ServiceStep
-          tenantName={widgetData.tenantName}
           services={widgetData.services}
           onSelect={(id) => {
             setSelectedService(id)
@@ -874,7 +879,7 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
       )}
       {displayMode !== 'conversational' && step === 'submitting' && <SubmittingState />}
       {step === 'success' && quoteResult && (
-        <SuccessState quoteUrl={quoteResult.quoteViewUrl} quoteId={quoteResult.quoteId} locale={widgetData?.region?.locale} businessName={widgetData?.tenantName || 'The business'} hasEmail={!demo && (displayMode === 'conversational' || Boolean(customerEmail.trim()))} />
+        <SuccessState quoteUrl={quoteResult.quoteViewUrl} quoteId={quoteResult.quoteId} locale={widgetData?.region?.locale} businessName={widgetData?.tenantName || 'The business'} hasEmail={!demo && (displayMode === 'conversational' || Boolean(customerEmail.trim()))} hosted={hosted} shownBelow={Boolean(demo)} />
       )}
 
       {/* Honeypot — off-screen, never shown to humans */}
@@ -896,64 +901,99 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
       <div ref={turnstileRef} className="flex justify-center empty:hidden px-6 pb-2" />
       </div>
       {widgetData?.branding?.showPoweredBy !== false && (
-        <div className="max-w-xl mx-auto mt-4 flex items-center justify-center gap-3">
-          <div className="tape-rule w-12 opacity-50" />
-          <span className="figure text-[10px] text-text-muted">Powered by {PRODUCT_NAME}</span>
-          <div className="tape-rule w-12 opacity-50" />
+        // T-171: readable: 12 px in text-muted, which is 4.5:1 on white and on paper (it was 10 px)
+        <div className="mx-auto flex max-w-xl items-center justify-center gap-3 px-4 py-4 sm:mt-4 sm:py-0" data-testid="powered-by">
+          <div className="tape-rule w-12 opacity-50" aria-hidden="true" />
+          <span className="figure text-xs text-text-muted">Powered by {PRODUCT_NAME}</span>
+          <div className="tape-rule w-12 opacity-50" aria-hidden="true" />
         </div>
       )}
     </div>
+    </StepHeadingLevel.Provider>
+  )
+}
+
+/**
+ * T-171: the business's name at the top of the form. On the quote link page
+ * it is the page's h1, with "Instant estimate" as part of it.
+ */
+function Letterhead({ as: Tag, name }: { as: 'h1' | 'h2'; name: string }) {
+  return (
+    <Tag className="leading-tight" data-testid="form-heading">
+      <span className="mb-0.5 block text-xs font-semibold uppercase tracking-[0.16em] text-tertiary">Instant estimate</span>
+      <span className="block font-display text-lg font-bold text-text-primary">{name}</span>
+    </Tag>
   )
 }
 
 // Step Components
 
+/**
+ * T-171: where the customer is in the form. Under 640 px it is one line,
+ * "Step 3 of 5" with the step's name, over a bar of that many parts: five
+ * labelled dots do not fit a phone (the labels were cut off at 390 px). From
+ * 640 px it is the labelled row it was.
+ */
 function ProgressIndicator({ steps, currentStep }: { steps: string[]; currentStep: number }) {
   return (
-    <div className="px-6 pt-5 pb-3">
-      <div className="flex items-center gap-3">
+    <div className="px-4 pt-4 pb-2 sm:px-6 sm:pt-5 sm:pb-3" data-testid="step-bar">
+      {/* a phone */}
+      <div className="sm:hidden" data-testid="step-bar-compact">
+        <p className="flex items-baseline justify-between gap-3 text-sm">
+          <span className="font-semibold text-text-primary" data-testid="step-count">
+            Step {currentStep + 1} of {steps.length}
+          </span>
+          <span className="text-text-secondary" data-testid="step-name">{steps[currentStep]}</span>
+        </p>
+        <div className="mt-2 flex gap-1" aria-hidden="true">
+          {steps.map((label, index) => (
+            <span key={label} className={`h-1.5 flex-1 rounded-full ${index <= currentStep ? 'bg-primary' : 'bg-border-strong'}`} />
+          ))}
+        </div>
+      </div>
+      {/* wider: each step's label sits under its number, in a column of its own, so five labels fit the card
+          (in one row beside their numbers they ran past its edge) */}
+      <ol className="hidden sm:grid" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }} data-testid="step-bar-full">
         {steps.map((label, index) => {
           const isActive = index === currentStep
           const isCompleted = index < currentStep
           return (
-            <div key={label} className="flex items-center gap-3 flex-1 last:flex-none">
-              <div className="flex items-center gap-2 shrink-0">
-                <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                    isActive
-                      ? 'bg-primary text-on-primary ring-2 ring-tape/50 ring-offset-1'
-                      : isCompleted
-                        ? 'bg-primary text-on-primary'
-                        : 'bg-surface border border-border text-text-muted'
-                  }`}
-                >
-                  {isCompleted ? (
-                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  ) : (
-                    index + 1
-                  )}
-                </div>
-                <span
-                  className={`text-xs font-semibold uppercase tracking-[0.08em] ${
-                    isActive ? 'text-primary' : isCompleted ? 'text-text-secondary' : 'text-text-muted'
-                  }`}
-                >
-                  {label}
-                </span>
-              </div>
+            <li key={label} className="relative flex flex-col items-center text-center" aria-current={isActive ? 'step' : undefined}>
+              {/* the line to the next step, from this number's middle to the next one's */}
               {index < steps.length - 1 && (
-                <div className={index < currentStep ? 'flex-1 h-[3px] rounded-full bg-primary/70' : 'flex-1 tape-rule opacity-60'} />
+                <span className="absolute left-1/2 top-3.5 w-full -translate-y-1/2 px-5" aria-hidden="true">
+                  <span className={index < currentStep ? 'block h-[3px] rounded-full bg-primary' : 'block tape-rule opacity-60'} />
+                </span>
               )}
-            </div>
+              <div
+                className={`relative w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                  isActive || isCompleted ? 'bg-primary text-on-primary' : 'bg-surface border border-border text-text-muted'
+                }`}
+              >
+                {isCompleted ? (
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                    <path
+                      fillRule="evenodd"
+                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                ) : (
+                  index + 1
+                )}
+              </div>
+              <span
+                className={`mt-1.5 whitespace-nowrap text-xs font-semibold uppercase tracking-[0.08em] ${
+                  isActive ? 'text-text-primary' : isCompleted ? 'text-text-secondary' : 'text-text-muted'
+                }`}
+                data-testid="step-label"
+              >
+                {label}
+              </span>
+            </li>
           )
         })}
-      </div>
+      </ol>
     </div>
   )
 }
@@ -1005,24 +1045,21 @@ function ErrorState({
 }
 
 function ServiceStep({
-  tenantName,
   services,
   onSelect,
 }: {
-  tenantName: string
   services: Array<{ id: string; name: string }>
   onSelect: (id: string) => void
 }) {
   return (
-    <div className="p-6">
-      <h2 className="font-display text-xl font-bold text-text-primary mb-1">{tenantName}</h2>
-      <p className="text-sm text-text-muted mb-4">Select a service to get started</p>
+    <div className="p-4 sm:p-6">
+      <StepTitle className="mb-4">What do you need?</StepTitle>
       <div className="space-y-2">
         {services.map((service) => (
           <button
             key={service.id}
             onClick={() => onSelect(service.id)}
-            className="w-full text-left px-5 py-4 text-[15px] font-medium bg-white border border-border rounded-xl hover:border-primary hover:bg-mint transition"
+            className="w-full min-h-[48px] text-left px-5 py-4 text-[15px] font-medium text-text-primary bg-white border border-field rounded-xl hover:border-primary hover:bg-mint transition"
           >
             {service.name}
           </button>
@@ -1257,8 +1294,8 @@ function FileUploadStep({
     hasMinPhotos && !isUploading && !hasUnresolvedReview && files.every((f) => f.status !== 'uploading')
 
   return (
-    <div className="p-6">
-      <h3 className="font-display text-xl font-bold text-text-primary mb-2">Photos & Documents</h3>
+    <div className="p-4 sm:p-6">
+      <StepTitle className="mb-2">Photos &amp; Documents</StepTitle>
       <p className="text-sm text-text-secondary mb-2">
         {minPhotos > 0
           ? `Add at least ${minPhotos} photo${minPhotos > 1 ? 's' : ''} of the job`
@@ -1288,9 +1325,10 @@ function FileUploadStep({
       {/* Guided capture slots (T-107): one card per configured angle */}
       {hasGuidedCapture && (
         <div className="mb-4">
-          <p className="text-xs font-medium text-text-secondary mb-2">
-            For the most accurate quote, we need these shots ({filledAngleIds.size} of{' '}
-            {requiredAngles.length} added):
+          {/* T-171: a list of photos that help, not a check of what a photo shows. An item is marked only
+              when the customer taps it and adds a photo for it. */}
+          <p className="text-sm font-medium text-text-secondary mb-2" data-testid="photo-list-lead">
+            Photos that help. Tap one to add it ({filledAngleIds.size} of {requiredAngles.length} added):
           </p>
           <div className="space-y-2">
             {requiredAngles.map((angle) => {
@@ -1302,10 +1340,12 @@ function FileUploadStep({
                   type="button"
                   onClick={() => !filled && canAddPhotos && openPickerForAngle(angle.id)}
                   disabled={filled || !canAddPhotos}
-                  className={`w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
+                  data-testid="photo-item"
+                  data-filled={filled ? 'true' : 'false'}
+                  className={`w-full min-h-[56px] flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
                     filled
                       ? 'border-secondary-line bg-secondary-light'
-                      : 'border-dashed border-border-strong hover:border-primary/60 hover:bg-mint/50'
+                      : 'border-dashed border-field hover:border-primary hover:bg-mint'
                   }`}
                 >
                   {filled && slotFile ? (
@@ -1323,7 +1363,11 @@ function FileUploadStep({
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium text-text-primary">
                       {angle.label}
-                      {filled && <span className="ml-2 text-secondary">✓</span>}
+                      {filled && (
+                        <span className="ml-2 text-secondary">
+                          <span aria-hidden="true">✓</span> <span className="text-xs font-semibold">Photo added</span>
+                        </span>
+                      )}
                     </span>
                     {angle.guidance && !filled && (
                       <span className="block text-xs text-text-muted">{angle.guidance}</span>
@@ -1412,28 +1456,34 @@ function FileUploadStep({
           </div>
         ))}
 
-        {/* Add button (shared input also serves the guided slots) */}
-        <label
-          className={`aspect-square bg-surface rounded-xl border-2 border-dashed border-border-strong items-center justify-center cursor-pointer hover:bg-surface ${
+        {/* T-171: the general Add. It opens the same picker with no item chosen, so a photo added here counts
+            toward the total and never toward a named shot. (It was a label around the input: a choice of
+            item left over from a cancelled pick could then mark that item for the wrong photo.) */}
+        <button
+          type="button"
+          onClick={() => openPickerForAngle(null)}
+          data-testid="add-photo"
+          className={`aspect-square bg-surface rounded-xl border-2 border-dashed border-field items-center justify-center hover:bg-mint ${
             canAddPhotos || canAddDocs ? 'flex' : 'hidden'
           }`}
         >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={[
-              ...(canAddPhotos ? ['image/jpeg', 'image/png', 'image/webp'] : []),
-              ...(canAddDocs ? ['application/pdf'] : []),
-            ].join(',')}
-            multiple
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-          <div className="text-center">
-            <span className="text-2xl text-text-muted">+</span>
-            <p className="text-xs text-text-muted mt-1">Add</p>
-          </div>
-        </label>
+          <span className="text-center">
+            <span className="block text-2xl text-text-secondary" aria-hidden="true">+</span>
+            <span className="mt-1 block text-xs font-semibold text-text-secondary">Add a photo</span>
+          </span>
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={[
+            ...(canAddPhotos ? ['image/jpeg', 'image/png', 'image/webp'] : []),
+            ...(canAddDocs ? ['application/pdf'] : []),
+          ].join(',')}
+          multiple
+          onChange={handleFileSelect}
+          className="hidden"
+          data-testid="photo-input"
+        />
       </div>
 
       {/* Status text */}
@@ -1477,12 +1527,35 @@ function SubmittingState() {
   )
 }
 
+/** What the finished screen needs of a priced estimate, from the same poll that watches for it */
+interface ShownEstimate {
+  total: number
+  currency: string
+  lines: Array<{ label: string; amount: number }>
+  minimumCharge: number | null
+  /** T-146: a quote once the business has reviewed it, an estimate before */
+  reviewed: boolean
+}
+
+/**
+ * The finished screen.
+ *
+ * T-171: nothing here opens a new tab. On the quote link page (`hosted`) the
+ * customer is moved straight into what is ready: the question when there is
+ * one, the estimate otherwise. Inside a business's own page the screen shows
+ * the estimate itself (the total and its lines, from the business's prices),
+ * and the link to the whole of it replaces the page it is on, in the same tab
+ * (`target="_top"`: the form is in a frame there). On /demo the estimate is
+ * shown by the page, just below (`shownBelow`), so this screen only says so.
+ */
 function SuccessState({
   quoteUrl,
   quoteId,
   locale = 'en-GB',
   businessName,
   hasEmail = true,
+  hosted = false,
+  shownBelow = false,
 }: {
   quoteUrl: string
   quoteId: string
@@ -1491,6 +1564,10 @@ function SuccessState({
   businessName: string
   /** T-151: a phone-only customer can't be emailed the link */
   hasEmail?: boolean
+  /** The quote link page: move straight into the estimate or the question */
+  hosted?: boolean
+  /** /demo: the page shows the estimate under the form */
+  shownBelow?: boolean
 }) {
   // T-108: poll quote status while the customer is still here — if the quote
   // needs a quick confirmation, route them to it in-flow instead of waiting
@@ -1498,6 +1575,8 @@ function SuccessState({
   const [liveStatus, setLiveStatus] = useState<string | null>(null)
   // T-109: provisional range shown the moment pricing is computed
   const [range, setRange] = useState<{ low: number; high: number; currency: string } | null>(null)
+  // T-171: the estimate itself, for the finished screen
+  const [estimate, setEstimate] = useState<ShownEstimate | null>(null)
 
   const token = (() => {
     try {
@@ -1507,6 +1586,9 @@ function SuccessState({
     }
   })()
   const clarifyUrl = token ? `/q/${quoteId}/clarify?token=${token}` : null
+  // inside a frame, a link replaces the page the frame is on: the same tab, never a new one
+  const framed = typeof window !== 'undefined' && window.parent !== window
+  const sameTab = framed ? { target: '_top' } : {}
 
   // Queue processing: past the poll window we stop and promise the email instead
   const [timedOut, setTimedOut] = useState(false)
@@ -1542,6 +1624,16 @@ function SuccessState({
         if (['awaiting_clarification', 'pending_review', 'sent', 'viewed', 'failed'].includes(data.status)) {
           // T-147: an estimate shown while the business reviews it is ready to view
           const shown = data.status === 'pending_review' && data.review?.confirmationPending === true
+          if ((shown || data.status === 'sent' || data.status === 'viewed') && !data.provisional && typeof data.pricing?.total === 'number' && data.pricing.total > 0) {
+            const split = splitMinimum((data.pricing.breakdown ?? []) as Array<{ label: string; amount: number }>)
+            setEstimate({
+              total: data.pricing.total,
+              currency: data.pricing.currency || 'GBP',
+              lines: split.lines.map((l) => ({ label: l.label, amount: l.amount })),
+              minimumCharge: split.minimum?.minimumCharge ?? null,
+              reviewed: data.review?.state === 'quote',
+            })
+          }
           setEstimateShown(shown)
           setLiveStatus(data.status)
           if (shown || ['sent', 'viewed', 'failed'].includes(data.status)) clearInterval(interval)
@@ -1557,56 +1649,97 @@ function SuccessState({
     }
   }, [quoteId, token])
 
+  const isReady = liveStatus === 'sent' || liveStatus === 'viewed'
+  // T-171: on the quote link page the customer goes straight on, in this tab
+  const destination =
+    liveStatus === 'awaiting_clarification' && clarifyUrl ? clarifyUrl : (liveStatus === 'pending_review' && estimateShown) || isReady ? quoteUrl : null
+  useEffect(() => {
+    if (hosted && destination) window.location.assign(destination)
+  }, [hosted, destination])
+
   // T-133: Intl formatting in the tenant's locale, whole units for a range
   const rangeDisplay = range
     ? `${formatMoney(range.low, range.currency, locale, { decimals: 0 })} – ${formatMoney(range.high, range.currency, locale, { decimals: 0 })}`
     : null
+  const linkClass = 'inline-flex min-h-[48px] items-center justify-center px-6 py-3 font-semibold bg-primary text-on-primary rounded-xl hover:bg-primary-hover transition'
 
-  // Quote needs a quick confirmation — bring the customer to it now
-  if (liveStatus === 'awaiting_clarification' && clarifyUrl) {
+  if (hosted && destination) {
     return (
-      <div className="text-center py-12 px-6">
-        <div className="w-16 h-16 bg-tertiary-light rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-2xl">✋</span>
-        </div>
-        <h3 className="font-display text-xl font-bold text-text-primary mb-2">One quick check</h3>
-        {rangeDisplay && (
-          <p className="font-display text-2xl font-bold text-text-primary mb-2">{rangeDisplay}</p>
-        )}
-        <p className="text-sm text-text-secondary mb-6">
-          {rangeDisplay
-            ? 'That’s our estimated range. Confirm a couple of details so we can price it for your job.'
-            : 'We’ve analysed your request — just confirm a couple of details and your quote will be ready in seconds.'}
+      <div className="text-center py-12 px-6" role="status" aria-live="polite" data-testid="finished-moving">
+        <h3 className="font-display text-xl font-bold text-text-primary">
+          {liveStatus === 'awaiting_clarification' ? 'One quick check' : 'Your estimate is ready'}
+        </h3>
+        <div className="tape-rule w-48 mx-auto my-6" aria-hidden="true" />
+        <p className="text-sm text-text-secondary">
+          Opening it now.{' '}
+          <a href={destination} className="font-semibold text-primary underline underline-offset-4" data-testid="finished-link">
+            Open it yourself
+          </a>
         </p>
-        <a
-          href={clarifyUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-xl hover:bg-primary-hover transition"
-        >
-          Confirm Details
-        </a>
       </div>
     )
   }
 
-  // T-147: the estimate is visible now; the business confirms it afterwards
-  if (liveStatus === 'pending_review' && estimateShown) {
+  // Quote needs a quick confirmation — bring the customer to it now
+  if (liveStatus === 'awaiting_clarification' && clarifyUrl) {
     return (
-      <div className="text-center py-12 px-6 animate-fade-in-up">
-        <div className="w-16 h-16 bg-mint rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-secondary text-2xl">✓</span>
+      <div className="text-center py-12 px-6" data-testid="finished-question">
+        <h3 className="font-display text-xl font-bold text-text-primary mb-2">One quick check</h3>
+        {rangeDisplay && (
+          <p className="figure text-2xl font-medium text-text-primary mb-2">{rangeDisplay}</p>
+        )}
+        <p className="text-sm text-text-secondary mb-6">
+          {rangeDisplay
+            ? 'That’s our estimated range. Confirm a detail so we can price it for your job.'
+            : 'Confirm a detail and your estimate will be ready in seconds.'}
+        </p>
+        {shownBelow ? null : (
+          <a href={clarifyUrl} {...sameTab} className={linkClass} data-testid="finished-link">
+            Confirm details
+          </a>
+        )}
+      </div>
+    )
+  }
+
+  // The estimate is ready: shown early while the business confirms it (T-147), or sent
+  if ((liveStatus === 'pending_review' && estimateShown) || isReady) {
+    const noun = estimate?.reviewed ? 'quote' : 'estimate'
+    return (
+      <div className="py-8 px-4 sm:px-6 animate-fade-in-up" data-testid="finished-ready">
+        <div className="text-center">
+          <h3 className="font-display text-xl font-bold text-text-primary mb-1">Your {noun} is ready</h3>
+          <p className="text-sm text-text-secondary">
+            {shownBelow ? 'It is shown just below.' : estimateShown ? `${businessName} will confirm it shortly.` : `From ${businessName}, for the job you described.`}
+          </p>
         </div>
-        <h3 className="font-display text-xl font-bold text-text-primary mb-2">Your estimate is ready</h3>
-        <p className="text-sm text-text-secondary mb-6">{businessName} will confirm it shortly.</p>
-        <a
-          href={quoteUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-xl hover:bg-primary-hover transition"
-        >
-          View Your Estimate
-        </a>
+        {/* the estimate itself: the total and its lines, as the business's prices made them */}
+        {estimate && !shownBelow && (
+          <div className="mt-5 rounded-2xl border border-border bg-background p-5 text-left" data-testid="finished-estimate">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-secondary">Your {noun}</p>
+            <p className="figure mt-1 text-4xl font-medium text-text-primary" data-testid="finished-total">
+              {formatMoney(estimate.total, estimate.currency, locale)}
+            </p>
+            {estimate.lines.length > 0 && (
+              <ul className="mt-4 space-y-2 border-t border-border pt-4 text-sm">
+                {estimate.lines.map((line, i) => (
+                  <li key={i} className="flex items-baseline justify-between gap-4">
+                    <span className="text-text-secondary">{line.label}</span>
+                    <span className="figure whitespace-nowrap text-text-primary">{formatMoney(line.amount, estimate.currency, locale)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <MinimumNote minimumCharge={estimate.minimumCharge} currency={estimate.currency} locale={locale} className="mt-3 text-sm text-text-secondary" />
+          </div>
+        )}
+        {!shownBelow && (
+          <p className="mt-5 text-center">
+            <a href={quoteUrl} {...sameTab} className={linkClass} data-testid="finished-link">
+              View your {noun}
+            </a>
+          </p>
+        )}
       </div>
     )
   }
@@ -1614,45 +1747,17 @@ function SuccessState({
   // Quote under business review — show the range so the customer isn't left with nothing
   if (liveStatus === 'pending_review' && rangeDisplay) {
     return (
-      <div className="text-center py-12 px-6">
-        <div className="w-16 h-16 bg-mint rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-secondary text-2xl">✓</span>
-        </div>
+      <div className="text-center py-12 px-6" data-testid="finished-held">
         <h3 className="font-display text-xl font-bold text-text-primary mb-2">Your estimate is being prepared</h3>
-        <p className="font-display text-2xl font-bold text-text-primary mb-2">{rangeDisplay}</p>
+        <p className="figure text-2xl font-medium text-text-primary mb-2">{rangeDisplay}</p>
         <p className="text-sm text-text-secondary mb-6">
           {businessName} will review and send it shortly.
         </p>
-        <a
-          href={quoteUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-xl hover:bg-primary-hover transition"
-        >
-          View Estimate
-        </a>
-      </div>
-    )
-  }
-
-  const isReady = liveStatus === 'sent' || liveStatus === 'viewed'
-
-  if (isReady) {
-    return (
-      <div className="text-center py-12 px-6 animate-fade-in-up">
-        <div className="w-16 h-16 bg-mint rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-secondary text-2xl">✓</span>
-        </div>
-        <h3 className="font-display text-xl font-bold text-text-primary mb-2">Your estimate is ready</h3>
-        <p className="text-sm text-text-secondary mb-6">Your personalised estimate has been prepared — take a look.</p>
-        <a
-          href={quoteUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-block px-6 py-3 font-semibold bg-primary text-on-primary rounded-xl hover:bg-primary-hover transition"
-        >
-          View Your Estimate
-        </a>
+        {shownBelow ? null : (
+          <a href={quoteUrl} {...sameTab} className={linkClass} data-testid="finished-link">
+            View your estimate
+          </a>
+        )}
       </div>
     )
   }
@@ -1661,10 +1766,7 @@ function SuccessState({
   // the request is safe; email is the channel now
   if (liveStatus === 'failed' || liveStatus === 'pending_review' || timedOut) {
     return (
-      <div className="text-center py-12 px-6">
-        <div className="w-16 h-16 bg-mint rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-secondary text-2xl">✓</span>
-        </div>
+      <div className="text-center py-12 px-6" data-testid="finished-received">
         <h3 className="font-display text-xl font-bold text-text-primary mb-2">We have your request</h3>
         <p className="text-sm text-text-secondary">
           {liveStatus === 'pending_review'
@@ -1679,8 +1781,8 @@ function SuccessState({
 
   // Queued / generating: the worker is pricing it now
   return (
-    <div className="text-center py-12 px-6" role="status" aria-live="polite">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted mb-3">Request received</p>
+    <div className="text-center py-12 px-6" role="status" aria-live="polite" data-testid="finished-preparing">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted mb-3">Request received</p>
       <h3 className="font-display text-xl font-bold text-text-primary">Preparing your estimate</h3>
       <div className="tape-rule tape-measuring w-48 mx-auto my-6" aria-hidden="true" />
       <p className="text-sm text-text-secondary mb-6 max-w-xs mx-auto">
@@ -1688,9 +1790,9 @@ function SuccessState({
       </p>
       <a
         href={quoteUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-sm font-semibold text-primary underline underline-offset-4 hover:text-primary-hover"
+        {...sameTab}
+        className="inline-flex min-h-[44px] items-center text-sm font-semibold text-primary underline underline-offset-4 hover:text-primary-hover"
+        data-testid="finished-link"
       >
         Open the estimate page
       </a>

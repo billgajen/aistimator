@@ -986,3 +986,45 @@ Live since 2026-11-15 14:17 UTC. No price changes.
   1000 px and 500 px.
 - [ ] **The demo's two new sample photos cost one more AI call each time a visitor uses them** (the photo is
   read, as a customer's would be). The demo's daily cap and per-visitor limit still apply.
+
+## T-171 — Customer pages: the request form, the quote page, billing, three leftovers
+
+- **Not committed and not on production.** A preview exists (behind your Vercel login):
+  `https://estimator-7dcc1viia-gajendrans-projects-1a87e0b4.vercel.app`
+  **The customer's pages cannot run on it** (previews have no database): the form, the question, the quote page
+  and the billing page need one. On the preview you can see the login and sign-up pages and the marketing
+  header, footer and pictures. The customer's pages are in the screenshots from the local run.
+- **A live deploy would be web only:** no migration, no worker change.
+- [ ] **A fault from T-170 is on production until this ships:** on Home's closing band the keyboard focus ring
+  is dark on dark green (2:1), so someone using a keyboard can hardly see which of the two controls they are on.
+  It is fixed in this ticket. It affects keyboard users only and nothing else.
+- [ ] **Look at it on your phone.** Open your quote link and send a request with a photo:
+  1. *The form* runs edge to edge; the top says "Step 2 of 5".
+  2. *A question with a few choices* is rows you tap, not a picker.
+  3. *Photos:* tap "Tank rating label" and add a photo, and only that row is ticked. Add one with "Add a photo"
+     and no row is ticked.
+  4. *After "Get my estimate"* you land on the question or the estimate in the same tab.
+  5. *The question* is one sentence: "We read 50 gal from your tank's rating label. Is that right?"
+  6. *The quote page* has no "Viewed" pill, and "Measurement & takeoff" says only what was read, with no prices.
+  7. *Accept:* the form comes into view; after you confirm, "What happens next" lists three steps.
+- [ ] **Text on your brand colour may change colour.** Text on a business's colour is now chosen so it can be
+  read (4.5:1). A business with a light colour (yellow, orange, pale green) gets dark text where it had white.
+  One with a bright mid-tone colour (a bright blue such as #3B82F6, a bright red) gets black text where it had
+  white, because neither white nor our dark ink can be read on it. This is on buttons too, not only the price
+  panel. Say if you would rather keep white on those and accept that it is harder to read.
+- [ ] **"What happens next" is in our words, not the business's.** There is no setting where a business can
+  write its own three steps. Today they read: "<Business> gets in touch", "You agree a time", "The job", with
+  the phone number and the timing the customer just gave. A setting for the business's own words is a dashboard
+  ticket.
+- [ ] **The total still appears in three places on the quote page:** the price panel, the last row of the
+  breakdown, and the Accept button. I read "the price appears once" as the audit's finding (the price lines
+  repeated in a second block) and removed that. Say if you want the breakdown's total row or the button's
+  amount gone too.
+- [x] **The form's last button reads "Get my estimate"** (your decision, 2026-11-16; it read "Get Quote"),
+  everywhere the form runs: the quote link page, the three embed modes and the demo.
+- [ ] **The billing page no longer lists "PDF generation" and "Email notifications".** It lists exactly what
+  Pricing lists, from the same source, which is how the two cannot disagree. Both are true of every plan; say
+  if you want them on both pages.
+- [ ] **The business's on-site app still shows the label's raw text** under a question (`apps/mobile`). It is
+  the business's screen, so I left it.
+- The preview stays until you say to delete it.

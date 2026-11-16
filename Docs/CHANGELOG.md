@@ -15,6 +15,161 @@
 
 ## Issues & Resolutions
 
+### 2026-11-16: T-171 — Customer pages: the request form and the quote page, clear and honest on a phone; the billing page; three small leftovers
+
+**Status: built and on a preview. Not committed. Not on production.** Preview deployment `dpl_BDAmLwq3Lk9b45bp1nCdnfpZABMM` (behind the
+Vercel login). It has no database, so the customer's form, the question, the quote page and the billing page
+cannot run on it; the login and sign-up pages and the marketing header, footer and pictures can be seen there.
+The customer's pages were checked and photographed on the local stack.
+
+**No migration and no worker change.** A live deploy would be web only. Everything the customer now sees is built
+by the web app from what the worker already stores.
+
+**What the owner asked for:** the request form and the customer's quote page made clear and honest on a phone
+(`Docs/design/audit.md` section 3), the billing page brought into line with the public Pricing page, and the
+login, sign-up, header and footer leftovers.
+
+**1. The request form** (`components/embed/EstimateWidget.tsx`, `components/embed/steps/`, `StepTitle.tsx`)
+- **Photo list.** The list reads "Photos that help. Tap one to add it (1 of 2 added)". An item is ticked ("Photo
+  added") only when the customer taps that item and adds a photo for it.
+  - **What was wrong:** the general "Add" was a label around the file input. If a customer tapped an item, left
+    the picker without choosing, then used "Add", the photo was filed under the item they had left. And the lead
+    said "For the most accurate quote, we need these shots", which reads as a check of what a photo shows.
+  - **Fix:** the general "Add a photo" is a button that opens the same picker with no item, so its photo counts
+    toward the total only. Of several photos chosen at once for an item, only the first is the item's (as before).
+  - On `/demo` the sample photo still goes to the service's first item: it is ours, made for that item (T-170).
+- **Step bar.** Under 640 px it is one line, "Step 3 of 5" with the step's name, over a bar of that many parts.
+  From 640 px the labels sit under their numbers.
+  - **Found while checking:** on a computer the old row was cut too. Five labels beside their numbers were
+    wider than the form's card, so the last one ran past its edge. The ticket named the phone; both are fixed.
+- **Tap rows.** A question with two to five choices is rows to tap (48 px), as "When suits you?" is on the accept
+  form; a longer list keeps its picker (`usesTapRows`). The rows' mark is the business's colour (it was our
+  juniper, hard-coded).
+- **Edge to edge on a phone.** No card, no margins, no empty paper under the form; from 640 px it is the card on
+  paper it was.
+- **Same tab.** Nothing in the form opens a new tab.
+  - On the quote link page the customer is moved straight on when the pipeline answers: into the one question if
+    there is one, into the estimate otherwise.
+  - Inside a business's own page (the three embed modes) the finished screen shows the estimate itself, the
+    total and its lines, and "View your estimate" replaces the page the form is on (`target="_top"`).
+  - On `/demo` the page already shows the estimate under the form, so the form's screen says "It is shown just
+    below".
+- **A real h1** on the quote link page: the business's name, with "Instant estimate" as part of it. A step's
+  title is an h2 there; inside a business's page the two are h2 and h3, under the page's own h1.
+- **Required in words.** "(required)" after the label; no red asterisk. Fields have an edge that can be seen.
+- **"Powered by Qolumns"** is 12 px in `text-muted` (it was 10 px).
+- **The last button reads "Get my estimate"** (the owner's decision, 2026-11-16; it read "Get Quote"). At that
+  point the customer gets an estimate (T-146), and the marketing pictures of the form already said so. It is one
+  component, so it is the same on the quote link page, in the three embed modes and on `/demo`. `verify-t162` and
+  `verify-t171` press the button by its new name.
+
+**2. The customer's quote page** (`app/q/[quoteId]/page.tsx`, `lib/customer-read.ts`, the public quote API)
+- **No status pill.** "Viewed", "Under review" and the rest are gone; the line under the price already says
+  where the estimate stands.
+- **The price lines appear once.** "Measurement & takeoff" used to list the same lines with the same amounts and
+  "Fixed quantity". It now shows only what was read or measured, a sentence each, with no amount and no rate:
+  "From your tank's rating label: 50 gal, Natural gas"; "From your photos: about 919.1 sq ft (Exterior walls)".
+  A quote for which nothing was read has no such block.
+  - The sentences are built on the server by one pure function and sent as `read` on the public quote API. Only
+    what is in the quote: a reading the customer corrected is left out, because the quote uses their answer.
+  - Never the words read off a label, never how a reading was made, never a word of the T-146/T-148 list; a line
+    that would carry one, or an amount, is dropped.
+  - The total is still shown in the price panel and as the last row of the breakdown, and on the Accept button.
+    The audit's finding was the lines repeated in a second block, and that is what was removed.
+- **The question** (`app/q/[quoteId]/clarify`): a label reading is asked as one plain sentence, "We read 50 gal
+  from your tank's rating label. Is that right?". The "What we saw" line, with the label's raw text and an
+  arrow, is gone. The page says "estimate" (it said "quote", which T-146 does not allow before a review).
+- **Accept.** The form is scrolled into view and its first field takes the focus. Its fields have a visible edge
+  (they were 1.2:1 against the page) and the timing note has a label, not only a placeholder. Accepting gets one
+  entrance of 250 ms, once; nothing under reduced motion. Then "What happens next" in three steps.
+  - **The business's words:** a business has no setting for those three steps today, so the words are ours, with
+    the business's name, the phone number and the timing the customer just gave. A setting is a dashboard ticket.
+- **The price panel's small labels** were white at 60% to 80% strength, and the on-colour itself was "white
+  unless the colour is lighter than 0.45", which put white on orange at 2.8:1.
+  - **Fix:** the on-colour is chosen by contrast (`readableTextOn`): white where white reaches 4.5:1, ink where
+    the colour is light, and black for the narrow band of mid-tone colours (a bright blue, a bright red) on which
+    neither does. Every word on the panel is that colour at full strength.
+  - **This reaches further than the panel:** every button and label on a business's colour, on the form and the
+    quote page, uses the same on-colour. A business with a bright mid-tone colour now gets black text on it where
+    it had white; one with a light colour gets ink where it had white. The business's colour itself is unchanged.
+  - The "Confirm details" button on the panel was butter; it is the panel's colours turned round.
+
+**3. The billing page** (`app/(dashboard)/app/settings/billing/page.tsx`)
+- A plan's lines there are `planLines()` from `lib/marketing/plan-claims.ts`, the list the public Pricing page
+  reads. A line that is not live says "Coming later" on both, in the same order. Business stays choosable there.
+- Its own list (PDF generation, email notifications, crosses for what a plan lacks) is gone; that is how the two
+  pages cannot disagree.
+
+**4. Small leftovers**
+- Login and sign-up fields are 44 px tall with a visible edge; "Sign up" and "Log in" are underlined semibold
+  links 24 px tall. Header and footer links are at least 24 px tall on a computer (the footer's were 20 px).
+
+**5. The marketing pictures of these screens follow the screens** (`screen-words.ts`, `ProductScreens.tsx`)
+- A marketing screen says the real screen's own words (T-167). So the question now reads "from your tank's
+  rating label" there too, from the function the real page uses, and the picture of "Measurement & takeoff" shows
+  the sentence the real page shows, with no amount.
+
+**Architectural decisions**
+- No new AD. `system.md` changed first: the on-colour by contrast; the customer-page rules (edge to edge, the
+  step line, tap rows, "(required)", no new tab, no status words, a fact once); accept's one confirmation.
+
+**Constraints introduced**
+- The customer's quote page draws no takeoff row. What was read or measured reaches it only through
+  `customerReadLines`, which never returns an amount.
+- Nothing on a customer page opens a new tab.
+- Text on a business's colour comes from `readableTextOn` and reaches 4.5:1; no faded on-colour on the price
+  panel.
+- The billing page and the Pricing page list a plan's lines through `planLines` only.
+- A photo marks a named item only through `openPickerForAngle(item)`.
+
+**Relation to other fixes**
+- AD-001: nothing here touches a price. `verify-t171` compares the stored total before and after accept.
+- T-146, T-147, T-148: the customer still sees exactly "estimate" or "quote"; the new lines are checked against
+  the same word list. The question page's "quote" before a review was a T-146 slip and is fixed.
+- T-151 (contact first, the accept form): the steps and the lead capture are unchanged; only how they look.
+- T-153, T-170 (the demo): the sample photo and the page's own estimate are unchanged.
+- T-162 (the embed modes): `verify-t162` walks the form inside another site. Its step now taps a row
+  where it used to pick from a picker; what it proves is unchanged.
+- T-165 (the minimum is a note, not a row): the page no longer draws takeoff rows at all, so its unit test now
+  holds that.
+- T-167: the marketing screens' words are still checked against the product's source, now through one function.
+- T-169 (the dashboard's "What Qolumns understood"): untouched; the business still sees the words read and how.
+- T-170 (`plan-claims.ts`): now also the billing page's source.
+
+**Checks**
+- `verify-t171` 91/91 on the local stack, in a browser at 360, 390 and 1440. A water heater request on the
+  quote link page through the real pipeline (the label was read, the customer asked, the answer re-priced it to
+  $2,150, the business approved, the customer accepted); an interior painting request at 360 and at 1440; the
+  three embed modes on another site; the price panel in four business colours; a quote with a quantity measured
+  from photos, set by hand; billing against Pricing; login, sign-up, header and footer.
+- The price panel's small labels, worst point: dark navy #1D3557 12.36:1 (white); light yellow #F4D35E 10.42:1 (ink);
+  orange #F97316 5.45:1 (ink); bright blue #3B82F6 5.71:1 (black).
+- The full regression set (this ticket touches the quote flow): all twenty scripts pass.
+  `verify-t146` 20/20, `t147` 33/33, `t148` 29/29, `t149` 35/35, `t150` 27/27, `t151` 35/35, `t152` 66/66,
+  `t153` 39/39, `t154` 26/26, `t155` 44/44, `t156` 31/31, `t157` 96/96, `t158` 116/116, `t160` 96/96,
+  `t162` 77/77, `t164` 78/78, `t165` 148/148, `t167` 182/182, `t169` 150/150, `t170` 412/412.
+  - Seventeen passed as they were. Three did not on the first run:
+  - **`verify-t164` 77/78: a real fault, from T-170, on production.** The keyboard focus ring on the two controls
+    of Home's closing band was ink on juniper, 2.03:1. T-170 gave that band a class of its own for its
+    photograph, and the rule that makes the ring light on juniper names `.bg-primary`. **Fix:** the band is named
+    in that rule (`globals.css`). `verify-t164` was not in T-170's list of scripts, which is how it got through.
+  - `verify-t167` 178/182: its four checks of the marketing pictures expected the old words ("the tank's rating
+    label", an amount in the takeoff picture). They now expect what the real screens say.
+  - `verify-t162` stopped at the questions step, waiting to pick from a picker that is rows now. Updated.
+- `pnpm lint` and `pnpm typecheck` pass. Unit tests: web 723, worker 519, mobile 11, all passing. The web and worker builds pass.
+
+**Files**
+- New: `apps/web/src/lib/customer-read.ts`, `apps/web/src/components/embed/StepTitle.tsx`,
+  `apps/web/src/__tests__/customer-pages-t171.test.ts`, `scripts/hardcore-test/verify-t171.mts`.
+- Changed: `EstimateWidget.tsx`, `steps/QuestionsStep.tsx`, `steps/ContactStep.tsx`, `steps/JobDetailsStep.tsx`,
+  `app/q/[quoteId]/page.tsx`, `app/q/[quoteId]/clarify/page.tsx`, `components/quote/AcceptDetailsForm.tsx`,
+  `lib/color.ts`, `app/api/public/quotes/[quoteId]/route.ts`, `packages/shared/src/api.types.ts`,
+  `app/(dashboard)/app/settings/billing/page.tsx`, `app/(auth)/login/page.tsx`, `app/(auth)/signup/page.tsx`,
+  `components/marketing/SiteNav.tsx`, `SiteFooter.tsx`, `lib/marketing/screen-words.ts`,
+  `components/marketing/screens/ProductScreens.tsx`, `TradeLanding.tsx`, `home/WhatItNotices.tsx`, two earlier
+  unit tests, `design-tokens.test.ts`, `verify-t162.mts`, `verify-t167.mts`, `globals.css` (the focus rule), and the docs (`system.md`, `ai-capabilities.md`, `04-frontend.md`,
+  `02-api-contracts.md`, `OWNER-TODO.md`).
+
 ### 2026-11-16: T-170 — Marketing photos and fixes: the hero at every width, "Add it anywhere", the closing band, trade page photos, demo samples, an honest Pricing page
 
 **Deployed 2026-11-16 14:40 UTC** (commit `6b2ca4a`): web only (`npx vercel deploy --prod`, deployment

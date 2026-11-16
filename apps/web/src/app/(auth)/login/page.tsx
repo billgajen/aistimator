@@ -59,7 +59,7 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full min-h-[44px] rounded-xl border border-field bg-white px-3 py-2 text-base text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             placeholder="you@example.com"
           />
         </div>
@@ -75,7 +75,7 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full min-h-[44px] rounded-xl border border-field bg-white px-3 py-2 text-base text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             placeholder="••••••••"
           />
         </div>
@@ -87,7 +87,7 @@ export default function LoginPage() {
 
       <p className="mt-6 text-center text-sm text-text-secondary">
         Don&apos;t have an account?{' '}
-        <Link href="/signup" className="text-primary hover:underline">
+        <Link href="/signup" className="inline-flex min-h-[24px] items-center font-semibold text-primary underline underline-offset-4" data-testid="signup-link">
           Sign up
         </Link>
       </p>

@@ -185,7 +185,10 @@
    juniper button on paper keeps the ink ring). on-primary is the colour that
    reads on the business's brand colour (lib/color.ts), white on juniper. */
 .bg-primary *,
-.bg-primary-hover * {
+.bg-primary-hover *,
+/* T-171: Home's closing band is juniper by its own class since T-170 (it carries a photograph), so it is
+   named here too. Without it the ring there was ink on juniper, 2:1 (found by verify-t164). */
+.closing-band * {
   --color-focus: rgb(var(--color-on-primary-rgb, 255 255 255));
 }
 .bg-ink *,

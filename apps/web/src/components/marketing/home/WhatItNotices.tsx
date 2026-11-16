@@ -1,5 +1,4 @@
 import { Picture, QuestionScreen, TakeoffScreen, LedgerScreen, RangeScreen } from '@/components/marketing/screens/ProductScreens'
-import { SCREEN_WORDS } from '@/lib/marketing/screen-words'
 import type { MarketingExample } from '@/lib/marketing/examples'
 
 /**
@@ -31,7 +30,7 @@ export function WhatItNotices({
   const screens: Record<string, React.ReactNode> = {
     label: heater.reading ? <QuestionScreen value={heater.reading.value} readFrom={heater.reading.readFrom} primaryColor={color} /> : null,
     walls: painting.measured ? (
-      <TakeoffScreen primaryColor={color} rows={[{ ...painting.measured, method: SCREEN_WORDS.estimate.fromPhotos }]} className="bg-white shadow-warm-md" />
+      <TakeoffScreen primaryColor={color} rows={[painting.measured]} className="bg-white shadow-warm-md" />
     ) : null,
     extra: painting.extra ? (
       <LedgerScreen

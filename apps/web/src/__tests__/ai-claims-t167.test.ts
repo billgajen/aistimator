@@ -241,7 +241,10 @@ describe('T-167: the screens on marketing pages say the product’s own words', 
     // the product's question ends the way the marketing screen's does
     const worker = read('apps/worker/src/ai/identification.ts')
     expect(worker).toMatch(/we read \$\{[^}]+\} from \$\{[^}]+\}\. Is that right\?/)
-    expect(SCREEN_WORDS.question.ask('50 gal', 'the tank\'s rating label')).toBe('We read 50 gal from the tank\'s rating label. Is that right?')
+    // T-171: the customer's page asks it as one plain sentence about their own label, and the marketing
+    // screens use the same function
+    expect(SCREEN_WORDS.question.ask('50 gal', 'the tank\'s rating label')).toBe('We read 50 gal from your tank\'s rating label. Is that right?')
+    expect(clarify).toContain('readingQuestion(String(q.aiValue), reading.where)')
   })
 
   it('the estimate: breakdown, the added line, the measurement block, the range', () => {

@@ -31,7 +31,7 @@ export function SiteNav() {
 
         <div className="hidden items-center gap-6 md:flex">
           {NAV_LINKS.filter((l) => l.href !== '/login').map((l) => (
-            <Link key={l.href} href={l.href} className="text-sm font-medium text-text-secondary transition-colors hover:text-text-primary">
+            <Link key={l.href} href={l.href} className="inline-flex min-h-[44px] items-center text-sm font-medium text-text-secondary transition-colors hover:text-text-primary">
               {l.label}
             </Link>
           ))}
@@ -40,7 +40,7 @@ export function SiteNav() {
         <div className="flex items-center gap-2 sm:gap-3">
           <Link
             href="/login"
-            className="hidden whitespace-nowrap px-3 py-2 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary md:inline"
+            className="hidden min-h-[44px] items-center whitespace-nowrap px-3 py-2 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary md:inline-flex"
           >
             Log in
           </Link>

@@ -184,6 +184,12 @@ export interface QuoteViewResponse {
   clarificationQuestions?: ClarificationQuestion[]
   /** T-122: quantity takeoff with measurement methods */
   takeoff?: TakeoffEntry[]
+  /**
+   * T-171: what was read or measured for this quote, in the customer's terms,
+   * one sentence each ("From your photos: about 919 sq ft (Exterior walls)").
+   * Only what is in the quote; never an amount. Absent when there is nothing.
+   */
+  read?: string[]
   /** T-122: human-facing estimate reference (EST-2026-XXXXXX) */
   reference?: string
   breakdown: Array<{

@@ -177,7 +177,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
     const noticeScreens = await notices.locator('[data-testid=notice]').evaluateAll((els) => els.map((el) => ({ id: el.getAttribute('data-notice'), title: el.querySelector('h3')?.textContent ?? '', picture: el.querySelectorAll('[data-product-screen][role=img]').length, described: (el.querySelector('[data-product-screen]')?.getAttribute('aria-label') ?? '').length > 20, screen: el.querySelector('[data-product-screen] [data-testid]')?.getAttribute('data-testid') ?? '', icons: el.querySelectorAll('svg').length, width: Math.round(el.querySelector('[data-product-screen]')!.getBoundingClientRect().width) })))
     check(`${width}: four examples, each with a real product screen at true size (no icon stands in for one)`, JSON.stringify(noticeScreens.map((n) => [n.id, n.screen])) === JSON.stringify([['label', 'question-screen'], ['walls', 'takeoff-screen'], ['extra', 'ledger-screen'], ['range', 'range-screen']]) && noticeScreens.every((n) => n.picture === 1 && n.described && n.icons === 0 && n.width >= 300), noticeScreens.map((n) => [n.id, n.screen, n.width]))
     const noticeText = (await notices.innerText()).replace(/\s+/g, ' ')
-    check(`${width}: the screens show what the product shows: the reading and "Yes", "${SCREEN_WORDS.estimate.fromPhotos}", "Added for you", and the range the product gave`, noticeText.includes('We read 50 gal from the tank\'s rating label. Is that right?') && noticeText.includes(SCREEN_WORDS.estimate.fromPhotos) && noticeText.includes(SCREEN_WORDS.estimate.added) && noticeText.includes('$1,890') && noticeText.includes('$2,410'))
+    check(`${width}: the screens show what the product shows: the reading and "Yes", "${SCREEN_WORDS.estimate.fromPhotos}", "Added for you", and the range the product gave`, noticeText.includes(SCREEN_WORDS.question.ask('50 gal', 'the tank\'s rating label')) && /from your tank's rating label/.test(noticeText) && noticeText.includes(SCREEN_WORDS.estimate.fromPhotos) && noticeText.includes(SCREEN_WORDS.estimate.added) && noticeText.includes('$1,890') && noticeText.includes('$2,410'))
     const moved = await p.evaluate(() => document.getAnimations().filter((an) => an.playState === 'running' && document.querySelector('[data-testid=notices]')!.contains((an.effect as KeyframeEffect | null)?.target ?? null)).length)
     check(`${width}: nothing moves in "What it notices" (Home keeps one moment: the price sentence)`, moved === 0, moved)
 
@@ -256,7 +256,13 @@ if (!process.env.PLAYWRIGHT_DIR) {
       } else {
         check(`${name}: it claims no label reading (this trade's template reads none)`, questions.length === 0 && !/rating plate|tank label|panel label|reads? (the|it) (label|plate)/i.test(pageText), questions.length)
       }
-      if (example.measured) check(`${name}: it shows the wall area worked out from photos, at the template's rate`, takeoffs.length >= 2 && takeoffs.every((m) => m.trim() === SCREEN_WORDS.estimate.fromPhotos) && pageText.includes('$2,300.00'), takeoffs.length)
+      // T-171: the real page's "Measurement & takeoff" block says what was measured in one sentence, with no
+      // amount (the price is in the breakdown, once), so the picture of it does too
+      if (example.measured) {
+        const blocks = (await t.locator('[data-testid=takeoff-screen]').allInnerTexts()).map((b) => b.replace(/\s+/g, ' '))
+        const sentence = SCREEN_WORDS.estimate.measuredLine(example.measured)
+        check(`${name}: it shows the wall area worked out from photos, as the real page says it ("${sentence}"), with no amount in that block`, takeoffs.length >= 2 && takeoffs.every((m) => m.trim() === SCREEN_WORDS.estimate.fromPhotos) && sentence.length > 20 && blocks.length >= 2 && blocks.every((b) => b.includes(sentence) && !/\$\s?\d/.test(b)), blocks.map((b) => b.slice(0, 120)))
+      }
       else check(`${name}: it claims no measuring from photos`, takeoffs.length === 0 && !/wall area|from (the|their) photos/i.test(pageText))
       const how = await t.locator('[data-testid=how-step]').evaluateAll((els) => els.map((el) => {
         const words = el.querySelector('h3')!.getBoundingClientRect()

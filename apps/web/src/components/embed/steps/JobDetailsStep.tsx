@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { RequiredMark, StepTitle } from '../StepTitle'
 
 /**
  * T-151: the last step — the ZIP or postcode (for the service area and the
@@ -30,11 +31,11 @@ export function JobDetailsStep({
 }) {
   const [touched, setTouched] = useState(false)
   const missingDescription = descriptionRequired && !description.trim()
-  const input = 'w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition border-border bg-background focus:ring-primary/25 focus:border-primary focus:bg-white'
+  const input = 'w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition border-field bg-white focus:ring-primary/25 focus:border-primary'
 
   return (
-    <div className="p-6">
-      <h3 className="font-display text-xl font-bold text-text-primary mb-5">Last step</h3>
+    <div className="p-4 sm:p-6">
+      <StepTitle>Last step</StepTitle>
       <div className="space-y-4">
         <div className="max-w-[220px]">
           <label htmlFor="job-postcode" className="block text-[13px] font-semibold text-text-primary mb-1.5">{postalCodeLabel}</label>
@@ -43,7 +44,7 @@ export function JobDetailsStep({
         <div>
           <label htmlFor="job-description" className="block text-[13px] font-semibold text-text-primary mb-1.5">
             Anything else about the job?
-            {descriptionRequired ? <span className="text-danger"> *</span> : <span className="font-normal text-text-muted"> (optional)</span>}
+            {descriptionRequired ? <RequiredMark /> : <span className="font-normal text-text-muted"> (optional)</span>}
           </label>
           <textarea id="job-description" value={description} onChange={(e) => onDescriptionChange(e.target.value)} rows={4} className={`${input} ${touched && missingDescription ? 'border-danger/50' : ''}`} />
           {touched && missingDescription
@@ -53,7 +54,7 @@ export function JobDetailsStep({
       </div>
       <div className="flex gap-3 mt-6">
         {onBack && (
-          <button type="button" onClick={onBack} className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-xl hover:border-border-strong transition">
+          <button type="button" onClick={onBack} className="min-h-[48px] px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-field rounded-xl transition">
             Back
           </button>
         )}
@@ -65,7 +66,8 @@ export function JobDetailsStep({
           }}
           className="flex-1 px-4 py-3.5 text-[15px] font-display font-bold bg-primary text-on-primary rounded-xl hover:bg-primary-hover active:scale-[0.995] transition"
         >
-          Get Quote
+          {/* T-171 (the owner's wording): what the customer gets at this point is an estimate (T-146) */}
+          Get my estimate
         </button>
       </div>
     </div>

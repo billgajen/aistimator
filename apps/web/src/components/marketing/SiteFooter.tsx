@@ -8,7 +8,7 @@ import { FOOTER } from '@/lib/marketing/site-copy'
  * T-165: on a phone each link is 44 px tall (a tap target); from `sm` up the
  * lists keep their tighter rhythm.
  */
-const FOOT_LINK = 'inline-flex min-h-[44px] items-center text-text-secondary transition-colors hover:text-text-primary sm:min-h-0'
+const FOOT_LINK = 'inline-flex min-h-[44px] items-center text-text-secondary transition-colors hover:text-text-primary sm:min-h-[24px]'
 export function SiteFooter() {
   return (
     <footer className="mt-4">

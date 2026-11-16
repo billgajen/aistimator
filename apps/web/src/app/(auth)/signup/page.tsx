@@ -81,7 +81,7 @@ export default function SignupPage() {
         </p>
         <Link
           href="/login"
-          className="text-sm text-primary hover:underline"
+          className="inline-flex min-h-[24px] items-center text-sm font-semibold text-primary underline underline-offset-4"
         >
           Back to login
         </Link>
@@ -109,7 +109,7 @@ export default function SignupPage() {
             value={businessName}
             onChange={(e) => setBusinessName(e.target.value)}
             required
-            className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full min-h-[44px] rounded-xl border border-field bg-white px-3 py-2 text-base text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             placeholder="Acme Services"
           />
         </div>
@@ -124,7 +124,7 @@ export default function SignupPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full min-h-[44px] rounded-xl border border-field bg-white px-3 py-2 text-base text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             placeholder="you@example.com"
           />
         </div>
@@ -140,7 +140,7 @@ export default function SignupPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
-            className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full min-h-[44px] rounded-xl border border-field bg-white px-3 py-2 text-base text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             placeholder="••••••••"
           />
           <p className="mt-1 text-xs text-text-muted">Minimum 8 characters</p>
@@ -153,7 +153,7 @@ export default function SignupPage() {
 
       <p className="mt-6 text-center text-sm text-text-secondary">
         Already have an account?{' '}
-        <Link href="/login" className="text-primary hover:underline">
+        <Link href="/login" className="inline-flex min-h-[24px] items-center font-semibold text-primary underline underline-offset-4" data-testid="login-link">
           Log in
         </Link>
       </p>

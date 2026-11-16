@@ -7,7 +7,6 @@ import { marketingExample, type MarketingExample } from '@/lib/marketing/example
 import { MAIN_CTA, QUIET_BUTTON } from '@/lib/marketing/cta'
 import { HERO_DEMO } from '@/lib/marketing/home-copy'
 import { TRADE_SMALL_LINE, TRADE_PRICING_BAND, TRADE_HOW_HEADING } from '@/lib/marketing/site-copy'
-import { SCREEN_WORDS } from '@/lib/marketing/screen-words'
 import { RequestFormScreen } from './home/RequestFormScreen'
 import { EstimateSheet } from '@/components/quote/EstimateSheet'
 import { Picture, QuestionScreen, TakeoffScreen, LedgerScreen, PriceCheckScreen } from './screens/ProductScreens'
@@ -70,7 +69,7 @@ export function TradeLanding({ trade }: { trade: TradePage }) {
             {example.reading ? (
               <QuestionScreen value={example.reading.value} readFrom={example.reading.readFrom} primaryColor={COLOR} stacked className="mt-4" />
             ) : example.measured ? (
-              <TakeoffScreen primaryColor={COLOR} rows={[{ ...example.measured, method: SCREEN_WORDS.estimate.fromPhotos }]} className="mt-4 bg-white shadow-warm-md" />
+              <TakeoffScreen primaryColor={COLOR} rows={[example.measured]} className="mt-4 bg-white shadow-warm-md" />
             ) : null}
           </Picture>
         </div>
@@ -174,7 +173,7 @@ function Screen({ kind, trade, example, business }: { kind: TradeScreen; trade: 
       return example.reading ? <QuestionScreen value={example.reading.value} readFrom={example.reading.readFrom} primaryColor={COLOR} /> : null
     case 'takeoff':
       return example.measured ? (
-        <TakeoffScreen primaryColor={COLOR} rows={[{ ...example.measured, method: SCREEN_WORDS.estimate.fromPhotos }]} className="bg-white shadow-warm-md" />
+        <TakeoffScreen primaryColor={COLOR} rows={[example.measured]} className="bg-white shadow-warm-md" />
       ) : null
     case 'extra':
       return example.extra ? (

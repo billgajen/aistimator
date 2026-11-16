@@ -118,6 +118,33 @@ popular" is "Recommended". **The public pages show a plan only once one of its o
 the owner's decision): today Starter and Pro, as a centred pair, on Pricing and in Home's plan cards. Business is
 defined and sold as before; it is only not shown.
 
+**Customer pages (T-171).**
+- *The request form* (`components/embed/EstimateWidget.tsx`, steps in `components/embed/steps/`): edge to edge
+  on a phone; the business's name is an `h1` on the quote link page (`StepTitle`, `StepHeadingLevel`); the step
+  bar is "Step 3 of 5" under 640 px; a question with two to five choices is rows to tap (`usesTapRows`); a
+  required field says "(required)" (`RequiredMark`). On the photo step an item of "Photos that help" is ticked
+  only when the customer taps that item and adds a photo for it; the general "Add a photo" opens the same picker
+  with no item, so its photo counts toward the total only.
+- *The finished screen* opens no new tab. On the quote link page the customer is moved straight into the
+  question or the estimate (`window.location.assign`). Inside a business's page it shows the estimate itself
+  (total and lines, from the poll that watches for it) and "View your estimate" replaces the page
+  (`target="_top"`). On `/demo` the page shows the estimate under the form.
+- *The question page* (`app/q/[quoteId]/clarify`): a label reading is asked as one sentence, "We read 50 gal
+  from your tank's rating label. Is that right?" (`readingQuestion` in `lib/customer-read.ts`); the words read
+  off the label are not shown. It says "estimate".
+- *The quote page* (`app/q/[quoteId]`): no status pill; the price panel's words are the on-colour at full
+  strength; "Measurement & takeoff" shows only what was read or measured, as sentences from the API's `read`
+  field, with no amounts (the takeoff's rows are no longer drawn); the accept form is scrolled to and focused;
+  the accepted block arrives once (250 ms) with "What happens next" in three steps. A business has no setting
+  for those three steps yet, so the words are ours, with its name and what the customer just told it.
+
+**Billing (T-171):** a plan's lines on `/app/settings/billing` are `planLines()` from
+`lib/marketing/plan-claims.ts`, the list the public Pricing page reads, so a line that is not live says "Coming
+later" on both. Every plan on offer can be chosen there, Business included.
+
+**Login, sign-up, header and footer (T-171):** fields are 44 px tall with a visible edge; "Sign up" and "Log in"
+are underlined semibold links 24 px tall; header and footer links are at least 24 px tall on a computer.
+
 `/demo` (T-170): "Use a sample photo" adds the photo that matches the chosen service (`lib/demo/sample-photos.ts`,
 by service name): the rating label drawn for T-153, the springs above a garage door, a room from its doorway. A
 service with no sample has no button.

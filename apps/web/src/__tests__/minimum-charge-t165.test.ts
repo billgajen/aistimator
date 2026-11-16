@@ -147,7 +147,10 @@ describe('T-165: the note every page shows', () => {
     expect(page).not.toMatch(/pricing\.breakdown(\s*\|\|\s*\[\])?\)?\.map\(/)
     expect(page).not.toMatch(/pricing\.notes(\?)?\.map\(/)
     expect(page).toContain('withoutMinimumNote(pricing.notes)')
-    expect(page).toContain('!isMinimumEntry({ label: entry.item })')
+    // T-171: the takeoff's rows are no longer drawn on this page (only what was read or measured, as
+    // sentences from the server), so there is no row a minimum could appear in
+    expect(page).not.toMatch(/takeoffRows|entry\.item/)
+    expect(page).toContain('const readLines = quote.read ?? []')
     expect(page).toContain('crossServiceLine(line)')
     // the note sits at the top of the totals block, before Subtotal
     const noteAt = page.indexOf('<MinimumNote minimumCharge={minimumApplied?.minimumCharge}')

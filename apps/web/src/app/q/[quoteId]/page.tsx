@@ -6,8 +6,9 @@ import { MinimumNote } from '@/components/quote/MinimumNote'
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { brandStyleVars } from '@/lib/color'
+import { timingLabel } from '@/lib/acceptance'
 import type { QuoteViewResponse, QuoteStatus } from '@qolumns/shared'
-import { formatMoney, formatDate, formatNumber, unitDisplayLabel, isQuoteProcessing, canCustomerDecide, customerDecisionWords, splitLabelMath, PRODUCT_NAME, splitMinimum, withoutMinimumNote, isMinimumEntry, crossServiceLine } from '@qolumns/shared'
+import { formatMoney, formatDate, isQuoteProcessing, canCustomerDecide, customerDecisionWords, splitLabelMath, PRODUCT_NAME, splitMinimum, withoutMinimumNote, crossServiceLine } from '@qolumns/shared'
 
 interface QuotePageProps {
   params: { quoteId: string }
@@ -36,6 +37,8 @@ export default function QuotePage({ params }: QuotePageProps) {
   const [acceptMode, setAcceptMode] = useState(false)
   const [acceptErrors, setAcceptErrors] = useState<Partial<Record<string, string>>>({})
   const [actionError, setActionError] = useState<string | null>(null)
+  // T-171: accepted just now, on this visit: the confirmation arrives once, with what the customer told the business
+  const [justAccepted, setJustAccepted] = useState<{ timing: string; phone: string } | null>(null)
 
   // Feedback state
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
@@ -153,6 +156,7 @@ export default function QuotePage({ params }: QuotePageProps) {
 
       if (response.ok) {
         setAccepted(true)
+        setJustAccepted({ timing: timingLabel(details.timing), phone: details.phone })
         setAcceptMode(false)
         if (quote) {
           setQuote({ ...quote, status: 'accepted' as QuoteStatus })
@@ -264,7 +268,7 @@ export default function QuotePage({ params }: QuotePageProps) {
     return null
   }
 
-  const { business, branding, customer, pricing, notes, validUntil, assets, status, actions, crossServicePricing, signalRecommendations, version: quoteVersion, acceptQuoteEnabled, takeoff, reference, review, estimateRange } = quote
+  const { business, branding, customer, pricing, notes, validUntil, assets, status, actions, crossServicePricing, signalRecommendations, version: quoteVersion, acceptQuoteEnabled, reference, review, estimateRange } = quote
   // T-146: exactly two customer states — an unreviewed Estimate or a reviewed Quote
   const isReviewedQuote = review?.state === 'quote'
   // T-158: "quote" around Accept and Decline once the business has reviewed
@@ -280,7 +284,8 @@ export default function QuotePage({ params }: QuotePageProps) {
   // to repeat among the notes.)
   const { lines: priceLines, minimum: minimumApplied } = splitMinimum(pricing.breakdown)
   const pricingNotes = withoutMinimumNote(pricing.notes)
-  const takeoffRows = (takeoff ?? []).filter((entry) => !isMinimumEntry({ label: entry.item }))
+  // T-171: what was read or measured, in the customer's terms (never the takeoff's amounts)
+  const readLines = quote.read ?? []
   const showAcceptButton = acceptQuoteEnabled !== false
   // T-147: the estimate is shown while the business reviews it — Accept is
   // locked until they confirm; asking a question stays available
@@ -305,20 +310,19 @@ export default function QuotePage({ params }: QuotePageProps) {
           <div className="bg-background rounded-3xl shadow-document overflow-hidden">
             <Letterhead
               business={business}
-              status={status}
               reference={reference}
               customerName={customer.name}
               locale={locale}
             />
             <div className="px-6 sm:px-10 py-10 bg-primary text-on-primary" role="status" aria-live="polite">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-primary/60 mb-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-on-primary mb-3">
                 Estimate for {customer.name}
               </p>
               <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">
                 {failed ? `Your request is with ${business.name}` : awaitingBusiness ? 'Your estimate is being prepared' : 'Preparing your estimate'}
               </h1>
               <div className={`tape-rule-light mt-8 ${failed || slowPreparing || awaitingBusiness ? '' : 'tape-measuring'}`} aria-hidden="true" />
-              <p className="mt-6 text-sm text-on-primary/80 max-w-md">
+              <p className="mt-6 text-sm text-on-primary max-w-md">
                 {awaitingBusiness
                   ? `${business.name} will review and send it shortly.`
                   : failed
@@ -328,7 +332,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                     : `${business.name} is pricing your job from the details you sent. This usually takes a minute or two — this page updates by itself.`}
               </p>
               {!failed && !slowPreparing && (
-                <p className="mt-2 text-xs text-on-primary/60 max-w-md">
+                <p className="mt-2 text-xs text-on-primary max-w-md">
                   You can close it: we’ll email you the link as soon as it’s ready.
                 </p>
               )}
@@ -349,7 +353,6 @@ export default function QuotePage({ params }: QuotePageProps) {
           <div className="bg-background rounded-3xl shadow-document overflow-hidden">
             <Letterhead
               business={business}
-              status={status}
               reference={reference}
               customerName={customer.name}
               validUntil={validUntil}
@@ -359,12 +362,12 @@ export default function QuotePage({ params }: QuotePageProps) {
 
             {/* Provisional price instrument */}
             <div className="px-6 sm:px-10 py-10 bg-primary text-on-primary">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-primary/60 mb-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-on-primary mb-3">
                 {reason === 'pending_review' ? 'Your estimate is being prepared' : `Estimate for ${customer.name}`}
               </p>
               <p className="figure text-4xl sm:text-5xl font-medium tracking-tight">
                 <Money amount={rangeLow} currency={pricing.currency} locale={locale} />
-                <span className="text-on-primary/40 mx-2 font-light">—</span>
+                <span className="text-on-primary mx-2 font-light" aria-hidden="true">—</span>
                 <Money amount={rangeHigh} currency={pricing.currency} locale={locale} />
               </p>
 
@@ -372,18 +375,18 @@ export default function QuotePage({ params }: QuotePageProps) {
 
               {reason === 'awaiting_clarification' ? (
                 <div className="mt-6">
-                  <p className="text-sm text-on-primary/80 mb-5 max-w-md">
+                  <p className="text-sm text-on-primary mb-5 max-w-md">
                     Confirm a couple of details so we can price it for your job. It takes less than a minute.
                   </p>
                   <a
                     href={`/q/${quoteId}/clarify?token=${token}`}
-                    className="inline-block px-6 py-3.5 bg-butter text-ink font-semibold rounded-xl hover:brightness-105 active:scale-[0.99] transition"
+                    className="inline-flex min-h-[48px] items-center px-6 py-3.5 bg-on-primary text-primary font-semibold rounded-xl active:scale-[0.99] transition" data-testid="confirm-details"
                   >
                     Confirm details
                   </a>
                 </div>
               ) : (
-                <p className="mt-6 text-sm text-on-primary/80 max-w-md">
+                <p className="mt-6 text-sm text-on-primary max-w-md">
                   Your estimate is being prepared. {business.name} will review and send it shortly.
                 </p>
               )}
@@ -412,7 +415,6 @@ export default function QuotePage({ params }: QuotePageProps) {
         <div className="animate-fade-in-up bg-background rounded-3xl shadow-document overflow-hidden">
           <Letterhead
             business={business}
-            status={status}
             reference={reference}
             customerName={customer.name}
             validUntil={validUntil}
@@ -425,13 +427,13 @@ export default function QuotePage({ params }: QuotePageProps) {
           <div className="px-6 sm:px-10 py-9 bg-primary text-on-primary">
             <div className="flex items-start justify-between gap-6">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-primary/60 mb-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-on-primary mb-3">
                   {isReviewedQuote ? 'Your quote' : 'Your estimate'}{pricing.taxAmount > 0 ? ` · incl. ${pricing.taxLabel || 'tax'}` : ''}
                 </p>
                 <p className="figure text-5xl sm:text-6xl font-medium tracking-tight leading-none">
                   <Money amount={pricing.total} currency={pricing.currency} locale={locale} emphasize />
                 </p>
-                <p className="mt-4 text-[13px] leading-snug text-on-primary/75 max-w-sm">
+                <p className="mt-4 text-[13px] leading-snug text-on-primary max-w-sm">
                   {isReviewedQuote
                     ? `Reviewed and confirmed by ${business.name}.`
                     : `This is an estimate based on your photos and details. ${business.name} will review and confirm it.`}
@@ -540,38 +542,24 @@ export default function QuotePage({ params }: QuotePageProps) {
               </div>
             </section>
 
-            {/* Measurement & takeoff */}
-            {takeoffRows.length > 0 && (
-              <section className="mb-8">
+            {/* Measurement & takeoff. T-171: what was read or measured, in the customer's terms, and only
+                that: the price lines are above, once, and are not repeated here. No amounts, no rates, nothing
+                about how a quantity was fixed. The lines are built on the server (lib/customer-read.ts). */}
+            {readLines.length > 0 && (
+              <section className="mb-8" data-testid="what-was-read">
                 <div className="rounded-2xl border border-tape/40 bg-butter/40 overflow-hidden">
                   <div className="px-5 pt-4 pb-3">
                     <SectionLabel tone="tape">Measurement &amp; takeoff</SectionLabel>
                     <p className="text-xs text-text-muted -mt-1">
-                      How each part of this estimate was established.
+                      What was measured or read for this estimate.
                     </p>
                   </div>
                   <div className="tape-rule mx-5" />
-                  <div className="px-5 py-4 space-y-4">
-                    {takeoffRows.map((entry, index) => (
-                      <div key={index}>
-                        <div className="flex items-baseline gap-2 text-sm">
-                          <span className="font-medium text-text-primary">{entry.item}</span>
-                          <span className="flex-1" />
-                          <span className="figure text-text-primary whitespace-nowrap">
-                            {formatCurrency(entry.amount, pricing.currency, locale)}
-                          </span>
-                        </div>
-                        {entry.quantity !== undefined && (
-                          <p className="figure text-xs text-tertiary mt-0.5">
-                            {formatNumber(entry.quantity, locale)}{entry.unit ? ` ${unitDisplayLabel(entry.unit)}` : ''}
-                            {entry.rate !== undefined &&
-                              ` × ${formatCurrency(entry.rate, pricing.currency, locale)}${entry.unit ? `/${unitDisplayLabel(entry.unit)}` : ''}`}
-                          </p>
-                        )}
-                        <p className="text-xs text-text-muted mt-0.5">{entry.method}</p>
-                      </div>
+                  <ul className="px-5 py-4 space-y-2">
+                    {readLines.map((line) => (
+                      <li key={line} className="text-sm text-text-primary" data-testid="read-line">{line}</li>
                     ))}
-                  </div>
+                  </ul>
                 </div>
               </section>
             )}
@@ -897,20 +885,54 @@ export default function QuotePage({ params }: QuotePageProps) {
             </div>
           )}
 
-          {/* Accepted state */}
+          {/* Accepted state. T-171: one short entrance when it has just happened (250 ms, opacity and a small
+              rise; nothing under reduced motion), then what happens next in three steps. The business has no
+              setting for these words yet, so they are ours, with its name and what the customer just said. */}
           {accepted && (
-            <div className="mx-6 sm:mx-10 mb-8 bg-mint border border-primary/20 rounded-2xl p-6 text-center">
-              <div
-                className="grade-seal mx-auto mb-3"
-                style={{ color: JUNIPER, ['--seal-gap' as never]: 'var(--color-mint)' }}
-              >
-                <span className="font-display text-xl font-bold">✓</span>
-                <span className="mt-1 text-[7.5px] font-semibold uppercase tracking-[0.14em]">Accepted</span>
+            <div
+              className={`mx-6 sm:mx-10 mb-8 bg-mint border border-secondary-line rounded-2xl p-6 ${justAccepted ? 'animate-fade-in-up' : ''}`}
+              role="status"
+              data-testid="accepted"
+              data-just-accepted={justAccepted ? 'true' : 'false'}
+            >
+              <div className="text-center">
+                <div
+                  className="grade-seal mx-auto mb-3"
+                  style={{ color: JUNIPER, ['--seal-gap' as never]: 'var(--color-mint)' }}
+                >
+                  <span className="font-display text-xl font-bold">✓</span>
+                  <span className="mt-1 text-[7.5px] font-semibold uppercase tracking-[0.14em]">Accepted</span>
+                </div>
+                <h3 className="font-display text-lg font-bold text-secondary mb-1">{words.accepted}</h3>
+                <p className="text-sm text-text-secondary">Thank you. {business.name} has your details.</p>
               </div>
-              <h3 className="font-display text-lg font-bold text-primary mb-1">{words.accepted}</h3>
-              <p className="text-sm text-text-secondary">
-                Thank you! {business.name} will be in touch shortly.
-              </p>
+              <div className="mt-5 border-t border-secondary-line pt-5" data-testid="what-happens-next">
+                <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-text-secondary">What happens next</h4>
+                <ol className="mt-3 space-y-3">
+                  {[
+                    {
+                      title: `${business.name} gets in touch`,
+                      text: justAccepted ? `They will call or text you on ${justAccepted.phone}.` : 'They will call or text you on the number you gave.',
+                    },
+                    {
+                      title: 'You agree a time',
+                      text: justAccepted ? `For a visit or to book the job. You said: ${justAccepted.timing.charAt(0).toLowerCase()}${justAccepted.timing.slice(1)}.` : 'For a visit or to book the job, at a time that suits you.',
+                    },
+                    {
+                      title: 'The job',
+                      text: `${business.name} does the work set out above. Nothing is charged today.`,
+                    },
+                  ].map((step, i) => (
+                    <li key={step.title} className="flex gap-3" data-testid="next-step">
+                      <span className="figure flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-secondary text-xs text-secondary" aria-hidden="true">{i + 1}</span>
+                      <span className="min-w-0 text-sm">
+                        <span className="block font-semibold text-text-primary">{step.title}</span>
+                        <span className="block text-text-secondary">{step.text}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
             </div>
           )}
         </div>
@@ -923,9 +945,12 @@ export default function QuotePage({ params }: QuotePageProps) {
 
 /* ================= document pieces ================= */
 
+/**
+ * T-171: no status pill here ("Viewed", "Under review" were the database's
+ * words). The line under the price says where the estimate stands.
+ */
 function Letterhead({
   business,
-  status,
   reference,
   customerName,
   validUntil,
@@ -941,7 +966,6 @@ function Letterhead({
     email?: string | null
     website?: string | null
   }
-  status: QuoteStatus
   reference?: string | null
   customerName: string
   validUntil?: string | null
@@ -965,7 +989,7 @@ function Letterhead({
             <p className="mt-1 text-xs text-text-secondary">{business.tagline}</p>
           )}
           {contactParts.length > 0 && (
-            <p className="mt-1 text-[11px] text-text-muted">
+            <p className="mt-1 text-xs text-text-muted">
               {contactParts.join(' · ')}
             </p>
           )}
@@ -985,7 +1009,6 @@ function Letterhead({
               PDF
             </a>
           )}
-          <StatusBadge status={status} />
         </div>
       </div>
 
@@ -1028,12 +1051,12 @@ function RangeScale({
   const pct = span > 0 ? Math.min(96, Math.max(4, ((value - low) / span) * 100)) : 50
   return (
     <div className="mt-7 max-w-md">
-      <div className="flex justify-between text-[11px] text-on-primary/60 mb-1.5">
+      <div className="flex justify-between text-xs text-on-primary mb-1.5">
         <span className="figure">{formatCurrency(low, currency, locale)}</span>
         <span aria-hidden="true" />
         <span className="figure">{formatCurrency(high, currency, locale)}</span>
       </div>
-      <div className="relative h-2.5 rounded-full bg-white/15 overflow-visible">
+      <div className="relative h-2.5 rounded-full bg-on-primary/20 overflow-visible">
         <div
           className="absolute inset-y-0 left-0 rounded-full bg-butter/80"
           style={{ width: `${pct}%` }}
@@ -1062,38 +1085,11 @@ function DocumentFooter({
         </p>
       )}
       {showPoweredBy && (
-        <p className="text-[11px] text-text-muted">
+        <p className="text-xs text-text-muted" data-testid="prepared-with">
           <span className="figure">Prepared with {PRODUCT_NAME}</span>
         </p>
       )}
     </div>
-  )
-}
-
-function StatusBadge({ status }: { status: QuoteStatus }) {
-  const statusConfig: Record<QuoteStatus, { label: string; className: string }> = {
-    queued: { label: 'Preparing', className: 'bg-butter text-tertiary' },
-    generating: { label: 'Preparing', className: 'bg-butter text-tertiary' },
-    pending_review: { label: 'Under review', className: 'bg-butter text-tertiary' },
-    awaiting_clarification: { label: 'Awaiting info', className: 'bg-butter text-tertiary' },
-    sent: { label: 'Ready to review', className: 'bg-mint text-primary' },
-    viewed: { label: 'Viewed', className: 'bg-mint text-primary' },
-    feedback_received: { label: 'Feedback received', className: 'bg-butter text-tertiary' },
-    revised: { label: 'Updated', className: 'bg-mint text-primary' },
-    accepted: { label: 'Accepted', className: 'bg-secondary-light text-secondary' },
-    declined: { label: 'Declined', className: 'bg-surface text-text-muted' },
-    paid: { label: 'Paid', className: 'bg-secondary-light text-secondary' },
-    expired: { label: 'Expired', className: 'bg-surface text-text-muted' },
-    // Customer-facing: a failed run is the business's problem, not an error to show
-    failed: { label: 'Received', className: 'bg-surface text-text-muted' },
-  }
-
-  const config = statusConfig[status] || statusConfig.sent
-
-  return (
-    <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${config.className}`}>
-      {config.label}
-    </span>
   )
 }
 

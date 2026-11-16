@@ -108,6 +108,7 @@ T-146 additions to this response:
 	•	`estimateRange`: `{ "low", "high" }` only on an unreviewed estimate with uncertain quantities. No label.
 	•	`provisional` while `pending_review`: only when the engine measured a range. A flat price shows no number until it is approved.
 	•	`pricing` NEVER carries `estimate` (grade/label/description), and `takeoff[]` rows carry no `evidence`. Both are business-only (`GET /api/quotes/:id`).
+	•	T-171: `read?: string[]` is what was read or measured for the quote, in the customer's terms, a sentence each (`"From your tank's rating label: 50 gal, Natural gas"`, `"From your photos: about 919 sq ft (Exterior walls)"`). Only what is in the quote: a label reading the customer confirmed or that was used as read, a quantity a priced line took from photos or a scan. Never an amount, never the words read off a label, never a word of `customer-language.ts`. Absent when there is nothing, and withheld (like `takeoff`) while the price is a range. The customer's quote page draws these and no longer draws `takeoff` rows; `takeoff` is still returned for other readers.
 	•	The token may be the current link or the one issued before approval (`quotes.previous_token_hash`). The same applies to accept, decline, feedback, pdf and asset routes. T-157: or any earlier link of the quote (`quotes.link_token_hashes`), see "T-157 quote actions" below.
 
 POST /api/quotes/:quoteId/approve (T-146, dashboard cookie or app Bearer)

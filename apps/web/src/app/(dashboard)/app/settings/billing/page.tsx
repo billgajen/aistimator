@@ -1,7 +1,8 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
-import { formatMoney } from '@qolumns/shared'
+import { formatMoney, getPlan } from '@qolumns/shared'
+import { COMING_LATER, planLines } from '@/lib/marketing/plan-claims'
 import { useSearchParams } from 'next/navigation'
 import type { BillingResponse, PlanInfo } from '@qolumns/shared'
 
@@ -357,6 +358,9 @@ function PlanCard({
   loading: boolean
   disabled: boolean
 }) {
+  // the plan as it is defined (packages/shared/src/plans.ts), for its lines
+  const definition = getPlan(plan.id)
+  const lines = definition ? planLines(definition) : []
   return (
     <div
       className={`relative rounded-xl border p-6 ${
@@ -396,16 +400,13 @@ function PlanCard({
         </p>
       </div>
 
-      <ul className="mt-6 space-y-3">
-        <FeatureItem included={plan.features.pdfGeneration} label="PDF generation" />
-        <FeatureItem included={plan.features.emailNotifications} label="Email notifications" />
-        <FeatureItem included={plan.features.customBranding} label="Custom branding" />
-        <FeatureItem included={plan.features.prioritySupport} label="Priority support" />
-        <FeatureItem included={Boolean(plan.channels?.includes('sms'))} label="Quoting by text (SMS)" />
-        <FeatureItem included={Boolean(plan.channels?.includes('whatsapp'))} label="WhatsApp quoting" />
-        <FeatureItem included={Boolean(plan.channels?.includes('mobile_app'))} label="On-site mobile app" />
-        <FeatureItem included={Boolean(plan.features.calibrationInsights)} label="Accuracy insights" />
-        <FeatureItem included={Boolean(plan.features.lidarScanning)} label="LiDAR scanning" />
+      {/* T-171: the plan's lines come from the same list the public Pricing page reads
+          (lib/marketing/plan-claims.ts), so the two pages cannot disagree: a line that is not live yet says
+          "Coming later" here too. Every plan on offer can be chosen here, Business included. */}
+      <ul className="mt-6 space-y-3" data-testid="plan-lines">
+        {lines.map((line) => (
+          <PlanLineItem key={line.label} label={line.label} live={line.live} />
+        ))}
       </ul>
 
       <button
@@ -425,19 +426,28 @@ function PlanCard({
   )
 }
 
-function FeatureItem({ included, label }: { included: boolean; label: string }) {
+function PlanLineItem({ label, live }: { label: string; live: boolean }) {
   return (
-    <li className="flex items-center gap-2 text-sm">
-      {included ? (
-        <svg className="h-4 w-4 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <li className="flex items-start gap-2 text-sm" data-testid="plan-line" data-live={live ? 'true' : 'false'}>
+      {live ? (
+        <svg className="mt-0.5 h-4 w-4 shrink-0 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
       ) : (
-        <svg className="h-4 w-4 text-border-strong" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        // not live yet: a hollow mark and the words, never a tick
+        <svg className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <circle cx="12" cy="12" r="7" strokeWidth={2} />
         </svg>
       )}
-      <span className={included ? 'text-text-secondary' : 'text-text-muted'}>{label}</span>
+      <span className="text-text-secondary">
+        {label}
+        {!live && ' '}
+        {!live && (
+          <span className="ml-1 inline-block whitespace-nowrap rounded-full border border-field px-2 text-xs font-semibold text-text-secondary" data-testid="coming-later">
+            {COMING_LATER}
+          </span>
+        )}
+      </span>
     </li>
   )
 }

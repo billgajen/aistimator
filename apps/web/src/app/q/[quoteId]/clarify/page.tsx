@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { ClarificationQuestion } from '@qolumns/shared'
+import { parseReading, readingQuestion } from '@/lib/customer-read'
 
 /**
  * Public clarification page for customers to answer questions.
@@ -32,7 +33,7 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
       try {
         const res = await fetch(`/api/public/quotes/${quoteId}?token=${token}`)
         if (!res.ok) {
-          setError('Could not load quote details')
+          setError('We could not load this page.')
           setLoading(false)
           return
         }
@@ -40,7 +41,7 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
         const data = await res.json()
 
         if (data.status !== 'awaiting_clarification') {
-          setError('This quote is no longer awaiting clarification')
+          setError('This question has already been answered.')
           setLoading(false)
           return
         }
@@ -48,7 +49,7 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
         if (data.clarificationQuestions && data.clarificationQuestions.length > 0) {
           setQuestions(data.clarificationQuestions)
         } else {
-          setError('No questions found for this quote')
+          setError('There is nothing to answer here.')
         }
       } catch {
         setError('Failed to load questions')
@@ -120,8 +121,7 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
         <div className="max-w-md text-center">
           <h1 className="text-2xl font-extrabold text-text-primary mb-4">Thank you!</h1>
           <p className="text-text-secondary">
-            Your answers have been received. Your updated quote will be ready shortly.
-            You will receive an email when it is ready.
+            We have your answer. Your estimate will be ready shortly.
           </p>
         </div>
       </div>
@@ -143,11 +143,12 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
     <div className="min-h-screen bg-background py-12 px-4">
       <div className="max-w-lg mx-auto">
         <div className="bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.08)] p-8">
-          <h1 className="text-2xl font-extrabold text-text-primary mb-2">
-            Quick questions about your quote
+          {/* T-171: at this point the customer has an estimate, not a quote (T-146) */}
+          <h1 className="font-display text-2xl font-extrabold text-text-primary mb-2">
+            {questions.length === 1 ? 'One quick question about your estimate' : 'Quick questions about your estimate'}
           </h1>
-          <p className="text-text-muted mb-8">
-            We need a little more information to finalize your quote. It will only take a moment.
+          <p className="text-text-secondary mb-8">
+            Your answer sets the price for your job. It only takes a moment.
           </p>
 
           {error && (
@@ -157,25 +158,25 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {questions.map((q) => (
+            {questions.map((q) => {
+              // T-171: a label reading is asked in one plain sentence. The words read off the label and how
+              // they became the value are the business's to see, not the customer's (lib/customer-read.ts).
+              const reading = q.type === 'confirm_value' && q.aiValue !== undefined ? parseReading(q.evidence) : null
+              return (
               <div key={q.id} className="space-y-2">
-                <label className="block text-sm font-semibold text-text-primary">
-                  {q.question}
-                </label>
+                <p className="block text-base font-semibold text-text-primary" data-testid="question-text">
+                  {reading ? readingQuestion(String(q.aiValue), reading.where) : q.question}
+                </p>
 
                 {q.type === 'confirm_value' && q.aiValue !== undefined ? (
                   /* T-108: one-tap confirmation of the AI's extracted value */
                   <div className="space-y-2">
-                    {q.evidence && (
-                      <p className="text-xs text-text-muted italic">
-                        What we saw: {q.evidence}
-                      </p>
-                    )}
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row">
                       <button
                         type="button"
                         onClick={() => setAnswers(prev => ({ ...prev, [q.id]: String(q.aiValue) }))}
-                        className={`flex-1 px-4 py-3 rounded-md border text-sm font-semibold transition-colors ${
+                        data-testid="answer-yes"
+                        className={`flex-1 min-h-[48px] px-4 py-3 rounded-md border text-sm font-semibold transition-colors ${
                           answers[q.id] === String(q.aiValue)
                             ? 'border-secondary bg-secondary-light text-secondary'
                             : 'border-field text-text-primary hover:border-ink'
@@ -186,7 +187,8 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
                       <button
                         type="button"
                         onClick={() => setAnswers(prev => ({ ...prev, [q.id]: prev[q.id] === String(q.aiValue) || prev[q.id] === undefined ? '' : prev[q.id] || '' }))}
-                        className={`flex-1 px-4 py-3 rounded-md border text-sm font-semibold transition-colors ${
+                        data-testid="answer-no"
+                        className={`flex-1 min-h-[48px] px-4 py-3 rounded-md border text-sm font-semibold transition-colors ${
                           answers[q.id] !== undefined && answers[q.id] !== String(q.aiValue)
                             ? 'border-ink bg-surface text-text-primary'
                             : 'border-field text-text-primary hover:border-ink'
@@ -271,14 +273,15 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
                   />
                 )}
               </div>
-            ))}
+              )
+            })}
 
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3 px-4 bg-ink text-white font-semibold rounded-md hover:bg-ink-deep disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full min-h-[48px] py-3 px-4 bg-ink text-white font-semibold rounded-md hover:bg-ink-deep disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {submitting ? 'Submitting...' : 'Submit answers'}
+              {submitting ? 'Sending…' : questions.length === 1 ? 'Send my answer' : 'Send my answers'}
             </button>
           </form>
         </div>

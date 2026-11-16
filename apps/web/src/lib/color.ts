@@ -43,13 +43,31 @@ export function relativeLuminance(hex: string): number {
   return 0.2126 * linear(16) + 0.7152 * linear(8) + 0.0722 * linear(0)
 }
 
+/** WCAG contrast ratio between two hex colours (1 to 21) */
+export function contrastRatio(a: string, b: string): number {
+  const la = relativeLuminance(a)
+  const lb = relativeLuminance(b)
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+}
+
+const WHITE = '#ffffff'
+const INK = '#1B2823'
+const BLACK = '#000000'
+
 /**
  * The readable text colour to place on a given background: white on dark
- * brands, ink on light ones. Keeps any tenant colour usable — a pale brand
- * can never produce white-on-pale buttons.
+ * brands, dark on light ones.
+ *
+ * T-171: chosen by contrast, so text on a business's colour reaches 4.5:1
+ * whatever the colour is. White where white reaches it; otherwise ink where
+ * ink reaches it; otherwise black, for the narrow band of mid-tone colours
+ * (a bright blue, a bright red) on which neither does. It was "white unless
+ * the colour is lighter than 0.45", which put white on orange at 2.8:1.
  */
 export function readableTextOn(hex: string): string {
-  return relativeLuminance(hex) > 0.45 ? '#1B2823' : '#ffffff'
+  if (contrastRatio(hex, WHITE) >= 4.5) return WHITE
+  if (contrastRatio(hex, INK) >= 4.5) return INK
+  return BLACK
 }
 
 /**
@@ -65,6 +83,6 @@ export function brandStyleVars(primaryColor: string | undefined | null): CSSProp
     '--color-primary-hover': darkenHex(primaryColor, 0.18),
     '--color-on-primary': onPrimary,
     // RGB triple for Tailwind opacity modifiers (text-on-primary/60)
-    '--color-on-primary-rgb': onPrimary === '#ffffff' ? '255 255 255' : '27 40 35',
+    '--color-on-primary-rgb': onPrimary === WHITE ? '255 255 255' : onPrimary === INK ? '27 40 35' : '0 0 0',
   } as CSSProperties
 }

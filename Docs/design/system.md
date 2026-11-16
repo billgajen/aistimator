@@ -62,6 +62,11 @@ Rules:
    token that takes an alpha.
 8. **The customer's pages keep the business's own colour.** The request form and the quote page are coloured by
    the business's brand colour (`primary` is overridden there). Our accent never appears on them.
+   **Text on the business's colour is the on-colour, chosen by contrast (T-171):** white where white reaches
+   4.5:1, ink where the colour is light, and black for the narrow band of mid-tone colours on which neither does
+   (`readableTextOn` in `lib/color.ts`). On the price panel every word is that colour at full strength: no faded
+   white. A button on the panel is the panel's colours turned round (`bg-on-primary text-primary`), never a
+   yellow of ours.
 
 The owner chose yellow in T-165 (tomato and orange were the other candidates; they and the `data-accent` switch
 are gone).
@@ -189,6 +194,23 @@ prompt, what was kept and what was rejected).
   1024 px, each a row of words and picture from 640 px, stacked on a phone).
 - Tap targets are 44 px on a phone. Controls are never closer than 8 px. Nothing a person can press is under
   24 px at any width. A destructive action sits apart from the others (a rule and a wider gap), never beside them.
+- **Customer pages (T-171):**
+  - *The request form on a phone runs edge to edge* on white, with no card and no empty paper under it; from
+    640 px it is a card on paper. On the quote link page the business's name is the page's `h1` and a step's
+    title an `h2`; inside a business's own page they are `h2` and `h3`.
+  - *Where the customer is:* "Step 3 of 5" with the step's name over a bar, under 640 px; from 640 px the steps'
+    labels sit under their numbers. A label is never cut.
+  - *A question with two to five choices is rows to tap* (48 px), in the business's colour; a longer list keeps
+    the picker. The accept form's "When suits you?" is the same pattern.
+  - *A required field says "(required)" in words*, never a red asterisk alone. An optional one says "(optional)".
+  - *A field has an edge that can be seen* (`border-field`, 3:1) on white.
+  - *Nothing opens a new tab.* The quote link page moves the customer straight into the estimate (or the one
+    question); a form inside a business's page shows the estimate itself and its link replaces the page.
+  - *No status words.* The customer never sees "Viewed" or "Under review"; the line under the price says where
+    the estimate stands.
+  - *A fact is shown once.* The price lines are in the breakdown; what was read or measured is in its own block
+    with no amounts.
+  - *"Powered by" and "Prepared with"* are 12 px in `text-muted`.
 - **The dashboard quote page reads in one order** (T-169): the next step, what the AI understood (with the
   customer's photos), the price, then the rest in one card divided by rules. The total is the mono figure at
   `text-4xl`. A new block on that page goes into one of those four, not into a box of its own.
@@ -236,7 +258,10 @@ Rules:
      on the page from the first paint; it waits only when script has seen that the section is still below the
      screen and motion is allowed. It can be played again by a button.
 4. **Customer pages:** a short entrance on the estimate arriving, and feedback. The wait is the tape rule being
-   drawn (`tape-measuring`), never a pulse.
+   drawn (`tape-measuring`), never a pulse. **Accepting gets one short confirmation (T-171):** the accepted
+   block's entrance, `animate-fade-in-up` (250 ms), once, only when it has just happened; nothing under reduced
+   motion. When the accept form opens it is scrolled into view (at once under reduced motion) and its first
+   field takes the focus.
 5. **An exit is quicker than its entrance.**
 6. **Reduced motion:** one global rule stills every transition and animation, ours and Tailwind's. Nothing is
    left hidden and nothing loops.

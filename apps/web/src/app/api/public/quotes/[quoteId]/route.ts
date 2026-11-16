@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import { hasCustomBranding } from '@/lib/plan-features'
+import { customerReadLines } from '@/lib/customer-read'
 import type {
   QuoteViewResponse,
   QuoteViewBusiness,
@@ -271,6 +272,18 @@ export async function GET(
 
     // T-133: locale + currency fallback come from the tenant's region
     const regionCtx = resolveRegionContext(tenant)
+    // T-171: what was read or measured, in the customer's terms (no amounts, no label text).
+    // Withheld with the takeoff while the price is still a range.
+    const read = isProvisional
+      ? []
+      : customerReadLines({
+          signals: (quote as { signals_json?: unknown }).signals_json,
+          questions: quote.clarification_questions_json,
+          answers: (quote as { clarification_answers_json?: unknown }).clarification_answers_json,
+          takeoff: content.takeoff,
+          locale: regionCtx.locale,
+        })
+
     const response: QuoteViewResponse = {
       quoteId: quote.id,
       status: quote.status,
@@ -295,6 +308,7 @@ export async function GET(
         }),
       // T-122: takeoff (withheld while provisional — exact amounts) + reference
       ...(!isProvisional && customerTakeoff.length > 0 && { takeoff: customerTakeoff }),
+      ...(read.length > 0 && { read }),
       ...(content.reference && { reference: content.reference }),
       pricing: isProvisional
         ? {

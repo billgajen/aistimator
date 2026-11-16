@@ -2,6 +2,18 @@
 
 import { useState } from 'react'
 import type { MeasurementModel, WidgetField } from '../EstimateWidget'
+import { RequiredMark, StepTitle } from '../StepTitle'
+
+/**
+ * T-171: a question with two to five choices is answered with large rows to
+ * tap, the way "When suits you?" is on the accept form. A longer list keeps
+ * the picker, where a row each would fill the screen.
+ */
+export const TAP_ROWS_MAX = 5
+export const usesTapRows = (field: { type: string; options?: unknown[] }) =>
+  field.type === 'radio' || (field.type === 'select' && (field.options?.length ?? 0) >= 2 && (field.options?.length ?? 0) <= TAP_ROWS_MAX)
+const ROW = 'flex min-h-[48px] items-center gap-2.5 px-4 py-3 bg-white border border-field rounded-xl cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-mint transition'
+const BOX = 'w-[18px] h-[18px] accent-[var(--color-primary)]'
 
 /**
  * T-151: the service's own questions (and the quantity, when the business asks
@@ -115,11 +127,11 @@ export function QuestionsStep({
   }
 
   const inputErrorClass = 'border-danger/50 bg-danger-light/30 focus:ring-danger/25 focus:border-danger'
-  const inputNormalClass = 'border-border bg-background focus:ring-primary/25 focus:border-primary focus:bg-white'
+  const inputNormalClass = 'border-field bg-white focus:ring-primary/25 focus:border-primary'
 
   return (
-    <div className="p-6">
-      <h3 className="font-display text-xl font-bold text-text-primary mb-5">About the job</h3>
+    <div className="p-4 sm:p-6">
+      <StepTitle>About the job</StepTitle>
 
       <div className="space-y-4">
         {/* Quantity field - shown when measurement model asks for customer quantity */}
@@ -138,7 +150,7 @@ export function QuestionsStep({
               className={`w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${inputNormalClass}`}
             />
             <p className="mt-1 text-xs text-text-muted">
-              This helps us provide a more accurate estimate
+              Your estimate is worked out from this
             </p>
           </div>
         )}
@@ -148,11 +160,11 @@ export function QuestionsStep({
           const fieldClass = hasError ? inputErrorClass : inputNormalClass
 
           return (
-            <div key={field.fieldId}>
-              <label className="block text-[13px] font-semibold text-text-primary mb-1.5">
+            <div key={field.fieldId} data-testid="question" data-kind={usesTapRows(field) ? 'rows' : field.type}>
+              <p className="block text-[13px] font-semibold text-text-primary mb-1.5" id={`q-${field.fieldId}`}>
                 {field.label}
-                {field.required && <span className="text-danger ml-1">*</span>}
-              </label>
+                {field.required && <RequiredMark />}
+              </p>
 
               {/* Text input */}
               {field.type === 'text' && (
@@ -162,6 +174,8 @@ export function QuestionsStep({
                   onChange={(e) => onFieldChange(field.fieldId, e.target.value)}
                   onBlur={() => handleFieldBlur(field.fieldId)}
                   placeholder={field.placeholder}
+                  aria-labelledby={`q-${field.fieldId}`}
+                  aria-required={field.required || undefined}
                   className={`w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
                 />
               )}
@@ -173,6 +187,8 @@ export function QuestionsStep({
                   onChange={(e) => onFieldChange(field.fieldId, e.target.value)}
                   onBlur={() => handleFieldBlur(field.fieldId)}
                   placeholder={field.placeholder}
+                  aria-labelledby={`q-${field.fieldId}`}
+                  aria-required={field.required || undefined}
                   rows={3}
                   className={`w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
                 />
@@ -186,17 +202,20 @@ export function QuestionsStep({
                   onChange={(e) => onFieldChange(field.fieldId, e.target.value ? Number(e.target.value) : '')}
                   onBlur={() => handleFieldBlur(field.fieldId)}
                   placeholder={field.placeholder}
+                  aria-labelledby={`q-${field.fieldId}`}
+                  aria-required={field.required || undefined}
                   className={`w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
                 />
               )}
 
-              {/* Select dropdown */}
-              {field.type === 'select' && field.options && (
+              {/* A long list: the picker */}
+              {field.type === 'select' && field.options && !usesTapRows(field) && (
                 <select
+                  aria-labelledby={`q-${field.fieldId}`}
                   value={(answers[field.fieldId] as string) || ''}
                   onChange={(e) => onFieldChange(field.fieldId, e.target.value)}
                   onBlur={() => handleFieldBlur(field.fieldId)}
-                  className={`w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
+                  className={`w-full min-h-[48px] px-4 py-3 text-base border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
                 >
                   <option value="">Select...</option>
                   {field.options.map((opt) => (
@@ -207,20 +226,27 @@ export function QuestionsStep({
                 </select>
               )}
 
-              {/* Radio buttons */}
-              {field.type === 'radio' && field.options && (
-                <div className="space-y-2 mt-1">
+              {/* Two to five choices (and every radio question): rows to tap */}
+              {usesTapRows(field) && field.options && (
+                <div className="space-y-2 mt-1" role="radiogroup" aria-labelledby={`q-${field.fieldId}`} data-testid="tap-rows">
                   {field.options.map((opt) => (
-                    <label key={opt.value} className="flex items-center gap-2.5 px-4 py-3 bg-white border border-border rounded-xl cursor-pointer hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-mint transition">
+                    <label key={opt.value} className={ROW} data-testid="tap-row">
                       <input
                         type="radio"
                         name={field.fieldId}
                         value={opt.value}
                         checked={(answers[field.fieldId] as string) === opt.value}
-                        onChange={(e) => onFieldChange(field.fieldId, e.target.value)}
-                        className="w-[18px] h-[18px] text-primary border-border-strong focus:ring-primary/25 accent-[#205E56]"
+                        onChange={(e) => {
+                          onFieldChange(field.fieldId, e.target.value)
+                          setErrors((prev) => {
+                            const updated = { ...prev }
+                            delete updated[field.fieldId]
+                            return updated
+                          })
+                        }}
+                        className={BOX}
                       />
-                      <span className="text-sm text-text-secondary">{opt.label}</span>
+                      <span className="text-sm text-text-primary">{opt.label}</span>
                     </label>
                   ))}
                 </div>
@@ -232,14 +258,14 @@ export function QuestionsStep({
                   {field.options.map((opt) => {
                     const currentValues = (answers[field.fieldId] as string[]) || []
                     return (
-                      <label key={opt.value} className="flex items-center gap-2.5 px-4 py-3 bg-white border border-border rounded-xl cursor-pointer hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-mint transition">
+                      <label key={opt.value} className={ROW}>
                         <input
                           type="checkbox"
                           checked={currentValues.includes(opt.value)}
                           onChange={(e) => handleCheckboxChange(field.fieldId, opt.value, e.target.checked)}
-                          className="w-[18px] h-[18px] rounded-sm border-border-strong text-primary focus:ring-primary/25 accent-[#205E56]"
+                          className={`${BOX} rounded-sm`}
                         />
-                        <span className="text-sm text-text-secondary">{opt.label}</span>
+                        <span className="text-sm text-text-primary">{opt.label}</span>
                       </label>
                     )
                   })}
@@ -248,14 +274,14 @@ export function QuestionsStep({
 
               {/* Boolean (single checkbox) */}
               {field.type === 'boolean' && (
-                <label className="flex items-center gap-2.5 px-4 py-3 bg-white border border-border rounded-xl cursor-pointer hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-mint transition">
+                <label className={ROW}>
                   <input
                     type="checkbox"
                     checked={(answers[field.fieldId] as boolean) || false}
                     onChange={(e) => onFieldChange(field.fieldId, e.target.checked)}
-                    className="w-[18px] h-[18px] rounded-sm border-border-strong text-primary focus:ring-primary/25 accent-[#205E56]"
+                    className={`${BOX} rounded-sm`}
                   />
-                  <span className="text-sm text-text-secondary">{field.helpText || 'Yes'}</span>
+                  <span className="text-sm text-text-primary">{field.helpText || 'Yes'}</span>
                 </label>
               )}
 
@@ -277,7 +303,7 @@ export function QuestionsStep({
         {onBack && (
           <button
             onClick={onBack}
-            className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-xl hover:border-border-strong transition"
+            className="min-h-[48px] px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-field rounded-xl transition"
           >
             Back
           </button>

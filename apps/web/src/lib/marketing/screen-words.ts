@@ -7,15 +7,17 @@
  * These are screen text, not marketing claims: they are not written through
  * `says` (lib/marketing/ai-claims.ts).
  */
+import { customerReadLines, readingQuestion } from '../customer-read'
+
 export const SCREEN_WORDS = {
   /** The customer's question screen (app/q/[quoteId]/clarify): a reading to confirm */
   question: {
     /**
-     * The product asks "<what it is>: we read 50 gal from the tank's rating
-     * label. Is that right?". The marketing screens show the sentence without
-     * its lead-in (the owner's wording, T-167).
+     * T-171: the product's own sentence, from the function the real question
+     * page uses: "We read 50 gal from your tank's rating label. Is that
+     * right?" (T-167 wrote it out here, with "the tank's".)
      */
-    ask: (value: string, readFrom: string) => `We read ${value} from ${readFrom}. Is that right?`,
+    ask: (value: string, readFrom: string) => readingQuestion(value, readFrom),
     yes: (value: string) => `✓ Yes, ${value} is right`,
     no: 'No, let me correct it',
   },
@@ -25,8 +27,15 @@ export const SCREEN_WORDS = {
     total: 'Total',
     added: 'Added for you — detected from your description',
     takeoffTitle: 'Measurement & takeoff',
-    takeoffLead: 'How each part of this estimate was established.',
+    takeoffLead: 'What was measured or read for this estimate.',
     fromPhotos: 'From your photos',
+    /**
+     * T-171: the block's one line for a quantity measured from photos, from
+     * the function the real page's lines come from. No amount and no rate:
+     * the price is in the breakdown, once.
+     */
+    measuredLine: (row: { item: string; quantity: number; unit: string }, locale = 'en-US') =>
+      customerReadLines({ signals: null, questions: null, answers: null, takeoff: [{ ...row, method: 'From your photos' }], locale })[0] ?? '',
     /** The range a customer sees while a detail is unconfirmed */
     rangeFor: (name: string) => `Estimate for ${name}`,
     rangeLead: 'Confirm a couple of details so we can price it for your job. It takes less than a minute.',

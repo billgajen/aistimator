@@ -135,7 +135,8 @@ describe('T-164: contrast, from the values in globals.css', () => {
       expect(ratio(ROOT_TOKENS, '--color-focus', ground), ground).toBeGreaterThanOrEqual(EDGE)
     }
     // inside a juniper or brand-coloured surface the ring takes the colour that reads on it
-    expect(CSS).toMatch(/\.bg-primary \*,\s*\.bg-primary-hover \* \{\s*--color-focus: rgb\(var\(--color-on-primary-rgb, 255 255 255\)\);/)
+    // T-171: Home's closing band is juniper by its own class since T-170, so it is in the list too
+    expect(CSS).toMatch(/\.bg-primary \*,\s*\.bg-primary-hover \*,\s*(?:\/\*[\s\S]*?\*\/\s*)?\.closing-band \* \{\s*--color-focus: rgb\(var\(--color-on-primary-rgb, 255 255 255\)\);/)
     expect(contrast(WHITE, hex(ROOT_TOKENS, '--color-primary'))).toBeGreaterThanOrEqual(EDGE)
     expect(CSS).toMatch(/\.bg-ink \*,\s*\.bg-ink-deep \* \{\s*--color-focus: var\(--color-background\);/)
     expect(ratio(ROOT_TOKENS, '--color-background', '--color-ink')).toBeGreaterThanOrEqual(EDGE)

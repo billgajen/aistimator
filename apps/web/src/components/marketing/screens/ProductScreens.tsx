@@ -1,4 +1,4 @@
-import { formatMoney, formatNumber, unitDisplayLabel } from '@qolumns/shared'
+import { formatMoney } from '@qolumns/shared'
 import { brandStyleVars } from '@/lib/color'
 import { Money, SectionLabel } from '@/components/quote/document-parts'
 import { Button } from '@/components/ui/Button'
@@ -103,18 +103,16 @@ export function QuestionScreen({
 /** The estimate's "Measurement & takeoff" block: how a quantity was established */
 export function TakeoffScreen({
   rows,
-  currency = 'USD',
   locale = 'en-US',
   primaryColor,
   className = '',
 }: {
-  rows: Array<{ item: string; quantity: number; unit: string; rate: number; amount: number; method: string }>
-  currency?: string
+  /** T-171: what was measured, as the real page shows it: one sentence a row, no amount and no rate */
+  rows: Array<{ item: string; quantity: number; unit: string }>
   locale?: string
   primaryColor: string
   className?: string
 }) {
-  const money = (n: number) => formatMoney(n, currency, locale)
   return (
     <div className={`overflow-hidden rounded-2xl border border-border bg-background text-left ${className}`} style={brandStyleVars(primaryColor)} data-testid="takeoff-screen">
       <div className="px-5 pb-3 pt-4">
@@ -122,21 +120,25 @@ export function TakeoffScreen({
         <p className="-mt-1 text-xs text-text-muted">{W.estimate.takeoffLead}</p>
       </div>
       <div className="tape-rule mx-5" aria-hidden="true" />
-      <div className="space-y-4 px-5 py-4">
-        {rows.map((row) => (
-          <div key={row.item}>
-            <div className="flex items-baseline gap-2 text-sm">
-              <span className="font-medium text-text-primary">{row.item}</span>
-              <span className="flex-1" />
-              <span className="figure whitespace-nowrap text-text-primary">{money(row.amount)}</span>
-            </div>
-            <p className="figure mt-0.5 text-xs text-tertiary">
-              {formatNumber(row.quantity, locale)} {unitDisplayLabel(row.unit)} × {money(row.rate)}/{unitDisplayLabel(row.unit)}
-            </p>
-            <p className="mt-0.5 text-xs text-text-muted" data-testid="takeoff-method">{row.method}</p>
-          </div>
-        ))}
-      </div>
+      <ul className="space-y-2 px-5 py-4">
+        {rows.map((row) => {
+          const line = W.estimate.measuredLine(row, locale)
+          // the line begins with where the quantity came from: "From your photos"
+          const rest = line.startsWith(W.estimate.fromPhotos) ? line.slice(W.estimate.fromPhotos.length) : ''
+          return (
+            <li key={row.item} className="text-sm text-text-primary" data-testid="read-line">
+              {rest ? (
+                <>
+                  <span data-testid="takeoff-method">{W.estimate.fromPhotos}</span>
+                  {rest}
+                </>
+              ) : (
+                line
+              )}
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }

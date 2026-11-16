@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { checkContact, type ContactRequirement } from '@/lib/contact-rules'
+import { RequiredMark, StepTitle } from '../StepTitle'
 
 /**
  * T-151: contact details come first, straight after the service: "Where
@@ -50,14 +51,14 @@ export function ContactStep({
   const phoneRequired = requirement !== 'email'
 
   const field = (hasError: boolean) =>
-    `w-full px-4 py-3 text-[15px] bg-white border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${
-      hasError ? 'border-danger/50 focus:ring-danger/25 focus:border-danger' : 'border-border focus:ring-primary/25 focus:border-primary'
+    `w-full min-h-[48px] px-4 py-3 text-base bg-white border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${
+      hasError ? 'border-danger focus:ring-danger/25 focus:border-danger' : 'border-field focus:ring-primary/25 focus:border-primary'
     }`
   const optional = <span className="font-normal text-text-muted"> (optional)</span>
 
   return (
-    <div className="p-6">
-      <h3 className="font-display text-xl font-bold text-text-primary mb-5">Where should we send your estimate?</h3>
+    <div className="p-4 sm:p-6">
+      <StepTitle>Where should we send your estimate?</StepTitle>
       {note && (
         <p className="-mt-2 mb-4 rounded-xl border border-tape/50 bg-butter px-3 py-2 text-sm text-text-primary" role="note" data-testid="demo-contact-note">
           {note}
@@ -66,20 +67,20 @@ export function ContactStep({
 
       <div className="space-y-4">
         <div>
-          <label htmlFor="contact-name" className="block text-[13px] font-semibold text-text-primary mb-1.5">Your name</label>
-          <input id="contact-name" type="text" autoComplete="name" value={name} onChange={(e) => onNameChange(e.target.value)} className={field(Boolean(errors.name))} />
+          <label htmlFor="contact-name" className="block text-[13px] font-semibold text-text-primary mb-1.5">Your name<RequiredMark /></label>
+          <input id="contact-name" type="text" autoComplete="name" aria-required="true" value={name} onChange={(e) => onNameChange(e.target.value)} className={field(Boolean(errors.name))} />
           {errors.name && <p className="text-xs text-danger mt-1">{errors.name}</p>}
         </div>
         <div>
           <label htmlFor="contact-email" className="block text-[13px] font-semibold text-text-primary mb-1.5">
-            Email{!emailRequired && optional}
+            Email{emailRequired ? <RequiredMark /> : optional}
           </label>
           <input id="contact-email" type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => onEmailChange(e.target.value)} className={field(Boolean(errors.email))} />
           {errors.email && <p className="text-xs text-danger mt-1">{errors.email}</p>}
         </div>
         <div>
           <label htmlFor="contact-phone" className="block text-[13px] font-semibold text-text-primary mb-1.5">
-            Phone{!phoneRequired && optional}
+            Phone{phoneRequired ? <RequiredMark /> : optional}
           </label>
           <input id="contact-phone" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => onPhoneChange(e.target.value)} placeholder={phoneExample} className={field(Boolean(errors.phone))} />
           {errors.phone ? <p className="text-xs text-danger mt-1">{errors.phone}</p> : <p className="text-xs text-text-muted mt-1">{phoneHint}</p>}
@@ -92,7 +93,7 @@ export function ContactStep({
 
       <div className="flex gap-3 mt-6">
         {onBack && (
-          <button type="button" onClick={onBack} className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-xl hover:border-border-strong transition">
+          <button type="button" onClick={onBack} className="min-h-[48px] px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-field rounded-xl transition">
             Back
           </button>
         )}
