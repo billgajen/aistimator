@@ -242,8 +242,9 @@ describe('T-152: old URLs still work (the five-item menu was replaced by T-160)'
   })
 
   it('renamed pages redirect, and every old page still exists or redirects', async () => {
-    const config = (await import(join(WEB, 'next.config.js'))).default as { redirects: () => Promise<Array<{ source: string; destination: string }>> }
-    const redirects = Object.fromEntries((await config.redirects()).map((r) => [r.source, r.destination]))
+    const config = (await import(join(WEB, 'next.config.js'))).default as { redirects: () => Promise<Array<{ source: string; destination: string; has?: unknown[] }>> }
+    // T-174: the rules that send another domain name to the main address are held in t174.test.ts; these are the page renames
+    const redirects = Object.fromEntries((await config.redirects()).filter((r) => !r.has).map((r) => [r.source, r.destination]))
     // T-160: /app/services is the page again; /app/prices, /app/share and /app/widget redirect
     expect(redirects).toEqual({
       '/app/prices': '/app/services',

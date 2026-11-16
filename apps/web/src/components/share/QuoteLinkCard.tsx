@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { slugify } from '@/lib/tenant-slug'
 import { useCopy } from './useCopy'
+import { CleanLinkOffer } from './CleanLinkOffer'
 
 interface Check {
   slug: string
@@ -13,17 +14,28 @@ interface Check {
 /**
  * T-149: "Your quote link" — the address, Copy, Open, and a one-time change
  * of the readable part with live availability checking.
+ *
+ * T-174: while the link still ends in random characters (`random`), the card
+ * offers cleaner ones in place of the one-time change: that replacement is
+ * free, and the one-time change is offered again afterwards.
  */
 export function QuoteLinkCard({
   appOrigin,
   slug,
   changeable,
+  random = false,
   onChanged,
+  onReplaced,
 }: {
   appOrigin: string
   slug: string
   changeable: boolean
+  /** the link still ends in generated characters and has never been replaced */
+  random?: boolean
+  /** the one change was used */
   onChanged: (slug: string) => void
+  /** a random link was replaced for free; the one change is still there */
+  onReplaced?: (slug: string) => void
 }) {
   const link = `${appOrigin}/quote/${slug}`
   const { copy, copiedId } = useCopy()
@@ -108,7 +120,9 @@ export function QuoteLinkCard({
         </div>
       </div>
 
-      {changeable && !editing && (
+      {random && <CleanLinkOffer appOrigin={appOrigin} onChanged={(next) => onReplaced?.(next)} className="mt-4" />}
+
+      {changeable && !random && !editing && (
         <button
           type="button"
           onClick={() => {

@@ -72,7 +72,7 @@ export const PLAN_FEATURE_LINES: Partial<Record<keyof PlanFeatureSet, PlanLine>>
   priority_support: {
     label: 'Priority support',
     live: false,
-    found: 'Not offered yet: the site has no support address (SUPPORT_EMAIL is empty), so there is no support to give priority in.',
+    found: 'Not offered yet. Since T-174 there is a support address (SUPPORT_EMAIL), but no promise of a faster answer for one plan; the owner decides when this is live.',
   },
 }
 

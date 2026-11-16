@@ -18,7 +18,7 @@ export function WhatItNotices({
   range,
   business,
 }: {
-  examples: ReadonlyArray<{ id: string; title: string; text: string; screen: string }>
+  examples: ReadonlyArray<{ id: string; title: string; text: string; note?: string; screen: string }>
   /** the water heater example: the label reading */
   heater: MarketingExample
   /** the painting example: the measured wall area and the extra */
@@ -47,6 +47,11 @@ export function WhatItNotices({
         <li key={example.id} data-testid="notice" data-notice={example.id}>
           <h3 className="font-display text-xl font-bold text-text-primary sm:text-2xl">{example.title}</h3>
           <p className="mt-2 max-w-md text-text-secondary">{example.text}</p>
+          {example.note && (
+            <p className="mt-2 max-w-md text-sm text-text-secondary" data-testid="notice-note">
+              {example.note}
+            </p>
+          )}
           <Picture label={example.screen} className="mt-5 max-w-md">
             {screens[example.id]}
           </Picture>

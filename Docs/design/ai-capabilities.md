@@ -27,6 +27,16 @@ built by `apps/web/src/lib/quote-understanding.ts` from the quote's stored signa
 answers; none carries an amount. The quote checker's findings show there too, as "Worth checking" (switched on
 in T-172, for checks made with the business's money settings; section 4's `checker` row).
 
+**Home's "What it notices" (T-174).** The order is the owner's: what the customer wrote (`extras-from-description`),
+what the photos show (`photo-measurement`), then the label ("Model and size, read from a photo",
+`label-reading`: the model number is among the words read, and the size is decoded from it or read beside it),
+then the question. Under the walls example the page says "It's an estimate. Your customer checks it and you
+confirm the price." It rests on `photo-measurement` and `confirm-question`: the customer is shown the wall
+reading in every run (on the estimate, "From your photos: about 919 sq ft"), and in most runs is asked to
+confirm it before the price settles (38 confirm questions; 2 quotes priced without one). "You confirm the
+price" is the default way of sending (show, then confirm); a business can switch a service to send
+automatically. No accuracy figure, as always.
+
 ## 1. What it reads from a job (claimable)
 
 | id | What it does | When it runs | What the customer sees | What the business sees | Code | Evidence |

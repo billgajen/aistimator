@@ -279,6 +279,13 @@ Tap targets (T-169, `system.md` Layout): on a phone the controls of Home, Quotes
 Quote link are 44 px tall or more, and no control anywhere on them is under 24 px. Icon-only buttons have names
 (the back arrow, the form builder's move, remove and dismiss buttons).
 
+**Cleaner links (T-174).** A business whose link ends in random characters (its name was taken, reserved or too
+short) sees "Get a cleaner link" inside "Your quote link", in place of "Change the end of the link": up to three
+options built from its own stored details and checked free, "Type my own" with the live check, and "Use this
+link". Each option is a tap row (one button the size of its row, 44 px or more), not a small radio button. With nothing to build from, only the box to type one. It is free and leaves the one change; afterwards the
+card says what the link now is and that the old one still works. The same offer is on setup's last step, under
+the link (`components/share/CleanLinkOffer.tsx`, which asks `GET /api/tenant/slug` itself).
+
 Quote link page (T-149 + T-152; "Share" until T-160): quote link · QR code · where to put it · **Use it on WhatsApp** ("Send on WhatsApp" via
 wa.me with the link; greeting, away and quick-reply texts for the WhatsApp Business app with where to paste them;
 "Connect your WhatsApp number for full in-chat quoting (advanced)" → /app/whatsapp) · embed code · Advanced.

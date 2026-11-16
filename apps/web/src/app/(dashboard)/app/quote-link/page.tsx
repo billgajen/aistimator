@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { hasRandomLink } from '@/lib/clean-slug-server'
 import { getOrCreateTenantKey, appOriginFrom } from '@/lib/tenant-site'
 import { SharePageClient } from '@/components/share/SharePageClient'
 
@@ -22,7 +23,7 @@ export default async function SharePage() {
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('name, region, slug, slug_changed_at')
+    .select('id, name, region, slug, slug_changed_at')
     .eq('id', profile.tenant_id)
     .single()
   if (!tenant) redirect('/signup?error=account_incomplete')
@@ -37,6 +38,7 @@ export default async function SharePage() {
       region={tenant.region}
       initialSlug={tenant.slug}
       changeable={!tenant.slug_changed_at}
+      random={await hasRandomLink(createAdminClient(), tenant)}
     />
   )
 }

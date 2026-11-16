@@ -70,7 +70,7 @@ export const scenarios = [
       'Returfing costs £22 per square metre including topsoil and preparation. Closeboard fencing £85 per ' +
       'metre supplied and installed. Porcelain patio £140 per square metre. Waste removal £90 per load. ' +
       '10% discount on jobs over £5,000.',
-    customer: { name: 'Priya Raman', email: 'priya.raman.test@example.com', postcode: 'BS9 3JD' },
+    customer: { name: 'Megan Grant', email: 'megan.grant.test@example.com', postcode: 'BS9 3JD' },
     request:
       'Quite a specific list: lawn is roughly 30ft x 18ft and needs returfing. Replace about 65 feet of fence ' +
       'on the left boundary. New porcelain patio approx 12ft x 10ft where the old shed was. Can you break the ' +

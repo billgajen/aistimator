@@ -177,7 +177,7 @@ const doorRow = await fullRow(door.id)
 const formOnly = { ...(doorRow.signals_json ?? {}), signals: (((doorRow.signals_json?.signals as Row[] | undefined) ?? []) as Row[]).filter((s) => s.source === 'form') }
 const { signalRecommendations: _recs, ...contentPlain } = doorRow.content_json as Row
 const plainBreakdown = doorRow.pricing_json.breakdown.map(({ autoRecommended: _a, recommendationReason: _r, ...line }) => line)
-const plain = await copyOf(door.id, 'Priya Lindqvist', {
+const plain = await copyOf(door.id, 'Megan Grant', {
   status: 'pending_review',
   signals_json: formOnly,
   content_json: contentPlain,

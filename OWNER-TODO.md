@@ -1078,3 +1078,120 @@ Live since 2026-11-15 14:17 UTC. No price changes.
   the product backlog near the top of this file, item 10, with the WhatsApp ticket.
 - [ ] **After the deploy, send one real request with a photo through your quote link** and open the quote on
   the dashboard: the small photo should load at once, and tapping it should open the full photo.
+
+## T-174 — Move to qolumns.com, cleaner quote links, Home's examples, the sample name
+
+- **Built and on a preview. Not committed, not on production.** Preview (web only, no database, behind the Vercel
+  login): `https://estimator-paxfihzrp-gajendrans-projects-1a87e0b4.vercel.app`. On it you can see Home's
+  "What it notices" in its new order and "Megan G."; the Quote link page needs a database, so the clean-link
+  offer is in the screenshots of `verify-t174` (its results folder) and not on the preview.
+- **Done already, as the ticket asked:** the four domains are on the Vercel project. They do nothing until the
+  DNS records below are in.
+
+### Your turn: DNS (I have not touched Cloudflare)
+
+Do these in order. Steps 1 and 3 give values only you can see.
+
+1. **Postmark: add the sending domain.** Postmark → Sender Signatures → Add Domain or Signature → Add Domain →
+   `qolumns.com`. Postmark then shows a DKIM record (a Hostname ending `._domainkey` and a long Value) and the
+   Return-Path record. Keep that page open. I could not do this step: this Mac has no Postmark account token and
+   the browser is not signed in to Postmark.
+2. **Cloudflare, `qolumns.com` → DNS → Records.** Delete every record Cloudflare imported from Namecheap, then
+   add the rows marked "you" in the table.
+3. **Cloudflare, `qolumns.com` → Email → Email Routing.** Turn it on (it refuses while Namecheap's MX records
+   are still there, so do step 2 first). Add your own inbox as the destination address and click the link
+   Cloudflare emails you. Create the address `hello@qolumns.com` → that destination. Cloudflare adds its three
+   MX records, its SPF record and its own DKIM record itself, and locks them.
+4. **Cloudflare, `qolums.com` → DNS → Records.** Delete the imported records and add that domain's rows.
+5. **Postmark:** press Verify on the DKIM and the Return-Path rows. It can take a few minutes.
+6. **Tell me "DNS is in"**, and paste the DKIM Hostname Postmark gave (the name only, for example
+   `20261116123456pm._domainkey`; it is public, not a secret).
+
+**`qolumns.com`**
+
+| Do | Type | Name | Value | Proxy |
+|---|---|---|---|---|
+| Remove | A | `@` | the Namecheap parking address Cloudflare imported | |
+| Remove | CNAME | `www` | the Namecheap parking name | |
+| Remove | MX | `@` | all five `eforward1` … `eforward5.registrar-servers.com` | |
+| Remove | TXT | `@` | `v=spf1 include:spf.efwd.registrar-servers.com ~all` | |
+| Add (you) | CNAME | `@` | `737c965c43751a11.vercel-dns-017.com` | **Off** (DNS only) |
+| Add (you) | CNAME | `www` | `737c965c43751a11.vercel-dns-017.com` | **Off** (DNS only) |
+| Add (you) | TXT | the DKIM Hostname from Postmark (step 1) | the DKIM Value from Postmark | n/a |
+| Add (you) | CNAME | `pm-bounces` | `pm.mtasv.net` | **Off** (DNS only) |
+| Add (you) | TXT | `_dmarc` | `v=DMARC1; p=none;` | n/a |
+| Added by Cloudflare (step 3) | MX | `@` | `route1.mx.cloudflare.net`, `route2.mx.cloudflare.net`, `route3.mx.cloudflare.net` (Cloudflare sets the priorities) | n/a |
+| Added by Cloudflare (step 3) | TXT | `@` | `v=spf1 include:_spf.mx.cloudflare.net ~all` | n/a |
+| Added by Cloudflare (step 3) | TXT | `cf2024-1._domainkey` | Cloudflare's own key | n/a |
+
+**`qolums.com`** (the spare spelling: it only redirects, and sends no email)
+
+| Do | Type | Name | Value | Proxy |
+|---|---|---|---|---|
+| Remove | A | `@` | the Namecheap parking address | |
+| Remove | CNAME | `www` | the Namecheap parking name | |
+| Remove | MX | `@` | all five `eforward….registrar-servers.com` | |
+| Remove | TXT | `@` | `v=spf1 include:spf.efwd.registrar-servers.com ~all` | |
+| Add (you) | CNAME | `@` | `737c965c43751a11.vercel-dns-017.com` | **Off** (DNS only) |
+| Add (you) | CNAME | `www` | `737c965c43751a11.vercel-dns-017.com` | **Off** (DNS only) |
+| Add (you) | TXT | `@` | `v=spf1 -all` | n/a |
+| Add (you) | TXT | `_dmarc` | `v=DMARC1; p=reject;` | n/a |
+
+Notes on the table:
+- **Proxy off** on the four Vercel records and on `pm-bounces`. Vercel asks for DNS only so it can issue
+  its certificate, and with the proxy on Postmark cannot verify the Return-Path.
+- Both names point at Vercel with a CNAME, the root included: that is what Vercel asked for on this project
+  (`vercel domains verify`), and Cloudflare allows a CNAME at the root.
+- **SPF:** `qolumns.com` needs only Cloudflare's SPF record. Postmark does not use the root's SPF: its mail
+  passes through `pm-bounces` (the Return-Path) and DKIM.
+- **DMARC** starts at `p=none` (watch, block nothing). After a week of real emails arriving, change it to
+  `v=DMARC1; p=quarantine;`. Say if you want reports sent to an address.
+- The two `qolums.com` TXT rows tell mail servers that this domain sends no email, so nobody can fake mail
+  from it. If you would rather have one mechanism for redirects, they can be left out; the redirect does not
+  need them.
+- I could only see the imported records from outside (they sit behind Cloudflare's proxy): an A and a `www`
+  record, five MX and one TXT on each domain. If Cloudflare lists anything else it imported, delete that too.
+
+### What I do once you say the DNS is in
+
+1. Check each record resolves, and that all four names reach Vercel with a certificate.
+2. The storage bucket accepts uploads from the new address (it accepts only the old one today; without this a
+   customer's photo upload on `qolumns.com` would fail).
+3. Supabase auth: Site URL `https://qolumns.com`, both addresses allowed.
+4. Commit and push; worker `APP_URL` and Vercel `NEXT_PUBLIC_APP_URL` to `https://qolumns.com`; deploy the web
+   app. The worker itself is not redeployed (no worker code changed).
+5. Check Postmark shows the domain verified, then switch the sending address to `quotes@qolumns.com` on the
+   worker and the web app. Until then emails keep going out from `thegreatbilliom.com`, so none is lost.
+6. `verify-t174.mts --live` (read-only), then record the deploy.
+
+Steps 2 to 5 are `scripts/deploy-t174-settings.sh` (`--dry-run` shows what each sends).
+
+### For you to know or decide
+
+- [ ] **No town is stored for a business.** Setup asks for a service area as postal codes, so today's clean
+  options read like `alex-hvac-replacement`, `alex-hvac-78701` and `alex-hvac-us`, not `alex-hvac-austin`. A
+  town would need one optional question in setup ("Where are you based?"). Say if you want that ticket.
+- [ ] **"What the photos show" on Home.** I read it as the walls example and reordered the four examples you
+  have. If you meant a new example for every trade (the AI's notes on condition and access from any photo),
+  that is a fifth example with its own screen: say so.
+- [ ] **Sign-up confirmation emails do not come from Postmark.** Supabase sends them from its own built-in
+  sender, which allows only a few emails an hour and uses a Supabase address. Before real signups arrive it
+  should send through Postmark (Supabase → Authentication → SMTP, with a Postmark SMTP token). Not in this
+  ticket.
+- [ ] **Stripe webhook** (test mode) points at the old address. It keeps working. To move it: Stripe →
+  Developers → Webhooks → the endpoint → change the URL to `https://qolumns.com/api/webhooks/stripe`.
+- [ ] **`hello@qolumns.com` shows nowhere yet.** The only place that prints the support address is the
+  "Who is behind this" section on Home, which is still empty (`lib/marketing/founder.ts`). "Priority support" on
+  the Business plan stays "Coming later": having an address is not a promise of a faster answer. Say if you
+  want the address in the footer.
+- [ ] **Google and the old address.** Both addresses serve the same pages. Marketing pages should tell search
+  engines the `qolumns.com` copy is the real one (a canonical link on each). Small follow-up; say if you want it.
+- [ ] **The Meta application can start once this is live.** Use `https://qolumns.com` as the business website
+  and `https://qolumns.com/privacy` and `/terms` as the policy links. When you reach the WhatsApp webhook step,
+  the callback address is `https://qolumns.com/api/whatsapp/webhook` (the keys are still not set in production:
+  T-144 and the WhatsApp section above).
+- [ ] **Three T-174 previews are listed in Vercel:** the one above, an earlier one it replaces
+  (`estimator-drn26f0vw…`), and a failed build that serves nothing (`estimator-9qsyma87w…`, stopped on a lint
+  error in a new test). Say if you want them deleted after the deploy.
+- The T-149 note "Later (custom domain)" is this ticket. Quote links, QR codes and embed code made after the
+  switch carry `qolumns.com`; the ones already given out keep working on the old address, for good.

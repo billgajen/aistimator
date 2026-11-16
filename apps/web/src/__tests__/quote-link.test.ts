@@ -147,7 +147,7 @@ describe('T-149: "Where to put it" texts', () => {
   })
 
   it('the social bio fits an Instagram bio (150 characters) with a long link', () => {
-    const long = `https://estimator-web-phi.vercel.app/quote/${'a'.repeat(40)}`
+    const long = `https://qolumns.com/quote/${'a'.repeat(40)}`
     expect(buildShareTexts({ businessName: 'A', link: long, region: 'US' })[1]!.text.length).toBeLessThanOrEqual(150)
   })
 
@@ -178,8 +178,8 @@ describe('T-149: embed snippet', () => {
 
 describe('T-149: QR code', () => {
   it.each([
-    'https://estimator-web-phi.vercel.app/quote/alpha-painting',
-    `https://estimator-web-phi.vercel.app/quote/${'b'.repeat(40)}`,
+    'https://qolumns.com/quote/alpha-painting',
+    `https://qolumns.com/quote/${'b'.repeat(40)}`,
   ])('decodes back to the link: %s', (link) => {
     const { data, size } = qrToRgba(qrMatrix(link), 4, 4)
     const decoded = jsQR(data, size, size)

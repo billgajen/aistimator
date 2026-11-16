@@ -139,7 +139,7 @@ const PICKS: Record<string, Pick> = {
     answer: '50 gal · natural gas',
     photo: 'Tank label',
     steps: [{ name: 'Drain, removal and haul-away' }, { name: '50 gal tank water heater' }, { name: 'Natural gas connection and venting' }],
-    customerName: 'Priya S.',
+    customerName: 'Megan G.',
     reads: '50 gal',
     form: { fieldId: 'heater_location', answer: 'Garage' },
   },

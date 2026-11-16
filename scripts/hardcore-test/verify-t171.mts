@@ -551,7 +551,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
       { item: 'Ladders & staging', amount: 250, method: 'Fixed quantity' },
       { item: 'Front door repaint', quantity: 1, unit: 'item', rate: 120, amount: 120, method: 'Quantity provided by you' },
     ] }
-    const created = await sb.insert('quotes', { ...source, customer_json: { ...(source.customer_json as Row), name: 'Priya Lindqvist', email: 'priya.lindqvist@example.com' }, content_json: content, quote_token_hash: sha(token), previous_token_hash: null, link_token_hashes: [], reminder_sent_at: null })
+    const created = await sb.insert('quotes', { ...source, customer_json: { ...(source.customer_json as Row), name: 'Megan Grant', email: 'megan.grant@example.com' }, content_json: content, quote_token_hash: sha(token), previous_token_hash: null, link_token_hashes: [], reminder_sent_at: null })
     const api = expectOk('public quote', await http('GET', `${cfg.appUrl}/api/public/quotes/${created.id}?token=${token}&poll=1`))
     check('the API gives the customer one sentence for what was measured, with no amount: "From your photos: about 919.1 sq ft (Exterior walls)"', JSON.stringify(api.read) === JSON.stringify(['From your photos: about 919.1 sq ft (Exterior walls)']), api.read)
     const ctx = await contextFor(390)

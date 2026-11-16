@@ -166,7 +166,8 @@ describe('T-154: the statistics, as sourced', () => {
 describe('T-154: the founder section', () => {
   it('renders nothing while the content file is empty', () => {
     expect(FOUNDER.name).toBe('')
-    expect(SUPPORT_EMAIL).toBe('')
+    // T-174: the address exists; the section still waits for a name and a note
+    expect(SUPPORT_EMAIL).toBe('hello@qolumns.com')
     expect(founderReady()).toBe(false)
     expect(renderToStaticMarkup(createElement(FounderNote))).toBe('')
   })

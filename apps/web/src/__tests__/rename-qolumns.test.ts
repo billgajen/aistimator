@@ -219,8 +219,8 @@ describe('T-162: what is left of the earlier names', () => {
     expect(wrangler).toContain('queue = "quote-jobs"')
     // reported, not changed: the web app's fallback bucket name differs from wrangler.toml
     expect(read('apps/web/src/lib/r2.ts')).toContain(`process.env.R2_BUCKET_NAME || '${FIRST_NAME.toLowerCase()}-assets'`)
-    // the support address waits for the domain ticket
-    expect(read('packages/shared/src/brand.ts')).toContain("export const SUPPORT_EMAIL = ''")
+    // the support address waited for the domain ticket (T-174)
+    expect(read('packages/shared/src/brand.ts')).toContain("export const SUPPORT_EMAIL = 'hello@qolumns.com'")
     // "estimate" is the product concept, not the brand
     expect(read('apps/web/src/components/embed/EstimateWidget.tsx')).toContain('export function EstimateWidget')
   })

@@ -4,7 +4,8 @@
 `gemini-3.5-flash-lite` (measured at ≈3× the real wall area in T-135) and
 `gemini-2.5-pro` to `gemini-3.8-flash`. Production runs the old 2.5 code until this ships.
 
-Production: web `https://estimator-web-phi.vercel.app` (Vercel project `estimator-web`),
+Production: web `https://qolumns.com` since T-174 (Vercel project `estimator-web`; the earlier address
+`https://estimator-web-phi.vercel.app` keeps serving),
 worker `https://estimator-worker-production.billgajen.workers.dev`, Supabase `ygsuzeveesgrafgpkrev`.
 Run every command from the repo root unless the step says otherwise.
 
@@ -105,7 +106,7 @@ git push origin main
 ```
 If Vercel → estimator-web → Settings → Git shows the GitHub repo connected, the push deploys production.
 Wait for that deployment to say **Ready**. If not, run `npx vercel deploy --prod` from the repo root.
-Then open `https://estimator-web-phi.vercel.app/pricing` and check that it loads.
+Then open `https://qolumns.com/pricing` and check that it loads.
 
 ## 8. Deploy the worker
 

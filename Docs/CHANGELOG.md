@@ -15,6 +15,151 @@
 
 ## Issues & Resolutions
 
+### 2026-11-16: T-174 — Move to qolumns.com, cleaner quote links, Home's examples reordered, a new sample name (AD-052)
+
+**Status: built and on a preview. Not committed. Not on production.** The move itself waits for the owner's DNS
+records (the table is in `OWNER-TODO.md`). Preview (web only, no database, behind the Vercel login):
+`https://estimator-paxfihzrp-gajendrans-projects-1a87e0b4.vercel.app`.
+
+**Already changed in production, on the ticket's instruction (B2):** the four domains are on the Vercel project
+(`vercel domains add`): `qolumns.com` serving, and `www.qolumns.com`, `qolums.com` and `www.qolums.com` each a
+permanent (308) redirect to it. They do nothing until DNS points at Vercel. Nothing else in production was
+touched: no env var, no secret, no Supabase setting, no bucket setting, no deploy.
+
+#### Part A
+
+**A1. "What it notices" on Home** (`lib/marketing/home-copy.ts`)
+- Order: "An extra your customer asked for" (what the customer wrote), "Walls, measured from photos" (what the
+  photos show), then the label, then "When it can't tell, it asks". The label was first.
+- "A label, read" is "Model and size, read from a photo".
+- Under the walls example: "It's an estimate. Your customer checks it and you confirm the price." The first of
+  the ticket's two sentences is used because the customer is shown the wall reading: on the estimate in every
+  run, and as a question to confirm in most runs (`Docs/design/ai-capabilities.md`). It is written through
+  `says(['photo-measurement', 'confirm-question'], …)`.
+- No accuracy figure. Every sentence still names its rows of the inventory; the unit test holds the order, the
+  titles and the line.
+- **How "what the photos show" was read:** as the walls example, which is the photo example the section has.
+  The four examples are the same four, reordered. An any-trade example of what the photos show (condition,
+  access: the `photo-notes` row) would be a fifth example with its own screen; it is noted in `OWNER-TODO.md`.
+
+**A2. Cleaner quote links**
+- **What a random link is.** One that ends in the four generated characters (`alex-hvac-3f9a`) and has never
+  been replaced: the ending is there, `slug_changed_at` is empty, and the business has nothing in
+  `tenant_slug_history`. The server works this out from the business's own record
+  (`lib/clean-slug-server.ts`, `hasRandomLink`). A plain name that happens to end in four such characters
+  (`studio-2024`) is not random.
+- **No migration.** A flag column would say the same thing the three facts above already say, and the history
+  table is what makes the free replacement happen once.
+- **The options** (`lib/clean-slug.ts`, pure) are built from what the business has stored, best first: a
+  service area written as a name, the trade (the template's id without its region, or the business's own words
+  for "something else"), a service area written as a code, pairs of those, the region, and the name of its own
+  website. A word the name already says is not added twice. Each option must pass the format and reserved-word
+  rules; the server then drops any that is another business's link or a link anyone used to have, and offers
+  the first three. **No town, trade or region is written into the code** (a unit test reads the file for it).
+- **The business does not store a town.** Setup asks for a service area as postal codes or prefixes, so for a
+  business set up today the options read like `alex-hvac-replacement`, `alex-hvac-78701`, `alex-hvac-us`. A
+  service area entered as a name (the county and state mode) gives `alex-hvac-austin`. Reported, not changed.
+- **Where it is offered.** On the Quote link page, inside "Your quote link", in place of "Change the end of the
+  link"; and on setup's last step, under the link (by then the trade and service area are saved). With nothing
+  to build from, the business types its own with the live check. Signup itself has only the business's name,
+  so nothing can be built there.
+- **Free, once.** `PUT /api/tenant/slug` for a business with a random link writes the old link to the history
+  table, sets the new one and leaves `slug_changed_at` empty. The request cannot ask for this: only `slug` is
+  read from it. After the replacement the link is not random again whatever it looks like, and the one change
+  is still there. Typing its own ending is free in the same way.
+- **The rules hold.** Format, reserved words and never-reuse are the same `check()` the one change uses. The
+  old link redirects (308) and can never be taken by anyone else. The database guard that refuses a direct
+  write to `tenants.slug` is untouched.
+- API: `GET /api/tenant/slug` gained `random` and `options`; `PUT` answers `{ slug, changeable, free }`.
+
+**A3. The sample customer** is "Megan G." (`lib/marketing/examples.ts`: Home, Features, the water heater
+page, the picture on the login and signup pages). Where test data used a full name it is "Megan Grant"
+(`verify-t169`, `verify-t171`, the checker cases, two gauntlet inputs). No image, alt text or doc carried the
+old name. The demo's own customer was already "Sam Sample" and is unchanged.
+
+#### Part B
+
+**B1. Where the old address lived** (searched before anything was changed)
+
+| Place | Found | What T-174 does |
+|---|---|---|
+| Code | No address typed anywhere. Every link comes from `NEXT_PUBLIC_APP_URL` (web) or `APP_URL` (worker); the embed loader takes its address from its own script tag. Three test strings used the old address as a sample. | The test strings use the new address. A unit test fails if an address is typed outside `domains.json`. |
+| Vercel env (production) | `NEXT_PUBLIC_APP_URL`, `POSTMARK_FROM_EMAIL` | New values at the switch (`scripts/deploy-t174-settings.sh`), then a deploy. |
+| Vercel domains | only `estimator-web-phi.vercel.app` | The four domains added (done). |
+| Worker secrets | `APP_URL`, `POSTMARK_FROM_EMAIL` | New values at the switch. |
+| **Storage bucket CORS** | allows `https://estimator-web-phi.vercel.app` and localhost only | **Not in the ticket and needed:** a photo upload goes from the browser straight to storage, so from `qolumns.com` it would be refused. The script adds `https://qolumns.com` and keeps the old one. |
+| Supabase auth | Site URL and the one allowed redirect are the old address. Sign-up sends the confirmation back to the address it was opened on. | Site URL new; both addresses allowed. |
+| Supabase auth emails | sent by Supabase's own built-in sender, not Postmark; it has a low hourly limit | Not in this ticket; in `OWNER-TODO.md`. |
+| Google sign-in | not set up | Nothing. |
+| Postmark | Could not be read: this Mac holds no Postmark account token, and the browser is not signed in. The code has no Postmark webhook route, so there is no webhook address of ours to move. | The owner adds the sending domain (one step, in `OWNER-TODO.md`). |
+| Stripe (test mode) | webhook `we_1Tves…` → the old address | Keeps working (the old address serves). Moving it is one line, in `OWNER-TODO.md`. |
+| WhatsApp, Twilio, Turnstile, Upstash | no keys in production | Nothing. The WhatsApp webhook address will be the new one when it is first set. |
+| Embed loader, QR code, quote links | built from the app address setting | New ones carry the new address after the switch; old ones keep working. |
+| Mobile app | reads `EXPO_PUBLIC_API_URL`; never shipped | Nothing. |
+| Docs | `DEPLOY.md`, this file, `OWNER-TODO.md` | The live ones updated at the switch; history stays as written. |
+
+**B2. The addresses** (AD-052)
+- `packages/shared/src/domains.json` names them: `main` (`qolumns.com`), `redirects` (the three others) and
+  `previous` (`estimator-web-phi.vercel.app`). `brand.ts` exports them; `next.config.js` reads the same file.
+- The three other names redirect permanently to the main address with the path and query kept: on Vercel (set
+  on each domain, so it works from the moment DNS is in) and again in the app (`next.config.js`, so the rule is
+  in the repo and is checked locally).
+- **The old address keeps serving; it does not redirect.** The embed loader takes its address from its own
+  script tag, loads the form in a frame from that address, and only trusts messages from that address
+  (`iframe-loader.js`: `event.origin !== WIDGET_ORIGIN`). A redirect would put the form on another address and
+  its height and "submitted" messages would be thrown away. Quote links and QR codes already given out open on
+  the old address as before.
+
+**B3 and B4** are one script, `scripts/deploy-t174-settings.sh` (`--dry-run` prints what each step sends):
+`cors`, `auth`, `app-url`, `sender`. `sender` refuses to run until told Postmark has verified the domain, so no
+email is sent from an address Postmark would refuse. `SUPPORT_EMAIL` is `hello@qolumns.com` (it shows only in
+the founder section, which is still empty). The T-159 sender name rule and reply-to are untouched.
+
+**B5. DNS:** the table is in `OWNER-TODO.md`. Nothing in Cloudflare was edited.
+
+#### Verified (2026-11-16, local stack)
+
+- `verify-t174.mts`: **83/83**. It covers: the clean options and that each is free; the free replacement,
+  the redirect from the old link, the one later change and the refusal after it; reserved words, format and
+  never-reuse; that a request cannot ask for a free change; Home's order, the line and the name; the three
+  names redirecting and the main one serving (requests carry the Host a visitor's browser would send); the old
+  address serving a quote link, the embed script and its form without a redirect; what each app hands to
+  Postmark with the new settings (nothing is sent); what the script sends for auth and the bucket; and in a
+  browser the offer on the Quote link page at 390 and 1440, typing its own, setup's last step, Home, and the
+  embed code with the old address showing the form on another site at the form's height.
+- Unit tests: web 778, worker 534, mobile 11. New: `apps/web/src/__tests__/t174.test.ts` (27).
+- `pnpm lint` and `pnpm typecheck` pass. Builds: web and worker.
+- Full regression, t146 to t174, all pass: 20, 33, 29, 35, 27, 35, 66, 39, 26, 44, 31, 96, 116, 96 (t160), 77 (t162),
+  78 (t164), 148, 182 (t167), 149 (t169), 412, 97, 78, 83 (t174). **`verify-t169` was 147/149 on the first run**
+  and found a real fault (below); after the fix, the scripts that open the Quote link page or setup were run
+  again (t149, t150, t160, t162, t169, t174), not the whole set.
+- Checks changed because the behaviour changed: `ai-claims-t167.test.ts` and `verify-t167.mts` (the order of the
+  examples), `marketing-home.test.ts` and `rename-qolumns.test.ts` (the support address),
+  `dashboard-simplify.test.ts` (reads the page renames apart from the domain redirects).
+
+**Found on the way**
+- **`verify-t169` caught the new options.** They were radio buttons 16 px across, and that script's rule for the
+  Quote link page is that no control is under 24 px, and on a phone none is under 44 px tall. Making the radio
+  24 px passed the first rule and failed the second. The options are now tap rows (one button per option, the
+  size of its row, `role="radio"`), as on the set-up screens.
+- The first preview build failed: a `require()` in the new unit test, which `next build`'s lint refuses and
+  `pnpm lint` does not look at (it had passed). Fixed with an `import`. `pnpm lint` passing does not mean the
+  build's lint will.
+- A browser will not load any `.app` name over plain http, so the local check of the old address answers the
+  browser's https requests for it from the local server, with the same Host.
+
+**Not proven in production:** all of Part B. Until the DNS records are in, none of the four names reaches
+Vercel. `verify-t174.mts --live` is the read-only check to run then (DNS, the four addresses, the old address,
+the settings, and the embed code in a browser). A delivered email from the new address needs a real send.
+
+**Files:** `packages/shared/src/{domains.json,brand.ts}`, `apps/web/next.config.js`,
+`apps/web/src/lib/{clean-slug,clean-slug-server}.ts`, `apps/web/src/app/api/tenant/slug/route.ts`,
+`apps/web/src/components/share/{CleanLinkOffer,QuoteLinkCard,SharePageClient}.tsx`,
+`apps/web/src/components/onboarding/TestQuoteStep.tsx`, `apps/web/src/app/(dashboard)/app/quote-link/page.tsx`,
+`apps/web/src/lib/marketing/{home-copy,examples,plan-claims}.ts`,
+`apps/web/src/components/marketing/home/WhatItNotices.tsx`, `scripts/deploy-t174-settings.sh`,
+`scripts/hardcore-test/verify-t174.mts`, tests and docs.
+
 ### 2026-11-16: T-172 — Worker fixes: the checker knows the business's settings, small photo copies, AI timeouts, colour classes, the form's step count
 
 **Deployed 2026-11-16 18:06 UTC** (commit `c891192`), worker first, then web. No migration.
@@ -6367,6 +6512,22 @@ if (pricingResult.estimatedTotal <= 0) {
 **Rules that follow:** the original is the record: the AI, the larger view and the photo's link always use it. A small copy is not an asset (no row, no limit, never sent to the AI). Whatever deletes an original's object deletes `<key>.small` with it. Both sizes go through the same route with the same checks; there is no separate, weaker path for small pictures.
 
 **Rejected:** a `thumb_key` column (a migration for something a naming rule gives); trusting the upload's `Content-Type` header (the uploader writes it); making copies in the worker (it would add an image library to the queue consumer, and photos uploaded but never submitted would get none).
+
+---
+
+### AD-052: One main address; other names redirect; the previous address keeps serving (T-174)
+
+**Decision:** the product lives at `qolumns.com`. `www.qolumns.com`, `qolums.com` and `www.qolums.com` answer with a permanent redirect to it, path and query kept. The address the app ran at before, `estimator-web-phi.vercel.app`, keeps serving every path and never redirects. The names are in `packages/shared/src/domains.json`; the app's own links come from `NEXT_PUBLIC_APP_URL` (web) and `APP_URL` (worker), set per environment.
+
+**Why:** quote links, QR codes and embed code already given out carry the old address. A link would survive a redirect; the embed would not: its loader takes its address from its own script tag and only trusts messages from that address, so a form redirected to another address loses its height and "submitted" messages. Serving is the one choice that is safe for all three.
+
+**Rules that follow:**
+- Never type an address in code. Links are built from the app address setting; a unit test fails on a typed one.
+- A previous address is never removed or redirected while embed code that names it may be on a business's website.
+- Anything that lists allowed addresses (the storage bucket's CORS, Supabase's redirect URLs) lists the main and every previous address. A new domain is added to both before it serves.
+- Email is sent from the main domain, and only after the email provider has verified it.
+
+**Rejected:** redirecting the old address (breaks the embed, above); a flag column for "random link" (the link's ending, `slug_changed_at` and the history table already say it); redirecting in the app only (the redirect would not exist between the DNS change and the next deploy), or on Vercel only (nothing in the repo would say so and nothing could check it locally).
 
 ---
 

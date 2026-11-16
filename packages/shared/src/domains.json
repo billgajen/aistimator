@@ -1,0 +1,5 @@
+{
+  "main": "qolumns.com",
+  "redirects": ["www.qolumns.com", "qolums.com", "www.qolums.com"],
+  "previous": ["estimator-web-phi.vercel.app"]
+}

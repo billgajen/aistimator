@@ -6,7 +6,26 @@
  * it comes from here. Technical identifiers (package scope, element ids,
  * message types, the mobile slug and scheme) are lower case: see EMBED_NAMES.
  */
+import domains from './domains.json'
+
 export const PRODUCT_NAME = 'Qolumns'
+
+/**
+ * T-174: where the product lives. One file (domains.json) so the web app's
+ * redirects (next.config.js, which cannot import TypeScript), the deploy
+ * script and the checks all read the same names.
+ * - APP_DOMAIN is the main address. The app's own links never read it: they
+ *   come from NEXT_PUBLIC_APP_URL (web) and APP_URL (worker), set per
+ *   environment.
+ * - REDIRECT_DOMAINS answer with a permanent redirect to the main address,
+ *   path and query kept.
+ * - PREVIOUS_DOMAINS keep serving, with no redirect: quote links, QR codes
+ *   and embed code already given out point at them, and the embed loader
+ *   only trusts messages from the address it was loaded from.
+ */
+export const APP_DOMAIN: string = domains.main
+export const REDIRECT_DOMAINS: readonly string[] = domains.redirects
+export const PREVIOUS_DOMAINS: readonly string[] = domains.previous
 
 /**
  * T-162: the public names of the embed code — what a business's web page sees.
@@ -39,8 +58,9 @@ export const EMBED_NAMES = {
 export const DEFAULT_PRIMARY_COLOR = '#2563eb'
 
 /**
- * T-154: the support address shown on the marketing site (founder section,
- * footer). Empty until the domain is chosen: anything that shows it renders
- * nothing while it is empty, so filling it in is one edit.
+ * T-154: the support address shown on the marketing site (the founder
+ * section). Anything that shows it renders nothing while it is empty.
+ * T-174: the address is on the product's own domain (delivered by Cloudflare
+ * Email Routing to the owner's inbox).
  */
-export const SUPPORT_EMAIL = ''
+export const SUPPORT_EMAIL = 'hello@qolumns.com'

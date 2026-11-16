@@ -31,7 +31,7 @@ max_retries = 3
 # - GEMINI_API_KEY
 # - POSTMARK_API_TOKEN
 # - POSTMARK_FROM_EMAIL
-# - APP_URL (e.g., https://yourdomain.com)
+# - APP_URL (production: https://qolumns.com, T-174)
 # - CLOUDFLARE_WORKER_TOKEN (same value as the web app's; required outside local dev)
 #
 # Optional rate limit overrides:

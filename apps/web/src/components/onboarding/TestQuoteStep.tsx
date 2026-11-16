@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { formatMoney } from '@qolumns/shared'
 import { MinimumNote } from '@/components/quote/MinimumNote'
 import { useCopy } from '@/components/share/useCopy'
+import { CleanLinkOffer } from '@/components/share/CleanLinkOffer'
 
 interface TestQuote {
   id: string
@@ -45,6 +46,8 @@ export function TestQuoteStep({
   const [approved, setApproved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { copy, copiedId } = useCopy()
+  // T-174: the link shown here follows a replacement made on this step
+  const [link, setLink] = useState(quoteLink)
 
   async function openTest() {
     setOpening(true)
@@ -204,17 +207,26 @@ export function TestQuoteStep({
 
       <div className="mt-4 rounded-xl border border-border bg-surface p-5">
         <h2 className="font-semibold text-text-primary">{priced ? '3' : '2'}. Share your quote link</h2>
-        {quoteLink && (
+        {link && (
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-            <code className="min-w-0 flex-1 truncate rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary">{quoteLink}</code>
+            <code className="min-w-0 flex-1 truncate rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary" data-testid="setup-quote-link">{link}</code>
             <button
               type="button"
-              onClick={() => copy('link', quoteLink)}
+              onClick={() => copy('link', link)}
               className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
             >
               {copiedId === 'link' ? 'Copied' : 'Copy'}
             </button>
           </div>
+        )}
+        {/* T-174: a link that ends in random characters can be swapped for a clean one here, free.
+            By this step the trade and the service area are saved, so there is something to build one from. */}
+        {link && (
+          <CleanLinkOffer
+            appOrigin={link.replace(/\/quote\/[^/]*$/, '')}
+            onChanged={(slug) => setLink(link.replace(/[^/]+$/, slug))}
+            className="mt-4"
+          />
         )}
         <div className="mt-4 flex flex-wrap items-center gap-4">
           <Link

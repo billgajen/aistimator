@@ -74,7 +74,7 @@ const NOT_CLAIMS = new Map<string, string>([
   ['Read the job', 'the name of step 02; its headline and body are the claims'],
   ['read', 'the id of step 02, not text on the page'],
   ['Does the AI decide my prices?', 'a question on Pricing; its answer is the claim'],
-  ['A label, read', 'a heading; the sentence under it is the claim'],
+  ['Model and size, read from a photo', 'a heading (T-174, the owner’s words); the sentence under it is the claim'],
   ['Walls, measured from photos', 'a heading; the sentence under it is the claim'],
   ['What it notices', 'a section heading'],
   ['It reads the label', 'a step title; the sentence under it is the claim'],
@@ -194,7 +194,18 @@ describe('T-167: the message, the demo beat and "What it notices"', () => {
   })
 
   it('four examples, each beside a real screen, before "Your prices"', () => {
-    expect(NOTICES.examples.map((e) => e.id)).toEqual(['label', 'walls', 'extra', 'range'])
+    // T-174: what the customer wrote and what the photos show lead; the label is third
+    expect(NOTICES.examples.map((e) => e.id)).toEqual(['extra', 'walls', 'label', 'range'])
+    expect(NOTICES.examples.map((e) => e.title)).toEqual([
+      'An extra your customer asked for',
+      'Walls, measured from photos',
+      'Model and size, read from a photo',
+      'When it can’t tell, it asks',
+    ])
+    const walls = NOTICES.examples.find((e) => e.id === 'walls')
+    expect(walls && 'note' in walls ? walls.note : null).toBe('It’s an estimate. Your customer checks it and you confirm the price.')
+    // no accuracy figure anywhere in the section
+    expect(JSON.stringify(NOTICES)).not.toMatch(/\d\s?%|accurate|accuracy|never wrong/i)
     const section = code('apps/web/src/components/marketing/home/WhatItNotices.tsx')
     for (const screen of ['<QuestionScreen', '<TakeoffScreen', '<LedgerScreen', '<RangeScreen']) expect(section).toContain(screen)
     // no icon stands in for a screen

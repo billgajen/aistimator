@@ -19,9 +19,13 @@ export function SharePageClient(props: {
   region?: string | null
   initialSlug: string
   changeable: boolean
+  /** T-174: the link still ends in random characters, so cleaner ones are offered */
+  random?: boolean
 }) {
   const [slug, setSlug] = useState(props.initialSlug)
   const [changeable, setChangeable] = useState(props.changeable)
+  // T-174: the offer stays up after a replacement (it then says what happened); the one-time change returns on the next visit
+  const [random] = useState(Boolean(props.random))
   const link = quoteLinkUrl(props.appOrigin, slug)
 
   return (
@@ -32,10 +36,12 @@ export function SharePageClient(props: {
         appOrigin={props.appOrigin}
         slug={slug}
         changeable={changeable}
+        random={random}
         onChanged={(next) => {
           setSlug(next)
           setChangeable(false)
         }}
+        onReplaced={setSlug}
       />
 
       <section className="rounded-xl bg-surface p-6 shadow-warm">

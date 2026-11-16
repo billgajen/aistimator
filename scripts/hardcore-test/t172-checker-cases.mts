@@ -87,7 +87,7 @@ async function addService(cfg: Cfg, biz: Biz, svc: Draft, change: { minimumCharg
   return created.service.id as string
 }
 
-const customers = ['Marta Okafor', 'Dev Raman', 'Wanda Pemberton', 'Tomas Albrecht', 'Olive Hartwell', 'Noor Castellan', 'Priya Lindqvist', 'Rowan Vale']
+const customers = ['Marta Okafor', 'Dev Raman', 'Wanda Pemberton', 'Tomas Albrecht', 'Olive Hartwell', 'Noor Castellan', 'Megan Grant', 'Rowan Vale']
 const customerOf = (n: number) => { const name = customers[n % customers.length]!; return { name, email: `${name.toLowerCase().replace(/[^a-z]+/g, '.')}@example.com`, phone: '(555) 201-1212' } }
 
 export async function runCheckerCases(cfg: Cfg, sb: Sb, repeats = 1): Promise<CheckerCaseResult[]> {

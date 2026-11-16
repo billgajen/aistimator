@@ -135,27 +135,37 @@ export const CONTROL = {
  */
 export const NOTICES = {
   heading: 'What it notices',
+  /**
+   * T-174: the two every trade recognises come first (what the customer wrote,
+   * what the photos show); the label, which three trades have, is third.
+   */
   examples: [
-    {
-      id: 'label',
-      title: 'A label, read',
-      text: says(
-        ['label-reading', 'confirm-question'],
-        'It reads the capacity and fuel off a tank label, the size off a rating plate, the rating off a panel. Then it checks the reading with your customer.'
-      ),
-      screen: 'The question a customer is asked after sending a photo of a tank label: the capacity that was read from it, with “Yes, 50 gal is right” chosen.',
-    },
-    {
-      id: 'walls',
-      title: 'Walls, measured from photos',
-      text: says(['photo-measurement'], 'For exterior painting it works out the wall area from your customer’s photos, using a door as its ruler.'),
-      screen: 'Part of an estimate: the exterior walls priced by the square foot, with the area marked as worked out from the customer’s photos.',
-    },
     {
       id: 'extra',
       title: 'An extra your customer asked for',
       text: says(['extras-from-description'], 'When they write “and the trim too”, it adds your trim line, at your price.'),
       screen: 'The price breakdown of an estimate: the trim line carries a note that it was added from the customer’s description.',
+    },
+    {
+      id: 'walls',
+      title: 'Walls, measured from photos',
+      text: says(['photo-measurement'], 'For exterior painting it works out the wall area from your customer’s photos, using a door as its ruler.'),
+      /**
+       * T-174 (the owner's words). The customer is shown the wall reading to
+       * check: as a question before the price settles in most runs, and on
+       * the estimate in every run (Docs/design/ai-capabilities.md, section 1).
+       */
+      note: says(['photo-measurement', 'confirm-question'], 'It’s an estimate. Your customer checks it and you confirm the price.'),
+      screen: 'Part of an estimate: the exterior walls priced by the square foot, with the area marked as worked out from the customer’s photos.',
+    },
+    {
+      id: 'label',
+      title: 'Model and size, read from a photo',
+      text: says(
+        ['label-reading', 'confirm-question'],
+        'It reads the capacity and fuel off a tank label, the size off a rating plate, the rating off a panel. Then it checks the reading with your customer.'
+      ),
+      screen: 'The question a customer is asked after sending a photo of a tank label: the capacity that was read from it, with “Yes, 50 gal is right” chosen.',
     },
     {
       id: 'range',
