@@ -935,11 +935,16 @@ Live since 2026-11-15 14:17 UTC. No price changes.
 
 ## T-170 — Marketing photos and fixes
 
-- **Not committed and not on production.** A preview exists (behind your Vercel login):
-  `https://estimator-isubqa733-gajendrans-projects-1a87e0b4.vercel.app`
-  Everything in this ticket is on it except `/demo`, which says it is not available there (previews have no
-  database). The demo's sample photos were checked on the local stack.
-- **A live deploy would be web only:** no migration, no worker change.
+- [x] **Deployed 2026-11-16 14:40 UTC** (commit `6b2ca4a`): web only (`dpl_4qavC6PeWmPZTY8GWRZYQjc3aMwn`, serving
+  `estimator-web-phi.vercel.app`). No worker change and no migration. Checked live, read-only (nothing was sent
+  to the site): Home, Pricing and the six trade pages load; the hero photograph shows on a phone and on a
+  computer with the headline starting on it; each trade page shows its photograph; on `/demo` the painting
+  service offers "Use a sample photo" and it is the room; Pricing shows Starter and Pro with three "Coming
+  later" lines.
+- The preview is **deleted**.
+- [ ] **Try one sample photo on the live demo yourself.** The live checks may not send a request, so they
+  stopped at the button. On `/demo` pick Interior Painting or Garage Door Spring Replacement, press "Use a
+  sample photo" and finish: you should get a price in under a minute.
 - [ ] **Look at it, on your phone and on a computer:**
   1. *Home on your phone:* the painter is at the top and fades into the page; the headline is on the first
      screen.
@@ -981,4 +986,3 @@ Live since 2026-11-15 14:17 UTC. No price changes.
   1000 px and 500 px.
 - [ ] **The demo's two new sample photos cost one more AI call each time a visitor uses them** (the photo is
   read, as a customer's would be). The demo's daily cap and per-visitor limit still apply.
-- The preview stays until you say to delete it.

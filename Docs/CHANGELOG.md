@@ -17,11 +17,35 @@
 
 ### 2026-11-16: T-170 — Marketing photos and fixes: the hero at every width, "Add it anywhere", the closing band, trade page photos, demo samples, an honest Pricing page
 
-**Status: built and on a preview. Not committed. Not on production.** Preview deployment
-`dpl_BxxXTnspbeRo4CUnFxmFuVrpK46u` (behind the Vercel login; no database, so `/demo` says it is not available
-there; every other page of this ticket is on it).
+**Deployed 2026-11-16 14:40 UTC** (commit `6b2ca4a`): web only (`npx vercel deploy --prod`, deployment
+`dpl_4qavC6PeWmPZTY8GWRZYQjc3aMwn`, target production, serving `estimator-web-phi.vercel.app`). No worker deploy
+and no migration. Before it the owner decided to leave Business off the public pages (section 6).
 
-**No migration and no worker change.** A live deploy would be web only.
+Checks run after that decision, before the commit: `pnpm lint` and `pnpm typecheck` pass; unit tests web 703,
+worker 519, mobile 11; `verify-t170` 412/412, `verify-t165` 148/148, `verify-t167` 182/182. `verify-t167` was
+181/182 on its first run: one check still wanted "four or more" demo links on Pricing, a number from when three
+plans were shown (two plans have three). It now counts from the plans shown, and the whole script was run again.
+
+Live checks, read-only, 36 of 36 (a browser at 390 and 1440; every request that was not a GET was answered
+inside the browser and never reached the site, and requests to other sites were blocked):
+- `/`, `/pricing` and the six trade pages return 200.
+- Home's hero photograph shows at 390 and at 1440, behind the band with the headline starting on it: no block of
+  its own above the headline. At 390 x 844 the headline ends at 415 px. Nothing scrolls sideways.
+- The van with the QR code on it and the closing band's photograph load; each trade page shows its own
+  photograph behind its hero at both widths.
+- `/demo`: with Interior Painting chosen, "Use a sample photo" is offered at the photo step, and the photo it
+  fetches is `sample-room-to-paint.webp` (200, `image/webp`). The upload it would then start was held back, with
+  the one request the contact step makes; nothing was sent.
+- Pricing shows two plans, Starter ($49) and Pro ($99), no Business, three "Coming later" lines on Pro, and
+  "Recommended".
+
+Not proven in production: that a sample photo uploads and prices there (that needs a real request, which the
+live checks must not send; it passed on the local stack through the real pipeline, `verify-t153`), and the
+contrast figures, which were measured on the local stack from the same files.
+
+The T-170 preview (`dpl_BxxXTnspbeRo4CUnFxmFuVrpK46u`) is deleted, as the owner asked.
+
+**No migration and no worker change.**
 
 **What the owner asked for:** Home's hero photograph never as a block above the headline; "Add it anywhere" as
 three equal columns with the QR code on a van, a real phone frame and short links; a photograph behind the
