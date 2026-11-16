@@ -15,6 +15,165 @@
 
 ## Issues & Resolutions
 
+### 2026-11-16: T-170 — Marketing photos and fixes: the hero at every width, "Add it anywhere", the closing band, trade page photos, demo samples, an honest Pricing page
+
+**Status: built and on a preview. Not committed. Not on production.** Preview deployment
+`dpl_BxxXTnspbeRo4CUnFxmFuVrpK46u` (behind the Vercel login; no database, so `/demo` says it is not available
+there; every other page of this ticket is on it).
+
+**No migration and no worker change.** A live deploy would be web only.
+
+**What the owner asked for:** Home's hero photograph never as a block above the headline; "Add it anywhere" as
+three equal columns with the QR code on a van, a real phone frame and short links; a photograph behind the
+closing band; a photograph of the trade's work behind each trade page's hero; a sample photo for each demo
+service; and Pricing checked line by line against what the product does.
+
+**1. Home's hero below 1280 px** (`globals.css` "scene photographs", `HeroPhoto`)
+- **What it was (T-168):** below 1280 px the photograph was a block of its own above the headline, which pushed
+  the headline off the first screen on a phone.
+- **Now:** from 768 px the layout is the desktop's: the photograph is the band's background, the painter stays
+  74% across the screen at every width (the picture is placed at its own focus point, so he does not drift under
+  the words as the band gets taller), and the three frames sit half on it. The words' column is 24rem at 768 px
+  and 30rem at 1024 px (36rem from 1280 px, as before), with solid paper to 1.5rem past it: the fade behind the
+  words is stronger the narrower the screen. The headline is one step of the type scale smaller there, so it
+  stays in three lines beside him.
+- **Under 768 px** the photograph fills the top 24rem of the band and fades down into paper; the words start
+  13.5rem down, over the faded part. At 390 x 844 the headline ends at 415 px.
+- 1280 px and up is unchanged.
+
+**2. "Add it anywhere"** (`AddItAnywhere`, `ShortLink`, `RequestFormScreen`)
+- Three columns of one height from 1024 px, with the three titles on one grid row so the pictures start on one
+  line; each picture is 5:8 and the same size. From 640 px each is a row (words, then picture); stacked on a
+  phone. It was three pictures of three sizes, bottom-aligned.
+- **The QR code is on a van.** The van is a scene photograph of a plain white van. The code (the real one for the
+  example business's quote page, from the same encoder as the Quote link page), the business's name and "Scan
+  for an estimate" are placed on the van's flat panel in code; the code is blended so the van's own paint shows
+  through it, as a printed sign would. The image model drew no code and no lettering.
+- **A phone-shaped frame** (an ink edge, a phone's corners, the camera cut-out) holds the quote page drawn as the
+  hosted page fills a phone: the logo on its own line, then the name. The name is on one line at every width
+  (it wrapped to three lines before, beside the logo).
+- **Links are short and never break inside a word:** `ShortLink` drops "https://" and lets a link wrap only after
+  a slash. The link under the QR code used `break-all` and the one in the phone was cut with an ellipsis.
+- The website picture no longer cuts the business's name either (its menu gives way first).
+- **The link shown is the real one.** It reads `qolumns.com/quote/…` once the site's address (`NEXT_PUBLIC_APP_URL`)
+  is that domain; until then it shows the address the site really has.
+
+**3. The closing band** (`ScenePhoto`, `CLOSING_PHOTO`)
+- An evening photograph (someone on a sofa beside a lamp, looking down at a phone) is the right-hand 55% of the
+  band from 768 px, fading into juniper; the heading, the button and the link moved from the centre to the calm
+  left side. Under 768 px it fills the top of the band and the words start over its faded part. Light words on
+  solid juniper. It loads lazily, without priority.
+
+**4. Trade page heroes** (`TradeLanding`, `TRADE_PHOTOS`)
+- Each of the six has a photograph of its trade's work, treated as Home's hero is. The trade's real screen stays
+  where T-167 put it: under the words below 1024 px, beside them above, and now partly on the photograph.
+- **A choice made here:** from 1024 px the screen is in the right-hand column, which is where a hero's subject
+  would be. So there the photograph is the right-hand 60% of the band's top (23rem tall: the whole scene shows,
+  not a strip of it), the screen starts under it, 6rem on it, and the words are centred against the two. The
+  hero is taller at 1440 px than it was: by about 220 px where the screen is a form and a question (HVAC), by
+  about 60 px where it is a form alone (plumbing).
+
+**5. Demo sample photos** (`lib/demo/sample-photos.ts`, `EstimateWidget`'s demo option)
+- "Use a sample photo" adds the photo that matches the chosen service: the rating label drawn for T-153 (water
+  heaters), the springs above a garage door seen from inside, a room from its doorway. A service with no sample
+  has no button.
+- **One line of the customer's form component changed**, inside its demo-only option: the sample comes from a
+  map by service name, not one fixed file. A real business's form gets no `demo` option and is untouched.
+- Both new samples were sent through the real pipeline: each uploaded and was priced from the demo's own rates
+  ($375, $825), with no question.
+
+**6. Pricing** (`lib/marketing/plan-claims.ts`, `app/pricing/page.tsx`; the full list is
+`Docs/design/ai-capabilities.md` section 7)
+- **LiDAR room scanning on site: not live.** It needs the on-site app in a build that has never shipped. Marked
+  "Coming later".
+- **Accuracy insights from finished jobs: live**, so it stays. Analytics compares estimates with the final
+  invoices a business records. It is not held back from Starter in the code.
+- **Also not live, and marked the same way** (the plans already promise them): quoting by text, WhatsApp
+  quoting, the on-site app, multiple team members, priority support.
+- Live and unchanged: the website widget, hosted estimate pages, "Your branding on every estimate" (the plan
+  removes our badge; the logo and colour are on every plan).
+- The page's taglines, lead and description no longer name what is not live; "Most popular" is "Recommended".
+- **What a plan includes was not changed** (`plans.ts`), and neither was the dashboard's billing page.
+- **The owner's decision (2026-11-16): Business is left off the public pages until one of its own features is
+  live.** The Pricing page and Home's plan cards show Starter and Pro. `sitePlans()` in `plan-claims.ts` applies it
+  as a rule, not a list of names: a plan is shown once it has one live line that the plan below it does not have.
+  Business's own three (LiDAR, team members, priority support) are all still to come, so it is off; it comes back
+  by itself when one of them is marked live. Nothing about the plan changed: it is still defined and offered in
+  `plans.ts` at $199 with 600 quotes, the billing page still lists it, and `/signup?plan=plan_us_business` still
+  works. With two plans the cards sit as a centred pair. So the page now has three "Coming later" lines, all on
+  Pro: text messages, WhatsApp quoting, the on-site app.
+
+**7. The photographs** (`Docs/design/photos.md`)
+- Ten new ones, 14 calls, all returned an image; no scene needed a third attempt. Rejected: a "van" that was a
+  white box, a closing picture with the phone held up over the face, a plumber with the top of the head cut off,
+  a room with a delivery company's logo on two boxes.
+- Three kept pictures carry a small patch made in code (a second yellow object, a stamp on a wrench, a warning
+  tag), and one a cut (a tester with made-up lettering). No rejected image is in the repo.
+- **One file size differs from the ticket:** the van has no 2400 px file. It is never shown wider than about
+  360 px and the part kept is 1103 px wide; its files are 1000 px and 500 px.
+
+**Architectural decisions**
+- No new AD. `system.md` changed first, as it must: a photograph is behind the band at every width (never a block
+  above a headline); it fades into the band's own ground, paper or juniper; the one evening picture; anything
+  readable in a photograph is ours, in code; a name or a link is never cut or broken inside a word; the phone
+  frame.
+
+**Constraints introduced**
+- Every line of text over a photograph reaches 4.5:1 at its worst point, measured from painted pixels
+  (`verify-t170`). A new photograph or a new line over one must pass it.
+- A Pricing line is shown as included only if `plan-claims.ts` says it is live. Making one live is an edit there,
+  after the thing can be used.
+- The public pages list plans through `sitePlans()`, never `offeredPlans()` directly: a plan with no live line of
+  its own is not shown.
+- A label or a rating plate is never made with an image model.
+- Only a hero's image loads with priority.
+
+**Relation to other fixes**
+- T-168 (hero photograph): its rule "below 1280 px a block of its own" is replaced; 1280 px and up is as it was.
+  Its unit tests and `verify-t165` were updated for the new rule.
+- T-167 (what the site may claim): section 7 of `ai-capabilities.md` extends the same rule to plan lines.
+  `verify-t167` still passes, with two checks added.
+- T-154 and T-167 had both left "Pricing promises channels that are not live" for the owner; this closes it by
+  marking them, without changing the plans.
+- T-153 (the demo): `verify-t153` sends the two new samples through the real pipeline.
+- T-169: its fix for the demo frames' cut-off name is untouched; the frames' logo now has fixed dimensions.
+- AD-001: nothing here touches a price, the quote flow, the dashboard or the customer's quote page.
+
+**Checks** (the "Regression runs" rule for a marketing ticket: the scripts that cover the pages changed)
+- `verify-t170` 402/402 on the local stack, at 390, 768, 1024, 1280 and 1440: the files, Home's hero, "Add
+  it anywhere", the closing band, the six trade pages, the demo's three sample photos added in a browser, Pricing,
+  and at every width the contrast over each photograph, one priority image a page, layout shift 0, no sideways
+  scroll.
+- Contrast at the worst point across the five widths: Home's hero, line under the headline 6.57:1, headline
+  10.14:1, small line 5.17:1; closing band, heading 6.83:1, link 7.51:1; trade pages, line under the headline
+  6.57:1 on all six, headline 12.82:1 or better, the line above the headline 4.95:1 at its lowest (HVAC at 390),
+  small line 5.17:1.
+- `verify-t165` 148/148 (one check rewritten: the phone's hero), `verify-t167` 182/182 (two checks
+  added), `verify-t153` 39/39 (the two new samples added).
+- **After the owner's decision about Business** the three scripts that read the plans were changed to expect the
+  plans `sitePlans()` shows (they named three plans, nine "Coming later" lines and a row of three plan cards), and
+  were run again with lint, typecheck and the unit tests: the results are in the deploy note at the top of this
+  entry.
+- On the last run `verify-t165` first stopped at its dashboard section: a 20-second wait for a dashboard page ran
+  out just after the local web server had been restarted for the build. Run again straight away it passed in
+  full; nothing was changed in between.
+- Not run: the rest of the regression set (no pricing, quote flow, worker, email or migration change).
+- `pnpm lint` and `pnpm typecheck` pass. Unit tests: web 702, worker 519, mobile 11, all passing. The web build
+  passes.
+
+**Files**
+- New: `apps/web/src/lib/marketing/photos.ts`, `apps/web/src/lib/marketing/plan-claims.ts`,
+  `apps/web/src/lib/demo/sample-photos.ts`, `apps/web/src/components/marketing/ScenePhoto.tsx`,
+  `apps/web/src/components/marketing/ShortLink.tsx`, `apps/web/src/__tests__/marketing-t170.test.ts`,
+  `scripts/hardcore-test/verify-t170.mts`, sixteen files in `apps/web/public/photos/` and two in
+  `apps/web/public/demo/`.
+- Changed: `globals.css`, `app/page.tsx`, `TradeLanding`, `AddItAnywhere`, `RequestFormScreen`, `HeroPhoto`,
+  `HeroDemo` (the logo's dimensions), `hero-photo.ts`, `home-copy.ts`, `app/pricing/page.tsx`, `EstimateWidget`
+  and `DemoExperience` (the demo's sample option), `scripts/design/generate-hero-photos.mjs`,
+  `scripts/design/photos-to-webp.mjs`, `verify-t153.mts`, `verify-t165.mts`, `verify-t167.mts`,
+  `hero-t168.test.ts`, `public-demo.test.ts`, and the docs (`system.md`, `photos.md`, `ai-capabilities.md`,
+  `04-frontend.md`, `OWNER-TODO.md`).
+
 ### 2026-11-15: T-169 — Dashboard: what the AI understood, the customer's photos, and the phone layout
 
 **Status: built; the owner chose to ship it without the "Worth checking" group (2026-11-16).** The group is

@@ -6,6 +6,10 @@ import { brandStyleVars } from '@/lib/color'
  * colour. A still screen: it takes data, has no state and sends nothing.
  * `answerClassName`, `photoClassName` and `buttonClassName` let the home
  * page's demo bring the answer and the photo in and press the button.
+ *
+ * T-170: `page` draws it as the business's hosted quote page fills a phone:
+ * no card around it, and the logo on its own line above the name, so the
+ * name has the screen's whole width and stays on one line.
  */
 export function RequestFormScreen({
   businessName,
@@ -22,6 +26,7 @@ export function RequestFormScreen({
   answerStyle,
   photoStyle,
   buttonStyle,
+  page = false,
   className = '',
 }: {
   businessName: string
@@ -39,20 +44,35 @@ export function RequestFormScreen({
   answerStyle?: React.CSSProperties
   photoStyle?: React.CSSProperties
   buttonStyle?: React.CSSProperties
+  /** T-170: as the hosted quote page on a phone (no card; the logo above the name) */
+  page?: boolean
   className?: string
 }) {
+  const logo = logoUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element -- a small SVG shipped in public/
+    <img src={logoUrl} alt="" width={120} height={32} className="h-8 w-auto shrink-0" />
+  ) : null
   return (
-    <div className={`rounded-3xl border border-border bg-white p-6 text-left shadow-warm-lg ${className}`} style={brandStyleVars(primaryColor)} data-testid="request-form-screen">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-tertiary">Instant estimate</p>
-          <p className="font-display text-xl font-bold leading-tight text-text-primary">{businessName}</p>
+    <div
+      className={`${page ? 'flex-1 bg-white px-4 pb-5 pt-4' : 'rounded-3xl border border-border bg-white p-6 shadow-warm-lg'} text-left ${className}`}
+      style={brandStyleVars(primaryColor)}
+      data-testid="request-form-screen"
+    >
+      {page ? (
+        <div>
+          {logo}
+          <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-tertiary">Instant estimate</p>
+          <p className="whitespace-nowrap font-display text-xl font-bold leading-tight text-text-primary" data-testid="phone-business-name">{businessName}</p>
         </div>
-        {logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- a small SVG shipped in public/
-          <img src={logoUrl} alt="" className="h-8 w-auto shrink-0" />
-        ) : null}
-      </div>
+      ) : (
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-tertiary">Instant estimate</p>
+            <p className="font-display text-xl font-bold leading-tight text-text-primary">{businessName}</p>
+          </div>
+          {logo}
+        </div>
+      )}
 
       <p className="mt-5 text-sm font-medium text-text-secondary">{serviceName}</p>
       <p className="mt-3 text-sm font-semibold text-text-primary">{question}</p>

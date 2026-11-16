@@ -32,7 +32,8 @@ export interface WidgetDemoOptions {
   contact: { name: string; email: string; phone: string }
   /** Shown on the contact step, e.g. "Example details. No message will be sent." */
   contactNote: string
-  samplePhotoUrl: string
+  /** T-170: the sample photo for each service, by the service's name. A service with none shows no button */
+  samplePhotos: Readonly<Record<string, string>>
   onResult: (result: { quoteId: string; quoteViewUrl: string; serviceName: string | null }) => void
   /** The demo is over its limits: the page shows the recorded example */
   onBusy: () => void
@@ -847,7 +848,7 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
           maxDocs={widgetData.files.maxDocs}
           photoGuidance={serviceMediaConfig?.photoGuidance ?? null}
           requiredAngles={serviceMediaConfig?.requiredAngles ?? []}
-          samplePhotoUrl={demo?.samplePhotoUrl}
+          samplePhotoUrl={demo && selectedServiceData ? demo.samplePhotos[selectedServiceData.name] : undefined}
           onBack={backFrom('files') ?? (() => setStep('contact'))}
           onNext={() => {
             lead.update('photos', { assetIds: uploadedFiles.filter((f) => f.status === 'complete').map((f) => f.assetId) })
@@ -1268,6 +1269,7 @@ function FileUploadStep({
       {samplePhotoUrl && canAddPhotos && (
         <button
           type="button"
+          data-testid="use-sample-photo"
           onClick={useSamplePhoto}
           disabled={isUploading}
           className="mb-4 w-full rounded-xl border-2 border-dashed border-primary/40 bg-mint px-4 py-3 text-sm font-semibold text-primary hover:border-primary disabled:opacity-50"

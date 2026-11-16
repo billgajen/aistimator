@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { EstimateWidget } from '@/components/embed/EstimateWidget'
 import { MinimumNote } from '@/components/quote/MinimumNote'
-import { DEMO_CONTACT, DEMO_SAMPLE_PHOTO_PATH, formatMoney, freeOfferLabel, isQuoteProcessing, splitMinimum } from '@qolumns/shared'
+import { DEMO_CONTACT, formatMoney, freeOfferLabel, isQuoteProcessing, splitMinimum } from '@qolumns/shared'
+import { DEMO_SAMPLE_PHOTOS } from '@/lib/demo/sample-photos'
 import type { QuoteViewResponse } from '@qolumns/shared'
 import { RECORDED_EXAMPLE, type DemoEstimate } from '@/lib/demo/recorded-example'
 import { DEMO_NOTE, DEMO_QUESTION_NOTE } from '@/lib/marketing/site-copy'
@@ -81,7 +82,7 @@ export function DemoExperience({ tenantKey }: { tenantKey: string }) {
           demo={{
             contact: DEMO_CONTACT,
             contactNote: 'These are example details. No email or text will be sent to anyone.',
-            samplePhotoUrl: DEMO_SAMPLE_PHOTO_PATH,
+            samplePhotos: DEMO_SAMPLE_PHOTOS,
             onResult,
             onBusy: () => {
               setEstimate(RECORDED_EXAMPLE)

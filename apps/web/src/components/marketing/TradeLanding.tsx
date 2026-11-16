@@ -11,6 +11,8 @@ import { SCREEN_WORDS } from '@/lib/marketing/screen-words'
 import { RequestFormScreen } from './home/RequestFormScreen'
 import { EstimateSheet } from '@/components/quote/EstimateSheet'
 import { Picture, QuestionScreen, TakeoffScreen, LedgerScreen, PriceCheckScreen } from './screens/ProductScreens'
+import { ScenePhoto } from './ScenePhoto'
+import { TRADE_PHOTOS } from '@/lib/marketing/photos'
 
 const WRAP = 'mx-auto max-w-container px-4 sm:px-6'
 /** The example business's colour: a customer's screen is in the business's colour, never ours */
@@ -27,41 +29,51 @@ const COLOR = DEMO_PRIMARY_COLOR
  * its label, its prices. A page says only what the AI does for its trade
  * (Docs/design/ai-capabilities.md, section 5). One yellow button per screen.
  *
- * The only photograph is the sample water heater label we ship; for the other
- * label trades the photo is named, not pictured: we draw no look-alike of a
- * real rating plate.
+ * The only photograph of a label is the sample water heater label we ship;
+ * for the other label trades the photo is named, not pictured: we draw no
+ * look-alike of a real rating plate.
+ *
+ * T-170: the hero has a scene photograph of the trade's work behind it
+ * (lib/marketing/photos.ts, Docs/design/photos.md), with the same treatment as
+ * Home's hero at every width. It is a situation, never a customer or a job we
+ * priced, and the trade's real screen sits partly on it.
  */
 export function TradeLanding({ trade }: { trade: TradePage }) {
   const example = marketingExample(trade.slug)
   const business = DEMO_BUSINESS_NAME
+  const photo = TRADE_PHOTOS[trade.slug]
   return (
     <main className="min-h-screen overflow-x-clip bg-background">
       <SiteNav />
 
-      {/* Hero: the words, the one yellow button, and this trade's own screen */}
-      <section className={`${WRAP} grid items-start gap-10 pb-16 pt-8 sm:pt-14 lg:grid-cols-[1fr_minmax(0,25rem)] lg:gap-16`} data-testid="hero">
-        <div>
-          <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-secondary">{trade.eyebrow}</p>
-          <h1 className="max-w-3xl font-display text-display-sm font-extrabold text-text-primary sm:text-display-md">{trade.headline}</h1>
-          <p className="mt-4 max-w-2xl text-base text-text-secondary sm:text-lg">{trade.lede}</p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link href="/signup" className={MAIN_CTA} data-testid="hero-signup" data-cta="main">
-              {freeOfferLabel()}
-            </Link>
-            <Link href="/demo" className={QUIET_BUTTON} data-testid="hero-demo">
-              Try it as a customer
-            </Link>
+      {/* Hero: the words, the one yellow button, and this trade's own screen. T-170: behind them a photograph
+          of the trade's work, treated as Home's hero is (globals.css, "scene photographs") */}
+      <section className="hero-band trade-hero" data-testid="hero">
+        <div className={`${WRAP} hero-inner grid items-start gap-10 pb-16 pt-8 sm:pt-14 lg:grid-cols-[1fr_minmax(0,25rem)] lg:gap-16`}>
+          <div className="trade-hero-words">
+            {photo ? <ScenePhoto photo={photo} priority testId="hero-photo" /> : null}
+            <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-secondary">{trade.eyebrow}</p>
+            <h1 className="max-w-3xl font-display text-display-sm font-extrabold text-text-primary sm:text-display-md">{trade.headline}</h1>
+            <p className="mt-4 max-w-2xl text-base text-text-secondary sm:text-lg">{trade.lede}</p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <Link href="/signup" className={MAIN_CTA} data-testid="hero-signup" data-cta="main">
+                {freeOfferLabel()}
+              </Link>
+              <Link href="/demo" className={QUIET_BUTTON} data-testid="hero-demo">
+                Try it as a customer
+              </Link>
+            </div>
+            <p className="hero-small-line mt-3 text-xs text-text-muted">{TRADE_SMALL_LINE}</p>
           </div>
-          <p className="mt-3 text-xs text-text-muted">{TRADE_SMALL_LINE}</p>
+          <Picture label={trade.heroScreen} className="trade-hero-screen animate-fade-in-up mx-auto w-full max-w-[25rem] lg:mx-0" testId="trade-hero-screen">
+            <Screen kind="form" trade={trade} example={example} business={business} />
+            {example.reading ? (
+              <QuestionScreen value={example.reading.value} readFrom={example.reading.readFrom} primaryColor={COLOR} stacked className="mt-4" />
+            ) : example.measured ? (
+              <TakeoffScreen primaryColor={COLOR} rows={[{ ...example.measured, method: SCREEN_WORDS.estimate.fromPhotos }]} className="mt-4 bg-white shadow-warm-md" />
+            ) : null}
+          </Picture>
         </div>
-        <Picture label={trade.heroScreen} className="animate-fade-in-up mx-auto w-full max-w-[25rem] lg:mx-0" testId="trade-hero-screen">
-          <Screen kind="form" trade={trade} example={example} business={business} />
-          {example.reading ? (
-            <QuestionScreen value={example.reading.value} readFrom={example.reading.readFrom} primaryColor={COLOR} stacked className="mt-4" />
-          ) : example.measured ? (
-            <TakeoffScreen primaryColor={COLOR} rows={[{ ...example.measured, method: SCREEN_WORDS.estimate.fromPhotos }]} className="mt-4 bg-white shadow-warm-md" />
-          ) : null}
-        </Picture>
       </section>
 
       {/* How the price is set: three steps, each beside its real screen, alternating sides */}

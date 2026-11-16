@@ -97,3 +97,36 @@ therefore showed the reading and the customer's "Yes".
 no photo (one question, one price line from the example business's price list, one lead to approve), so it makes
 no claim about reading anything. The reading and the customer's "Yes" are shown in "What it notices" on Home, on
 Features and on the trade pages that have a label, with the sample label above.
+
+## 7. Plan lines on Pricing (T-170)
+
+Not AI claims, but the same rule: the Pricing page may show a line as included only if a business on that plan
+can use it today. What a plan includes is in `packages/shared/src/plans.ts` and is the owner's to decide; which
+of those things exist yet is in `apps/web/src/lib/marketing/plan-claims.ts`, which the page reads. A line that is
+not live is listed after the live ones and marked "Coming later"; none is dropped and none is shown as live that
+is not. Checked against the code and the production setup on 2026-11-16.
+
+| Line on Pricing | Plans | Today | What was found |
+|---|---|---|---|
+| Website widget | all | live | The embed code and the hosted quote link work on every plan. |
+| Hosted estimate pages | all | live | Every estimate has its own page. |
+| Your branding on every estimate | Pro, Business | live | Enforced by plan (`hasCustomBranding`): the "Prepared with Qolumns" badge is left off the estimate. The business's logo and colour are on every plan, Starter included, so the line promises a little more than the plan adds. |
+| Accuracy insights from finished jobs | Pro, Business | live | Analytics has the panel (T-143): it compares estimates with the final invoices a business records on a quote. **It is not held back from Starter or the free allowance**: no code checks `calibration_insights`. True for Pro and Business; not exclusive to them. |
+| Quoting by text (SMS) | Pro, Business | **coming later** | Built (`lib/sms-intake.ts`, `/app/sms`). Production runs it in test mode with no number provider, so no business has a number. |
+| WhatsApp quoting | Pro, Business | **coming later** | Built, with a setup page in the dashboard. Production has no WhatsApp keys and no conversation has ever run (section 4, `whatsapp-conversation`). Sharing the quote link in a WhatsApp chat works on every plan and is not this. |
+| On-site app for your phone | Pro, Business | **coming later** | Built (`apps/mobile`). It is in no app store and no business has it. |
+| LiDAR room scanning on site | Business | **coming later** | Built in the on-site app (T-138), in a build that has never been shipped. Nothing checks `lidar_scanning`. |
+| Multiple team members | Business | **coming later** | Not built: there is no way to invite a second person to a business. |
+| Priority support | Business | **coming later** | The site has no support address (`SUPPORT_EMAIL` is empty), so there is no support to give priority in. |
+
+**Also changed on that page:** the plans' own taglines name things that are not live ("Website, text and WhatsApp
+— plus the on-site app", "On-site measurement with LiDAR scanning"), so Pricing shows a line of its own for Pro
+and Business (`PRICING_TAGLINES`); the words under the headline no longer say "by text, and on site"; and "Most
+popular" (a claim about customers) became "Recommended" (our own advice). The dashboard's billing page still
+lists the plan definitions as they are; it was out of this ticket's scope.
+
+**The owner's decision (2026-11-16):** with these marked, Business differed from Pro only by its 600 quotes a
+month, so **Business is left off the Pricing page and Home's plan cards until one of its own lines is live**
+(`sitePlans()` in `plan-claims.ts`: a plan is shown once it has a live line the plan below it lacks). The plan
+itself is unchanged in `plans.ts`. The page therefore shows Starter and Pro, with three "Coming later" lines on
+Pro. The table above still lists Business's lines, because they are what brings it back.

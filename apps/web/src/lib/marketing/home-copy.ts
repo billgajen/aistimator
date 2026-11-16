@@ -200,6 +200,10 @@ export const ADD_IT = {
   lead: 'No website needed. Share your quote link anywhere your customers already find you: a text, a WhatsApp chat, your Google profile.',
   /** T-165: the three things shown, each as its real screen */
   screens: {
+    /** T-170: the words on the van's side, beside the QR code (ours, drawn in code) */
+    van: 'Scan for an estimate',
+    /** What the QR code is, for a screen reader; the link follows it */
+    sign: 'A QR code on the side of the van. It opens',
     page: 'A phone showing a business’s quote page, with its request form.',
     site: 'A business’s own website, with the same request form on the page.',
   },

@@ -932,3 +932,53 @@ Live since 2026-11-15 14:17 UTC. No price changes.
   4. *Services on your phone:* Edit, Disable and Delete on every row, Delete set apart.
 - [ ] **The home page demo** at tablet width: the logo sits above the business name there, so nothing is cut.
   The frames are 16 px taller on a computer because the name takes two lines beside the logo.
+
+## T-170 — Marketing photos and fixes
+
+- **Not committed and not on production.** A preview exists (behind your Vercel login):
+  `https://estimator-isubqa733-gajendrans-projects-1a87e0b4.vercel.app`
+  Everything in this ticket is on it except `/demo`, which says it is not available there (previews have no
+  database). The demo's sample photos were checked on the local stack.
+- **A live deploy would be web only:** no migration, no worker change.
+- [ ] **Look at it, on your phone and on a computer:**
+  1. *Home on your phone:* the painter is at the top and fades into the page; the headline is on the first
+     screen.
+  2. *Home on a tablet or a narrow window:* the same layout as on a computer, with the painter on the right.
+  3. *"Add it anywhere":* three pictures of one size. The QR code is on a van; point your phone at it. The
+     business's name is on one line in the phone.
+  4. *The bottom of Home:* the evening photograph behind "Your next customer could have your price tonight."
+  5. *Each trade page:* a photograph of that trade's work behind the top.
+  6. *Pricing:* two plans, Starter and Pro; three lines on Pro say "Coming later".
+- [x] **Business is off the public pages** (your decision, 2026-11-16): the Pricing page and Home's plan cards
+  show Starter and Pro. It comes back by itself when one of its own lines (LiDAR, team members, priority
+  support) is marked live in `apps/web/src/lib/marketing/plan-claims.ts`. The plan is unchanged: $199, 600
+  quotes, still on the billing page, and `/signup?plan=plan_us_business` still works for anyone who has the
+  link.
+- [ ] **"Accuracy insights from finished jobs" is on Pro and Business, but every business gets it.** Nothing in
+  the code holds it back from Starter or the free allowance. Either hold it back by plan, or list it on Starter
+  too. I left the page as the plans have it.
+- [ ] **"Your branding on every estimate"** is what Pro adds in name; what it really adds is that our "Prepared
+  with Qolumns" badge is left off. A business's logo and colour are on every plan. Say if you want the line
+  reworded.
+- [ ] **Two lines on Pricing are mine, because the plans' own taglines name things that are not live.** Pro:
+  "Everything in Starter, with more quotes and no badge of ours on your estimates". Business: "Everything in
+  Pro, with the most quotes a month". Change the words in `apps/web/src/lib/marketing/plan-claims.ts`.
+- [ ] **"Most popular" is now "Recommended".** With no customers yet, "most popular" could not be backed.
+- [ ] **The dashboard's billing page still lists the plans as they are defined** (text messages, WhatsApp, the
+  on-site app, LiDAR, with no "Coming later"). The dashboard was out of this ticket's scope.
+- [ ] **The link under the phone's address bar is the site's real address.** On production today that is
+  `estimator-web-phi.vercel.app/quote/example-home-services`, on two or three lines. It will read
+  `qolumns.com/quote/example-home-services` by itself once the site moves to that domain. I did not show a
+  domain the site does not have.
+- [ ] **On a trade page on a computer, the top is between about 60 and 220 px taller than it was.** The trade's form sits in
+  the right-hand column, which is where the photograph's subject would be, so the photograph is above it and the
+  form sits partly on it. Say if you would rather have the form further up, over the photograph.
+- [ ] **Three photographs carry a small retouch made in code**, and one a cut (the record is
+  `Docs/design/photos.md`): a second yellow object painted out of the painting picture, a stamp on the
+  plumber's wrench blurred, a warning tag covered in the garage spring sample; the electrician's picture is cut
+  above the belt. If you would rather have none retouched, those three are the ones to make again.
+- [ ] **The van's picture is not at 2400 px.** It is shown at about 360 px wide at most, so its files are
+  1000 px and 500 px.
+- [ ] **The demo's two new sample photos cost one more AI call each time a visitor uses them** (the photo is
+  read, as a customer's would be). The demo's daily cap and per-visitor limit still apply.
+- The preview stays until you say to delete it.

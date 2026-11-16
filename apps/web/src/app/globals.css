@@ -344,43 +344,171 @@
 [data-moment='waiting'] .moment-line { opacity: 0; }
 
 /* ------------------------------------------------------------
-   The home page's hero photograph (T-168; system.md, Imagery).
-   Below 1280 px it is a block of its own above the headline,
-   never behind text. From 1280 px it is the hero band's
-   full-width background: it fades into paper on the left, where
-   the words are, and the three demo frames sit half on it.
+   Scene photographs behind words (T-168, T-170; system.md, Imagery):
+   Home's hero, the hero of each trade page, Home's closing band.
+
+   From 768 px the photograph is the band's full-width background.
+   It fades into the band's own ground (paper; juniper on the
+   closing band) on the left, where the words are, and its subject
+   sits on the right. The words' column is narrower below 1280 px,
+   so the fade behind them is stronger there.
+   Under 768 px the photograph fills the top of the band and fades
+   down into the ground; the words start over the faded part. It is
+   never a block of its own above the headline.
    The fade is the one gradient the design system allows.
+
+   --ground      the band's ground, as three numbers (r g b)
+   --photo-top   how tall the photograph is under 768 px
+   --hero-text   how wide the line under the headline may be
+   --hero-edge   where that line ends, from the left of the screen
+   --hero-fade   from there, how far until the photograph is clear
    ------------------------------------------------------------ */
-.hero-band { position: relative; }
-.hero-photo { width: 100%; aspect-ratio: 3 / 2; overflow: hidden; background: var(--color-surface); }
+.hero-band { position: relative; --ground: 250 249 246; --photo-top: 24rem; }
+.hero-photo { position: absolute; top: 0; left: 0; right: 0; height: var(--photo-top); overflow: hidden; background: rgb(var(--ground)); }
 .hero-photo img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: var(--focus); }
-.hero-photo-fade { display: none; }
-@media (min-width: 640px) and (max-width: 1279px) {
-  .hero-photo { aspect-ratio: 2 / 1; }
+.hero-photo-fade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(var(--ground) / 0) 0, rgb(var(--ground) / 0) 24%, rgb(var(--ground) / 0.9) 54%, rgb(var(--ground)) 76%);
+}
+.hero-inner { position: relative; }
+@media (max-width: 767px) {
+  /* the words start over the faded part of the photograph */
+  .home-hero > .hero-inner { padding-top: 13.5rem; }
+}
+@media (min-width: 768px) {
+  .hero-band {
+    --hero-text: 24rem;
+    --hero-fade: 11rem;
+    --hero-edge: calc(max((100vw - 72rem) / 2, 0px) + 1.5rem + var(--hero-text));
+  }
+  /* the subject stays as far across the screen as it is across the photograph */
+  .hero-photo img { object-position: var(--focus-x) var(--band-y); }
+  /* solid ground to just past the end of the line under the headline, so that line is never on the picture */
+  .hero-photo-fade {
+    background: linear-gradient(90deg, rgb(var(--ground)) 0, rgb(var(--ground)) calc(var(--hero-edge) + 1.5rem), rgb(var(--ground) / 0) calc(var(--hero-edge) + var(--hero-fade)));
+  }
+  .hero-band h1 + p { max-width: var(--hero-text); }
+  .home-hero h1 { max-width: var(--hero-text); }
+  .hero-band .hero-small-line { max-width: var(--hero-text); color: var(--color-text-secondary); }
+}
+@media (min-width: 1024px) {
+  .hero-band { --hero-text: 30rem; --hero-fade: 14rem; }
 }
 @media (min-width: 1280px) {
-  /* --hero-edge: where the line under the headline ends (the page gutter, the container's own inset, then
-     36rem of text). --hero-under: from the band's bottom up to the middle of the three demo frames (the
-     band's 4rem of padding, the 4rem "Play again" row, and half of a 23.5rem frame). */
-  .hero-band {
-    --hero-edge: calc(max((100vw - 72rem) / 2, 0px) + 1.5rem + 36rem);
-    --hero-under: 19.75rem;
-  }
-  .hero-photo { position: absolute; top: 0; left: 0; right: 0; bottom: var(--hero-under); aspect-ratio: auto; }
-  .hero-photo img { object-position: right var(--band-y); }
-  /* solid paper to just past the end of the line under the headline, so that line is never on the picture */
-  .hero-photo-fade {
-    display: block;
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, var(--color-background) 0, var(--color-background) calc(var(--hero-edge) + 1.5rem), rgb(250 249 246 / 0) calc(var(--hero-edge) + 19rem));
-  }
-  .hero-inner { position: relative; }
-  .hero-band h1 + p { max-width: 36rem; }
-  .hero-band .hero-small-line { color: var(--color-text-secondary); }
-  /* a frame's label sits on the picture here, so it gets its own white ground */
-  .hero-band .demo-caption { align-self: flex-start; background: #fff; border-radius: 9999px; padding: 4px 14px 4px 4px; box-shadow: 0 1px 2px rgb(27 40 35 / 0.12); }
+  .hero-band { --hero-text: 36rem; --hero-fade: 19rem; }
 }
+
+/* Home's hero: the photograph runs from the top of the band down to the middle of the three demo frames.
+   --hero-under is from the band's bottom up to there: the band's 4rem of padding, the 4rem "Play again" row,
+   and half of a frame (the frames are taller where they are narrower). */
+@media (min-width: 768px) {
+  .home-hero { --hero-under: 24rem; }
+  .home-hero > .hero-photo { height: auto; bottom: var(--hero-under); }
+  /* a frame's label sits on the picture here, so it gets its own white ground */
+  .home-hero .demo-caption { align-self: flex-start; background: #fff; border-radius: 9999px; padding: 4px 14px 4px 4px; box-shadow: 0 1px 2px rgb(27 40 35 / 0.12); }
+}
+@media (min-width: 768px) and (max-width: 1279px) {
+  /* the headline one step of the scale smaller than the classes give it, so it stays in three lines beside the
+     painter (display-sm to 1023 px, display-md from 1024 px) */
+  .home-hero h1 { font-size: 2.5rem; line-height: 1.08; }
+}
+@media (min-width: 1024px) {
+  .home-hero { --hero-under: 21rem; }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .home-hero h1 { font-size: 3.25rem; line-height: 1.06; }
+}
+@media (min-width: 1280px) {
+  .home-hero { --hero-under: 19.75rem; }
+  /* as T-168 set it: the photograph's right edge on the screen's right edge, and the headline at its full width */
+  .home-hero > .hero-photo img { object-position: right var(--band-y); }
+  .home-hero h1 { max-width: none; }
+}
+
+/* A trade page's hero (T-170). The photograph is drawn from inside the words' block, so it can end a fixed
+   distance below the words whatever their length; it still spans the screen. The trade's own screen stays
+   where T-167 put it (under the words; beside them from 1024 px) and sits partly on the photograph. */
+.trade-hero { --hero-pt: 2rem; }
+@media (min-width: 640px) { .trade-hero { --hero-pt: 3.5rem; } }
+.trade-hero-words { position: relative; }
+.trade-hero .hero-photo { left: 50%; right: auto; width: 100vw; transform: translateX(-50%); top: calc(-1 * var(--hero-pt)); }
+.trade-hero-words > :not(.hero-photo), .trade-hero-screen { position: relative; }
+@media (max-width: 767px) {
+  .trade-hero-words { padding-top: 11.5rem; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* the photograph ends 8rem below the words; the screen starts 2.5rem below them, so it sits 5.5rem on it */
+  .trade-hero .hero-photo { height: auto; bottom: -8rem; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .trade-hero h1 { max-width: 27rem; }
+}
+@media (min-width: 1024px) {
+  /* Beside the words: the photograph is the right-hand 60% of the band's top (so the whole scene shows, not a
+     thin strip of it), fading into paper towards the words; the trade's screen sits under it, 6rem on it; the
+     words are centred against the two. --trade-photo is the photograph's height. */
+  .trade-hero { --trade-photo: 23rem; --trade-on: 6rem; }
+  .trade-hero-words { position: static; align-self: center; }
+  .trade-hero .hero-photo { top: 0; left: auto; right: calc((100% - 100vw) / 2); width: 60vw; height: var(--trade-photo); transform: none; }
+  .trade-hero .hero-photo-fade {
+    background: linear-gradient(90deg, rgb(var(--ground)) 0, rgb(var(--ground)) calc(var(--hero-edge) + 1.5rem - 40vw), rgb(var(--ground) / 0) calc(var(--hero-edge) + var(--hero-fade) - 40vw));
+  }
+  .trade-hero-screen { margin-top: calc(var(--trade-photo) - var(--trade-on) - var(--hero-pt)); }
+}
+
+/* Home's closing band (T-170): the same treatment on juniper, with light words. From 768 px the photograph
+   is the right-hand 55% of the band (so the whole scene shows, not a strip of it) and fades into juniper
+   towards the words. */
+.closing-band { --ground: 32 94 86; background: rgb(var(--ground)); --photo-top: 22rem; }
+@media (max-width: 767px) {
+  .closing-band > .hero-inner { padding-top: 15.5rem; }
+  .closing-band > .hero-photo > .hero-photo-fade {
+    background: linear-gradient(180deg, rgb(var(--ground) / 0) 0, rgb(var(--ground) / 0) 36%, rgb(var(--ground) / 0.92) 66%, rgb(var(--ground)) 84%);
+  }
+}
+@media (min-width: 768px) {
+  .closing-band > .hero-photo { left: auto; width: 55vw; height: auto; bottom: 0; }
+  .closing-band > .hero-photo > .hero-photo-fade {
+    background: linear-gradient(90deg, rgb(var(--ground)) 0, rgb(var(--ground)) 4%, rgb(var(--ground) / 0) 42%);
+  }
+  .closing-band h2 { max-width: 22rem; }
+}
+@media (min-width: 1024px) {
+  .closing-band h2 { max-width: 30rem; }
+}
+
+/* ------------------------------------------------------------
+   "Add it anywhere" on Home (T-170): three columns of one height,
+   aligned at the top, each with a picture of the same size (5:8).
+   From 1024 px the three sit side by side, and a row of the grid
+   holds the three titles so the pictures start on one line. From
+   640 px each is a row: its words, then its picture. On a phone
+   they stack.
+   ------------------------------------------------------------ */
+.add-it { display: grid; gap: 3rem; }
+.add-it-item { display: grid; gap: 1rem; align-content: start; }
+.add-it-picture { width: 100%; max-width: 20rem; aspect-ratio: 5 / 8; margin-inline: auto; }
+@media (min-width: 640px) and (max-width: 1023px) {
+  .add-it-item { grid-template-columns: minmax(0, 1fr) 20rem; align-items: center; gap: 2rem; }
+}
+@media (min-width: 1024px) {
+  .add-it { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto auto; gap: 1.25rem 2rem; }
+  .add-it-item { grid-row: span 2; grid-template-rows: subgrid; gap: 1.25rem; }
+  .add-it-picture { max-width: none; }
+}
+/* The sign on the van: the name and its line are sized from the picture's own width, so the sign keeps its
+   proportions at every size of the picture */
+.add-it-picture { container-type: inline-size; }
+.van-sign-name { font-size: clamp(0.75rem, 5.2cqw, 1.25rem); }
+.van-sign-line { font-size: clamp(0.75rem, 3.6cqw, 0.875rem); }
+/* the website picture's menu: its second word shows only where the picture is wide enough for the name too */
+.site-menu-extra { display: none; }
+@container (min-width: 21.5rem) { .site-menu-extra { display: inline; } }
+/* A phone: the one device frame on the site. Its corners are a phone's, not a step of the radius scale. */
+.phone-frame { position: relative; width: 100%; max-width: 19rem; border: 0.5rem solid var(--color-ink); border-radius: 2.5rem; background: var(--color-ink); overflow: hidden; }
+.phone-frame-screen { border-radius: 2rem; overflow: hidden; }
+.phone-frame-island { position: absolute; top: 0.6rem; left: 50%; width: 4.5rem; height: 1.15rem; transform: translateX(-50%); border-radius: 9999px; background: var(--color-ink); z-index: 1; }
 
 /* ---- T-169: the larger view of a customer's photo (dashboard quote page) ----
    The browser's own modal dialog. The page behind is dimmed with ink, so the

@@ -187,7 +187,7 @@ function BusinessHeader({ name, logoUrl }: { name: string; logoUrl: string }) {
         <p className="text-balance font-display text-base font-bold leading-tight text-text-primary" data-testid="demo-business-name">{name}</p>
       </div>
       {/* eslint-disable-next-line @next/next/no-img-element -- a small SVG shipped in public/ */}
-      <img src={logoUrl} alt="" className="h-8 w-auto shrink-0" />
+      <img src={logoUrl} alt="" width={120} height={32} className="h-8 w-auto shrink-0" />
     </div>
   )
 }

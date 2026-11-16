@@ -259,7 +259,8 @@ describe('T-153: the /demo page and links', () => {
   it('one widget: the demo passes options to EstimateWidget, no second implementation', () => {
     const exp = read('apps/web/src/components/demo/DemoExperience.tsx')
     expect(exp).toContain('<EstimateWidget')
-    expect(exp).toContain('samplePhotoUrl: DEMO_SAMPLE_PHOTO_PATH')
+    // T-170: one sample photo per demo service, by the service's name
+    expect(exp).toContain('samplePhotos: DEMO_SAMPLE_PHOTOS')
     expect(exp).toContain('What the business sees')
     expect(exp).toContain('freeOfferLabel()')
   })

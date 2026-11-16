@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { DEMO_BUSINESS_NAME, DEMO_LOGO_PATH, DEMO_PRIMARY_COLOR, DEMO_SLUG, offeredPlans, formatMoney, freeOfferLabel, FREE_ALLOWANCE } from '@qolumns/shared'
+import { DEMO_BUSINESS_NAME, DEMO_LOGO_PATH, DEMO_PRIMARY_COLOR, DEMO_SLUG, formatMoney, freeOfferLabel, FREE_ALLOWANCE } from '@qolumns/shared'
+import { sitePlans } from '@/lib/marketing/plan-claims'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { FounderNote } from '@/components/marketing/FounderNote'
@@ -8,6 +9,8 @@ import { HeroDemo } from '@/components/marketing/home/HeroDemo'
 import { SetupSteps } from '@/components/marketing/home/SetupSteps'
 import { WhatItNotices } from '@/components/marketing/home/WhatItNotices'
 import { HeroPhoto } from '@/components/marketing/home/HeroPhoto'
+import { ScenePhoto } from '@/components/marketing/ScenePhoto'
+import { CLOSING_PHOTO } from '@/lib/marketing/photos'
 import { PriceSentence } from '@/components/marketing/home/PriceSentence'
 import { AddItAnywhere } from '@/components/marketing/home/AddItAnywhere'
 import { listPacks } from '@/lib/vertical-packs'
@@ -32,16 +35,16 @@ const WRAP = 'mx-auto max-w-container px-4 sm:px-6'
  *
  * One idea per section, and no two neighbours share a layout or a background
  * (T-167 order):
- *   1 hero (paper): the words, the one yellow button, and the product demo (three frames of one height, T-168)
+ *   1 hero (paper): the words over the hero photograph, the one yellow button, and the product demo (three frames of one height, T-168)
  *   2 what homeowners want (grey): three large figures in three columns (T-168), one column on a phone
  *   3 what it notices (paper): the message line and four examples, each with its real screen
  *   4 your prices (mint): a sentence that turns into price lines (the one moment)
  *   5 set up in minutes (paper): three steps beside their screens; the trade links sit in step 1
  *   6 add it anywhere (grey): a QR code, the quote page on a phone, the form on a website
- *   7 plans: three cards, each with its own button
+ *   7 plans: a card for each plan the site shows (sitePlans: two today), each with its own button
  *   8 questions: a narrow column
  *   9 who is behind this (when filled in)
- *  10 the closing band: one button and one quiet link
+ *  10 the closing band: one button and one quiet link, over an evening photograph (T-170)
  * Copy: lib/marketing/home-copy.ts. Screens: the product's own parts, at true size.
  */
 export default function HomePage() {
@@ -51,6 +54,7 @@ export default function HomePage() {
   const demo = marketingExample()
   const trades = templateTrades(listPacks('US').filter((p) => p.region === 'US').map((p) => p.id))
   const free = FREE_ALLOWANCE.US!.quotes
+  const plans = sitePlans()
   const appOrigin = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
   const quoteLink = `${appOrigin}/quote/${DEMO_SLUG}`
   const form = {
@@ -107,10 +111,11 @@ export default function HomePage() {
     <main className="min-h-screen overflow-x-clip bg-background">
       <SiteNav />
 
-      {/* 1. Hero. T-168: a band with the hero photograph. On a computer the photograph is the band's background,
-          fading into paper under the words, and the demo frames sit half on it; on a phone it is a block of its
-          own above the headline (globals.css, "hero photograph"). */}
-      <section className="hero-band" data-testid="hero">
+      {/* 1. Hero. T-168, T-170: a band with the hero photograph. From 768 px the photograph is the band's
+          background, fading into paper under the words, and the demo frames sit half on it; under 768 px it
+          fills the top of the band and fades down into paper, with the headline over the faded part
+          (globals.css, "scene photographs"). */}
+      <section className="hero-band home-hero" data-testid="hero">
         <HeroPhoto />
         <div className={`${WRAP} hero-inner pb-16 pt-8 sm:pt-14`}>{heroBody}</div>
       </section>
@@ -202,8 +207,9 @@ export default function HomePage() {
         <p className="mt-3 text-text-secondary">
           <span className="figure">{free}</span> priced quotes free in total, no card.
         </p>
-        <div className="mt-8 grid gap-5 sm:grid-cols-3">
-          {offeredPlans().map((def) => (
+        {/* T-170 (owner's decision): only the plans with a line of their own live today (sitePlans) */}
+        <div className={`mt-8 grid gap-5 ${plans.length === 2 ? 'max-w-3xl sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
+          {plans.map((def) => (
             <div key={def.id} className={`flex flex-col rounded-2xl p-6 ${def.recommended ? 'bg-primary text-white shadow-warm-lg' : 'border border-border bg-white'}`} data-testid="plan-card">
               <p className={`text-sm font-semibold ${def.recommended ? 'text-on-primary/80' : 'text-text-secondary'}`}>{def.name}</p>
               <p className="figure mt-2 text-3xl font-medium">{formatMoney((def.monthlyPrice.USD ?? 0) / 100, 'USD', 'en-US', { decimals: 0 })}</p>
@@ -258,11 +264,13 @@ export default function HomePage() {
       {/* 9. Who is behind this (renders nothing until lib/marketing/founder.ts is filled in) */}
       <FounderNote />
 
-      {/* 10. The closing band: one button style and one quiet link */}
-      <section className="bg-primary py-16 text-white" data-testid="closing">
-        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
+      {/* 10. The closing band: one button style and one quiet link. T-170: an evening photograph behind it, with
+          the same treatment as the hero on juniper: the words are light, on the side that is solid juniper */}
+      <section className="hero-band closing-band text-white" data-testid="closing">
+        <ScenePhoto photo={CLOSING_PHOTO} testId="closing-photo" />
+        <div className={`${WRAP} hero-inner pb-16 md:py-24`}>
           <h2 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">{FINAL_CTA}</h2>
-          <div className="mt-8 flex flex-col items-center gap-2">
+          <div className="mt-8 flex flex-col items-start gap-2">
             <Link href="/signup" className={MAIN_CTA} data-testid="closing-signup" data-cta="main">
               {freeOfferLabel()}
             </Link>

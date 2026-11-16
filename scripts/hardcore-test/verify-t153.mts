@@ -7,10 +7,14 @@
 // It starts from an empty demo (clean-up check), prices all three demo
 // services the way a visitor would, then hits the per-IP limit and the daily
 // cap, and finally clears everything again through the daily cron.
+// T-170: it also sends the two new sample photos (the springs, the room)
+// through the same upload and the real pipeline, from a second visitor.
 import path from 'node:path'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { ROOT, loadEnv, makeSupabase, sessionCookieHeader, http, expectOk, pollQuote, shortId, saveJson, runStamp } from './lib.mjs'
 import { DEMO_TENANT_ID, DEMO_CONTACT, DEMO_SLUG } from '../../packages/shared/src/demo'
+import { DEMO_SERVICE_PICKS } from '../../apps/web/src/lib/demo/demo-services'
+import { DEMO_SAMPLE_PHOTOS } from '../../apps/web/src/lib/demo/sample-photos'
 
 const cfg = loadEnv()
 const sb = makeSupabase(cfg)
@@ -112,9 +116,30 @@ check(
   { status: heaterQuote.status, total: heaterQuote.pricing?.total, range: heaterRange }
 )
 
+// T-170: the two other services have a sample photo of their own now. Each goes through the same upload and
+// the real pipeline, from a second visitor (a visitor may send three requests an hour). The price still comes
+// from the form's answers and the demo's own rates: priced outright, or an honest range with a question.
+const ipB = `198.51.100.${220 + (Date.now() % 30)}`
+const withSample = async (service: string, file: string, answers: unknown[]) => {
+  const bytes = readFileSync(path.join(ROOT, 'apps/web/public', file))
+  const up = expectOk(`upload init ${file}`, await http('POST', `${cfg.appUrl}/api/public/uploads/init`, { headers: { 'X-Forwarded-For': ipB }, body: { tenantKey: key, files: [{ fileName: path.basename(file), contentType: 'image/webp', sizeBytes: bytes.length }] } })).uploads[0] as { assetId: string; uploadUrl: string }
+  const sent = await fetch(up.uploadUrl, { method: 'PUT', body: bytes, headers: { 'Content-Type': 'image/webp' } })
+  const made = expectOk(service, await submit(svc(service), answers, ipB, { assetIds: [up.assetId] }))
+  return { uploaded: sent.ok, quote: await pollQuote(cfg, made.quoteId, tokenOf(made)) }
+}
+const pricedOrRange = (q: { status: string; pricing?: { total?: number }; provisional?: unknown }, total: number) => {
+  const range = q.provisional as { rangeLow: number; rangeHigh: number } | undefined
+  return q.pricing?.total === total || (q.status === 'awaiting_clarification' && Boolean(range) && range!.rangeLow <= total && range!.rangeHigh >= total)
+}
+check('each demo service has a sample photo', DEMO_SERVICE_PICKS.every((p) => Boolean(DEMO_SAMPLE_PHOTOS[p.name])), DEMO_SAMPLE_PHOTOS)
+const springSample = await withSample('Garage Door Spring Replacement', DEMO_SAMPLE_PHOTOS['Garage Door Spring Replacement']!, [{ fieldId: 'spring_count', value: 'two' }])
+check('garage door springs with its sample photo: the photo uploads, and the price is still the demo’s own ($375 for the pair), or a range around it with a question', springSample.uploaded && pricedOrRange(springSample.quote, 375), { status: springSample.quote.status, total: springSample.quote.pricing?.total, range: springSample.quote.provisional })
+const roomSample = await withSample('Interior Painting', DEMO_SAMPLE_PHOTOS['Interior Painting']!, [{ fieldId: 'room_count', value: 2 }])
+check('interior painting with its sample photo: the photo uploads, and the price is still the demo’s own ($825 for two rooms), or a range around it with a question', roomSample.uploaded && pricedOrRange(roomSample.quote, 825), { status: roomSample.quote.status, total: roomSample.quote.pricing?.total, range: roomSample.quote.provisional })
+
 // nothing counted, nothing emailed, flagged as demo (not test)
 const rows = (await sb.select('quotes', `tenant_id=eq.${DEMO_TENANT_ID}&select=is_demo,is_test`)) as Array<{ is_demo: boolean; is_test: boolean }>
-check('every demo request is flagged demo (not test)', rows.length === 3 && rows.every((r) => r.is_demo && !r.is_test), rows)
+check('every demo request is flagged demo (not test)', rows.length === 5 && rows.every((r) => r.is_demo && !r.is_test), rows)
 check('nothing counts as usage', (await count('usage_counters', `tenant_id=eq.${DEMO_TENANT_ID}`)) === 0)
 check('nothing is learned for calibration', (await count('measurement_examples', `tenant_id=eq.${DEMO_TENANT_ID}`)) === 0)
 const reqs = (await sb.select('quote_requests', `tenant_id=eq.${DEMO_TENANT_ID}&select=source_json`)) as Array<{ source_json: Record<string, unknown> }>
@@ -123,8 +148,8 @@ check('the IP is kept only as a hash', reqs.every((r) => typeof r.source_json.de
 // ---------- 4. the per-IP limit and the daily cap ----------
 const fourth = await submit(svc('Garage Door Spring Replacement'), [{ fieldId: 'spring_count', value: 'one' }], ipA)
 check(`a visitor's ${IP_LIMIT + 1}th request in the hour is turned away (DEMO_BUSY)`, fourth.status === 429 && fourth.json?.error?.code === 'DEMO_BUSY' && fourth.json?.error?.reason === 'ip_limit', fourth.json?.error)
-check('…and creates nothing', (await count('quotes', `tenant_id=eq.${DEMO_TENANT_ID}`)) === 3)
-let n = 3
+check('…and creates nothing', (await count('quotes', `tenant_id=eq.${DEMO_TENANT_ID}`)) === 5)
+let n = 5
 let ip = 1
 while (n < CAP) {
   const r = await submit(svc('Garage Door Spring Replacement'), [{ fieldId: 'spring_count', value: 'one' }], `203.0.113.${ip++}`)

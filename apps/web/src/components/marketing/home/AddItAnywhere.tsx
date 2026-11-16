@@ -1,12 +1,23 @@
 import { QrSvg } from '@/components/marketing/QrSvg'
+import { ShortLink, shortLink } from '@/components/marketing/ShortLink'
+import { VAN_PHOTO } from '@/lib/marketing/photos'
 import { RequestFormScreen } from './RequestFormScreen'
 
 /**
- * T-165: "Add it anywhere", shown instead of told: the real QR code for a
- * real quote page, that quote page on a phone, and the same form sitting
- * inline on a business's own page. Three pictures of different sizes in one
- * composition (not three equal cards). Each has its title above it; there is
- * no caption under a picture.
+ * "Add it anywhere", shown instead of told (T-165; redrawn in T-170): three
+ * columns of one height, aligned at the top, each with a picture of the same
+ * size, stacked on a phone (globals.css, "Add it anywhere").
+ *
+ *   1 the QR code on the side of a van. The van is a scene photograph
+ *     (Docs/design/photos.md); the code is our real one for the example
+ *     business's quote page, placed on the van's flat panel in code, with
+ *     the business's name beside it. The image model drew no code and no
+ *     lettering.
+ *   2 that quote page on a phone: a phone-shaped frame wide enough for the
+ *     business's name on one line, with the link, short, in its address bar.
+ *   3 the same form sitting on the business's own web page.
+ *
+ * Each has its title above it; there is no caption under a picture.
  */
 export function AddItAnywhere({
   shown,
@@ -15,48 +26,72 @@ export function AddItAnywhere({
   form,
 }: {
   shown: { qr: { title: string; text: string }; page: { title: string; text: string }; site: { title: string; text: string } }
-  screenLabels: { page: string; site: string }
+  screenLabels: { van: string; sign: string; page: string; site: string }
   quoteLink: string
   form: { businessName: string; logoUrl: string; primaryColor: string; serviceName: string; question: string; answer: string }
 }) {
   return (
-    <div className="mt-10 grid gap-10 lg:grid-cols-[0.8fr_1fr_1.25fr] lg:items-end lg:gap-8" data-testid="add-it">
-      {/* 1. The QR code */}
-      <div>
+    <div className="add-it mt-10" data-testid="add-it">
+      {/* 1. The QR code, on a van */}
+      <div className="add-it-item" data-testid="add-it-item">
         <Title {...shown.qr} />
-        <div className="mt-4 inline-block rounded-2xl bg-white p-5 shadow-warm-md">
-          <QrSvg value={quoteLink} label={`A QR code that opens ${quoteLink.replace(/^https?:\/\//, '')}`} className="h-40 w-40 text-ink" />
-          <p className="figure mt-3 max-w-[10rem] break-all text-xs text-text-secondary">{quoteLink.replace(/^https?:\/\//, '')}</p>
+        <div className="add-it-picture relative overflow-hidden rounded-2xl bg-surface shadow-warm-md" data-testid="add-it-van">
+          {/* eslint-disable-next-line @next/next/no-img-element -- our own WebP file in two sizes, served as it is */}
+          <img
+            src={VAN_PHOTO.src}
+            srcSet={`${VAN_PHOTO.srcSmall} ${VAN_PHOTO.smallWidth}w, ${VAN_PHOTO.src} ${VAN_PHOTO.width}w`}
+            sizes="(min-width: 1024px) 23rem, 20rem"
+            width={VAN_PHOTO.width}
+            height={VAN_PHOTO.height}
+            alt={VAN_PHOTO.alt}
+            loading="lazy"
+            decoding="async"
+            className="block h-full w-full object-cover"
+          />
+          {/* the sign on the van's side: ours, drawn here. `mix-blend-multiply` lets the van's own paint and
+              shading show through it, as a printed sign would */}
+          <div className="van-sign absolute flex items-center gap-[4%]" style={VAN_PHOTO.sign} data-testid="van-sign">
+            <QrSvg value={quoteLink} label={`${screenLabels.sign} ${shortLink(quoteLink)}`} className="h-full w-auto shrink-0 text-ink mix-blend-multiply" />
+            <p className="min-w-0 font-display font-extrabold leading-tight text-ink">
+              <span className="van-sign-name block">{form.businessName}</span>
+              <span className="van-sign-line mt-1 block font-sans font-semibold">{screenLabels.van}</span>
+            </p>
+          </div>
         </div>
       </div>
 
       {/* 2. The quote page on a phone */}
-      <div>
+      <div className="add-it-item" data-testid="add-it-item">
         <Title {...shown.page} />
-        <div className="mx-auto mt-4 max-w-[22rem] rounded-3xl border border-field bg-surface p-2.5 shadow-warm-lg lg:mx-0" role="img" aria-label={screenLabels.page} {...({ inert: '' } as object)} data-testid="add-it-phone">
-          <div className="overflow-hidden rounded-2xl bg-background px-3 pb-6 pt-4">
-            <p className="figure mb-3 truncate text-center text-[11px] text-text-muted">{quoteLink.replace(/^https?:\/\//, '')}</p>
-            <RequestFormScreen {...form} className="shadow-warm-md" />
+        <div className="add-it-picture" role="img" aria-label={screenLabels.page} {...({ inert: '' } as object)} data-testid="add-it-phone">
+          <div className="phone-frame mx-auto h-full shadow-warm-lg">
+            <span className="phone-frame-island" aria-hidden="true" />
+            <div className="phone-frame-screen flex h-full flex-col bg-background">
+              <p className="figure mx-3 mt-9 rounded-lg bg-surface px-3 py-1.5 text-center text-xs leading-snug text-text-secondary" data-testid="phone-address">
+                <ShortLink url={quoteLink} />
+              </p>
+              <RequestFormScreen {...form} page className="mt-2" />
+            </div>
           </div>
         </div>
       </div>
 
       {/* 3. The same form on the business's own website */}
-      <div>
+      <div className="add-it-item" data-testid="add-it-item">
         <Title {...shown.site} />
-        <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-white shadow-warm-md" role="img" aria-label={screenLabels.site} {...({ inert: '' } as object)} data-testid="add-it-site">
-          <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-3">
-            <p className="truncate font-display text-base font-bold text-text-primary">{form.businessName}</p>
-            <p className="hidden shrink-0 gap-4 text-xs font-medium text-text-secondary sm:flex">
-              <span>Services</span>
-              <span>About</span>
+        <div className="add-it-picture overflow-hidden rounded-2xl border border-border bg-white shadow-warm-md" role="img" aria-label={screenLabels.site} {...({ inert: '' } as object)} data-testid="add-it-site">
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+            {/* the name is never cut: where the picture is narrow the menu gives way (globals.css) */}
+            <p className="whitespace-nowrap font-display text-sm font-bold text-text-primary" data-testid="site-business-name">{form.businessName}</p>
+            <p className="flex min-w-0 shrink gap-3 text-xs font-medium text-text-secondary">
+              <span className="site-menu-extra">Services</span>
               <span>Contact</span>
             </p>
           </div>
-          <div className="p-5">
-            <p className="font-display text-xl font-bold text-text-primary">Get an estimate</p>
-            <p className="mt-1 max-w-sm text-sm text-text-secondary">Tell us about the job and add a photo. You’ll see an estimate from our prices straight away.</p>
-            <RequestFormScreen {...form} className="mt-4 max-w-md p-5 shadow-warm" />
+          <div className="p-4">
+            <p className="font-display text-lg font-bold text-text-primary">Get an estimate</p>
+            <p className="mt-1 text-sm text-text-secondary">Tell us about the job. You’ll see an estimate from our prices straight away.</p>
+            <RequestFormScreen {...form} logoUrl={null} className="mt-3 p-4 shadow-warm" />
           </div>
         </div>
       </div>

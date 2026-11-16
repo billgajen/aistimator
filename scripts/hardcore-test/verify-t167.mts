@@ -17,6 +17,7 @@
 //    price is set" on three real screens; only what the AI does for that
 //    trade; the main button yellow;
 // 5. (browser) Pricing's two lines link to the live demo.
+// T-170: each trade hero has its photograph; Pricing marks what is not live yet.
 import path from 'node:path'
 import { mkdirSync } from 'node:fs'
 import { ROOT, loadEnv, shortId, saveJson, runStamp } from './lib.mjs'
@@ -26,6 +27,7 @@ import { marketingExample } from '../../apps/web/src/lib/marketing/examples'
 import { HERO, MESSAGE_LINE, NOTICES } from '../../apps/web/src/lib/marketing/home-copy'
 import { FEATURE_STEPS } from '../../apps/web/src/lib/marketing/features-copy'
 import { SCREEN_WORDS } from '../../apps/web/src/lib/marketing/screen-words'
+import { planLines, sitePlans } from '../../apps/web/src/lib/marketing/plan-claims'
 
 const cfg = loadEnv()
 const outDir = path.join(ROOT, 'scripts/hardcore-test/results', `${runStamp()}-t167-${shortId()}`)
@@ -269,6 +271,9 @@ if (!process.env.PLAYWRIGHT_DIR) {
       const tSections = await sectionsOf(t)
       check(`${name}: no two neighbouring sections share a background; nothing scrolls sideways`, tSections.every((s, i) => i === 0 || s.bg !== tSections[i - 1]!.bg) && (await noSideways(t)), tSections.map((s) => s.bg))
       check(`${name}: the small line carries the message`, (await t.locator('[data-testid=hero]').innerText()).includes(`${MESSAGE_LINE} No website needed.`))
+      // T-170: the hero has a photograph of the trade's work behind it; the trade's real screen is still the picture of the product
+      const tPhoto = await t.locator('[data-testid=hero] [data-testid=hero-photo] img').evaluate((img) => ({ file: (img as HTMLImageElement).currentSrc.split('/').pop() ?? '', alt: (img as HTMLImageElement).alt.length, loaded: (img as HTMLImageElement).naturalWidth > 0 }))
+      check(`${name}: the hero has this trade's own photograph behind it, with alt text and no caption (T-170)`, tPhoto.loaded && tPhoto.file.startsWith(`trade-${trade.slug}-`) && tPhoto.alt > 40 && (await t.locator('[data-testid=hero] figcaption').count()) === 0, tPhoto)
       if (trade.slug === 'water-heaters' || trade.slug === 'painting' || trade.slug === 'plumbing') await shot(t, `trade-${trade.slug}-${width}`)
     }
     await tctx.close()
@@ -281,8 +286,15 @@ if (!process.env.PLAYWRIGHT_DIR) {
   const pr = await pctx.newPage()
   await pr.goto(`${cfg.appUrl}/pricing`, { waitUntil: 'networkidle' })
   const links = await pr.locator('[data-testid=plan-demo-link]').evaluateAll((els) => els.map((el) => ({ text: (el as HTMLElement).innerText.trim(), href: el.getAttribute('href') })))
-  check('"Hosted estimate pages" and "Your branding on every estimate" link to /demo on every plan that lists them', links.length >= 4 && links.every((l) => l.href === '/demo') && links.some((l) => l.text === 'Hosted estimate pages') && links.some((l) => l.text === 'Your branding on every estimate'), links.length)
+  // T-170: how many there are follows the plans the page shows (it was "four or more", when three plans were shown)
+  const demoLinksWanted = sitePlans().flatMap((plan) => planLines(plan)).filter((l) => l.label === 'Hosted estimate pages' || l.label === 'Your branding on every estimate').length
+  check('"Hosted estimate pages" and "Your branding on every estimate" link to /demo on every plan that lists them', links.length === demoLinksWanted && links.length >= 3 && links.every((l) => l.href === '/demo') && links.some((l) => l.text === 'Hosted estimate pages') && links.some((l) => l.text === 'Your branding on every estimate'), links.length)
   const pricingText = (await pr.locator('main').innerText()).replace(/\s+/g, ' ')
+  // T-170: a plan line that is not live yet says so
+  const later = await pr.locator('[data-testid=plan-line][data-live=false]').evaluateAll((els) => els.map((el) => (el as HTMLElement).innerText.replace(/\s+/g, ' ').trim()))
+  // (the owner's decision: Business is left off the page until a line of its own is live, so these are Pro's)
+  const laterWanted = sitePlans().flatMap((plan) => planLines(plan).filter((l) => !l.live).map((l) => l.label))
+  check(`Pricing marks every line that is not live yet "Coming later" (T-170): ${[...new Set(laterWanted)].join(', ')}`, later.length === laterWanted.length && later.length >= 3 && later.every((l) => l.endsWith('Coming later')) && laterWanted.every((label) => later.some((l) => l.includes(label))), later)
   check('Pricing no longer lists "AI chat", and its answer says the AI works out the job', !/AI chat/.test(pricingText) && pricingText.includes('The AI works out the job; the price is calculated from the prices you set.'))
   await pctx.close()
   await browser.close()

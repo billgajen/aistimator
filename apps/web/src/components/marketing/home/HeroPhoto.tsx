@@ -3,11 +3,12 @@ import { HERO_PHOTO, heroPhotoSrc } from '@/lib/marketing/hero-photo'
 /**
  * The home page's hero photograph (T-168; system.md, Imagery).
  *
- * On a computer (1280 px and up) it is the full-width background of the hero
- * band, fading into paper on the left where the words are, and the three
- * demo frames sit half on it. Below that it is a block of its own above the
- * headline, never behind text. The styles are in globals.css ("hero
- * photograph").
+ * From 768 px it is the full-width background of the hero band, fading into
+ * paper on the left where the words are, with the painter on the right and
+ * the three demo frames half on it. Under 768 px it fills the top of the
+ * band and fades down into paper, and the headline starts over the faded
+ * part (T-170: it is never a block of its own above the headline). The styles
+ * are in globals.css ("scene photographs").
  *
  * The <img> has its width and height and its box is sized by CSS, so nothing
  * moves when the picture arrives. It loads at once, with high priority.
@@ -26,7 +27,7 @@ export function HeroPhoto() {
         decoding="async"
         loading="eager"
         fetchPriority="high"
-        style={{ '--focus': HERO_PHOTO.focus, '--band-y': HERO_PHOTO.bandY } as React.CSSProperties}
+        style={{ '--focus': HERO_PHOTO.focus, '--focus-x': HERO_PHOTO.focus.split(' ')[0], '--band-y': HERO_PHOTO.bandY } as React.CSSProperties}
       />
       <span className="hero-photo-fade" aria-hidden="true" />
     </div>

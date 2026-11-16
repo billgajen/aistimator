@@ -52,7 +52,8 @@ Rules:
 4. **Butter and tape are for measurement only:** the takeoff, grades, ranges, the tape rule. A warning is
    `tertiary`. "Needs you" is the strong yellow with its small dark marker (Status colours).
 5. **No dark panels, no glass, no gradients.** The dark code block on the Quote link page is the one dark surface.
-   The one gradient allowed is a scene photograph fading into paper where words sit beside it (Imagery, T-168).
+   The one gradient allowed is a scene photograph fading into the ground its band already has, where words sit
+   beside it: paper, or juniper on the closing band (Imagery, T-168, T-170).
 6. **Never choose a colour from a skill's catalogue,** and never write a raw Tailwind palette colour
    (`text-red-500`, `bg-zinc-50`). Every colour is one of the tokens above. A unit test fails on a raw one.
 7. **Do not write an opacity modifier on a colour token** (`border-danger/30`, `ring-primary/20`). The tokens are
@@ -116,9 +117,11 @@ are gone).
   prices (`lib/marketing/examples.ts`); it is built in `components/marketing/screens/`.
 - **No icon stands in for a screen.** Where the page says the product does something, it shows the screen where
   the result appears.
-- **A photo we do not have is named, not drawn.** The photographs we ship are the sample tank label and Home's
-  hero photograph (a scene, T-168). A form
-  that asks for another label shows "1 photo added" beside the label's name, with no picture (T-167).
+- **A photo we do not have is named, not drawn.** The photographs we ship are the sample tank label and the scene
+  photographs listed in `photos.md`: Home's hero (T-168), and from T-170 one per trade page's hero, Home's
+  closing band, the van in "Add it anywhere" and the demo's two sample photos. A form
+  that asks for another label shows "1 photo added" beside the label's name, with no picture (T-167). A label or
+  a rating plate is never made with an image model: it has to be readable, and the model must draw no text.
 - No stock photograph passed off as a customer, a customer's job or the team. A stand-in photograph, if ever
   used, is listed in the ticket's report as one.
 - No drawn look-alike of a real logo, product or person.
@@ -149,11 +152,25 @@ prompt, what was kept and what was rejected).
 - **Rejected on sight:** a malformed hand or face, readable text, a logo, a likeness to a recognisable person.
 - **One art direction, for every one of them:** documentary style, natural daylight, American homes and streets,
   calm and warm, our paper and juniper tones, with at most one small yellow object (a tape measure or a hi-vis
-  detail). No studio look. No posed smile at the camera.
-- **Beside words:** the photograph fades into paper so the words stay dark on light. The fade is to the paper
-  token, and body text reaches 4.5:1 against the picture at its worst point (measured, not judged by eye). On a
-  phone a photograph is a block of its own, never behind text.
-- The image has fixed dimensions, so nothing moves when it arrives; a hero image loads with priority.
+  detail). No studio look. No posed smile at the camera. **One exception (T-170):** the closing band's picture is
+  an evening one (dusk in the window, one lamp).
+- **Behind words (T-170, replacing T-168's rule for small screens):** the photograph is the band's background
+  and fades into the band's own ground, so the words sit on that ground: dark words on paper, or light words on
+  juniper (the closing band). From 768 px the words are on the left and the picture's subject on the right; the
+  line under a headline sits on solid ground, and the narrower the screen, the further the solid ground reaches.
+  Under 768 px the photograph fills the top of the band and fades downwards, and the words start over the faded
+  part. **It is never a block of its own above the headline.** Every line of text over a photograph reaches
+  4.5:1 at its worst point, measured from the painted pixels, not judged by eye (`verify-t170`).
+- **A product screen may sit partly on a photograph** (Home's three frames, a trade page's form): the screen is
+  ours, drawn in code, on its own white ground.
+- **Anything a person could read in a photograph is ours, placed in code:** the QR code and the business's name
+  on the van in "Add it anywhere". The image model drew a plain van.
+- **The demo's sample photos** stand in for a customer's own photo on `/demo` only: no people, no faces, one per
+  demo service, following that service's own photo instruction.
+- The image has fixed dimensions, so nothing moves when it arrives. Only a hero's image loads with priority; every
+  other photograph loads when it is near the screen.
+- **A phone frame** is the one device frame on the site ("Add it anywhere"): an ink edge and a phone's corners,
+  which are not a step of the radius scale.
 
 ## Layout
 
@@ -166,6 +183,10 @@ prompt, what was kept and what was rejected).
   screens per section is not ours; see the rulings.)
 - One main action per screen. A second action is visibly quieter.
 - Phone first. Nothing scrolls sideways at 390 px; content does not swipe sideways as its only way to be read.
+- **A name or a link is never cut and never broken inside a word.** A link is shown short (no "https://") and may
+  wrap only after a slash (`ShortLink`). Where a name does not fit, the layout gives way, not the name.
+- **Pictures in a row are one size, and start on one line** ("Add it anywhere": three columns of one height from
+  1024 px, each a row of words and picture from 640 px, stacked on a phone).
 - Tap targets are 44 px on a phone. Controls are never closer than 8 px. Nothing a person can press is under
   24 px at any width. A destructive action sits apart from the others (a rule and a wider gap), never beside them.
 - **The dashboard quote page reads in one order** (T-169): the next step, what the AI understood (with the

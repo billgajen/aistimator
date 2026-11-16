@@ -47,8 +47,9 @@ describe('T-168: the hero photograph (option b, the owner\'s choice)', () => {
     // a sentence that says what the picture shows; never a name, a customer or a claim
     expect(HERO_PHOTO.alt.length).toBeGreaterThan(40)
     expect(HERO_PHOTO.alt).not.toMatch(/customer of|our customer|review|testimonial|\b[A-Z][a-z]+ [A-Z]\.|AI[- ]generated|stock/)
-    // only the chosen photograph is in the repo: no other option, no candidate, no rejected image
-    expect(readdirSync(join(WEB, 'public/photos')).sort()).toEqual(['hero-b-1200.webp', 'hero-b-2400.webp', 'hero-sizes.json'])
+    // only the chosen hero is in the repo: no other option, no candidate, no rejected image
+    // (T-170 added other photographs beside it; marketing-t170.test.ts holds that list)
+    expect(readdirSync(join(WEB, 'public/photos')).filter((f) => f.startsWith('hero-')).sort()).toEqual(['hero-b-1200.webp', 'hero-b-2400.webp', 'hero-sizes.json'])
     expect(component).not.toMatch(/caption/i)
     expect(component).toContain('alt={HERO_PHOTO.alt}')
     // and it is recorded: the model, the prompt, what was changed, what was rejected
@@ -62,27 +63,36 @@ describe('T-168: the hero photograph (option b, the owner\'s choice)', () => {
     expect(component).toContain('loading="eager"')
     expect(component).toContain('fetchPriority="high"')
     expect(component).toContain('srcSet={`${heroPhotoSrc(1200)} 1200w, ${heroPhotoSrc(2400)} 2400w`}')
-    // its box is sized by CSS before the picture arrives: a ratio as a block, the band's own height as a background
-    expect(css).toContain('.hero-photo { width: 100%; aspect-ratio: 3 / 2; overflow: hidden; background: var(--color-surface); }')
+    // its box is sized by CSS before the picture arrives (T-170: a set height at the top of the band on a phone, the band's own height from 768 px)
+    expect(css).toContain('.hero-photo { position: absolute; top: 0; left: 0; right: 0; height: var(--photo-top); overflow: hidden; background: rgb(var(--ground)); }')
   })
 
-  it('behind the words only from 1280 px up, with the line under the headline on solid paper; a block above the headline below that', () => {
-    const wide = css.slice(css.indexOf('@media (min-width: 1280px) {', css.indexOf('hero photograph')))
-    expect(wide).toContain('.hero-photo { position: absolute;')
-    // the fade is into paper, and it stays solid until after the line under the headline ends
-    expect(wide).toContain('linear-gradient(90deg, var(--color-background) 0, var(--color-background) calc(var(--hero-edge) + 1.5rem)')
-    expect(wide).toContain('.hero-band h1 + p { max-width: 36rem; }')
-    // nothing puts the photograph behind text outside that media query
-    expect(css.slice(0, css.indexOf('@media (min-width: 1280px) {', css.indexOf('hero photograph')))).not.toMatch(/\.hero-photo[^{]*\{[^}]*position: absolute/)
-    // the fade is the only gradient in the stylesheet besides the tape rule's ticks
-    expect((css.match(/linear-gradient\(90deg, var\(--color-background\)/g) ?? []).length).toBe(1)
+  it('T-170: behind the words from 768 px, with the line under the headline on solid paper; never a block of its own above the headline', () => {
+    const block = css.slice(css.indexOf('Scene photographs behind words'), css.indexOf('"Add it anywhere" on Home'))
+    const from768 = block.slice(block.indexOf('@media (min-width: 768px) {'))
+    // the fade is into the band's ground (paper), and it stays solid until after the line under the headline ends
+    expect(from768).toContain('linear-gradient(90deg, rgb(var(--ground)) 0, rgb(var(--ground)) calc(var(--hero-edge) + 1.5rem), rgb(var(--ground) / 0) calc(var(--hero-edge) + var(--hero-fade)))')
+    expect(from768).toContain('.hero-band h1 + p { max-width: var(--hero-text); }')
+    expect(block).toContain('.hero-band { position: relative; --ground: 250 249 246;')
+    // the line is 36rem wide from 1280 px, as T-168 set it, and narrower below (so the fade behind it is stronger)
+    expect(block).toMatch(/@media \(min-width: 1280px\) \{\s*\.hero-band \{ --hero-text: 36rem;/)
+    expect(block).toMatch(/@media \(min-width: 768px\) \{\s*\.hero-band \{\s*--hero-text: 24rem;/)
+    // the photograph is never a block in the page's flow: it is always placed behind the band's own content
+    expect(block).not.toMatch(/\.hero-photo(?: img)? \{[^}]*position: (static|relative)/)
+    expect(block).not.toContain('aspect-ratio')
+    // under 768 px it fades downwards into the ground, and Home's words start over the faded part
+    expect(block).toContain('linear-gradient(180deg, rgb(var(--ground) / 0) 0')
+    expect(block).toMatch(/@media \(max-width: 767px\) \{[^}]*\.home-hero > \.hero-inner \{ padding-top: 13\.5rem; \}/)
+    // every gradient in that block is a photograph's fade into the ground: nothing else
+    for (const g of block.match(/linear-gradient\([^;]+;/g) ?? []) expect(g, g).toMatch(/^linear-gradient\((90|180)deg, rgb\(var\(--ground\)/)
   })
 
-  it('the generator: the key by name only, the model from an env var with a documented default, three attempts a scene and twelve calls at most', () => {
+  it('the generator: the key by name only, the model from an env var with a documented default, three attempts a scene', () => {
     const script = read('scripts/design/generate-hero-photos.mjs')
     expect(script).toContain("process.env.HERO_IMAGE_MODEL || 'gemini-3-pro-image'")
     expect(script).toContain('const MAX_PER_SCENE = 3')
-    expect(script).toContain('const MAX_CALLS = 12')
+    // T-170: the limit is per scene (each ticket keeps its own ledger); every call still checks it first
+    expect(script).toContain('if (made(id) >= MAX_PER_SCENE) throw new Error')
     expect(script).toContain("'x-goog-api-key': key")
     // the key is never printed: nothing logs it, and no key value is written in the file
     expect(script).not.toMatch(/console\.(log|error|info)\([^)]*\bkey\b/)
@@ -96,14 +106,15 @@ describe('T-168: the hero photograph (option b, the owner\'s choice)', () => {
 describe('T-168: the preview switch is gone', () => {
   it('no option switch, no script and no flag anywhere in the app', () => {
     const page = code('apps/web/src/app/page.tsx')
-    expect(page).toMatch(/<section className="hero-band" data-testid="hero">\s*<HeroPhoto \/>\s*<div className=\{`\$\{WRAP\} hero-inner pb-16 pt-8 sm:pt-14`\}>\{heroBody\}<\/div>\s*<\/section>/)
+    expect(page).toMatch(/<section className="hero-band home-hero" data-testid="hero">\s*<HeroPhoto \/>\s*<div className=\{`\$\{WRAP\} hero-inner pb-16 pt-8 sm:pt-14`\}>\{heroBody\}<\/div>\s*<\/section>/)
     for (const f of ['apps/web/src/app/page.tsx', 'apps/web/src/components/marketing/home/HeroPhoto.tsx', 'apps/web/src/lib/marketing/hero-photo.ts', 'apps/web/src/app/globals.css']) {
       expect(read(f), f).not.toMatch(/HERO_PREVIEW|hero-switch|HeroSwitch|data-hero|currentScript|dangerouslySetInnerHTML|suppressHydrationWarning|\?hero=/)
     }
     expect(existsSync(join(WEB, 'src/components/marketing/home/HeroPhotos.tsx'))).toBe(false)
     expect(existsSync(join(WEB, 'src/lib/marketing/hero-photos.ts'))).toBe(false)
-    // the photograph is on Home only
-    for (const other of ['apps/web/src/app/features/page.tsx', 'apps/web/src/components/marketing/TradeLanding.tsx', 'apps/web/src/app/pricing/page.tsx']) expect(code(other)).not.toMatch(/HeroPhoto|hero-photo/)
+    // Home's photograph is on Home only (T-170 gave each trade page a photograph of its own, through ScenePhoto)
+    for (const other of ['apps/web/src/app/features/page.tsx', 'apps/web/src/components/marketing/TradeLanding.tsx', 'apps/web/src/app/pricing/page.tsx']) expect(code(other)).not.toMatch(/HeroPhoto|hero-b-|HERO_PHOTO/)
+    for (const none of ['apps/web/src/app/features/page.tsx', 'apps/web/src/app/pricing/page.tsx']) expect(code(none)).not.toMatch(/ScenePhoto|hero-photo/)
   })
 })
 

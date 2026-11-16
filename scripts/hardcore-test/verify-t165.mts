@@ -29,8 +29,11 @@ import path from 'node:path'
 import { mkdirSync } from 'node:fs'
 import { ROOT, loadEnv, makeSupabase, sessionCookieHeader, http, expectOk, pollQuote, shortId, saveJson, runStamp } from './lib.mjs'
 import { garageDoorsPackUS } from '../../apps/web/src/lib/vertical-packs/garage-doors-us'
+import { sitePlans } from '../../apps/web/src/lib/marketing/plan-claims'
 
 const cfg = loadEnv()
+/** T-170: the plans the public pages show (a plan is left off until a line of its own is live) */
+const SITE_PLANS = sitePlans()
 const sb = makeSupabase(cfg)
 const outDir = path.join(ROOT, 'scripts/hardcore-test/results', `${runStamp()}-t165-${shortId()}`)
 mkdirSync(outDir, { recursive: true })
@@ -80,7 +83,8 @@ for (const pathname of PUBLIC_PAGES) {
 }
 check('no public page says "14-day" or "trial" (twelve pages)', offending.length === 0, offending)
 const pricingText = visibleText(await (await fetch(`${cfg.appUrl}/pricing`)).text())
-check('pricing: every plan button is "Choose <plan>", and the offer is the free quotes', ['Choose Starter', 'Choose Pro', 'Choose Business'].every((b) => pricingText.includes(b)) && pricingText.includes('Try it free: 10 quotes, no card') && pricingText.includes('When do I start paying?'))
+// T-170 (owner's decision): the page shows the plans that have a line of their own live today (Starter and Pro)
+check(`pricing: every plan button is "Choose <plan>" (${SITE_PLANS.map((pl) => pl.name).join(', ')}), and the offer is the free quotes`, SITE_PLANS.map((pl) => `Choose ${pl.name}`).every((b) => pricingText.includes(b)) && pricingText.includes('Try it free: 10 quotes, no card') && pricingText.includes('When do I start paying?'))
 
 // ---------- a business with one request waiting for it ----------
 async function business(name: string) {
@@ -327,8 +331,11 @@ if (!process.env.PLAYWRIGHT_DIR) {
       }
     })
     check(`${width}: the hero photograph has loaded, full width, with alt text, fixed dimensions and high priority`, !!photo && photo.loaded && /^hero-b-(1200|2400)\.webp$/.test(photo.file) && photo.alt.length > 40 && photo.attrs === '2400x1451' && photo.priority === 'high' && photo.loading === 'eager' && photo.left === 0 && photo.width === width && photo.captions === 0, photo)
-    if (width < 1280) {
-      check(`${width}: the photograph is a block of its own above the headline, never behind text`, !!photo && photo.position === 'static' && photo.bottom <= photo.h1Top, photo && { bottom: photo.bottom, h1Top: photo.h1Top })
+    if (width < 768) {
+      // T-170: under 768 px the photograph fills the top of the hero and fades into paper; the headline starts
+      // over the faded part. It is never a block of its own above the headline (T-168 had it as one below 1280 px).
+      const share = photo ? (photo.h1Top - photo.top) / (photo.bottom - photo.top) : 0
+      check(`${width}: the photograph fills the top of the hero and the headline starts over its faded lower half (never a block of its own above the headline)`, !!photo && photo.position === 'absolute' && share >= 0.5 && share <= 0.95, photo && { top: photo.top, bottom: photo.bottom, h1Top: photo.h1Top })
     } else {
       check(`${width}: the photograph is the hero band's background; the line under the headline sits on solid paper`, !!photo && photo.position === 'absolute' && photo.top <= photo.h1Top && photo.bottom > photo.h1Top && photo.lineRight <= photo.solidTo, photo && { lineRight: photo.lineRight, solidTo: photo.solidTo })
       check(`${width}: the three frames sit half on the photograph and half on the page`, !!photo && photo.onPhoto >= 0.45 && photo.onPhoto <= 0.55, photo?.onPhoto)
@@ -395,10 +402,12 @@ if (!process.env.PLAYWRIGHT_DIR) {
       // T-168 (the owner's choice): the hero demo is three framed screens of one height again, so two sections
       // are rows of equal boxes: the hero and the plans. They are far apart, and the figures between the hero and
       // the next section are open columns on grey, not boxes.
+      // T-170: with Business left off the page the plans are two cards, so the hero is the only row of three.
       const boxRows = shapes.map((s, i) => (/^[34] equal-boxes$/.test(s) ? i : -1)).filter((i) => i >= 0)
-      check(`${width}: two sections are rows of equal boxes, the hero's three frames and the plans, and they are not neighbours (it was five)`, boxRows.length === 2 && boxRows[0] === 0 && boxRows[1]! - boxRows[0]! > 1 && shapes[1] === '3 equal-open', { boxRows, shapes })
+      const threePlans = SITE_PLANS.length >= 3
+      check(`${width}: rows of three equal boxes are the hero's three frames${threePlans ? ' and the plans' : ' only (the plans are two cards)'}, never neighbours (it was five)`, boxRows.length === (threePlans ? 2 : 1) && boxRows[0] === 0 && (!threePlans || boxRows[1]! - boxRows[0]! > 1) && shapes[1] === '3 equal-open', { boxRows, shapes })
     }
-    check(`${width}: each plan card has its own button`, (await p.locator('[data-testid=plan-card]').count()) === 3 && (await p.locator('[data-testid=plan-card] [data-testid=plan-button]').count()) === 3)
+    check(`${width}: each plan card has its own button`, (await p.locator('[data-testid=plan-card]').count()) === SITE_PLANS.length && (await p.locator('[data-testid=plan-card] [data-testid=plan-button]').count()) === SITE_PLANS.length)
     const closing = await p.locator('[data-testid=closing] a').evaluateAll((els) => els.map((el) => ({ text: (el as HTMLElement).innerText.trim(), boxed: getComputedStyle(el).backgroundColor !== 'rgba(0, 0, 0, 0)' })))
     check(`${width}: the closing band has one button and one quiet link`, closing.length === 2 && closing.filter((c) => c.boxed).length === 1 && closing[1]!.text === 'Or try it as a customer first', closing)
     check(`${width}: "Set up in minutes" shows three steps, each with its screen; "How it works" is gone`, (await p.locator('[data-testid=setup-step]').count()) === 3 && (await p.locator('[data-testid^=setup-screen-]').count()) === 3 && !(await p.locator('main').innerText()).includes('How it works'))

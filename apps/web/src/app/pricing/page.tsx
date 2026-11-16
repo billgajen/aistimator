@@ -4,36 +4,27 @@ import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { MAIN_CTA } from '@/lib/marketing/cta'
 import { PRICING_AI_FAQ, PRICING_DEMO_LINKS } from '@/lib/marketing/site-copy'
-import { offeredPlans, formatMoney, freeOfferLabel, FREE_ALLOWANCE, type PlanDefinition, type PlanChannel, PRODUCT_NAME } from '@qolumns/shared'
+import { COMING_LATER, PRICING_DESCRIPTION, PRICING_LEAD, PRICING_TAGLINES, planLines, sitePlans } from '@/lib/marketing/plan-claims'
+import { formatMoney, freeOfferLabel, FREE_ALLOWANCE, PRODUCT_NAME } from '@qolumns/shared'
 
 export const metadata: Metadata = {
   title: `Pricing — ${PRODUCT_NAME}`,
-  description:
-    'Simple monthly plans for service businesses. Instant estimates on your website, by text and on site — in your own prices.',
+  description: PRICING_DESCRIPTION,
 }
 
 // T-134: every number on this page comes from the plan definitions
 // (packages/shared/src/plans.ts) — nothing is duplicated here.
-const OFFERED = offeredPlans()
+// T-170 (owner's decision): the page shows a plan only once one of its own lines is live, so Business is left
+// off for now (lib/marketing/plan-claims.ts, `sitePlans`). The plans themselves are unchanged.
+const OFFERED = sitePlans()
+/** Two plans sit as a centred pair; three fill the row */
+const GRID = OFFERED.length === 2 ? 'mx-auto max-w-4xl lg:grid-cols-2' : 'lg:grid-cols-3'
 // T-152: the free allowance for new businesses — counted in total, never resets
 const FREE_QUOTES = FREE_ALLOWANCE.US!.quotes
 
-const CHANNEL_LABEL: Record<PlanChannel, string> = {
-  widget: 'Website widget',
-  sms: 'Quoting by text (SMS)',
-  whatsapp: 'WhatsApp quoting',
-  mobile_app: 'On-site app for your phone',
-}
-
-function planBullets(plan: PlanDefinition): string[] {
-  const bullets = [...plan.channels.map((c) => CHANNEL_LABEL[c]), PRICING_DEMO_LINKS.hostedPages]
-  if (plan.features.custom_branding) bullets.push(PRICING_DEMO_LINKS.branding)
-  if (plan.features.calibration_insights) bullets.push('Accuracy insights from finished jobs')
-  if (plan.features.lidar_scanning) bullets.push('LiDAR room scanning on site')
-  if (plan.features.multiple_users) bullets.push('Multiple team members')
-  if (plan.features.priority_support) bullets.push('Priority support')
-  return bullets
-}
+// T-170: which of a plan's lines a business can use today is in
+// lib/marketing/plan-claims.ts. A line that is not live yet is shown after the
+// live ones, marked "Coming later"; nothing is shown as live that is not.
 
 const dollars = (cents: number) => formatMoney(cents / 100, 'USD', 'en-US', { decimals: cents % 100 === 0 ? 0 : 2 })
 
@@ -74,10 +65,7 @@ export default function PricingPage() {
         <h1 className="font-display text-4xl font-extrabold tracking-tight text-text-primary sm:text-5xl">
           One missed job pays for the year.
         </h1>
-        <p className="mx-auto mt-4 max-w-xl text-lg text-text-secondary">
-          Instant estimates in your own prices — on your website, by text, and on site. Subscription only:
-          no commission, no per-lead fees.
-        </p>
+        <p className="mx-auto mt-4 max-w-xl text-lg text-text-secondary">{PRICING_LEAD}</p>
         <p className="mt-5">
           {/* T-165: the one yellow call to action of this screen */}
           <Link href="/signup" className={MAIN_CTA} data-cta="main">
@@ -90,14 +78,14 @@ export default function PricingPage() {
       </section>
 
       <section className="mx-auto max-w-6xl px-6 py-12">
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className={`grid gap-6 ${GRID}`} data-testid="plans">
           {OFFERED.map((def) => {
             const plan = {
               name: def.name,
-              tagline: def.tagline,
+              tagline: PRICING_TAGLINES[def.id] ?? def.tagline,
               price: dollars(def.monthlyPrice.USD ?? 0),
               estimates: def.quoteLimit.toLocaleString('en-US'),
-              features: planBullets(def),
+              lines: planLines(def),
               highlight: Boolean(def.recommended),
               cta: `Choose ${def.name}`,
               annual: def.annualPrice?.USD ? dollars(def.annualPrice.USD) : null,
@@ -112,8 +100,9 @@ export default function PricingPage() {
               }`}
             >
               {plan.highlight && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-tape px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-ink">
-                  Most popular
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-tape px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-ink" data-testid="plan-recommended">
+                  {/* T-170: "Most popular" was a claim about customers we cannot back; this is our own recommendation */}
+                  Recommended
                 </span>
               )}
               <p className={`text-sm font-semibold ${plan.highlight ? 'text-white/80' : 'text-text-secondary'}`}>
@@ -137,20 +126,33 @@ export default function PricingPage() {
                   or <span className="figure">{plan.annual}</span> a year (two months free)
                 </p>
               )}
-              <ul className={`mt-5 flex-1 space-y-2.5 text-sm ${plan.highlight ? 'text-white/85' : 'text-text-secondary'}`}>
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex gap-2">
-                    <span aria-hidden="true" className={plan.highlight ? 'text-white/60' : 'text-secondary'}>✓</span>
-                    {/* T-167: these two are shown, not only told: they open the live demo */}
-                    {feature === PRICING_DEMO_LINKS.hostedPages || feature === PRICING_DEMO_LINKS.branding ? (
-                      <Link href={PRICING_DEMO_LINKS.href} className="underline underline-offset-2" data-testid="plan-demo-link">
-                        {feature}
-                      </Link>
-                    ) : (
-                      feature
-                    )}
-                  </li>
-                ))}
+              <ul className={`mt-5 flex-1 space-y-2.5 text-sm ${plan.highlight ? 'text-white/85' : 'text-text-secondary'}`} data-testid="plan-lines">
+                {plan.lines.map((line) =>
+                  line.live ? (
+                    <li key={line.label} className="flex gap-2" data-testid="plan-line" data-live="true">
+                      <span aria-hidden="true" className={plan.highlight ? 'text-white/60' : 'text-secondary'}>✓</span>
+                      {/* T-167: these two are shown, not only told: they open the live demo */}
+                      {line.label === PRICING_DEMO_LINKS.hostedPages || line.label === PRICING_DEMO_LINKS.branding ? (
+                        <Link href={PRICING_DEMO_LINKS.href} className="underline underline-offset-2" data-testid="plan-demo-link">
+                          {line.label}
+                        </Link>
+                      ) : (
+                        line.label
+                      )}
+                    </li>
+                  ) : (
+                    // not live yet: no tick, and the words say so (a mark that is a shape, and words, never colour alone)
+                    <li key={line.label} className="flex gap-2" data-testid="plan-line" data-live="false">
+                      <span aria-hidden="true" className={plan.highlight ? 'text-white/60' : 'text-text-muted'}>○</span>
+                      <span>
+                        {line.label}{' '}
+                        <span className={`ml-1 inline-block whitespace-nowrap rounded-full border px-2 text-xs font-semibold ${plan.highlight ? 'border-white/60 text-white' : 'border-field text-text-secondary'}`} data-testid="coming-later">
+                          {COMING_LATER}
+                        </span>
+                      </span>
+                    </li>
+                  )
+                )}
               </ul>
               <Link
                 href={`/signup?plan=${def.id}`}

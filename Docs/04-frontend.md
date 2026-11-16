@@ -49,9 +49,13 @@ section, and no two neighbours sharing a layout or a background:
    it notices" shows it.
    **The hero photograph (T-168):** a painter on a porch checking a phone, a scene photograph made with an image
    model (`HeroPhoto`, `lib/marketing/hero-photo.ts`, `public/photos/hero-b-*.webp`, styles in `globals.css`;
-   the record is `Docs/design/photos.md`). From 1280 px up it is the hero band's full-width background, fading
-   into paper on the left under the words, and the three frames sit half on it; below that it is a block of its
-   own above the headline, never behind text. It has fixed dimensions and loads with high priority.
+   the record is `Docs/design/photos.md`). **At every width it is behind the band, never a block of its own
+   above the headline (T-170).** From 768 px it is the band's full-width background, fading into paper on the
+   left under the words, with the painter on the right and the three frames half on it; below 1280 px the words'
+   column is narrower (24rem, then 30rem) and the headline one step smaller, so the fade behind them is
+   stronger. Under 768 px it fills the top of the band (24rem) and fades down into paper; the headline starts
+   over the faded part and is on the first screen at 390 x 844. It has fixed dimensions and loads with high
+   priority.
 2. **What homeowners want** (grey): three large figures in three columns side by side (the figure, the short line
    under it, then its linked source), one column on a phone (T-168; T-167 had them one to a row).
 3. **What it notices** (paper): the message line and four examples, each beside the real screen where the result
@@ -63,11 +67,21 @@ section, and no two neighbours sharing a layout or a background:
 5. **Set up in minutes** (paper): choose your trade, check your prices, share your link, each beside its screen,
    alternating sides. **The links to the trade pages are pills under step 1**, on a line that wraps, ending with
    "Other trades: describe your prices in plain English". (They were a row of their own under the hero.)
-6. **Add it anywhere** (grey): the real QR code for a real quote page, that page on a phone, and the same form on
-   a business's website.
-7. **Plans** (paper) from `plans.ts`, each card with its own "Choose <plan>" button.
+6. **Add it anywhere** (grey; redrawn in T-170, `AddItAnywhere`): three columns of one height, aligned at the
+   top, each with a 5:8 picture of the same size (from 1024 px; from 640 px each is a row of words and picture;
+   stacked on a phone). The pictures: **the real QR code on the side of a van** (the van is a scene photograph;
+   the code, the business's name and "Scan for an estimate" are ours, placed on the van's panel in code); the
+   quote page **in a phone-shaped frame**, with the business's name on one line and the link, short, in its
+   address bar; and the same form on a business's website. A link is shown through `ShortLink`: no "https://",
+   wrapping only after a slash.
+7. **Plans** (paper) from `plans.ts` through `sitePlans()` (T-170: two today), each card with its own
+   "Choose <plan>" button.
 8. **Questions** (grey), a narrow column.
 9. **Who is behind this** (only when `lib/marketing/founder.ts` is filled in).
+10. **The closing band** (juniper): the heading, the one yellow button and the quiet link, on the left. T-170: an
+    evening photograph is the band's right-hand side, fading into juniper (`ScenePhoto`, `CLOSING_PHOTO`); under
+    768 px it fills the top of the band and the words start over its faded part. The words are light, on solid
+    juniper. It loads without priority.
 10. **The closing band** (juniper): one yellow button and one quiet link.
 
 Features (T-167): leads with the message line and follows the product's five steps, each with its real screen in
@@ -80,8 +94,14 @@ Trade pages (`TradeLanding`, T-167): the hero's right half is that trade's own r
 question) and, where the template reads a label or measures from photos, what is read for it. "How the price is
 set" is three steps, each on its real screen, alternating sides (it was three grey cards). A page claims only what
 the AI does for its trade: label reading on water heaters, HVAC and electrical; wall area from photos on painting;
-neither on plumbing or garage doors. The one photograph is the sample tank label we ship; any other label is
-named in the form ("Rating plate · 1 photo added"), not drawn. The main button is yellow.
+neither on plumbing or garage doors. The one photograph of a label is the sample tank label we ship; any other
+label is named in the form ("Rating plate · 1 photo added"), not drawn. The main button is yellow.
+**T-170:** each trade page's hero has a scene photograph of that trade's work behind it (`TRADE_PHOTOS` in
+`lib/marketing/photos.ts`: a painted house front, an outdoor unit, a tank in a garage, a plumber at a sink, an
+electrician at a panel, a garage door), treated as Home's hero is. Under 768 px it fills the top and the words
+start over its faded part; from 768 px it is behind the words and ends 8rem below them, with the trade's screen
+5.5rem on it; from 1024 px it is the right-hand 60% of the band's top (so the whole scene shows), the screen sits
+under it and 6rem on it, beside the words, and the words are centred against the two.
 
 Product screens on marketing pages are built in `components/marketing/screens/ProductScreens.tsx` from the real
 screens' markup, with the real screens' words (`lib/marketing/screen-words.ts`, checked against the product's
@@ -90,6 +110,17 @@ The old three-frame strip (`ProductStrip`) is no longer on any marketing page; o
 
 Pricing (T-167): "Hosted estimate pages" and "Your branding on every estimate" link to the live demo. The plan
 line "Website widget & AI chat" is "Website widget" (the chat form is not offered to businesses).
+**T-170:** which of a plan's lines a business can use today is in `lib/marketing/plan-claims.ts` (the list, with
+what was found for each, is `Docs/design/ai-capabilities.md` section 7). A line that is not live yet is shown
+after the live ones with a hollow mark and "Coming later": text messages, WhatsApp quoting, the on-site app,
+LiDAR, team members, priority support. The page's own taglines and lead say only what is live, and "Most
+popular" is "Recommended". **The public pages show a plan only once one of its own lines is live** (`sitePlans()`,
+the owner's decision): today Starter and Pro, as a centred pair, on Pricing and in Home's plan cards. Business is
+defined and sold as before; it is only not shown.
+
+`/demo` (T-170): "Use a sample photo" adds the photo that matches the chosen service (`lib/demo/sample-photos.ts`,
+by service name): the rating label drawn for T-153, the springs above a garage door, a room from its doorway. A
+service with no sample has no button.
 
 Copy lives in the files above; the buttons in `lib/marketing/cta.ts` (`MAIN_CTA` is the yellow one: one per
 screen). Still screens are pictures to a screen reader (`role="img"` with a description). Marketing copy rules: no
