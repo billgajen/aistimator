@@ -56,10 +56,10 @@ Rules:
    beside it: paper, or juniper on the closing band (Imagery, T-168, T-170).
 6. **Never choose a colour from a skill's catalogue,** and never write a raw Tailwind palette colour
    (`text-red-500`, `bg-zinc-50`). Every colour is one of the tokens above. A unit test fails on a raw one.
-7. **Do not write an opacity modifier on a colour token** (`border-danger/30`, `ring-primary/20`). The tokens are
-   plain `var()` values, so Tailwind writes no CSS for it and the class does nothing. Use the `-line` and
-   `-light` tokens. (228 such classes already exist and do nothing; see "Known gaps".) `on-primary` is the one
-   token that takes an alpha.
+7. **An opacity on a colour token works since T-172** (`bg-ink/40`, `border-danger/30`), and has rules: never on
+   a focus ring, never on the accent or on text, never on the edge of a control, and butter and tape only in
+   measurement. See "Opacity on a colour token" below. For the soft edge of a tinted box the `-line` tokens
+   are still the first choice.
 8. **The customer's pages keep the business's own colour.** The request form and the quote page are coloured by
    the business's brand colour (`primary` is overridden there). Our accent never appears on them.
    **Text on the business's colour is the on-colour, chosen by contrast (T-171):** white where white reaches
@@ -332,14 +332,32 @@ The numbers are those of `audit.md`, section 6.
 11. **Which checklist.** Dashboard and customer pages: ui-ux-pro-max's web rules. Marketing: taste's checklist,
     minus what this file overrules. Its app checklist (safe areas, Dynamic Type) is for the mobile app.
 
+## Opacity on a colour token (T-172)
+
+A class may put an opacity on one of our colours (`bg-ink/40`, `border-danger/30`). Every colour token is defined
+as an RGB triple with a slot for that opacity: the hex in `globals.css` (`--color-ink: #1B2823`) has its triple
+beside it (`--color-ink-rgb: 27 40 35`), and `tailwind.config.ts` reads the triple. Until T-172 the tokens were
+plain `var()` strings, such a class wrote no CSS, and 208 of them sat in the code doing nothing. A unit test
+holds each triple to its hex. A business's own colour is set in both forms (`lib/color.ts`).
+
+Rules for using one:
+
+1. **Never on a focus ring.** `focus:ring-primary/30` is a faint ring (1.4:1 to 1.6:1 on paper) and it would beat
+   the rule that makes a ring the focus colour. A control that draws its focus with `focus:ring-2` writes no ring
+   colour of its own. (T-172 removed 129 of them.)
+2. **Butter and tape only in measurement,** as for the colours at full strength: the takeoff block and the range
+   bar of the customer quote page. Not on a notice, not on a step marker.
+3. **Never on the accent,** and never to thin text: text is a text token at full strength. (One place is allowed:
+   the admin bar's light text on ink, 9:1 at 80%.)
+4. **Never on the edge of a control.** A field's edge, an error edge and an outlined button's edge are the full
+   colour (3:1). A soft edge is for a box that is not a control: `border-danger/30` on a tinted panel, or the
+   `-line` tokens.
+5. Fine at part strength: the dimming layer behind a window or the phone menu (`bg-ink/40`), a tint made paler
+   (`bg-mint/40`), a divider made lighter (`border-border/50`), the soft edge of a tinted box.
+
 ## Known gaps (not fixed by T-164; each needs its own ticket)
 
 
-- **Opacity modifiers on tokens do nothing.** 228 classes such as `ring-primary/30`, `border-danger/30` and
-  `bg-ink/40` write no CSS. Fields therefore show Tailwind's default blue focus halo, tinted borders fall back to
-  the default hairline, and the phone menu's dimming layer has no colour. Making the tokens take an alpha would
-  switch all 228 on at once and change how many pages look, customer pages included. A unit test stops the number
-  growing.
 - **Features' hero and the closing bands are words only** (taste's `text-only`), and a trade page's three feature
   cards and its "Tell it your prices" band have no screen. (Features and the trade pages were redrawn in T-167:
   real screens, the yellow call to action.)
@@ -350,4 +368,6 @@ The numbers are those of `audit.md`, section 6.
 - **Containers.** Trade pages use `max-w-5xl` for some sections; the FAQ and closing bands are narrower.
 - **The product frames** (`ProductStrip`, two corner sizes of their own) are on no marketing page since T-167;
   only `/design` still shows them. It can go when `/design` shows a current screen.
-- **Field focus.** Fields remove the outline and rely on a border colour change plus the (default blue) halo.
+- **Field focus.** Fields remove the outline and rely on a border colour change plus a ring, which is the focus
+  colour (ink) since T-164. (The one decorative ring, the current step of the service set-up window, is juniper
+  since T-172: it had a tape colour written for it, and tape is for measurement only.)

@@ -1,5 +1,8 @@
 import type { Config } from 'tailwindcss'
 
+/** A colour token as Tailwind reads it: the RGB triple from globals.css, with the alpha a class may ask for */
+const token = (name: string) => `rgb(var(--color-${name}-rgb) / <alpha-value>)`
+
 const config: Config = {
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
@@ -21,54 +24,56 @@ const config: Config = {
       full: '9999px',
     },
     extend: {
+      // T-172: every colour token is an RGB triple with an alpha slot, so a class can carry an opacity modifier
+      // (bg-ink/40, ring-primary/30). They were plain var() strings, for which Tailwind writes no CSS when a
+      // modifier is present. The triples live beside the hex values in globals.css.
       colors: {
-        background: 'var(--color-background)',
-        surface: 'var(--color-surface)',
-        'text-primary': 'var(--color-text-primary)',
-        'text-secondary': 'var(--color-text-secondary)',
-        'text-muted': 'var(--color-text-muted)',
+        background: token('background'),
+        surface: token('surface'),
+        'text-primary': token('text-primary'),
+        'text-secondary': token('text-secondary'),
+        'text-muted': token('text-muted'),
         primary: {
-          DEFAULT: 'var(--color-primary)',
-          hover: 'var(--color-primary-hover)',
-          light: 'var(--color-primary-light)',
+          DEFAULT: token('primary'),
+          hover: token('primary-hover'),
+          light: token('primary-light'),
         },
-        // Readable text on primary surfaces; white unless a light tenant
-        // brand colour overrides the var (see lib/color.ts). RGB triple so
-        // opacity modifiers (text-on-primary/60) keep working.
+        // Readable text on primary surfaces; white unless a business's own
+        // colour overrides the var (see lib/color.ts).
         'on-primary': 'rgb(var(--color-on-primary-rgb, 255 255 255) / <alpha-value>)',
-        // `line` is the soft edge of a box in that colour's tint. Do not write
-        // an opacity modifier (border-danger/30) on these tokens: they are
-        // plain var() strings, so Tailwind writes no CSS for it.
+        // `line` is the soft edge of a box in that colour's tint.
         secondary: {
-          DEFAULT: 'var(--color-secondary)',
-          light: 'var(--color-secondary-light)',
-          line: 'var(--color-secondary-line)',
+          DEFAULT: token('secondary'),
+          light: token('secondary-light'),
+          line: token('secondary-line'),
         },
         tertiary: {
-          DEFAULT: 'var(--color-tertiary)',
-          light: 'var(--color-tertiary-light)',
-          line: 'var(--color-tertiary-line)',
+          DEFAULT: token('tertiary'),
+          light: token('tertiary-light'),
+          line: token('tertiary-line'),
         },
-        border: 'var(--color-border)',
-        'border-strong': 'var(--color-border-strong)',
+        border: token('border'),
+        'border-strong': token('border-strong'),
         // The edge of a field or an outlined control (3:1 on paper). Kept
         // before `danger` so an error border still wins over it.
-        field: 'var(--color-field)',
+        field: token('field'),
         danger: {
-          DEFAULT: 'var(--color-danger)',
-          light: 'var(--color-danger-light)',
-          line: 'var(--color-danger-line)',
+          DEFAULT: token('danger'),
+          light: token('danger-light'),
+          line: token('danger-line'),
         },
-        ink: 'var(--color-ink)',
-        'ink-deep': 'var(--color-ink-deep)',
-        mist: 'var(--color-mist)',
-        mint: 'var(--color-mint)',
-        butter: 'var(--color-butter)',
-        tape: 'var(--color-tape)',
+        ink: token('ink'),
+        'ink-deep': token('ink-deep'),
+        mist: token('mist'),
+        mint: token('mint'),
+        butter: token('butter'),
+        tape: token('tape'),
         // Accent (system.md): the strong yellow, and the dark text and edge on it.
-        // There is no tint: a pale yellow would read as butter.
-        accent: 'var(--color-accent)',
-        'on-accent': 'var(--color-on-accent)',
+        // There is no tint: a pale yellow would read as butter. Do not write an
+        // opacity modifier on it (a unit test fails on one).
+        accent: token('accent'),
+        'on-accent': token('on-accent'),
+        // The focus ring's colour changes with what it sits on (globals.css), so it stays a plain variable.
         focus: 'var(--color-focus)',
       },
       fontFamily: {

@@ -181,7 +181,7 @@ export function ExpectedSignalEditor({
                           updateSignal(index, { signalKey: key })
                         }}
                         placeholder="e.g., item_count"
-                        className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                       />
                       <p className="mt-1 text-xs text-text-muted">
                         Unique identifier (auto-formatted)
@@ -199,7 +199,7 @@ export function ExpectedSignalEditor({
                             possibleValues: e.target.value === 'enum' ? [] : undefined,
                           })
                         }
-                        className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                       >
                         {SIGNAL_TYPES.map((type) => (
                           <option key={type.value} value={type.value}>
@@ -219,7 +219,7 @@ export function ExpectedSignalEditor({
                       value={signal.description}
                       onChange={(e) => updateSignal(index, { description: e.target.value })}
                       placeholder="What does this signal represent?"
-                      className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                     />
                   </div>
 

@@ -66,7 +66,7 @@ export function NotificationsSettings() {
           value={notificationEmail}
           onChange={(e) => setNotificationEmail(e.target.value)}
           placeholder={userEmail || 'Leave empty to use account email'}
-          className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2"
         />
         <p className="mt-1 text-xs text-text-muted">
           Quote notifications will be sent to this email instead of your account email. Leave empty to use your

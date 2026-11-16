@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import { assetIdsOf, DASHBOARD_PHOTO_URL_SECONDS } from '@/lib/quote-photos'
+import { photoKeyToServe, photoSizeOf } from '@/lib/small-photo-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,8 +19,12 @@ const notFound = () => NextResponse.json({ error: { code: 'NOT_FOUND', message: 
  * must be one of that quote's request's assets, and the asset row must belong
  * to the same tenant. Anything else is 404, the same answer as a photo that
  * does not exist. Neither the key nor the signed URL is logged.
+ *
+ * T-172: `?size=small` answers with the photo's small copy when it has one
+ * that passes the server's check, and the original when it has not. The
+ * sign-in and tenant checks are the same for both sizes.
  */
-export async function GET(_request: Request, { params }: { params: { quoteId: string; assetId: string } }) {
+export async function GET(request: Request, { params }: { params: { quoteId: string; assetId: string } }) {
   try {
     const { quoteId, assetId } = params
     const supabase = await createClient()
@@ -56,7 +61,8 @@ export async function GET(_request: Request, { params }: { params: { quoteId: st
       return NextResponse.json({ error: { code: 'STORAGE_UNAVAILABLE', message: 'Photo storage is not set up' } }, { status: 503 })
     }
 
-    const signedUrl = await generateDownloadUrl(asset.r2_key, DASHBOARD_PHOTO_URL_SECONDS)
+    const key = await photoKeyToServe(asset.r2_key, photoSizeOf(new URL(request.url).searchParams.get('size')))
+    const signedUrl = await generateDownloadUrl(key, DASHBOARD_PHOTO_URL_SECONDS)
     // The browser may reuse the answer for a little less than the signed URL lasts; nothing shared may keep it
     return NextResponse.redirect(signedUrl, {
       status: 302,

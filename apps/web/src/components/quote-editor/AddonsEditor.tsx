@@ -49,7 +49,7 @@ export default function AddonsEditor({ items, currency, onChange }: AddonsEditor
                 value={item.label}
                 onChange={(e) => handleUpdate(item.id, { label: e.target.value })}
                 placeholder="Extra label..."
-                className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-background text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-background text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:border-primary"
               />
               <div className="flex items-center gap-1">
                 <span className="text-sm text-text-muted">{symbol}</span>
@@ -60,7 +60,7 @@ export default function AddonsEditor({ items, currency, onChange }: AddonsEditor
                   placeholder="0.00"
                   step="0.01"
                   min="0"
-                  className="w-24 px-3 py-2 text-sm border border-border rounded-lg bg-background text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-right"
+                  className="w-24 px-3 py-2 text-sm border border-border rounded-lg bg-background text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:border-primary text-right"
                 />
               </div>
               <button

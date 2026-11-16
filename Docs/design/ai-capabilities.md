@@ -24,8 +24,8 @@ lists what the rows below produced for that quote and nothing else: label readin
 quantity measured from photos, notes from photos, an extra picked up from the customer's words, work that may also
 be needed, and the question asked and the answer. A quote the AI produced nothing for has no panel. The lines are
 built by `apps/web/src/lib/quote-understanding.ts` from the quote's stored signals, takeoff, questions and
-answers; none carries an amount. The quote checker's findings can show there too, as "Worth checking", but that
-group is **switched off** (`SHOW_WORTH_CHECKING`, section 4's `checker` row says why).
+answers; none carries an amount. The quote checker's findings show there too, as "Worth checking" (switched on
+in T-172, for checks made with the business's money settings; section 4's `checker` row).
 
 ## 1. What it reads from a job (claimable)
 
@@ -61,7 +61,7 @@ group is **switched off** (`SHOW_WORTH_CHECKING`, section 4's `checker` row says
 
 | id | Why not |
 |---|---|
-| `checker` | The AI quote checker reads every priced quote and logs issues. It changes nothing (AD-049) and its findings hold no quote. T-169 built a "Worth checking" group for them on the dashboard quote page, and the owner shipped it **switched off** (`SHOW_WORTH_CHECKING` in `apps/web/src/lib/quote-understanding.ts`): no business sees a finding today. **Not claimable:** the checker is not told the business's minimum charge, base fee, tax or currency, so it reports the minimum and the tax as fees nobody configured (locally 18 of 217 runs with a finding name the minimum charge), and a wrong note is worse than none. It needs its own worker ticket before the group is switched on or a page may mention it. |
+| `checker` | The AI quote checker reads every priced quote and logs issues. It changes nothing (AD-049) and its findings hold no quote. Since T-172 it is told the business's currency, base fee, minimum charge and tax, so it no longer reports those as mistakes: four kinds of correct quote (under the minimum, with a base fee, with tax, in pounds) came back with no finding in 12 runs of 12, where 6 runs of 8 had one before. Its findings show to the business on the dashboard quote page as "Worth checking" (`SHOW_WORTH_CHECKING` in `apps/web/src/lib/quote-understanding.ts`, on), only for checks made with those settings. **Still not claimable on a marketing page:** it is an AI's note, it can be wrong about scope and wording, and it is a note to the business, never a guarantee to a customer. |
 | `cross-service-suggestions` | Code exists to notice another of the business's services in the customer's words and estimate it. It ran on 543 quotes and stored a suggestion on **none**. |
 | `learning-from-edits` | Code exists to learn wording habits from the business's edits. Its table (`tenant_learning_context`) is empty: it has never produced anything. The Features page's "Your corrections improve the next estimate" is true only of confirmed measurements (`measurement-memory`). |
 | `inventory-from-photos` | Counting catalogue items in photos exists in code. No template uses it and it has never run in a timed quote. |

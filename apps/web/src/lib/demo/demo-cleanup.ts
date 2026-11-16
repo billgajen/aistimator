@@ -6,6 +6,7 @@
  * Order: R2 objects → asset rows → quotes (their logs and amendments cascade)
  * → quote requests (quotes reference them with ON DELETE RESTRICT).
  */
+import { smallPhotoKey } from '@/lib/small-photo'
 import type { createAdminClient } from '@/lib/supabase/server'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -45,7 +46,11 @@ export async function cleanUpDemoRequests(
   if (assetRows.length > 0) {
     if (opts.deleteObjects) {
       try {
-        out.objects = await opts.deleteObjects(assetRows.map((a) => a.r2_key as string))
+        const keys = assetRows.map((a) => a.r2_key as string)
+        out.objects = await opts.deleteObjects(keys)
+        // T-172: a photo's small copy sits beside it under a derived key and has no row
+        // of its own; it goes with its original (a key with no small copy deletes nothing)
+        await opts.deleteObjects(keys.map(smallPhotoKey))
       } catch (error) {
         // Keep the rows so the next run retries the objects
         console.error('[DemoCleanup] R2 delete failed; will retry tomorrow:', error)

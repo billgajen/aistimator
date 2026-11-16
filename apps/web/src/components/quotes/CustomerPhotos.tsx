@@ -67,7 +67,7 @@ export function CustomerPhotos({ photos, customerName }: { photos: QuotePhoto[];
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element -- a private upload behind a signed redirect; the image optimiser cannot sign in
                 <img
-                  src={photo.url}
+                  src={photo.smallUrl ?? photo.url}
                   alt=""
                   loading="lazy"
                   decoding="async"

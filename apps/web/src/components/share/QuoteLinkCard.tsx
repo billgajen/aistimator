@@ -133,7 +133,7 @@ export function QuoteLinkCard({
               id="slug-input"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
               autoComplete="off"
               spellCheck={false}
             />

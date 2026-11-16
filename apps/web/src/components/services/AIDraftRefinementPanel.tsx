@@ -210,13 +210,13 @@ export function AIDraftRefinementPanel({
       <button
         type="button"
         onClick={() => setCollapsed(false)}
-        className="flex w-full items-center gap-2 rounded-lg border border-tertiary/30 bg-tertiary-light p-3 text-left text-sm text-tertiary hover:bg-tertiary-light/80"
+        className="flex w-full items-center gap-2 rounded-lg border bg-tertiary-light p-3 text-left text-sm text-tertiary"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
         <span className="font-medium">AI Refinement</span>
-        <span className="text-tertiary/70">— Upload docs or chat to adjust pricing</span>
+        <span>— Upload docs or chat to adjust pricing</span>
         <svg className="ml-auto h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -225,9 +225,9 @@ export function AIDraftRefinementPanel({
   }
 
   return (
-    <div className="rounded-lg border border-tertiary/30 bg-tertiary-light/50">
+    <div className="rounded-lg border">
       {/* Panel header */}
-      <div className="flex items-center justify-between border-b border-tertiary/20 px-4 py-3">
+      <div className="flex items-center justify-between border-b px-4 py-3">
         <div className="flex items-center gap-2">
           <svg className="h-4 w-4 text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -381,7 +381,7 @@ export function AIDraftRefinementPanel({
                 onKeyDown={handleChatKeyDown}
                 placeholder="e.g., Add a line item for cleanup at $30 fixed..."
                 disabled={chatLoading}
-                className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 disabled:opacity-50"
               />
               <button
                 type="button"

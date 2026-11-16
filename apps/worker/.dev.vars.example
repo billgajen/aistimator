@@ -22,3 +22,8 @@ ENVIRONMENT=development
 # Rate limit overrides (optional)
 # RATE_LIMIT_GLOBAL=100
 # RATE_LIMIT_TENANT=10
+
+# Wall-time caps for AI calls, in ms (optional; defaults in src/ai/timeouts.ts; 0 = no cap)
+# AI_TIMEOUT_WORDING_MS=30000
+# AI_TIMEOUT_ADDONS_MS=20000
+# AI_TIMEOUT_CHECKER_MS=30000

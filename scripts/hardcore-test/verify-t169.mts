@@ -33,6 +33,7 @@ import { browserDeps } from './browser.mjs'
 import { garageDoorsPackUS } from '../../apps/web/src/lib/vertical-packs/garage-doors-us'
 import { waterHeaterPackUS } from '../../apps/web/src/lib/vertical-packs/water-heater-us'
 import { UNDERSTOOD_COPY, SHOW_WORTH_CHECKING } from '../../apps/web/src/lib/quote-understanding'
+import { CHECKER_SETTINGS_VERSION } from '../../packages/shared/src/checker'
 import { formatMoney } from '../../packages/shared/src/format'
 
 const cfg = loadEnv()
@@ -201,7 +202,8 @@ await sb.insert('quote_validation_logs', {
   quote_id: noted,
   tenant_id: a.tenantId,
   service_id: doorSvc,
-  input_snapshot: { formAnswers: [], photoCount: 0 },
+  // T-172: the worker marks a check made with the business's money settings; only such a row is shown
+  input_snapshot: { formAnswers: [], photoCount: 0, serviceConfigVersion: CHECKER_SETTINGS_VERSION },
   original_quote_snapshot: { total: notedBefore.pricing_json.total, breakdown: notedBefore.pricing_json.breakdown },
   validation_result: {
     overallStatus: 'REVIEW_NEEDED',
@@ -278,7 +280,8 @@ const rivalList = await http('GET', `${cfg.appUrl}/api/quotes?group=all`, { head
 check('another business’s list is empty', rivalList.ok && ((rivalList.json as { items?: unknown[] }).items ?? []).length === 0)
 const list = await http('GET', `${cfg.appUrl}/api/quotes?group=all`, { headers: a.cookie })
 const items = ((list.json as { items?: Array<{ quoteId: string; photoUrl?: string | null }> }).items ?? [])
-check('the quotes list carries one small photo for a quote that has one, and none for one that has none', items.find((i) => i.quoteId === heater.id)?.photoUrl === `/api/quotes/${heater.id}/photos/${upload.assetIds[0]}` && items.find((i) => i.quoteId === door.id)?.photoUrl === null)
+// T-172: a small picture asks for the photo's small size (?size=small); a photo with no small copy is served as the original
+check('the quotes list carries one small photo for a quote that has one, and none for one that has none', items.find((i) => i.quoteId === heater.id)?.photoUrl === `/api/quotes/${heater.id}/photos/${upload.assetIds[0]}?size=small` && items.find((i) => i.quoteId === door.id)?.photoUrl === null)
 
 // ====================================================================
 section('3. Nothing changed a price, and the checker’s log changed no quote')
@@ -390,7 +393,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
     })
     check(`${width} quote: the order is next step, what the AI understood, pricing, the rest`, q.order.every((y) => y !== null) && [...q.order].sort((x, y) => (x as number) - (y as number)).join() === q.order.join(), q.order)
     check(`${width} quote: the customer's photo is at the top of the panel, above what was read`, q.thumbs === 1 && q.photosTop !== null && q.readingTop !== null && q.photosTop < q.readingTop && q.photosTop > (q.order[1] as number), { photos: q.photosTop, reading: q.readingTop })
-    check(`${width} quote: the photo loaded, from a path on our site`, q.photoLoaded && q.photoSrc === `/api/quotes/${heater.id}/photos/${upload.assetIds[0]}`, q.photoSrc)
+    check(`${width} quote: the photo loaded, from a path on our site`, q.photoLoaded && q.photoSrc === `/api/quotes/${heater.id}/photos/${upload.assetIds[0]}?size=small`, q.photoSrc)
     check(`${width} quote: the page holds no storage address`, !q.html)
     check(`${width} quote: the panel says what was read, the question and the answer`, q.panelText.includes(UNDERSTOOD_COPY.title) && /From the tank's rating label: /.test(q.panelText) && q.panelText.includes(firstQuestions[0]?.question ?? '∅') && q.panelText.includes(UNDERSTOOD_COPY.answered))
     check(`${width} quote: the total stands out: the mono figure, 36 px, over 14 px lines`, q.totalText === money(heaterRow.pricing_json.total).replace(/\s+/g, '') && /Spline|mono/i.test(q.totalFont) && q.totalSize >= 36 && q.lineSize <= 14, { text: q.totalText, size: q.totalSize, font: q.totalFont.split(',')[0] })

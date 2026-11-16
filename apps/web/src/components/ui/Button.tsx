@@ -12,15 +12,15 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-primary text-white hover:bg-primary-hover focus:ring-primary/30',
+    'bg-primary text-white hover:bg-primary-hover',
   secondary:
-    'bg-secondary text-white hover:bg-secondary/90 focus:ring-secondary/30',
+    'bg-secondary text-white hover:bg-secondary/90',
   ghost:
-    'bg-transparent text-text-secondary hover:bg-background focus:ring-primary/20',
+    'bg-transparent text-text-secondary hover:bg-background',
   danger:
-    'bg-danger text-white hover:bg-danger/90 focus:ring-danger/30',
+    'bg-danger text-white hover:bg-danger/90',
   outline:
-    'border border-border bg-surface text-text-primary hover:bg-background focus:ring-primary/20',
+    'border border-border bg-surface text-text-primary hover:bg-background',
   // T-165: the yellow button: dark text and a thin dark edge (system.md,
   // Colour). The one main call to action of a marketing screen. Dashboard
   // buttons do not use it.

@@ -138,6 +138,20 @@ defined and sold as before; it is only not shown.
   the accepted block arrives once (250 ms) with "What happens next" in three steps. A business has no setting
   for those three steps yet, so the words are ours, with its name and what the customer just told it.
 
+**The form's step count (T-172).** The Questions step exists only for a service that asks something. Before a
+service is chosen the form counts it only when every service has one (`components/embed/step-count.ts`,
+`questionsSpread`): every service has questions, or none has, and the first step shows the true total ("Step 1 of
+5", or the numbered row with Questions in it). When some services have questions and some do not, the first step
+shows only its name ("Service"): no "Step 1 of", no bar parts, no numbered row, also after the customer comes
+back to it with a service chosen. The count starts on the second step. A form with one service has no such step.
+
+**Small photo copies (T-172).** When a customer adds a photo, the browser makes a copy at most 480 px on its
+longest side (a canvas, WebP or JPEG, no library: `lib/small-photo-client.ts`) and uploads it beside the original.
+Small pictures ask for `?size=small`: the quote page's photo grid, the dashboard's photo strip and the 48 px photo
+on a list row. The larger view and the photo's own link are the original. The server checks the copy in storage
+before serving it and falls back to the original (`lib/small-photo-server.ts`). A failed copy never fails the
+upload, and the upload waits at most 15 seconds for it.
+
 **Billing (T-171):** a plan's lines on `/app/settings/billing` are `planLines()` from
 `lib/marketing/plan-claims.ts`, the list the public Pricing page reads, so a line that is not live says "Coming
 later" on both. Every plan on offer can be chosen there, Business included.

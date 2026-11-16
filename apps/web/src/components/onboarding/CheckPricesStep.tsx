@@ -42,7 +42,7 @@ export function CheckPricesStep({
         This is everything your estimates will charge. Change any number to match what you charge.
       </p>
       {fromTemplate && (
-        <p className="mt-4 rounded-xl border border-tape/50 bg-butter px-4 py-3 text-sm text-text-primary" role="note">
+        <p className="mt-4 rounded-xl border bg-butter px-4 py-3 text-sm text-text-primary" role="note">
           These are typical starting prices. Change them to yours.
         </p>
       )}
@@ -216,7 +216,7 @@ function AmountInput({
 }) {
   const [text, setText] = useState<string | null>(null)
   return (
-    <span className="inline-flex items-center rounded-lg border border-border bg-background focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
+    <span className="inline-flex items-center rounded-lg border border-border bg-background focus-within:border-primary focus-within:ring-2">
       {prefix && <span className="pl-2.5 text-sm text-text-muted">{prefix}</span>}
       <input
         aria-label={label}

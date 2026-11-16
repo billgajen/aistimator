@@ -52,6 +52,10 @@ export interface Env {
   ADJUDICATION_TIMEOUT_MS?: string
   /** T-139 label-read wall-time cap, ms (default 25000; 0 = no cap) */
   IDENTIFICATION_TIMEOUT_MS?: string
+  /** T-172 wall-time caps, ms (defaults in ai/timeouts.ts; 0 = no cap) */
+  AI_TIMEOUT_WORDING_MS?: string
+  AI_TIMEOUT_ADDONS_MS?: string
+  AI_TIMEOUT_CHECKER_MS?: string
   MEASUREMENT_COV_THRESHOLD?: string
 
   // Email (Postmark)

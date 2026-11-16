@@ -75,6 +75,29 @@ export async function generateDownloadUrl(
 }
 
 /**
+ * T-172: the first bytes of an object and its full size, in one request, or
+ * null when there is no such object. Used to check a small photo copy before
+ * it is served: what it is and how big it is are read from storage, not
+ * taken from the browser that uploaded it.
+ */
+export async function readObjectStart(key: string, bytes: number): Promise<{ head: Uint8Array; sizeBytes: number } | null> {
+  const client = getR2Client()
+  try {
+    const result = await client.send(new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key, Range: `bytes=0-${Math.max(0, bytes - 1)}` }))
+    if (!result.Body) return null
+    const head = await result.Body.transformToByteArray()
+    // "bytes 0-11/34567": the number after the slash is the whole object's size
+    const total = Number(/\/(\d+)$/.exec(result.ContentRange ?? '')?.[1])
+    return { head, sizeBytes: Number.isFinite(total) && total > 0 ? total : (result.ContentLength ?? head.length) }
+  } catch (error) {
+    const name = (error as { name?: string } | null)?.name
+    const status = (error as { $metadata?: { httpStatusCode?: number } } | null)?.$metadata?.httpStatusCode
+    if (name === 'NoSuchKey' || name === 'NotFound' || status === 404 || status === 416) return null
+    throw error
+  }
+}
+
+/**
  * Get the public R2 URL for a key (if bucket is public)
  * Note: For private buckets, use generateDownloadUrl instead
  */

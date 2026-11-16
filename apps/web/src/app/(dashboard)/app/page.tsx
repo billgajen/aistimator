@@ -418,7 +418,7 @@ export default async function DashboardPage() {
 function UsageBanner({ tone, title, text, cta }: { tone: 'warn' | 'danger'; title: string; text: string; cta: string }) {
   const danger = tone === 'danger'
   return (
-    <div className={`mb-8 rounded-2xl border p-5 ${danger ? 'border-danger/30 bg-danger-light' : 'border-tape/40 bg-butter'}`}>
+    <div className={`mb-8 rounded-2xl border p-5 ${danger ? 'border-danger/30 bg-danger-light' : 'bg-butter'}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className={`font-display text-base font-bold ${danger ? 'text-danger' : 'text-tertiary'}`}>{title}</h2>

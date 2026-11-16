@@ -15,7 +15,8 @@
  *   checks     the quote checker's findings, as "Worth checking". The checker
  *              changes nothing on a quote (AD-049); these are notes. One
  *              kind is left out because the quote itself proves it wrong
- *              (see `contradictedByTheQuote`). SWITCHED OFF today: see
+ *              (see `contradictedByTheQuote`). On since T-172, and only
+ *              for checks made with the business's money settings: see
  *              `SHOW_WORTH_CHECKING`
  *
  * No customer contact detail is read here, and nothing here is logged.
@@ -27,18 +28,24 @@ import type { QuoteUnderstanding, UnderstoodItem, UnderstoodQuestion } from '@qo
 export type { QuoteUnderstanding, UnderstoodItem, UnderstoodQuestion }
 
 /**
- * The "Worth checking" group is off (owner's decision, T-169).
+ * The "Worth checking" group: on since T-172.
  *
- * The quote checker is not told the business's minimum charge, base fee, tax
- * or currency, so some of its findings are wrong, and a warning that is
- * sometimes wrong teaches a business to ignore the panel. While this is
- * false no finding is built, sent to the page or shown, and the checker's log
- * is not read for the quote page. The checker itself runs and logs as before.
+ * It was off from T-169 because the quote checker was not told the business's
+ * minimum charge, base fee, tax or currency, so it flagged correct quotes,
+ * and a warning that is sometimes wrong teaches a business to ignore the
+ * panel. T-172 tells the checker those four settings; four kinds of correct
+ * quote (under the minimum, with a base fee, with tax, in a currency other
+ * than USD) then came back with no finding, where six runs in eight had one
+ * before. So it is on.
  *
- * Switch it on only after the worker tells the checker those four things
- * (OWNER-TODO.md, T-169).
+ * Only a check made with those settings is shown: the quote API reads the
+ * checker's log only for rows marked `CHECKER_SETTINGS_VERSION`. Findings
+ * made before T-172 stay in the log and are never shown.
+ *
+ * While this is false no finding is built, sent to the page or shown, and the
+ * checker's log is not read for the quote page.
  */
-export const SHOW_WORTH_CHECKING = false as boolean
+export const SHOW_WORTH_CHECKING = true as boolean
 
 export interface UnderstandingInput {
   /** How many photos the customer sent. Notes "from the photos" need at least one. */

@@ -23,7 +23,7 @@ interface SmsConfigResponse {
 }
 
 const inputClass =
-  'mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30'
+  'mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2'
 
 export default function SmsSettingsPage() {
   const [data, setData] = useState<SmsConfigResponse | null>(null)
@@ -116,7 +116,7 @@ export default function SmsSettingsPage() {
       <PageHeader title="SMS" description="Customers text your number, send photos, and get an estimate link back by text." />
 
       {data?.setup.testMode && (
-        <div className="rounded-xl border border-tape/40 bg-butter/40 p-4 text-sm text-text-secondary">
+        <div className="rounded-xl border p-4 text-sm text-text-secondary">
           Test mode: texts are recorded but not sent (Twilio credentials are not configured on this server).
         </div>
       )}

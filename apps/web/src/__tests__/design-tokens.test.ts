@@ -8,8 +8,9 @@
  *    ratio fails here.
  * 2. The motion tokens and the one reduced-motion rule.
  * 3. Source rules: no raw Tailwind palette colour in a component, one radius
- *    scale, no butter on "needs you", no new opacity modifier on a token that
- *    cannot take one, and the /design page unlinked and not indexed.
+ *    scale, no butter on "needs you", every colour token able to take an
+ *    opacity modifier (T-172) with the rules that follow from that, and the
+ *    /design page unlinked and not indexed.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -17,6 +18,7 @@ import { describe, expect, it } from 'vitest'
 import type { QuoteTurnTone } from '@qolumns/shared'
 import config from '../../tailwind.config'
 import { NEEDS_YOU_MARK, STATUS_TONE, STATUS_TONE_TOKENS } from '@/lib/status-tone'
+import { brandStyleVars, rgbTriple } from '@/lib/color'
 
 const ROOT = join(__dirname, '..', '..', '..', '..')
 const WEB = join(ROOT, 'apps/web/src')
@@ -298,9 +300,11 @@ describe('T-164: colours come from our tokens', () => {
 
   it('the Tailwind config names every token the system uses', () => {
     const colors = config.theme!.extend!.colors as Record<string, unknown>
-    expect(colors.accent).toBe('var(--color-accent)')
-    expect(colors['on-accent']).toBe('var(--color-on-accent)')
-    expect(colors.field).toBe('var(--color-field)')
+    // T-172: each is its RGB triple with a slot for the alpha a class may ask for
+    expect(colors.accent).toBe('rgb(var(--color-accent-rgb) / <alpha-value>)')
+    expect(colors['on-accent']).toBe('rgb(var(--color-on-accent-rgb) / <alpha-value>)')
+    expect(colors.field).toBe('rgb(var(--color-field-rgb) / <alpha-value>)')
+    // the focus colour changes with the ground it is on (globals.css), so it stays a plain variable
     expect(colors.focus).toBe('var(--color-focus)')
     // `field` is generated before `danger`, so an error border still wins when both are on one element
     const order = Object.keys(colors)
@@ -308,26 +312,84 @@ describe('T-164: colours come from our tokens', () => {
   })
 
   /**
-   * An opacity modifier on one of our colour tokens (border-danger/30) writes
-   * NO CSS: the tokens are plain var() strings and Tailwind cannot put an
-   * alpha on them. 228 such classes were already in the code before T-164 and
-   * do nothing today; turning them on would change how many pages look, so
-   * that is a ticket of its own. Until then: none may be added, and the
-   * number may only go down.
+   * T-172. An opacity modifier on one of our colour tokens (border-danger/30)
+   * used to write NO CSS: the tokens were plain var() strings and Tailwind
+   * cannot put an alpha on one. 228 such classes sat in the code doing
+   * nothing. The tokens are now RGB triples with an alpha slot, defined once
+   * (tailwind.config.ts and globals.css), so every such class writes CSS.
    */
-  it('no new opacity modifier on a token that cannot take one (228 dead ones are known; the number may only fall)', () => {
-    const TOKENS = 'background|surface|text-primary|text-secondary|text-muted|primary|primary-hover|primary-light|secondary|secondary-light|secondary-line|tertiary|tertiary-light|tertiary-line|border|border-strong|field|danger|danger-light|danger-line|ink|ink-deep|mist|mint|butter|tape|accent|accent-tint|accent-line|accent-ink|on-accent|focus'
-    const DEAD = new RegExp(`(?<![\\w/-])(?:[a-z-]+:)*(?:${COLOUR_UTILITY})-(?:${TOKENS})/[0-9]+`, 'g')
-    const count = sources().reduce((n, [, src]) => n + (src.match(DEAD)?.length ?? 0), 0)
-    expect(count).toBeLessThanOrEqual(228)
-    // the new files have none
-    for (const f of ['components/design/DesignPreview.tsx', 'lib/status-tone.ts', 'components/brand/Wordmark.tsx', 'components/quotes/TurnBadge.tsx', 'components/home/QuoteStand.tsx']) {
-      expect(readFileSync(join(WEB, f), 'utf8').match(DEAD), f).toBeNull()
+  const TOKENS = 'background|surface|text-primary|text-secondary|text-muted|primary|primary-hover|primary-light|secondary|secondary-light|secondary-line|tertiary|tertiary-light|tertiary-line|border|border-strong|field|danger|danger-light|danger-line|ink|ink-deep|mist|mint|butter|tape|accent|on-accent|on-primary'
+  const WITH_ALPHA = new RegExp(`(?<![\\w/-])((?:[a-z-]+:)*)(${COLOUR_UTILITY})-(${TOKENS})/[0-9]+`, 'g')
+  const uses = () => sources().flatMap(([file, src]) => [...src.matchAll(WITH_ALPHA)].map((m) => ({ file, cls: m[0], variants: m[1]!, utility: m[2]!, token: m[3]! })))
+
+  it('every colour token can take an opacity modifier: an RGB triple with an alpha slot', () => {
+    const flat: Array<[string, unknown]> = Object.entries(config.theme!.extend!.colors as Record<string, unknown>).flatMap(([name, value]) =>
+      typeof value === 'string' ? [[name, value] as [string, unknown]] : Object.entries(value as Record<string, unknown>).map(([step, v]) => [step === 'DEFAULT' ? name : `${name}-${step}`, v] as [string, unknown])
+    )
+    expect(flat.length).toBeGreaterThanOrEqual(29)
+    for (const [name, value] of flat) {
+      if (name === 'focus') continue
+      if (name === 'on-primary') expect(value).toBe('rgb(var(--color-on-primary-rgb, 255 255 255) / <alpha-value>)')
+      else expect(value, name).toBe(`rgb(var(--color-${name}-rgb) / <alpha-value>)`)
     }
-    // on-primary is the one token that can: it is an RGB triple with <alpha-value>
-    expect((config.theme!.extend!.colors as Record<string, unknown>)['on-primary']).toContain('<alpha-value>')
+  })
+
+  it('each RGB triple in globals.css is the hex beside it', () => {
+    const triples = Object.entries(ROOT_TOKENS).filter(([name]) => name.startsWith('--color-') && name.endsWith('-rgb'))
+    expect(triples.length).toBe(28)
+    for (const [name, triple] of triples) {
+      expect(triple, name).toBe(rgbTriple(hex(ROOT_TOKENS, name.replace(/-rgb$/, ''))))
+    }
+    expect(rgbTriple('#205E56')).toBe('32 94 86')
+    expect(rgbTriple('not a colour')).toBe('0 0 0')
+  })
+
+  it('a business’s own colour is set as a hex and as a triple, so the classes follow it', () => {
+    const vars = brandStyleVars('#B4532A') as Record<string, string>
+    expect(vars['--color-primary']).toBe('#B4532A')
+    expect(vars['--color-primary-rgb']).toBe('180 83 42')
+    expect(vars['--color-primary-hover-rgb']).toBe(rgbTriple(vars['--color-primary-hover']!))
+    // nothing else of ours is overridden: no accent, no other token
+    expect(Object.keys(vars).sort()).toEqual(['--color-on-primary', '--color-on-primary-rgb', '--color-primary', '--color-primary-hover', '--color-primary-hover-rgb', '--color-primary-rgb'])
+    expect(brandStyleVars(null)).toEqual({})
+  })
+
+  it('no focus ring carries an opacity modifier: it would be a faint ring (1.4:1 to 1.6:1) in place of the ink one', () => {
+    // T-172 removed 129 of them. `:focus { --tw-ring-color: var(--color-focus) }` gives a ring its colour;
+    // a class such as focus:ring-primary/30 now writes CSS and would beat that rule.
+    expect(uses().filter((u) => u.utility === 'ring' && /focus/.test(u.variants)).map((u) => `${u.file} ${u.cls}`)).toEqual([])
+  })
+
+  it('butter and tape take a modifier only in the measurement block and the range bar of the customer quote page', () => {
+    const found = uses().filter((u) => u.token === 'butter' || u.token === 'tape')
+    expect(found.map((u) => u.file).filter((f) => f !== 'app/q/[quoteId]/page.tsx')).toEqual([])
+    expect(found.map((u) => u.cls).sort()).toEqual(['bg-butter/40', 'bg-butter/80', 'border-tape/40'])
+  })
+
+  it('the accent takes no modifier (there is no pale yellow), and no text is thinned with one', () => {
+    expect(uses().filter((u) => u.token === 'accent' || u.token === 'on-accent').map((u) => `${u.file} ${u.cls}`)).toEqual([])
+    // text at part strength: only the admin bar's light text on ink (9:1 at 80%)
+    expect(uses().filter((u) => u.utility === 'text' && u.token !== 'on-primary').map((u) => `${u.file} ${u.cls}`).filter((x) => !x.startsWith('app/admin/layout.tsx text-surface/80'))).toEqual([])
+  })
+
+  it('the owner\'s three follow-ups: a juniper step ring, a readable admin label, no amber switched on in the service window', () => {
+    const services = read('apps/web/src/app/(dashboard)/app/services/page.tsx')
+    expect(services).toContain("'bg-primary text-white ring-2 ring-primary ring-offset-1'")
+    // "Support Tools": secondary text on mist, 4.5:1 or more (it was amber on ink, 2.4:1)
+    expect(read('apps/web/src/app/admin/layout.tsx')).toContain('rounded-full bg-mist px-2.5 py-0.5 text-xs font-medium text-text-secondary')
+    expect(ratio(ROOT_TOKENS, '--color-text-secondary', '--color-mist')).toBeGreaterThanOrEqual(4.5)
+    // the AI boxes of the service window carry no amber at part strength (it reads as butter and tape)
+    const panel = read('apps/web/src/components/services/AIDraftRefinementPanel.tsx')
+    for (const src of [services, panel]) expect(src).not.toMatch(/(border|bg)-tertiary(-light)?\/[0-9]+/)
+  })
+
+  it('the edge of a control is never thinned: an error field and the sample-photo button keep the full colour', () => {
+    expect(read('apps/web/src/components/embed/steps/QuestionsStep.tsx')).toContain("const inputErrorClass = 'border-danger bg-danger-light/30 focus:border-danger'")
+    expect(read('apps/web/src/components/embed/steps/JobDetailsStep.tsx')).toContain("? 'border-danger' : ''")
+    expect(read('apps/web/src/components/embed/EstimateWidget.tsx')).toMatch(/border-2 border-dashed border-primary bg-mint/)
   })
 })
+
 
 describe('T-164: one radius scale', () => {
   it('the scale replaces Tailwind’s own, so no other step exists', () => {

@@ -312,7 +312,7 @@ function TagInput({
   }
 
   return (
-    <div className="min-h-[80px] rounded-lg border border-border p-2 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
+    <div className="min-h-[80px] rounded-lg border border-border p-2 focus-within:border-primary focus-within:ring-2">
       <div className="flex flex-wrap gap-2">
         {tags.map((tag, index) => (
           <span
@@ -1141,7 +1141,7 @@ export default function ServicesPage() {
                         <span
                           className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-all ${
                             isActive
-                              ? 'bg-primary text-white ring-2 ring-tape/50 ring-offset-1'
+                              ? 'bg-primary text-white ring-2 ring-primary ring-offset-1'
                               : isDone
                                 ? 'bg-primary text-white'
                                 : 'border border-border bg-surface text-text-muted'
@@ -1209,7 +1209,7 @@ export default function ServicesPage() {
                         className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
                           nameError
                             ? 'border-danger focus:border-danger focus:ring-danger'
-                            : 'border-border focus:border-primary focus:ring-primary/30'
+                            : 'border-border focus:border-primary'
                         }`}
                         required
                         autoFocus
@@ -1228,7 +1228,7 @@ export default function ServicesPage() {
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         placeholder="Describe what this service includes. AI will use this to generate sensible defaults for scope, pricing, and form fields."
                         rows={4}
-                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
                       />
                       <p className="mt-1 text-xs text-text-muted">
                         A good description helps AI generate better defaults for the next steps
@@ -1247,7 +1247,7 @@ export default function ServicesPage() {
                             documentTypeDefault: e.target.value as DocumentType,
                           })
                         }
-                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
                       >
                         {DOCUMENT_TYPES.map((type) => (
                           <option key={type.value} value={type.value}>
@@ -1278,7 +1278,7 @@ export default function ServicesPage() {
                               value={option.value}
                               checked={formData.reviewMode === option.value}
                               onChange={() => setFormData({ ...formData, reviewMode: option.value })}
-                              className="mt-0.5 h-4 w-4 border-border text-primary focus:ring-primary/20"
+                              className="mt-0.5 h-4 w-4 border-border text-primary"
                             />
                             <span>
                               <span className="block text-sm font-medium text-text-primary">{option.label}</span>
@@ -1297,7 +1297,7 @@ export default function ServicesPage() {
                     )}
 
                     {generatingDraft && (
-                      <div className="flex items-center gap-2 rounded-lg border border-tertiary/30 bg-tertiary-light p-3">
+                      <div className="flex items-center gap-2 rounded-lg border bg-tertiary-light p-3">
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-tertiary border-t-transparent" />
                         <span className="text-sm text-tertiary">
                           Generating AI draft configuration...
@@ -1312,7 +1312,7 @@ export default function ServicesPage() {
                   <div className="space-y-6">
                     {/* AI Draft Badge for Scope section */}
                     {aiDraft && (
-                      <div className="flex items-center justify-between rounded-lg border border-tertiary/30 bg-tertiary-light p-3">
+                      <div className="flex items-center justify-between rounded-lg border bg-tertiary-light p-3">
                         <div className="flex items-center gap-2">
                           <AIDraftBadge compact />
                           <span className="text-sm text-tertiary">
@@ -1396,7 +1396,7 @@ export default function ServicesPage() {
                             })
                           }
                           onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                          className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
                         />
                       </div>
 
@@ -1419,7 +1419,7 @@ export default function ServicesPage() {
                             })
                           }
                           onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                          className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
                         />
                       </div>
                     </div>
@@ -1441,7 +1441,7 @@ export default function ServicesPage() {
                         }
                         placeholder="e.g., Please include photos of the area from multiple angles, any damage or problem areas, and any obstacles."
                         rows={3}
-                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
                       />
                     </div>
                   </div>
@@ -1452,7 +1452,7 @@ export default function ServicesPage() {
                   <div className="space-y-6">
                     {/* AI Draft Badge */}
                     {aiDraft && (
-                      <div className="flex items-center justify-between rounded-lg border border-tertiary/30 bg-tertiary-light p-3">
+                      <div className="flex items-center justify-between rounded-lg border bg-tertiary-light p-3">
                         <div className="flex items-center gap-2">
                           <AIDraftBadge compact />
                           <span className="text-sm text-tertiary">
@@ -1518,7 +1518,7 @@ export default function ServicesPage() {
                               step="0.01"
                               value={formData.baseFee}
                               onChange={(e) => setFormData({ ...formData, baseFee: parseFloat(e.target.value) || 0 })}
-                              className="w-full rounded-lg border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                              className="w-full rounded-lg border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2"
                             />
                           </div>
                           <p className="mt-1 text-xs text-text-muted">Starting price for all quotes</p>
@@ -1533,7 +1533,7 @@ export default function ServicesPage() {
                               step="0.01"
                               value={formData.minimumCharge}
                               onChange={(e) => setFormData({ ...formData, minimumCharge: parseFloat(e.target.value) || 0 })}
-                              className="w-full rounded-lg border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                              className="w-full rounded-lg border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2"
                             />
                           </div>
                           <p className="mt-1 text-xs text-text-muted">Minimum quote amount</p>
@@ -1597,7 +1597,7 @@ export default function ServicesPage() {
                                     newMultipliers[index] = { ...mult, when: { ...mult.when, fieldId: e.target.value } }
                                     setFormData({ ...formData, multipliers: newMultipliers })
                                   }}
-                                  className="w-40 rounded-lg border border-border px-2 py-1.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                  className="w-40 rounded-lg border border-border px-2 py-1.5 focus:border-primary focus:outline-none focus:ring-2"
                                 >
                                   <option value="">Select question...</option>
                                   {formData.suggestedFields.map((field) => (
@@ -1613,7 +1613,7 @@ export default function ServicesPage() {
                                       newMultipliers[index] = { ...mult, when: { ...mult.when, equals: e.target.value } }
                                       setFormData({ ...formData, multipliers: newMultipliers })
                                     }}
-                                    className="w-40 rounded-lg border border-border px-2 py-1.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                    className="w-40 rounded-lg border border-border px-2 py-1.5 focus:border-primary focus:outline-none focus:ring-2"
                                   >
                                     <option value="">Select value...</option>
                                     {fieldOptions.map((opt) => (
@@ -1630,7 +1630,7 @@ export default function ServicesPage() {
                                       setFormData({ ...formData, multipliers: newMultipliers })
                                     }}
                                     placeholder="value"
-                                    className="w-32 rounded-lg border border-border px-2 py-1.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                    className="w-32 rounded-lg border border-border px-2 py-1.5 focus:border-primary focus:outline-none focus:ring-2"
                                   />
                                 )}
                                 <span className="text-text-muted">→</span>
@@ -1643,7 +1643,7 @@ export default function ServicesPage() {
                                     newMultipliers[index] = { ...mult, multiplier: newMult }
                                     setFormData({ ...formData, multipliers: newMultipliers })
                                   }}
-                                  className="w-28 rounded-lg border border-border px-2 py-1.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                  className="w-28 rounded-lg border border-border px-2 py-1.5 focus:border-primary focus:outline-none focus:ring-2"
                                 >
                                   <option value="increase">Increase</option>
                                   <option value="decrease">Reduce</option>
@@ -1661,7 +1661,7 @@ export default function ServicesPage() {
                                     newMultipliers[index] = { ...mult, multiplier: newMult }
                                     setFormData({ ...formData, multipliers: newMultipliers })
                                   }}
-                                  className="w-16 rounded-lg border border-border px-2 py-1.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                  className="w-16 rounded-lg border border-border px-2 py-1.5 focus:border-primary focus:outline-none focus:ring-2"
                                 />
                                 <span className="text-text-muted">%</span>
                                 <button
@@ -1719,7 +1719,7 @@ export default function ServicesPage() {
                                   setFormData({ ...formData, addons: newAddons })
                                 }}
                                 placeholder="Add-on name (e.g., Deep Carpet Cleaning)"
-                                className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                               />
                               <div className="relative w-28">
                                 <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-text-muted">$</span>
@@ -1733,7 +1733,7 @@ export default function ServicesPage() {
                                     newAddons[index] = { ...addon, price: parseFloat(e.target.value) || 0 }
                                     setFormData({ ...formData, addons: newAddons })
                                   }}
-                                  className="w-full rounded-lg border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                  className="w-full rounded-lg border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2"
                                 />
                               </div>
                               <button
@@ -1758,7 +1758,7 @@ export default function ServicesPage() {
                   <div className="space-y-6">
                     {/* AI Draft Badge */}
                     {aiDraft && (
-                      <div className="flex items-center justify-between rounded-lg border border-tertiary/30 bg-tertiary-light p-3">
+                      <div className="flex items-center justify-between rounded-lg border bg-tertiary-light p-3">
                         <div className="flex items-center gap-2">
                           <AIDraftBadge compact />
                           <span className="text-sm text-tertiary">
@@ -1829,7 +1829,7 @@ export default function ServicesPage() {
                                 setSimulatorResult(null)
                               }}
                               placeholder="0"
-                              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                             />
                           </div>
                         ))}
@@ -1847,7 +1847,7 @@ export default function ServicesPage() {
                                 }))
                                 setSimulatorResult(null)
                               }}
-                              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                             >
                               <option value="">Select...</option>
                               {field.options?.map((opt) => (
@@ -1869,7 +1869,7 @@ export default function ServicesPage() {
                                   }))
                                   setSimulatorResult(null)
                                 }}
-                                className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+                                className="h-4 w-4 rounded-sm border-border text-primary"
                               />
                               <span className="text-sm text-text-secondary">{field.label}</span>
                             </label>

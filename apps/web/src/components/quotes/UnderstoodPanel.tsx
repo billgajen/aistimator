@@ -10,9 +10,10 @@ import { CustomerPhotos } from './CustomerPhotos'
  * builds the lines on the server): what it read from the photos, what it
  * picked up from the customer's words, the question it asked and the answer,
  * and the quote checker's findings as "Worth checking". That last group is
- * switched off today (`SHOW_WORTH_CHECKING` in lib/quote-understanding.ts): the
- * server sends no finding, so it never renders. The checker changes nothing
- * on a quote (AD-049) and no line here carries a price of the AI's (AD-001).
+ * on since T-172 (`SHOW_WORTH_CHECKING` in lib/quote-understanding.ts), for
+ * checks made with the business's money settings only; the server decides,
+ * and this component renders whatever findings it is sent. The checker changes
+ * nothing on a quote (AD-049) and no line here carries a price of the AI's (AD-001).
  *
  * The customer's photos sit at the top. When the AI produced nothing, there
  * is no panel: the photos, if any, show on their own, and with neither

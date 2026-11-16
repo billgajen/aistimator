@@ -247,7 +247,7 @@ export default function BrandingPage() {
                   maxLength={80}
                   onChange={(e) => setBranding({ ...branding, tagline: e.target.value || null })}
                   placeholder="e.g., Family-run since 1998"
-                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -258,7 +258,7 @@ export default function BrandingPage() {
                     value={branding.phone || ''}
                     onChange={(e) => setBranding({ ...branding, phone: e.target.value || null })}
                     placeholder={regionCopy.phoneExample}
-                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                   />
                 </div>
                 <div>
@@ -268,7 +268,7 @@ export default function BrandingPage() {
                     value={branding.email || ''}
                     onChange={(e) => setBranding({ ...branding, email: e.target.value || null })}
                     placeholder={regionCopy.emailExample}
-                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                   />
                 </div>
               </div>
@@ -279,7 +279,7 @@ export default function BrandingPage() {
                   value={branding.website || ''}
                   onChange={(e) => setBranding({ ...branding, website: e.target.value || null })}
                   placeholder={regionCopy.websiteExample}
-                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                 />
               </div>
             </div>
@@ -320,7 +320,7 @@ export default function BrandingPage() {
                   value={branding.primaryColor}
                   onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
                   pattern="^#[0-9A-Fa-f]{6}$"
-                  className="w-28 rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-28 rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                 />
               </div>
               <p className="mt-1 text-xs text-text-muted">Used for buttons, links, and accents</p>
@@ -340,7 +340,7 @@ export default function BrandingPage() {
                 onChange={(e) => setBranding({ ...branding, footerNotes: e.target.value || null })}
                 placeholder="e.g., Thank you for your business! Payment terms: Net 30"
                 rows={3}
-                className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
               />
             </div>
           </div>
@@ -356,7 +356,7 @@ export default function BrandingPage() {
                   type="checkbox"
                   checked={template.showLineItems}
                   onChange={(e) => setTemplate({ ...template, showLineItems: e.target.checked })}
-                  className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+                  className="h-4 w-4 rounded-sm border-border text-primary"
                 />
                 <div>
                   <span className="text-sm font-medium text-text-secondary">Show line items</span>
@@ -371,7 +371,7 @@ export default function BrandingPage() {
                   onChange={(e) =>
                     setTemplate({ ...template, includeAssumptions: e.target.checked })
                   }
-                  className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+                  className="h-4 w-4 rounded-sm border-border text-primary"
                 />
                 <div>
                   <span className="text-sm font-medium text-text-secondary">Include assumptions</span>
@@ -386,7 +386,7 @@ export default function BrandingPage() {
                   onChange={(e) =>
                     setTemplate({ ...template, includeExclusions: e.target.checked })
                   }
-                  className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+                  className="h-4 w-4 rounded-sm border-border text-primary"
                 />
                 <div>
                   <span className="text-sm font-medium text-text-secondary">Include exclusions</span>
@@ -401,7 +401,7 @@ export default function BrandingPage() {
                   onChange={(e) =>
                     setTemplate({ ...template, acceptQuoteEnabled: e.target.checked })
                   }
-                  className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+                  className="h-4 w-4 rounded-sm border-border text-primary"
                 />
                 <div>
                   <span className="text-sm font-medium text-text-secondary">Allow customers to accept quotes directly</span>
@@ -421,7 +421,7 @@ export default function BrandingPage() {
                   onChange={(e) =>
                     setTemplate({ ...template, validityDays: parseInt(e.target.value) || 30 })
                   }
-                  className="mt-1 w-24 rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="mt-1 w-24 rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                 />
                 <p className="mt-1 text-xs text-text-muted">
                   How long quotes remain valid for acceptance

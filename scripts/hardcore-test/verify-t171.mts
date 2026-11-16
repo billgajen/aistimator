@@ -98,6 +98,9 @@ await addService(a, serviceLike(garageDoorsPackUS, 'Garage Door Replacement'))
 const config = expectOk('widget config', await http('GET', `${cfg.appUrl}/api/public/widget/config?tenantKey=${a.tenantKey}`))
 const fieldsOf = (id: string) => [...(config.globalFields ?? []), ...((config.serviceFields ?? {})[id] ?? [])] as Array<{ fieldId: string; type: string; label: string; required: boolean; options?: unknown[] }>
 check('(the form has three services, each with its own questions)', config.services.length === 3 && fieldsOf(heaterId).length > 0 && fieldsOf(paintId).length > 0, config.services.map((s: { name: string }) => s.name))
+// T-172: every one of the three has questions, so the form knows its number of steps before a service is chosen
+const everyServiceAsks = (config.services as Array<{ id: string }>).every((s) => fieldsOf(s.id).length > 0)
+check('(every service has questions of its own, so the first step can say how many steps there are)', everyServiceAsks, (config.services as Array<{ id: string; name: string }>).map((s) => `${s.name}: ${fieldsOf(s.id).length}`))
 const heaterAngles = (config.services.find((s: { id: string }) => s.id === heaterId).mediaConfig.requiredAngles ?? []) as Array<{ id: string; label: string }>
 check('(the water heater service lists the photos that help: the rating label and the whole heater)', heaterAngles.length === 2, heaterAngles.map((x) => x.label))
 const LABEL = path.join(ROOT, 'apps/web/public/demo/sample-water-heater-label.png')
@@ -207,6 +210,8 @@ if (!process.env.PLAYWRIGHT_DIR) {
     const below = await p.evaluate(() => { const b = getComputedStyle(document.querySelector('[data-testid=request-form]')!).backgroundColor; return b })
     check(`${width} form: the page under it is the form's own white, not a strip of empty paper`, below === 'rgb(255, 255, 255)', below)
     await shot(p, `form-1-service-${width}`)
+    // T-172: the first step counts the Questions step too, because every service has one (it read "Step 1 of 4")
+    check(`${width} form: the first step reads "Step 1 of 5", the total the next step shows`, !!f.compact && f.compact.count === 'Step 1 of 5' && f.compact.name === 'Service' && f.compact.fits && f.full === null, f.compact)
     await p.getByRole('button', { name: 'Water Heater Replacement', exact: true }).click()
 
     // contact
@@ -381,11 +386,16 @@ if (!process.env.PLAYWRIGHT_DIR) {
     let f = await formState(p)
     if (width < 640) check(`${width} form: edge to edge, with a real h1 and nothing sideways`, f.heading === 'H1' && f.card.left === 0 && f.card.right === width && f.card.radius === '0px' && f.sideways <= 0, f.card)
     else check(`${width} form: on a computer it is the card on paper it was, with a real h1`, f.heading === 'H1' && f.card.left > 0 && f.card.radius !== '0px' && f.card.shadow !== 'none' && f.sideways <= 0, f.card)
+    // T-172: step 1 shows the same number of steps as step 2 will
+    const firstStep = f
+    if (width < 640) check(`${width} form: the first step reads "Step 1 of 5"`, f.compact?.count === 'Step 1 of 5' && f.compact.name === 'Service' && f.compact.fits, f.compact)
+    else check(`${width} form: the first step's bar already shows all five steps, Questions among them`, !!f.full && f.full.map((l) => l.text.toLowerCase()).join(',') === 'service,contact,questions,photos,details' && f.full.every((l) => l.inside && !l.cut), f.full?.map((l) => l.text))
     await p.getByRole('button', { name: 'Interior Painting', exact: true }).click()
     await p.getByText('Where should we send your estimate?').waitFor({ timeout: 15_000 })
     f = await formState(p)
     if (width < 640) check(`${width} form: the step bar fits at ${width}: "${f.compact?.count}", "${f.compact?.name}"`, !!f.compact && /^Step 2 of \d$/.test(f.compact.count) && f.compact.fits && f.sideways <= 0, f.compact)
     else check(`${width} form: the step bar shows every step's label, whole and inside the form`, !!f.full && f.full.length >= 4 && f.full.every((l) => l.inside && !l.cut) && f.compact === null, f.full?.map((l) => l.text))
+    check(`${width} form: the number of steps did not change between the first step and the second`, width < 640 ? firstStep.compact?.count.replace('Step 1', 'Step 2') === f.compact?.count : firstStep.full?.length === f.full?.length, width < 640 ? [firstStep.compact?.count, f.compact?.count] : [firstStep.full?.length, f.full?.length])
     await p.getByLabel('Your name').fill('Dev Raman')
     await p.getByLabel('Email').fill('dev.raman@example.com')
     await p.getByLabel('Phone').fill('(555) 201-3434')

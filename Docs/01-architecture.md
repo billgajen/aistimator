@@ -48,6 +48,11 @@
      `ADJUDICATION_VALUE_THRESHOLD` (default 2500). The reviewer is given the customer's
      answers (they define the scope) and is capped at `ADJUDICATION_TIMEOUT_MS` (default 30 s);
      past the cap the pass median stands and the customer is asked to confirm it
+   - T-172: the wording, add-on detection and checker calls are capped too, in one place
+     (`apps/worker/src/ai/timeouts.ts`: 30 s, 20 s and 30 s; env `AI_TIMEOUT_WORDING_MS`,
+     `AI_TIMEOUT_ADDONS_MS`, `AI_TIMEOUT_CHECKER_MS`; 0 = no cap). Past its cap a call is treated
+     as a failed call: template wording, no AI-detected add-ons, or an unchecked quote. None of
+     them can touch a price.
    - T-139: for expected signals with an `identify` spec, a label-reading call (task
      `identification`, 25 s cap) runs alongside; it transcribes nameplates and the pack's decode
      rules produce the value (AD-032). Identified values select steps via `triggerSignal`; they

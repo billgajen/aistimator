@@ -50,7 +50,8 @@ import { initializeFusionFromStructuredSignals } from './agents/signal-fusion'
 import { evaluateQualityGate } from './agents/quality-gate'
 import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
 import type { QualityGateResult, ClarificationQuestion } from '@qolumns/shared'
-import { AiUsageMeter } from '@qolumns/shared'
+import { AiUsageMeter, CHECKER_SETTINGS_VERSION } from '@qolumns/shared'
+import { withAiTimeout, aiCallTimeoutMs } from './ai/timeouts'
 import { createAiClient } from './ai/factory'
 import type { AiClient } from './ai/client'
 import { computeEnvelope, enforceEnvelope, computeEstimateGrade, capFlatRateGrade, priceDependsOnJobFacts, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue, parseRoomScan, scanAnswers, scanEvidence, summarizeRoomScan, ROOM_SCAN_FIELD, decideReviewHold, reviewModeOf, customerEstimateRange, repairCustomerWording, businessPhrasesFrom } from '@qolumns/shared'
@@ -632,11 +633,14 @@ export async function processQuote(
     !reprice && textAi && customerNotes && addonRules.addons && addonRules.addons.length > 0
       ? timer
           .time('addons', () =>
-            detectAddonsFromDescription(
-              textAi,
-              service.name,
-              customerNotes,
-              addonRules.addons.map((a) => ({ id: a.id, label: a.label }))
+            // T-172: capped; on a timeout the catch below gives "no AI add-ons", as for any failure
+            withAiTimeout('addons', aiCallTimeoutMs('addons', env), () =>
+              detectAddonsFromDescription(
+                textAi,
+                service.name,
+                customerNotes,
+                addonRules.addons.map((a) => ({ id: a.id, label: a.label }))
+              )
             )
           )
           .catch((error) => {
@@ -1237,12 +1241,13 @@ export async function processQuote(
         .map((c) => c.replace(/_/g, ' '))
         .join(', ') + ' detected in photos'
 
-      const detectedAddons = await timer.time('addons', () => detectAddonsFromDescription(
+      // T-172: capped; a timeout lands in the catch below (no AI add-ons from the photos)
+      const detectedAddons = await timer.time('addons', () => withAiTimeout('addons', aiCallTimeoutMs('addons', env), () => detectAddonsFromDescription(
         textAi,
         service.name,
         conditionsText,
         availableAddons
-      ))
+      )))
 
       // Add detected addons as form answers so they get applied by pricing engine
       for (const detected of detectedAddons) {
@@ -1744,7 +1749,8 @@ export async function processQuote(
   } else if (textAi) {
     console.log('[Processor] Generating wording with Gemini')
     try {
-      content = await timer.time('wording', () => generateWording(textAi, wordingContext))
+      // T-172: capped; a timeout uses the template wording, as any failure does
+      content = await timer.time('wording', () => withAiTimeout('wording', aiCallTimeoutMs('wording', env), () => generateWording(textAi, wordingContext)))
     } catch (error) {
       console.error('[Processor] Wording generation failed, using fallback:', error)
       content = generateWordingFallback(wordingContext)
@@ -1911,6 +1917,20 @@ export async function processQuote(
         workSteps: service.work_steps,
         addons: rules.addons,
         multipliers: rules.multipliers,
+        // T-172: the money settings the engine priced with, so a correct quote
+        // is not flagged for its base fee, minimum charge, tax or currency.
+        // The same values the engine was given above; nothing is set here.
+        pricingSettings: {
+          currency: pricing.currency,
+          locale: regionCtx.locale,
+          baseFee: rules.baseFee || 0,
+          minimumCharge: rules.minimumCharge || 0,
+          tax: {
+            enabled: Boolean(tenant.tax_enabled && !service.tax_exempt),
+            label: regionCtx.taxLabel,
+            ratePercent: (tenant.tax_rate || 0) * 100,
+          },
+        },
       }
 
       // Build quote data for validation
@@ -1924,13 +1944,15 @@ export async function processQuote(
       })
 
       // Run validation
-      validationResult = await timer.time('validation', () => validateQuote(
+      // T-172: capped. A timeout lands in the catch below: the quote goes on as
+      // priced, unchecked, and no log row is written for a check that did not finish.
+      validationResult = await timer.time('validation', () => withAiTimeout('checker', aiCallTimeoutMs('checker', env), () => validateQuote(
         textAi,
         quoteForValidation,
         customerRequestContext,
         serviceConfigForValidation,
         quoteData.widgetFields
-      ))
+      )))
 
       console.log(`[Processor] Validation result: ${validationResult.overallStatus}, ${validationResult.issues.length} issues found`)
 
@@ -1958,7 +1980,9 @@ export async function processQuote(
           formAnswers: Object.fromEntries((quoteRequest.job_answers || []).map(a => [a.fieldId, a.value])),
           customerDescription: projectDescription || '',
           photoCount: quoteData.assets.filter(a => a.type === 'image').length,
-          serviceConfigVersion: 'v1',
+          // T-172: marks a check made with the business's money settings; the
+          // dashboard shows findings only from rows that carry it
+          serviceConfigVersion: CHECKER_SETTINGS_VERSION,
         },
         originalQuoteSnapshot: {
           total: pricing.total,
@@ -1976,7 +2000,8 @@ export async function processQuote(
         console.error('[Processor] Failed to log validation result:', err)
       })
     } catch (error) {
-      console.error('[Processor] Quote validation failed:', error)
+      // The error is the call's name and cap, or the provider's error: never the customer's text
+      console.error('[Processor] Quote validation failed:', error instanceof Error ? error.message : 'unknown error')
       // Continue without validation - don't block the quote
     }
   }

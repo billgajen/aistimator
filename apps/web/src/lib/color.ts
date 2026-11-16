@@ -15,6 +15,14 @@ export function isValidHexColor(value: string | undefined | null): value is stri
   return typeof value === 'string' && HEX_PATTERN.test(value)
 }
 
+/** "#205E56" as the three numbers CSS takes in rgb(): "32 94 86" */
+export function rgbTriple(hex: string): string {
+  const digits = HEX_PATTERN.exec(hex)?.[1]
+  if (!digits) return '0 0 0'
+  const value = parseInt(digits, 16)
+  return `${(value >> 16) & 0xff} ${(value >> 8) & 0xff} ${value & 0xff}`
+}
+
 /** Darken a #rrggbb colour by the given fraction (0..1). */
 export function darkenHex(hex: string, amount: number): string {
   const digits = HEX_PATTERN.exec(hex)?.[1]
@@ -78,9 +86,14 @@ export function readableTextOn(hex: string): string {
 export function brandStyleVars(primaryColor: string | undefined | null): CSSProperties {
   if (!isValidHexColor(primaryColor)) return {}
   const onPrimary = readableTextOn(primaryColor)
+  const hover = darkenHex(primaryColor, 0.18)
   return {
     '--color-primary': primaryColor,
-    '--color-primary-hover': darkenHex(primaryColor, 0.18),
+    '--color-primary-hover': hover,
+    // T-172: Tailwind's colour classes read the triples (tailwind.config.ts), so the business's colour is set
+    // in both forms; without these the classes would stay our juniper
+    '--color-primary-rgb': rgbTriple(primaryColor),
+    '--color-primary-hover-rgb': rgbTriple(hover),
     '--color-on-primary': onPrimary,
     // RGB triple for Tailwind opacity modifiers (text-on-primary/60)
     '--color-on-primary-rgb': onPrimary === WHITE ? '255 255 255' : onPrimary === INK ? '27 40 35' : '0 0 0',

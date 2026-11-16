@@ -31,7 +31,7 @@ export default async function DemoPage({ searchParams }: { searchParams: { tenan
         <p className="mt-3 text-base text-text-secondary">
           Ask for an estimate the way your customers would. It takes about a minute, and the price appears right here.
         </p>
-        <p className="mx-auto mt-4 max-w-md rounded-xl border border-tape/50 bg-butter px-4 py-2.5 text-sm text-text-primary" role="note" data-testid="demo-example-note">
+        <p className="mx-auto mt-4 max-w-md rounded-xl border bg-butter px-4 py-2.5 text-sm text-text-primary" role="note" data-testid="demo-example-note">
           {DEMO_BUSINESS_NAME} is an example business with example prices. Nothing you send here reaches a real business.
         </p>
       </section>

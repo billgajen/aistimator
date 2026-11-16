@@ -49,6 +49,17 @@ Response:
   ]
 }
 
+Small photo copies (T-172). A photo's entry in `files` may carry `"small": { "contentType": "image/webp", "sizeBytes": 23456 }`:
+the small copy the browser made of it (longest side 480 px). When that is declared as `image/webp` or `image/jpeg` and
+at most 204,800 bytes, the photo's entry in `uploads` also carries `"smallUploadUrl"`, a signed PUT address for the
+copy, at a key derived from the original's (`<key>.small`). Otherwise there is no `smallUploadUrl`; the photo itself
+is accepted as before. `small` is optional and a client that does not send it (the mobile app, SMS and WhatsApp
+intake, any older page) works unchanged. A small copy is not an asset: it has no row, counts toward no limit and is
+never read by the AI. File size limits, the file count and the rate limit are unchanged.
+
+Before a small copy is served, the server reads its first bytes and its size from storage: it must start as a WebP
+or a JPEG and be within the limit. A copy that is missing or fails is never served; the original is.
+
 POST /api/public/quotes
 
 Create quote request (widget submission). Stores submission and enqueues job.
@@ -96,7 +107,7 @@ Response:
   "breakdown": [{ "label": "Base service", "amount": 150 }],
   "notes": { "assumptions": [], "exclusions": [] },
   "validUntil": "2026-02-10",
-  "assets": [{ "assetId": "ast_1", "type": "image", "viewUrl": "https://..." }],
+  "assets": [{ "assetId": "ast_1", "type": "image", "viewUrl": "https://...", "smallUrl": "https://...&size=small" }],
   "actions": {
     "acceptUrl": "https://app.yourdomain.com/q/qte_123/accept?token=...",
     "payUrl": "https://app.yourdomain.com/q/qte_123/pay?token=..."
@@ -233,6 +244,7 @@ T-157 quote actions that always work (dashboard cookie or app Bearer unless mark
 	•	**What the AI understood and the customer's photos (T-169).**
 		- `GET /api/quotes/:quoteId` also returns `photos: [{ id, url }]` (the customer's photos in the order sent; `url` is the path `/api/quotes/:quoteId/photos/:assetId`, never a storage address) and `understanding: { photos[], words[], alsoNoted[], asked[], checks[], checksBeforeChange }` (`QuoteUnderstanding` in `@qolumns/shared`). Each list item is `{ text, detail? }`; `asked` items are `{ question, answer | null }`. Every list can be empty; nothing is padded. **`checks` is always empty and `checksBeforeChange` always false today:** "Worth checking" is switched off (`SHOW_WORTH_CHECKING` in `apps/web/src/lib/quote-understanding.ts`) and the checker's log is not read for this route. When it is on, `checks` are the descriptions from the newest quote checker run for that quote that found something (`quote_validation_logs`, read for the caller's tenant only); `checksBeforeChange` is true when the quote's total is no longer the total the checker read. The checker's `found`, `expected` and suggested fix are never returned.
 		- `GET /api/quotes/:quoteId/photos/:assetId` → 302 to a signed storage address that lasts 300 seconds (`Cache-Control: private`). 401 signed out. 404 `NOT_FOUND` when the quote is another tenant's, the asset is not one of that quote's request, the asset row is another tenant's, or it is not an image: the same answer as an id that does not exist. 503 `STORAGE_UNAVAILABLE` when storage is not configured. Neither the key nor the signed address is logged.
+		- T-172: each entry of `photos` also has `smallUrl` (the same path with `?size=small`). `GET /api/quotes/:quoteId/photos/:assetId?size=small` and `GET /api/public/assets/:assetId?token=…&size=small` answer with the photo's small copy when it has one that passes the server's check, and with the original when it has not (a photo uploaded before T-172). Sign-in, tenant and token checks are the same for both sizes; both answer with a signed address. A public quote's `assets[]` carry `smallUrl` for photos.
 		- `GET /api/quotes` items carry `photoUrl` (the first photo's path, or null).
 		- Nothing here writes: no route in this ticket changes a quote, a price or the checker's log.
 	•	**Links.** Every route that hands out a link still makes a new token (raw tokens are never stored), but the replaced one keeps working: a database trigger (migration 38) puts the old `quote_token_hash` at the front of `quotes.link_token_hashes` (no duplicates, the newest 10). All public token routes (`GET /api/public/quotes/:id`, accept, decline, feedback, pdf, clarify, assets) accept the current link, `previous_token_hash`, or any hash in that list. Expiry is unchanged: `token_expires_at` covers every link of the quote (410 `TOKEN_EXPIRED`).

@@ -61,7 +61,7 @@ export function TradeStep({
             onRegionChange(e.target.value)
             setChoice(null)
           }}
-          className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
         >
           {listRegions().map((r) => (
             <option key={r.code} value={r.code}>
@@ -115,7 +115,7 @@ export function TradeStep({
             maxLength={200}
             onChange={(e) => setOther(e.target.value)}
             placeholder="e.g. Tree surgery, pressure washing, removals"
-            className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
           />
         </div>
       )}

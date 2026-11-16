@@ -126,8 +126,8 @@ export function QuestionsStep({
     onFieldChange(fieldId, newValues)
   }
 
-  const inputErrorClass = 'border-danger/50 bg-danger-light/30 focus:ring-danger/25 focus:border-danger'
-  const inputNormalClass = 'border-field bg-white focus:ring-primary/25 focus:border-primary'
+  const inputErrorClass = 'border-danger bg-danger-light/30 focus:border-danger'
+  const inputNormalClass = 'border-field bg-white focus:border-primary'
 
   return (
     <div className="p-4 sm:p-6">

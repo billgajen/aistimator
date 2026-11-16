@@ -37,7 +37,7 @@ export function AcceptDetailsForm({
   const [touched, setTouched] = useState(false)
   const check = checkAcceptance({ timing, timingNote: note, address, phone })
   const errors = { ...(touched && !check.ok ? check.errors : {}), ...serverErrors }
-  const input = 'w-full min-h-[48px] px-4 py-3 text-base border border-field rounded-xl bg-white text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition'
+  const input = 'w-full min-h-[48px] px-4 py-3 text-base border border-field rounded-xl bg-white text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:border-primary transition'
   const root = useRef<HTMLDivElement>(null)
   const first = useRef<HTMLInputElement>(null)
   useEffect(() => {

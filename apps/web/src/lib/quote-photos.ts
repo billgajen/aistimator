@@ -9,6 +9,7 @@
  */
 import type { QuotePhoto } from '@qolumns/shared'
 import type { createClient } from '@/lib/supabase/server'
+import { smallSizeUrl } from '@/lib/small-photo'
 
 type Supabase = Awaited<ReturnType<typeof createClient>>
 
@@ -26,7 +27,11 @@ export function assetIdsOf(request: unknown): string[] {
 
 /** Pure: the request's photos in the order the customer sent them (documents and unknown ids are left out) */
 export function photosInOrder(quoteId: string, assetIds: string[], imageIds: ReadonlySet<string>): QuotePhoto[] {
-  return assetIds.filter((id) => imageIds.has(id)).map((id) => ({ id, url: quotePhotoUrl(quoteId, id) }))
+  // T-172: smallUrl is the same photo at its small size (the original, if it has no small copy)
+  return assetIds.filter((id) => imageIds.has(id)).map((id) => {
+    const url = quotePhotoUrl(quoteId, id)
+    return { id, url, smallUrl: smallSizeUrl(url) }
+  })
 }
 
 /** Which of these asset ids are this tenant's photos (one query, however many quotes) */
@@ -41,7 +46,7 @@ export async function quotePhotos(supabase: Supabase, tenantId: string, quoteId:
   return photosInOrder(quoteId, assetIds, await imageIdsOf(supabase, tenantId, assetIds))
 }
 
-/** The first photo of each quote in a list, by quote id (quotes with no photo are absent) */
+/** The first photo of each quote in a list, at its small size (a list row shows 48 px), by quote id (quotes with no photo are absent) */
 export async function firstPhotoUrls(
   supabase: Supabase,
   tenantId: string,
@@ -51,7 +56,7 @@ export async function firstPhotoUrls(
   const out = new Map<string, string>()
   for (const row of rows) {
     const first = photosInOrder(row.quoteId, row.assetIds, images)[0]
-    if (first) out.set(row.quoteId, first.url)
+    if (first) out.set(row.quoteId, first.smallUrl ?? first.url)
   }
   return out
 }

@@ -215,7 +215,8 @@ describe('T-153: clean-up after 24 hours', () => {
     const { supabase, log } = fake(rows)
     const out = await cleanUpDemoRequests(supabase, { now: new Date('2026-11-10T12:00:00Z'), retentionHours: 24, deleteObjects: async (k) => (deleted.push(k), k.length) })
     expect(out).toEqual({ quotes: 1, requests: 1, assets: 1, objects: 1 })
-    expect(deleted).toEqual([['tnt_demo/req/1.png']])
+    // T-172: the photo's small copy goes with it
+    expect(deleted).toEqual([['tnt_demo/req/1.png'], ['tnt_demo/req/1.png.small']])
     expect(log[0]).toMatchObject({ table: 'tenants', filters: [['eq', 'is_demo', true]] })
     const deletes = log.filter((l) => l.op === 'delete').map((l) => l.table)
     expect(deletes).toEqual(['assets', 'quotes', 'quote_requests'])

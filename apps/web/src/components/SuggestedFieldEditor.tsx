@@ -235,7 +235,7 @@ export function SuggestedFieldEditor({
                           })
                         }}
                         placeholder="e.g., Number of Rooms"
-                        className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                       />
                     </div>
                     <div>
@@ -252,7 +252,7 @@ export function SuggestedFieldEditor({
                               : undefined,
                           })
                         }
-                        className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                       >
                         {FIELD_TYPES.map((type) => (
                           <option key={type.value} value={type.value}>
@@ -272,7 +272,7 @@ export function SuggestedFieldEditor({
                       value={field.helpText || ''}
                       onChange={(e) => updateField(index, { helpText: e.target.value || undefined })}
                       placeholder="Instructions for the customer"
-                      className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                     />
                   </div>
 
@@ -332,7 +332,7 @@ export function SuggestedFieldEditor({
                         type="checkbox"
                         checked={field.required}
                         onChange={(e) => updateField(index, { required: e.target.checked })}
-                        className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+                        className="h-4 w-4 rounded-sm border-border text-primary"
                       />
                       <span className="text-sm text-text-secondary">Required</span>
                     </label>
@@ -343,7 +343,7 @@ export function SuggestedFieldEditor({
                         onChange={(e) =>
                           updateField(index, { criticalForPricing: e.target.checked })
                         }
-                        className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+                        className="h-4 w-4 rounded-sm border-border text-primary"
                       />
                       <span className="text-sm text-text-secondary">Critical for Pricing</span>
                     </label>

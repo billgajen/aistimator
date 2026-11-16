@@ -129,7 +129,8 @@ describe('T-166: the checker’s output cannot change pricing_json', () => {
   })
 
   it('the checker has no function that returns or takes a corrected quote', () => {
-    expect(Object.keys(checker).sort()).toEqual(['determineValidationOutcome', 'getDefaultValidationSettings', 'validateQuote'])
+    // T-172 exports the prompt builder for its tests: it returns the prompt's text, nothing of a quote
+    expect(Object.keys(checker).sort()).toEqual(['buildValidationPrompt', 'determineValidationOutcome', 'getDefaultValidationSettings', 'validateQuote'])
     expect('applyAutoCorrections' in ai).toBe(false)
     const file = code('ai/quote-validator.ts')
     for (const gone of ['applyAutoCorrections', 'AutoCorrectionResult', 'correctedPricing', 'correctedContent', 'appliedFixes', 'add_work_step', 'remove_addon', 'add_note', 'remove_note', 'roundMoney']) {

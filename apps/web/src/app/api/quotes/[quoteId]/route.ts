@@ -26,6 +26,7 @@ import type {
   QuoteDetailResponse,
   AmendmentSummary,
 } from '@qolumns/shared'
+import { CHECKER_SETTINGS_VERSION } from '@qolumns/shared'
 import type {
   QuotePricing,
   QuoteContent,
@@ -112,7 +113,7 @@ export async function GET(
     // tenant has an active SMS number: "Text link" only shows when it can work
     // T-169: the customer's photos, and the newest run of the quote checker
     // that found something. Both are read for this tenant only. The checker's
-    // log is read only while "Worth checking" is switched on (it is off).
+    // log is read only while "Worth checking" is switched on (it is, since T-172).
     const [amendmentsResult, feedbackResult, smsResult, photos, checkerResult] = await Promise.all([
       supabase
         .from('quote_amendments')
@@ -139,6 +140,10 @@ export async function GET(
             .eq('quote_id', quoteId)
             .eq('tenant_id', auth.tenantId)
             .neq('outcome', 'passed')
+            // T-172: only a check made with the business's money settings. Rows from
+            // before (marked 'v1') were made without the minimum charge, base fee, tax
+            // and currency, and could flag a correct quote; they are never shown.
+            .eq('input_snapshot->>serviceConfigVersion', CHECKER_SETTINGS_VERSION)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle()

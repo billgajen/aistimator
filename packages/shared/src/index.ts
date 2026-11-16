@@ -32,6 +32,7 @@ export * from './formula'
 export * from './regions'
 export * from './units'
 export * from './format'
+export * from './checker'
 
 // Re-export the AI model registry (T-135)
 export * from './ai-models'

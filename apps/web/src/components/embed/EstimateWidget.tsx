@@ -1,5 +1,7 @@
 'use client'
 
+import { questionsSpread } from './step-count'
+import { makeSmallPhoto, smallPhotoDeclaration, uploadSmallPhoto } from '@/lib/small-photo-client'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { EMBED_NAMES, formatMoney, PRODUCT_NAME, splitMinimum } from '@qolumns/shared'
 import { useSearchParams } from 'next/navigation'
@@ -224,20 +226,25 @@ function ConversationalChat({
       setUploadedFiles(prev => [...prev, { assetId: tempId, previewUrl, fileName: file.name, status: 'uploading' }])
 
       try {
+        // T-172: a small copy for small pictures; null if the browser cannot make one
+        const small = await makeSmallPhoto(file)
         const initRes = await fetch('/api/public/uploads/init', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             tenantKey,
-            files: [{ fileName: file.name, contentType: file.type, sizeBytes: file.size }],
+            files: [{ fileName: file.name, contentType: file.type, sizeBytes: file.size, ...smallPhotoDeclaration(small) }],
           }),
         })
         const initData = await initRes.json()
         if (!initRes.ok || !initData.uploads?.[0]) throw new Error('Upload init failed')
 
-        const { assetId, uploadUrl } = initData.uploads[0]
+        const { assetId, uploadUrl, smallUploadUrl } = initData.uploads[0]
 
-        const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
+        const [uploadRes] = await Promise.all([
+          fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } }),
+          uploadSmallPhoto(small, smallUploadUrl),
+        ])
         if (!uploadRes.ok) throw new Error('Upload failed')
 
         setUploadedFiles(prev => {
@@ -693,7 +700,16 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
     ? [...(widgetData.globalFields || widgetData.fields || []), ...(widgetData.serviceFields?.[selectedService] || [])]
     : []
   const asksQuantity = serviceMeasurementModel?.type === 'per_unit' && serviceMeasurementModel.askCustomerForQuantity
-  const hasQuestionsStep = serviceQuestions.length > 0 || Boolean(asksQuantity)
+  // T-172: before a service is chosen, Questions is counted only when every
+  // service leads to it. (It was counted from the business-wide questions
+  // alone, so the first step read "Step 1 of 4" and the second "Step 2 of 5".)
+  const spread = widgetData ? questionsSpread(widgetData) : 'none'
+  const hasQuestionsStep = selectedService
+    ? serviceQuestions.length > 0 || Boolean(asksQuantity)
+    : spread === 'every'
+  // Some services have questions and some do not: on the first step the total
+  // is not known, whatever is highlighted there, so that step shows its name only
+  const countUnknown = hasServiceStep && step === 'service' && spread === 'some'
 
   // T-151 order, skipping the steps this service doesn't need
   const flow: Step[] = [
@@ -739,7 +755,7 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
       data-testid="request-form"
     >
       {testToken && (
-        <p className="mx-3 mt-3 max-w-xl rounded-xl border border-tape/50 bg-butter px-4 py-2.5 text-center text-sm text-text-primary sm:mx-auto sm:mb-3 sm:mt-0" role="note">
+        <p className="mx-3 mt-3 max-w-xl rounded-xl border bg-butter px-4 py-2.5 text-center text-sm text-text-primary sm:mx-auto sm:mb-3 sm:mt-0" role="note">
           Test mode: this is how your customers see your quote page. This request won&apos;t count toward your plan.
         </p>
       )}
@@ -767,7 +783,7 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
 
       {/* Progress indicator — form mode only */}
       {displayMode !== 'conversational' && showProgress && (
-        <ProgressIndicator steps={progressSteps} currentStep={currentProgressIndex} />
+        <ProgressIndicator steps={progressSteps} currentStep={currentProgressIndex} nameOnly={countUnknown} />
       )}
 
       {step === 'loading' && <LoadingState />}
@@ -934,7 +950,17 @@ function Letterhead({ as: Tag, name }: { as: 'h1' | 'h2'; name: string }) {
  * labelled dots do not fit a phone (the labels were cut off at 390 px). From
  * 640 px it is the labelled row it was.
  */
-function ProgressIndicator({ steps, currentStep }: { steps: string[]; currentStep: number }) {
+function ProgressIndicator({ steps, currentStep, nameOnly = false }: { steps: string[]; currentStep: number; nameOnly?: boolean }) {
+  // T-172: the number of steps is not known yet (it depends on the service
+  // chosen on this step), so no total is shown in words, in bar parts or in
+  // numbered steps: only this step's name. The count starts on the next step.
+  if (nameOnly) {
+    return (
+      <div className="px-4 pt-4 pb-2 sm:px-6 sm:pt-5 sm:pb-3" data-testid="step-bar" data-count="unknown">
+        <p className="text-sm font-semibold text-text-primary" data-testid="step-name">{steps[currentStep]}</p>
+      </div>
+    )
+  }
   return (
     <div className="px-4 pt-4 pb-2 sm:px-6 sm:pt-5 sm:pb-3" data-testid="step-bar">
       {/* a phone */}
@@ -1108,13 +1134,16 @@ function FileUploadStep({
 
   async function startUpload(tempId: string, file: File) {
     try {
+      // T-172: a small copy of a photo for small pictures; null for a document, or if the browser cannot make one
+      const small = await makeSmallPhoto(file)
+
       // 1. Initialize upload
       const initResponse = await fetch('/api/public/uploads/init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenantKey,
-          files: [{ fileName: file.name, contentType: file.type, sizeBytes: file.size }],
+          files: [{ fileName: file.name, contentType: file.type, sizeBytes: file.size, ...smallPhotoDeclaration(small) }],
         }),
       })
 
@@ -1124,7 +1153,7 @@ function FileUploadStep({
         throw new Error(initData.error?.message || 'Failed to initialize upload')
       }
 
-      const { assetId, uploadUrl } = initData.uploads[0]
+      const { assetId, uploadUrl, smallUploadUrl } = initData.uploads[0]
 
       // Update with assetId
       setFiles((prev) =>
@@ -1133,12 +1162,16 @@ function FileUploadStep({
         )
       )
 
-      // 2. Upload file to R2 (or fallback endpoint)
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': file.type },
-      })
+      // 2. Upload file to R2 (or fallback endpoint), and the small copy beside it.
+      // The small copy never fails the upload (uploadSmallPhoto does not throw).
+      const [uploadResponse] = await Promise.all([
+        fetch(uploadUrl, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': file.type },
+        }),
+        uploadSmallPhoto(small, smallUploadUrl),
+      ])
 
       if (!uploadResponse.ok) {
         throw new Error('Upload failed')
@@ -1309,7 +1342,7 @@ function FileUploadStep({
           data-testid="use-sample-photo"
           onClick={useSamplePhoto}
           disabled={isUploading}
-          className="mb-4 w-full rounded-xl border-2 border-dashed border-primary/40 bg-mint px-4 py-3 text-sm font-semibold text-primary hover:border-primary disabled:opacity-50"
+          className="mb-4 w-full rounded-xl border-2 border-dashed border-primary bg-mint px-4 py-3 text-sm font-semibold text-primary hover:border-primary disabled:opacity-50"
         >
           Use a sample photo
         </button>

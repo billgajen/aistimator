@@ -107,7 +107,7 @@ function DemoPageContent() {
                   value={tenantKey}
                   onChange={(e) => setTenantKey(e.target.value)}
                   placeholder="tkey_xxx"
-                  className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:border-primary"
                 />
                 <p className="text-xs text-text-muted mt-1">
                   Get this from your tenant settings in the dashboard

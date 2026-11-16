@@ -31,7 +31,7 @@ export function JobDetailsStep({
 }) {
   const [touched, setTouched] = useState(false)
   const missingDescription = descriptionRequired && !description.trim()
-  const input = 'w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition border-field bg-white focus:ring-primary/25 focus:border-primary'
+  const input = 'w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition border-field bg-white focus:border-primary'
 
   return (
     <div className="p-4 sm:p-6">
@@ -46,7 +46,7 @@ export function JobDetailsStep({
             Anything else about the job?
             {descriptionRequired ? <RequiredMark /> : <span className="font-normal text-text-muted"> (optional)</span>}
           </label>
-          <textarea id="job-description" value={description} onChange={(e) => onDescriptionChange(e.target.value)} rows={4} className={`${input} ${touched && missingDescription ? 'border-danger/50' : ''}`} />
+          <textarea id="job-description" value={description} onChange={(e) => onDescriptionChange(e.target.value)} rows={4} className={`${input} ${touched && missingDescription ? 'border-danger' : ''}`} />
           {touched && missingDescription
             ? <p className="mt-1 text-xs text-danger">Please describe the job.</p>
             : <p className="mt-1 text-xs text-text-muted">{descriptionRequired ? 'What needs doing, and roughly how big it is.' : 'Anything the questions didn’t cover.'}</p>}

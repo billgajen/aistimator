@@ -83,7 +83,7 @@ export default function AdminTenantsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by tenant ID (tnt_...) or name"
-          className="flex-1 rounded-xl border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="flex-1 rounded-xl border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2"
         />
         <button
           type="submit"

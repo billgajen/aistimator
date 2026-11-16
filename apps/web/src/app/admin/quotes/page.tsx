@@ -137,12 +137,12 @@ export default function AdminQuotesPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by quote ID (qte_...) or customer email"
-          className="flex-1 rounded-xl border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="flex-1 rounded-xl border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2"
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-xl border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="rounded-xl border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2"
         >
           <option value="">All statuses</option>
           <option value="queued">Queued</option>

@@ -502,7 +502,7 @@ export default function QuotePage({ params }: QuotePageProps) {
               )}
 
               {pricingNotes.length > 0 && (
-                <div className="bg-butter/50 border border-tape/30 rounded-xl px-4 py-3.5 mb-5">
+                <div className="border rounded-xl px-4 py-3.5 mb-5">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-tertiary mb-1.5">Worth knowing</p>
                   <ul className="text-[13px] leading-relaxed text-tertiary space-y-1.5">
                     {pricingNotes.map((note, index) => (
@@ -698,7 +698,7 @@ export default function QuotePage({ params }: QuotePageProps) {
             {notes.notes && (
               <section className="mb-2">
                 <SectionLabel tone="tape">A note from {business.name}</SectionLabel>
-                <div className="border-l-2 border-tape/60 pl-4">
+                <div className="border-l-2 pl-4">
                   <p className="text-[13px] leading-relaxed text-text-secondary">{notes.notes}</p>
                 </div>
               </section>
@@ -721,8 +721,10 @@ export default function QuotePage({ params }: QuotePageProps) {
                       className="block aspect-square bg-surface rounded-xl overflow-hidden hover:opacity-85 transition-opacity"
                     >
                       <img
-                        src={asset.viewUrl}
+                        src={asset.smallUrl ?? asset.viewUrl}
                         alt="Attached photo"
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover"
                       />
                     </a>
@@ -800,7 +802,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                     value={feedbackText}
                     onChange={(e) => setFeedbackText(e.target.value)}
                     placeholder="Questions, changes, anything we should know…"
-                    className="w-full px-4 py-3 text-sm border border-border rounded-xl bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary resize-none transition"
+                    className="w-full px-4 py-3 text-sm border border-border rounded-xl bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:border-primary resize-none transition"
                     rows={3}
                     autoFocus
                   />
@@ -842,7 +844,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                     onChange={(e) => setDeclineReason(e.target.value)}
                     placeholder="Optional: let us know why, it helps us improve"
                     maxLength={500}
-                    className="w-full px-4 py-3 text-sm border border-border rounded-xl bg-white text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary resize-none transition"
+                    className="w-full px-4 py-3 text-sm border border-border rounded-xl bg-white text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:border-primary resize-none transition"
                     rows={3}
                   />
                   <div className="flex gap-3">

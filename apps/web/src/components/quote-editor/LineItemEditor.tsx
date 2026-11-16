@@ -138,7 +138,7 @@ function LineItemRow({
         <div className="flex items-center gap-1 flex-shrink-0 pr-1">
           <button
             onClick={() => { onRemove(item.id); setConfirmRemove(false) }}
-            className="px-2 py-1 text-xs font-medium text-danger bg-danger-light rounded-sm hover:bg-danger/20 transition-colors"
+            className="px-2 py-1 text-xs font-medium text-danger bg-danger-light rounded-sm transition-colors"
           >
             Yes
           </button>

@@ -277,7 +277,7 @@ export default function WhatsAppSettingsPage() {
               value={phoneNumberId}
               onChange={(e) => setPhoneNumberId(e.target.value)}
               placeholder="e.g., 1234567890123456"
-              className="mt-1 block w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="mt-1 block w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2"
               required
             />
             <p className="mt-1 text-xs text-text-muted">
@@ -295,7 +295,7 @@ export default function WhatsAppSettingsPage() {
               value={displayPhoneNumber}
               onChange={(e) => setDisplayPhoneNumber(e.target.value)}
               placeholder="e.g., +1 234 567 8900"
-              className="mt-1 block w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="mt-1 block w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2"
               required
             />
             <p className="mt-1 text-xs text-text-muted">
@@ -313,7 +313,7 @@ export default function WhatsAppSettingsPage() {
               value={accessToken}
               onChange={(e) => setAccessToken(e.target.value)}
               placeholder={configured ? '••••••••' : 'Enter your access token'}
-              className="mt-1 block w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="mt-1 block w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2"
               required={!configured}
             />
             <p className="mt-1 text-xs text-text-muted">
@@ -327,7 +327,7 @@ export default function WhatsAppSettingsPage() {
               id="isActive"
               checked={isActive}
               onChange={(e) => setIsActive(e.target.checked)}
-              className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+              className="h-4 w-4 rounded-sm border-border text-primary"
             />
             <label htmlFor="isActive" className="text-sm text-text-secondary">
               Enable WhatsApp integration

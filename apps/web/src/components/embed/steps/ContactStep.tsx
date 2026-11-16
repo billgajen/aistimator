@@ -52,7 +52,7 @@ export function ContactStep({
 
   const field = (hasError: boolean) =>
     `w-full min-h-[48px] px-4 py-3 text-base bg-white border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${
-      hasError ? 'border-danger focus:ring-danger/25 focus:border-danger' : 'border-field focus:ring-primary/25 focus:border-primary'
+      hasError ? 'border-danger focus:border-danger' : 'border-field focus:border-primary'
     }`
   const optional = <span className="font-normal text-text-muted"> (optional)</span>
 
@@ -60,7 +60,7 @@ export function ContactStep({
     <div className="p-4 sm:p-6">
       <StepTitle>Where should we send your estimate?</StepTitle>
       {note && (
-        <p className="-mt-2 mb-4 rounded-xl border border-tape/50 bg-butter px-3 py-2 text-sm text-text-primary" role="note" data-testid="demo-contact-note">
+        <p className="-mt-2 mb-4 rounded-xl border bg-butter px-3 py-2 text-sm text-text-primary" role="note" data-testid="demo-contact-note">
           {note}
         </p>
       )}

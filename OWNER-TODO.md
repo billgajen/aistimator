@@ -914,13 +914,13 @@ Live since 2026-11-15 14:17 UTC. No price changes.
   understood" is live. The group is behind one flag in the code (`SHOW_WORTH_CHECKING` in
   `apps/web/src/lib/quote-understanding.ts`). The checker still runs and logs as before; no business sees its
   notes.
-- [ ] **Worker ticket: tell the quote checker the minimum charge, base fee, tax and currency, then switch "Worth
+- [x] *(Built in T-172, not yet deployed.)* **Worker ticket: tell the quote checker the minimum charge, base fee, tax and currency, then switch "Worth
   checking" on.** Today the checker is not told those four things, so it can write a wrong note: on a real test
   quote with a $400 minimum it wrote "an unconfigured minimum charge of £25 was added", and on taxed quotes it
   can say "the total does not match the lines". The ticket: add the four to what the checker is given
   (`apps/worker/src/ai/quote-validator.ts`), run it over quotes with a minimum, a base fee and tax and read the
   notes, then set the flag to on and deploy web. It is a worker change, so it needs the full regression set.
-- [ ] **Worker ticket: small photo copies at upload.** The small photos on Home, the Quotes list and the quote
+- [x] *(Built in T-172, not yet deployed.)* **Worker ticket: small photo copies at upload.** The small photos on Home, the Quotes list and the quote
   page are the full uploads (a few hundred KB each). Storing a small copy when a photo is uploaded would make
   the lists load faster on a phone.
 - [ ] **Look at it, on your phone and on a computer.** The signed-in screens could not be checked live (the live
@@ -994,7 +994,7 @@ Live since 2026-11-15 14:17 UTC. No price changes.
   sent): Home, the login page and the demo load; the public quote API answers 404 for a made-up token; the
   keyboard focus ring on Home's closing band can be seen again (the fault T-170 left there is fixed).
 - The preview is **deleted**.
-- [ ] **Next ticket: the form's step count.** On the step where the customer picks a service the form says
+- [x] *(Built in T-172, not yet deployed.)* **Next ticket: the form's step count.** On the step where the customer picks a service the form says
   "Step 1 of 4"; once a service with questions is picked it says "Step 2 of 5". You accepted this for now
   (2026-11-16); the fix is planned for the next ticket.
 - [ ] **A setting for a business to write its own "What happens next" steps.** After a customer accepts, the
@@ -1028,3 +1028,44 @@ Live since 2026-11-15 14:17 UTC. No price changes.
   if you want them on both pages.
 - [ ] **The business's on-site app still shows the label's raw text** under a question (`apps/mobile`). It is
   the business's screen, so I left it.
+
+## T-172 — Worker fixes: the checker's settings, small photo copies, AI time limits, colour classes, the step count
+
+- **Built and on a preview. Not committed, not on production.** Preview (web only, no database, behind the Vercel
+  login): `https://estimator-pz9p8d3hv-gajendrans-projects-1a87e0b4.vercel.app`.
+- [ ] **To put it live: commit, then deploy the worker and the web app.** This is the first ticket since T-166
+  that changes the worker. No migration. Deploy the worker first (it marks new checks `v2`), then the web app.
+  New checks on old quotes are never needed: a quote checked before the deploy simply shows no "Worth checking".
+- [ ] **"Worth checking" is switched on.** The checker is now told your minimum charge, base fee, tax and
+  currency. Four correct quotes that it used to flag (6 runs of 8) came back clean (12 runs of 12). It is still
+  an AI's note: it can be wrong about wording or scope. If you see a wrong one on a real quote, tell me the
+  quote and I will look; to switch the group off again is one line (`SHOW_WORTH_CHECKING`).
+- [ ] **Look at the colour changes** before they go live. Open
+  `scripts/hardcore-test/results/t172-colour-screens/index.html` on this computer: each changed page before and
+  after, at 390 and 1440. What you will notice most:
+  1. the page behind a window, and behind the dashboard's phone menu, is now dimmed;
+  2. on the customer quote page, the "Measurement & takeoff" block has a pale butter ground and the range bar
+     shows its filled part;
+  3. tinted boxes (Danger Zone, "customer accepted", notes) have a soft coloured edge.
+- [ ] **Three small things I decided; say if you want any of them the other way.**
+  1. *The current step in the service set-up window* had a tape-coloured ring written for it. Tape is for
+     measurement only, so I removed it. **Done (your decision, 2026-11-16): the ring is juniper.**
+  2. *An error on a form field* now has a full red edge. The half-strength red written for it could not be
+     seen well enough (2.3:1).
+  3. *Notices in butter* (the demo note, the test-mode note, the plan-usage banner) keep their butter ground
+     and did not get the tape edge written for them. They are the older "butter outside measurement" item.
+- [x] **"Support Tools" in the admin bar** was amber on dark ink, 2.4:1. Fixed before the commit (your
+  decision, 2026-11-16): it is now a pale pill with dark text, 4.5:1 or more.
+- [ ] **The AI boxes in the add or edit service window still have a pale yellow ground in two places.** The
+  "AI Draft" banner ("Pre-filled from AI draft") and the closed "AI Refinement" bar use the amber warning tint
+  (`tertiary-light`), which is the same colour value as butter, at full strength. That was there before T-172,
+  so I left it, as you said. What T-172 had switched on there is removed: the amber edge on those two, and the
+  pale ground and edges of the open "AI Refinement" box. Moving these two to a colour that is not butter's is a
+  small design ticket (the tint is shared by every amber warning pill).
+- [ ] **A time limit can be changed without a code change** if the AI provider is slow one day:
+  `AI_TIMEOUT_WORDING_MS`, `AI_TIMEOUT_ADDONS_MS`, `AI_TIMEOUT_CHECKER_MS` on the worker (30, 20 and 30 seconds
+  today; names only, no secret).
+- [ ] **Photos sent by text, WhatsApp or the mobile app get no small copy** (only the web form makes one), so
+  their small pictures still load the full photo. Say if you want a ticket for that.
+- [ ] **After the deploy, send one real request with a photo through your quote link** and open the quote on
+  the dashboard: the small photo should load at once, and tapping it should open the full photo.

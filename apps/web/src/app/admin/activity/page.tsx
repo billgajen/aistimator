@@ -91,7 +91,7 @@ export default function AdminActivityPage() {
             setResourceFilter(e.target.value)
             setActivities([])
           }}
-          className="rounded-xl border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="rounded-xl border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2"
         >
           <option value="">All resources</option>
           <option value="quote">Quotes</option>

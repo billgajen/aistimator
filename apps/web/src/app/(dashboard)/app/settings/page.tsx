@@ -268,7 +268,7 @@ export default function SettingsPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2"
               />
             </div>
             <div>
@@ -292,7 +292,7 @@ export default function SettingsPage() {
                   setCurrency(next.currency)
                   setUnitSystem(null)
                 }}
-                className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2"
               >
                 {listRegions().map((r) => (
                   <option key={r.code} value={r.code}>
@@ -312,7 +312,7 @@ export default function SettingsPage() {
                 value={currency}
                 maxLength={3}
                 onChange={(e) => setCurrency(e.target.value.toUpperCase())}
-                className="mt-1 w-full rounded-xl border border-border px-3 py-2 uppercase focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-xl border border-border px-3 py-2 uppercase focus:border-primary focus:outline-none focus:ring-2"
               />
               <datalist id="currency-options">
                 {CURRENCIES.map((c) => (
@@ -330,7 +330,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setUnitSystem(e.target.value === '' ? null : (e.target.value as UnitSystem))
                 }
-                className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2"
               >
                 <option value="">
                   Region default ({getRegion(region).unitSystem === 'imperial' ? 'feet, sq ft' : 'metres, sqm'})
@@ -363,7 +363,7 @@ export default function SettingsPage() {
                 type="checkbox"
                 checked={taxEnabled}
                 onChange={(e) => setTaxEnabled(e.target.checked)}
-                className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+                className="h-4 w-4 rounded-sm border-border text-primary"
               />
               <span className="text-sm font-medium text-text-secondary">Enable tax on quotes</span>
             </label>
@@ -378,7 +378,7 @@ export default function SettingsPage() {
                   value={taxLabel}
                   onChange={(e) => setTaxLabel(e.target.value)}
                   placeholder={`${getRegion(region).copy.taxLabel} (region default)`}
-                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2"
                 />
                 <p className="mt-1 text-xs text-text-muted">
                   This label appears on quotes (e.g., VAT, GST, Sales Tax)
@@ -393,7 +393,7 @@ export default function SettingsPage() {
                   step="0.01"
                   value={taxRatePercent}
                   onChange={(e) => setTaxRatePercent(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2"
                 />
                 <p className="mt-1 text-xs text-text-muted">Enter as percentage (e.g., 20 for 20%)</p>
               </div>
@@ -425,7 +425,7 @@ export default function SettingsPage() {
                   value={mode.value}
                   checked={serviceAreaMode === mode.value}
                   onChange={(e) => setServiceAreaMode(e.target.value as ServiceAreaMode)}
-                  className="mt-1 h-4 w-4 border-border text-primary focus:ring-primary/30"
+                  className="mt-1 h-4 w-4 border-border text-primary"
                 />
                 <div>
                   <span className="text-sm font-medium text-text-secondary">{mode.label}</span>
@@ -451,7 +451,7 @@ export default function SettingsPage() {
                     : 'Enter counties or states separated by commas or one per line\ne.g., California, Texas, New York'
                 }
                 rows={4}
-                className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
               />
               <p className="mt-1 text-xs text-text-muted">
                 Separate multiple values with commas or put each on a new line
@@ -483,7 +483,7 @@ export default function SettingsPage() {
                 type="checkbox"
                 checked={showLineItems}
                 onChange={(e) => setShowLineItems(e.target.checked)}
-                className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+                className="h-4 w-4 rounded-sm border-border text-primary"
               />
               <div>
                 <span className="text-sm font-medium text-text-secondary">Show line items</span>
@@ -496,7 +496,7 @@ export default function SettingsPage() {
                 type="checkbox"
                 checked={includeAssumptions}
                 onChange={(e) => setIncludeAssumptions(e.target.checked)}
-                className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+                className="h-4 w-4 rounded-sm border-border text-primary"
               />
               <div>
                 <span className="text-sm font-medium text-text-secondary">Include assumptions</span>
@@ -511,7 +511,7 @@ export default function SettingsPage() {
                 type="checkbox"
                 checked={includeExclusions}
                 onChange={(e) => setIncludeExclusions(e.target.checked)}
-                className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+                className="h-4 w-4 rounded-sm border-border text-primary"
               />
               <div>
                 <span className="text-sm font-medium text-text-secondary">Include exclusions</span>
@@ -533,7 +533,7 @@ export default function SettingsPage() {
                 max="365"
                 value={validityDays}
                 onChange={(e) => setValidityDays(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-xl border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2"
               />
               <p className="mt-1 text-xs text-text-muted">
                 How long quotes remain valid before expiring
@@ -550,7 +550,7 @@ export default function SettingsPage() {
               onChange={(e) => setDefaultTermsText(e.target.value)}
               placeholder="Enter your default terms and conditions text that will appear on all quotes..."
               rows={4}
-              className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
             />
             <p className="mt-1 text-xs text-text-muted">
               This text will appear at the bottom of all quotes

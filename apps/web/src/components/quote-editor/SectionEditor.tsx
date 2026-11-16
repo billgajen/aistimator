@@ -35,7 +35,7 @@ export function TextSectionEditor({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={2}
-        className="w-full px-3 py-2.5 text-sm text-text-primary bg-background border border-border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+        className="w-full px-3 py-2.5 text-sm text-text-primary bg-background border border-border rounded-lg resize-none focus:outline-none focus:ring-2 focus:border-primary"
       />
     </div>
   )
@@ -86,7 +86,7 @@ export function ListSectionEditor({
               value={item}
               onChange={(e) => updateItem(index, e.target.value)}
               placeholder={placeholder || `Item ${index + 1}`}
-              className="flex-1 px-3 py-2 text-sm text-text-primary bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className="flex-1 px-3 py-2 text-sm text-text-primary bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:border-primary"
             />
             <button
               type="button"

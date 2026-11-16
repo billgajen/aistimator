@@ -43,7 +43,7 @@
     --color-tertiary-light: #F7E9C6;
     --color-danger: #A23D2F;
     --color-danger-light: #F8E3DD;
-    /* The soft edge of a tinted box (an opacity modifier on a token writes no CSS) */
+    /* The soft edge of a tinted box */
     --color-secondary-line: #B4C7B9;
     --color-tertiary-line: #CFC0A6;
     --color-danger-line: #DBB7B0;
@@ -60,6 +60,39 @@
        and never the colour of text on paper. */
     --color-accent: #FFC53D;
     --color-on-accent: #1B2823;      /* text and the thin edge on the accent */
+
+    /* T-172: the colours above again, as RGB triples. Tailwind's colour classes read these (tailwind.config.ts),
+       which is what lets a class carry an opacity modifier (bg-ink/40, ring-primary/30): a plain var() could
+       not, and 228 such classes wrote no CSS. Each triple must be its hex above; a unit test holds them
+       together. A business's own colour sets --color-primary-rgb with --color-primary (lib/color.ts). */
+    --color-background-rgb: 250 249 246;
+    --color-surface-rgb: 242 240 234;
+    --color-mist-rgb: 234 239 245;
+    --color-mint-rgb: 223 237 229;
+    --color-butter-rgb: 247 233 198;
+    --color-tape-rgb: 220 175 62;
+    --color-ink-rgb: 27 40 35;
+    --color-ink-deep-rgb: 20 31 26;
+    --color-text-primary-rgb: 27 40 35;
+    --color-text-secondary-rgb: 79 93 87;
+    --color-text-muted-rgb: 98 108 102;
+    --color-primary-rgb: 32 94 86;
+    --color-primary-hover-rgb: 23 71 65;
+    --color-primary-light-rgb: 223 237 229;
+    --color-secondary-rgb: 50 107 73;
+    --color-secondary-light-rgb: 224 240 228;
+    --color-tertiary-rgb: 127 87 16;
+    --color-tertiary-light-rgb: 247 233 198;
+    --color-danger-rgb: 162 61 47;
+    --color-danger-light-rgb: 248 227 221;
+    --color-secondary-line-rgb: 180 199 185;
+    --color-tertiary-line-rgb: 207 192 166;
+    --color-danger-line-rgb: 219 183 176;
+    --color-border-rgb: 229 226 216;
+    --color-border-strong-rgb: 207 203 189;
+    --color-field-rgb: 128 135 129;
+    --color-accent-rgb: 255 197 61;
+    --color-on-accent-rgb: 27 40 35;
 
     /* Keyboard focus: ink on light grounds; flipped on juniper, a business's
        brand colour and ink (see the rules after the utilities) */

@@ -136,6 +136,8 @@ export interface QuoteViewAsset {
   assetId: string
   type: 'image' | 'document'
   viewUrl: string
+  /** T-172: a photo at its small size, for the grid; the link still opens viewUrl */
+  smallUrl?: string
 }
 
 export interface QuoteViewActions {
@@ -579,6 +581,8 @@ export interface QuoteDetailResponse {
 export interface QuotePhoto {
   id: string
   url: string
+  /** T-172: the same photo at its small size, for small pictures */
+  smallUrl?: string
 }
 
 /** T-169: one line of "What Qolumns understood" */

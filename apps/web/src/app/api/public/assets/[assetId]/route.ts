@@ -3,6 +3,7 @@ import { quoteTokenFilter } from '@/lib/tokens'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
+import { photoKeyToServe, photoSizeOf } from '@/lib/small-photo-server'
 
 /**
  * GET /api/public/assets/:assetId
@@ -64,7 +65,9 @@ export async function GET(
 
     // If R2 is configured, redirect to signed download URL
     if (isR2Configured()) {
-      const downloadUrl = await generateDownloadUrl(asset.r2_key, 3600) // 1 hour expiry
+      // T-172: ?size=small serves a photo's checked small copy, or the original when it has none
+      const size = asset.type === 'image' ? photoSizeOf(url.searchParams.get('size')) : 'full'
+      const downloadUrl = await generateDownloadUrl(await photoKeyToServe(asset.r2_key, size), 3600) // 1 hour expiry
       return NextResponse.redirect(downloadUrl)
     }
 

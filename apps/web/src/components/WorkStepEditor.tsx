@@ -453,7 +453,7 @@ export function WorkStepEditor({
                           value={step.name}
                           onChange={(e) => updateStep(step.id, { name: e.target.value })}
                           placeholder="e.g., Bedroom Cleaning"
-                          className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                         />
                       </div>
                       <div>
@@ -480,7 +480,7 @@ export function WorkStepEditor({
 
                             updateStep(step.id, updates)
                           }}
-                          className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                         >
                           {COST_TYPES.map((type) => (
                             <option key={type.value} value={type.value}>
@@ -511,7 +511,7 @@ export function WorkStepEditor({
                                 defaultCost: parseFloat(e.target.value) || 0,
                               })
                             }
-                            className="w-full rounded-xl border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            className="w-full rounded-xl border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2"
                           />
                         </div>
                       </div>
@@ -525,7 +525,7 @@ export function WorkStepEditor({
                           <select
                             value={getMultiplyByValue(step)}
                             onChange={(e) => handleMultiplyByChange(step.id, e.target.value)}
-                            className={`w-full rounded-xl border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 ${
+                            className={`w-full rounded-xl border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 ${
                               !step.quantitySource ? 'border-tertiary-line bg-tertiary-light' : 'border-border'
                             }`}
                           >
@@ -589,7 +589,7 @@ export function WorkStepEditor({
                           value={step.unitLabel || ''}
                           onChange={(e) => updateStep(step.id, { unitLabel: e.target.value || undefined })}
                           placeholder="e.g., bedrooms, sq ft, items"
-                          className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                         />
                         <p className="mt-1 text-xs text-text-muted">
                           Shown on the quote (e.g., &quot;3 bedrooms × $25&quot;)
@@ -606,7 +606,7 @@ export function WorkStepEditor({
                           onChange={(e) =>
                             updateStep(step.id, { optional: e.target.checked })
                           }
-                          className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+                          className="h-4 w-4 rounded-sm border-border text-primary"
                         />
                         <span className="text-sm text-text-secondary">Only include when condition is met</span>
                       </label>
@@ -630,7 +630,7 @@ export function WorkStepEditor({
                                   triggerSignal: e.target.value || undefined,
                                 })
                               }
-                              className="w-full rounded-xl border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                              className="w-full rounded-xl border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
                             >
                               <option value="">Select question...</option>
                               {expectedSignals.map((sig) => (
@@ -654,7 +654,7 @@ export function WorkStepEditor({
                                   },
                                 })
                               }
-                              className="w-full rounded-xl border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                              className="w-full rounded-xl border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
                             >
                               {OPERATORS.map((op) => (
                                 <option key={op.value} value={op.value}>
@@ -681,7 +681,7 @@ export function WorkStepEditor({
                                   })
                                 }
                                 placeholder="Value"
-                                className="w-full rounded-xl border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                className="w-full rounded-xl border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
                               />
                             </div>
                           )}
@@ -699,7 +699,7 @@ export function WorkStepEditor({
                         value={step.description}
                         onChange={(e) => updateStep(step.id, { description: e.target.value })}
                         placeholder="Brief note about this item"
-                        className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                       />
                     </div>
 

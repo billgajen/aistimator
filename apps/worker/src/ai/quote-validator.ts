@@ -34,6 +34,7 @@ import type {
   CrossServicePricing,
   ExtractedSignal,
 } from '@qolumns/shared'
+import { formatMoney } from '@qolumns/shared'
 import type { PricingResult } from '../pricing/rules-engine'
 import type { QuoteContent } from './wording'
 
@@ -62,6 +63,31 @@ export interface ServiceConfigForValidation {
   workSteps?: WorkStepConfig[]
   addons?: AddonConfig[]
   multipliers?: MultiplierConfig[]
+  /** T-172: the business's money settings, as the pricing engine was given them */
+  pricingSettings?: PricingSettingsForValidation
+}
+
+/**
+ * T-172: the settings that explain money the work steps do not. Without them
+ * the checker read a base fee as an invented line, a minimum charge as an
+ * overcharge and tax as an unexplained gap, and wrote every amount in pounds.
+ * Every value is the business's own configuration; none is a default of ours.
+ */
+export interface PricingSettingsForValidation {
+  /** The currency the business prices in (ISO code), and the locale its amounts are written in */
+  currency: string
+  locale?: string
+  /** Charged once on every quote; 0 when the business has none */
+  baseFee: number
+  /** A floor, not an item; 0 when the business has none */
+  minimumCharge: number
+  tax: {
+    /** False when the business charges no tax, or this service is exempt */
+    enabled: boolean
+    label?: string
+    /** Whole number: 20 means 20% */
+    ratePercent: number
+  }
 }
 
 /**
@@ -93,22 +119,28 @@ interface WidgetField {
 /**
  * Build the comprehensive validation prompt
  */
-function buildValidationPrompt(
+export function buildValidationPrompt(
   customerRequest: CustomerRequestContext,
   serviceConfig: ServiceConfigForValidation,
   quote: GeneratedQuoteForValidation,
   _widgetFields?: WidgetField[]
 ): string {
+  // T-172: every amount is written in the business's own currency (it was a
+  // hardcoded pound sign, whatever the business priced in)
+  const settings = serviceConfig.pricingSettings
+  const currency = settings?.currency || quote.pricing.currency
+  const money = (amount: number) => formatMoney(amount, currency, settings?.locale)
+
   const formAnswersText = customerRequest.formAnswers
     .map(a => `  - ${a.fieldId}: ${JSON.stringify(a.value)}`)
     .join('\n')
 
   const workStepsText = (serviceConfig.workSteps || [])
-    .map(ws => `  - [ID: ${ws.id}] ${ws.name}: £${ws.defaultCost}/${ws.costType === 'fixed' ? 'fixed' : ws.unitLabel || 'unit'} (${ws.optional ? `optional, trigger: ${ws.triggerSignal}` : 'mandatory'})`)
+    .map(ws => `  - [ID: ${ws.id}] ${ws.name}: ${money(ws.defaultCost)}/${ws.costType === 'fixed' ? 'fixed' : ws.unitLabel || 'unit'} (${ws.optional ? `optional, trigger: ${ws.triggerSignal}` : 'mandatory'})`)
     .join('\n')
 
   const addonsText = (serviceConfig.addons || [])
-    .map(a => `  - ${a.label}: £${a.price} (keywords: ${(a.triggerKeywords || []).join(', ')})`)
+    .map(a => `  - ${a.label}: ${money(a.price)} (keywords: ${(a.triggerKeywords || []).join(', ')})`)
     .join('\n')
 
   const multipliersText = (serviceConfig.multipliers || [])
@@ -116,7 +148,7 @@ function buildValidationPrompt(
     .join('\n')
 
   const breakdownText = quote.pricing.breakdown
-    .map(b => `  - ${b.label}: £${b.amount}`)
+    .map(b => `  - ${b.label}: ${money(b.amount)}${b.kind === 'minimum' ? ' [this line tops the job up to the business\'s minimum charge]' : ''}`)
     .join('\n')
 
   const potentialWorkText = (quote.signalRecommendations || [])
@@ -124,8 +156,26 @@ function buildValidationPrompt(
     .join('\n')
 
   const crossServicesText = (quote.crossServicePricing || [])
-    .map(cs => `  - ${cs.serviceName}: £${cs.estimatedTotal} (reason: ${cs.reason})`)
+    .map(cs => `  - ${cs.serviceName}: ${money(cs.estimatedTotal)} (reason: ${cs.reason})`)
     .join('\n')
+
+  // The business's money settings, in words. A setting that is off is said to
+  // be off, so its absence from the quote is not read as a mistake either.
+  const taxLabel = settings?.tax.label || quote.pricing.taxLabel || 'Tax'
+  const settingsText = settings
+    ? [
+        `- Currency: ${currency}. Every amount in the configuration and in the quote is in ${currency}.`,
+        settings.baseFee > 0
+          ? `- Base fee: ${money(settings.baseFee)}, charged once on every quote. It appears in the breakdown as its own line.`
+          : '- Base fee: none.',
+        settings.minimumCharge > 0
+          ? `- Minimum charge: ${money(settings.minimumCharge)}. It is a floor, not an item: when the priced work comes to less, one line in the breakdown tops the job up to exactly ${money(settings.minimumCharge)}. When the work comes to more, it does not appear.`
+          : '- Minimum charge: none.',
+        settings.tax.enabled
+          ? `- Tax: ${taxLabel} at ${settings.tax.ratePercent}%, added to the subtotal. It is not a line in the breakdown.`
+          : '- Tax: not charged on this service.',
+      ].join('\n')
+    : '- (not provided)'
 
   return `You are a senior quote reviewer. Your job is to catch ALL issues before a quote reaches the customer.
 
@@ -150,10 +200,15 @@ ${addonsText || '  (none configured)'}
 - Multipliers:
 ${multipliersText || '  (none configured)'}
 
+### THE BUSINESS'S MONEY SETTINGS (configured by the business; never an error in themselves)
+${settingsText}
+
 ### GENERATED QUOTE
-- Pricing Breakdown:
+- Pricing Breakdown (before tax):
 ${breakdownText || '  (none)'}
-- Total: £${quote.pricing.total}
+- Subtotal: ${money(quote.pricing.subtotal)}
+- ${taxLabel}: ${money(quote.pricing.taxAmount)}${quote.pricing.taxRate ? ` (${quote.pricing.taxRate}%)` : ''}
+- Total: ${money(quote.pricing.total)}
 - Scope Text: "${quote.content.scopeSummary || ''}"
 - Assumptions: ${JSON.stringify(quote.content.assumptions || [])}
 - Exclusions: ${JSON.stringify(quote.content.exclusions || [])}
@@ -180,9 +235,14 @@ b) WORK STEPS THAT SHOULD TRIGGER
    - If trigger should fire but work step is missing → ISSUE
 
 c) EXPECTED TOTAL CALCULATION
-   - Calculate what total SHOULD be based on configured work steps
-   - Compare to actual total
+   - Calculate what the total SHOULD be: the base fee (if the business has one), plus the configured work
+     steps and addons that apply, with any multiplier that applies. If that comes to less than the
+     minimum charge, the subtotal is the minimum charge. Then add tax at the configured rate, if tax
+     is charged.
+   - Compare to the actual total
    - If actual < expected by >20% → ISSUE (underpriced)
+   - The base fee, the minimum charge and tax are the business's own settings. A total that differs from
+     the sum of the work steps only because of them is CORRECT and is never an issue.
 
 d) MULTIPLIERS APPLIED
    - For each multiplier, check if condition is met
@@ -210,7 +270,7 @@ a) NO CONTRADICTIONS WITH FORM
 
 b) NO AI-INVENTED PRICES
    - Potential work should NOT show specific costs (AD-001 compliance)
-   - If any item has a specific price like "£180" → ISSUE
+   - If any item states a specific price → ISSUE
 
 c) RELEVANCE CHECK
    - Each suggested item should relate to the service and customer description
@@ -235,8 +295,8 @@ c) NEGATION RESPECTED
    - ISSUE if negated service is still recommended
 
 d) VALID PRICING
-   - Each suggested service must have price > £0
-   - ISSUE if price is £0 or missing
+   - Each suggested service must have a price above zero
+   - ISSUE if the price is zero or missing
 
 ### CHECK 5: ADDONS
 a) NEGATION RESPECTED
@@ -267,8 +327,10 @@ a) NO UNAUTHORIZED DISCOUNTS
    - ISSUE if unexpected discount appears
 
 b) NO INVENTED FEES
-   - Every line item must trace back to configured work steps/addons/multipliers
-   - ISSUE if line item not found in config
+   - Every line item must trace back to the configured work steps, addons or multipliers, or to the
+     business's money settings: the base fee line, and the line that tops the job up to the minimum charge
+   - Tax at the configured rate is never an invented fee
+   - ISSUE if a line item is found in none of these
 
 ### CHECK 8: LOGICAL CONSISTENCY
 a) FORM/DESCRIPTION CONFLICTS
@@ -285,7 +347,8 @@ a) FORM/DESCRIPTION CONFLICTS
 4. DISTINGUISH CONFIG ISSUES FROM PROCESSING ISSUES - config issues need business action
 5. EVERY ISSUE MUST HAVE EVIDENCE - quote the specific text/value that's wrong
 6. Be conservative - only flag real issues, not theoretical problems
-7. The actualTotal for this quote is ${quote.pricing.total}`
+7. The actualTotal for this quote is ${quote.pricing.total}
+8. The base fee, the minimum charge, tax and the currency are set by the business. Never flag a quote for applying them as configured.`
 }
 
 // ============================================================================

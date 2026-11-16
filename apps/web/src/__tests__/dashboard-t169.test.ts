@@ -29,7 +29,7 @@ const nothing: UnderstandingInput = {
 }
 const READING = 'Read from the tank\'s rating label (photo 1): "CAPACITY 50 U.S. GAL" → 50 gal (capacity printed on the label)'
 const MEASURED = 'Measured across 2 independent passes (spread ±5%), anchored to entry door height'
-/** "Worth checking" is switched off; its rules are held here with it switched on, for the day it is */
+/** "Worth checking" is on since T-172; its rules are held here with the option set, whatever the flag says */
 const ON = { worthChecking: true }
 const allText = (u: ReturnType<typeof quoteUnderstanding>) =>
   [...u.photos, ...u.words, ...u.alsoNoted, ...u.checks].map((i) => `${i.text} ${i.detail ?? ''}`).join(' | ') +
@@ -197,13 +197,15 @@ describe('T-169: what Qolumns understood — only what the AI produced', () => {
     expect(JSON.stringify(input)).toBe(before)
   })
 
-  it('"Worth checking" is switched off: one flag, and with it off no finding is built or shown', () => {
-    expect(SHOW_WORTH_CHECKING).toBe(false)
+  it('"Worth checking" is one flag, on since T-172; with it off no finding is built or shown', () => {
+    // T-172: the checker is told the business's minimum, base fee, tax and currency, so the group is on
+    expect(SHOW_WORTH_CHECKING).toBe(true)
     const lib = code('apps/web/src/lib/quote-understanding.ts')
     expect(lib.match(/SHOW_WORTH_CHECKING = /g)).toHaveLength(1)
+    const OFF = { worthChecking: false }
     const finding = { check: 'CHECK 2: SCOPE TEXT VALIDATION', description: 'The scope mentions removal, which no line prices.' }
     // a quote whose only AI output is a checker finding: nothing to show, so no panel
-    const only = quoteUnderstanding({ ...nothing, checker: { issues: [finding], checkedTotal: 400 } })
+    const only = quoteUnderstanding({ ...nothing, checker: { issues: [finding], checkedTotal: 400 } }, OFF)
     expect(only.checks).toEqual([])
     expect(only.checksBeforeChange).toBe(false)
     expect(understoodNothing(only)).toBe(true)
@@ -216,7 +218,7 @@ describe('T-169: what Qolumns understood — only what the AI produced', () => {
       questions: [{ id: 'q1', question: 'Is 50 gal right?' }],
       answers: [{ questionId: 'q1', answer: '50 gal' }],
       checker: { issues: [finding], checkedTotal: 375 },
-    })
+    }, OFF)
     expect(rest.photos).toHaveLength(1)
     expect(rest.words).toHaveLength(1)
     expect(rest.asked).toEqual([{ question: 'Is 50 gal right?', answer: '50 gal' }])
@@ -243,8 +245,9 @@ describe('T-169: the customer’s photos', () => {
 
   it('keeps the customer’s order and leaves out documents and unknown ids', () => {
     expect(photosInOrder('q', ['a', 'doc', 'b', 'gone'], new Set(['b', 'a']))).toEqual([
-      { id: 'a', url: '/api/quotes/q/photos/a' },
-      { id: 'b', url: '/api/quotes/q/photos/b' },
+      // T-172: each photo also carries the address of its small size
+      { id: 'a', url: '/api/quotes/q/photos/a', smallUrl: '/api/quotes/q/photos/a?size=small' },
+      { id: 'b', url: '/api/quotes/q/photos/b', smallUrl: '/api/quotes/q/photos/b?size=small' },
     ])
   })
 
@@ -319,6 +322,8 @@ describe('T-169: the quote page', () => {
     expect(route).toContain('understanding,')
     // the log is read only while "Worth checking" is switched on
     expect(route).toMatch(/SHOW_WORTH_CHECKING\s*\?\s*supabase\s*\.from\('quote_validation_logs'\)/)
+    // T-172: only a check made with the business's money settings is read (rows from before are marked 'v1')
+    expect(log).toContain(".eq('input_snapshot->>serviceConfigVersion', CHECKER_SETTINGS_VERSION)")
     // the checker's log is read, never written, by the web app
     expect(route).not.toMatch(/from\('quote_validation_logs'\)\s*\.(insert|update|delete|upsert)/)
   })

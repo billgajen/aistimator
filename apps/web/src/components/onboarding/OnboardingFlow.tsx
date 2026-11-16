@@ -425,7 +425,7 @@ export function OnboardingFlow({
                   if (e.key === 'Enter' && websiteUrl.trim()) handleExtract()
                 }}
                 placeholder="www.yourbusiness.com"
-                className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
                 autoFocus
               />
             ) : (
@@ -434,7 +434,7 @@ export function OnboardingFlow({
                 onChange={(e) => setBusinessDescription(e.target.value)}
                 rows={5}
                 placeholder="Say what you offer and how you usually charge for it, the way you'd explain it to a customer."
-                className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
                 autoFocus
               />
             )}
@@ -506,7 +506,7 @@ export function OnboardingFlow({
                       prev.map((s, i) => (i === index ? { ...s, selected: !s.selected } : s))
                     )
                   }
-                  className="mt-1 h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+                  className="mt-1 h-4 w-4 rounded-sm border-border text-primary"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold text-text-primary">{svc.name}</div>
@@ -567,7 +567,7 @@ export function OnboardingFlow({
                 onChange={(e) => setPricingText(e.target.value)}
                 rows={5}
                 placeholder={`e.g. "${currencySymbol}120 call-out covers the first hour, then ${currencySymbol}45/hour. Add 20% for weekend jobs. Minimum charge ${currencySymbol}150."`}
-                className="mt-4 w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-4 w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
                 autoFocus
                 disabled={compiling}
               />
@@ -691,7 +691,7 @@ export function OnboardingFlow({
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
               >
                 <option value="USD">USD — US Dollar</option>
                 <option value="GBP">GBP — British Pound</option>
@@ -708,7 +708,7 @@ export function OnboardingFlow({
                   type="checkbox"
                   checked={taxEnabled}
                   onChange={(e) => setTaxEnabled(e.target.checked)}
-                  className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+                  className="h-4 w-4 rounded-sm border-border text-primary"
                 />
                 <span className="text-sm font-medium text-text-primary">
                   Add {regionDef.copy.taxLabel.toLowerCase()} to estimates
@@ -723,7 +723,7 @@ export function OnboardingFlow({
                       value={taxLabel}
                       onChange={(e) => setTaxLabel(e.target.value)}
                       placeholder={regionDef.copy.taxLabel}
-                      className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                     />
                   </div>
                   <div>
@@ -734,7 +734,7 @@ export function OnboardingFlow({
                       max="100"
                       value={taxRatePct}
                       onChange={(e) => setTaxRatePct(parseFloat(e.target.value) || 0)}
-                      className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                     />
                   </div>
                 </div>
@@ -750,7 +750,7 @@ export function OnboardingFlow({
                 value={serviceArea}
                 onChange={(e) => setServiceArea(e.target.value)}
                 placeholder={`${regionDef.copy.postalCodeLabel}s or prefixes, comma-separated — e.g. ${regionDef.copy.postalPrefixExample}`}
-                className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
               />
               <p className="mt-1 text-xs text-text-muted">
                 Leave blank to accept quote requests from anywhere

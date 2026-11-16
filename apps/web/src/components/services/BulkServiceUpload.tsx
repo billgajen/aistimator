@@ -332,7 +332,7 @@ export function BulkServiceUpload({ open, onClose, onServicesCreated }: BulkServ
                       onChange={(e) => setWebsiteUrl(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleWebsiteExtract() } }}
                       placeholder="www.yourbusiness.com"
-                      className="flex-1 rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="flex-1 rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
                       autoFocus
                     />
                     <button
@@ -438,7 +438,7 @@ export function BulkServiceUpload({ open, onClose, onServicesCreated }: BulkServ
                         type="checkbox"
                         checked={svc.selected}
                         onChange={() => toggleService(index)}
-                        className="mt-0.5 h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+                        className="mt-0.5 h-4 w-4 rounded-sm border-border text-primary"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-text-primary">{svc.name}</div>

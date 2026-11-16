@@ -3,12 +3,15 @@ import { NextResponse } from 'next/server'
 import type { AssetType } from '@qolumns/shared'
 import { generateUploadUrl, isR2Configured } from '@/lib/r2'
 import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
+import { smallPhotoDeclarationOk, smallPhotoKey } from '@/lib/small-photo'
 
 // Request body types
 interface FileInput {
   fileName: string
   contentType: string
   sizeBytes: number
+  /** T-172: the small copy the browser made of a photo (optional). Checked here, and again in storage before it is ever served. */
+  small?: { contentType: string; sizeBytes: number }
 }
 
 interface InitUploadsRequest {
@@ -113,6 +116,8 @@ export async function POST(request: Request) {
       assetId: string
       uploadUrl: string
       method: string
+      /** T-172: where to PUT the photo's small copy; absent when none was offered or it was not acceptable */
+      smallUploadUrl?: string
     }> = []
     const errors: Array<{ fileName: string; error: string }> = []
 
@@ -180,10 +185,22 @@ export async function POST(request: Request) {
         uploadUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/public/uploads/${asset.id}`
       }
 
+      // T-172: a photo may come with a small copy. It gets its own signed
+      // address, at a key derived from the original's (same tenant folder,
+      // same private bucket), only when it is declared as a WebP or JPEG
+      // within the small-copy limit. It is not an asset: it has no row, counts
+      // toward no limit, and the AI never reads it. A copy that is refused
+      // here is simply not uploaded; the photo itself is unaffected.
+      let smallUploadUrl: string | undefined
+      if (assetType === 'image' && isR2Configured() && smallPhotoDeclarationOk(file.small)) {
+        smallUploadUrl = await generateUploadUrl(smallPhotoKey(r2Key), file.small.contentType, 3600)
+      }
+
       uploads.push({
         assetId: asset.id,
         uploadUrl,
         method: 'PUT',
+        ...(smallUploadUrl && { smallUploadUrl }),
       })
     }
 

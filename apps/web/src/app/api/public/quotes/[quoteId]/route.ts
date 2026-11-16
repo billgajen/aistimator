@@ -121,6 +121,7 @@ export async function GET(
           assetId: asset.id,
           type: asset.type === 'image' ? 'image' : 'document',
           viewUrl: `${appUrl}/api/public/assets/${asset.id}?token=${token}`,
+          ...(asset.type === 'image' && { smallUrl: `${appUrl}/api/public/assets/${asset.id}?token=${token}&size=small` }),
         }))
       }
     }

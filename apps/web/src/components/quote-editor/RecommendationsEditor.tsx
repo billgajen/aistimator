@@ -46,7 +46,7 @@ export default function RecommendationsEditor({ items, onChange }: Recommendatio
                 type="text"
                 value={item.workDescription}
                 onChange={(e) => handleUpdate(index, { workDescription: e.target.value })}
-                className="flex-1 px-2 py-1 text-sm font-medium border border-border rounded-sm bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="flex-1 px-2 py-1 text-sm font-medium border border-border rounded-sm bg-surface text-text-primary focus:outline-none focus:ring-2 focus:border-primary"
               />
               <button
                 onClick={() => handleRemove(index)}
@@ -63,7 +63,7 @@ export default function RecommendationsEditor({ items, onChange }: Recommendatio
               value={item.costBreakdown}
               onChange={(e) => handleUpdate(index, { costBreakdown: e.target.value })}
               placeholder="Description of what's involved..."
-              className="w-full px-2 py-1 text-xs border border-border rounded-sm bg-surface text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary mb-1"
+              className="w-full px-2 py-1 text-xs border border-border rounded-sm bg-surface text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:border-primary mb-1"
             />
             <p className="text-xs text-text-muted italic">{item.evidence}</p>
           </div>

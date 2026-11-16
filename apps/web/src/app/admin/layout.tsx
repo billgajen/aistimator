@@ -11,7 +11,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link href="/admin" className="font-display text-lg font-bold">
                 Admin Panel
               </Link>
-              <span className="rounded-full bg-tertiary/20 px-2.5 py-0.5 text-xs font-medium text-tertiary">
+              <span className="rounded-full bg-mist px-2.5 py-0.5 text-xs font-medium text-text-secondary">
                 Support Tools
               </span>
             </div>

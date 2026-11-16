@@ -442,7 +442,7 @@ export function FormFieldsBuilder() {
                           value={newField.label}
                           onChange={(e) => setNewField((prev) => ({ ...prev, label: e.target.value }))}
                           placeholder="e.g., Surface Condition"
-                          className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                         />
                       </div>
                       <div>
@@ -450,7 +450,7 @@ export function FormFieldsBuilder() {
                         <select
                           value={newField.type}
                           onChange={(e) => setNewField((prev) => ({ ...prev, type: e.target.value as FieldType }))}
-                          className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                         >
                           {FIELD_TYPES.map((type) => (
                             <option key={type.value} value={type.value}>{type.label}</option>
@@ -470,7 +470,7 @@ export function FormFieldsBuilder() {
                           value={newField.fieldId}
                           onChange={(e) => setNewField((prev) => ({ ...prev, fieldId: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') }))}
                           placeholder={generateFieldId(newField.label) || 'field_id'}
-                          className="mt-1 w-full rounded-xl border border-border px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="mt-1 w-full rounded-xl border border-border px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none focus:ring-2"
                         />
                       </div>
                       <div>
@@ -478,7 +478,7 @@ export function FormFieldsBuilder() {
                         <select
                           value={newField.serviceId || ''}
                           onChange={(e) => setNewField((prev) => ({ ...prev, serviceId: e.target.value || null }))}
-                          className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                         >
                           <option value="">All Services (Global)</option>
                           {services.map((service) => (
@@ -497,7 +497,7 @@ export function FormFieldsBuilder() {
                           type="checkbox"
                           checked={newField.required}
                           onChange={(e) => setNewField((prev) => ({ ...prev, required: e.target.checked }))}
-                          className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary/30"
+                          className="h-4 w-4 rounded-sm border-border text-primary"
                         />
                         <span className="text-sm text-text-secondary">Required field</span>
                       </label>
@@ -514,14 +514,14 @@ export function FormFieldsBuilder() {
                                 value={opt.value}
                                 onChange={(e) => updateNewFieldOption(optIndex, 'value', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                                 placeholder="value"
-                                className="w-32 rounded-xl border border-border px-3 py-1.5 font-mono text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                className="w-32 rounded-xl border border-border px-3 py-1.5 font-mono text-sm focus:border-primary focus:outline-none focus:ring-2"
                               />
                               <input
                                 type="text"
                                 value={opt.label}
                                 onChange={(e) => updateNewFieldOption(optIndex, 'label', e.target.value)}
                                 placeholder="Display label"
-                                className="flex-1 rounded-xl border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                className="flex-1 rounded-xl border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
                               />
                               {(newField.options?.length || 0) > 1 && (
                                 <button

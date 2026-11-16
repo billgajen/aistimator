@@ -15,6 +15,185 @@
 
 ## Issues & Resolutions
 
+### 2026-11-16: T-172 — Worker fixes: the checker knows the business's settings, small photo copies, AI timeouts, colour classes, the form's step count
+
+**Status: built and on a preview. Not committed. Not on production.** Preview (web only, no database, behind the
+Vercel login): `https://estimator-pz9p8d3hv-gajendrans-projects-1a87e0b4.vercel.app`
+(`dpl_DdZw3jo4gb8V9vEGu6oCngzTDVvi`). **A live deploy needs the worker as well as the web app** (items 1 and 3
+are worker changes). No migration. One small change came after the preview was built (the upload waits
+at most 15 seconds for a photo's small copy); a preview without a database cannot show it either way.
+
+**1. The checker knows the business's settings**
+
+- *What was wrong.* The quote checker (`apps/worker/src/ai/quote-validator.ts`) was given the work steps, add-ons
+  and multipliers, and nothing else about money. It was not told the base fee, the minimum charge, tax or the
+  currency, and its prompt wrote every amount with a pound sign whatever the business priced in. So it read the
+  engine's own lines as mistakes.
+- *Before, on four correct quotes through the real pipeline, twice each (8 runs):* 6 runs came back with a
+  finding, 7 findings in all, every one wrong.
+  - Under the minimum (one spring at $275, a $400 minimum, total $400): flagged both times. "An unconfigured
+    fee line item 'Minimum charge applied' was added" (critical), and once more "The total charged (£400)
+    exceeds the expected total (£275)" (high).
+  - A base fee ($75 plus two rooms, total $825): flagged both times. "An unconfigured base service fee of £75
+    was added" (medium).
+  - Tax (a $375 pair of springs at 8.25%, total $405.94): flagged both times. "The calculated sum of line items
+    (£375.00) does not match the generated quote total (£405.94)" (high).
+  - In pounds, no tax (£375): no finding either time. The currency fault showed in the others: dollar amounts
+    written as pounds in every finding.
+- *The fix.* The worker passes the settings the pricing engine was itself given: the currency and locale, the
+  base fee, the minimum charge, and tax (on or off for this service, its label and rate). The prompt states
+  each in words, says a setting that is off is off, marks the breakdown line that tops a job up to the
+  minimum, and shows subtotal, tax and total as three lines. Check 1c (the expected total) and check 7b (no
+  invented fees) are told what the settings explain. Every amount is written with `formatMoney` in the
+  business's currency. Nothing business-specific is typed in: every value is read from the tenant, the service
+  and its pricing rules. The model is the registry's (`createAiClient('wording', …)`, unchanged).
+- *After, the same four, three times each (12 runs):* no finding on any. Each quote was priced the same as
+  before, to the cent (the checker cannot change a price).
+- *It still checks.* `verify-t172` hands the checker two wrong quotes with the same settings: a line the
+  business never configured ("Administration fee"), and a pair of springs at $200 under a $400 minimum. It
+  flags both.
+- *AD-049 holds.* The checker is still handed a copy and still returns findings only.
+- *"Worth checking" is switched on* (`SHOW_WORTH_CHECKING = true`), because no false flag remains on correct
+  quotes. Reverse it by setting the flag to false: one line.
+- *Old results are never shown.* A check's log row is marked in `input_snapshot.serviceConfigVersion`: `v1`
+  before this change, `v2` (`CHECKER_SETTINGS_VERSION`, `packages/shared/src/checker.ts`) from it. The quote API
+  reads the checker's log only for rows marked `v2`. A JSON field that already existed, so no migration.
+  T-169's guard (`contradictedByTheQuote`) stays as a second line.
+
+**2. Small photo copies**
+
+- *What was wrong.* A 48 px photo on a dashboard row, the dashboard's photo strip and the quote page's grid each
+  loaded the full upload.
+- *The fix.* When a customer adds a photo, the browser makes a copy at most 480 px on its longest side (a
+  canvas; WebP, or JPEG where the browser cannot write WebP; no library) and uploads it beside the original, at
+  a key derived from the original's (`<key>.small`, the same tenant folder, the same private bucket). Small
+  pictures ask for `?size=small`. In the test, a 181,705 byte photo has a 13,656 byte small copy.
+- *The server checks it, twice.* At upload, `POST /api/public/uploads/init` gives a small copy a signed address
+  only if it is declared as WebP or JPEG and at most 204,800 bytes. Before serving, the server reads the copy's
+  first bytes and its size from storage: it must start as a WebP or JPEG and be within the limit
+  (`lib/small-photo-server.ts`). An HTML page uploaded as "WebP" and a WebP over the limit are both refused
+  there, and the original is served.
+- *Unchanged.* The original is what the AI reads (the worker knows nothing of small copies) and what the larger
+  view and the photo's link show. A photo uploaded before this change, or by a client that makes no copy (the
+  mobile app, SMS and WhatsApp intake), falls back to the original. Storage stays private: both sizes are
+  served through the same routes, the same sign-in, tenant and token checks, as signed addresses. Upload limits
+  are unchanged; a small copy is not an asset, has no row and counts toward nothing. The demo clean-up deletes a
+  photo's small copy with it.
+- No migration, no new dependency.
+
+**3. Time limits on AI calls**
+
+- The wording, add-on detection and checker calls had no time limit. Each now has one, set in one place
+  (`apps/worker/src/ai/timeouts.ts`): wording 30 s, add-ons 20 s, checker 30 s. Each usually answers in 3 to 5
+  seconds. Each can be changed per deployment (`AI_TIMEOUT_WORDING_MS`, `AI_TIMEOUT_ADDONS_MS`,
+  `AI_TIMEOUT_CHECKER_MS`; 0 = no limit).
+- A call that passes its limit is treated as a failed call, and each already had a fallback, so none was added:
+  wording falls back to the template wording (`generateWordingFallback`); add-on detection to "no AI-detected
+  add-ons" (add-ons the business's keywords or the customer's answers trigger are still priced); the checker to
+  an unchecked quote that goes on as priced. A check that did not finish writes no log row, so it is never
+  shown as "passed".
+- None of the three sets a price, so a timeout cannot change one. `verify-t172` starts a second worker with all
+  three limits at 1 ms: the quote is sent, at the configured $375 with the same lines, with template wording.
+- A timeout logs one line, the call's name and the limit: `[AI] wording timed out after 30000 ms; continuing
+  with the fallback`. No customer text. The checker's failure line now logs the error's message only (it logged
+  the whole error object).
+- The request already sent to the provider is not cancelled; its late answer is dropped.
+
+**4. Colour classes that wrote no CSS**
+
+- *What was wrong.* A class with an opacity on one of our colours (`bg-ink/40`, `ring-primary/30`) wrote no CSS,
+  because the tokens were plain `var()` strings. The ticket says 228, the number recorded in T-164; the code
+  held 208 when this ticket began.
+- *The fix, at the token definition.* Each colour in `globals.css` has its RGB triple beside its hex
+  (`--color-ink-rgb: 27 40 35`), and `tailwind.config.ts` defines every colour as
+  `rgb(var(--color-x-rgb) / <alpha-value>)` through one helper. A business's own colour is set in both forms
+  (`brandStyleVars`). A unit test holds each triple to its hex.
+- *What switching them on showed, and what was removed.* 146 classes in 144 places, because their new look
+  failed contrast or broke system.md. The line-by-line list is in
+  `scripts/hardcore-test/results/t172-colour-screens/removed-classes.txt` (not committed).
+  - **129 focus rings** (`focus:ring-primary/30`, `/20`, `/25`, `focus:ring-danger/20`, `/25`, `/30`,
+    `focus:ring-secondary/30`, `focus-within:ring-primary/20`). Switched on, a field's focus ring went from ink
+    to a faint juniper, 1.4:1 to 1.6:1 on paper. Removed, so the ring is the focus colour again. By file:
+    services page 20, settings page 14, branding page 11, WorkStepEditor 10, OnboardingFlow 9,
+    FormFieldsBuilder 7, Button 5, SuggestedFieldEditor 5, whatsapp page 4, ExpectedSignalEditor 3, sign-up
+    page 3, and 2 each in Textarea, Select, Input, BulkServiceUpload, the quote editor's SectionEditor,
+    RecommendationsEditor and AddonsEditor, TradeStep, QuestionsStep, ContactStep, the customer quote page,
+    the admin quotes page and the login page, and 1 each in QuoteLinkCard, NotificationsSettings,
+    PricingComposer, AIDraftRefinementPanel, AcceptDetailsForm, CheckPricesStep, JobDetailsStep,
+    DeveloperDemo, the sms page, the quotes page, and the admin tenants and activity pages.
+  - **11 butter or tape classes outside measurement** (system.md, colour rule 4): `border-tape/50` on the demo
+    note (`app/demo/page.tsx`), the form's test-mode note (`EstimateWidget`), the demo contact note
+    (`ContactStep`) and the starting-prices note (`CheckPricesStep`); `border-tape/40` on the plan-usage banner
+    (dashboard Home); `border-tape/40` and `bg-butter/40` on the SMS test-mode note; `ring-tape/50` on the
+    current step of the service set-up window; and on the customer quote page `bg-butter/50` and
+    `border-tape/30` on "Worth knowing" and `border-tape/60` beside the business's note. Each looks as it did
+    before this ticket. (The solid `bg-butter` on four of those notes is the older known gap and is untouched.)
+  - **3 that failed text contrast:** `text-tertiary/70` in the AI refinement bar (2.96:1), `bg-tertiary/20`
+    behind "Support Tools" in the admin bar (2.06:1; that label is 2.38:1 without it, an older fault left as
+    found), and `hover:bg-danger/20` on the quote editor's remove button (4.22:1 on a grey card).
+  - **3 control edges, where the opacity went and the colour stayed** (an edge must read at 3:1): the error
+    edge of a question's field and of the job description (`border-danger/50`, 2.3:1, now `border-danger`),
+    and the demo's "Use a sample photo" button (`border-primary/40`, 1.9:1 on mint, now `border-primary`).
+- *What now shows colour (62 classes).* The dimming layer behind the dashboard's phone menu and the service
+  window; the soft edges of tinted boxes (the Danger Zone, the "customer accepted" card, error and success
+  notes); lighter dividers (Analytics rows, the marketing phone menu, the dashboard's phone top
+  bar); paler tints (the chosen review option, "Optional extras" on the quote page); and, on the customer quote
+  page, the measurement block's butter ground and tape edge and the range bar's filled part, which are
+  measurement and so allowed.
+- *Screenshots.* 75 before and 75 after, at 390 and 1440, in
+  `scripts/hardcore-test/results/t172-colour-screens/` with `index.html` showing each changed state side by
+  side. 14 states changed colour; 4 look as they did because a class was removed; 3 pairs differ for another
+  reason (item 5's step count, and test rows).
+- No yellow was added anywhere: the accent takes no opacity (a unit test), and the customer pages still carry
+  none of it.
+
+**5. The form's step count**
+
+- *What was wrong.* On the step where a service is chosen the form counted without Questions ("Step 1 of 4"),
+  then "Step 2 of 5" once a service with questions was picked.
+- *The rule now* (`components/embed/step-count.ts`). Every service has questions: the first step counts
+  Questions ("Step 1 of 5"). No service has: "Step 1 of 4", and it stays 4. One service: no such step, as
+  before. Some have and some do not: the first step shows only its name, "Service", with no "Step 1 of", no bar
+  parts and no numbered row, also when the customer comes back to it with a service chosen; the count starts on
+  the second step. The step bar follows the same rule at both widths.
+- `verify-t171` now checks step 1 (4 new checks); `verify-t172` checks all four kinds of form at 390 and 1440.
+
+**Three changes by the owner's decision, before the commit (2026-11-16)**
+
+- The current step of the service set-up window has a juniper ring (`ring-primary`). T-172 had removed its tape
+  colour, which left Tailwind's default blue.
+- "Support Tools" in the admin bar is secondary text on a mist pill (4.5:1 or more; it was amber on ink,
+  2.4:1).
+- The "AI Refinement" box and the "AI Draft" banner in the service window looked butter with a tape edge. They
+  use the amber `tertiary` tokens, and `tertiary-light` has butter's colour value. What T-172 had switched on
+  there is removed: `border-tertiary/30` on the four AI draft banners and the closed AI Refinement bar,
+  `bg-tertiary-light/50`, `border-tertiary/30` and `border-tertiary/20` on the open AI Refinement box, and the
+  bar's `hover:bg-tertiary-light/80` (9 classes; 53 with an opacity remain). The solid `bg-tertiary-light` on
+  the banners and the closed bar was there before T-172 and is left; OWNER-TODO has the line.
+
+**Changed outside the five items, because a check required it**
+
+- `verify-t169` stores its test finding marked `v2`, as the worker now marks a check, and three of its checks
+  expect a small picture's address to end `?size=small`. `dashboard-t169.test.ts`
+  holds the flag on. `checker-t166.test.ts` allows the checker's file a fourth export, the prompt builder
+  (text only). `public-demo.test.ts` expects the small copy's key to be deleted too.
+- The checker's prompt keeps its older example wording (trade words inside its instructions). That is a
+  hardcoding question for another ticket; this ticket added none.
+
+**Checks**
+
+- `pnpm lint` and `pnpm typecheck` pass. Unit tests: web 750, worker 534, mobile 11. Builds: web and worker.
+- `verify-t172`: 78/78 (items 1, 2, 3 and 5).
+- Full regression set, `verify-t146` through `verify-t172`: every script passes: t146 20/20, t147 33/33, t148 29/29, t149 35/35, t150 27/27, t151 35/35, t152 66/66, t153 39/39, t154 26/26, t155 44/44, t156 31/31, t157 96/96, t158 116/116, t160 96/96, t162 77/77, t164 78/78, t165 148/148, t167 182/182, t169 149/149, t170 412/412, t171 97/97, t172 78/78.
+  **One script needed a second run.** `verify-t169` first came back 146/149: three checks expected a small
+  picture's address to be exactly `/api/quotes/…/photos/…`, and item 2 makes a small picture ask for
+  `…?size=small`. The three expectations were updated and the script re-run: 149/149.
+
+**Not proven in production:** all of it. Nothing was deployed. The preview has no database, so it shows the
+marketing pages, the login page and the colours, not a signed-in page or a real request.
+
+---
+
 ### 2026-11-16: T-171 — Customer pages: the request form and the quote page, clear and honest on a phone; the billing page; three small leftovers
 
 **Deployed 2026-11-16 16:08 UTC** (commit `670408e`): web only (`npx vercel deploy --prod`, deployment
@@ -6149,6 +6328,30 @@ if (pricingResult.estimatedTotal <= 0) {
 - fixing the order (work the minimum out after the checker's step): it repairs arithmetic in code that should not exist;
 - switching the corrections back on with the order fixed: the AI would choose steps and quantities on real quotes;
 - keeping the wording corrections and deleting only the price ones: they were equally unreachable, shared the function, and "flags, never corrects" is simpler to hold to than "corrects words but not prices".
+
+---
+
+### AD-050: A colour token is an RGB triple that takes an opacity (T-172)
+
+**Decision:** every colour token is defined twice in `globals.css`, as a hex (`--color-ink`) and as its RGB triple (`--color-ink-rgb`), and `tailwind.config.ts` defines each colour as `rgb(var(--color-x-rgb) / <alpha-value>)`. A class may therefore carry an opacity (`bg-ink/40`). `focus` stays a plain variable, because its value changes with the ground it is on.
+
+**Why:** with plain `var()` strings Tailwind wrote no CSS for a class with an opacity, silently. 208 such classes sat in the code doing nothing, and nobody could tell a working class from a dead one by reading it. `color-mix()` would also have worked, but a computed colour would then read as `color(srgb …)`, which the verify scripts and the contrast checks do not parse; the triple keeps computed colours as `rgb()`.
+
+**Rules that follow** (system.md, "Opacity on a colour token"): never on a focus ring, the accent, text, or the edge of a control; butter and tape only in measurement. A new colour token needs both forms; a unit test fails when a triple is not its hex. Anything that sets a colour variable at run time (a business's own colour) sets both forms.
+
+**Rejected:** fixing the 208 places one by one (the ticket's instruction, and the next dead class would be just as invisible); removing all 208 (62 of them are wanted: dimming layers, soft edges, pale tints).
+
+---
+
+### AD-051: A photo's small copy is made by the browser and checked by the server before it is served (T-172)
+
+**Decision:** the browser makes a small copy of a photo at upload and stores it at `<original key>.small`. The server never trusts it: it gives the copy a signed address only for a declared WebP or JPEG within the size limit, and before serving reads the copy's first bytes and size from storage. Anything else falls back to the original.
+
+**Why:** the worker runs on Cloudflare Workers and the web app on serverless functions; resizing on the server needs an image library (a heavy dependency) or a paid image service. The browser already holds the picture and a canvas. A derived key needs no column, so no migration, and a photo with no copy (older, or from a client that makes none) needs no back-fill: the route looks, and falls back.
+
+**Rules that follow:** the original is the record: the AI, the larger view and the photo's link always use it. A small copy is not an asset (no row, no limit, never sent to the AI). Whatever deletes an original's object deletes `<key>.small` with it. Both sizes go through the same route with the same checks; there is no separate, weaker path for small pictures.
+
+**Rejected:** a `thumb_key` column (a migration for something a naming rule gives); trusting the upload's `Content-Type` header (the uploader writes it); making copies in the worker (it would add an image library to the queue consumer, and photos uploaded but never submitted would get none).
 
 ---
 
