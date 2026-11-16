@@ -102,6 +102,12 @@ Code for every item is already built; these are the steps that unlock it.
      presses "Mark as answered", or edits the quote and sends it. A reply box that emails or texts the customer and
      keeps the thread on the quote is not built.
   9. **Suggest chasing a quiet customer (T-158 follow-up).** A quote the customer opened several days ago and has not answered still reads "Nothing for you to do". Make its next step "Contact customer" after a set number of days.
+  10. **Small photo copies for photos sent by text, WhatsApp or the mobile app (T-172 follow-up; do it with the
+     WhatsApp ticket, T-111 in `Docs/06-v2-strategy.md`).** Since T-172 the web form makes a small copy of each photo
+     for small pictures. A photo that arrives by SMS, by WhatsApp or from the business's mobile app has none, so its
+     small pictures on the dashboard and the quote page still load the full photo. Those photos reach storage through
+     the server (or the app), not a browser, so the copy has to be made there; the serving side needs no change (it
+     already falls back to the original and will use a copy at `<key>.small` once one exists).
 - [x] **Disagreement path decided 2026-11-09:** both. The reviewer gets the scope answers and a 30 s cap (CHANGELOG 2026-11-09).
 
 ## T-139 — Identification signals (nameplate reading)
@@ -1031,22 +1037,25 @@ Live since 2026-11-15 14:17 UTC. No price changes.
 
 ## T-172 — Worker fixes: the checker's settings, small photo copies, AI time limits, colour classes, the step count
 
-- **Built and on a preview. Not committed, not on production.** Preview (web only, no database, behind the Vercel
-  login): `https://estimator-pz9p8d3hv-gajendrans-projects-1a87e0b4.vercel.app`.
-- [ ] **To put it live: commit, then deploy the worker and the web app.** This is the first ticket since T-166
-  that changes the worker. No migration. Deploy the worker first (it marks new checks `v2`), then the web app.
-  New checks on old quotes are never needed: a quote checked before the deploy simply shows no "Worth checking".
+- [x] **Deployed 2026-11-16 18:06 UTC** (commit `c891192`): the worker first (version `d739210a`), then the web
+  app (`dpl_35mburqfwb7cJgSGidy5rQDPK1u4`, serving `estimator-web-phi.vercel.app`). No migration. Checked live,
+  read-only (nothing was sent): Home, the login page and the demo load; the demo form's first step reads "Step 1
+  of 5"; the public quote API answers 404 for a made-up token; the worker answers its health check.
+- The preview is **deleted**.
+- A quote checked before this deploy shows no "Worth checking"; only quotes priced from now on can.
 - [ ] **"Worth checking" is switched on.** The checker is now told your minimum charge, base fee, tax and
   currency. Four correct quotes that it used to flag (6 runs of 8) came back clean (12 runs of 12). It is still
   an AI's note: it can be wrong about wording or scope. If you see a wrong one on a real quote, tell me the
   quote and I will look; to switch the group off again is one line (`SHOW_WORTH_CHECKING`).
-- [ ] **Look at the colour changes** before they go live. Open
+- [ ] **Look at the colour changes** (they are live). Open
   `scripts/hardcore-test/results/t172-colour-screens/index.html` on this computer: each changed page before and
   after, at 390 and 1440. What you will notice most:
   1. the page behind a window, and behind the dashboard's phone menu, is now dimmed;
   2. on the customer quote page, the "Measurement & takeoff" block has a pale butter ground and the range bar
      shows its filled part;
   3. tinted boxes (Danger Zone, "customer accepted", notes) have a soft coloured edge.
+  The pictures were taken before your three follow-up changes, so the service window's step ring and AI boxes
+  look slightly different in them from what is live.
 - [ ] **Three small things I decided; say if you want any of them the other way.**
   1. *The current step in the service set-up window* had a tape-coloured ring written for it. Tape is for
      measurement only, so I removed it. **Done (your decision, 2026-11-16): the ring is juniper.**
@@ -1065,7 +1074,7 @@ Live since 2026-11-15 14:17 UTC. No price changes.
 - [ ] **A time limit can be changed without a code change** if the AI provider is slow one day:
   `AI_TIMEOUT_WORDING_MS`, `AI_TIMEOUT_ADDONS_MS`, `AI_TIMEOUT_CHECKER_MS` on the worker (30, 20 and 30 seconds
   today; names only, no secret).
-- [ ] **Photos sent by text, WhatsApp or the mobile app get no small copy** (only the web form makes one), so
-  their small pictures still load the full photo. Say if you want a ticket for that.
+- **Photos sent by text, WhatsApp or the mobile app get no small copy** (only the web form makes one). It is in
+  the product backlog near the top of this file, item 10, with the WhatsApp ticket.
 - [ ] **After the deploy, send one real request with a photo through your quote link** and open the quote on
   the dashboard: the small photo should load at once, and tapping it should open the full photo.

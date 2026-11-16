@@ -17,11 +17,29 @@
 
 ### 2026-11-16: T-172 — Worker fixes: the checker knows the business's settings, small photo copies, AI timeouts, colour classes, the form's step count
 
-**Status: built and on a preview. Not committed. Not on production.** Preview (web only, no database, behind the
-Vercel login): `https://estimator-pz9p8d3hv-gajendrans-projects-1a87e0b4.vercel.app`
-(`dpl_DdZw3jo4gb8V9vEGu6oCngzTDVvi`). **A live deploy needs the worker as well as the web app** (items 1 and 3
-are worker changes). No migration. One small change came after the preview was built (the upload waits
-at most 15 seconds for a photo's small copy); a preview without a database cannot show it either way.
+**Deployed 2026-11-16 18:06 UTC** (commit `c891192`), worker first, then web. No migration.
+- Worker: `npx wrangler deploy --env production`, version `d739210a-94f0-487b-a50c-0a6a1afe0961`
+  (`estimator-worker-production`).
+- Web: `npx vercel deploy --prod`, deployment `dpl_35mburqfwb7cJgSGidy5rQDPK1u4`, target production, serving
+  `estimator-web-phi.vercel.app`.
+
+Checks run before the commit: `pnpm lint` and `pnpm typecheck` pass; unit tests web 751, worker 534, mobile 11;
+`verify-t172` 78/78, `verify-t171` 97/97 and `verify-t164` 78/78.
+
+Live checks, read-only (no request was submitted; in the browser check, requests to other sites were blocked and
+the page tried to send nothing that was not a GET):
+- `/`, `/login` and `/demo` return 200.
+- the demo form's first step reads "Step 1 of 5" at 390 (it read "Step 1 of 4" before this deploy).
+- the public quote API: 404 `QUOTE_NOT_FOUND` for a made-up token.
+- the worker's health check answers 200, `status: ok`.
+- also seen: the live stylesheet carries the colour tokens as RGB triples.
+
+Not proven in production: a real request priced by the new worker (the checker's settings and the time limits),
+a photo's small copy, and "Worth checking" on a signed-in quote page. Each needs a real request or a sign-in,
+which the live checks must not use; they passed on the local stack through the real pipeline (`verify-t172`).
+Quotes checked before this deploy have rows marked `v1` and show no "Worth checking".
+
+The T-172 preview (`dpl_DdZw3jo4gb8V9vEGu6oCngzTDVvi`) is deleted, as the owner asked.
 
 **1. The checker knows the business's settings**
 
@@ -182,15 +200,12 @@ at most 15 seconds for a photo's small copy); a preview without a database canno
 
 **Checks**
 
-- `pnpm lint` and `pnpm typecheck` pass. Unit tests: web 750, worker 534, mobile 11. Builds: web and worker.
+- At the build: `pnpm lint` and `pnpm typecheck` pass. Unit tests: web 750, worker 534, mobile 11. Builds: web and worker.
 - `verify-t172`: 78/78 (items 1, 2, 3 and 5).
 - Full regression set, `verify-t146` through `verify-t172`: every script passes: t146 20/20, t147 33/33, t148 29/29, t149 35/35, t150 27/27, t151 35/35, t152 66/66, t153 39/39, t154 26/26, t155 44/44, t156 31/31, t157 96/96, t158 116/116, t160 96/96, t162 77/77, t164 78/78, t165 148/148, t167 182/182, t169 149/149, t170 412/412, t171 97/97, t172 78/78.
   **One script needed a second run.** `verify-t169` first came back 146/149: three checks expected a small
   picture's address to be exactly `/api/quotes/…/photos/…`, and item 2 makes a small picture ask for
   `…?size=small`. The three expectations were updated and the script re-run: 149/149.
-
-**Not proven in production:** all of it. Nothing was deployed. The preview has no database, so it shows the
-marketing pages, the login page and the colours, not a signed-in page or a real request.
 
 ---
 
