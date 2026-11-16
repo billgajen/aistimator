@@ -17,14 +17,47 @@
 
 ### 2026-11-16: T-174 — Move to qolumns.com, cleaner quote links, Home's examples reordered, a new sample name (AD-052)
 
-**Status: built and on a preview. Not committed. Not on production.** The move itself waits for the owner's DNS
-records (the table is in `OWNER-TODO.md`). Preview (web only, no database, behind the Vercel login):
-`https://estimator-paxfihzrp-gajendrans-projects-1a87e0b4.vercel.app`.
+**Live 2026-11-16 22:39 UTC** (commit `8a048cb`). The product is at `https://qolumns.com`. No migration, and
+the worker's code was not redeployed.
 
-**Already changed in production, on the ticket's instruction (B2):** the four domains are on the Vercel project
-(`vercel domains add`): `qolumns.com` serving, and `www.qolumns.com`, `qolums.com` and `www.qolums.com` each a
-permanent (308) redirect to it. They do nothing until DNS points at Vercel. Nothing else in production was
-touched: no env var, no secret, no Supabase setting, no bucket setting, no deploy.
+The owner put the DNS records in (both zones cleaned, Email Routing on, Postmark verified for DKIM and
+Return-Path). Then, in this order:
+1. **DNS:** every record resolved (Vercel CNAMEs with the proxy off, Cloudflare's three MX and SPF, the Postmark
+   DKIM record `20261116223106pm._domainkey`, `pm-bounces`, both DMARC records; no Namecheap record left).
+2. **Certificates:** Vercel showed the four names as configured but had issued no certificate, so HTTPS failed
+   on all four. `vercel certs issue <name>`, one name at a time, fixed it (all four in one command fails with
+   "Domain not found").
+3. `scripts/deploy-t174-settings.sh cors auth`: the bucket accepts uploads from `https://qolumns.com` as well
+   as the old address; Supabase auth's Site URL is `https://qolumns.com` and both addresses are allowed.
+4. Commit and push.
+5. `scripts/deploy-t174-settings.sh app-url sender`: the worker's `APP_URL` and `POSTMARK_FROM_EMAIL` (two
+   secret changes; the worker's version is now `cf585ec7-b059-4fdd-b742-e9f6a79751ca`, same code) and Vercel's
+   `NEXT_PUBLIC_APP_URL` and `POSTMARK_FROM_EMAIL`. Emails are sent from `quotes@qolumns.com`.
+6. Web: `npx vercel deploy --prod`, deployment `dpl_4pZAN5TUjt8peh6PcDmDtimz5ZN3`, target production, serving
+   `qolumns.com` and `estimator-web-phi.vercel.app`.
+
+Live check, read-only (`verify-t174.mts --live`, **34/34**; nothing was submitted, and in the browser the pages
+tried to send nothing that was not a GET):
+- DNS as above.
+- `https://qolumns.com/`, `/login`, `/demo` and `/pricing` return 200 from Vercel; the three other names answer
+  308 to `https://qolumns.com` with the path and query kept; plain http goes to https on all four.
+- The old address still serves: a real business's quote link (200, no redirect), the embed script, the form it
+  loads, and in a browser the embed code with the old address shows that business's form on another site at
+  the form's height. The public quote API answers 404 for a made-up token on both addresses.
+- Supabase auth and the bucket read back with both addresses. The worker answers its health check.
+- Home on the new address: the examples in the new order, the estimate line, "Megan G.", links built on
+  `qolumns.com`; the demo form reads "Step 1 of 5" at 390; `/app` signed out goes to `qolumns.com/login`.
+
+The first live run was 33/34: the check compared "Megan G." with text the page prints in capitals. The page
+was right; the check now compares without case.
+
+**Not proven in production** (each needs a real request, a real email or a sign-in, which the live check must
+not use): an email delivered from `quotes@qolumns.com`; a photo uploaded from `qolumns.com` (the bucket setting
+reads back right); a sign-up confirmation landing on the new address; the clean-link offer on a signed-in page.
+No production business has a random link today (0 of 4), so none will see the offer yet. The hand tests are in
+`OWNER-TODO.md`.
+
+The three T-174 previews are deleted, as the owner asked.
 
 #### Part A
 
@@ -147,10 +180,6 @@ the founder section, which is still empty). The T-159 sender name rule and reply
   build's lint will.
 - A browser will not load any `.app` name over plain http, so the local check of the old address answers the
   browser's https requests for it from the local server, with the same Host.
-
-**Not proven in production:** all of Part B. Until the DNS records are in, none of the four names reaches
-Vercel. `verify-t174.mts --live` is the read-only check to run then (DNS, the four addresses, the old address,
-the settings, and the embed code in a browser). A delivered email from the new address needs a real send.
 
 **Files:** `packages/shared/src/{domains.json,brand.ts}`, `apps/web/next.config.js`,
 `apps/web/src/lib/{clean-slug,clean-slug-server}.ts`, `apps/web/src/app/api/tenant/slug/route.ts`,

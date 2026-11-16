@@ -568,7 +568,7 @@ async function live() {
   await p.goto(`${NEW}/`, { waitUntil: 'networkidle' })
   const titles = await p.locator('[data-testid=notices] [data-testid=notice] h3').allInnerTexts()
   check('Home on the new address: the examples are in the new order', JSON.stringify(titles) === JSON.stringify(['An extra your customer asked for', 'Walls, measured from photos', 'Model and size, read from a photo', 'When it can’t tell, it asks']), titles)
-  check('Home on the new address: "Megan G.", and the estimate line under the walls example', (await p.locator('main').innerText()).includes('Megan G.') && (await p.locator('[data-testid=notice-note]').innerText()).startsWith('It’s an estimate.'))
+  check('Home on the new address: "Megan G.", and the estimate line under the walls example', /megan g\./i.test(await p.locator('main').innerText()) && (await p.locator('[data-testid=notice-note]').innerText()).startsWith('It’s an estimate.'))
   if (real) {
     const snippet = embedSnippet({ appOrigin: OLD, tenantKey: String(real.tenant_key), placement: 'inline', experience: 'form' })
     await ctx.route('http://business.example/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: `<!doctype html><html><body>${snippet}</body></html>` }))

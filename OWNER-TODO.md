@@ -1081,16 +1081,32 @@ Live since 2026-11-15 14:17 UTC. No price changes.
 
 ## T-174 — Move to qolumns.com, cleaner quote links, Home's examples, the sample name
 
-- **Built and on a preview. Not committed, not on production.** Preview (web only, no database, behind the Vercel
-  login): `https://estimator-paxfihzrp-gajendrans-projects-1a87e0b4.vercel.app`. On it you can see Home's
-  "What it notices" in its new order and "Megan G."; the Quote link page needs a database, so the clean-link
-  offer is in the screenshots of `verify-t174` (its results folder) and not on the preview.
-- **Done already, as the ticket asked:** the four domains are on the Vercel project. They do nothing until the
-  DNS records below are in.
+- [x] **Live 2026-11-16 22:39 UTC** (commit `8a048cb`, web `dpl_4pZAN5TUjt8peh6PcDmDtimz5ZN3`). The product is at
+  `https://qolumns.com`. `www.qolumns.com`, `qolums.com` and `www.qolums.com` redirect to it. The old address
+  still serves, so every quote link, QR code and embed code already given out keeps working. Emails are sent
+  from `quotes@qolumns.com`. No migration; the worker's code was not redeployed (only two of its settings).
+- Checked live, read-only, 34 of 34 (`verify-t174.mts --live`). The three previews are **deleted**.
+- [ ] **Try by hand** (the live check cannot send anything):
+  1. *An email in.* Send a message to `hello@qolumns.com` from another address. It should reach your inbox.
+  2. *A real request with a photo,* through your quote link on `qolumns.com`. The photo should upload (this is
+     the first upload from the new address), and the email you get should come from "Qolumns" at
+     `quotes@qolumns.com`. Approve it for a customer address you can read: that email should come from
+     "<your business> via Qolumns" at the same address, and a reply to it should be addressed to your business.
+     If either lands in spam, tell me before anything else changes.
+  3. *Sign in on `qolumns.com`.* You are signed out there: a sign-in belongs to one address. Then open Quote
+     link: the link, the QR code and the website code should all say `qolumns.com`.
+  4. *An old link.* Open a quote link or scan a QR code you gave out before today. It should still open, on
+     the old address.
+  5. *A new account* (optional): sign up on `qolumns.com` with a spare address. The confirmation email's link
+     should land on `qolumns.com`.
+- [ ] **In a week:** if emails are arriving normally, change the `_dmarc` record on `qolumns.com` to
+  `v=DMARC1; p=quarantine;`.
+- No business has a random link today (0 of 4), so nobody sees "Get a cleaner link" yet. The next business
+  whose name is taken will.
 
-### Your turn: DNS (I have not touched Cloudflare)
+### The DNS records (done by the owner, 2026-11-16; kept as the record of what is there)
 
-Do these in order. Steps 1 and 3 give values only you can see.
+The Postmark DKIM Hostname is `20261116223106pm._domainkey`. The steps were:
 
 1. **Postmark: add the sending domain.** Postmark → Sender Signatures → Add Domain or Signature → Add Domain →
    `qolumns.com`. Postmark then shows a DKIM record (a Hostname ending `._domainkey` and a long Value) and the
@@ -1152,7 +1168,10 @@ Notes on the table:
 - I could only see the imported records from outside (they sit behind Cloudflare's proxy): an A and a `www`
   record, five MX and one TXT on each domain. If Cloudflare lists anything else it imported, delete that too.
 
-### What I do once you say the DNS is in
+### What was done once the DNS was in (all done)
+
+One thing was not on this list: Vercel had issued no certificate for the four names, so HTTPS failed until
+`vercel certs issue <name>` was run for each.
 
 1. Check each record resolves, and that all four names reach Vercel with a certificate.
 2. The storage bucket accepts uploads from the new address (it accepts only the old one today; without this a
@@ -1190,8 +1209,5 @@ Steps 2 to 5 are `scripts/deploy-t174-settings.sh` (`--dry-run` shows what each 
   and `https://qolumns.com/privacy` and `/terms` as the policy links. When you reach the WhatsApp webhook step,
   the callback address is `https://qolumns.com/api/whatsapp/webhook` (the keys are still not set in production:
   T-144 and the WhatsApp section above).
-- [ ] **Three T-174 previews are listed in Vercel:** the one above, an earlier one it replaces
-  (`estimator-drn26f0vw…`), and a failed build that serves nothing (`estimator-9qsyma87w…`, stopped on a lint
-  error in a new test). Say if you want them deleted after the deploy.
 - The T-149 note "Later (custom domain)" is this ticket. Quote links, QR codes and embed code made after the
   switch carry `qolumns.com`; the ones already given out keep working on the old address, for good.
