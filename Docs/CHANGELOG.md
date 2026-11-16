@@ -17,13 +17,40 @@
 
 ### 2026-11-16: T-171 — Customer pages: the request form and the quote page, clear and honest on a phone; the billing page; three small leftovers
 
-**Status: built and on a preview. Not committed. Not on production.** Preview deployment `dpl_BDAmLwq3Lk9b45bp1nCdnfpZABMM` (behind the
-Vercel login). It has no database, so the customer's form, the question, the quote page and the billing page
-cannot run on it; the login and sign-up pages and the marketing header, footer and pictures can be seen there.
-The customer's pages were checked and photographed on the local stack.
+**Deployed 2026-11-16 16:08 UTC** (commit `670408e`): web only (`npx vercel deploy --prod`, deployment
+`dpl_68tijQyY2M7rDTH4JaupnL9wjqVZ`, target production, serving `estimator-web-phi.vercel.app`). No worker deploy
+and no migration. Before it, by the owner's decision, the form's last button became "Get my estimate" (section 1).
 
-**No migration and no worker change.** A live deploy would be web only. Everything the customer now sees is built
-by the web app from what the worker already stores.
+Checks run before the commit: `pnpm lint` and `pnpm typecheck` pass; unit tests web 724, worker 519, mobile 11;
+`verify-t171` 91/91 and `verify-t162` 77/77.
+
+Live checks, read-only (a browser at 390 and 1440; requests to other sites blocked; the pages tried to send
+nothing that was not a GET):
+- `/`, `/login` and `/demo` return 200.
+- the public quote API: 404 `QUOTE_NOT_FOUND` for a made-up token.
+- Home's closing band: the keyboard focus ring on both of its controls is white on juniper, 7.51:1 (it was ink
+  on juniper, 2.03:1, the fault T-170 left there).
+- `/demo` at 1440: no step label is cut off or outside the form.
+- **One check did not match what the owner expected, and the owner accepted it as it is.** The demo form's first
+  step was expected to read "Step 1 of 5" at 390; it reads **"Step 1 of 4"** (and at 1440 the bar shows four
+  labels there, not five). The deploy was stopped at that point and reported; the owner chose no code change.
+
+**Known behaviour: the form's step count grows after the first step.** On the step where the customer chooses a
+service, the form counts four steps (Service, Contact, Photos, Details). It cannot know yet whether the chosen
+service has questions of its own, so "Questions" is not counted. Once a service with questions is chosen, the
+count is five and the next screen reads "Step 2 of 5". A form with one service, or opened for one service, has
+no such step and is right from the start. The count has always been worked out this way; "Step 1 of 4" only
+makes it visible as a number. `verify-t171` checked from the second step on, so it did not catch it. **A fix is
+planned for the next ticket.**
+
+Not proven in production: a customer's request through the new form, the question, the quote page and accept
+(that needs a real request, which the live checks must not send; they passed on the local stack through the real
+pipeline, `verify-t171`), and the billing page (it needs a sign-in).
+
+The T-171 preview (`dpl_BDAmLwq3Lk9b45bp1nCdnfpZABMM`) is deleted, as the owner asked.
+
+**No migration and no worker change.** Everything the customer now sees is built by the web app from what the
+worker already stores.
 
 **What the owner asked for:** the request form and the customer's quote page made clear and honest on a phone
 (`Docs/design/audit.md` section 3), the billing page brought into line with the public Pricing page, and the
