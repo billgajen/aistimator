@@ -27,7 +27,9 @@ import type {
   QuoteDetailResponse,
   AmendmentSummary,
 } from '@qolumns/shared'
-import { CHECKER_SETTINGS_VERSION } from '@qolumns/shared'
+import { CHECKER_SETTINGS_VERSION, serviceSuggestionOf } from '@qolumns/shared'
+import { fieldLabels, requestDetails } from '@/lib/request-details'
+import type { FieldRow } from '@/lib/request-details'
 import type {
   QuotePricing,
   QuoteContent,
@@ -97,7 +99,7 @@ export async function GET(
           work_steps,
           expected_signals
         ),
-        request:quote_requests!quote_request_id (asset_ids)
+        request:quote_requests!quote_request_id (asset_ids, job_answers, job_postcode, job_address, job_quantity, source_json)
       `)
       .eq('id', quoteId)
       .eq('tenant_id', auth.tenantId)
@@ -115,7 +117,7 @@ export async function GET(
     // T-169: the customer's photos, and the newest run of the quote checker
     // that found something. Both are read for this tenant only. The checker's
     // log is read only while "Worth checking" is switched on (it is, since T-172).
-    const [amendmentsResult, feedbackResult, smsResult, photos, checkerResult] = await Promise.all([
+    const [amendmentsResult, feedbackResult, smsResult, photos, checkerResult, fieldRows] = await Promise.all([
       supabase
         .from('quote_amendments')
         .select('id, version, source, changes_json, created_at, amended_by')
@@ -149,7 +151,15 @@ export async function GET(
             .limit(1)
             .maybeSingle()
         : Promise.resolve({ data: null }),
+      // T-178: the form's questions, to word the customer's answers as the business asked them
+      supabase.from('widget_configs').select('service_id, config_json').eq('tenant_id', auth.tenantId),
     ])
+
+    // T-178: what the customer sent, and the request form's suggestion of another service (if any)
+    const requestRow = ((r: unknown) => (Array.isArray(r) ? r[0] : r))((quote as { request?: unknown }).request) as
+      | { job_answers?: unknown; job_postcode?: string | null; job_address?: string | null; job_quantity?: number | null; source_json?: unknown }
+      | null
+      | undefined
 
     // T-169: what the AI produced for this quote, worded for the business.
     // Built here so the page never reads the checker's log or the raw signals.
@@ -219,6 +229,8 @@ export async function GET(
       smsActive: (smsResult.data as { is_active?: boolean } | null)?.is_active === true,
       photos,
       understanding,
+      request: requestDetails(requestRow, fieldLabels(fieldRows.data as FieldRow[] | null, quote.service_id)),
+      serviceSuggestion: serviceSuggestionOf(requestRow?.source_json),
     }
 
     return NextResponse.json(response)

@@ -523,7 +523,7 @@ export async function extractSignals(
     return validateSignals(signals)
   } catch (error) {
     console.error('[Signals] Failed to parse Gemini response:', error)
-    console.error('[Signals] Raw response:', response)
+    console.error(`[Signals] Raw response not logged (${String(response).length} chars): it can repeat the customer's words`)
 
     // Return a default low-confidence result
     return getDefaultSignals('Failed to parse AI response')

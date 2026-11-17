@@ -3,7 +3,7 @@
 import { questionsSpread } from './step-count'
 import { makeSmallPhoto, smallPhotoDeclaration, uploadSmallPhoto } from '@/lib/small-photo-client'
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { EMBED_NAMES, formatMoney, PRODUCT_NAME, splitMinimum } from '@qolumns/shared'
+import { EMBED_NAMES, formatMoney, PRODUCT_NAME, splitMinimum, SLOW_PREPARING_MS, slowPreparingLine, failedRequestLine } from '@qolumns/shared'
 import { useSearchParams } from 'next/navigation'
 import { assessImageQuality } from '@/lib/image-quality'
 import { brandStyleVars } from '@/lib/color'
@@ -503,7 +503,6 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
   const [step, setStep] = useState<Step>('loading')
   const [widgetData, setWidgetData] = useState<WidgetData | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [suggestedService, setSuggestedService] = useState<{ id: string; name: string } | null>(null)
   const [quoteResult, setQuoteResult] = useState<QuoteResponse | null>(null)
 
   // Form state
@@ -655,7 +654,6 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
         // T-153: over the demo's limits, the page shows the recorded example
         if (demo && response.status === 429) {
           setError('The demo is busy right now. Here is an example estimate instead.')
-          setSuggestedService(null)
           setStep('error')
           demo.onBusy()
           return
@@ -664,12 +662,9 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
         // T-173: held back, not refused for what was typed: every answer is still here and can be sent again
         setCanResend(response.status === 429 || response.status >= 500 || data.error?.code === 'VERIFICATION_FAILED')
 
-        // Handle service mismatch with suggestion
-        if (data.error?.code === 'SERVICE_MISMATCH' && data.error?.suggestedService) {
-          setSuggestedService(data.error.suggestedService)
-        } else {
-          setSuggestedService(null)
-        }
+        // T-178: there is no "switch to another service" any more. The server
+        // no longer refuses a request for its description; it keeps it on the
+        // chosen service and the business reviews it.
 
         setStep('error')
         return
@@ -796,15 +791,8 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
       {step === 'error' && (
         <ErrorState
           message={error}
-          suggestedService={suggestedService}
           onRetry={loadWidgetConfig}
           onResend={canResend ? handleSubmit : undefined}
-          onSelectSuggested={suggestedService ? () => {
-            setSelectedService(suggestedService.id)
-            setSuggestedService(null)
-            setError(null)
-            setStep('contact') // Go back to contact to resubmit
-          } : undefined}
         />
       )}
 
@@ -1042,33 +1030,18 @@ function LoadingState() {
 
 function ErrorState({
   message,
-  suggestedService,
   onRetry,
   onResend,
-  onSelectSuggested,
 }: {
   message: string | null
-  suggestedService?: { id: string; name: string } | null
   onRetry: () => void
   /** T-173: send the same request again; given only when nothing typed was at fault */
   onResend?: () => void
-  onSelectSuggested?: () => void
 }) {
   return (
     <div className="text-center py-12 px-4">
       <div className="text-4xl mb-4">⚠️</div>
       <p className="text-text-secondary mb-4">{message || 'Something went wrong'}</p>
-
-      {suggestedService && onSelectSuggested && (
-        <div className="mb-4">
-          <button
-            onClick={onSelectSuggested}
-            className="px-5 py-3 text-sm font-semibold bg-primary text-on-primary rounded-xl hover:bg-primary-hover transition"
-          >
-            Switch to &quot;{suggestedService.name}&quot; and Submit
-          </button>
-        </div>
-      )}
 
       {onResend ? (
         <>
@@ -1646,8 +1619,14 @@ function SuccessState({
   const framed = typeof window !== 'undefined' && window.parent !== window
   const sameTab = framed ? { target: '_top' } : {}
 
-  // Queue processing: past the poll window we stop and promise the email instead
+  // Queue processing: past the poll window we stop checking
   const [timedOut, setTimedOut] = useState(false)
+  // T-178: after 60 seconds of "Preparing" the customer is told it is slow (the page keeps checking)
+  const [slow, setSlow] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), SLOW_PREPARING_MS)
+    return () => clearTimeout(timer)
+  }, [])
   // T-147: priced and visible to the customer, awaiting the business's confirmation
   const [estimateShown, setEstimateShown] = useState(false)
 
@@ -1828,8 +1807,8 @@ function SuccessState({
           {liveStatus === 'pending_review'
             ? `Your estimate is being prepared. ${businessName} will review and send it shortly.`
             : liveStatus === 'failed'
-              ? hasEmail ? 'The business will send your estimate by email shortly — nothing more needed from you.' : `${businessName} will be in touch about your estimate shortly — nothing more needed from you.`
-              : hasEmail ? 'This one is taking longer than usual. We’ll email you the link the moment it’s ready.' : 'This one is taking longer than usual. Keep this page open, or bookmark it: your estimate will appear here.'}
+              ? failedRequestLine(businessName)
+              : slowPreparingLine(hasEmail)}
         </p>
       </div>
     )
@@ -1841,8 +1820,10 @@ function SuccessState({
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted mb-3">Request received</p>
       <h3 className="font-display text-xl font-bold text-text-primary">Preparing your estimate</h3>
       <div className="tape-rule tape-measuring w-48 mx-auto my-6" aria-hidden="true" />
-      <p className="text-sm text-text-secondary mb-6 max-w-xs mx-auto">
-        {hasEmail ? 'This usually takes a minute or two. Keep this open — or we’ll email you the link when it’s ready.' : 'This usually takes a minute or two. Keep this page open.'}
+      <p className="text-sm text-text-secondary mb-6 max-w-xs mx-auto" data-testid={slow ? 'finished-slow' : 'finished-usual'}>
+        {slow
+          ? slowPreparingLine(hasEmail)
+          : hasEmail ? 'This usually takes a minute or two. Keep this open — or we’ll email you the link when it’s ready.' : 'This usually takes a minute or two. Keep this page open.'}
       </p>
       <a
         href={quoteUrl}

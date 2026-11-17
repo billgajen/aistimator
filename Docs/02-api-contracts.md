@@ -33,6 +33,32 @@
 - `POST /api/public/uploads/init`: `sizeBytes` must be a whole number. The `uploadUrl` (and `smallUploadUrl`) is
   signed for exactly that size and the declared `contentType`; a PUT of anything else is refused by storage (403).
 
+## Requests are never refused for what the customer wrote (T-178)
+- `POST /api/public/quotes` **no longer returns `SERVICE_MISMATCH`** (400, with `suggestedService`). That code
+  is gone; a client that still handles it simply never sees it.
+- A request that carries any answered question, a `quantity` or any `assetIds` for the chosen service is
+  accepted on that service whatever its `_project_description` says. The service matcher is not asked.
+- A request whose only content is its description is judged by the matcher, which is given every active
+  service's name, description, includes and excludes:
+  - another of the business's services clearly fits → **200**, `status: "queued"`, the request is made on the
+    chosen service. The suggestion is stored on the request and the priced quote is held for the business
+    (`pending_review`, hidden from the customer) with the reason;
+  - nothing the business offers fits → a general inquiry (**200**, `isGeneralInquiry: true`), or **400**
+    `SERVICE_NOT_AVAILABLE` when the business switched general inquiries off. Both as before;
+  - unsure, slow or failing → accepted as usual.
+- When the request is saved but cannot be handed to the pricing worker: **200** with `status: "failed"`, the
+  customer's link, and `warning`. The quote is marked failed and the business is emailed.
+- `GET /api/public/quotes/{id}`: `customer.hasEmail` (boolean; never the address). On `status: "failed"` the page
+  says the business has the request and will be in touch.
+- `GET /api/quotes/{id}` (dashboard) adds `request` (`description`, `answers[] { label, value }`, `postcode`,
+  `address`, `quantity`) and `serviceSuggestion` (`serviceId`, `serviceName`, `reason`, or `null`).
+- `POST /api/admin/quotes/{id}/retry`: a signed-in platform admin, **or** the header `X-Retry-Code` holding the
+  one-time code `scripts/retry-failed-quote.sh` wrote onto that quote (one quote, one use, ten minutes).
+  Otherwise **403**. Only for `failed`, `queued` or `generating` quotes. **502** `QUEUE_FAILED` if the worker
+  cannot be reached (the quote goes back to `failed`).
+- `GET /quote/{slug}` (the quote link page) over its limit answers **429** with `Retry-After` and a plain HTML
+  line. It used to answer 200 with the same words.
+
 ## Account routes (T-173)
 The browser does not call Supabase's auth directly. All answer `{ "ok": true }` or the standard error envelope.
 - `POST /api/auth/signup` `{ "email", "password", "businessName", "plan"?, "turnstileToken"?, "website"? }`.

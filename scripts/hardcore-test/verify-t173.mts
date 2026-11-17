@@ -783,7 +783,9 @@ section('K. The home page’s first example is what the product does (live, with
   const who = person('Megan Grant')
   const message = NOTICES.examples[0].message
   const wrongPick = await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, aWallpaper, who, [{ fieldId: '_project_description', value: message }, { fieldId: 'wall_count', value: 3 }], { turnstileToken: GOOD_TOKEN }), timeoutMs: 300_000 })
-  check('the service: sent to Wallpaper Installation, the home page’s message is answered "did you mean Interior Painting?"', wrongPick.status === 400 && wrongPick.json?.error?.code === 'SERVICE_MISMATCH' && wrongPick.json.error.suggestedService?.name === 'Interior Painting', wrongPick.json?.error)
+  // T-178: this used to be refused with "did you mean Interior Painting?" (SERVICE_MISMATCH). A request that
+  // answers one of the chosen service's questions is never refused for what its note says: the customer chose it.
+  check('the service: sent to Wallpaper Installation with one of its questions answered, the home page’s message is accepted, not refused', wrongPick.status === 200 && !wrongPick.json?.error && typeof wrongPick.json?.quoteId === 'string', wrongPick.json?.error)
   const q = await submitted(await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, aInterior, who, [{ fieldId: '_project_description', value: message }, { fieldId: 'room_count', value: 1 }], { turnstileToken: GOOD_TOKEN, assetIds: await roomPhoto(a) }), timeoutMs: 300_000 }))
   const row = (await sb.select('quotes', `id=eq.${q.id}&select=status,pricing_json,clarification_questions_json`))[0] as { status: string; pricing_json: { breakdown: Array<Row> }; clarification_questions_json: Array<{ question: string; targetSignalKey?: string }> | null }
   const question = (row.clarification_questions_json ?? []).find((c) => c.targetSignalKey === 'room_count')

@@ -7,6 +7,14 @@ compatibility_date = "2024-06-01"
 binding = "ASSETS"
 bucket_name = "aistimator-assets"
 
+# T-178: Workers Logs, so an error in production can be read afterwards (the
+# day the limiter failed every quote there was nothing to read). Logs carry
+# quote ids and error names, never a customer's name, address or words.
+# Kept for 7 days on Workers Paid. A deploy without this block switches the
+# logs off again, whatever the dashboard says.
+[observability]
+enabled = true
+
 # Development environment variables
 [vars]
 ENVIRONMENT = "development"
@@ -26,8 +34,8 @@ max_retries = 3
 # Production secrets (set via wrangler secret put):
 # - SUPABASE_URL
 # - SUPABASE_SERVICE_KEY
-# - UPSTASH_REDIS_URL
-# - UPSTASH_REDIS_TOKEN
+# - UPSTASH_REDIS_URL    (Upstash's "REST URL", https://…upstash.io; optional: without both, no limiter)
+# - UPSTASH_REDIS_TOKEN  (Upstash's "REST token")
 # - GEMINI_API_KEY
 # - POSTMARK_API_TOKEN
 # - POSTMARK_FROM_EMAIL
@@ -41,6 +49,10 @@ max_retries = 3
 # Production environment
 [env.production]
 vars = { ENVIRONMENT = "production" }
+
+# Inherited from the top level; repeated so it is plain that production has it
+[env.production.observability]
+enabled = true
 
 [[env.production.r2_buckets]]
 binding = "ASSETS"

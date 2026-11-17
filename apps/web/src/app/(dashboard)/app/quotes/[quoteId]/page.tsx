@@ -5,6 +5,7 @@ import type { AcceptanceDetails } from '@/lib/acceptance'
 import { useEffect, useState, useCallback } from 'react'
 import { formatMoney, quoteActions, quoteTurn, quoteTracker, customerFirstName, splitMinimum } from '@qolumns/shared'
 import { NextStepBox } from '@/components/quotes/NextStepBox'
+import { CustomerSent, ServiceSuggestionNote } from '@/components/quotes/CustomerSent'
 import { MinimumNote } from '@/components/quote/MinimumNote'
 import { QuoteTracker } from '@/components/quotes/QuoteTracker'
 import { TurnBadge } from '@/components/quotes/TurnBadge'
@@ -433,6 +434,12 @@ export default function QuoteDetailPage({
           ))}
         </div>
       )}
+
+      {/* T-178: the request form's suggestion of another service, on a quote held for that reason */}
+      {quote.status === 'pending_review' && <ServiceSuggestionNote suggestion={data.serviceSuggestion} chosenServiceName={data.service?.name ?? null} />}
+
+      {/* T-178: no estimate to read (it failed, or has no price yet): the customer's own answers, to quote it by hand */}
+      {(quote.status === 'failed' || (pricing?.total ?? 0) <= 0) && <CustomerSent request={data.request} serviceName={data.service?.name ?? null} />}
 
       {/* T-151: what the customer told you when accepting (it is what you act on next) */}
       {acceptance && <AcceptanceCard details={acceptance} />}

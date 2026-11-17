@@ -15,7 +15,11 @@ import { enqueueQuoteJob } from '@/lib/queue'
 import { incrementUsageCounter } from '@/lib/usage'
 import { checkPlanLimit, maybeNotifyLimitReached, recordOverageQuote } from '@/lib/plan-limits'
 import { leadHoldContent, leadHeldMessage, notifyLeadHeld } from '@/lib/lead-hold'
+import { markQuoteFailed } from '@/lib/failed-quote'
 import { validateServiceMatch } from '@/lib/ai/service-matcher'
+import type { MatchService } from '@/lib/ai/service-matcher'
+import { DESCRIPTION_FIELD, decideServiceMatch, requestHasOwnContent } from '@/lib/service-match'
+import type { ServiceSuggestion } from '@qolumns/shared'
 import type { createAdminClient } from '@/lib/supabase/server'
 
 export interface CustomerInput {
@@ -133,77 +137,57 @@ export async function createQuoteSubmission(
   const serviceMatchMode = (tenantSettings?.service_match_mode as string) || 'medium'
   const generalInquiryEnabled = tenantSettings?.general_inquiry_enabled ?? true
 
-  // 4. Validate service match using AI (if enabled)
+  // 4. Service match (T-178): never a reason to stop a customer at submit.
+  // The matcher is asked only when the description is the request's whole
+  // content; a request with any answer, quantity or photo for the chosen
+  // service goes ahead untouched. See lib/service-match.ts.
   let isGeneralInquiry = false
-  const projectDescription = input.job?.answers?.find((a) => a.fieldId === '_project_description')
+  let serviceSuggestion: ServiceSuggestion | null = null
+  const projectDescription = input.job?.answers?.find((a) => a.fieldId === DESCRIPTION_FIELD)
     ?.value as string | undefined
+  const descriptionOnly = !requestHasOwnContent({
+    answers: input.job?.answers,
+    quantity: input.job?.quantity,
+    assetIds: input.assetIds,
+  })
 
-  if (!limitHold && !input.skipServiceMatch && serviceMatchMode !== 'off' && projectDescription) {
-    // Get all active services for this tenant for suggestions
+  if (!limitHold && !input.skipServiceMatch && serviceMatchMode !== 'off' && projectDescription && descriptionOnly) {
+    // Every active service, with what each covers, so the matcher judges on the business's own words
     const { data: allServices } = await supabase
       .from('services')
-      .select('id, name')
+      .select('id, name, description, scope_includes, scope_excludes')
       .eq('tenant_id', tenantId)
       .eq('active', true)
 
-    const geminiKey = process.env.GEMINI_API_KEY
-    if (geminiKey && allServices && allServices.length > 0) {
-      const matchResult = await validateServiceMatch(
-        projectDescription,
-        { id: service.id, name: service.name },
-        allServices,
-        geminiKey
-      )
-
-      // Determine confidence threshold based on strictness
-      // Higher strictness = lower threshold to trigger rejection
-      const thresholds: Record<string, number> = {
-        low: 0.9, // Only reject if 90%+ confident it's wrong
-        medium: 0.8, // Reject if 80%+ confident it's wrong (default)
-        high: 0.7, // Reject if 70%+ confident it's wrong
-      }
-      const threshold = thresholds[serviceMatchMode] || 0.8
-
-      // If not a match with sufficient confidence, handle it
-      if (!matchResult.isMatch && matchResult.confidence >= threshold) {
-        // Check if there's a suggested service
-        if (matchResult.suggestedServiceId && matchResult.suggestedServiceName) {
-          // Wrong service selected, suggest the correct one
-          return respond(
-            {
-              error: {
-                code: 'SERVICE_MISMATCH',
-                message: `The selected service doesn't match your project description. Did you mean "${matchResult.suggestedServiceName}"?`,
-                suggestedService: {
-                  id: matchResult.suggestedServiceId,
-                  name: matchResult.suggestedServiceName,
-                },
-              },
+    const offered: MatchService[] = ((allServices ?? []) as Array<{ id: string; name: string; description?: string | null; scope_includes?: string[] | null; scope_excludes?: string[] | null }>).map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      scopeIncludes: s.scope_includes,
+      scopeExcludes: s.scope_excludes,
+    }))
+    const chosen = offered.find((s) => s.id === service.id)
+    if (process.env.GEMINI_API_KEY && chosen) {
+      const matchResult = await validateServiceMatch(projectDescription, chosen, offered, process.env.GEMINI_API_KEY)
+      const decision = decideServiceMatch(matchResult, { mode: serviceMatchMode, generalInquiryEnabled })
+      if (decision.kind === 'hold') {
+        // Made on the service the customer chose; the worker holds the priced quote for the business
+        serviceSuggestion = decision.suggestion
+        console.log('[QuoteAPI] Description reads like another offered service: request kept on the chosen service and held for review')
+      } else if (decision.kind === 'general_inquiry') {
+        isGeneralInquiry = true
+        console.log('[QuoteAPI] Description matches no offered service: saved as a general inquiry')
+      } else if (decision.kind === 'not_available') {
+        return respond(
+          {
+            error: {
+              code: 'SERVICE_NOT_AVAILABLE',
+              message: `Sorry, we don't currently offer services matching your description: '${projectDescription.slice(0, 100)}${projectDescription.length > 100 ? '...' : ''}'.`,
+              reason: decision.reason,
             },
-            { status: 400 }
-          )
-        }
-
-        // No matching service available
-        if (generalInquiryEnabled) {
-          // Create as general inquiry instead of rejecting
-          isGeneralInquiry = true
-          console.log(
-            `[QuoteAPI] Creating general inquiry for unmatched project: "${projectDescription.slice(0, 50)}..."`
-          )
-        } else {
-          // Reject the request
-          return respond(
-            {
-              error: {
-                code: 'SERVICE_NOT_AVAILABLE',
-                message: `Sorry, we don't currently offer services matching your description: '${projectDescription.slice(0, 100)}${projectDescription.length > 100 ? '...' : ''}'.`,
-                reason: matchResult.reason,
-              },
-            },
-            { status: 400 }
-          )
-        }
+          },
+          { status: 400 }
+        )
       }
     }
   }
@@ -407,7 +391,8 @@ export async function createQuoteSubmission(
       job_quantity: input.job?.quantity || null,
       job_answers: input.job?.answers || [],
       asset_ids: input.assetIds || [],
-      source_json: input.source,
+      // T-178: a suggested service travels with the request; the worker reads it and holds the quote
+      source_json: serviceSuggestion ? { ...input.source, serviceSuggestion } : input.source,
     })
     .select()
     .single()
@@ -544,11 +529,9 @@ export async function createQuoteSubmission(
     } catch (queueError) {
       console.error(`[Quotes] Failed to enqueue quote ${quote.id}:`, queueError)
       queueFailed = true
-      // Mark quote as failed so it's visible in dashboard and can be retried
-      await supabase
-        .from('quotes')
-        .update({ status: 'failed', error_message: 'Queue dispatch failed — will retry' })
-        .eq('id', quote.id)
+      // T-178: marked failed and the business emailed. (This used to write a
+      // column that does not exist, so the quote stayed "queued" for ever.)
+      await markQuoteFailed(supabase, quote.id, 'The request was saved but could not be handed to the pricing worker')
     }
   } else {
     // For general inquiries, mark as ready (no AI processing needed)
@@ -565,6 +548,6 @@ export async function createQuoteSubmission(
     isGeneralInquiry,
     quoteViewUrl,
     tokenExpiresAt: tokenExpiry.toISOString(),
-    ...(queueFailed && { warning: 'Quote created but processing delayed. We will retry shortly.' }),
+    ...(queueFailed && { warning: 'Your request is saved. The business will be in touch about your estimate.' }),
   })
 }

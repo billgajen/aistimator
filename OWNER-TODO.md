@@ -1742,3 +1742,80 @@ sends nothing. Three to check or change (Dashboard → Authentication):
 - `Docs/design/ai-capabilities.md` (the list of what the AI does) has no row yet for "decides whether a
   WhatsApp message is a price request". Nothing on the site claims it, so nothing is wrong; it should be
   added before the site says anything about the WhatsApp assistant.
+
+## T-178 — No quote is ever lost
+
+### 1. What you must do
+
+- [ ] **Add the two Upstash values to the worker again, when you are ready. It is safe now.** After this
+  deploy the limiter cannot fail or hold up a quote: any error, or no answer in 2 seconds, and the quote is
+  priced anyway.
+  ```
+  cd apps/worker
+  npx wrangler secret put UPSTASH_REDIS_URL --env production     # Upstash console → your database → REST API → "UPSTASH_REDIS_REST_URL" (https://….upstash.io)
+  npx wrangler secret put UPSTASH_REDIS_TOKEN --env production   # same place → "UPSTASH_REDIS_REST_TOKEN"
+  ```
+  The worker's names differ from the website's (`…_REST_URL`, `…_REST_TOKEN` in Vercel); the values are the same two.
+  Then send one test request by hand. It should be priced as usual. To see the limiter working:
+  `npx wrangler tail --env production` while you send it, or Cloudflare dashboard → Workers → estimator-worker →
+  Logs. You should see `Processing job` and no line saying `FAILING OPEN`. If you do see `FAILING OPEN`, the
+  quote is still priced; tell me the word in brackets after it.
+- [ ] **Optional, for a proof on this machine against the real database:** put the same two values in
+  `apps/worker/.dev.vars` as `UPSTASH_REDIS_URL=…` and `UPSTASH_REDIS_TOKEN=…` and tell me. That was not done,
+  so **the limiter has not been run against a real Upstash database**: it was run in the Workers runtime
+  against a stand-in that speaks Upstash's REST format (see Docs/CHANGELOG.md, T-178).
+- [ ] **Retry today's failed quotes if you want them priced.**
+  ```
+  bash scripts/retry-failed-quote.sh --list            # failed quotes, and any stuck for 15 minutes or more
+  bash scripts/retry-failed-quote.sh qte_…              # price one again
+  ```
+  A retry emails the customer their estimate (or the business a review request) as a first run would. For a
+  request from hours ago, consider contacting the customer yourself instead.
+
+### 2. What a failed quote does now
+
+- The business gets one email: who asked, for which service, how to reach them, and a link to the request.
+- The business's quote page shows "What the customer sent": their words, each answer under the business's own
+  question, where the job is, and the photos.
+- The customer's page says "{business} has your request" and that the business will be in touch.
+- After 60 seconds of "Preparing your estimate" the customer reads "This is taking longer than usual. We’ll
+  email you as soon as it’s ready." (A customer who gave no email is told to keep the page.)
+- Why it failed is stored on the quote for us. It is not in the email and not on any page.
+
+### 3. What changed at submit
+
+- A request with any answer or photo is never refused or redirected, whatever the note says.
+- A request that is only a description, and reads like another of the business's services, is still made on
+  the service the customer chose. It is priced and held: the business sees "Check the service" with both names
+  and the reason, and the customer sees no price until the business decides.
+- "Switch to X and Submit" is gone.
+
+### 4. Settled in this ticket
+
+- [x] The website's limiter is on (Upstash is configured in Vercel). It counted correctly but answered a
+  blocked page view with status 200; it now answers 429.
+- [x] Workers Logs are on for production (7 days). A deploy from a `wrangler.toml` without the
+  `[observability]` block would switch them off again.
+- [x] A request the web app could not hand to the worker used to stay "queued" for ever. It is now marked
+  failed and the business is emailed.
+
+### Later (seen, not changed)
+
+- The business cannot retry a failed quote itself; only the script (or a platform admin) can. A "Try pricing
+  again" button on the failed request would be a small ticket.
+- A stuck quote (queued or generating for a long time, with nothing working on it) tells nobody. The script's
+  `--list` shows them. A daily sweep that marks them failed, which emails the business, would close this.
+- When a request is refused for a missing required answer (400), the form's error screen offers only "Start
+  Over", which clears what was typed. The form itself prevents this before submit, so it is rare.
+- The "Check the service" notice uses the amber notice colour, which you have said reads as butter. It is the
+  same style as the "Customer question" box on that page; both should move together.
+- A request held with a suggestion that the AI also wants to ask the customer a question about shows the
+  suggestion only after the customer answers.
+- The form's own finish screen at 60 seconds was not opened in a browser; it uses the same line as the
+  customer's page, which was.
+- The worker's wording, add-on and validation AI calls still have no time limit of their own (see
+  "Reliability", T-157). A stalled call is the likeliest cause of a slow quote.
+- `scripts/hardcore-test/verify-t173.mts` had a check expecting the old refusal; it now expects the request to
+  be accepted. That script was not run in this ticket.
+- wrangler is at 3.114 and prints an "update to 4" notice on every command.
+

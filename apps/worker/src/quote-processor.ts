@@ -50,7 +50,7 @@ import { initializeFusionFromStructuredSignals } from './agents/signal-fusion'
 import { evaluateQualityGate } from './agents/quality-gate'
 import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
 import type { QualityGateResult, ClarificationQuestion } from '@qolumns/shared'
-import { AiUsageMeter, CHECKER_SETTINGS_VERSION } from '@qolumns/shared'
+import { AiUsageMeter, CHECKER_SETTINGS_VERSION, serviceSuggestionOf, suggestedServiceReason } from '@qolumns/shared'
 import { withAiTimeout, aiCallTimeoutMs } from './ai/timeouts'
 import { createAiClient } from './ai/factory'
 import type { AiClient } from './ai/client'
@@ -2238,7 +2238,14 @@ export async function processQuote(
     const stepsConfigured = rulesWithWorkSteps.workSteps?.length ?? 0
     const stepLinesPriced = pricingTrace.trace.filter((t) => t.type === 'work_step').length
     let guardReason: string | null = null
-    if (content.serviceMismatch) {
+    // T-178: the request form no longer refuses a request whose description
+    // reads like another of the business's services. It is priced for the
+    // service the customer chose and held here, with the suggestion, for the
+    // business to decide.
+    const serviceSuggestion = serviceSuggestionOf(quoteRequest.source_json)
+    if (serviceSuggestion) {
+      guardReason = suggestedServiceReason(serviceSuggestion, service.name)
+    } else if (content.serviceMismatch) {
       // R2-1: the wording layer detected the request is for a different trade
       // entirely — never send a priced quote with an apology attached
       guardReason = `Request appears to be for a service this business does not offer${content.mismatchReason ? ` — ${content.mismatchReason}` : ''}`
@@ -3462,7 +3469,7 @@ function detectCrossServiceMentionsKeywords(
           matchedKeyword: service.name,
         })
       } else {
-        console.log(`[CrossService] Skipping "${service.name}" - not a genuine request: "${phraseContext}"`)
+        console.log(`[CrossService] Skipping "${service.name}" - not a genuine request (${phraseContext.length} chars of context)`)
       }
       continue
     }
@@ -3483,7 +3490,7 @@ function detectCrossServiceMentionsKeywords(
           const phraseContext = extractPhraseContext(projectDescription, keyword)
 
           if (!isGenuineServiceRequest(phraseContext)) {
-            console.log(`[CrossService] Skipping keyword "${keyword}" for "${service.name}" - not a request: "${phraseContext}"`)
+            console.log(`[CrossService] Skipping keyword "${keyword}" for "${service.name}" - not a request (${phraseContext.length} chars of context)`)
             continue
           }
 

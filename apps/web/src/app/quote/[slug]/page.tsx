@@ -1,9 +1,7 @@
 import type { Metadata } from 'next'
-import { headers } from 'next/headers'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { resolveQuoteLink, supabaseQuoteLinkStore, markFirstVisit } from '@/lib/quote-link'
-import { checkPublicRateLimit, getClientIp } from '@/lib/rate-limit'
 import { EstimateWidget } from '@/components/embed/EstimateWidget'
 import { verifyTestToken } from '@/lib/test-quote-token'
 
@@ -34,17 +32,9 @@ export async function generateMetadata({ params }: QuotePageProps): Promise<Meta
 }
 
 export default async function QuoteLinkPage({ params, searchParams }: QuotePageProps) {
-  const rate = await checkPublicRateLimit('quote_page', {
-    ip: getClientIp({ headers: headers() }),
-    tenantKey: `slug:${params.slug.toLowerCase().slice(0, 60)}`,
-  })
-  if (!rate.allowed) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-background px-4">
-        <p className="text-sm text-text-secondary">Too many requests. Please wait a moment and try again.</p>
-      </main>
-    )
-  }
+  // T-178: this page's rate limit (`quote_page`) is checked in the middleware,
+  // where a blocked visitor can be answered with a real 429. A page that is
+  // already rendering can only answer 200.
 
   const result = await resolve(params.slug)
   if (result.kind === 'redirect') permanentRedirect(`/quote/${result.slug}`)

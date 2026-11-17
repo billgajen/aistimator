@@ -4,6 +4,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const processQuote = vi.fn()
 const updateQuoteStatus = vi.fn()
 vi.mock('../quote-processor', () => ({ processQuote: (...a: unknown[]) => processQuote(...a) }))
+// T-178: a quote that fails for good is marked through failed-quote.ts (which also emails the business)
+const markQuoteFailed = vi.fn()
+vi.mock('../failed-quote', () => ({ markQuoteFailed: (...a: unknown[]) => markQuoteFailed(...a) }))
 vi.mock('../supabase', () => ({
   getSupabaseClient: () => ({}),
   updateQuoteStatus: (...a: unknown[]) => updateQuoteStatus(...a),
@@ -33,6 +36,7 @@ function prodEnv(extra: Partial<Env> = {}): Env {
 beforeEach(() => {
   processQuote.mockReset()
   updateQuoteStatus.mockReset()
+  markQuoteFailed.mockReset()
 })
 
 describe('worker auth', () => {
@@ -112,14 +116,14 @@ describe('queue consumer retries', () => {
     const m = message(2)
     await worker.queue(batch(m), prodEnv())
     expect(m.retry).toHaveBeenCalledWith({ delaySeconds: 60 })
-    expect(updateQuoteStatus).not.toHaveBeenCalledWith(expect.anything(), 'qte_1', 'failed', expect.anything())
+    expect(markQuoteFailed).not.toHaveBeenCalled()
   })
 
   it('marks the quote failed on the last attempt instead of dead-lettering it silently', async () => {
     processQuote.mockResolvedValue({ success: false, error: 'boom' })
     const m = message(4)
     await worker.queue(batch(m), prodEnv())
-    expect(updateQuoteStatus).toHaveBeenCalledWith(expect.anything(), 'qte_1', 'failed', 'boom')
+    expect(markQuoteFailed).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'qte_1', 'boom')
     expect(m.ack).toHaveBeenCalled()
   })
 
@@ -130,7 +134,7 @@ describe('queue consumer retries', () => {
     expect(early.retry).toHaveBeenCalledWith({ delaySeconds: 60 })
     const last = message(4)
     await worker.queue(batch(last), prodEnv())
-    expect(updateQuoteStatus).toHaveBeenCalledWith(expect.anything(), 'qte_1', 'failed', expect.stringContaining('429'))
+    expect(markQuoteFailed).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'qte_1', expect.stringContaining('429'))
     expect(last.ack).toHaveBeenCalled()
   })
 })

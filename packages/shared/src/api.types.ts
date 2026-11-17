@@ -3,6 +3,7 @@
  */
 
 import type { QuoteListCounts, QuoteListGroup } from './quote-turn'
+import type { ServiceSuggestion } from './service-suggestion'
 import type {
   QuoteStatus,
   DocumentType,
@@ -126,10 +127,21 @@ export interface QuoteViewBranding {
   showPoweredBy?: boolean
 }
 
+/** T-178: a request as the customer sent it, for the business (web: lib/request-details.ts) */
+export interface RequestDetails {
+  description: string | null
+  answers: Array<{ label: string; value: string }>
+  postcode: string | null
+  address: string | null
+  quantity: number | null
+}
+
 export interface QuoteViewCustomer {
   name: string
   /** T-151: the customer's own phone (the link holder typed it), to confirm on accept */
   phone?: string | null
+  /** T-178: whether an email address was given (never the address), so the page only promises an email it can send */
+  hasEmail?: boolean
 }
 
 export interface QuoteViewAsset {
@@ -571,6 +583,10 @@ export interface QuoteDetailResponse {
   photos?: QuotePhoto[]
   /** T-169: what the AI produced for this quote, worded for the business (web: lib/quote-understanding.ts) */
   understanding?: QuoteUnderstanding
+  /** T-178: what the customer sent (their words, their answers to the service's questions, where the job is) */
+  request?: RequestDetails
+  /** T-178: the request form thought another of the business's services fits what the customer wrote */
+  serviceSuggestion?: ServiceSuggestion | null
 }
 
 /**

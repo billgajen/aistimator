@@ -3,9 +3,21 @@
  *
  * Implements sliding window rate limiting using Redis INCR with TTL.
  * Supports both global and per-tenant limits.
+ *
+ * T-178: the client is Upstash's Cloudflare build. The default build sends
+ * fetch a `cache: "no-store"` option, which a Worker on this compatibility
+ * date (before 2024-11-11) refuses with "The 'cache' field on
+ * 'RequestInitializerDict' is not implemented"; that failed every quote the
+ * first day the limiter was switched on. The Cloudflare build sends no
+ * `cache` option. One attempt and a 2 second limit, because the limiter is
+ * never allowed to hold a quote up: see `askLimiter` in queue-consumer.ts,
+ * which is the only place the queue calls this, and which fails open.
  */
 
-import { Redis } from '@upstash/redis'
+import { Redis } from '@upstash/redis/cloudflare'
+
+/** How long the limiter may take before the quote is processed without it */
+export const LIMITER_TIMEOUT_MS = 2_000
 
 export interface RateLimiterConfig {
   /** Global limit across all tenants per window */
@@ -42,6 +54,9 @@ export class RateLimiter {
     this.redis = new Redis({
       url: redisUrl,
       token: redisToken,
+      // One attempt: the client's default is six, with over four seconds of waiting between them
+      retry: { retries: 0 },
+      signal: () => AbortSignal.timeout(LIMITER_TIMEOUT_MS),
     })
     this.config = { ...DEFAULT_CONFIG, ...config }
   }

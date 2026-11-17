@@ -180,6 +180,7 @@ export async function GET(
     const customerView: QuoteViewCustomer = {
       name: customer.name,
       phone: customer.phone ?? null,
+      hasEmail: Boolean(customer.email && customer.email.trim()),
     }
 
     // Calculate validity date

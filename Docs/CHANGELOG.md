@@ -15,6 +15,129 @@
 
 ## Issues & Resolutions
 
+### 2026-11-17: T-178 — No quote is ever lost: the worker's limiter fails open, a failed quote is never silent, a customer is never stopped at submit (AD-058, AD-059)
+
+#### What broke on production (2026-11-17)
+
+**A. Every quote failed after about four minutes.**
+- *What happened:* the owner added `UPSTASH_REDIS_URL` and `UPSTASH_REDIS_TOKEN` to the worker. That switched
+  on `apps/worker/src/rate-limiter.ts` for the first time. Every job then threw before pricing started, was
+  retried three times (30, 60, 120 seconds) and was marked failed. Stored on `qte_b2696651e64b956566642c9a`:
+  "The 'cache' field on 'RequestInitializerDict' is not implemented."
+- *Root cause:* the limiter imported the default build of `@upstash/redis`, which sends every `fetch` a
+  `cache: "no-store"` option. A Worker with a compatibility date before 2024-11-11 (ours is 2024-06-01) refuses
+  any `cache` option with exactly that error. Upstash publishes a Cloudflare build that sends none. Two
+  things made it worse: the limiter call sat inside the same `try` as the pricing, so a limiter error counted
+  as a failed quote; and nothing told anyone, because a failed quote changed its status and nothing else, and
+  the worker kept no logs.
+- *Fix:* the import is `@upstash/redis/cloudflare` (Upstash's documented entry for Workers). No change to
+  `compatibility_date`. The limiter can no longer fail a quote at all (AD-058, below).
+- *Reproduced and proven in the Workers runtime on this machine* (`wrangler dev`, compatibility date
+  2024-06-01, a stand-in for Upstash's REST API): with the old import, `/stats` answers 500 with the production
+  error word for word, and a queued job logs `Rate limiter FAILING OPEN (Error)` and is priced anyway; with the
+  new import the same calls reach the stand-in (`get`, `get`, then `incr`, `expire`, `incr`, `expire`) and the
+  job is priced; with a stand-in that never answers, pricing starts 2.1 seconds after the job is picked up.
+- **Not proven: the limiter against a real Upstash database.** `apps/worker/.dev.vars` has no Upstash values,
+  so the run above used a stand-in. See OWNER-TODO, T-178.
+
+**B. A customer was refused at submit with `SERVICE_MISMATCH`.**
+- *What happened:* a customer chose a service, answered its questions, added photos and wrote in "Anything
+  else about the job?" that they also wanted work from another service. The request was refused. The form
+  offered "Switch to X and Submit", which would have sent the first service's answers to the other service.
+- *Root cause:* `lib/quote-intake.ts` step 4 gave the matcher only the `_project_description` text and the
+  service names. Since T-151 that field is the optional extra note, not the whole job, and the matcher never
+  saw the answers, the photos or what each service covers.
+- *Fix:* AD-059, below.
+
+**C. Found while fixing: a request the worker could not be given stayed "queued" for ever.** When the web app
+saved a request but could not reach the worker, it wrote `status: 'failed'` together with `error_message`, a
+column that does not exist, so the whole update was refused. The quote stayed queued, the customer's page said
+"Preparing" indefinitely and nobody was told. Now `lib/failed-quote.ts` marks it failed and emails the business.
+
+**D. Found by the limit check: the quote link page's limit worked but answered 200.** 65 views of the demo
+business's link in one minute on production: 60 were served, 61 to 65 got the "Too many requests" words with
+status **200**. A page that is already rendering cannot change its status. The check moved into the
+middleware, which answers **429** with `Retry-After`.
+
+#### What changed
+
+**1. Worker rate limiter**
+- `rate-limiter.ts`: Upstash's Cloudflare build; one attempt (the client's default is six, with over four
+  seconds of waiting between them, which is why each failure took so long); a 2-second `AbortSignal` on every call.
+- New `queue-consumer.ts`: what the consumer does with one job, apart from the entry file so it can be tested.
+  `askLimiter` races the limiter against 2 seconds and treats any error or no answer as "go ahead", logging the
+  error's **name** only (`[Worker] Rate limiter FAILING OPEN (TypeError): …`). Over the limit still requeues
+  (`resetIn + 5`, at most 60 seconds), as before.
+- `wrangler.toml`: Workers Logs on (`[observability] enabled = true`, repeated under `env.production`). Kept 7
+  days on Workers Paid. Nine log lines that printed pieces of a customer's words or a raw model answer now print
+  a length or nothing (`quote-processor.ts`, `ai/signals.ts`, `ai/service-detection.ts`, `pricing/rules-engine.ts`).
+
+**2. A failed or slow quote is never silent**
+- *Before:* on `failed` the customer's page said "Your request is with {business} … will send your estimate by
+  email shortly", and the business's dashboard listed it under "needs you" with "We could not work out a price
+  for this request. Contact … and quote it yourself." **The business was not emailed**, and its quote page
+  showed the customer's contact details and photos but not their answers. The customer's page said "this usually
+  takes a minute or two" for about ten minutes before admitting it was slow.
+- *Now:*
+  - **The business gets one email** ("{customer} asked for an estimate: please reply to them yourself") with the
+    customer's name, the service, how to reach them and a link to the request. Sent by the worker
+    (`failed-quote.ts`) when it marks a quote failed, and by the web app (`lib/failed-quote.ts`) when it cannot
+    hand a request to the worker. One email per request: `content_json.failedNotifiedAt` is the stamp both read.
+    The reason it failed is kept on the quote (`content_json.error`) and is in neither the email nor any page.
+    The T-134 held-lead email did not fit (it is about the plan limit and offers an upgrade), so the wording is
+    its own, in `packages/shared/src/failed-request.ts`, used by both sides.
+  - **The business's quote page shows "What the customer sent"** when there is no estimate to read (failed, or
+    no price): their words, each answer under the business's own question wording, the quantity and where the
+    job is. Photos sit just below, as before. No new table: the answers were already on the request.
+  - **The customer** reads "{business} has your request" and "{business} has your details and will be in touch
+    about your estimate. There is nothing more you need to do." After **60 seconds** of "Preparing your
+    estimate" one line replaces the usual one: "This is taking longer than usual. We’ll email you as soon as
+    it’s ready." A customer who gave no email is told to keep the page instead (the page learns whether there
+    is an address, never the address). The page keeps checking; only the words change. Same on the form's own
+    finish screen.
+  - The worker's direct path (`/process`, used locally) marks a job that throws as failed; it used to leave it
+    "generating".
+- **Retry:** `bash scripts/retry-failed-quote.sh --list` and `bash scripts/retry-failed-quote.sh qte_…`. The
+  script writes the hash of a random one-time code onto the quote through the database's management API, then
+  calls `POST /api/admin/quotes/{id}/retry` with the code (`lib/retry-code.ts`: one quote, one use, ten
+  minutes). The route still accepts a signed-in platform admin. The customer's existing link keeps working
+  (T-157 keeps every earlier link); the retry's emails carry a new one.
+
+**3. A customer is never stopped at submit for what they wrote** (AD-059)
+- `lib/service-match.ts` (pure) decides; `lib/ai/service-matcher.ts` asks the model.
+- A request with **any answered question, a quantity or any photo** for the chosen service: the matcher is not
+  called. The customer chose that service.
+- **Description only:** the matcher gets every service's name, description, includes and excludes. If it is
+  confident another offered service fits, the request is still made on the chosen service; the suggestion is
+  stored on the request (`quote_requests.source_json.serviceSuggestion`) and the worker's existing send-guard
+  holds the priced quote (`pending_review`, hold kind `check`, hidden from the customer) with the reason
+  "The customer chose "A", but what they wrote reads more like "B". … Check which they need before you send a
+  price." The business sees it on the quote page ("Check the service") and in the review email.
+- General inquiry and `SERVICE_NOT_AVAILABLE` are unchanged and reachable only in the description-only case.
+- The API never returns `SERVICE_MISMATCH`. The form's "Switch to X and Submit" is removed. An old cached form
+  simply sees a success.
+- The matcher's prompt no longer has trade examples in it (anti-hardcoding); the customer's words are fenced
+  as data and are never logged; a suggested service counts only if it is one of the business's own, and its
+  name is taken from the business's list, not from the model.
+
+**4. The website limiter**
+- Result on production before this ticket: on, 60 allowed, the rest blocked, but with status 200 (D above).
+- `lib/rate-limit-edge.ts`: the same counters and decision as every other public limit
+  (`lib/rate-limit-counters.ts`, split out of `lib/rate-limit.ts`), calling Upstash's REST pipeline with `fetch`
+  so it can run in the middleware. Fails open like the rest (AD-055). The page no longer checks its own limit.
+
+#### Checks
+- `pnpm lint`, `pnpm typecheck`: pass. Unit tests: web 953 (23 new), worker 551 (17 new).
+- `verify-t178` 52/52 (new): the three submit cases against a stand-in for the matcher's model and the real
+  worker; the failed-quote email captured from the worker's own function against the local database; the
+  business's page; the retry code (refused without it, for another quote, and the second time); the old link
+  after a retry; a real 429 from the 61st view; the customer's page at 60 seconds (browser clock moved forward)
+  and on failure; both pages at 390 and 1440 px.
+- `verify-t177` 99/99. Builds: web and worker (and a dry run of the production worker config).
+- `verify-t173`'s check that expected `SERVICE_MISMATCH` for a request with an answered question now expects
+  the request to be accepted. **verify-t173 was not run** (the ticket named the checks to run).
+- Not run: the rest of the regression set (verify-t146 to t176, except t177).
+
 ### 2026-11-17: T-177 — WhatsApp assistant v2 (silent unless asked for a price), automatic template, plan and subscription rule, Embedded Signup v5, legal pages (AD-057)
 
 **Deployed 2026-11-17 16:59 UTC** (commits `b45c6df` and `04acb95`). Web only: no migration, and the worker is
@@ -7429,6 +7552,62 @@ business did not set up, and the price stays the engine's.
 model write the replies (it could promise or price); answering when unsure and letting the owner correct it;
 keeping every message's text "for context"; a grace period for an unpaid subscription on WhatsApp (the owner
 listed unpaid as a reason to pause); making the real model's answers a required check (they vary by run).
+
+---
+
+### AD-058: The worker's rate limiter fails open (T-178)
+
+**Decision:** on the queue, the rate limiter can only delay a job that is over the limit. Any limiter error, or
+no answer within 2 seconds, means the quote is processed and the error's name is logged. The limiter is never
+the reason a quote fails or waits. This is AD-055's rule (the website's limits fail open) applied to the worker.
+
+**Why:** on 2026-11-17 the limiter was switched on for the first time and failed every quote for the hours it
+was on, because one option its client sent was not supported by the runtime. A limiter exists to stop a flood
+from costing money; losing every real customer's request to protect against a flood that is not happening is
+the worse outcome by far. The plan limits and the website's own limits still hold when it is down.
+
+**Rules that follow:**
+- The limiter is called only through `askLimiter` (`apps/worker/src/queue-consumer.ts`), never inside the same
+  `try` as the pricing.
+- Its client is Upstash's Cloudflare build, with one attempt and a 2-second limit. A client that retries on its
+  own is not used: retries are time the customer waits.
+- Nothing the limiter throws is logged beyond its name (a message can carry an address or a key).
+- A new dependency of the queue path (anything called before `processQuote`) gets the same treatment: a time
+  limit, and a failure that lets the job through.
+- A quote that does fail is marked through `markQuoteFailed`, which tells the business. Nothing sets
+  `status = 'failed'` any other way.
+
+**Rejected:** raising `compatibility_date` (it switches on every other runtime change between June 2024 and
+now, for one option we do not need); the `cache_option_enabled` flag (it works, but keeps a client that sends
+an option the runtime only partly supports); failing closed (takes pricing down with a third party); removing
+the limiter (it is still the only brake on a flood of queue jobs).
+
+---
+
+### AD-059: A customer is never stopped at submit for what they wrote (T-178)
+
+**Decision:** the request form does not refuse, redirect or re-classify a request because of its free text
+when the customer gave the chosen service anything of its own (an answer, a quantity, a photo). Only a request
+whose description is its whole content is judged, and even then a "this reads like another of your services"
+is never a refusal: the request is made on the chosen service and held for the business with the suggestion.
+
+**Why:** the customer chose the service and did the work of filling it in. The free-text box became an optional
+note in T-151; judging the whole request by an optional note refused a real, complete request on production.
+A wrong hold costs the business a minute; a wrong refusal costs it the customer.
+
+**Rules that follow:**
+- `SERVICE_MISMATCH` does not exist. Nothing offers the customer a different service after they have filled one in.
+- The matcher is given the business's configuration (each service's description, includes and excludes) and
+  nothing else about the trade. No service name, trade or keyword is written in its prompt or in the code.
+- A suggestion is the business's to act on. It travels on the request (`source_json.serviceSuggestion`) and
+  holds the quote through the worker's existing send-guard; the customer sees no price until the business decides.
+- General inquiry and `SERVICE_NOT_AVAILABLE` remain, for a description-only request that fits nothing the
+  business offers.
+- The matcher failing, being slow or being unsure always means "go ahead on the chosen service".
+
+**Rejected:** keeping the refusal but passing the answers to the matcher (still lets a model overrule a
+customer's explicit choice); switching the request to the suggested service automatically (its answers belong
+to the first service's questions); asking the customer "did you mean…" (the same refusal with a nicer face).
 
 ---
 

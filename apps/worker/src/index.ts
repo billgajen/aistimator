@@ -7,6 +7,8 @@
  */
 
 import { createRateLimiter } from './rate-limiter'
+import { handleQuoteJob } from './queue-consumer'
+import { markQuoteFailed } from './failed-quote'
 import type { RateLimiter } from './rate-limiter'
 import { getSupabaseClient, updateQuoteStatus } from './supabase'
 import { processQuote } from './quote-processor'
@@ -236,6 +238,8 @@ export default {
         })
       }
 
+      // T-178: kept outside the try, so a job that throws is still marked failed (it used to stay "generating")
+      let startedQuoteId: string | null = null
       try {
         const body = (await request.json()) as QuoteJobMessage
 
@@ -253,6 +257,7 @@ export default {
 
         // Update status to 'generating'
         await updateQuoteStatus(supabase, body.quoteId, 'generating')
+        startedQuoteId = body.quoteId
 
         // Process the quote directly
         const result = await processQuote(body.quoteId, body.quoteRequestId, supabase, env, body.quoteToken)
@@ -267,7 +272,7 @@ export default {
             { headers: { 'Content-Type': 'application/json' } }
           )
         } else {
-          await updateQuoteStatus(supabase, body.quoteId, 'failed', result.error)
+          await markQuoteFailed(supabase, env, body.quoteId, result.error)
           return new Response(
             JSON.stringify({ success: false, error: result.error }),
             {
@@ -279,6 +284,7 @@ export default {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         console.error('[Worker] Process error:', errorMessage)
+        if (startedQuoteId) await markQuoteFailed(supabase, env, startedQuoteId, errorMessage)
         return new Response(JSON.stringify({ error: errorMessage }), {
           status: 500,
           headers: { 'Content-Type': 'application/json' },
@@ -310,89 +316,16 @@ export default {
     }
 
     for (const message of batch.messages) {
-      const job = message.body
-      // Cloudflare counts deliveries (first = 1); the message body never changes
-      const retryCount = message.attempts - 1
-
-      console.log(
-        `[Worker] Processing job: quoteId=${job.quoteId}, retry=${retryCount}/${MAX_RETRIES}`
-      )
-
-      try {
-        // Check rate limits if Redis is configured
-        if (rateLimiter) {
-          const limitResult = await rateLimiter.checkLimit(job.tenantId)
-
-          if (!limitResult.allowed) {
-            console.log(
-              `[Worker] Rate limited (${limitResult.limitType}): ` +
-                `${limitResult.current}/${limitResult.limit}, reset in ${limitResult.resetIn}s`
-            )
-
-            // Requeue with delay based on reset time
-            message.retry({
-              delaySeconds: Math.min(limitResult.resetIn + 5, 60),
-            })
-            continue
-          }
-
-          // Increment counters before processing
-          await rateLimiter.increment(job.tenantId)
-        }
-
-        // Process the quote
-        // Enqueue → now; diagnostics only (stored in pricing_trace_json.timings)
-        const queueWaitMs = message.timestamp ? Date.now() - message.timestamp.getTime() : undefined
-        const result = await processQuoteJob(job, supabase, env, queueWaitMs)
-
-        if (result.success) {
-          message.ack()
-        } else {
-          // Check if we should retry or fail permanently
-          if (retryCount >= MAX_RETRIES) {
-            console.error(
-              `[Worker] Quote ${job.quoteId} failed after ${MAX_RETRIES} retries: ${result.error}`
-            )
-            await updateQuoteStatus(supabase, job.quoteId, 'failed', result.error)
-            message.ack() // Ack to remove from queue, we've marked it failed
-          } else {
-            // Retry with exponential backoff
-            const delaySeconds = getBackoffDelay(retryCount)
-            console.log(`[Worker] Retrying quote ${job.quoteId} in ${delaySeconds}s`)
-
-            message.retry({
-              delaySeconds,
-            })
-
-            // Note: The retry will use the original message body.
-            // Cloudflare Queues tracks retries internally.
-            console.log(`[Worker] Scheduled retry #${retryCount + 1} for quote ${job.quoteId}`)
-          }
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        console.error(`[Worker] Error processing quote ${job.quoteId}:`, errorMessage)
-
-        // Check for rate limit errors from external APIs
-        const isRateLimitError =
-          errorMessage.includes('429') ||
-          errorMessage.includes('rate limit') ||
-          errorMessage.includes('quota')
-
-        if (isRateLimitError && retryCount < MAX_RETRIES) {
-          // Longer delay for API rate limits
-          console.log(`[Worker] API rate limit hit, retrying in 60s`)
-          message.retry({ delaySeconds: 60 })
-        } else if (retryCount >= MAX_RETRIES) {
-          console.error(`[Worker] Quote ${job.quoteId} permanently failed: ${errorMessage}`)
-          await updateQuoteStatus(supabase, job.quoteId, 'failed', errorMessage)
-          message.ack()
-        } else {
-          // Standard retry with backoff
-          const delaySeconds = getBackoffDelay(retryCount)
-          message.retry({ delaySeconds })
-        }
-      }
+      // T-178: the rules for one job (limiter fails open, retries, failure) are in queue-consumer.ts
+      await handleQuoteJob<QuoteJobMessage>(message, {
+        limiter: rateLimiter,
+        process: (job, queueWaitMs) => processQuoteJob(job, supabase, env, queueWaitMs),
+        markFailed: async (job, error) => {
+          await markQuoteFailed(supabase, env, job.quoteId, error)
+        },
+        maxRetries: MAX_RETRIES,
+        backoffSeconds: getBackoffDelay,
+      })
     }
   },
 }

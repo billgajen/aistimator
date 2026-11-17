@@ -207,6 +207,15 @@ Indexes: `(tenant_id, created_at desc)` where not completed; the same where also
     stored text never carries the token of an estimate's link.
 - A photo sent in a chat (WhatsApp, SMS) is an `assets` row like any other; since T-177 a JPEG also has a small
   copy in storage at `<r2_key>.small` (no row, as for a form photo).
+- T-178 (no migration, no new column): three things kept in existing JSON columns.
+  - `quote_requests.source_json.serviceSuggestion` (`serviceId`, `serviceName`, `reason`): the request form
+    thought another of the business's services fits a description-only request. The worker reads it and holds
+    the quote for review.
+  - `quotes.content_json.error`, `failedAt`, `failedNotifiedAt` on a failed quote: why (for us only), when, and
+    when the business was emailed about it. `failedNotifiedAt` is what keeps it to one email.
+  - `quotes.content_json.retryCode` (`hash`, `expiresAt`): the hash of the one-time code
+    `scripts/retry-failed-quote.sh` writes; the retry route removes it as it uses it.
+  - There is no `quotes.error_message` column. Code that wrote one had its whole update refused.
 
 ### SMS channel (T-136, migration 27)
 - sms_configs: tenant_id (unique), phone_number (E.164, unique), messaging_service_sid, is_active, a2p_brand_registered, a2p_campaign_registered

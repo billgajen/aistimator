@@ -445,6 +445,16 @@ Must be:
 - Clear CTAs: accept, pay, contact
 - Show optional sections based on tenant settings
 
+- **T-178: waiting and failure.** While the estimate is being made the page says "Preparing your estimate".
+  After 60 seconds one line replaces the usual one: "This is taking longer than usual. We’ll email you as soon
+  as it’s ready." (no email on the request: "Keep this page open, or come back to it…"). The page keeps
+  checking. If pricing fails it says "{business} has your request" and that the business will be in touch,
+  never why. The words are in `packages/shared/src/failed-request.ts`; the request form's finish screen uses
+  the same ones. The form no longer offers "Switch to X and Submit" (AD-059).
+- **T-178: the dashboard quote page** shows "What the customer sent" (their words and their answers under the
+  business's own questions) when there is no estimate to read, and "Check the service" on a quote held because
+  the description read like another of the business's services (`components/quotes/CustomerSent.tsx`).
+
 ### Setup (T-150, /app/onboarding)
 Signup (`/signup?plan=<id>` from the pricing page keeps the plan) → email verification → `/app`, which sends a
 business with no services to setup until it has one or presses "Skip". Steps:

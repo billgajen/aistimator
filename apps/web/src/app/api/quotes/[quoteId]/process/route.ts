@@ -10,6 +10,8 @@ import { checkPlanLimit, maybeNotifyLimitReached } from '@/lib/plan-limits'
 import { incrementUsageCounter } from '@/lib/usage'
 import { enqueueQuoteJob } from '@/lib/queue'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
+import { markQuoteFailed } from '@/lib/failed-quote'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -68,7 +70,7 @@ export async function POST(_request: Request, { params }: { params: { quoteId: s
     })
   } catch (error) {
     console.error('[Process] Failed to enqueue held lead:', error)
-    await supabase.from('quotes').update({ status: 'failed' }).eq('id', quote.id)
+    await markQuoteFailed(createAdminClient(), quote.id, 'The request could not be handed to the pricing worker')
     return NextResponse.json({ error: { code: 'QUEUE_FAILED', message: 'Could not start pricing — try again' } }, { status: 502 })
   }
   return NextResponse.json({ queued: true })

@@ -369,7 +369,7 @@ function shouldApplyAddon(
     // Check for global addon suppressor phrases first (e.g., "no extras", "budget only")
     // If customer explicitly says they don't want extras, skip all keyword-based addons
     if (hasGlobalAddonSuppressor(searchableText)) {
-      console.log(`[Pricing] Addon "${addon.id}" skipped - global suppressor phrase detected in: "${searchableText.substring(0, 100)}..."`)
+      console.log(`[Pricing] Addon "${addon.id}" skipped - global suppressor phrase detected`)
       return { apply: false }
     }
 

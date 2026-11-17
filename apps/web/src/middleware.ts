@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { PLATFORM_ADMIN_ROLE } from '@/lib/roles'
+import { quotePageLimit, tooManyPageResponse } from '@/lib/rate-limit-edge'
 
 // Routes that require authentication
 const PROTECTED_ROUTES = ['/app', '/setup']
@@ -18,6 +19,19 @@ export function underRoute(pathname: string, route: string): boolean {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // T-178: the quote link page's rate limit is checked here, before anything
+  // renders, so a blocked visitor gets a real 429 (the page could only answer
+  // 200 with the words). Fails open like every public limit (AD-055).
+  if (request.method === 'GET' && pathname.startsWith('/quote/')) {
+    let limit
+    try {
+      limit = await quotePageLimit(pathname, request.headers.get('x-forwarded-for'), request.headers.get('x-real-ip'))
+    } catch {
+      limit = null // a slug that cannot be decoded: the page itself answers "not found"
+    }
+    if (limit && !limit.allowed) return tooManyPageResponse(limit)
+  }
 
   // Create Supabase client
   let response = NextResponse.next({ request })

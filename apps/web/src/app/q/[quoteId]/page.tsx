@@ -8,7 +8,7 @@ import { useSearchParams } from 'next/navigation'
 import { brandStyleVars } from '@/lib/color'
 import { timingLabel } from '@/lib/acceptance'
 import type { QuoteViewResponse, QuoteStatus } from '@qolumns/shared'
-import { formatMoney, formatDate, isQuoteProcessing, canCustomerDecide, customerDecisionWords, splitLabelMath, PRODUCT_NAME, splitMinimum, withoutMinimumNote, crossServiceLine } from '@qolumns/shared'
+import { formatMoney, formatDate, isQuoteProcessing, canCustomerDecide, customerDecisionWords, splitLabelMath, PRODUCT_NAME, splitMinimum, withoutMinimumNote, crossServiceLine, SLOW_PREPARING_MS, slowPreparingLine, failedRequestTitle, failedRequestLine } from '@qolumns/shared'
 
 interface QuotePageProps {
   params: { quoteId: string }
@@ -81,17 +81,30 @@ export default function QuotePage({ params }: QuotePageProps) {
   // Poll quietly (poll=1 doesn't count as a view); once the status moves on,
   // load it normally so the real view is recorded.
   const [slowPreparing, setSlowPreparing] = useState(false)
+  // the page has stopped checking (about 10 minutes): the tape stops moving
+  const [stoppedChecking, setStoppedChecking] = useState(false)
   const processing = isQuoteProcessing(quote?.status)
+  // T-178: after 60 seconds of "Preparing" the customer is told it is slow.
+  // The page keeps checking; only the wording changes. (It used to stay on
+  // "this usually takes a minute or two" for about ten minutes.)
+  useEffect(() => {
+    if (!processing) {
+      setSlowPreparing(false)
+      return
+    }
+    const timer = setTimeout(() => setSlowPreparing(true), SLOW_PREPARING_MS)
+    return () => clearTimeout(timer)
+  }, [processing])
   useEffect(() => {
     if (!processing || !token) return
     let cancelled = false
     let polls = 0
-    const maxPolls = 150 // ~10 min, then stop and promise the email
+    const maxPolls = 150 // ~10 min, then stop checking
     const interval = setInterval(async () => {
       polls++
       if (polls > maxPolls) {
         clearInterval(interval)
-        if (!cancelled) setSlowPreparing(true)
+        if (!cancelled) setStoppedChecking(true)
         return
       }
       try {
@@ -319,19 +332,19 @@ export default function QuotePage({ params }: QuotePageProps) {
                 Estimate for {customer.name}
               </p>
               <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">
-                {failed ? `Your request is with ${business.name}` : awaitingBusiness ? 'Your estimate is being prepared' : 'Preparing your estimate'}
+                {failed ? failedRequestTitle(business.name) : awaitingBusiness ? 'Your estimate is being prepared' : 'Preparing your estimate'}
               </h1>
-              <div className={`tape-rule-light mt-8 ${failed || slowPreparing || awaitingBusiness ? '' : 'tape-measuring'}`} aria-hidden="true" />
-              <p className="mt-6 text-sm text-on-primary max-w-md">
+              <div className={`tape-rule-light mt-8 ${failed || stoppedChecking || awaitingBusiness ? '' : 'tape-measuring'}`} aria-hidden="true" />
+              <p className="mt-6 text-sm text-on-primary max-w-md" data-testid={failed ? 'request-failed' : slowPreparing && !awaitingBusiness ? 'preparing-slow' : 'preparing'}>
                 {awaitingBusiness
                   ? `${business.name} will review and send it shortly.`
                   : failed
-                  ? `${business.name} will send your estimate by email shortly — nothing more needed from you.`
+                  ? failedRequestLine(business.name)
                   : slowPreparing
-                    ? 'This one is taking longer than usual. We’ll email you the link the moment it’s ready.'
+                    ? slowPreparingLine(customer.hasEmail !== false)
                     : `${business.name} is pricing your job from the details you sent. This usually takes a minute or two — this page updates by itself.`}
               </p>
-              {!failed && !slowPreparing && (
+              {!failed && !slowPreparing && customer.hasEmail !== false && (
                 <p className="mt-2 text-xs text-on-primary max-w-md">
                   You can close it: we’ll email you the link as soon as it’s ready.
                 </p>

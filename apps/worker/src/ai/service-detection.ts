@@ -303,7 +303,7 @@ Respond with ONLY the JSON array, no other text.`
       const phraseLower = r.matchedPhrase.toLowerCase().trim()
       const phraseExists = descriptionLower.includes(phraseLower)
       if (!phraseExists) {
-        console.log(`[ServiceDetection] REJECTING hallucinated phrase: "${r.matchedPhrase}" not in source text for ${r.serviceId}`)
+        console.log(`[ServiceDetection] REJECTING hallucinated phrase: not in source text for ${r.serviceId}`)
         return false
       }
 
@@ -351,7 +351,7 @@ Respond with ONLY the JSON array, no other text.`
         })
 
         if (!serviceMatchesRequest) {
-          console.log(`[ServiceDetection] REJECTING mismatched service: "${r.serviceName}" doesn't match request keywords [${keyObjectWords.join(', ')}] from phrase "${r.matchedPhrase}"`)
+          console.log(`[ServiceDetection] REJECTING mismatched service: "${r.serviceName}" doesn't match the request's ${keyObjectWords.length} key words`)
           return false
         }
       }
@@ -360,7 +360,7 @@ Respond with ONLY the JSON array, no other text.`
       // Prevents recommending "Roof Leak Repair" when customer mentions "bathroom leak"
       const contextConflict = detectLocationContextConflict(r.matchedPhrase, r.serviceName)
       if (contextConflict.hasConflict) {
-        console.log(`[ServiceDetection] REJECTING context conflict (AD-014): phrase context "${contextConflict.phraseContext}" vs service context "${contextConflict.serviceContext}" for ${r.serviceId} ("${r.serviceName}")`)
+        console.log(`[ServiceDetection] REJECTING context conflict (AD-014): phrase context vs service context "${contextConflict.serviceContext}" for ${r.serviceId} ("${r.serviceName}")`)
         return false
       }
 
@@ -369,7 +369,7 @@ Respond with ONLY the JSON array, no other text.`
 
     console.log(`[ServiceDetection] AI detected ${validated.length} services from description`)
     for (const service of validated) {
-      console.log(`[ServiceDetection]   - ${service.serviceName} (conf: ${service.confidence}): "${service.matchedPhrase}"`)
+      console.log(`[ServiceDetection]   - ${service.serviceName} (conf: ${service.confidence})`)
     }
 
     return validated
