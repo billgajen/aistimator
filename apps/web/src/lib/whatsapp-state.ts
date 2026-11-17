@@ -98,3 +98,36 @@ export function connectionView(row: WhatsAppConfigRow, now: Date): ConnectionVie
 /** The columns `connectionView` needs: what a route selects (never the encrypted columns) */
 export const CONNECTION_VIEW_COLUMNS =
   'phone_number_id, display_phone_number, is_active, connection_method, waba_id, business_id, verified_name, number_kind, token_expires_at, registered_at, messages_ready_at, connected_at, created_at, updated_at'
+
+/**
+ * T-176: what Meta says about a connection at this moment. Asked when the page
+ * opens and on "Check again"; never stored, because Meta changes it without
+ * telling us.
+ */
+export interface LiveStatus {
+  /** Meta's `name_status` for the number, as it sent it; null when Meta did not say */
+  nameStatus: string | null
+  /** a payment method is on the WhatsApp account; null when Meta did not say */
+  hasPaymentMethod: boolean | null
+}
+
+export type NameReview = 'in_review' | 'declined' | 'approved' | 'unknown'
+
+/**
+ * Meta's review of the display name, in the three states the page speaks of.
+ * Meta's values (phone number node, `name_status`): APPROVED,
+ * AVAILABLE_WITHOUT_REVIEW, DECLINED, EXPIRED, PENDING_REVIEW, NONE.
+ */
+export function nameReview(nameStatus: string | null): NameReview {
+  switch ((nameStatus ?? '').toUpperCase()) {
+    case 'PENDING_REVIEW':
+      return 'in_review'
+    case 'DECLINED':
+      return 'declined'
+    case 'APPROVED':
+    case 'AVAILABLE_WITHOUT_REVIEW':
+      return 'approved'
+    default:
+      return 'unknown'
+  }
+}

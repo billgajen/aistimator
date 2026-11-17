@@ -26,6 +26,7 @@ import {
   GraphError,
   META_ERROR,
   accountNumbers,
+  displayNameStatus,
   exchangeCode,
   hasPaymentMethod,
   inspectToken,
@@ -37,7 +38,7 @@ import {
   subscribeApp,
   unsubscribeApp,
 } from '@/lib/whatsapp-graph'
-import { CONNECTION_VIEW_COLUMNS, connectionView, type ConnectionView, type WhatsAppConfigRow } from '@/lib/whatsapp-state'
+import { CONNECTION_VIEW_COLUMNS, connectionView, type ConnectionView, type LiveStatus, type WhatsAppConfigRow } from '@/lib/whatsapp-state'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -262,12 +263,15 @@ export async function finishRegistration(admin: Admin, tenantId: string, pin: un
 /**
  * Ask Meta how the connection stands and store what it says: the number's
  * name, whether a payment method is on the account, and whether the token is
- * still good. Returns the refreshed view, and a line to show when Meta
- * reported a problem.
+ * still good. Returns the refreshed view, a line to show when Meta reported a
+ * problem, and (T-176) what Meta says at this moment about the display name's
+ * review and a card on the account.
  */
-export async function refreshConnection(admin: Admin, tenantId: string): Promise<{ connection: ConnectionView | null; problem: string | null }> {
+export async function refreshConnection(admin: Admin, tenantId: string): Promise<{ connection: ConnectionView | null; problem: string | null; live: LiveStatus }> {
+  // T-176: what Meta says right now; shown, never stored
+  const live: LiveStatus = { nameStatus: null, hasPaymentMethod: null }
   const row = await loadSecrets(admin, tenantId)
-  if (!row) return { connection: null, problem: null }
+  if (!row) return { connection: null, problem: null, live }
   let problem: string | null = null
   const updates: Record<string, unknown> = {}
   try {
@@ -275,8 +279,10 @@ export async function refreshConnection(admin: Admin, tenantId: string): Promise
     const number = await numberDetails(token, row.phone_number_id)
     if (number.displayPhoneNumber) updates.display_phone_number = number.displayPhoneNumber
     updates.verified_name = number.verifiedName
+    live.nameStatus = await displayNameStatus(token, row.phone_number_id).catch(() => null)
     if (row.connection_method === 'embedded' && row.waba_id) {
       const paid = await hasPaymentMethod(token, row.waba_id).catch(() => null)
+      live.hasPaymentMethod = paid
       if (paid === true) updates.messages_ready_at = new Date().toISOString()
       const app = metaApp()
       if (app) {
@@ -298,7 +304,7 @@ export async function refreshConnection(admin: Admin, tenantId: string): Promise
     if (Object.keys(rest).length > 0) await admin.from('whatsapp_configs').update(rest).eq('tenant_id', tenantId)
     if (readyAt) await admin.from('whatsapp_configs').update({ messages_ready_at: readyAt }).eq('tenant_id', tenantId).is('messages_ready_at', null)
   }
-  return { connection: await loadConnection(admin, tenantId), problem }
+  return { connection: await loadConnection(admin, tenantId), problem, live }
 }
 
 /**

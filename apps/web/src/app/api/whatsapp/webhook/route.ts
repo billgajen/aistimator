@@ -219,6 +219,8 @@ async function handleEntry(supabase: Admin, config: StoredConfig, whatsappConfig
 
   // Delivery receipts, for this business's own messages only
   for (const status of entry.statuses) {
+    // T-176: Meta accepts a message and reports later that it was not delivered. The code only: never the number.
+    if (status.status === 'failed') console.error(`[WhatsApp Webhook] Meta did not deliver a message: code ${status.errorCode ?? 'none'}`)
     await supabase.from('whatsapp_messages').update({ status: status.status }).eq('tenant_id', tenantId).eq('wa_message_id', status.messageId)
   }
 }

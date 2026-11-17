@@ -1,6 +1,10 @@
 /**
  * T-175: the calls to Meta's Graph API that Embedded Signup needs, server only.
  *
+ * T-176 adds message templates (create one, read its review), checked against
+ * Meta's docs on 2026-11-17 (templates overview, components, template
+ * management, template review, the message-template API reference).
+ *
  * Checked against Meta's docs on 2026-11-16 (Embedded Signup implementation,
  * "Onboarding customers as a Tech Provider", "Onboarding WhatsApp Business app
  * users", registration, error codes):
@@ -159,6 +163,16 @@ export async function numberDetails(token: string, phoneNumberId: string): Promi
   return { ...toNumber({ ...json, id: json.id ?? phoneNumberId }), qualityRating: typeof json.quality_rating === 'string' ? json.quality_rating : null }
 }
 
+/**
+ * T-176: Meta's review of the number's display name (`name_status`), as Meta
+ * words it; null when it does not say. Asked on its own, so a refusal of this
+ * one field can never break reading the number.
+ */
+export async function displayNameStatus(token: string, phoneNumberId: string): Promise<string | null> {
+  const json = await call(`/${encodeURIComponent(phoneNumberId)}`, { token, query: { fields: 'name_status' } })
+  return typeof json.name_status === 'string' ? json.name_status : null
+}
+
 /** Our app starts receiving this account's webhooks */
 export async function subscribeApp(token: string, wabaId: string): Promise<void> {
   await call(`/${encodeURIComponent(wabaId)}/subscribed_apps`, { method: 'POST', token })
@@ -193,6 +207,59 @@ export async function hasPaymentMethod(token: string, wabaId: string): Promise<b
   return typeof id === 'string' ? id !== '' && id !== '0' : typeof id === 'number' ? id !== 0 : null
 }
 
+/** A message template, as Meta lists it (T-176) */
+export interface MetaTemplate {
+  id: string
+  name: string
+  language: string
+  /** Meta's own word: APPROVED, PENDING, REJECTED, PAUSED, DISABLED, IN_APPEAL, … */
+  status: string
+  category: string | null
+  /** Meta's reason when it rejected the wording; null for NONE */
+  rejectedReason: string | null
+  /** the BODY component's text, with its {{1}} placeholders */
+  bodyText: string | null
+}
+
+function toTemplate(row: Json): MetaTemplate {
+  const components = Array.isArray(row.components) ? (row.components as Json[]) : []
+  const body = components.find((c) => typeof c.type === 'string' && c.type.toUpperCase() === 'BODY')
+  const reason = typeof row.rejected_reason === 'string' && row.rejected_reason !== 'NONE' ? row.rejected_reason : null
+  return {
+    id: String(row.id ?? ''),
+    name: typeof row.name === 'string' ? row.name : '',
+    language: typeof row.language === 'string' ? row.language : '',
+    status: typeof row.status === 'string' ? row.status.toUpperCase() : '',
+    category: typeof row.category === 'string' ? row.category.toUpperCase() : null,
+    rejectedReason: reason,
+    bodyText: typeof body?.text === 'string' ? body.text : null,
+  }
+}
+
+/**
+ * T-176: the account's templates with this name (one per language), read with
+ * the business's own token (`whatsapp_business_management`). Meta's two
+ * reference pages disagree on whether `name` is still a filter, so the name is
+ * sent AND checked here: a list that ignored it is still narrowed correctly.
+ */
+export async function templatesNamed(token: string, wabaId: string, name: string): Promise<MetaTemplate[]> {
+  const json = await call(`/${encodeURIComponent(wabaId)}/message_templates`, {
+    token,
+    query: { name, fields: 'id,name,language,status,category,rejected_reason,components', limit: '100' },
+  })
+  return (Array.isArray(json.data) ? (json.data as Json[]) : []).map(toTemplate).filter((t) => t.name === name)
+}
+
+/** T-176: submit a template for Meta's review. Meta answers with its id, PENDING (or APPROVED), and the category it gave it. */
+export async function createTemplate(token: string, wabaId: string, definition: Json): Promise<{ id: string; status: string; category: string | null }> {
+  const json = await call(`/${encodeURIComponent(wabaId)}/message_templates`, { method: 'POST', token, body: definition })
+  return {
+    id: String(json.id ?? ''),
+    status: typeof json.status === 'string' ? json.status.toUpperCase() : 'PENDING',
+    category: typeof json.category === 'string' ? json.category.toUpperCase() : null,
+  }
+}
+
 /**
  * Ask Meta for a fresh 60-day token in exchange for one that has not expired.
  * Meta documents this call for system user tokens; whether it accepts a token
@@ -224,4 +291,10 @@ export const META_ERROR = {
   PIN_WRONG: 133005,
   /** the number is not registered for the Cloud API */
   NOT_REGISTERED: 133010,
+  /** more than 24 hours since the customer last wrote: only a template is delivered (T-176) */
+  OUTSIDE_WINDOW: 131047,
+  /** the number's display name is not approved yet: Meta's own 555 numbers cannot send until it is (T-176) */
+  NAME_NOT_APPROVED: 131037,
+  /** the template does not exist in that language, or is not approved (T-176) */
+  TEMPLATE_NOT_APPROVED: 132001,
 } as const

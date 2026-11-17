@@ -6,6 +6,9 @@ import { graphApiUrl } from './whatsapp-graph'
  * WhatsApp Cloud API client
  */
 
+/** T-176: a send that Meta does not answer is given up on, so nothing that waits for it hangs */
+const SEND_TIMEOUT_MS = 15_000
+
 export interface WhatsAppConfig {
   phoneNumberId: string
   accessToken: string
@@ -51,6 +54,7 @@ export async function sendTextMessage(
           'Authorization': `Bearer ${config.accessToken}`,
           'Content-Type': 'application/json',
         },
+        signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
         body: JSON.stringify({
           messaging_product: 'whatsapp',
           recipient_type: 'individual',
@@ -105,6 +109,7 @@ export async function sendTemplateMessage(
           'Authorization': `Bearer ${config.accessToken}`,
           'Content-Type': 'application/json',
         },
+        signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
         body: JSON.stringify({
           messaging_product: 'whatsapp',
           recipient_type: 'individual',
@@ -230,6 +235,8 @@ export interface WebhookEntry {
     status: 'sent' | 'delivered' | 'read' | 'failed'
     timestamp: string
     recipientId: string
+    /** T-176: Meta's code for why a message was not delivered (a failed status only) */
+    errorCode: number | null
   }>
 }
 
@@ -267,6 +274,7 @@ export function parseWebhookPayload(body: unknown): WebhookEntry[] {
             status: string
             timestamp: string
             recipient_id: string
+            errors?: Array<{ code?: unknown }>
           }>
         }
         field: string
@@ -315,6 +323,7 @@ export function parseWebhookPayload(body: unknown): WebhookEntry[] {
         status: s.status as 'sent' | 'delivered' | 'read' | 'failed',
         timestamp: s.timestamp,
         recipientId: s.recipient_id,
+        errorCode: typeof s.errors?.[0]?.code === 'number' ? s.errors[0].code : null,
       }))
 
       entries.push({

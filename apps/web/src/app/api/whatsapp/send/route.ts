@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { currentTenant } from '@/lib/current-tenant'
 import { sendTextMessage, decryptToken } from '@/lib/whatsapp'
 import { META_ERROR } from '@/lib/whatsapp-graph'
+import { lastInboundAt, windowOpen } from '@/lib/whatsapp-window'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,8 +13,6 @@ interface SendMessageRequest {
   conversationId?: unknown
 }
 
-/** Meta's code for "this person has not messaged the business in the last 24 hours" */
-const OUTSIDE_WINDOW = 131047
 
 /**
  * POST /api/whatsapp/send  { toPhone, message, conversationId? }
@@ -21,6 +20,11 @@ const OUTSIDE_WINDOW = 131047
  * dashboard's test message). T-175: the stored token is read with the service
  * role for the caller's own tenant; a message that goes out marks the number
  * as working, and Meta's two usual refusals are said in plain words.
+ *
+ * T-176: Meta accepts a message to a phone that has not written to the
+ * business in the last 24 hours, and then does not deliver it. The answer
+ * says whether we hold such a message (`windowOpen`), so the page does not
+ * say "sent" about a message that will not arrive.
  */
 export async function POST(request: Request) {
   const auth = await currentTenant()
@@ -51,6 +55,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: { code: 'WHATSAPP_DISABLED', message: 'WhatsApp is switched off for this business.' } }, { status: 400 })
     }
 
+    const inWindow = windowOpen(await lastInboundAt(admin, tenantId, toPhone), new Date())
+
     const result = await sendTextMessage(
       { phoneNumberId: waConfig.phone_number_id as string, accessToken: decryptToken(waConfig.access_token_encrypted as string) },
       { to: toPhone, text: message }
@@ -64,9 +70,15 @@ export async function POST(request: Request) {
           { status: 402 }
         )
       }
-      if (result.errorCode === OUTSIDE_WINDOW) {
+      if (result.errorCode === META_ERROR.OUTSIDE_WINDOW) {
         return NextResponse.json(
           { error: { code: 'OUTSIDE_WINDOW', message: 'WhatsApp only lets a business message someone who has messaged it in the last 24 hours. Send any message from that phone to your number first, then try again.' } },
+          { status: 422 }
+        )
+      }
+      if (result.errorCode === META_ERROR.NAME_NOT_APPROVED) {
+        return NextResponse.json(
+          { error: { code: 'NAME_IN_REVIEW', message: 'Meta has not approved the name on this number yet, and does not let it send until it has. Nothing is broken: try again once the name is approved.' } },
           { status: 422 }
         )
       }
@@ -113,9 +125,34 @@ export async function POST(request: Request) {
       })
     }
 
-    return NextResponse.json({ ok: true, messageId: result.messageId })
+    return NextResponse.json({ ok: true, messageId: result.messageId, windowOpen: inWindow })
   } catch (error) {
     console.error('[WhatsApp send] failed:', error instanceof Error ? error.name : 'unknown error')
     return NextResponse.json({ error: { code: 'INTERNAL_ERROR', message: 'Could not send the message.' } }, { status: 500 })
   }
+}
+
+/**
+ * GET /api/whatsapp/send?messageId=…
+ * T-176: what became of a message this business sent: 'sent' (Meta accepted
+ * it), 'delivered', 'read' or 'failed', as Meta's status webhook reported it.
+ * The business's own messages only (row-level security).
+ */
+export async function GET(request: Request) {
+  const auth = await currentTenant()
+  if (!auth.ok) return auth.response
+  const messageId = new URL(request.url).searchParams.get('messageId') ?? ''
+  if (!messageId || messageId.length > 300) {
+    return NextResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'Name the message.' } }, { status: 400 })
+  }
+  const { data } = await auth.supabase
+    .from('whatsapp_messages')
+    .select('status')
+    .eq('tenant_id', auth.tenantId)
+    .eq('direction', 'outbound')
+    .eq('wa_message_id', messageId)
+    .limit(1)
+  const status = (data?.[0] as { status?: string } | undefined)?.status
+  if (!status) return NextResponse.json({ error: { code: 'NOT_FOUND', message: 'No such message.' } }, { status: 404 })
+  return NextResponse.json({ status })
 }

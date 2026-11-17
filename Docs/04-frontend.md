@@ -241,6 +241,20 @@ Routes:
     WhatsApp" (one click, same number); "Disconnect WhatsApp", which asks first. Connected manually: the manual
     form to update, test or disconnect. Components: `components/whatsapp/{ConnectWhatsApp,ConnectedCard,ManualConnect}.tsx`.
     No token or secret is ever given to the page.
+  - **T-176 changes to the WhatsApp page.**
+    - Not connected: "Which app is this number on today?" (the WhatsApp Business app, ordinary WhatsApp, a new
+      number) is asked first, and "Connect WhatsApp" is locked until it is answered. Ordinary WhatsApp stops
+      there, with what connecting would do and the steps to move the number to the WhatsApp Business app
+      (`components/whatsapp/NumberQuestion.tsx`). The same warning is in the help text under the button and in
+      the manual steps. The words live in `lib/whatsapp-copy.ts`.
+    - Connected: a payment method is a note, not a step ("You don't need a card to start"); a display name in
+      Meta's review is said plainly ("up to five working days", "Nothing is broken"), and for one of Meta's own
+      555 numbers the page adds that it cannot send until then; "Message templates" (the one template, its
+      wording, "Create the template", Meta's review status and "Refresh": `components/whatsapp/MessageTemplates.tsx`);
+      a test message says "Sent" only when that phone wrote in the last 24 hours, and then "Delivered" or "Meta
+      did not deliver the message" once Meta reports it.
+    - The page asks Meta how the connection stands once when it opens (`POST /api/whatsapp/status`), so what it
+      shows about the name, a card and the token's end date is Meta's, not a stored copy.
 - /app/sms (no menu item; reachable by URL, behaviour unchanged)
 
 Unfinished requests (T-151, T-160): people who gave their details and did not finish. The list (the Unfinished tab)

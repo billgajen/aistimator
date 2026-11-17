@@ -180,6 +180,8 @@ const mock = http.createServer((req, res) => {
     if (node === account.wabaId && !account.manual) {
       if (edge === 'phone_numbers') return send(200, { data: account.numbers.map(numberJson) })
       if (edge === 'subscribed_apps') return send(200, { success: true })
+      // T-176: the page also asks for the account's message templates; this script has none (verify-t176 covers them)
+      if (edge === 'message_templates' && req.method === 'GET') return send(200, { data: [] })
       if (!edge) return send(200, account.funding ? { id: account.wabaId, primary_funding_id: account.funding } : { id: account.wabaId })
     }
     if (number) {
@@ -553,6 +555,8 @@ for (const width of [390, 1440]) {
   await p.goto(`${app}/app/whatsapp`, { waitUntil: 'networkidle' })
   const button = p.locator('[data-testid=connect-whatsapp]')
   await button.waitFor({ timeout: 30_000 })
+  // T-176: the button is locked until the business says which app its number is on (verify-t176 covers the question)
+  await p.locator('[data-testid=number-app-new]').check()
   await p.waitForFunction(() => !(document.querySelector('[data-testid=connect-whatsapp]') as HTMLButtonElement).disabled, null, { timeout: 15_000 })
   const first = await p.evaluate(() => ({
     mainButtons: [...document.querySelectorAll('main button')].filter((b) => (b as HTMLElement).offsetParent !== null).map((b) => (b as HTMLElement).innerText.trim()),
@@ -585,7 +589,8 @@ for (const width of [390, 1440]) {
   check(`${width}: Meta’s window is opened with our app, our configuration and the current settings`, sdk.inits[0]?.appId === APP_ID && sdk.inits[0]?.version === 'v27.0' && login.config_id === CONFIG_ID && login.response_type === 'code' && login.override_default_response_type === true && login.extras.featureType === 'whatsapp_business_app_onboarding', { init: sdk.inits[0], login })
   const connectedText = (await p.locator('[data-testid=whatsapp-connected]').innerText()).replace(/\s+/g, ' ')
   check(`${width}: connected, the page shows the number and what happens next`, (await p.locator('[data-testid=connected-number]').innerText()).trim() === numP.display && /asks about the job/.test(await p.locator('[data-testid=what-happens-next]').innerText()))
-  check(`${width}: the one step left is the payment method, with a link to WhatsApp Manager`, /One step left/.test(connectedText) && (await p.locator('[data-testid=payment-link]').getAttribute('href'))?.includes(accP.wabaId) === true && (await p.locator('[data-testid=register-step]').count()) === 0)
+  // T-176: a payment method is a note, not a step
+  check(`${width}: nothing is left to do; the payment note links to WhatsApp Manager`, /Nothing left to do/.test(connectedText) && !/step left|steps left/i.test(connectedText) && (await p.locator('[data-testid=payment-link]').getAttribute('href'))?.includes(accP.wabaId) === true && (await p.locator('[data-testid=register-step]').count()) === 0)
   check(`${width}: no token is anywhere in the page`, !(await p.content()).includes(accP.token))
   const sidewaysConnected = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   check(`${width}: the connected page does not scroll sideways`, sidewaysConnected <= 0, sidewaysConnected)
@@ -594,18 +599,20 @@ for (const width of [390, 1440]) {
   // "Check again" once Meta reports a payment method
   accP.funding = metaId()
   await p.getByRole('button', { name: 'Check again' }).click()
-  await p.locator('[data-testid=all-done]').waitFor({ timeout: 15_000 })
-  check(`${width}: once Meta reports a payment method, "Check again" clears the step`, /Nothing left to do/.test(await p.locator('[data-testid=steps-left]').innerText()))
+  await p.waitForFunction(() => /Meta has a card for this account/.test(document.querySelector('[data-testid=payment-note]')?.textContent ?? ''), null, { timeout: 15_000 })
+  check(`${width}: once Meta reports a payment method, "Check again" says so`, /Nothing left to do/.test(await p.locator('[data-testid=steps-left]').innerText()) && (await p.locator('[data-testid=payment-link]').count()) === 0)
 
   // the test message (to the stand-in: nobody is messaged)
   const testsBefore = sentMessages.length
   await p.getByLabel('Your own mobile number, with country code').fill('+1 555 555 0199')
   await p.locator('[data-testid=send-test]').click()
   await p.locator('[data-testid=test-note]').waitFor({ timeout: 15_000 })
-  check(`${width}: a test message goes out from the business’s own number`, sentMessages.length === testsBefore + 1 && sentMessages.at(-1)!.to === '15555550199' && sentMessages.at(-1)!.token === accP.token && /Sent/.test(await p.locator('[data-testid=test-note]').innerText()))
+  check(`${width}: a test message goes out from the business’s own number`, sentMessages.length === testsBefore + 1 && sentMessages.at(-1)!.to === '15555550199' && sentMessages.at(-1)!.token === accP.token && /Meta accepted the message/.test(await p.locator('[data-testid=test-note]').innerText()))
 
   // the 60-day warning and one-click reconnect
   await patchRow(P.tenantId, { token_expires_at: new Date(Date.now() + 4.5 * 86_400_000).toISOString() })
+  // T-176: the page asks Meta how the connection stands when it opens, so Meta's answer has to carry the same date
+  accP.expiresAt = Math.floor((Date.now() + 4.5 * 86_400_000) / 1000)
   await p.reload({ waitUntil: 'networkidle' })
   await p.locator('[data-testid=token-warning]').waitFor({ timeout: 15_000 })
   const warning = (await p.locator('[data-testid=token-warning]').innerText()).replace(/\s+/g, ' ')

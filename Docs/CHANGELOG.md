@@ -15,6 +15,184 @@
 
 ## Issues & Resolutions
 
+### 2026-11-17: T-176 — WhatsApp review-ready: a message template, plainer wording, the personal number warning (AD-056)
+
+**Not committed and not deployed.** No migration; the worker is not touched.
+
+**Nothing was sent to Meta or to anyone on WhatsApp.** Every check ran against a stand-in for Meta's Graph API
+on this machine. Production was read only: its logs, and a few columns of its WhatsApp rows (no token, no message text).
+
+#### The owner's test message of 17 November: what production recorded
+
+- The first real connect worked (the test business "Bluum - Qolumns Test", Meta's number +1 555-759-6002,
+  display name in Meta's review). "Send a test message" to the owner's phone delivered nothing.
+- **Meta's response to the send call was "accepted":** `POST /api/whatsapp/send` answered 200 at 12:02:35 UTC
+  and again at 12:42:36 UTC, and each stored row has Meta's message id. There is no "send refused" line for
+  either. Meta's send page says a 200 "does not indicate successful delivery".
+- **Meta never reported the outcome.** A delivery report is a call to our webhook. Between 11:18 and 12:43 UTC
+  the request records show **no call to `/api/whatsapp/webhook` at all**, and both rows are still `sent`.
+- Vercel's free plan keeps runtime logs and request records for one hour, so nothing earlier can be read.
+- **Two reasons in Meta's docs why it would not deliver**; which one applied is not known without the report:
+  1. the number is one of Meta's own 555 numbers, which "must have their display names approved before they
+     can be used to send messages" (error 131037);
+  2. the phone had not written to the number in the last 24 hours (error 131047). Meta accepts the call and
+     drops the message.
+- **Why no report came (the owner's answer, 17 November):** the webhook was verified and subscribed to
+  `messages` and `account_update` that morning; **Meta does not deliver real messages to an app that is not
+  published**, so it never called. The owner had not messaged the number from a phone, so the 24-hour rule
+  applied to both test messages too. Until the app is Live, the product does not hear a customer's message on
+  a connected number and cannot show "Delivered".
+- **What changed because of it:** the page no longer says "Sent" about a message that will not arrive
+  (below, 4), and Meta's failure code is logged when it does report one.
+
+#### What Meta's docs say today (read 2026-11-17)
+
+- **Templates.** Create with `POST /<account>/message_templates` (name, language, category, components). A name
+  is lowercase letters, digits and underscores. **The body cannot start or end with a variable**, and every
+  variable needs an example. Review "can take up to 24 hours". Statuses: APPROVED, PENDING, REJECTED, PAUSED,
+  DISABLED, IN_APPEAL, ARCHIVED, DELETED, PENDING_DELETION, LIMIT_EXCEEDED; only APPROVED can be sent.
+  **Meta chooses the category itself** and may file a "utility" template under marketing
+  (`allow_category_change` is gone). Deleting an approved template blocks its name for 30 days.
+- Meta's two reference pages disagree on whether `name` still filters the template list, so the code sends it
+  and also narrows the answer itself.
+- A full link as a body variable is neither allowed nor forbidden in writing; Meta's own example does it. A link
+  button's variable is "appended to the end of the URL", and nothing says whether it may hold `?` and `=`, which
+  our link needs. So the link is a body variable.
+- **Pricing since 1 October 2026: per message.** "1,000 free service messages per month" per number, delivered
+  without a payment method; past that, nothing without one. Template messages are charged, inside the 24-hour
+  window too. So inside the window this sends an ordinary message, never the template. Meta's Help Center still
+  has pages that say otherwise.
+- **App Review.** The management recording must show "your app, or WhatsApp Manager, being used to create a
+  message template"; the messaging recording, a message sent from the app arriving in WhatsApp. One recording
+  and one written description per permission. "Requesting unnecessary permissions is a common reason for
+  rejection."
+- **"Log events"** in Meta's window: I matched it, by wording only, to the permission
+  `whatsapp_business_manage_events` ("allows an app to log events, such as purchase, add-to-cart, leads").
+  **That was wrong.** The owner checked the Embedded Signup configuration on 17 November: it requests only
+  `whatsapp_business_management` and `whatsapp_business_messaging`, and "log events" is Meta's own wording on
+  its screen. Nothing was changed. Lesson: Meta's docs do not print that screen's sentences, so a match by
+  wording is a guess and has to be checked in the dashboard before it is reported as a cause.
+- **Display name.** The number's `name_status` is APPROVED, AVAILABLE_WITHOUT_REVIEW, DECLINED, EXPIRED,
+  PENDING_REVIEW or NONE. An ordinary number can send while its name is in review; **a 555 number cannot**.
+  No Meta page gives a review time; "up to five working days" is the owner's figure.
+- **A number on ordinary WhatsApp.** "Numbers already in use with WhatsApp cannot be registered unless they are
+  deleted first", and a registered number can no longer be used in the WhatsApp app. The way round is to move
+  it to the WhatsApp Business app, which keeps the chats, and connect it from there.
+
+#### What was built
+
+**1. The message template** (`lib/whatsapp-templates.ts`, `lib/whatsapp-template-service.ts`,
+`GET` and `POST /api/whatsapp/template`, `components/whatsapp/MessageTemplates.tsx`; AD-056)
+- One fixed template per business, named `estimate_ready`: "Your estimate from {business} is ready. Open it
+  here: {{1}}", a blank line, "Thank you for asking {business} for a price." The closing line is there because
+  Meta refuses a body that ends with a variable. It does not invite a reply: on a connected number a reply is
+  answered by the quote questions.
+- The business's name is written into the template (each business has its own WhatsApp account, so its own
+  copy); the customer's link is the one variable. The language follows the business's region (`en_GB`, else
+  `en_US`). The category asked for is utility.
+- The page shows the wording, **Create the template**, then Meta's status in words (In review with Meta,
+  Approved, Rejected by Meta with its reason, Paused, Switched off) and **Refresh**.
+- **Nothing is stored.** Meta is asked each time with the business's own token on its own account. No
+  migration.
+- Pressing Create twice makes one: a template Meta already lists is returned as it stands; and if Meta answers
+  "already exists", the list is read again before a failure is reported.
+- A manual connection (the business's own Meta app) has no account id stored, so it has no template section
+  and gets 404.
+
+**2. The template is used** (`lib/whatsapp-notify.ts`, `lib/whatsapp-window.ts`, `lib/quote-approval.ts`,
+`PATCH /api/quotes/:id`)
+- When a business approves an estimate that was asked for on WhatsApp (its conversation names the quote), the
+  customer is told on WhatsApp too:
+  - the customer wrote in the last 24 hours → an ordinary message with the link;
+  - longer ago → the approved template with the link;
+  - longer ago with no approved template, or a manual connection → nothing (the email goes as before).
+- Both ways to approve do it: "Approve & send" (dashboard, app, the one-tap email link) and "edit, then send"
+  for a first send. A later revision is not announced.
+- **It cannot fail or undo an approval.** It starts after the quote is already marked sent, runs beside the
+  email, is tried once, and gives up after 8 seconds. Every failure ends in "not sent". The approve route's
+  answer gains `whatsapp: "message" | "template"` when one went out.
+- The 24 hours are measured from our own record of the customer's last message, with five minutes held back at
+  the edge.
+- The message is kept with its chat **without the link** (the link carries the quote's token), and nothing
+  about the customer is logged.
+- Both send calls now give up after 15 seconds; before, a send Meta never answered would wait for ever.
+
+**3. Wording on the WhatsApp page** (`components/whatsapp/ConnectedCard.tsx`, `lib/whatsapp-copy.ts`,
+`lib/whatsapp-state.ts`)
+- **Payment is a note, not a step.** The heading is "Nothing left to do" (or "One step left" when the number
+  still has to be registered). Under it: "You don't need a card to start", when a card is needed, a link to
+  WhatsApp Manager, and "Check again". When Meta shows a card: "Meta has a card for this account".
+- **A display name in review** is said plainly: "Meta is reviewing the name on this number … up to five working
+  days … Nothing is broken". For one of Meta's 555 numbers it adds that the number cannot send until then; for
+  any other number, that it works in the meantime.
+- The page asks Meta how the connection stands once when it opens (`POST /api/whatsapp/status`, which now also
+  returns `live`: the name's review and whether a card is on the account). Neither is stored.
+- The name's review is read in a call of its own, so Meta refusing that one field cannot break anything else.
+
+**4. The test message tells the truth** (`POST` and `GET /api/whatsapp/send`)
+- The answer carries `windowOpen`: whether we hold a message from that phone in the last 24 hours. If not, the
+  page says Meta accepted the message but it will probably not arrive, and what to do, instead of "Sent".
+- The page then asks what became of it for 20 seconds and says "Delivered" or "Meta did not deliver the
+  message" when Meta reports it.
+- Meta's refusal 131037 (name not approved) is said in plain words (422 `NAME_IN_REVIEW`).
+- The webhook reads Meta's code from a failed delivery report and logs it, the code alone.
+
+**5. The personal number warning** (`components/whatsapp/NumberQuestion.tsx`, `lib/whatsapp-copy.ts`)
+- Before Meta's window: "Which app is this number on today?" with three answers. "Connect WhatsApp" is locked
+  until one is chosen, and the function that opens Meta's window refuses while it is locked.
+- **Ordinary WhatsApp stops there.** The page says Meta only connects such a number once its WhatsApp account
+  is deleted, which loses its chats, and that it then no longer works in WhatsApp on the phone; and gives six
+  steps to move it to the free WhatsApp Business app first, which keeps the chats.
+- The same two sentences are in the help text under the button and in step 1 of "Connect manually".
+- Reconnecting an existing connection is not asked the question.
+
+**6. Docs.** `Docs/meta-app-review.md` is rewritten for the connected test business: what to do before
+recording, both recordings step by step, the form answers, and what to do if the template was already created.
+Recording 1 is written to work while the app is unpublished (it needs no webhook call).
+
+#### Decisions taken (the owner confirmed the first two on 17 November: keep both)
+
+- **"Replies", not "conversations".** The ticket asked for "the first 1,000 customer conversations a month".
+  Meta's pricing page counts messages, and one WhatsApp quote takes about ten. The page says "your first 1,000
+  replies to customers each month", which is true on either reading.
+- **Inside the 24 hours the customer now gets a WhatsApp message on approval** (before: only the email).
+- **Creating the template is the business's consent to its cost.** There is no separate switch.
+
+#### Not proven
+
+- Anything against the real Meta: creating a template, its review, sending one, `name_status`, a delivery
+  report reaching the page.
+- Whether Meta files the template under utility, and whether it accepts a link as the variable.
+- Whether a 555 number's undelivered message is reported with 131037.
+
+#### Checks
+
+- `scripts/hardcore-test/verify-t176.mts`: 96/96 (stand-in for Meta on port 8799, the same settings as
+  verify-t175, so one running web app serves both).
+- `verify-t175`: 110/110, after three changes to the script for what this ticket changed on the page (the
+  question before Meta's window, payment as a note, the test message's words) and one for the stand-in (the
+  page now asks Meta for the token's end date when it opens).
+- `pnpm lint` and `pnpm typecheck` pass. Unit tests: web 876, worker 534, mobile 11.
+- Builds: web and worker both build.
+- Full regression (this ticket touches approval): all 25 scripts pass, `verify-t146` to `verify-t176` (t146 20, t147 33, t148 29, t149 35, t150 27,
+  t151 35, t152 66, t153 39, t154 26, t155 44, t156 31, t157 96, t158 116, t160 96, t162 77, t164 78, t165 148,
+  t167 182, t169 149, t170 412, t171 97, t172 78, t174 83, t175 110, t176 96); `verify-t173` 100/100 on its
+  own server, with its stand-ins.
+- Preview: `https://estimator-qktqiucr0-gajendrans-projects-1a87e0b4.vercel.app` (behind the Vercel sign-in;
+  built with placeholder database settings, so it cannot sign in to the dashboard). An earlier preview of this
+  ticket, `estimator-irwve3ajb-…`, was made before the last three small changes and is still there.
+
+#### Fix dependencies
+
+- T-175 (AD-053): the stored row stays server-only; the template routes read it with the service role for the
+  caller's own business. Calls to Meta stay in `lib/whatsapp-graph.ts` (account) and `lib/whatsapp.ts` (sends).
+- T-146 / T-156 / T-157: `approveQuote` and "edit, then send" keep their order and answers; the notice is
+  added after the quote is marked sent.
+- T-173: the new routes sit behind the signed-in session like the other WhatsApp routes; no public route was
+  added, so no rate limit entry was needed.
+
+---
+
 ### 2026-11-17: T-173 — Bot and spam protection, the open database rules closed, home page changes (AD-054, AD-055)
 
 **Deployed 2026-11-17 10:20 UTC** (commit `cb8f632`). The worker is not touched (its code did not change).
@@ -6963,6 +7141,40 @@ if (pricingResult.estimatedTotal <= 0) {
 - Sign-up, log-in and reset go through `/api/auth/*`; the browser does not call Supabase's auth directly. Account emails are sent by `lib/auth-flow.ts` through Postmark, and a link in one is used by a button press, never by opening it.
 
 **Rejected:** limits read from environment settings (the ticket: one config file); blocking when Upstash is down (takes the product down with a third party); Supabase's own captcha setting (it would also demand a token on every log-in made by our server); a test-only header that switches protection off (a switch an attacker could find).
+
+---
+
+### AD-056: The WhatsApp template is Meta's record, not ours; the approval notice is best-effort (T-176)
+
+**Decision:**
+1. **One fixed template per business, `estimate_ready`, and nothing about it stored.** Its wording is in code
+   and the same for every business except its name. Its status is read from Meta each time it is shown or
+   sent.
+2. **Inside the customer's 24 hours an ordinary message is sent; the template only after them.** The window is
+   judged from our own record of the customer's last message.
+3. **Telling the customer on WhatsApp can never fail, delay for long, or undo an approval.** It runs after the
+   quote is marked sent, once, with a time limit, and every failure ends in "not sent".
+4. **What Meta says "now" is shown, not stored:** the template's status, the display name's review, a card on
+   the account.
+
+**Why:** Meta changes a template's status (approves, rejects, pauses, re-files it) without telling us unless we
+subscribe to more webhook fields, and a stored copy would be wrong the day it changed. Meta charges for a
+template even inside the 24 hours, and an ordinary message there is free within its allowance. An approval is
+the business's act and already sends the email; a third party being slow or refusing must not cost it.
+
+**Rules that follow:**
+- The webhook still handles `messages` and `account_update` only (AD-053). `message_template_status_update`
+  is not subscribed.
+- The link to an estimate is never stored with a message and never logged: it carries the quote's token.
+- A template is never sent from a manual connection (no account id is known for it).
+- New words about WhatsApp that are said in more than one place go in `lib/whatsapp-copy.ts`.
+- Meta's send calls answer 200 for messages it will not deliver. Never show "sent" as "arrived".
+
+**Rejected:** a table of templates (stale by design, and a migration); letting the business write the wording
+(each wording is a separate Meta review, and a promotional one gets the account restricted); a link button
+instead of a body variable (Meta's docs do not say its variable may hold `?` and `=`); sending the template
+inside the 24 hours (charged, and the ordinary message says the same); blocking the test message when the
+window looks closed (our record can be wrong; the page says what to expect instead).
 
 ---
 

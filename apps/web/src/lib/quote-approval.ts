@@ -18,11 +18,17 @@
  * - T-156: the one function behind every approval: the dashboard, the app and
  *   the one-tap email link (no user: `userId` null, `via: 'email_link'`).
  *   `approved_via` records which.
+ * - T-176: an estimate that was asked for on WhatsApp is also announced there
+ *   (`lib/whatsapp-notify.ts`): an ordinary message inside the customer's 24
+ *   hours, the business's approved template after them. It is tried once,
+ *   with a time limit, after the quote is already marked sent, and can never
+ *   fail or undo an approval.
  */
 
 import { formatMoney, getRegion, repairCustomerWording, businessPhrasesFrom } from '@qolumns/shared'
 import type { QuotePricing, TenantBranding, CustomerWording, WordingRepairRecord, PricingRules, WorkStepConfig } from '@qolumns/shared'
 import type { createClient, createAdminClient } from '@/lib/supabase/server'
+import { notifyEstimateReady } from '@/lib/whatsapp-notify'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { sendEmail, isPostmarkConfigured, generateCustomerEmailHtml } from '@/lib/postmark'
 import { businessReplyTo } from '@/lib/business-email'
@@ -33,7 +39,7 @@ type Supabase = Awaited<ReturnType<typeof createClient>> | ReturnType<typeof cre
 export type ApprovalVia = 'dashboard' | 'app' | 'email_link'
 
 export type ApproveResult =
-  | { ok: true; status: 'sent'; quoteViewUrl: string; emailed: boolean; emailError?: string }
+  | { ok: true; status: 'sent'; quoteViewUrl: string; emailed: boolean; emailError?: string; /** T-176: how the customer was told on WhatsApp, if they were */ whatsapp: 'message' | 'template' | null }
   | { ok: false; httpStatus: number; code: string; message: string }
 
 /** Pure: can this quote be approved, and if not, why (for tests and the UI). */
@@ -179,8 +185,13 @@ export async function approveQuote(opts: {
   const customer = quote.customer_json as { name: string; email?: string | null }
   const pricing = quote.pricing_json as QuotePricing
 
+  // T-176: started now, so it runs beside the email and not after it. It never throws.
+  const whatsappNotice = notifyEstimateReady({ tenantId, quoteId, businessName: tenant.name, region: tenant.region, quoteViewUrl })
+    .then((notice) => notice.sent)
+    .catch(() => null)
+
   if (!customer?.email || !isPostmarkConfigured()) {
-    return { ok: true, status: 'sent', quoteViewUrl, emailed: false }
+    return { ok: true, status: 'sent', quoteViewUrl, emailed: false, whatsapp: await whatsappNotice }
   }
   const locale = getRegion(tenant.region).locale
   const htmlBody = generateCustomerEmailHtml({
@@ -202,5 +213,5 @@ export async function approveQuote(opts: {
     replyTo: await businessReplyTo(tenantId),
   })
   if (!emailResult.success) console.error('[Approve] customer email failed:', emailResult.error)
-  return { ok: true, status: 'sent', quoteViewUrl, emailed: emailResult.success, emailError: emailResult.error }
+  return { ok: true, status: 'sent', quoteViewUrl, emailed: emailResult.success, emailError: emailResult.error, whatsapp: await whatsappNotice }
 }

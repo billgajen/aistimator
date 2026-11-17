@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { PageHeader } from '@/components/dashboard/EmptyState'
-import { ConnectWhatsApp, type ConnectSettings } from '@/components/whatsapp/ConnectWhatsApp'
+import type { ConnectSettings } from '@/components/whatsapp/ConnectWhatsApp'
+import { NumberQuestion } from '@/components/whatsapp/NumberQuestion'
+import { PERSONAL_NUMBER_WARNING, PERSONAL_NUMBER_WAY_ROUND } from '@/lib/whatsapp-copy'
 import { ConnectedCard } from '@/components/whatsapp/ConnectedCard'
 import { ManualConnect } from '@/components/whatsapp/ManualConnect'
 import type { ConnectionView } from '@/lib/whatsapp-state'
@@ -18,7 +20,8 @@ interface Loaded {
  * The WhatsApp page (T-175).
  * - Not connected: one main button, "Connect WhatsApp" (Meta's Embedded
  *   Signup), and under it "Connect manually" (T-112, for a business with its
- *   own Meta app).
+ *   own Meta app). T-176: the button is locked until the business says which
+ *   app its number is on; a number on ordinary WhatsApp is stopped there.
  * - Connected through Meta: the number, what happens next, what is left to
  *   do, the 60-day renewal, a test message, disconnect.
  * - Connected manually: the manual form, to update or disconnect.
@@ -125,10 +128,13 @@ export default function WhatsAppSettingsPage() {
               you already use in the WhatsApp Business app. It takes a few minutes, and you can close the window at any point without changing anything.
             </p>
             <div className="mt-4">
-              <ConnectWhatsApp settings={data.connect} onConnected={onConnected} />
+              <NumberQuestion settings={data.connect} onConnected={onConnected} />
             </div>
             <p className="mt-4 max-w-2xl text-sm text-text-secondary">
               Once connected, a customer who messages that number is asked about the job and sent a link to their estimate, priced from your own price list.
+            </p>
+            <p className="mt-2 max-w-2xl text-sm text-text-secondary" data-testid="personal-number-help">
+              {PERSONAL_NUMBER_WARNING} {PERSONAL_NUMBER_WAY_ROUND}
             </p>
           </section>
 

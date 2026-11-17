@@ -1220,9 +1220,9 @@ Steps 2 to 5 are `scripts/deploy-t174-settings.sh` (`--dry-run` shows what each 
   first, then the web app. The worker was not touched. Checked live, read-only: Home, Privacy and Terms load;
   the webhook refuses a wrong verify token (403) and a call with no valid signature (401). The two previews
   are **deleted**.
-- **Nothing has run against the real Meta yet.** Every check before the deploy used a stand-in on this
-  computer, and no WhatsApp message has been sent. The page is live at `https://qolumns.com/app/whatsapp`, and
-  the first real run is yours, after section 3 below.
+- **First real run, 17 November 2026 (yours):** connecting works end to end against the real Meta. The test
+  business "Bluum - Qolumns Test" is connected with Meta's number +1 555-759-6002; its display name is in
+  Meta's review. The test message was accepted by Meta and not delivered: see T-176, section 1.
 - A temporary icon for the Meta app is at `Docs/design/meta-app-icon.png` (1024 × 1024).
 
 ### 1. Settings (done 2026-11-17: all five are in Vercel production)
@@ -1262,17 +1262,17 @@ Steps 2 to 5 are `scripts/deploy-t174-settings.sh` (`--dry-run` shows what each 
 - [ ] Copy the **App secret** from here into `WHATSAPP_APP_SECRET` (step 1). Do not paste it anywhere else.
 
 **WhatsApp → Configuration → Webhook** (after the web app is live with the settings)
-- [ ] Callback URL: `https://qolumns.com/api/whatsapp/webhook`
-- [ ] Verify token: the value you gave `WHATSAPP_VERIFY_TOKEN`. Press Verify and save.
-- [ ] Webhook fields: subscribe **`messages`** and **`account_update`**. Those two only.
+- [x] Callback URL: `https://qolumns.com/api/whatsapp/webhook` (done 17 November)
+- [x] Verify token: the value you gave `WHATSAPP_VERIFY_TOKEN`. Press Verify and save. (done 17 November)
+- [x] Webhook fields: subscribe **`messages`** and **`account_update`**. Those two only. (done 17 November)
 - [ ] **Do not subscribe** `history`, `smb_app_state_sync` or `smb_message_echoes`. They carry a business's
       contact list and old chats from the WhatsApp Business app. Qolumns ignores them, and not subscribing
       means they are never sent to us at all.
 
 **Facebook Login for Business** (you have done these; listed so they can be ticked)
 - [x] The six Client OAuth switches on; both addresses in the allowed domains and redirect URIs.
-- [ ] Configuration `1566858898811795`: permissions `whatsapp_business_management` and
-      `whatsapp_business_messaging`; asset: WhatsApp accounts. Nothing else.
+- [x] Configuration `1566858898811795`: permissions `whatsapp_business_management` and
+      `whatsapp_business_messaging`; asset: WhatsApp accounts. Nothing else. (confirmed 17 November)
 
 **WhatsApp → Embedded Signup Builder → "Check a launch config"**
 - [ ] Paste `{"setup":{},"featureType":"whatsapp_business_app_onboarding","sessionInfoVersion":"3"}`. It
@@ -1312,10 +1312,9 @@ Steps 2 to 5 are `scripts/deploy-t174-settings.sh` (`--dry-run` shows what each 
 - [ ] **Meta asks for a "sync" of the Business app's contacts and chats within 24 hours**, or the business has
   to connect again. Qolumns makes the two requests and keeps nothing. If you would rather not make them at
   all, the choice is to not offer Business app numbers.
-- [ ] **The payment step's wording.** Meta's own pages disagree: one says a payment method is needed before
-  any message; the pricing page says the first 1,000 replies a month per number are free and delivered without
-  one. The page says "Meta asks every business for one before it will keep delivering your messages", which is
-  true either way.
+- [x] **The payment step's wording** (settled in T-176: it is a note, not a step). Meta's own pages disagree:
+  one says a payment method is needed before any message; the pricing page says the first 1,000 replies a month
+  per number are free and delivered without one.
 - [ ] **Privacy and Terms.** I changed three sentences: Privacy now names Meta as a processor (for a business
   that connects WhatsApp) and gives `hello@qolumns.com` for privacy and deletion requests; Terms gives the same
   address. Both used to say "the email address on our website", and the site shows none. Read them and say
@@ -1331,8 +1330,7 @@ Steps 2 to 5 are `scripts/deploy-t174-settings.sh` (`--dry-run` shows what each 
   single-letter mark would read better.
 - The checkbox "Answer messages on this number" in the manual form is 24 px, in a 44 px row.
 - A business cannot see its WhatsApp conversations in the dashboard, only the quotes they produce.
-- Quoting does not yet send a WhatsApp message when the business approves an estimate (the customer has the
-  link from the chat, and the email).
+- ~~Quoting does not yet send a WhatsApp message when the business approves an estimate.~~ Built in T-176.
 - The two-step PIN Qolumns sets when it registers a number is stored (encrypted) and not shown to the
   business. A business that later moves the number elsewhere may need it.
 
@@ -1486,3 +1484,123 @@ sends nothing. Three to check or change (Dashboard → Authentication):
   (`/login?error=auth_callback_error`).
 - "Check your email" after sign-up has no "send it again" button; signing up again with the same address
   sends a new link.
+
+## T-176 — WhatsApp review-ready: a message template, plainer wording, the personal number warning
+
+- **Not committed and not deployed.** Preview: `https://estimator-qktqiucr0-gajendrans-projects-1a87e0b4.vercel.app`
+  (behind your Vercel sign-in). It is built with placeholder database settings, so it shows that the build
+  works but cannot sign in to the dashboard. An earlier preview of this ticket, `estimator-irwve3ajb-…`, is
+  still there; say if you want both deleted.
+- Checked against a stand-in for Meta on this computer. **Nothing was sent to Meta and no WhatsApp message was
+  sent to anyone.**
+- Checks: `verify-t176` 96/96, `verify-t175` 110/110, the full regression (25 scripts, t146 to t176) and
+  `verify-t173` all pass; lint, typecheck, unit tests (web 876, worker 534, mobile 11) and both builds pass.
+- Screenshots of the page from the last local run: `scripts/hardcore-test/results/`, the newest `…-t176-…`
+  folder (the question, the stop for a personal number, the template in review, the connected page; phone and
+  desktop).
+
+### 1. Your test message (17 November): what production recorded
+
+- **Meta's response to the send call was "accepted":** HTTP 200 with a message id, at 12:02:35 UTC, and again
+  for your second try at 12:42:36 UTC. Meta refused nothing. Our log has no refusal line for either.
+- **Meta never reported what became of them.** A delivery report (delivered, or failed with a reason) comes
+  as a call to our webhook. **Between 11:18 and 12:43 UTC Meta did not call the webhook once**, and both
+  messages are still stored as "sent", never "delivered" or "failed".
+- Vercel's free plan keeps logs for one hour only, so anything earlier is gone.
+- **Two reasons Meta would not deliver, both in its docs.** I cannot tell which applied, because the report
+  never arrived:
+  1. **The number is one of Meta's own 555 numbers, and its display name is still in review.** Meta: 555
+     numbers "must have their display names approved before they can be used to send messages" (its error
+     131037). This alone stops every message until the name is approved.
+  2. **Your phone had not written to the number in the last 24 hours.** WhatsApp only delivers a free-form
+     message inside that window (its error 131047). Meta accepts the call anyway and drops the message.
+
+- [x] **The webhook is set (your answer, 17 November).** It was verified at
+  `https://qolumns.com/api/whatsapp/webhook` and subscribed to `messages` and `account_update` that morning.
+  **Meta does not deliver real messages to an app that is not published**, which is why it never called.
+  So the missing delivery reports are Meta's rule for an unpublished app, not a fault in the set-up.
+- [x] **You had not messaged the number from your phone.** So the 24-hour rule applied to both test messages
+  as well as the 555 number's name review.
+- **What follows until the app is published:** Qolumns does not hear a customer's message on the connected
+  number, so it does not reply in the chat, and the page cannot show "Delivered". A test message can still
+  arrive: Meta opens the 24 hours when your phone writes to the number, whether or not it tells us.
+
+### 2. What was built
+
+- **Message templates** on the WhatsApp page. One fixed template, "estimate ready":
+  *"Your estimate from [your business] is ready. Open it here: [link]"*, then *"Thank you for asking [your
+  business] for a price."* (Meta refuses a template that ends with the link, so it has a closing line.)
+  - **Create the template** sends it to Meta. The page then shows **In review with Meta**, **Approved**,
+    **Rejected by Meta** (with Meta's reason), **Paused** or **Switched off**. **Refresh** asks Meta again.
+  - Nothing about it is stored: Meta is asked each time. No database change.
+- **It is used.** When you approve an estimate that was asked for on WhatsApp, the customer is told on
+  WhatsApp too:
+  - they wrote in the last 24 hours: an ordinary message with the link;
+  - longer ago: the approved template with the link;
+  - longer ago and no approved template: nothing on WhatsApp (they still get the email).
+  - It is tried once, for at most 8 seconds, after the estimate is already sent. It cannot fail an approval.
+- **Payment is a note, not a step.** The page says "Nothing left to do", then "You don't need a card to
+  start", with when a card is needed.
+- **Display name in review** is said plainly, with "up to five working days" and "Nothing is broken". For one
+  of Meta's 555 numbers it also says the number cannot send until the name is approved.
+- **"Which app is this number on today?"** is asked before Meta's window: the WhatsApp Business app, ordinary
+  WhatsApp, or a new number. "Connect WhatsApp" is locked until it is answered. **Ordinary WhatsApp stops**:
+  the page says what connecting would do and gives the six steps to move the number to the free WhatsApp
+  Business app first. The same warning is in the help text under the button and in "Connect manually".
+- **The test message tells the truth.** If that phone has not written in the last 24 hours, the page says the
+  message will probably not arrive and why, instead of "Sent". It then shows "Delivered" or "Meta did not
+  deliver the message" when Meta reports it (needs the webhook).
+- `Docs/meta-app-review.md` is rewritten: both recordings step by step with the Bluum test business, and the
+  form answers.
+
+### 3. Asking for less access (item 4): nothing to change
+
+- [x] **Checked by you, 17 November:** the Embedded Signup configuration already requests only
+  `whatsapp_business_management` and `whatsapp_business_messaging`. **"Log events" is Meta's own wording** on
+  its screen for those, not a third permission. The configuration stays as it is.
+- My earlier reading was wrong: I matched the sentence to the permission `whatsapp_business_manage_events`
+  by its description in Meta's docs ("allows an app to log events"). Meta's docs do not print that screen's
+  sentence, so the match was a guess, and I said so at the time. Qolumns does not request that permission.
+
+### 4. To put it live
+
+1. Commit, then `npx vercel deploy --prod`. No migration. The worker is not touched.
+2. Do **not** press "Create the template" for Bluum until you record the second video
+   (`Docs/meta-app-review.md` says why).
+
+### 5. Decisions
+
+- [x] **"Replies" stays (your answer, 17 November).** The question was "1,000 conversations" or "1,000 replies". You asked for "the first 1,000 customer conversations a
+  month work without a card". Meta's pricing page today counts **messages, not conversations**: "1,000 free
+  service messages per month" per number, and one WhatsApp quote takes about ten replies. So the page says
+  **"your first 1,000 replies to customers each month"**, which is true on either reading. It is one sentence
+  (`PAYMENT_NOTE` in `lib/whatsapp-copy.ts`) if you want Meta's window's word instead.
+- [ ] **"Up to five working days"** is on the page as you asked. Meta's docs give no figure for a display name
+  review.
+- [ ] **Meta charges the business for each template message** (and needs a card for it). The approved-template
+  note says so. Creating the template is the business's choice to use it; there is no separate switch.
+- [x] **A customer who asked on WhatsApp also gets a WhatsApp message when you approve, inside the 24 hours
+  too (your answer, 17 November: keep it).** Before, only the email.
+- [ ] **The business's name is written into the template.** If a business changes its name later, the template
+  keeps the old one until it is deleted in WhatsApp Manager and created again.
+
+### Not proven
+
+- Nothing here has run against the real Meta: creating a template, Meta's review statuses, sending a template,
+  the display name status, delivery reports.
+- Whether Meta files the template under "utility". It decides by itself and may choose "marketing"; the page
+  shows what it chose.
+- Whether Meta accepts a full link as the template's variable. Its docs neither allow nor forbid it; its own
+  example does it.
+
+### Later (seen, not changed)
+
+- The WhatsApp page cannot show Meta's reason for an undelivered message (its code is logged; a column would be
+  needed to show it).
+- After approving, the dashboard does not say "also sent on WhatsApp" (the answer from the server carries it).
+- A rejected template cannot be changed or deleted from Qolumns; that is done in WhatsApp Manager.
+- When "Ordinary WhatsApp" is chosen, the warning shows twice on the page: in the stop box and in the help
+  text under the button.
+- On a phone, "Connect manually · with your own Meta app" wraps onto three lines.
+- The Meta SDK is started with `autoLogAppEvents: true`, as in Meta's sample. It concerns our own page, not
+  what a business grants.

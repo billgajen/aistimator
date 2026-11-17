@@ -18,6 +18,7 @@ import {
 } from '@/lib/postmark'
 import { generateRevisedQuoteEmailHtml } from '@/lib/email-templates'
 import { businessReplyTo } from '@/lib/business-email'
+import { notifyEstimateReady } from '@/lib/whatsapp-notify'
 import { assetIdsOf, quotePhotos } from '@/lib/quote-photos'
 import { quoteUnderstanding, SHOW_WORTH_CHECKING } from '@/lib/quote-understanding'
 import type {
@@ -542,6 +543,13 @@ export async function PATCH(
     // Send revised email to customer if requested
     // T-146: a held quote's first send is the customer's FIRST quote, not an update
     const firstSend = !(QUOTE_ALREADY_SENT_STATUSES as readonly string[]).includes(quote.status)
+    // T-176: a first send is an approval, so an estimate asked for on WhatsApp is announced there too
+    // (as in lib/quote-approval.ts). Started here to run beside the email; it never throws, and a
+    // revised quote is not announced: the template says "is ready", not "has changed".
+    const whatsappNotice =
+      body.sendToCustomer && quoteViewUrl && firstSend
+        ? notifyEstimateReady({ tenantId: auth.tenantId, quoteId, businessName: tenant.name, region: tenant.region, quoteViewUrl }).catch(() => null)
+        : null
     // T-151: a phone-only customer has no email address to send to
     const customerEmail = (quote.customer_json as { email?: string | null } | null)?.email
     // T-157: replies to a customer email reach the business
@@ -594,6 +602,8 @@ export async function PATCH(
         console.error('Failed to send revised quote email:', emailResult.error)
       }
     }
+
+    await whatsappNotice
 
     // Check if learning analysis should be triggered (fire-and-forget)
     // Trigger if >= 5 amendments since last analysis

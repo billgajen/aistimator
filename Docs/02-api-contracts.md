@@ -474,7 +474,29 @@ WHICH_NUMBER / WHICH_ACCOUNT, 502 META_REFUSED, 503 NOT_AVAILABLE. Nothing is sa
 
 POST /api/whatsapp/status
 Asks Meta how the connection stands (the number's name, whether a payment method is on the account, whether the
-token is still good), stores it. → { "ok": true, "config": { … }, "problem": null | "…" }. 404 NOT_CONNECTED.
+token is still good), stores it. → { "ok": true, "config": { … }, "problem": null | "…", "live": { … } }.
+404 NOT_CONNECTED.
+T-176: `live` is what Meta says at that moment and is never stored:
+{ "nameStatus": "PENDING_REVIEW" | "APPROVED" | "AVAILABLE_WITHOUT_REVIEW" | "DECLINED" | "EXPIRED" | "NONE" | null,
+  "hasPaymentMethod": true | false | null }. The page calls this once when it opens, and on "Check again".
+
+GET /api/whatsapp/template   (T-176)
+The business's one message template, "estimate_ready", as Meta has it now. Nothing is stored: Meta is asked each
+time, with the business's own token, on its own WhatsApp account.
+→ { "ok": true, "problem": null,
+    "template": { "name": "estimate_ready", "language": "en_US",
+                  "state": "none" | "pending" | "approved" | "rejected" | "paused" | "disabled" | "unknown",
+                  "metaStatus": "PENDING" | … | null, "category": "UTILITY" | "MARKETING" | null,
+                  "reason": null | "Meta read the wording as advertising.",
+                  "text": "Your estimate from Kent Garage Doors is ready. Open it here: https://qolumns.com/q/…\n\nThank you …",
+                  "managerUrl": "https://business.facebook.com/wa/manage/message-templates/?waba_id=…" } }
+404 NOT_CONNECTED (no connection, or a manual one: templates belong to an account connected through Meta),
+502 META_REFUSED.
+
+POST /api/whatsapp/template   (T-176)
+Creates that template (Meta then reviews the wording). No body: the wording is fixed, with the business's name
+written in and the customer's link as its one variable. Pressing twice makes one: a template Meta already lists
+is returned as it stands. → the same shape, normally `state: "pending"`. 404 NOT_CONNECTED, 422 / 502 META_REFUSED.
 
 POST /api/whatsapp/register   { "pin"? }
 Finishes registering a number Meta refused at connect time. `pin` is the number's own six-digit two-step PIN when
@@ -494,7 +516,16 @@ A read-only check of credentials with Meta. Nothing is stored.
 
 POST /api/whatsapp/send   { "toPhone", "message", "conversationId"? }
 Sends a text from the business's own number (the page's test message). 402 PAYMENT_NEEDED, 422 OUTSIDE_WINDOW
-(the person has not messaged the number in the last 24 hours) / RECONNECT, 502 SEND_FAILED.
+(the person has not messaged the number in the last 24 hours) / RECONNECT / NAME_IN_REVIEW (T-176: Meta's code
+131037, the display name is not approved yet), 502 SEND_FAILED.
+→ { "ok": true, "messageId": "wamid.…", "windowOpen": true | false }
+T-176: Meta accepts a message to a phone outside the 24-hour window (200 and a message id) and then does not
+deliver it; the refusal comes later on the status webhook. `windowOpen` says whether we hold a message from that
+phone in the last 24 hours, so the page does not say "sent" about a message that will not arrive.
+
+GET /api/whatsapp/send?messageId=wamid.…   (T-176)
+What became of a message this business sent: { "status": "sent" | "delivered" | "read" | "failed" }, as Meta's
+status webhook reported it. The business's own messages only. 400, 404 NOT_FOUND.
 
 GET /api/whatsapp/webhook
 Meta's handshake: answers `hub.challenge` when `hub.verify_token` matches `WHATSAPP_VERIFY_TOKEN`; otherwise 403.

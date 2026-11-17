@@ -28,5 +28,7 @@ export async function POST(request: Request, { params }: { params: { quoteId: st
     status: result.status,
     emailed: result.emailed,
     ...(result.emailError && { emailError: result.emailError }),
+    // T-176: 'message' or 'template' when the customer was also told on WhatsApp
+    ...(result.whatsapp && { whatsapp: result.whatsapp }),
   })
 }
