@@ -17,8 +17,39 @@
 
 ### 2026-11-17: T-177 — WhatsApp assistant v2 (silent unless asked for a price), automatic template, plan and subscription rule, Embedded Signup v5, legal pages (AD-057)
 
-**Committed, not deployed.** No migration. The worker's own code is unchanged (the shared package gained an AI
-task and three small helpers it does not use).
+**Deployed 2026-11-17 16:59 UTC** (commits `b45c6df` and `04acb95`). Web only: no migration, and the worker is
+not touched (its own code did not change; the shared package gained an AI task and two small helpers it does not
+use).
+1. The owner's decisions first (below, "Decisions taken"): past due keeps its grace on WhatsApp; the company
+   number stays a setting, which the owner added in Vercel; Bluum goes on Pro by hand.
+2. Checks before the second commit: `pnpm lint` and `pnpm typecheck` pass; unit tests web 930, worker 534, mobile
+   11; `verify-t177` 99/99.
+3. **Bluum put on Pro by hand**, as a free test account: `bash scripts/set-test-plan.sh tnt_4cbe2121dc1e4139b4ed84e1
+   plan_us_pro`. One row added to `subscriptions` in production: plan `plan_us_pro`, status `active`, no Stripe
+   customer and no Stripe subscription. Before: no row. It is the only free test account (`--list`).
+4. Web: `npx vercel deploy --prod`, deployment `dpl_FVnAbJoWjyiRkAyuM2xN5FaxfHaV`, target production, serving
+   `qolumns.com`.
+
+Live checks, read-only (no WhatsApp message was sent, no template was created, no request was submitted):
+- `/privacy` and `/terms` return 200; both say "Qolumns is run by Billiom Limited, a company registered in
+  England and Wales (company number …)" with the number from the setting, and "Last updated: 17 November 2026";
+  Terms carry the governing law line and the WhatsApp section.
+- The webhook's handshake with a wrong verify token: 403. A POST with no signature: 401 "Missing signature";
+  with a wrong signature: 401 "Invalid signature"; an owner's-reply call with a wrong signature: 401.
+- Also: `/api/whatsapp/template` signed out 401, and POST to it 405 (nothing can ask for a template to be
+  created); `/`, `/login` 200; `/app/whatsapp` signed out goes to the login page.
+
+**Not done: the read-only check that Bluum's template on Meta is named `estimate_ready`.** Asking Meta needs
+Bluum's stored token, which can only be decrypted inside production, and the owner's browser was not signed in
+to Qolumns. Nothing was created. The owner can see it in one look: Bluum's WhatsApp page, "Message templates".
+A status (Approved or In review) means Meta has `estimate_ready`; "Not set up yet" means it has another name.
+
+**Not tried on production:** anything signed in, and any WhatsApp message.
+
+**Free test accounts** (`scripts/set-test-plan.sh`): a subscription row with no Stripe customer and no Stripe
+subscription. Stripe does not know it, so it is never billed. The product has no revenue report today; when one
+is built (the Stripe launch ticket) it must count Stripe subscriptions only, which leaves these rows out. The
+script never touches a business that has a Stripe subscription.
 
 **No WhatsApp message was sent to anyone, nothing was created on Meta, and nothing was submitted to
 production.** Every check ran against stand-ins on this machine. Production was read once: the WhatsApp
@@ -100,7 +131,8 @@ three-answer question, its lock on the button and its steps are removed.
 
 **5 and 7. Plan and subscription** (`lib/whatsapp-access.ts`, `packages/shared/src/plans.ts`)
 - One rule, read everywhere: the plan includes the WhatsApp channel (from the plan definitions; no plan is
-  named in the page) and the subscription is active or on trial.
+  named in the page) and the subscription is live (active, on trial, or past due while the payment is retried:
+  the same rule as the quote limit).
 - When it does not hold, nothing leaves: no reply (the model is not even asked), no template, no approval
   notice, no test message, and no new connection (embedded or manual). The connection is kept.
 - The page: a plan without WhatsApp sees one line naming the plans that have it, a link to the plans, and no
@@ -130,7 +162,9 @@ happens to a WhatsApp message that is not a price request. Both dated 17 Novembe
 
 #### Decisions taken (each is in OWNER-TODO for the owner)
 
-- `past_due` pauses the assistant (the ticket lists "unpaid"); the quote limit keeps its grace.
+- ~~`past_due` pauses the assistant.~~ **Changed by the owner before the deploy:** WhatsApp gets the same grace
+  as the quote limit. A payment that failed and is being retried does not pause the assistant; a cancelled
+  subscription does. One rule (`subscriptionLive`) is read by both, with a unit test.
 - No email is asked for on WhatsApp unless the business requires both.
 - No confirmation step; one retry, then silence.
 - The Privacy sentence, and the `jpeg-js` dependency.

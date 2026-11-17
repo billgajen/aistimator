@@ -1612,35 +1612,39 @@ sends nothing. Three to check or change (Dashboard → Authentication):
 
 ## T-177 — WhatsApp assistant v2, connect polish, legal pages
 
-- **Committed, not deployed.** Checked against stand-ins on this computer. **No WhatsApp message was sent to
-  anyone, nothing was created on Meta, and nothing was submitted to production.**
+- [x] **Deployed 2026-11-17 16:59 UTC** (commits `b45c6df` and `04acb95`, web `dpl_FVnAbJoWjyiRkAyuM2xN5FaxfHaV`):
+  web only, no migration, the worker not touched. Checked live, read-only: Privacy and Terms show Billiom
+  Limited and the company number; the webhook refuses a wrong verify token (403) and a call with no valid
+  signature (401). **No WhatsApp message was sent, no template was created, and no request was submitted.**
+- **Nothing signed in was tried on production.** What to try is in section 6.
 - Checks: unit tests web 929, worker 534, mobile 11; lint and typecheck pass; `verify-t177` 99/99,
   `verify-t176` 82/82, `verify-t175` 110/110; the full regression (26 scripts, t146 to t177) and `verify-t173`
   pass; web and worker build.
 
-### 1. Before this is deployed: three things only you can settle
+### 1. The three things settled before the deploy
 
-- [ ] **Bluum has no subscription in production** (I read it: no plan, no subscription row; nobody has one).
-  Items 5 and 7 make WhatsApp work only on a plan that includes it, with an active subscription. So **the
-  moment this is deployed, Bluum's WhatsApp page shows the upgrade line, its assistant is silent and "Send a
-  test message" is refused**, which stops the App Review recordings. Choose one:
-  1. deploy after the recordings are done; or
-  2. tell me to put Bluum on the Pro plan by hand (one row in production, which I will only write when you
-     say so); or
-  3. wait for the Stripe launch ticket, where a business gets a plan by paying.
-- [ ] **The company number.** I do not know Billiom Limited's company number, and there was no place for it,
-  so it is a setting: `NEXT_PUBLIC_COMPANY_NUMBER` (public, not a secret). Until it is set, both pages say
-  "Qolumns is run by Billiom Limited, a company registered in England and Wales." without a number. Either
-  add it in Vercel (production), or tell me the number and I will write it into the brand config instead.
-- [ ] **Is Bluum's template on Meta named `estimate_ready`?** Qolumns finds an existing template by that name.
-  If Bluum's was made with our button in T-176, it is, and nothing will ever be created for Bluum again. If
-  it was made by hand in WhatsApp Manager under another name, tell me before Bluum reconnects: a reconnect
-  would then create `estimate_ready` beside it. (Opening the page never creates anything, whatever its name.)
+- [x] **Bluum is on Pro, by hand, as a free test account** (17 November). One row was added in production:
+  business `tnt_4cbe2121dc1e4139b4ed84e1` ("Bluum"), plan `plan_us_pro`, status `active`, with no Stripe
+  customer and no Stripe subscription. Before, Bluum had no subscription row.
+  - It is never billed: Stripe does not know it exists.
+  - It is not revenue. The product has no revenue report yet; when the Stripe launch ticket builds one, it
+    must count Stripe subscriptions only, which leaves this row out.
+  - `bash scripts/set-test-plan.sh --list` shows every free test account (today: Bluum only).
+    `bash scripts/set-test-plan.sh tnt_4cbe2121dc1e4139b4ed84e1 --remove` puts Bluum back on the free allowance.
+  - On Bluum's Billing page, "Manage Billing" will say there is no billing account. That is expected.
+- [x] **The company number** is in Vercel as `NEXT_PUBLIC_COMPANY_NUMBER` (your choice: keep the setting). Both
+  pages show it.
+- [ ] **Is Bluum's template on Meta named `estimate_ready`?** I could not check this myself: asking Meta needs
+  Bluum's stored token, which only production can read, and your browser was not signed in to Qolumns. Nothing
+  was created. **You can see it in one look:** open Bluum's WhatsApp page and find "Message templates".
+  - It shows **Approved** or **In review with Meta**: Meta has `estimate_ready`. Nothing more to do.
+  - It shows **Not set up yet**: Bluum's template has another name. Tell me before Bluum reconnects, because a
+    reconnect would then create `estimate_ready` beside it.
 
 ### 2. In the Meta dashboard (one change)
 
-- [ ] **Subscribe the webhook field `smb_message_echoes`** (WhatsApp → Configuration → Webhook fields), next
-  to `messages` and `account_update`. It is what tells us the owner has replied from the WhatsApp Business
+- [ ] **Subscribe the webhook field `smb_message_echoes`** (yours; you said you will do it) (WhatsApp →
+  Configuration → Webhook fields), next to `messages` and `account_update`. It is what tells us the owner has replied from the WhatsApp Business
   app, so the assistant can stay out of that chat for 24 hours.
   - It only exists for a number that is also on the WhatsApp Business app. Bluum's number is Meta's 555
     number, which has no app, so nothing changes for Bluum.
@@ -1686,10 +1690,9 @@ sends nothing. Three to check or change (Dashboard → Authentication):
 
 ### 4. Decisions I took (say if you want any changed)
 
-- [ ] **An unpaid subscription pauses the assistant at once.** The database has four statuses: active,
-  trialing, past due, cancelled. You listed "unpaid" as a reason to pause, so past due (a failed payment the
-  card company is still retrying) pauses WhatsApp. The quote limit still gives a past-due business grace.
-  One line to change if you want WhatsApp to have the same grace.
+- [x] **Past due does not pause WhatsApp (your decision, 17 November).** WhatsApp has the same grace as the
+  quote limit: a payment that failed and is being retried keeps the assistant on; a cancelled subscription
+  pauses it. One rule is read by both.
 - [ ] **No email is asked for on WhatsApp**, unless the business set "email and phone both required". The
   customer's WhatsApp number is already a way to reach them. The cost: a customer whose estimate is approved
   more than 24 hours later hears about it only if the template is approved (no email to fall back on).
@@ -1702,6 +1705,15 @@ sends nothing. Three to check or change (Dashboard → Authentication):
 - [ ] **One small library added** (`jpeg-js`, no dependencies of its own). The small copies of form photos
   are made in the customer's browser; a WhatsApp photo never passes through one, so the server has to make
   the copy, and that needs something that can read a JPEG.
+
+### 6. What to try on production (all yours; I tried nothing signed in)
+
+1. Open `https://qolumns.com/app/whatsapp` as Bluum. It should show **Connected** with no upgrade or paused
+   line, and "Message templates" with a status (see section 1 for what the status tells you).
+2. Once Meta approves the display name: send "Hi" from your phone to the number, then press **Send a test
+   message**. The page should say "Sent." and the message should arrive.
+3. `https://qolumns.com/privacy` and `/terms`: read the company line and the new WhatsApp section in Terms.
+4. After you subscribe `smb_message_echoes`, nothing visible changes for Bluum (its number has no app).
 
 ### 5. The live AI check is separate and optional
 
