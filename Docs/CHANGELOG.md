@@ -17,7 +17,37 @@
 
 ### 2026-11-17: T-173 — Bot and spam protection, the open database rules closed, home page changes (AD-054, AD-055)
 
-**Not committed, not deployed.** Preview (web only, protection off, behind the Vercel login): `https://estimator-k45gv5sb0-gajendrans-projects-1a87e0b4.vercel.app`.
+**Deployed 2026-11-17 10:20 UTC** (commit `cb8f632`). The worker is not touched (its code did not change).
+1. Checks before the commit: `pnpm lint` and `pnpm typecheck` pass; unit tests web 841, worker 534, mobile 11;
+   `verify-t173` 100/100.
+2. Migration 43: `bash scripts/deploy-migration-43.sh`. Before: 9 open "Public can …" rules, 189 table
+   privileges held by signed-out callers, no profile guard, 3 accounts with the role `admin`. After: latest
+   `00000000000043`, 0 open rules, 0 privileges, the guard in place, 0 platform admins, 3 owners.
+3. **Platform admin: not granted.** The owner's instruction had a placeholder where the sign-in address goes, and
+   the address was not filled in for them. So **0 accounts hold the role and nobody can open `/admin`** until
+   the owner runs `bash scripts/set-platform-admin.sh <address>`.
+4. Web: `npx vercel deploy --prod`, deployment `dpl_EPeniEce3hVbdTPsdDN8eYxiteET`, target production, serving
+   `qolumns.com`. Upstash and Turnstile are not set, by the owner's choice: **rate limits and the human check
+   are off** until the keys are added (the log says so). Everything else in this ticket is live.
+5. Live checks, read-only (nothing filled in, nothing submitted):
+   - With the public key only: listing `quotes`, `services`, `widget_configs` and `tenant_sites` is refused
+     (401, permission denied), and an insert into `quote_feedback`, `assets`, `quote_requests` and
+     `widget_analytics` is refused (401). Row counts before and after are the same; no row was left. Signed-out
+     callers hold a privilege on 0 tables.
+   - A real business's quote link page loads its form with its 4 services, and its form settings load through
+     the server.
+   - The embed loads from the old address: the loader (200), the embed page, and embed code naming the old
+     address on a page of another site.
+   - `/`, `/login`, `/signup`, `/demo` and `/forgot-password` return 200. Home shows the new headline (page
+     and title) and "What it notices" in the new order. No page threw an error in the browser.
+   - **Not done: opening an existing quote link.** A link holds a token that is never stored, and making a new
+     one would change a real quote. Checked instead: a real quote with a made-up token is refused plainly (404,
+     "This estimate can't be opened"), and the server's own access to `quotes` is intact.
+   - **Not tried on production:** signing up, logging in and resetting a password (each is a real request).
+6. The T-173 preview is deleted.
+
+**Still the owner's:** the platform admin command (3); the Upstash and Turnstile accounts and their four
+settings; in Supabase, "Minimum password length" 8 and "Allow new users to sign up" off (`OWNER-TODO.md`, T-173).
 
 **Found first, and worse than spam: three open doors in the database (all in production, read-only check 2026-11-17).**
 Listing what a stranger can reach turned up rules in the database itself that the product never needed, because

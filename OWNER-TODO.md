@@ -1338,30 +1338,41 @@ Steps 2 to 5 are `scripts/deploy-t174-settings.sh` (`--dry-run` shows what each 
 
 ## T-173 — Bot and spam protection, the open database rules, home page changes
 
-- **Built and on a preview. Not committed, not on production.** Preview (web only, protection off, behind the
-  Vercel login): `https://estimator-k45gv5sb0-gajendrans-projects-1a87e0b4.vercel.app`. It has no database (placeholder
-  settings), so Home, Log in, Sign up, Forgot password, Pricing, Features and the trade pages show; signing in,
-  the demo and quote links do not.
-- **Nothing has run against the real Upstash, the real Turnstile keys or a real inbox.** Every check used a
-  stand-in on this computer. The accounts in section 3 do not exist yet.
+- [x] **Deployed 2026-11-17 10:20 UTC** (commit `cb8f632`, web `dpl_EPeniEce3hVbdTPsdDN8eYxiteET`): migration 43
+  first, then the web app. The worker was not touched. The preview is **deleted**.
+- [x] **The open database rules are closed on production.** Checked live with the public key only: listing
+  quotes, services, form settings and business keys is refused, and so is an insert into each of the four
+  tables. No row was left behind.
+- [ ] **Nobody is a platform admin yet (0 accounts).** Your message had a placeholder where your sign-in
+  address goes, so I did not grant it. Run `bash scripts/set-platform-admin.sh you@example.com` with the
+  address you sign in to Qolumns with. Until then `/admin` is closed to everyone, you included. Then
+  `bash scripts/set-platform-admin.sh --list` should say 1.
+- [ ] **Rate limits and the human check are off** until you add the Upstash and Turnstile settings (section 3)
+  and deploy the web app once more.
+- [ ] **Try by hand, with a spare address:** sign up, confirm from the email, log out, and use "Forgot your
+  password?". None of that was tried on production (each is a real request), and no real inbox has received
+  these emails yet.
+- [ ] **Open one of your own quote links** (from an email you were sent). I could not: a link holds a token
+  that is never stored. A made-up token is refused plainly, and the server's own access is intact.
+- Everything before the deploy used stand-ins on this computer for Upstash, Turnstile and Postmark.
 
-### 1. Do this first: three open doors in the production database
+### 1. The three open doors in the production database (closed 2026-11-17 by migration 43)
 
-Found while listing what a stranger can reach. All three are in production today (read-only check, 2026-11-17).
+Found while listing what a stranger can reach. All three were in production until 10:16 UTC on 2026-11-17.
 
-- [ ] **Anyone can read every quote.** A database rule ("Public can view quotes by token") never compared a
+- [x] **Anyone could read every quote.** A database rule ("Public can view quotes by token") never compared a
   token. The site's public key, which is in every page's JavaScript, is enough to list every quote with its
   customer's details and prices. Production holds 4 quotes.
-- [ ] **A signed-in business can move itself into another business** by changing one value on its own profile.
-- [ ] **Every sign-up counts as a platform admin** and can open `/admin`. All 3 production accounts have the role.
+- [x] **A signed-in business could move itself into another business** by changing one value on its own profile.
+- [x] **Every sign-up counted as a platform admin** and could open `/admin`. All 3 production accounts had the role; all 3 are now `owner`.
 - Also: the public key can list every business's services and form settings, and insert rows into four tables.
 
 **The fix is migration 43, and it needs no web deploy:**
 
-1. `bash scripts/deploy-migration-43.sh`. It prints before and after. Expected after: `public_rules 0`,
-   `signed_out_grants 0`, `profile_guard 1`, `platform_admins 0`.
-2. `bash scripts/set-platform-admin.sh you@example.com` with your own sign-in address. **Until you run it,
-   nobody can open `/admin`, you included.**
+1. Done: `bash scripts/deploy-migration-43.sh`. After: `public_rules 0`, `signed_out_grants 0`,
+   `profile_guard 1`, `platform_admins 0`, `owners 3`.
+2. **Yours, still to do:** `bash scripts/set-platform-admin.sh you@example.com` with your own sign-in
+   address. **Until you run it, nobody can open `/admin`, you included.**
 3. Nothing else changes for a business or a customer: every public page already reads through the server.
 
 - [ ] **Decide whether to tell anyone.** 4 quotes were readable. Whether any was read cannot be known from here:
@@ -1429,12 +1440,12 @@ sends nothing. Three to check or change (Dashboard → Authentication):
   spare address. If that fails, switch it back on and tell me.
 - The email templates and the "SMTP settings" page are no longer used by the product. Leave them.
 
-### 4. To put it live (when you say so)
+### 4. To put it live (steps 1 and 2 done; 3 and 4 are yours)
 
-1. `bash scripts/deploy-migration-43.sh`, then `bash scripts/set-platform-admin.sh <your address>` (section 1).
-   This can go today, ahead of everything else.
-2. Commit, then `npx vercel deploy --prod`. The worker is not touched. Protection is still off at this point,
-   and everything works as before plus the new sign-in routes and the home page.
+1. Done 2026-11-17: `bash scripts/deploy-migration-43.sh`. **Not done:** `bash scripts/set-platform-admin.sh
+   <your address>` (yours; see the top of this section).
+2. Done 2026-11-17: committed, `npx vercel deploy --prod`. The worker was not touched. Protection is still
+   off at this point, and everything works as before plus the new sign-in routes and the home page.
 3. Create the two accounts and add the settings (section 3), then deploy the web app once more.
    Switch off "Allow new users to sign up" in Supabase now.
 4. Check live: send yourself a request from the form, sign up with a spare address and confirm from the
