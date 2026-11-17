@@ -17,7 +17,25 @@
 
 ### 2026-11-17: T-176 — WhatsApp review-ready: a message template, plainer wording, the personal number warning (AD-056)
 
-**Not committed and not deployed.** No migration; the worker is not touched.
+**Deployed 2026-11-17 13:55 UTC** (commit `9ab85dc`). Web only: no migration, and the worker is not touched (its
+code did not change).
+1. Checks before the commit: `pnpm lint` and `pnpm typecheck` pass; unit tests web 876, worker 534, mobile 11;
+   `verify-t175` 110/110; `verify-t176` 96/96.
+2. Web: `npx vercel deploy --prod`, deployment `dpl_BiRuPZYDN4Csjcr7SPbbeAhfACS9`, target production, serving
+   `qolumns.com`.
+
+Live checks, read-only (no WhatsApp message was sent, no template was created, nothing was sent to Meta):
+- `/` and `/login` return 200; `/app/whatsapp` signed out goes to the login page (307).
+- The webhook's handshake with a wrong verify token, and with none: 403.
+- A webhook POST of `{}` with no signature: 401 "Missing signature"; with a wrong signature: 401 "Invalid
+  signature".
+- Also: `/api/whatsapp/template`, `/api/whatsapp/send?messageId=…` and `/api/whatsapp/config` signed out: 401;
+  the old address 200.
+
+Both T-176 previews are deleted, as the owner asked.
+
+**Not tried on production:** anything signed in. The first real use of the new page (the template, the name
+note, the test message) is the owner's.
 
 **Nothing was sent to Meta or to anyone on WhatsApp.** Every check ran against a stand-in for Meta's Graph API
 on this machine. Production was read only: its logs, and a few columns of its WhatsApp rows (no token, no message text).
@@ -178,9 +196,8 @@ Recording 1 is written to work while the app is unpublished (it needs no webhook
   t151 35, t152 66, t153 39, t154 26, t155 44, t156 31, t157 96, t158 116, t160 96, t162 77, t164 78, t165 148,
   t167 182, t169 149, t170 412, t171 97, t172 78, t174 83, t175 110, t176 96); `verify-t173` 100/100 on its
   own server, with its stand-ins.
-- Preview: `https://estimator-qktqiucr0-gajendrans-projects-1a87e0b4.vercel.app` (behind the Vercel sign-in;
-  built with placeholder database settings, so it cannot sign in to the dashboard). An earlier preview of this
-  ticket, `estimator-irwve3ajb-…`, was made before the last three small changes and is still there.
+- Two previews were made (`estimator-qktqiucr0-…`, and an earlier `estimator-irwve3ajb-…`), behind the Vercel
+  sign-in and built with placeholder database settings. Both are deleted.
 
 #### Fix dependencies
 

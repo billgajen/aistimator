@@ -1487,10 +1487,11 @@ sends nothing. Three to check or change (Dashboard → Authentication):
 
 ## T-176 — WhatsApp review-ready: a message template, plainer wording, the personal number warning
 
-- **Not committed and not deployed.** Preview: `https://estimator-qktqiucr0-gajendrans-projects-1a87e0b4.vercel.app`
-  (behind your Vercel sign-in). It is built with placeholder database settings, so it shows that the build
-  works but cannot sign in to the dashboard. An earlier preview of this ticket, `estimator-irwve3ajb-…`, is
-  still there; say if you want both deleted.
+- [x] **Deployed 2026-11-17 13:55 UTC** (commit `9ab85dc`, web `dpl_BiRuPZYDN4Csjcr7SPbbeAhfACS9`): web only, no
+  migration, the worker not touched. Checked live, read-only: Home and the login page load; the WhatsApp page
+  signed out goes to the login page; the webhook refuses a wrong verify token (403) and a call with no valid
+  signature (401). No WhatsApp message was sent and no template was created. Both previews are **deleted**.
+- **Nothing signed in was tried on production.** The first real use of the new page is yours.
 - Checked against a stand-in for Meta on this computer. **Nothing was sent to Meta and no WhatsApp message was
   sent to anyone.**
 - Checks: `verify-t176` 96/96, `verify-t175` 110/110, the full regression (25 scripts, t146 to t176) and
@@ -1562,11 +1563,14 @@ sends nothing. Three to check or change (Dashboard → Authentication):
   by its description in Meta's docs ("allows an app to log events"). Meta's docs do not print that screen's
   sentence, so the match was a guess, and I said so at the time. Qolumns does not request that permission.
 
-### 4. To put it live
+### 4. Now that it is live
 
-1. Commit, then `npx vercel deploy --prod`. No migration. The worker is not touched.
-2. Do **not** press "Create the template" for Bluum until you record the second video
-   (`Docs/meta-app-review.md` says why).
+1. Do **not** press "Create the template" for Bluum until you record the second video
+   (`Docs/meta-app-review.md` says why). It can be created once.
+2. Open `https://qolumns.com/app/whatsapp` as Bluum and look at the page: the note that Meta is reviewing the
+   name, "Nothing left to do", the payment note, and "Message templates" with its wording. Tell me anything
+   that reads wrong.
+3. Recording 2 (the template) can be made now. Recording 1 waits for Meta to approve the display name.
 
 ### 5. Decisions
 
