@@ -5,12 +5,11 @@ import { PRODUCT_NAME } from '@qolumns/shared'
 import type { ConnectionView } from '@/lib/whatsapp-state'
 import type { TemplateView } from '@/lib/whatsapp-templates'
 
-const primary = 'inline-flex min-h-[44px] items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover disabled:opacity-50'
 const quiet = 'inline-flex min-h-[44px] items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-text-primary hover:bg-background disabled:opacity-50'
 
 /** The status, in words and in the design system's status colours (colour is never the only signal) */
 const STATUS: Record<TemplateView['state'], { label: string; tone: string } | null> = {
-  none: null,
+  none: { label: 'Not set up yet', tone: 'border border-border bg-surface text-text-muted' },
   pending: { label: 'In review with Meta', tone: 'bg-mist text-text-secondary' },
   approved: { label: 'Approved', tone: 'bg-secondary-light text-secondary' },
   rejected: { label: 'Rejected by Meta', tone: 'bg-danger-light text-danger' },
@@ -20,8 +19,8 @@ const STATUS: Record<TemplateView['state'], { label: string; tone: string } | nu
 }
 
 const EXPLAIN: Record<TemplateView['state'], string> = {
-  none: 'Create it once. Meta reviews the wording, usually within minutes and sometimes up to a day.',
-  pending: 'Meta is reviewing the wording. That usually takes minutes and can take up to a day. Press Refresh to see where it stands.',
+  none: 'Meta has no template for this account yet. It is set up when WhatsApp is connected: press “Reconnect WhatsApp” if it stays like this.',
+  pending: 'Meta is reviewing the wording. That usually takes minutes and can take up to a day. This page shows the answer when you open it again.',
   approved: `Ready. ${PRODUCT_NAME} sends it when you approve an estimate more than 24 hours after the customer last wrote. Meta charges your business for each one and needs a card on the account for it.`,
   rejected: 'Meta did not approve the wording, so it is not sent. Meta’s reason is below, and in WhatsApp Manager under Message templates.',
   paused: 'Meta has paused this template, usually after customers blocked or reported it. It is not sent while paused. WhatsApp Manager says when the pause ends.',
@@ -32,17 +31,21 @@ const EXPLAIN: Record<TemplateView['state'], string> = {
 /**
  * T-176: the business's one message template. WhatsApp delivers a free-form
  * message only for 24 hours after the customer's last message; after that it
- * delivers only wording Meta approved beforehand. This section creates that
- * wording (fixed: the business does not write it), shows Meta's review of it,
- * read from Meta each time, and refreshes it. Nothing is stored here.
+ * delivers only wording Meta approved beforehand.
+ *
+ * T-177: there is nothing to press. The template is set up when the business
+ * connects (used if Meta already has it, created if not). This section only
+ * shows where it stands with Meta: Approved, In review, or Rejected with
+ * Meta's reason. It asks Meta each time the page opens, and never creates
+ * anything.
  */
 export function MessageTemplates({ connection }: { connection: ConnectionView }) {
   const [template, setTemplate] = useState<TemplateView | null>(null)
-  const [busy, setBusy] = useState<'loading' | 'creating' | 'refreshing' | null>('loading')
+  const [busy, setBusy] = useState<'loading' | null>('loading')
   const [note, setNote] = useState<string | null>(null)
 
-  const load = useCallback(async (how: 'loading' | 'refreshing') => {
-    setBusy(how)
+  const load = useCallback(async () => {
+    setBusy('loading')
     setNote(null)
     try {
       const res = await fetch('/api/whatsapp/template')
@@ -61,26 +64,8 @@ export function MessageTemplates({ connection }: { connection: ConnectionView })
   }, [])
 
   useEffect(() => {
-    void load('loading')
-  }, [load, connection.phoneNumberId])
-
-  async function create() {
-    setBusy('creating')
-    setNote(null)
-    try {
-      const res = await fetch('/api/whatsapp/template', { method: 'POST' })
-      const json = await res.json().catch(() => null)
-      if (!res.ok) {
-        setNote(json?.error?.message || 'Meta did not accept the template. Try again in a minute.')
-        return
-      }
-      setTemplate(json.template as TemplateView)
-    } catch {
-      setNote('Could not reach the server. Try again.')
-    } finally {
-      setBusy(null)
-    }
-  }
+    void load()
+  }, [load, connection.phoneNumberId, connection.connectedAt])
 
   const status = template ? STATUS[template.state] : null
 
@@ -89,7 +74,8 @@ export function MessageTemplates({ connection }: { connection: ConnectionView })
       <h3 className="text-lg font-medium text-text-primary">Message templates</h3>
       <p className="mt-1 max-w-2xl text-sm text-text-secondary">
         WhatsApp lets a business write freely to a customer for 24 hours after the customer’s last message. After that it only delivers wording Meta has
-        approved beforehand, called a template. {PRODUCT_NAME} uses one, to tell a customer their estimate is ready.
+        approved beforehand, called a template. {PRODUCT_NAME} uses one, to tell a customer their estimate is ready, and sets it up for you when you
+        connect.
       </p>
 
       {busy === 'loading' && !template && (
@@ -122,22 +108,11 @@ export function MessageTemplates({ connection }: { connection: ConnectionView })
               Meta’s reason: {template.reason}
             </p>
           )}
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            {template.state === 'none' ? (
-              <button type="button" onClick={create} disabled={busy !== null} className={primary} data-testid="template-create">
-                {busy === 'creating' ? 'Sending to Meta…' : 'Create the template'}
-              </button>
-            ) : (
-              <button type="button" onClick={() => void load('refreshing')} disabled={busy !== null} className={quiet} data-testid="template-refresh">
-                {busy === 'refreshing' ? 'Asking Meta…' : 'Refresh'}
-              </button>
-            )}
-            {template.managerUrl && template.state !== 'none' && (
-              <a href={template.managerUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center text-sm text-text-secondary underline underline-offset-2">
-                See it in WhatsApp Manager
-              </a>
-            )}
-          </div>
+          {template.managerUrl && template.state !== 'none' && (
+            <a href={template.managerUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex min-h-[44px] items-center text-sm text-text-secondary underline underline-offset-2">
+              See it in WhatsApp Manager
+            </a>
+          )}
         </div>
       )}
 
@@ -147,7 +122,7 @@ export function MessageTemplates({ connection }: { connection: ConnectionView })
         </p>
       )}
       {!template && busy === null && (
-        <button type="button" onClick={() => void load('loading')} className={`mt-3 ${quiet}`}>
+        <button type="button" onClick={() => void load()} className={`mt-3 ${quiet}`}>
           Try again
         </button>
       )}

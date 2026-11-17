@@ -4,6 +4,7 @@ import { currentTenant } from '@/lib/current-tenant'
 import { disconnect, embeddedSignupAvailable, loadConnection, manualNeedsSecret, saveManualConnection } from '@/lib/whatsapp-connect'
 import { GRAPH_API_VERSION } from '@/lib/whatsapp-graph'
 import { EMBEDDED_SIGNUP_VERSION } from '@/lib/whatsapp-signup'
+import { accessRefusal, accessView, whatsappAccess } from '@/lib/whatsapp-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,17 +21,21 @@ export const dynamic = 'force-dynamic'
  * GET /api/whatsapp/config
  * The connection as the page shows it, what the page needs to open Meta's
  * Embedded Signup (two public ids), and the two values of the manual method's
- * webhook step.
+ * webhook step. T-177: also `access`, whether the plan allows WhatsApp, with
+ * the one line to show when it does not.
  */
 export async function GET() {
   const auth = await currentTenant()
   if (!auth.ok) return auth.response
   const admin = createAdminClient()
   const config = await loadConnection(admin, auth.tenantId)
+  // T-177: may this business use WhatsApp (its plan includes it and its subscription is live)?
+  const access = accessView(await whatsappAccess(admin, auth.tenantId))
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, '')
   return NextResponse.json({
     configured: Boolean(config),
     config,
+    access,
     connect: {
       available: embeddedSignupAvailable(),
       appId: process.env.NEXT_PUBLIC_WHATSAPP_APP_ID || null,
@@ -56,8 +61,12 @@ export async function GET() {
 export async function PUT(request: Request) {
   const auth = await currentTenant()
   if (!auth.ok) return auth.response
+  const admin = createAdminClient()
+  // T-177: the plan must include WhatsApp, with a live subscription
+  const refusal = accessRefusal(await whatsappAccess(admin, auth.tenantId))
+  if (refusal) return NextResponse.json({ error: { code: refusal.code, message: refusal.message } }, { status: refusal.status })
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
-  const result = await saveManualConnection(createAdminClient(), auth.tenantId, body ?? {})
+  const result = await saveManualConnection(admin, auth.tenantId, body ?? {})
   if (!result.ok) return NextResponse.json({ error: { code: result.code, message: result.message } }, { status: result.status })
   return NextResponse.json({ ok: true, config: result.connection })
 }

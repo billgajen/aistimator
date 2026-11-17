@@ -8,6 +8,8 @@
  *   - longer ago: the business's approved "estimate ready" template, the only
  *     thing Meta delivers then. With no approved template nothing is sent
  *     (the customer still has the email, and the link from the chat).
+ * T-177: nothing at all is sent for a business whose plan does not include
+ * WhatsApp or whose subscription is not live.
  *
  * This never stops or delays an approval for long: it is tried once, with a
  * time limit, and every failure ends in "not sent". Nothing about the
@@ -20,13 +22,14 @@ import { decryptSecret } from '@/lib/whatsapp-crypto'
 import { approvedEstimateTemplate } from '@/lib/whatsapp-template-service'
 import { estimateReadyText, estimateTemplateParameters, templateLanguage } from '@/lib/whatsapp-templates'
 import { lastInboundAt, windowOpen } from '@/lib/whatsapp-window'
+import { whatsappAccess } from '@/lib/whatsapp-access'
 
 type Admin = ReturnType<typeof createAdminClient>
 
 /** How the customer was told, or why not */
 export type EstimateNotice =
   | { sent: 'message' | 'template' }
-  | { sent: null; why: 'not_whatsapp' | 'not_connected' | 'no_template' | 'refused' | 'timed_out' | 'error' }
+  | { sent: null; why: 'not_whatsapp' | 'not_connected' | 'paused' | 'no_template' | 'refused' | 'timed_out' | 'error' }
 
 /** The approval waits this long for WhatsApp, and no longer */
 export const NOTICE_TIME_LIMIT_MS = 8_000
@@ -86,6 +89,8 @@ async function send(admin: Admin, opts: EstimateNoticeInput): Promise<EstimateNo
     is_active: boolean
   } | null
   if (!config || !config.is_active) return { sent: null, why: 'not_connected' }
+  // T-177: the plan does not include WhatsApp, or the subscription is not live: nothing is sent, template included
+  if (!(await whatsappAccess(admin, tenantId)).allowed) return { sent: null, why: 'paused' }
 
   const to = conversation.customer_phone
   const token = decryptSecret(config.access_token_encrypted)

@@ -1,4 +1,12 @@
-# Meta App Review for Qolumns (T-175, rewritten in T-176)
+# Meta App Review for Qolumns (T-175, rewritten in T-176, updated in T-177)
+
+**T-177 changed three things that matter here** (they apply once T-177 is deployed):
+- **The template is automatic.** There is no "Create the template" button. Connecting a number sets the
+  template up (used if Meta already has it, created if not). Bluum's template is already on Meta.
+- **The assistant is silent unless a customer asks for a price.** A plain "Hi" gets no reply, by design.
+- **WhatsApp needs a plan that includes it, with an active subscription.** Bluum has no subscription in
+  production: until it has one, its WhatsApp page shows an upgrade line and a test message is refused.
+  Settle that first (`OWNER-TODO.md`, T-177, section 1).
 
 What to record and what to write when you ask Meta for **advanced access** to the two WhatsApp permissions.
 Written from Meta's own pages as they read on 17 November 2026 (App Review for solution providers; Get started
@@ -39,15 +47,13 @@ fill it in: it changes.
    is Meta's own wording, not a third permission.
 4. **The app's basic settings are complete** (the list is in `OWNER-TODO.md`, T-175): icon, privacy policy URL,
    terms URL, category, contact email, data deletion instructions.
-5. **T-176 is live on `qolumns.com`** (it adds "Message templates" to the WhatsApp page).
-6. **Do not press "Create the template" before recording 2.** A template can be created once; the recording
-   has to show it being created. If it was pressed already: while it is still "In review" or "Rejected",
-   delete it in WhatsApp Manager (Message templates) and record. If it was **approved** and then deleted, Meta
-   blocks the same name for 30 days; in that case record WhatsApp Manager creating a template instead (Meta
-   accepts that), using the steps at the end of this file.
+5. **Bluum is on a plan that includes WhatsApp** (needed from T-177 on, or the page is paused).
+6. **The template.** Bluum's is on Meta already. If recording 2 was made with T-176's button, it is done and
+   needs nothing more. If it still has to be made, see "Recording 2" below: the button no longer exists.
 7. **Each permission has been used in the 30 days before you submit.** Meta's button "Request advanced access"
-   stays grey until it has logged a call, which can take up to two days. Connecting and creating the template
-   use `whatsapp_business_management`; any reply or test message uses `whatsapp_business_messaging`.
+   stays grey until it has logged a call, which can take up to two days. Connecting, and opening the WhatsApp
+   page (which reads the template's status), use `whatsapp_business_management`; any reply or test message
+   uses `whatsapp_business_messaging`.
 8. **A way in for the reviewer.** Meta asks for access instructions. Make a Qolumns account for the reviewer
    (a business with one service set up), and give its email and password in the form's "access instructions"
    box. Meta says not to give a personal account. Do not write the password in this file or anywhere in the
@@ -80,25 +86,22 @@ signed in as your phone is the easiest to capture).
    Qolumns connection. It is working."). That is the app sending a message through the Cloud API, and
    WhatsApp receiving and showing it: what Meta asks to see.
 
-While the app is not published, two things on the page differ from what you might expect, and neither
-matters to the reviewer:
-- Qolumns does not answer your `Hi` in the chat, because Meta does not pass it on to us yet.
-- Under the button the page may say the message "will probably not arrive", because your `Hi` never reached
-  Qolumns. The message arrives all the same. If you would rather the recording did not show that line, tell me
-  and I will change it before you record.
+Qolumns does not answer your `Hi` in the chat. That is by design since T-177 (it only answers a request
+for a price), and while the app is not published Meta does not pass your message on to us anyway.
 
-If Meta does pass your message on (it does once the app is Live), Qolumns replies in the chat. Then also show:
-answering its questions (the job, your name, an email, `skip` for the phone number, an address, `skip` for
-photos, then `yes`), the link to the estimate arriving, and, after you press **Approve & send** on that
-request in **Quotes**, the message "Your estimate from Bluum is ready. Open it here: …".
+Once the app is Live you can also show the assistant at work: send
+`How much for <a job one of Bluum's services covers, with a size>?` from your phone. Qolumns replies in the
+chat with the link to the estimate; after you press **Approve & send** on that request in **Quotes**, the
+message "Your estimate from Bluum is ready. Open it here: …" arrives.
 
 **What to write in the form** (plain words; your own, not copied from another app's submission):
 
 > Qolumns lets a trade business (a painter, a plumber, an HVAC company) give its customers a price estimate.
 > A business connects its own WhatsApp number to Qolumns through Embedded Signup. When one of its customers
-> sends that number a message asking for a quote, Qolumns replies in the same chat on the business's behalf:
-> it asks what the job is, asks for the customer's name and contact details and for photos of the job, and
-> then sends a link to the estimate, which is priced from that business's own price list.
+> sends that number a message asking for a price for one of the business's services, Qolumns replies in the
+> same chat on the business's behalf: it asks only for what it still needs (what the job is, the postcode
+> where the business limits its area, photos where the service requires them), and then sends a link to the
+> estimate, which is priced from that business's own price list. It does not reply to any other message.
 >
 > We use `whatsapp_business_messaging` to receive those customer messages (the `messages` webhook), to
 > download the photos the customer sends, and to send the replies. When the business approves the estimate,
@@ -112,23 +115,24 @@ request in **Quotes**, the message "Your estimate from Bluum is ready. Open it h
 
 ## Recording 2: `whatsapp_business_management`
 
-**Needs:** T-176 live, and "Create the template" never pressed for this business (step 6 above). The display
-name does not need to be approved for this one.
+**If this recording was made with T-176's "Create the template" button, it is done.** That button was removed
+in T-177; the notes below are for making the recording after T-177 is live.
 
-1. Open `https://qolumns.com`, signed out. Press **Log in** and sign in as Bluum - Qolumns Test.
-2. In the menu, open **WhatsApp**. Pause on the top of the page: **Connected**, the number and its name. Those
-   were read from the WhatsApp account with this permission.
-3. Scroll to **Message templates**. The page shows the template's wording ("Your estimate from Bluum is
-   ready. Open it here: …") and the button **Create the template**. Pause so the wording can be read.
-4. Press **Create the template**. The status changes to **In review with Meta**. That call created the
-   template in the business's WhatsApp account.
-5. Press **See it in WhatsApp Manager**. WhatsApp Manager opens on Message templates and lists
-   `estimate_ready`. This shows the template really exists at Meta. Go back to the Qolumns tab.
-6. Wait a minute and press **Refresh**. If Meta has decided, the status reads **Approved** (it can take up
-   to a day; "In review" is enough for the recording, so stop here if it has not changed).
+Meta asks to see "your app, or WhatsApp Manager, being used to create a message template". From T-177 the
+app creates the template **when a number is connected**, so the recording shows a connection:
 
-Do not disconnect and reconnect the number for this recording. Meta asks to see the template being created,
-and nothing is gained by putting a working connection through Meta's window again.
+1. Use a business whose WhatsApp account has **no** `estimate_ready` template yet: a second test business
+   with its own number. (Bluum's account already has the template; connecting Bluum again finds it and
+   creates nothing, which is correct but shows nothing being created.)
+2. Open `https://qolumns.com`, signed out. Press **Log in** and sign in as that business.
+3. In the menu, open **WhatsApp**. Press **Connect WhatsApp** and go through Meta's window to **Finish**.
+4. Back in Qolumns the page shows **Connected**. Scroll to **Message templates**: the wording, and the
+   status **In review with Meta**. Qolumns created that template in the business's account as part of
+   connecting.
+5. Press **See it in WhatsApp Manager**. It opens on Message templates and lists `estimate_ready`.
+
+If a second test business is not practical, record WhatsApp Manager creating a template instead (the last
+section of this file). Meta accepts that.
 
 **What to write in the form:**
 
@@ -140,8 +144,8 @@ and nothing is gained by putting a working connection through Meta's window agai
 > - to subscribe our app to that account's webhooks, so the business's incoming customer messages reach
 >   Qolumns, and to unsubscribe when the business presses Disconnect;
 > - to create one utility message template in the business's account, "estimate_ready", when the business
->   presses "Create the template", and to read that template's review status so the business can see whether
->   Meta has approved it. The template tells a customer their estimate is ready when more than 24 hours have
+>   connects (only if the account does not have it yet), and to read that template's review status so the
+>   business can see whether Meta has approved it. The template tells a customer their estimate is ready when more than 24 hours have
 >   passed since they wrote;
 > - to read whether the display name is still in review and whether a payment method is on the account, so
 >   we can tell the business plainly what, if anything, is left for it to do;
@@ -151,8 +155,8 @@ and nothing is gained by putting a working connection through Meta's window agai
 > We do not edit or delete templates, and we do not change the business's account settings. Businesses
 > manage billing themselves in WhatsApp Manager.
 >
-> The recording shows a business signed in to Qolumns, its connected number, and the business creating its
-> message template from the Qolumns WhatsApp page, with the template then listed in WhatsApp Manager.
+> The recording shows a business connecting its number from Qolumns, the message template Qolumns set up
+> for it as part of connecting, and that template listed in WhatsApp Manager.
 
 ## Questions the form also asks
 
@@ -169,7 +173,8 @@ and nothing is gained by putting a working connection through Meta's window agai
 
 ## If the template has to be made in WhatsApp Manager instead
 
-Only for the case in step 6 of "Before you record". Meta accepts this for the management recording.
+For when the template cannot be shown being created by the app. Meta accepts this for the management
+recording.
 
 1. Record signing in to Qolumns and the WhatsApp page showing **Connected**, as in recording 2, steps 1 to 2.
 2. Open WhatsApp Manager (`https://business.facebook.com/wa/manage/message-templates/`), choose the Bluum

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
-import { PRODUCT_NAME, SUPPORT_EMAIL } from '@qolumns/shared'
+import { PRODUCT_NAME, SUPPORT_EMAIL, operatorStatement } from '@qolumns/shared'
 
 export const metadata: Metadata = {
   title: `Privacy Policy — ${PRODUCT_NAME}`,
@@ -19,7 +19,7 @@ const SECTIONS = [
   },
   {
     title: '3. How photos and AI are used',
-    body: 'Photos and enquiry text are processed by AI models to read the job details and measurements used to prepare the estimate. Photos are used only to prepare the estimate. The measurements taken from them, never the photos, can improve the accuracy of that business’s own future estimates. We do not use your photos to train public AI models, and we do not sell your data.',
+    body: 'Photos and enquiry text are processed by AI models to read the job details and measurements used to prepare the estimate. Photos are used only to prepare the estimate. The measurements taken from them, never the photos, can improve the accuracy of that business’s own future estimates. We do not use your photos to train public AI models, and we do not sell your data. Where a business has connected its WhatsApp number, a message sent to that number is read by an AI model to see whether it asks for a price for one of that business’s services. A message that does not is not answered by us and its text is not kept; only that it arrived, from which number and when is recorded.',
   },
   {
     title: '4. Where data lives',
@@ -52,7 +52,11 @@ export default function PrivacyPage() {
         <h1 className="font-display text-4xl font-extrabold tracking-tight text-text-primary">
           Privacy Policy
         </h1>
-        <p className="mt-3 text-sm text-text-muted">Last updated: 10 November 2026</p>
+        <p className="mt-3 text-sm text-text-muted">Last updated: 17 November 2026</p>
+        {/* T-177: who runs the product. The company number comes from NEXT_PUBLIC_COMPANY_NUMBER. */}
+        <p className="mt-3 leading-relaxed text-text-secondary" data-testid="operator">
+          {operatorStatement(process.env.NEXT_PUBLIC_COMPANY_NUMBER)}
+        </p>
         <div className="tape-rule mt-8" />
         <div className="mt-10 space-y-8">
           {SECTIONS.map((section) => (

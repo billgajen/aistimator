@@ -4,6 +4,7 @@ import { currentTenant } from '@/lib/current-tenant'
 import { sendTextMessage, decryptToken } from '@/lib/whatsapp'
 import { META_ERROR } from '@/lib/whatsapp-graph'
 import { lastInboundAt, windowOpen } from '@/lib/whatsapp-window'
+import { accessRefusal, whatsappAccess } from '@/lib/whatsapp-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,6 +43,9 @@ export async function POST(request: Request) {
     }
 
     const admin = createAdminClient()
+    // T-177: a paused assistant sends nothing, a test message included
+    const refusal = accessRefusal(await whatsappAccess(admin, tenantId))
+    if (refusal) return NextResponse.json({ error: { code: refusal.code, message: refusal.message } }, { status: refusal.status })
     const { data: waConfig } = await admin
       .from('whatsapp_configs')
       .select('phone_number_id, display_phone_number, access_token_encrypted, is_active')

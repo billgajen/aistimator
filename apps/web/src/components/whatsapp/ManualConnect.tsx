@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import type { ConnectionView } from '@/lib/whatsapp-state'
-import { PERSONAL_NUMBER_WARNING, PERSONAL_NUMBER_WAY_ROUND } from '@/lib/whatsapp-copy'
 
 const field = 'mt-1 block min-h-[44px] w-full rounded-lg border border-field bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2'
 const primary = 'inline-flex min-h-[44px] items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover disabled:opacity-50'
@@ -186,9 +185,6 @@ export function ManualConnect({
             <li>In the app dashboard: Add Product → WhatsApp → Set up.</li>
             <li>Link (or create) your WhatsApp Business phone number when asked.</li>
           </ol>
-          <p className="mt-3 text-sm text-text-secondary" data-testid="manual-personal-number-help">
-            {PERSONAL_NUMBER_WARNING} {PERSONAL_NUMBER_WAY_ROUND}
-          </p>
         </div>
 
         <div className="rounded-xl border border-border bg-background p-5">

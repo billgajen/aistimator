@@ -64,3 +64,23 @@ export const DEFAULT_PRIMARY_COLOR = '#2563eb'
  * Email Routing to the owner's inbox).
  */
 export const SUPPORT_EMAIL = 'hello@qolumns.com'
+
+/**
+ * T-177: who runs the product, for the Privacy and Terms pages. The company
+ * number is not written here: it is read from NEXT_PUBLIC_COMPANY_NUMBER (a
+ * public value, set per environment), and the sentence leaves it out until
+ * it is set.
+ */
+export const OPERATOR = {
+  name: 'Billiom Limited',
+  registeredIn: 'England and Wales',
+} as const
+
+/** "Qolumns is run by Billiom Limited, a company registered in England and Wales (company number …)." */
+export function operatorStatement(companyNumber?: string | null): string {
+  const number = (companyNumber ?? '').replace(/\s+/g, ' ').trim()
+  return `${PRODUCT_NAME} is run by ${OPERATOR.name}, a company registered in ${OPERATOR.registeredIn}${number ? ` (company number ${number})` : ''}.`
+}
+
+/** The law the terms are under */
+export const GOVERNING_LAW = `the law of ${OPERATOR.registeredIn}`

@@ -439,7 +439,13 @@ Response:
 
 ⸻
 
-WhatsApp APIs (T-111, T-112; rewritten in T-175)
+WhatsApp APIs (T-111, T-112; rewritten in T-175; T-176; T-177)
+
+T-177, for every route below: WhatsApp is for a business whose plan includes the WhatsApp channel (the plan
+definitions in `packages/shared/src/plans.ts` decide) and whose subscription is active or on trial
+(`lib/whatsapp-access.ts`). Otherwise the routes that would connect or send answer 403 `PLAN_REQUIRED` (the plan
+has no WhatsApp, or there is no plan) or 403 `ASSISTANT_PAUSED` (the subscription is not active): `POST connect`,
+`PUT config`, `POST send`. Reading and disconnecting stay open, and a connection is never removed for this.
 
 Every dashboard route below needs a signed-in user and acts on that user's own business only. The stored row
 (`whatsapp_configs`) is server-only since migration 42: the routes read and write it with the service role. No
@@ -458,7 +464,8 @@ The connection as the page shows it, and what the page needs to open Meta's Embe
     "registered": true, "messagesReady": false,
     "paymentUrl": "https://business.facebook.com/wa/manage/home/?waba_id=…"
   },
-  "connect": { "available": true, "appId": "…", "configId": "…", "graphVersion": "v27.0", "signupVersion": "v4" },
+  "access": { "allowed": true, "why": null, "line": null },   // T-177. why: "plan" | "subscription"; line: the one line the page shows
+  "connect": { "available": true, "appId": "…", "configId": "…", "graphVersion": "v27.0", "signupVersion": "v5" },
   "setup": { "webhookUrl": "https://qolumns.com/api/whatsapp/webhook", "verifyToken": "…" },   // manual method only
   "manualNeedsSecret": false
 }
@@ -469,6 +476,8 @@ are from Meta's message event and are never trusted: the server exchanges the co
 reads the account's numbers with that token, and only connects a number Meta lists under it. Then it subscribes the
 app to the account, registers the number (not a WhatsApp Business app number) and stores the token encrypted.
 → { "ok": true, "config": { … }, "registrationProblem": null | "…" }
+T-177: after a successful connect the message template is looked for on Meta and created only if the account has
+none with our name (best effort; it never fails the connect). The page runs Embedded Signup v5.
 Errors: 400 INVALID_REQUEST, 403 NOT_YOUR_ACCOUNT / NOT_YOUR_NUMBER, 422 CODE_REFUSED / TOKEN_REFUSED / NO_NUMBER /
 WHICH_NUMBER / WHICH_ACCOUNT, 502 META_REFUSED, 503 NOT_AVAILABLE. Nothing is saved on an error.
 
@@ -493,10 +502,12 @@ time, with the business's own token, on its own WhatsApp account.
 404 NOT_CONNECTED (no connection, or a manual one: templates belong to an account connected through Meta),
 502 META_REFUSED.
 
-POST /api/whatsapp/template   (T-176)
-Creates that template (Meta then reviews the wording). No body: the wording is fixed, with the business's name
-written in and the customer's link as its one variable. Pressing twice makes one: a template Meta already lists
-is returned as it stands. → the same shape, normally `state: "pending"`. 404 NOT_CONNECTED, 422 / 502 META_REFUSED.
+POST /api/whatsapp/template   (T-176; REMOVED in T-177)
+There is no route that creates a template on request any more. The template is set up when a business connects
+(`ensureEstimateTemplate`, called by `POST /api/whatsapp/connect`): a template Meta already lists under our name,
+in any language and any state, is used and nothing is created; with none, it is created (the wording is fixed,
+with the business's name written in and the customer's link as its one variable). `GET` above only reads, so
+opening the page can never create one. `state: "none"` means Meta has none for the account yet.
 
 POST /api/whatsapp/register   { "pin"? }
 Finishes registering a number Meta refused at connect time. `pin` is the number's own six-digit two-step PIN when
@@ -532,6 +543,19 @@ Meta's handshake: answers `hub.challenge` when `hub.verify_token` matches `WHATS
 
 POST /api/whatsapp/webhook
 One address for every business's incoming messages.
+T-177 (the silent assistant, AD-057):
+- A message is answered only when it asks for a price for something the business offers. One AI call decides
+  (registry task `whatsapp_intent`), given the business's services, what each includes and excludes, and its
+  service area. Anything else, or any doubt or failure: no reply.
+- A message that is not answered is stored without its text (`content` and `media_url` null): only that it
+  arrived, from whom and when. The text is stored only when the message is part of a price request.
+- A price request is answered in short fixed sentences that ask only for what is missing, then the link. When the
+  request is made the conversation's `status` becomes `completed`, so the next message starts a new one.
+- A business whose plan has no WhatsApp, or whose subscription is not active, gets no reply and the model is not
+  asked.
+- `smb_message_echoes` (a message the business sent from its own WhatsApp Business app; coexistence numbers
+  only): the chat with that customer is left alone for 24 hours (`intake_data._ownerRepliedAt`), and a request
+  under way is dropped. Only the customer's number and the time are read. Signed like a message.
 - `X-Hub-Signature-256` is checked on every call (HMAC-SHA256 of the raw body). A call is acted on only when it is
   signed by the Meta app the number is connected through: the platform's app (`WHATSAPP_APP_SECRET`) for an
   embedded connection, the business's own app secret for a manual one. No signature, or one that proves nothing:

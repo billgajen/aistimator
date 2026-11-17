@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { PRODUCT_NAME } from '@qolumns/shared'
 import { PAYMENT_HELP_URL, nameReview, type ConnectionView, type LiveStatus } from '@/lib/whatsapp-state'
-import { NAME_REVIEW_DAYS, PAYMENT_NOTE, PAYMENT_NOTE_TITLE, isMetaIssuedNumber } from '@/lib/whatsapp-copy'
+import { NAME_REVIEW_DAYS, PAYMENT_NOTE, PAYMENT_NOTE_TITLE, TEST_MESSAGE_LINE, isMetaIssuedNumber } from '@/lib/whatsapp-copy'
 import { ConnectWhatsApp, type ConnectSettings } from './ConnectWhatsApp'
 import { MessageTemplates } from './MessageTemplates'
 
@@ -43,7 +43,7 @@ export function ConnectedCard({
   const [registerNote, setRegisterNote] = useState<string | null>(registrationProblem)
   const [testTo, setTestTo] = useState('')
   const [testing, setTesting] = useState(false)
-  const [testNote, setTestNote] = useState<{ tone: 'ok' | 'info' | 'error'; text: string } | null>(null)
+  const [testNote, setTestNote] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
   // what Meta says right now (the display name's review, a card on the account): asked once the page is open
   const [live, setLive] = useState<LiveStatus | null>(null)
   const alive = useRef(true)
@@ -132,18 +132,8 @@ export function ConnectedCard({
         setTestNote({ tone: 'error', text: json?.error?.message || 'The test message was not sent.' })
         return
       }
-      // Meta accepts a message it will not deliver: only a phone that wrote in the last 24 hours gets it
-      const notDelivered = heldForName
-        ? 'Meta does not let this number send until it has approved the display name. Try again once the name is approved.'
-        : `WhatsApp only delivers this to a phone that has messaged your number in the last 24 hours. Send “Hi” from that phone to ${config.displayPhoneNumber}, then press the button again.`
-      const expected = json.windowOpen !== false && !heldForName
-      setTestNote(
-        expected
-          ? { tone: 'ok', text: 'Sent. It should arrive on that phone in a few seconds.' }
-          : heldForName
-            ? { tone: 'info', text: `Meta accepted the message, but it will not arrive yet. ${notDelivered}` }
-            : { tone: 'info', text: `Meta accepted the message, but it will probably not arrive: no message from that phone has reached ${PRODUCT_NAME} in the last 24 hours. ${notDelivered}` }
-      )
+      // T-177: what to do first is said before the button (TEST_MESSAGE_LINE), not after the send
+      setTestNote({ tone: 'ok', text: 'Sent.' })
       if (!config.messagesReady) onChanged({ ...config, messagesReady: true })
       // the send is done: the button is free again while the page asks what Meta reported (delivered, or not)
       setTesting(false)
@@ -160,7 +150,7 @@ export function ConnectedCard({
           return
         }
         if (seen?.status === 'failed') {
-          setTestNote({ tone: 'error', text: `Meta did not deliver the message. ${notDelivered}` })
+          setTestNote({ tone: 'error', text: 'Meta did not deliver the message.' })
           return
         }
       }
@@ -206,7 +196,7 @@ export function ConnectedCard({
             <p className="mt-2 max-w-2xl text-sm text-text-secondary" data-testid="name-review-effect">
               {heldForName
                 ? `Until then this number cannot send messages. It is one of Meta’s own 555 numbers, and Meta holds those back until the name is approved. So ${PRODUCT_NAME} cannot answer customers on it yet, and a test message will not arrive.`
-                : `In the meantime the number works: ${PRODUCT_NAME} answers the customers who message it. Meta shows them your name once it is approved.`}
+                : `In the meantime the number works. Meta shows customers your name once it is approved.`}
             </p>
           </div>
         )}
@@ -221,10 +211,12 @@ export function ConnectedCard({
 
         <h3 className="mt-6 text-sm font-semibold text-text-primary">What happens next</h3>
         <p className="mt-1 max-w-2xl text-sm text-text-secondary" data-testid="what-happens-next">
+          You keep using WhatsApp as you do now. {PRODUCT_NAME} stays quiet in your chats, and steps in only when a customer asks for a price for one of
+          your services. Then it asks a few short questions, sends a link to their estimate, and goes quiet again. The request shows in Quotes like any
+          other, priced from your own price list.
           {config.alsoOnBusinessApp
-            ? `This number is still on your WhatsApp Business app, so your other chats arrive on it too. ${PRODUCT_NAME} only steps in when a message asks for a quote, an estimate or a price; everything else is left for you to answer in the app. When it does step in, it asks about the job, collects photos and sends the customer a link to their estimate.`
-            : `When a customer messages this number, ${PRODUCT_NAME} asks about the job, collects photos and sends them a link to their estimate.`}{' '}
-          The request then shows in Quotes like any other, priced from your own price list.
+            ? ` If you answer a customer yourself in the WhatsApp Business app, ${PRODUCT_NAME} leaves that chat alone for 24 hours.`
+            : ''}
         </p>
       </section>
 
@@ -279,8 +271,8 @@ export function ConnectedCard({
         {stepsLeft === 0 && (
           <p className="mt-1 text-sm text-text-secondary" data-testid="all-done">
             {heldForName
-              ? `The number is registered. ${PRODUCT_NAME} starts answering customers on it once Meta approves its name.`
-              : `The number is registered, and ${PRODUCT_NAME} answers the customers who message it.`}
+              ? `The number is registered. ${PRODUCT_NAME} can answer on it once Meta approves its name.`
+              : `The number is registered, and ${PRODUCT_NAME} is listening for price requests on it.`}
           </p>
         )}
 
@@ -316,9 +308,8 @@ export function ConnectedCard({
 
       <section className="rounded-xl bg-surface p-6 shadow-warm">
         <h3 className="text-lg font-medium text-text-primary">Try it</h3>
-        <p className="mt-1 max-w-2xl text-sm text-text-secondary">
-          From your own phone, send “Hi, I need a quote” to {config.displayPhoneNumber}. {PRODUCT_NAME} should answer within a few seconds. Then you can send that
-          phone a test message from here.
+        <p className="mt-1 max-w-2xl text-sm text-text-secondary" data-testid="test-message-line">
+          {TEST_MESSAGE_LINE}
         </p>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
           <div>
@@ -340,7 +331,7 @@ export function ConnectedCard({
         </div>
         {testNote && (
           <p
-            className={`mt-2 max-w-2xl text-sm ${testNote.tone === 'ok' ? 'text-secondary' : testNote.tone === 'error' ? 'text-danger' : 'text-text-secondary'}`}
+            className={`mt-2 max-w-2xl text-sm ${testNote.tone === 'ok' ? 'text-secondary' : 'text-danger'}`}
             role={testNote.tone === 'error' ? 'alert' : 'status'}
             data-testid="test-note"
             data-tone={testNote.tone}

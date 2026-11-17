@@ -15,6 +15,171 @@
 
 ## Issues & Resolutions
 
+### 2026-11-17: T-177 — WhatsApp assistant v2 (silent unless asked for a price), automatic template, plan and subscription rule, Embedded Signup v5, legal pages (AD-057)
+
+**Committed, not deployed.** No migration. The worker's own code is unchanged (the shared package gained an AI
+task and three small helpers it does not use).
+
+**No WhatsApp message was sent to anyone, nothing was created on Meta, and nothing was submitted to
+production.** Every check ran against stand-ins on this machine. Production was read once: the WhatsApp
+connection's plan (none) and one table's nullable columns.
+
+#### Found before building
+
+- **Bluum, the one connected business, has no subscription in production** (nobody has one). Items 5 and 7
+  make WhatsApp depend on a plan that includes it, so deploying this pauses Bluum's assistant and blocks the
+  App Review recordings until Bluum has a plan. The owner decides how (OWNER-TODO, T-177, section 1).
+- **The database knows four subscription statuses** (active, trialing, past_due, canceled), not the six or
+  seven Stripe has. "Unpaid" in the ticket is `past_due` here.
+- **The small copies of photos are made in the customer's browser** (T-172). A photo sent on WhatsApp never
+  passes through one, and the server had nothing that can read a picture.
+- **A chat photo had no size or type limit at all.** Whatever a customer sent was downloaded and stored.
+
+#### What Meta's docs say today (read 2026-11-17, before building item 6)
+
+- **Embedded Signup v5** (released 20 October 2026) is chosen by `extras: { version: "v5" }`. It "makes two
+  changes": WhatsApp Business app onboarding is "on by default; opt out in `features`", and the finish message
+  carries `messaging_account_ids`, `primary_waac_ids` and `is_on_biz_app` instead of `waba_id`. "Everything
+  else works as in v4." A request with no version is served as v4.
+- **Coexistence** (a number that stays on the WhatsApp Business app) needs app version 2.24.17 or later. The
+  business "can still send messages on a one-to-one basis using the WhatsApp Business app". Messages sent from
+  the app "do not create, extend, or affect" the 24-hour window.
+- **Echoes exist, for those numbers only.** "Each time a business sends a message with one of these apps, it
+  triggers an `smb_message_echoes` webhook." The app must be subscribed to that field. The call names the
+  customer in `message_echoes[].to` (left out when Meta does not share the number) and carries the owner's own
+  message. A number that is only on the Cloud API (Bluum's 555 number) has no app to reply from, so there is
+  nothing to detect there.
+
+#### What was built
+
+**1. The silent assistant** (`lib/whatsapp-assistant.ts`, `lib/whatsapp-assistant-rules.ts`,
+`lib/ai/whatsapp-intent.ts`, `app/api/whatsapp/webhook/route.ts`; AD-057)
+- *Before:* a number connected only for this product answered every first message with the scripted quote
+  questions (a numbered menu, eight steps, a confirmation); a number kept on the WhatsApp Business app answered
+  when a message contained one of six words.
+- *Now, for every number:* nothing is said unless a customer asks for a price for something the business
+  offers. One AI call decides, from the business's own services (name, description, what each includes and
+  excludes) and its service area. The model answers yes or no, names a service id and says whether the job is
+  already described. The answer counts only as a sure yes (0.75 or more) for one of the business's own service
+  ids. No key, a slow or broken answer, any doubt: silent.
+- The model is the registry task `whatsapp_intent`. No model is named in code, and the words we give the model
+  are the same for every business (a unit test checks nothing in them names a trade or a service).
+- *A message that is not answered* is kept without its text: only that it arrived, from whom and when (Meta's
+  repeats and the 24-hour rule need that much). The text is added only when the message turns out to be part
+  of a price request. Nothing about a message is logged.
+- *A price request:* short plain replies. It asks for what the job is only if the message did not say; a name
+  only if WhatsApp gave none; an email only if the business requires both email and phone; the postcode only
+  if the business limits where it works; photos only if the service requires them. No menu, no confirmation.
+  With nothing missing, the first reply is the link.
+- The price is never the assistant's. It makes the same request every channel makes
+  (`createQuoteFromIntake`), and the pricing engine prices it from the business's price list.
+- *An answer it cannot use* is asked for once more; then it goes quiet and keeps nothing of the request. *A
+  question left unanswered for a day* is dropped.
+- *After the link* the chat is closed, so the next message starts a new one and is judged afresh.
+- *Owner takes over:* when Meta echoes a message the business sent from its own app, the assistant leaves
+  that chat alone for 24 hours and drops a request it was in the middle of. Only the customer's number and the
+  time are kept. The echo is acted on only when signed by the app the number is connected through, and never
+  for a message the assistant itself sent.
+- The old scripted flow stays for text messages (SMS), which shares the engine.
+
+**2. The template is automatic** (`lib/whatsapp-template-service.ts`, `app/api/whatsapp/connect/route.ts`,
+`app/api/whatsapp/template/route.ts`, `components/whatsapp/MessageTemplates.tsx`)
+- The button and the route that created a template on request are gone.
+- Connecting looks for a template with our name on Meta: any language, any state, it is used and nothing is
+  created. None: it is created. If Meta cannot be asked, nothing is created blind.
+- The page reads the status each time it opens (Approved, In review, Rejected with Meta's reason) and can
+  never create anything. So Bluum's existing template is shown, not duplicated.
+
+**3. The test message note.** "Will probably not arrive" is gone. One line sits before the button: "Send 'Hi'
+to your business number from your phone first. WhatsApp only lets businesses reply within 24 hours of a
+customer's last message."
+
+**4. The personal number warning.** One line, in the text that introduces Meta's window: "Use your business
+WhatsApp number. Don't connect a personal number, it can stop working in the normal WhatsApp app." T-176's
+three-answer question, its lock on the button and its steps are removed.
+
+**5 and 7. Plan and subscription** (`lib/whatsapp-access.ts`, `packages/shared/src/plans.ts`)
+- One rule, read everywhere: the plan includes the WhatsApp channel (from the plan definitions; no plan is
+  named in the page) and the subscription is active or on trial.
+- When it does not hold, nothing leaves: no reply (the model is not even asked), no template, no approval
+  notice, no test message, and no new connection (embedded or manual). The connection is kept.
+- The page: a plan without WhatsApp sees one line naming the plans that have it, a link to the plans, and no
+  connect button; a number connected earlier is shown as kept and paused, and can be disconnected. A lapsed
+  subscription sees "Your WhatsApp assistant is paused until your plan is active again."
+- A subscription that cannot be read counts as not active.
+
+**6. Embedded Signup v5.** One constant. The configuration id and app id still come from the environment. A
+stored connection is not touched by the version.
+
+**8. Small copies of chat photos** (`lib/small-photo-make.ts`, `lib/upload-limits.ts`,
+`lib/messaging/intake-engine.ts`)
+- The original is stored privately as before. A JPEG now gets a small copy beside it (`<key>.small`, at most
+  480 px, JPEG), the same place and limits as a form photo's, so the same routes serve it. A photo stored on
+  its side comes out upright. Anything that is not a JPEG, or cannot be read, has no small copy and is served
+  as its original.
+- The request form's upload limits apply to a chat file: photos up to 10 MB, PDFs up to 25 MB, the same types.
+  A unit test keeps the two lists equal.
+- One dependency: `jpeg-js` 0.4.4 (pure JavaScript, none of its own), given hard limits on what it will
+  decode. Applies to photos sent by text message too.
+
+**9. Privacy and Terms.** Both: "Qolumns is run by Billiom Limited, a company registered in England and Wales",
+with the company number from `NEXT_PUBLIC_COMPANY_NUMBER` (left out until it is set). Terms: the governing law
+line, and a WhatsApp section (a number the business owns and may use; WhatsApp's Business Messaging and
+Commerce policies; the assistant may be paused if Meta restricts the number). Privacy: one sentence on what
+happens to a WhatsApp message that is not a price request. Both dated 17 November 2026.
+
+#### Decisions taken (each is in OWNER-TODO for the owner)
+
+- `past_due` pauses the assistant (the ticket lists "unpaid"); the quote limit keeps its grace.
+- No email is asked for on WhatsApp unless the business requires both.
+- No confirmation step; one retry, then silence.
+- The Privacy sentence, and the `jpeg-js` dependency.
+
+#### The live model is not a gate (the owner's instruction, during the ticket)
+
+- A live model's answers vary a little between runs, so they cannot be a pass-or-fail check.
+- The unit tests mock the model and are required. `verify-t177.mts` stands in for the model
+  (`WHATSAPP_INTENT_BASE_URL`, ignored in production) and is the same every run.
+- `verify-t177-live.mts` is separate and optional: it puts real-sounding messages to the real model, reports
+  what it did, and always exits 0 once it has run.
+- One run of the optional live script after the last change, no further tuning: 12 of 12 messages that are not
+  a price request stayed silent, and 4 of 4 price requests were answered for the right service.
+- One miss seen while the script was still live (two runs of five): a bare "can I get a quote for a new garage
+  door?" was read as already describing the job, so the link was sent without first asking what needs doing.
+  The model's instructions were tightened once, in words that name no service; it was not chased further.
+
+#### Checks
+
+- Unit tests (the model mocked; required): web 929, worker 534, mobile 11. `pnpm lint` and `pnpm typecheck` pass.
+- `scripts/hardcore-test/verify-t177.mts`: 99/99, with Meta and the AI model both stood in for.
+- `verify-t175`: 110/110 and `verify-t176`: 82/82, each after its script was brought in line with this ticket
+  (test businesses get a plan with WhatsApp; v5; the automatic template; the removed question; the assistant
+  in place of the scripted chat; a one-line stand-in for the model).
+- Full regression (this changes how a WhatsApp request becomes a quote): all 26 scripts pass, `verify-t146` to
+  `verify-t177` (t146 20, t147 33, t148 29, t149 35, t150 27, t151 35, t152 66, t153 39, t154 26, t155 44,
+  t156 31, t157 96, t158 116, t160 96, t162 77, t164 78, t165 148, t167 182, t169 149, t170 412, t171 97,
+  t172 78, t174 83, t175 110, t176 82, t177 99).
+- `verify-t173`: 100/100 on its own server. (Two earlier attempts were mine to blame, not the code's: one
+  started before the server was up, and one read a log left behind by a run I had stopped.)
+- Builds: web and worker both build.
+- One older unit test (`rename-qolumns`, which reads the whole repository) ran past its 5-second limit once
+  when all three packages were tested at the same time as the local servers; it passes on its own.
+- No preview was deployed (the ticket asks for one commit and no deploy).
+
+#### Fix dependencies
+
+- T-175 (AD-053): signatures and routing are unchanged; "which messages are answered" moved from
+  `shouldAnswer` (removed) to the assistant. `smb_message_echoes` is now read, for who and when only;
+  `history` and `smb_app_state_sync` are still ignored.
+- T-176 (AD-056): the template is still Meta's record and never stored; only when it is created changed
+  (connect, not a button). The approval notice now also checks the plan.
+- T-172: the small copy's key, type and size rules are reused unchanged; only who makes it differs.
+- T-151: a request needs a name and one way to reach the customer; the chat engine no longer insists on an
+  email when a phone number is known.
+- T-136: the scripted engine is unchanged for SMS.
+
+---
+
 ### 2026-11-17: T-176 — WhatsApp review-ready: a message template, plainer wording, the personal number warning (AD-056)
 
 **Deployed 2026-11-17 13:55 UTC** (commit `9ab85dc`). Web only: no migration, and the worker is not touched (its
@@ -7192,6 +7357,44 @@ the business's act and already sends the email; a third party being slow or refu
 instead of a body variable (Meta's docs do not say its variable may hold `?` and `=`); sending the template
 inside the 24 hours (charged, and the ordinary message says the same); blocking the test message when the
 window looks closed (our record can be wrong; the page says what to expect instead).
+
+---
+
+### AD-057: The WhatsApp assistant is silent by default; the business's configuration decides when it speaks (T-177)
+
+**Decision:**
+1. **Silence is the default on every connected number.** The assistant answers only when a customer asks for
+   a price for something the business offers. Unsure, or any failure, means silent.
+2. **That judgement is one AI call given the business's own configuration** (services, what each includes and
+   excludes, service area). No word list, trade or service name is in code or in the words we give the model.
+   The model never writes what a customer reads and never sees or sets a price.
+3. **A message that is not answered is kept without its text.** Only that it arrived, from whom and when.
+4. **The assistant asks only for what the business's settings require and the chat does not already give**,
+   in short fixed sentences, then makes the ordinary request and sends the link.
+5. **It steps back:** after the link; for 24 hours after the business replies to that customer itself; and
+   when an answer cannot be used twice or a question waits a day.
+6. **It speaks only for a business whose plan includes WhatsApp and whose subscription is active.** Otherwise
+   nothing leaves from any path, and the connection is kept.
+7. **A live model is never a pass-or-fail check.** Unit tests mock it; the verify script stands in for it; a
+   separate optional script reports what the real one does.
+
+**Why:** a business's WhatsApp number is where it talks to its customers, suppliers and family. A bot that
+answers "are you coming tomorrow?" with quote questions is worse than no bot. A missed lead is answered by a
+person; an interruption cannot be taken back. Fixed sentences keep the assistant from saying anything the
+business did not set up, and the price stays the engine's.
+
+**Rules that follow:**
+- Never start a request from a keyword, and never add a business's terms to the model's instructions; add
+  them to the business's configuration, which the model is given.
+- Never store or log the text of a message that was not part of a price request.
+- Never send from a paused business: every path that can send checks `lib/whatsapp-access.ts` first.
+- The page never names a plan; the plan definitions say which plans have WhatsApp.
+- Opening a page never creates anything on Meta.
+
+**Rejected:** keyword triggers (the anti-hardcoding rule, and "price" appears in ordinary chat); letting the
+model write the replies (it could promise or price); answering when unsure and letting the owner correct it;
+keeping every message's text "for context"; a grace period for an unpaid subscription on WhatsApp (the owner
+listed unpaid as a reason to pause); making the real model's answers a required check (they vary by run).
 
 ---
 

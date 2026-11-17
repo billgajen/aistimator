@@ -15,6 +15,9 @@ import type {
 } from '@qolumns/shared'
 import { generateQuoteToken, getTokenExpiry } from '../tokens'
 import { uploadToR2, isR2Configured } from '../r2'
+import { uploadAllowed, uploadKindOf } from '../upload-limits'
+import { smallPhotoKey } from '../small-photo'
+import { makeSmallCopy } from '../small-photo-make'
 import { enqueueQuoteJob } from '../queue'
 import { incrementUsageCounter } from '../usage'
 import { checkPlanLimit, maybeNotifyLimitReached, recordOverageQuote } from '../plan-limits'
@@ -32,7 +35,7 @@ const SKIP_KEYWORDS = ['no', 'nope', 'n', 'skip', 'none', 'later']
 
 
 /** T-133: the tenant's region; a lookup failure falls back to the legacy region */
-async function loadTenantRegion(supabase: SupabaseClient, tenantId: string): Promise<RegionDefinition> {
+export async function loadTenantRegion(supabase: SupabaseClient, tenantId: string): Promise<RegionDefinition> {
   try {
     const { data } = await supabase.from('tenants').select('region').eq('id', tenantId).single()
     return getRegion((data as { region?: string | null } | null)?.region)
@@ -42,7 +45,7 @@ async function loadTenantRegion(supabase: SupabaseClient, tenantId: string): Pro
 }
 
 /** T-133: find a postal code in free text, trying the tenant's region format first */
-function extractPostalCode(address: string, region: RegionDefinition): string | undefined {
+export function extractPostalCode(address: string, region: RegionDefinition): string | undefined {
   const regions = [region, ...listRegions().filter((r) => r.code !== region.code)]
   for (const r of regions) {
     const unanchored = r.postalCodePattern.replace(/^\^/, '').replace(/\$$/, '')
@@ -427,8 +430,6 @@ async function handleMediaUpload(
   currentState: WhatsAppIntakeState,
   currentData: WhatsAppIntakeData
 ): Promise<IntakeResult> {
-  const { supabase, tenantId, message } = ctx
-
   // If in address state and user sends photo, accept it and move to photos state
   if (currentState === 'awaiting_address') {
     currentData = {
@@ -445,48 +446,105 @@ async function handleMediaUpload(
     }
   }
 
-  // Download the media from WhatsApp
-  if (!message.mediaId) {
+  const stored = await storeIntakeMedia(ctx)
+  if (!stored.ok) {
+    if (stored.reason === 'not_allowed') {
+      return {
+        success: true,
+        responseText: "We can't use that file: please send a photo (JPEG or PNG, up to 10 MB), or reply \"done\" to continue without it.",
+      }
+    }
+    if (stored.reason === 'no_storage') {
+      return {
+        success: true,
+        responseText: "We couldn't save that photo — please continue, and mention key details in text instead.",
+      }
+    }
+    if (stored.reason === 'storage') {
+      return {
+        success: true,
+        responseText: "We couldn't save that photo — please try sending it again, or reply \"done\" to continue without it.",
+      }
+    }
     return {
       success: true,
       responseText: 'Photo received! Send more, or reply "done" when finished.',
     }
   }
 
+  // Update photo count and asset IDs
+  const assetIds = [...(currentData.assetIds || [])]
+  if (stored.assetId) {
+    assetIds.push(stored.assetId)
+  }
+  const photoCount = (currentData.photoCount || 0) + 1
+
+  return {
+    success: true,
+    newState: 'awaiting_photos',
+    newData: { ...currentData, assetIds, photoCount },
+    responseText: `Photo ${photoCount} received! Send more, or reply "done" when finished.`,
+  }
+}
+
+export type StoredMedia =
+  | { ok: true; assetId: string | null }
+  | { ok: false; reason: 'no_media' | 'download' | 'not_allowed' | 'no_storage' | 'storage' }
+
+/**
+ * Keep a photo or document a customer sent in a chat: download it from the
+ * channel, store the original privately, and record it as an asset.
+ *
+ * T-177:
+ * - the upload limits of the request form apply here too (type and size); a
+ *   file outside them is not stored;
+ * - a photo gets a small copy beside the original (`<key>.small`), as a photo
+ *   from the request form does, so the dashboard and the quote page do not
+ *   load the full picture for a thumbnail. The original is what the AI reads.
+ */
+export async function storeIntakeMedia(ctx: IntakeContext): Promise<StoredMedia> {
+  const { supabase, tenantId, message } = ctx
+  if (!message.mediaId) return { ok: false, reason: 'no_media' }
+
   try {
     const mediaResult = await ctx.channel.downloadMedia(message)
 
     if (!mediaResult.success || !mediaResult.data) {
       console.error('[Intake] Failed to download media:', mediaResult.error)
-      return {
-        success: true,
-        responseText: 'Photo received! Send more, or reply "done" when finished.',
-      }
+      return { ok: false, reason: 'download' }
     }
+
+    const contentType = (mediaResult.contentType || 'image/jpeg').split(';')[0]!.trim().toLowerCase()
+    if (!uploadAllowed(contentType, mediaResult.data.length)) {
+      console.warn(`[Intake] A ${ctx.channel.name} file was not kept: outside the upload limits`)
+      return { ok: false, reason: 'not_allowed' }
+    }
+    const kind = uploadKindOf(contentType)
 
     // Upload the actual bytes to R2 BEFORE creating the asset record (T-111).
     // Previously only the asset row was created — the object was never written,
     // so the worker fetched nothing and photos silently vanished from AI extraction.
     const r2Key = `${ctx.channel.name}/${tenantId}/${ctx.conversation.id}/${Date.now()}_${safeKeyPart(message.messageId)}`
-    const contentType = mediaResult.contentType || 'image/jpeg'
 
     if (!isR2Configured()) {
       console.error('[Intake] R2 not configured — cannot store media')
-      return {
-        success: true,
-        responseText:
-          "We couldn't save that photo — please continue, and mention key details in text instead.",
-      }
+      return { ok: false, reason: 'no_storage' }
     }
 
     try {
       await uploadToR2(r2Key, mediaResult.data, contentType)
     } catch (uploadError) {
-      console.error('[Intake] R2 upload failed:', uploadError)
-      return {
-        success: true,
-        responseText:
-          "We couldn't save that photo — please try sending it again, or reply \"done\" to continue without it.",
+      console.error('[Intake] R2 upload failed:', uploadError instanceof Error ? uploadError.name : 'unknown error')
+      return { ok: false, reason: 'storage' }
+    }
+
+    // T-177: the small copy. Best effort: a photo without one is served as its original.
+    if (kind === 'image') {
+      try {
+        const small = makeSmallCopy(mediaResult.data)
+        if (small) await uploadToR2(smallPhotoKey(r2Key), small, 'image/jpeg')
+      } catch (smallError) {
+        console.warn('[Intake] no small copy was made:', smallError instanceof Error ? smallError.name : 'unknown error')
       }
     }
 
@@ -495,7 +553,7 @@ async function handleMediaUpload(
       .from('assets')
       .insert({
         tenant_id: tenantId,
-        type: message.type === 'image' ? 'image' : 'document',
+        type: kind === 'document' ? 'document' : 'image',
         file_name: `${ctx.channel.name}_${message.type}_${Date.now()}`,
         content_type: contentType,
         size_bytes: mediaResult.data.length,
@@ -505,28 +563,12 @@ async function handleMediaUpload(
       .single()
 
     if (assetError) {
-      console.error('[Intake] Failed to create asset record:', assetError)
+      console.error('[Intake] Failed to create asset record:', assetError.message)
     }
-
-    // Update photo count and asset IDs
-    const assetIds = [...(currentData.assetIds || [])]
-    if (asset?.id) {
-      assetIds.push(asset.id)
-    }
-    const photoCount = (currentData.photoCount || 0) + 1
-
-    return {
-      success: true,
-      newState: 'awaiting_photos',
-      newData: { ...currentData, assetIds, photoCount },
-      responseText: `Photo ${photoCount} received! Send more, or reply "done" when finished.`,
-    }
+    return { ok: true, assetId: (asset?.id as string | undefined) ?? null }
   } catch (error) {
-    console.error('[Intake] Media processing error:', error)
-    return {
-      success: true,
-      responseText: 'Photo received! Send more, or reply "done" when finished.',
-    }
+    console.error('[Intake] Media processing error:', error instanceof Error ? error.name : 'unknown error')
+    return { ok: false, reason: 'download' }
   }
 }
 
@@ -590,15 +632,21 @@ async function handleConfirmation(
 }
 
 /**
- * Create quote request from intake data and trigger processing
+ * Create quote request from intake data and trigger processing.
+ *
+ * T-177: exported for the WhatsApp assistant, and an email is no longer
+ * required when the customer's phone number is known (a request needs a name
+ * and one way to reach the customer, as on the request form since T-151).
+ * The scripted flow always collects an email, so nothing changes for it.
  */
-async function createQuoteFromIntake(
+export async function createQuoteFromIntake(
   ctx: IntakeContext,
   data: WhatsAppIntakeData
 ): Promise<IntakeResult> {
   const { supabase, tenantId, conversation } = ctx
+  const reachable = Boolean(data.customerEmail || data.customerPhone || conversation.customer_phone)
 
-  if (!data.serviceId || !data.customerName || !data.customerEmail) {
+  if (!data.serviceId || !data.customerName || !reachable) {
     return {
       success: false,
       error: 'Missing required data',
@@ -649,7 +697,7 @@ async function createQuoteFromIntake(
         tenant_id: tenantId,
         service_id: data.serviceId,
         customer_name: data.customerName,
-        customer_email: data.customerEmail,
+        customer_email: data.customerEmail || null,
         customer_phone: data.customerPhone || conversation.customer_phone,
         job_postcode: data.jobPostcode || null,
         job_address: data.jobAddress || null,
@@ -681,7 +729,7 @@ async function createQuoteFromIntake(
         service_id: data.serviceId,
         customer_json: {
           name: data.customerName,
-          email: data.customerEmail,
+          ...(data.customerEmail && { email: data.customerEmail }),
           phone: data.customerPhone || conversation.customer_phone,
         },
         pricing_json: {
@@ -772,7 +820,9 @@ async function createQuoteFromIntake(
       success: true,
       newState: 'completed',
       newData: { ...data, _quoteId: quote.id, _quoteUrl: quoteViewUrl } as unknown as Partial<WhatsAppIntakeData>,
-      responseText: `Your quote request has been submitted!\n\nWe're generating your personalized quote now. You'll receive it at ${data.customerEmail} shortly.\n\nYou can also view it here:\n${quoteViewUrl}`,
+      responseText: data.customerEmail
+        ? `Your quote request has been submitted!\n\nWe're generating your personalized quote now. You'll receive it at ${data.customerEmail} shortly.\n\nYou can also view it here:\n${quoteViewUrl}`
+        : `Your quote request has been submitted!\n\nWe're generating your personalized quote now. You can view it here:\n${quoteViewUrl}`,
     }
   } catch (error) {
     console.error('[Intake] Failed to create quote:', error)

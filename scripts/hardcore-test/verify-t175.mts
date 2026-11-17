@@ -6,7 +6,7 @@
 // test values, not secrets):
 //
 //   CRON_SECRET=local-cron-t153 DEMO_DAILY_CAP=8 DEMO_IP_LIMIT_PER_HOUR=3 \
-//   WHATSAPP_GRAPH_BASE_URL=http://127.0.0.1:8799 \
+//   WHATSAPP_GRAPH_BASE_URL=http://127.0.0.1:8799 WHATSAPP_INTENT_BASE_URL=http://127.0.0.1:8799/ai \
 //   NEXT_PUBLIC_WHATSAPP_APP_ID=900000000000175 NEXT_PUBLIC_WHATSAPP_CONFIG_ID=900000000000176 \
 //   WHATSAPP_APP_SECRET=local-app-secret-t175 WHATSAPP_VERIFY_TOKEN=local-verify-t175 \
 //   WHATSAPP_ENCRYPTION_KEY=local-encryption-key-t175 pnpm dev:web
@@ -24,6 +24,7 @@ import crypto from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { ROOT, loadEnv, makeSupabase, sessionCookieHeader, http as call, expectOk, shortId, runStamp } from './lib.mjs'
 import { garageDoorsPackUS } from '../../apps/web/src/lib/vertical-packs/garage-doors-us'
+import { offeredPlansWithChannel } from '../../packages/shared/src/plans'
 
 type Row = Record<string, unknown>
 const MOCK_PORT = 8799
@@ -128,6 +129,16 @@ const mock = http.createServer((req, res) => {
     const refuse = (status: number, code: number, message: string) => send(status, { error: { message, type: 'OAuthException', code } })
     const parts = url.pathname.split('/').filter(Boolean)
     const version = parts.shift()
+    // T-177: a stand-in for the AI model that decides whether a message is a price request (WHATSAPP_INTENT_BASE_URL).
+    // This script is about routing and signatures, so its "model" is one line: a message that asks for a quote, an
+    // estimate or a price is one, for the business's first service. verify-t177 covers the assistant itself.
+    if (version === 'ai') {
+      const prompt = String(((body?.contents as Array<{ parts?: Array<{ text?: string }> }> | undefined)?.[0]?.parts?.[0]?.text) ?? '')
+      const message = /<<<MESSAGE\n([\s\S]*?)\nMESSAGE>>>/.exec(prompt)?.[1] ?? ''
+      const serviceId = /- id: (\S+)/.exec(prompt)?.[1] ?? null
+      const yes = /quote|estimate|price|how much/i.test(message) && Boolean(serviceId)
+      return send(200, { candidates: [{ content: { parts: [{ text: JSON.stringify({ wants_price: yes, service_id: yes ? serviceId : null, confidence: 0.95, job_described: false }) }] } }] })
+    }
     calls.push({ method: req.method ?? 'GET', path: `/${parts.join('/')}`, query, token, body })
     if (version !== 'v27.0') return refuse(400, 2635, `unexpected Graph API version ${version}`)
 
@@ -182,6 +193,8 @@ const mock = http.createServer((req, res) => {
       if (edge === 'subscribed_apps') return send(200, { success: true })
       // T-176: the page also asks for the account's message templates; this script has none (verify-t176 covers them)
       if (edge === 'message_templates' && req.method === 'GET') return send(200, { data: [] })
+      // T-177: connecting sets the template up when Meta has none
+      if (edge === 'message_templates' && req.method === 'POST') return send(200, { id: metaId(), status: 'PENDING', category: 'UTILITY' })
       if (!edge) return send(200, account.funding ? { id: account.wabaId, primary_funding_id: account.funding } : { id: account.wabaId })
     }
     if (number) {
@@ -229,6 +242,8 @@ async function business(name: string) {
   const setup = await call('POST', `${app}/api/auth/setup-tenant`, { headers: cookie, body: { businessName: name } })
   const tenantId = (setup.ok ? setup.json.tenantId : (await sb.select('user_profiles', `id=eq.${user.id}&select=tenant_id`))[0].tenant_id) as string
   expectOk('tenant', await call('PUT', `${app}/api/tenant`, { headers: cookie, body: { region: 'US', currency: 'USD', taxEnabled: false, taxRate: 0, serviceAreaMode: 'none', serviceAreaValues: [] } }))
+  // T-177: WhatsApp is for a plan that includes it, with a live subscription
+  await sb.insert('subscriptions', { tenant_id: tenantId, plan_id: offeredPlansWithChannel('whatsapp')[0]!.id, status: 'active' })
   return { cookie, cookieHeader, tenantId, name, bearer: session.access_token as string }
 }
 type Biz = Awaited<ReturnType<typeof business>>
@@ -292,7 +307,7 @@ if (probed.connect?.appId !== APP_ID || probed.connect?.configId !== CONFIG_ID |
   check('the web app runs with the local test settings', false, { connect: probed.connect, handshake: handshake.status })
   finish()
 }
-check('one-click connect is available, on Graph v27.0 and Embedded Signup v4', probed.connect.graphVersion === 'v27.0' && probed.connect.signupVersion === 'v4' && probed.configured === false, probed.connect)
+check('one-click connect is available, on Graph v27.0 and Embedded Signup v5', probed.connect.graphVersion === 'v27.0' && probed.connect.signupVersion === 'v5' && probed.configured === false, probed.connect)
 
 // =====================================================================================
 section('1. Connect: a business with a new number')
@@ -395,8 +410,8 @@ check('nothing was stored or answered for those', (await conversations(A.tenantI
 check('a properly signed call is accepted', (await webhook(payload1)) === 200)
 const convA = await conversations(A.tenantId)
 const outA = sentMessages.filter((m) => m.phoneNumberId === numA.id)
-check('the message goes into the existing intake: a conversation for that business, moved on by the engine', convA.length === 1 && convA[0]!.customer_phone === cust1 && convA[0]!.intake_state === 'awaiting_description', convA)
-check('the reply is sent from that business’s number with that business’s token, to that customer', outA.length === 1 && outA[0]!.token === accA.token && outA[0]!.to === cust1 && /quote/i.test(outA[0]!.text), outA.map((m) => m.text.slice(0, 50)))
+check('a price request starts a request: a conversation for that business, moved on by the assistant', convA.length === 1 && convA[0]!.customer_phone === cust1 && convA[0]!.intake_state === 'awaiting_description', convA)
+check('the reply is sent from that business’s number with that business’s token, to that customer', outA.length === 1 && outA[0]!.token === accA.token && outA[0]!.to === cust1 && /price/i.test(outA[0]!.text), outA.map((m) => m.text.slice(0, 50)))
 check('no other business has a conversation or a message', (await conversations(B.tenantId)).length === 0 && (await conversations(C.tenantId)).length === 0 && (await messagesOf(B.tenantId)).length === 0)
 check('Meta sending the same message again changes nothing', (await webhook(payload1)) === 200 && (await messagesOf(A.tenantId)).filter((m) => m.direction === 'inbound').length === 1 && sentMessages.filter((m) => m.phoneNumberId === numA.id).length === 1)
 
@@ -411,18 +426,18 @@ const cust3 = customer(3)
 check('a call naming one account and another business’s number goes by the number', (await webhook(messagePayload(accC, numA, cust3, 'price for a spring repair please'))) === 200 && (await conversations(A.tenantId)).some((c) => c.customer_phone === cust3) && !(await conversations(C.tenantId)).some((c) => c.customer_phone === cust3))
 check('a signed call for a number nobody has connected is acknowledged and stores nothing', (await webhook(messagePayload(accA, { ...numA, id: metaId() }, customer(4), 'quote please'))) === 200 && !(await conversations(A.tenantId)).some((c) => c.customer_phone === customer(4)))
 
-// the quiet rule on a number shared with the WhatsApp Business app
+// T-177: every number is quiet unless a customer asks for a price (the T-175 rule applied to Business app numbers only)
 const cust5 = customer(5)
 const quietBefore = sentMessages.length
 await webhook(messagePayload(accC, numC, cust5, 'See you at 5 then'))
-check('on a WhatsApp Business app number, a message that is not about a quote is kept and not answered', sentMessages.length === quietBefore && (await messagesOf(C.tenantId)).some((m) => m.content === 'See you at 5 then'))
+const quietRows = await messagesOf(C.tenantId)
+check('on a WhatsApp Business app number, a message that is not about a price is not answered, and its text is not kept', sentMessages.length === quietBefore && !quietRows.some((m) => m.content === 'See you at 5 then') && quietRows.some((m) => m.direction === 'inbound' && m.content === null))
 await webhook(messagePayload(accC, numC, cust5, 'Actually, can I get an estimate for the hallway?'))
 check('and one that asks for an estimate is answered', sentMessages.length === quietBefore + 1 && sentMessages.at(-1)!.to === cust5)
-// on a number connected only for Qolumns, any first message starts it (T-111, unchanged)
 const cust6 = customer(6)
 const anyBefore = sentMessages.length
 await webhook(messagePayload(accA, numA, cust6, 'Hello, are you open on Saturdays?'))
-check('on a number connected just for Qolumns, any first message is answered, as before', sentMessages.length === anyBefore + 1 && sentMessages.at(-1)!.to === cust6)
+check('on a number connected just for Qolumns, a message that is not about a price is not answered either (T-177)', sentMessages.length === anyBefore)
 
 // a message going out settles the payment step; Meta refusing for payment brings it back
 check('a reply going out marks the number as working', Boolean((await row(C.tenantId))?.messages_ready_at))
@@ -555,8 +570,6 @@ for (const width of [390, 1440]) {
   await p.goto(`${app}/app/whatsapp`, { waitUntil: 'networkidle' })
   const button = p.locator('[data-testid=connect-whatsapp]')
   await button.waitFor({ timeout: 30_000 })
-  // T-176: the button is locked until the business says which app its number is on (verify-t176 covers the question)
-  await p.locator('[data-testid=number-app-new]').check()
   await p.waitForFunction(() => !(document.querySelector('[data-testid=connect-whatsapp]') as HTMLButtonElement).disabled, null, { timeout: 15_000 })
   const first = await p.evaluate(() => ({
     mainButtons: [...document.querySelectorAll('main button')].filter((b) => (b as HTMLElement).offsetParent !== null).map((b) => (b as HTMLElement).innerText.trim()),
@@ -586,9 +599,9 @@ for (const width of [390, 1440]) {
   await p.locator('[data-testid=whatsapp-connected]').waitFor({ timeout: 30_000 })
   const sdk = await p.evaluate(() => (window as unknown as { __fb: { inits: Row[]; logins: Array<{ config_id: string; response_type: string; override_default_response_type: boolean; extras: Row }> } }).__fb)
   const login = sdk.logins.at(-1)!
-  check(`${width}: Meta’s window is opened with our app, our configuration and the current settings`, sdk.inits[0]?.appId === APP_ID && sdk.inits[0]?.version === 'v27.0' && login.config_id === CONFIG_ID && login.response_type === 'code' && login.override_default_response_type === true && login.extras.featureType === 'whatsapp_business_app_onboarding', { init: sdk.inits[0], login })
+  check(`${width}: Meta’s window is opened with our app, our configuration and the current settings`, sdk.inits[0]?.appId === APP_ID && sdk.inits[0]?.version === 'v27.0' && login.config_id === CONFIG_ID && login.response_type === 'code' && login.override_default_response_type === true && login.extras.version === 'v5', { init: sdk.inits[0], login })
   const connectedText = (await p.locator('[data-testid=whatsapp-connected]').innerText()).replace(/\s+/g, ' ')
-  check(`${width}: connected, the page shows the number and what happens next`, (await p.locator('[data-testid=connected-number]').innerText()).trim() === numP.display && /asks about the job/.test(await p.locator('[data-testid=what-happens-next]').innerText()))
+  check(`${width}: connected, the page shows the number and what happens next`, (await p.locator('[data-testid=connected-number]').innerText()).trim() === numP.display && /stays quiet in your chats/.test((await p.locator('[data-testid=what-happens-next]').innerText()).replace(/\s+/g, ' ')))
   // T-176: a payment method is a note, not a step
   check(`${width}: nothing is left to do; the payment note links to WhatsApp Manager`, /Nothing left to do/.test(connectedText) && !/step left|steps left/i.test(connectedText) && (await p.locator('[data-testid=payment-link]').getAttribute('href'))?.includes(accP.wabaId) === true && (await p.locator('[data-testid=register-step]').count()) === 0)
   check(`${width}: no token is anywhere in the page`, !(await p.content()).includes(accP.token))
@@ -607,7 +620,7 @@ for (const width of [390, 1440]) {
   await p.getByLabel('Your own mobile number, with country code').fill('+1 555 555 0199')
   await p.locator('[data-testid=send-test]').click()
   await p.locator('[data-testid=test-note]').waitFor({ timeout: 15_000 })
-  check(`${width}: a test message goes out from the business’s own number`, sentMessages.length === testsBefore + 1 && sentMessages.at(-1)!.to === '15555550199' && sentMessages.at(-1)!.token === accP.token && /Meta accepted the message/.test(await p.locator('[data-testid=test-note]').innerText()))
+  check(`${width}: a test message goes out from the business’s own number`, sentMessages.length === testsBefore + 1 && sentMessages.at(-1)!.to === '15555550199' && sentMessages.at(-1)!.token === accP.token && /^Sent\./.test((await p.locator('[data-testid=test-note]').innerText()).trim()))
 
   // the 60-day warning and one-click reconnect
   await patchRow(P.tenantId, { token_expires_at: new Date(Date.now() + 4.5 * 86_400_000).toISOString() })

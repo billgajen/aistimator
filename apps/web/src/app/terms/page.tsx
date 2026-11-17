@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
-import { PRODUCT_NAME, SUPPORT_EMAIL } from '@qolumns/shared'
+import { GOVERNING_LAW, PRODUCT_NAME, SUPPORT_EMAIL, operatorStatement } from '@qolumns/shared'
 
 export const metadata: Metadata = {
   title: `Terms of Service — ${PRODUCT_NAME}`,
@@ -46,7 +46,17 @@ const SECTIONS = [
     body: 'You may close your account at any time. We may suspend or terminate accounts that breach these terms, with notice where practicable. On termination we will make your quote history available for export for 30 days.',
   },
   {
-    title: '10. Contact',
+    // T-177
+    title: '10. WhatsApp',
+    body: `If you connect a WhatsApp number to ${PRODUCT_NAME}, it must be a number your business owns and has the right to use. You must follow the WhatsApp Business Messaging Policy and the WhatsApp Commerce Policy, and you are responsible for the messages sent from your number, including those the assistant sends on your behalf. Meta charges you directly for WhatsApp. ${PRODUCT_NAME} may pause the assistant on your number if Meta restricts or suspends it, if your plan no longer includes WhatsApp, or if your subscription is not active; your connection is kept, and you can remove it at any time with Disconnect.`,
+  },
+  {
+    // T-177
+    title: '11. Governing law',
+    body: `These terms are governed by ${GOVERNING_LAW}.`,
+  },
+  {
+    title: '12. Contact',
     body: `Questions about these terms: email ${SUPPORT_EMAIL}, or contact us through your dashboard.`,
   },
 ]
@@ -59,7 +69,11 @@ export default function TermsPage() {
         <h1 className="font-display text-4xl font-extrabold tracking-tight text-text-primary">
           Terms of Service
         </h1>
-        <p className="mt-3 text-sm text-text-muted">Last updated: 10 November 2026</p>
+        <p className="mt-3 text-sm text-text-muted">Last updated: 17 November 2026</p>
+        {/* T-177: who runs the product. The company number comes from NEXT_PUBLIC_COMPANY_NUMBER. */}
+        <p className="mt-3 leading-relaxed text-text-secondary" data-testid="operator">
+          {operatorStatement(process.env.NEXT_PUBLIC_COMPANY_NUMBER)}
+        </p>
         <div className="tape-rule mt-8" />
         <div className="mt-10 space-y-8">
           {SECTIONS.map((section) => (

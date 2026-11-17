@@ -17,7 +17,7 @@ vi.mock('@/lib/business-email', () => ({ resolveBusinessEmail: async () => 'owne
 
 import { WhatsAppKeyMissingError, decryptSecret, encryptSecret, whatsappKeyConfigured } from '@/lib/whatsapp-crypto'
 import { verifyWebhookSignature } from '@/lib/whatsapp'
-import { ACCOUNT_GONE_EVENTS, parseAccountUpdates, shouldAnswer, signedForConnection } from '@/lib/whatsapp-webhook'
+import { ACCOUNT_GONE_EVENTS, parseAccountUpdates, signedForConnection } from '@/lib/whatsapp-webhook'
 import { CONNECTION_VIEW_COLUMNS, TOKEN_RENEW_DAYS, TOKEN_WARN_DAYS, connectionView, daysUntil, paymentSettingsUrl, tokenState, type WhatsAppConfigRow } from '@/lib/whatsapp-state'
 import { EMBEDDED_SIGNUP_VERSION, fromMeta, readSignupMessage, signupLoginOptions } from '@/lib/whatsapp-signup'
 import { GRAPH_API_VERSION, graphApiUrl } from '@/lib/whatsapp-graph'
@@ -136,15 +136,9 @@ describe('T-175: account events and the quiet rule', () => {
     expect(ACCOUNT_GONE_EVENTS).not.toContain('PARTNER_ADDED')
   })
 
-  it('a number connected just for Qolumns answers every first message; one shared with the Business app only a request for a quote', () => {
-    expect(shouldAnswer({ numberKind: 'new_number', intakeState: 'idle', asksForQuote: false })).toBe(true)
-    expect(shouldAnswer({ numberKind: null, intakeState: 'idle', asksForQuote: false })).toBe(true)
-    expect(shouldAnswer({ numberKind: 'business_app', intakeState: 'idle', asksForQuote: false })).toBe(false)
-    expect(shouldAnswer({ numberKind: 'business_app', intakeState: 'idle', asksForQuote: true })).toBe(true)
-    // once a quote conversation is under way, its answers are not keyword-checked
-    expect(shouldAnswer({ numberKind: 'business_app', intakeState: 'awaiting_description', asksForQuote: false })).toBe(true)
-    // and when it is finished, the owner's ordinary chat with that customer is left alone again
-    expect(shouldAnswer({ numberKind: 'business_app', intakeState: 'completed', asksForQuote: false })).toBe(false)
+  it('T-177: which messages are answered is no longer decided by the kind of number (the assistant decides, for every number)', () => {
+    expect(code('apps/web/src/lib/whatsapp-webhook.ts')).not.toContain('shouldAnswer')
+    expect(code('apps/web/src/app/api/whatsapp/webhook/route.ts')).toContain('handleCustomerMessage(')
   })
 })
 
@@ -203,15 +197,16 @@ describe('T-175: what the page is told', () => {
 
 describe('T-175: the browser side of Embedded Signup', () => {
   it('opens Meta with our configuration, on the current version, with the Business app option', () => {
-    expect(EMBEDDED_SIGNUP_VERSION).toBe('v4')
+    // T-177: v5 (Meta's current version), where the Business app option is on by default
+    expect(EMBEDDED_SIGNUP_VERSION).toBe('v5')
     expect(signupLoginOptions('1566858898811795')).toEqual({
       config_id: '1566858898811795',
       response_type: 'code',
       override_default_response_type: true,
-      extras: { setup: {}, featureType: 'whatsapp_business_app_onboarding', sessionInfoVersion: '3' },
+      extras: { setup: {}, version: 'v5' },
     })
-    // v5 is one constant away: chosen in extras, where the Business app option is on by default
-    expect(signupLoginOptions('1', 'v5').extras).toEqual({ setup: {}, version: 'v5' })
+    // v4 asked for the Business app option by name
+    expect(signupLoginOptions('1', 'v4').extras).toEqual({ setup: {}, featureType: 'whatsapp_business_app_onboarding', sessionInfoVersion: '3' })
     // neither id is written into the code
     const client = read('apps/web/src/components/whatsapp/ConnectWhatsApp.tsx') + read('apps/web/src/lib/whatsapp-signup.ts') + read('apps/web/src/lib/whatsapp-graph.ts')
     expect(client).not.toMatch(/4654271271562035|1566858898811795/)

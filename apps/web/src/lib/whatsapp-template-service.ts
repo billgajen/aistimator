@@ -1,6 +1,8 @@
 /**
  * T-176: creating the business's message template and reading Meta's review
- * of it — server only. Every function takes the service-role client and a
+ * of it — server only. T-177: there is no button. The template is looked for
+ * when a business connects and created only if Meta has none with our name
+ * (`ensureEstimateTemplate`); the page only reads its status. Every function takes the service-role client and a
  * tenant id the caller has already authorised (the signed-in user's own).
  *
  * Nothing is stored: Meta is the record. The status is read from Meta each
@@ -89,12 +91,15 @@ export async function loadEstimateTemplate(admin: Admin, tenantId: string): Prom
 }
 
 /**
- * Create the template and hand back Meta's first answer (normally "in
- * review"). Pressing twice makes one: a template Meta already lists is
- * returned as it stands, and Meta itself refuses a second with the same name
- * and language.
+ * T-177: make sure the business has the template, with no button. Called when
+ * a business connects (and reconnects):
+ *   - Meta already lists a template with our name, in any language and any
+ *     state: that one is used. NOTHING is created.
+ *   - Meta lists none: it is created, and Meta reviews the wording.
+ * `created` says which happened. Reading it for the page (`loadEstimateTemplate`)
+ * never creates anything.
  */
-export async function createEstimateTemplate(admin: Admin, tenantId: string): Promise<TemplateResult> {
+export async function ensureEstimateTemplate(admin: Admin, tenantId: string): Promise<TemplateResult & { created?: boolean }> {
   let acc: Account | null
   try {
     acc = await account(admin, tenantId)
@@ -104,8 +109,9 @@ export async function createEstimateTemplate(admin: Admin, tenantId: string): Pr
   if (!acc) return fail(404, 'NOT_CONNECTED', 'Connect WhatsApp first. Templates belong to the WhatsApp account you connect.')
   try {
     const existing = pickTemplate(await templatesNamed(acc.token, acc.wabaId, ESTIMATE_TEMPLATE_NAME), acc.language)
-    if (existing) return { ok: true, template: view(acc, existing), problem: null }
+    if (existing) return { ok: true, template: view(acc, existing), problem: null, created: false }
   } catch (error) {
+    // Meta could not be asked: do NOT create blind, or a second one could be made
     console.error(`[WhatsApp template] could not read the template: ${describe(error)}`)
     return fail(502, 'META_REFUSED', metaProblem(error))
   }
@@ -121,17 +127,17 @@ export async function createEstimateTemplate(admin: Admin, tenantId: string): Pr
       rejectedReason: null,
       bodyText: definition.components[0]?.text ?? null,
     }
-    return { ok: true, template: view(acc, made), problem: null }
+    return { ok: true, template: view(acc, made), problem: null, created: true }
   } catch (error) {
     console.error(`[WhatsApp template] Meta refused the template: ${describe(error)}`)
     // Meta says "already exists" with a code it shares with other refusals: look again before reporting a failure
     try {
       const now = pickTemplate(await templatesNamed(acc.token, acc.wabaId, ESTIMATE_TEMPLATE_NAME), acc.language)
-      if (now) return { ok: true, template: view(acc, now), problem: null }
+      if (now) return { ok: true, template: view(acc, now), problem: null, created: false }
     } catch {
       // the first refusal is the one to report
     }
-    return fail(error instanceof GraphError && error.status === 0 ? 502 : 422, 'META_REFUSED', `Meta did not accept the template${error instanceof GraphError && error.code ? ` (code ${error.code})` : ''}. Nothing was created. Try again in a minute.`)
+    return fail(error instanceof GraphError && error.status === 0 ? 502 : 422, 'META_REFUSED', `Meta did not accept the template${error instanceof GraphError && error.code ? ` (code ${error.code})` : ''}. Nothing was created.`)
   }
 }
 

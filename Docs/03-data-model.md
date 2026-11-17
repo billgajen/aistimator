@@ -197,7 +197,16 @@ Indexes: `(tenant_id, created_at desc)` where not completed; the same where also
   registered_at, registration_pin_encrypted, messages_ready_at, connected_at. Every `_encrypted` value is
   AES-256-GCM under `WHATSAPP_ENCRYPTION_KEY` (lib/whatsapp-crypto.ts); values from before T-175 are AES-256-CBC
   and still read.
-- whatsapp_conversations, whatsapp_messages: unchanged (migration 25).
+- whatsapp_conversations, whatsapp_messages: the tables are unchanged (migration 25). How they are used changed
+  in T-177 (no migration):
+  - a conversation's `status` becomes `completed` when its request is made, so the next message from that
+    customer starts a new conversation;
+  - `intake_data` also holds `_ownerRepliedAt` (when the business last replied to that customer from its own
+    app), `_retries`, and `_quoteId` (the quote the chat produced);
+  - an inbound message the assistant did not answer has `content` and `media_url` null; an outbound message's
+    stored text never carries the token of an estimate's link.
+- A photo sent in a chat (WhatsApp, SMS) is an `assets` row like any other; since T-177 a JPEG also has a small
+  copy in storage at `<r2_key>.small` (no row, as for a form photo).
 
 ### SMS channel (T-136, migration 27)
 - sms_configs: tenant_id (unique), phone_number (E.164, unique), messaging_service_sid, is_active, a2p_brand_registered, a2p_campaign_registered

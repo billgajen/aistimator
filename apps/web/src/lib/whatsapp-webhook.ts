@@ -9,6 +9,11 @@
  *     manual connection. There is no path that skips the check;
  *   - a message goes to the one business whose stored row names the phone
  *     number id Meta put in the call.
+ *
+ * T-177: whether a message is ANSWERED is no longer decided here. Every
+ * number is silent unless the customer asks for a price for something the
+ * business offers (`lib/whatsapp-assistant.ts`), which replaces the T-175
+ * rule that only a number kept on the WhatsApp Business app stayed quiet.
  */
 import { verifyWebhookSignature } from './whatsapp'
 
@@ -55,15 +60,41 @@ export function signedForConnection(rawBody: string, signature: string | null, c
   return Boolean(secret) && verifyWebhookSignature(rawBody, signature, secret as string)
 }
 
+/** A message the business itself sent from the WhatsApp Business app (Meta's `smb_message_echoes` field) */
+export interface OwnerEcho {
+  phoneNumberId: string
+  /** the customer it was sent to; Meta leaves this out when it does not share the number */
+  to: string
+  messageId: string
+  /** when it was sent */
+  at: Date | null
+}
+
 /**
- * A number that stays on the WhatsApp Business app is not only for quotes: the
- * owner's other chats arrive on it too. So a new conversation there starts
- * only when the message asks for a quote, estimate or price; anything else is
- * left for the owner to answer in the app. A number connected just for
- * Qolumns answers every first message, as before (T-111).
+ * T-177: the `smb_message_echoes` changes in a webhook call. Meta sends one
+ * each time a business that kept its number on the WhatsApp Business app
+ * messages a customer from the app. Only who it was sent to and when is
+ * read: the business's own words are never looked at.
  */
-export function shouldAnswer(opts: { numberKind: 'new_number' | 'business_app' | null; intakeState: string; asksForQuote: boolean }): boolean {
-  if (opts.numberKind !== 'business_app') return true
-  const underWay = opts.intakeState !== 'idle' && opts.intakeState !== 'completed'
-  return underWay || opts.asksForQuote
+export function parseOwnerEchoes(body: unknown): OwnerEcho[] {
+  const payload = body as {
+    object?: unknown
+    entry?: Array<{ changes?: Array<{ field?: unknown; value?: { metadata?: { phone_number_id?: unknown }; message_echoes?: Array<{ to?: unknown; id?: unknown; timestamp?: unknown }> } }> }>
+  } | null
+  if (!payload || payload.object !== 'whatsapp_business_account' || !Array.isArray(payload.entry)) return []
+  const echoes: OwnerEcho[] = []
+  for (const entry of payload.entry) {
+    for (const change of entry?.changes ?? []) {
+      if (change?.field !== 'smb_message_echoes') continue
+      const phoneNumberId = change.value?.metadata?.phone_number_id
+      if (typeof phoneNumberId !== 'string' || !phoneNumberId) continue
+      for (const echo of change.value?.message_echoes ?? []) {
+        const to = typeof echo?.to === 'string' ? echo.to.replace(/\D/g, '') : ''
+        if (!to || typeof echo?.id !== 'string') continue
+        const seconds = Number(echo.timestamp)
+        echoes.push({ phoneNumberId, to, messageId: echo.id, at: Number.isFinite(seconds) && seconds > 0 ? new Date(seconds * 1000) : null })
+      }
+    }
+  }
+  return echoes
 }

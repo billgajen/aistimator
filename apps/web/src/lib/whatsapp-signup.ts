@@ -2,19 +2,21 @@
  * T-175: Meta's Embedded Signup, the browser side — pure. What the page hands
  * to FB.login, and how it reads the message Meta's window posts back.
  *
- * Checked against Meta's docs on 2026-11-16:
- * - v2 and v3 were retired on 15 October 2026. v4 is what a configuration
- *   made from Meta's template runs, and is what this uses. v5 (20 October
- *   2026) is chosen by `version: "v5"` in `extras`; it turns WhatsApp Business
- *   app onboarding on by default and renames `waba_id` in the message to
- *   `messaging_account_ids`. `readSignupMessage` already reads both shapes, so
- *   moving to v5 is the one constant below.
- * - On v4, letting a business bring the number it already uses in the
- *   WhatsApp Business app is opted into with `featureType`. The first screen
- *   then offers that as a choice; a new number is still possible.
+ * T-177: this runs **v5**, Meta's current version (released 20 October 2026;
+ * read on 2026-11-17). Against v4 it changes two things only:
+ * - connecting a number that is already on the WhatsApp Business app is on by
+ *   default (v4 needed `featureType`), so a business can keep using its app
+ *   while this product listens;
+ * - the message Meta's window posts names the account in
+ *   `messaging_account_ids` (v4: `waba_id`) and carries `is_on_biz_app`.
+ *   `readSignupMessage` reads both shapes.
+ * The configuration id and the app id are unchanged, and a connection made
+ * under v4 is not touched: the version only shapes Meta's window.
+ * v2 and v3 were retired on 15 October 2026. A request with no version is
+ * served as v4, which is why the version is always sent.
  */
 
-export const EMBEDDED_SIGNUP_VERSION: 'v4' | 'v5' = 'v4'
+export const EMBEDDED_SIGNUP_VERSION: 'v4' | 'v5' = 'v5'
 
 /** The second argument of FB.login */
 export function signupLoginOptions(configId: string, version: 'v4' | 'v5' = EMBEDDED_SIGNUP_VERSION) {

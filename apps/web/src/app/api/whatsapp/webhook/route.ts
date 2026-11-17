@@ -1,11 +1,13 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { parseWebhookPayload, sendTextMessage, verifyWebhookSignature } from '@/lib/whatsapp'
 import { decryptSecret } from '@/lib/whatsapp-crypto'
-import { processIntakeMessage, shouldStartIntake } from '@/lib/whatsapp-intake'
-import { ACCOUNT_GONE_EVENTS, parseAccountUpdates, shouldAnswer, signedForConnection } from '@/lib/whatsapp-webhook'
+import { whatsappChannel } from '@/lib/whatsapp-intake'
+import { ACCOUNT_GONE_EVENTS, parseAccountUpdates, parseOwnerEchoes, signedForConnection } from '@/lib/whatsapp-webhook'
 import { removeConnectionsOfAccount } from '@/lib/whatsapp-connect'
 import { META_ERROR } from '@/lib/whatsapp-graph'
-import type { WhatsAppConversation, WhatsAppIntakeState, WhatsAppIntakeData } from '@qolumns/shared'
+import { handleCustomerMessage, recordOwnerReply } from '@/lib/whatsapp-assistant'
+import { whatsappAccess } from '@/lib/whatsapp-access'
+import type { WhatsAppConversation, WhatsAppIntakeState } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -49,6 +51,18 @@ interface StoredConfig {
  * - A message goes to the business whose stored row has the phone number id
  *   Meta named, and to no other.
  * - Nothing about the customer is logged: no number, no text.
+ *
+ * T-177:
+ * - The assistant is silent unless a customer asks for a price for something
+ *   the business offers (`lib/whatsapp-assistant.ts`). A message it does not
+ *   answer is kept without its text: only that it arrived, from whom and
+ *   when, which the 24-hour rule and Meta's repeats need.
+ * - A business whose plan does not include WhatsApp, or whose subscription is
+ *   not live, gets no reply sent at all (`lib/whatsapp-access.ts`). Its
+ *   connection is kept.
+ * - When the business replies to a customer from its own WhatsApp Business
+ *   app (Meta's `smb_message_echoes`), the assistant leaves that chat alone
+ *   for 24 hours.
  */
 export async function POST(request: Request) {
   const rawBody = await request.text()
@@ -95,6 +109,30 @@ export async function POST(request: Request) {
       await handleEntry(supabase, config, { phoneNumberId: entry.phoneNumberId, accessToken }, entry)
     }
 
+    // T-177: the business answered a customer from its own app. Signed by the app the number is connected through, like a message.
+    for (const echo of parseOwnerEchoes(body)) {
+      const { data } = await supabase
+        .from('whatsapp_configs')
+        .select('tenant_id, app_secret_encrypted, connection_method')
+        .eq('phone_number_id', echo.phoneNumberId)
+        .eq('is_active', true)
+        .maybeSingle()
+      const owner = data as Pick<StoredConfig, 'tenant_id' | 'app_secret_encrypted' | 'connection_method'> | null
+      if (!owner) continue
+      let ownAppSecret: string | null = null
+      try {
+        if (owner.app_secret_encrypted) ownAppSecret = decryptSecret(owner.app_secret_encrypted)
+      } catch {
+        continue
+      }
+      if (!signedForConnection(rawBody, signature, { connection_method: owner.connection_method, ownAppSecret }, platformSecret)) continue
+      acted = true
+      // a message we sent ourselves is not the owner taking over
+      const { data: ours } = await supabase.from('whatsapp_messages').select('id').eq('tenant_id', owner.tenant_id).eq('wa_message_id', echo.messageId).limit(1)
+      if (ours && ours.length > 0) continue
+      await recordOwnerReply(supabase, owner.tenant_id, echo.to, echo.at ?? new Date())
+    }
+
     // The account left: only the platform's app is told this, so only its signature counts
     if (signedByPlatform) {
       for (const update of parseAccountUpdates(body)) {
@@ -118,6 +156,8 @@ type Entry = ReturnType<typeof parseWebhookPayload>[number]
 
 async function handleEntry(supabase: Admin, config: StoredConfig, whatsappConfig: { phoneNumberId: string; accessToken: string }, entry: Entry) {
   const tenantId = config.tenant_id
+  // T-177: may this business's assistant speak at all? Asked once for the call.
+  const access = entry.messages.length > 0 ? await whatsappAccess(supabase, tenantId) : { allowed: false as const, why: 'plan' as const }
 
   for (const message of entry.messages) {
     // Meta sends a message again if we were slow to answer: once is enough
@@ -153,23 +193,28 @@ async function handleEntry(supabase: Admin, config: StoredConfig, whatsappConfig
       conversation = created as WhatsAppConversation
     }
 
-    const { error: msgError } = await supabase.from('whatsapp_messages').insert({
-      tenant_id: tenantId,
-      conversation_id: conversation.id,
-      wa_message_id: message.messageId,
-      direction: 'inbound',
-      message_type: message.type === 'text' ? 'text' : message.type === 'image' ? 'image' : 'document',
-      from_phone: message.from,
-      to_phone: entry.displayPhoneNumber,
-      content: message.text || message.caption || null,
-      media_url: message.mediaId || null,
-      status: 'received',
-    })
+    // Kept first, WITHOUT its text: that it arrived, from whom and when (Meta's repeats and the 24-hour rule need
+    // that much). The text is added below only if the message turns out to be part of a price request.
+    const { data: kept, error: msgError } = await supabase
+      .from('whatsapp_messages')
+      .insert({
+        tenant_id: tenantId,
+        conversation_id: conversation.id,
+        wa_message_id: message.messageId,
+        direction: 'inbound',
+        message_type: message.type === 'text' ? 'text' : message.type === 'image' ? 'image' : 'document',
+        from_phone: message.from,
+        to_phone: entry.displayPhoneNumber,
+        content: null,
+        media_url: null,
+        status: 'received',
+      })
+      .select('id')
+      .single()
     if (msgError) console.error('[WhatsApp Webhook] could not store a message')
 
-    // A number shared with the WhatsApp Business app: stay quiet unless the customer asks for a quote
-    const asksForQuote = shouldStartIntake(message.text || message.caption || '')
-    if (!shouldAnswer({ numberKind: config.number_kind, intakeState: conversation.intake_state || 'idle', asksForQuote })) continue
+    // The plan does not include WhatsApp, or the subscription is not live: silent, and nothing is asked of the AI
+    if (!access.allowed) continue
 
     const reply = async (text: string) => {
       const sent = await sendTextMessage(whatsappConfig, { to: message.from, text })
@@ -182,7 +227,8 @@ async function handleEntry(supabase: Admin, config: StoredConfig, whatsappConfig
           message_type: 'text',
           from_phone: entry.displayPhoneNumber,
           to_phone: message.from,
-          content: text,
+          // the link to an estimate carries its token: it is not kept with the chat
+          content: text.replace(/\?token=[A-Za-z0-9_-]+/g, ''),
           status: 'sent',
         })
         // a message went out: nothing is blocking this number
@@ -191,29 +237,44 @@ async function handleEntry(supabase: Admin, config: StoredConfig, whatsappConfig
           await supabase.from('whatsapp_configs').update({ messages_ready_at: config.messages_ready_at }).eq('tenant_id', tenantId).is('messages_ready_at', null)
         }
       } else if (sent.errorCode === META_ERROR.PAYMENT && config.messages_ready_at) {
-        // Meta refused for the payment method: the dashboard shows that step again
+        // Meta refused for the payment method: the dashboard shows that note again
         config.messages_ready_at = null
         await supabase.from('whatsapp_configs').update({ messages_ready_at: null }).eq('tenant_id', tenantId)
       }
     }
 
     try {
-      const intakeResult = await processIntakeMessage({ supabase, waConfig: whatsappConfig, tenantId, conversation, message })
+      const outcome = await handleCustomerMessage({
+        admin: supabase,
+        tenantId,
+        conversation,
+        message,
+        profileName: message.profileName ?? null,
+        channel: whatsappChannel(whatsappConfig),
+      })
 
-      if (intakeResult.newState || intakeResult.newData) {
-        const updates: Partial<WhatsAppConversation> = {}
-        if (intakeResult.newState) updates.intake_state = intakeResult.newState as WhatsAppIntakeState
-        if (intakeResult.newData) {
-          updates.intake_data = { ...(conversation.intake_data || {}), ...intakeResult.newData } as WhatsAppIntakeData
-        }
-        if (intakeResult.newData?.customerName) updates.customer_name = intakeResult.newData.customerName
+      if (outcome.keepText && kept?.id) {
+        await supabase
+          .from('whatsapp_messages')
+          .update({ content: message.text || message.caption || null, media_url: message.mediaId || null })
+          .eq('id', kept.id)
+      }
+
+      if (outcome.newState || outcome.newData || outcome.finished) {
+        const updates: Record<string, unknown> = {}
+        if (outcome.newState) updates.intake_state = outcome.newState as WhatsAppIntakeState
+        // replaced, not merged: a dropped request leaves nothing of the customer's answers behind
+        if (outcome.newData) updates.intake_data = outcome.newData
+        if (outcome.newData?.customerName) updates.customer_name = outcome.newData.customerName
+        // the request is made: this chat is finished, and the next message starts a new one
+        if (outcome.finished) updates.status = 'completed'
         await supabase.from('whatsapp_conversations').update(updates).eq('id', conversation.id)
       }
 
-      if (intakeResult.responseText) await reply(intakeResult.responseText)
-    } catch (intakeError) {
-      console.error('[WhatsApp Webhook] intake failed:', intakeError instanceof Error ? intakeError.name : 'unknown error')
-      await reply('Sorry, something went wrong. Please try again or contact us directly.')
+      for (const text of outcome.replies) await reply(text)
+    } catch (assistantError) {
+      // silent: an error is never a reason to write into someone's chat
+      console.error('[WhatsApp Webhook] the assistant failed:', assistantError instanceof Error ? assistantError.name : 'unknown error')
     }
   }
 

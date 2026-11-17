@@ -40,13 +40,10 @@ type Finished = Extract<SignupMessage, { kind: 'finished' }>
 export function ConnectWhatsApp({
   settings,
   label = 'Connect WhatsApp',
-  locked = false,
   onConnected,
 }: {
   settings: ConnectSettings
   label?: string
-  /** T-176: held shut until the business has said which app its number is on */
-  locked?: boolean
   onConnected: (config: ConnectionView, registrationProblem: string | null) => void
 }) {
   const [sdkReady, setSdkReady] = useState(false)
@@ -139,7 +136,7 @@ export function ConnectWhatsApp({
   }, [usable, finish])
 
   function launch() {
-    if (locked || !window.FB || !settings.configId) return
+    if (!window.FB || !settings.configId) return
     finished.current = null
     code.current = null
     sent.current = false
@@ -169,7 +166,7 @@ export function ConnectWhatsApp({
       <button
         type="button"
         onClick={launch}
-        disabled={locked || !usable || !sdkReady || busy !== null}
+        disabled={!usable || !sdkReady || busy !== null}
         data-testid="connect-whatsapp"
         className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover disabled:opacity-50"
       >

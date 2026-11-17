@@ -255,6 +255,21 @@ Routes:
       did not deliver the message" once Meta reports it.
     - The page asks Meta how the connection stands once when it opens (`POST /api/whatsapp/status`), so what it
       shows about the name, a card and the token's end date is Meta's, not a stored copy.
+  - **T-177 changes to the WhatsApp page.**
+    - The three-answer question is removed. Before connecting there is one line, in the text that introduces
+      Meta's window: "Use your business WhatsApp number. Don't connect a personal number, it can stop working in
+      the normal WhatsApp app." (`PERSONAL_NUMBER_LINE`, `lib/whatsapp-copy.ts`). Meta's window runs Embedded
+      Signup v5.
+    - "Message templates" has no button: it shows the status only (Approved, In review with Meta, Rejected by
+      Meta with the reason; "Not set up yet" when Meta has none), read each time the page opens.
+    - "Try it": one line before the button ("Send 'Hi' to your business number from your phone first. …"); after
+      a send the page says "Sent.", then "Delivered" or "Meta did not deliver the message" once Meta reports it.
+    - A plan without WhatsApp: one upgrade line naming the plans that have it (from the plan definitions), a "See
+      plans" link, no connect button and no manual section; a number connected earlier is shown as "Connected,
+      paused" with Disconnect (`components/whatsapp/PausedConnection.tsx`). A subscription that is not active:
+      one line at the top, "Your WhatsApp assistant is paused until your plan is active again."
+    - The page describes the assistant as it now is: quiet in the business's chats, stepping in only for a price
+      request.
 - /app/sms (no menu item; reachable by URL, behaviour unchanged)
 
 Unfinished requests (T-151, T-160): people who gave their details and did not finish. The list (the Unfinished tab)

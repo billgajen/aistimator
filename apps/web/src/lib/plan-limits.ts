@@ -3,7 +3,7 @@ import { getCurrentPeriod } from './usage'
 import { sendEmail, isPostmarkConfigured } from './postmark'
 import { generateLimitReachedEmailHtml } from './email-templates'
 import { getStripeClient, reportOverageMeterEvent, formatPrice } from './stripe'
-import { getPlan, freeAllowance, noSubscriptionLimit } from '@qolumns/shared'
+import { getPlan, freeAllowance, noSubscriptionLimit, subscriptionLive } from '@qolumns/shared'
 import { businessEmailFor } from './business-email'
 
 /** Legacy (GB) monthly allowance for tenants without a subscription — kept for callers/tests. */
@@ -105,7 +105,7 @@ export async function checkPlanLimit(
     // T-134: limits, overage and features come from the plan definitions in
     // @qolumns/shared — never from DB numbers. Stripe's metered price id is
     // account-specific data and stays on the plans row (T-102).
-    const live = subscription && ['active', 'trialing', 'past_due'].includes(subscription.status as string)
+    const live = subscription && subscriptionLive(subscription.status as string)
     const plan = live ? getPlan(subscription.plan_id as string) : null
     const meteredPriceId = (subscription?.plans as { stripe_metered_price_id?: string | null } | null)
       ?.stripe_metered_price_id

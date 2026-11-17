@@ -16,6 +16,8 @@ export type AiTask =
   | 'chat_widget'
   | 'service_match'
   | 'identification'
+  /** T-177: is a WhatsApp message a price request for a service this business offers? */
+  | 'whatsapp_intent'
 
 export const AI_TASKS: AiTask[] = [
   'extraction_pass',
@@ -25,6 +27,7 @@ export const AI_TASKS: AiTask[] = [
   'chat_widget',
   'service_match',
   'identification',
+  'whatsapp_intent',
 ]
 
 export interface ModelRoute {

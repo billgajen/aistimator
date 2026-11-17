@@ -43,17 +43,7 @@ import {
   templateView,
 } from '@/lib/whatsapp-templates'
 import { nameReview } from '@/lib/whatsapp-state'
-import {
-  MOVE_TO_BUSINESS_APP_STEPS,
-  NAME_REVIEW_DAYS,
-  NUMBER_APP_CHOICES,
-  PAYMENT_NOTE,
-  PAYMENT_NOTE_TITLE,
-  PERSONAL_NUMBER_WARNING,
-  PERSONAL_NUMBER_WAY_ROUND,
-  isMetaIssuedNumber,
-  mayConnect,
-} from '@/lib/whatsapp-copy'
+import { NAME_REVIEW_DAYS, PAYMENT_NOTE, PAYMENT_NOTE_TITLE, PERSONAL_NUMBER_LINE, isMetaIssuedNumber } from '@/lib/whatsapp-copy'
 import { NOTICE_TIME_LIMIT_MS, notifyEstimateReady } from '@/lib/whatsapp-notify'
 
 const ROOT = join(__dirname, '..', '..', '..', '..')
@@ -221,6 +211,8 @@ interface Stored {
   lastInbound: string | null
   inserted: Array<Record<string, unknown>>
   filters: Array<[string, string, unknown]>
+  /** T-177: the business's subscription (the approval notice needs a plan with WhatsApp, live) */
+  subscription?: { plan_id: string; status: string } | null
 }
 
 /** A stand-in for the service-role client: just the calls the notice makes */
@@ -235,7 +227,7 @@ function fakeAdmin(stored: Stored) {
         },
         order: () => builder,
         limit: () => builder,
-        maybeSingle: async () => ({ data: table === 'whatsapp_configs' ? stored.config : null }),
+        maybeSingle: async () => ({ data: table === 'whatsapp_configs' ? stored.config : table === 'subscriptions' ? (stored.subscription === undefined ? { plan_id: 'plan_us_pro', status: 'active' } : stored.subscription) : null }),
         insert: async (row: Record<string, unknown>) => {
           stored.inserted.push({ table, ...row })
           return { error: null }
@@ -421,35 +413,11 @@ describe('T-176: what Meta reports later is read', () => {
 })
 
 describe('T-176: the words on the WhatsApp page', () => {
-  it('a number on ordinary WhatsApp is stopped before Meta’s window; the other two go on', () => {
-    expect(NUMBER_APP_CHOICES.map((c) => c.value)).toEqual(['business_app', 'personal', 'new'])
-    expect(mayConnect('business_app')).toBe(true)
-    expect(mayConnect('new')).toBe(true)
-    expect(mayConnect('personal')).toBe(false)
-    expect(mayConnect(null)).toBe(false)
-    const question = code('apps/web/src/components/whatsapp/NumberQuestion.tsx')
-    expect(question).toContain('locked={!mayConnect(app)}')
+  it('T-177 replaced the three-answer question with one short line (the question, its lock and its steps are gone)', () => {
+    expect(PERSONAL_NUMBER_LINE).toMatch(/Don’t connect a personal number/)
     const button = code('apps/web/src/components/whatsapp/ConnectWhatsApp.tsx')
-    expect(button).toContain('if (locked || !window.FB')
-    expect(button).toContain('disabled={locked ||')
-  })
-
-  it('the warning says what happens, and the way round keeps the chats', () => {
-    expect(PERSONAL_NUMBER_WARNING).toMatch(/ordinary WhatsApp/)
-    expect(PERSONAL_NUMBER_WARNING).toMatch(/deleted/)
-    expect(PERSONAL_NUMBER_WARNING).toMatch(/no longer works/)
-    expect(PERSONAL_NUMBER_WAY_ROUND).toMatch(/WhatsApp Business app first/)
-    expect(PERSONAL_NUMBER_WAY_ROUND).toMatch(/keeps your chats/)
-    expect(MOVE_TO_BUSINESS_APP_STEPS.length).toBeGreaterThanOrEqual(4)
-    expect(MOVE_TO_BUSINESS_APP_STEPS[0]).toMatch(/back up/i)
-  })
-
-  it('the same warning is in the help text: on the page and in the manual steps', () => {
-    for (const file of ['apps/web/src/app/(dashboard)/app/whatsapp/page.tsx', 'apps/web/src/components/whatsapp/ManualConnect.tsx', 'apps/web/src/components/whatsapp/NumberQuestion.tsx']) {
-      const src = code(file)
-      expect(src, file).toContain('{PERSONAL_NUMBER_WARNING}')
-      expect(src, file).toContain('{PERSONAL_NUMBER_WAY_ROUND}')
-    }
+    expect(button).not.toMatch(/\blocked\b/)
+    expect(code('apps/web/src/app/(dashboard)/app/whatsapp/page.tsx')).not.toContain('NumberQuestion')
   })
 
   it('payment is a note, not a step: the first 1,000 need no card', () => {
@@ -477,7 +445,6 @@ describe('T-176: the words on the WhatsApp page', () => {
     for (const file of [
       'apps/web/src/components/whatsapp/ConnectedCard.tsx',
       'apps/web/src/components/whatsapp/MessageTemplates.tsx',
-      'apps/web/src/components/whatsapp/NumberQuestion.tsx',
       'apps/web/src/lib/whatsapp-copy.ts',
       'apps/web/src/lib/whatsapp-templates.ts',
       'apps/web/src/lib/whatsapp-notify.ts',
@@ -501,10 +468,11 @@ describe('T-176: nothing secret is logged or returned', () => {
     for (const file of files) expect(code(file), file).not.toMatch(/\bfetch\(/)
   })
 
-  it('the template route answers only the signed-in business, through the service role for its own tenant', () => {
+  it('the template route answers only the signed-in business, through the service role for its own tenant (T-177: it only reads)', () => {
     const route = code('apps/web/src/app/api/whatsapp/template/route.ts')
-    expect(route.match(/await currentTenant\(\)/g)).toHaveLength(2)
-    expect(route.match(/if \(!auth\.ok\) return auth\.response/g)).toHaveLength(2)
+    expect(route.match(/await currentTenant\(\)/g)).toHaveLength(1)
+    expect(route.match(/if \(!auth\.ok\) return auth\.response/g)).toHaveLength(1)
+    expect(route).not.toMatch(/export async function (POST|PUT|PATCH|DELETE)/)
     expect(route).not.toMatch(/request\.json|searchParams/)
     expect(route).toMatch(/auth\.tenantId/)
   })

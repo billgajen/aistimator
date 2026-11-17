@@ -1265,7 +1265,8 @@ Steps 2 to 5 are `scripts/deploy-t174-settings.sh` (`--dry-run` shows what each 
 - [x] Callback URL: `https://qolumns.com/api/whatsapp/webhook` (done 17 November)
 - [x] Verify token: the value you gave `WHATSAPP_VERIFY_TOKEN`. Press Verify and save. (done 17 November)
 - [x] Webhook fields: subscribe **`messages`** and **`account_update`**. Those two only. (done 17 November)
-- [ ] **Do not subscribe** `history`, `smb_app_state_sync` or `smb_message_echoes`. They carry a business's
+- [ ] **Do not subscribe** `history` or `smb_app_state_sync`. (T-177: `smb_message_echoes` IS now to be
+      subscribed; see T-177, section 2.) They carry a business's
       contact list and old chats from the WhatsApp Business app. Qolumns ignores them, and not subscribing
       means they are never sent to us at all.
 
@@ -1565,8 +1566,8 @@ sends nothing. Three to check or change (Dashboard → Authentication):
 
 ### 4. Now that it is live
 
-1. Do **not** press "Create the template" for Bluum until you record the second video
-   (`Docs/meta-app-review.md` says why). It can be created once.
+1. ~~Do not press "Create the template" for Bluum until you record the second video.~~ Bluum's template is
+   on Meta now, and T-177 removes the button.
 2. Open `https://qolumns.com/app/whatsapp` as Bluum and look at the page: the note that Meta is reviewing the
    name, "Nothing left to do", the payment note, and "Message templates" with its wording. Tell me anything
    that reads wrong.
@@ -1608,3 +1609,124 @@ sends nothing. Three to check or change (Dashboard → Authentication):
 - On a phone, "Connect manually · with your own Meta app" wraps onto three lines.
 - The Meta SDK is started with `autoLogAppEvents: true`, as in Meta's sample. It concerns our own page, not
   what a business grants.
+
+## T-177 — WhatsApp assistant v2, connect polish, legal pages
+
+- **Committed, not deployed.** Checked against stand-ins on this computer. **No WhatsApp message was sent to
+  anyone, nothing was created on Meta, and nothing was submitted to production.**
+- Checks: unit tests web 929, worker 534, mobile 11; lint and typecheck pass; `verify-t177` 99/99,
+  `verify-t176` 82/82, `verify-t175` 110/110; the full regression (26 scripts, t146 to t177) and `verify-t173`
+  pass; web and worker build.
+
+### 1. Before this is deployed: three things only you can settle
+
+- [ ] **Bluum has no subscription in production** (I read it: no plan, no subscription row; nobody has one).
+  Items 5 and 7 make WhatsApp work only on a plan that includes it, with an active subscription. So **the
+  moment this is deployed, Bluum's WhatsApp page shows the upgrade line, its assistant is silent and "Send a
+  test message" is refused**, which stops the App Review recordings. Choose one:
+  1. deploy after the recordings are done; or
+  2. tell me to put Bluum on the Pro plan by hand (one row in production, which I will only write when you
+     say so); or
+  3. wait for the Stripe launch ticket, where a business gets a plan by paying.
+- [ ] **The company number.** I do not know Billiom Limited's company number, and there was no place for it,
+  so it is a setting: `NEXT_PUBLIC_COMPANY_NUMBER` (public, not a secret). Until it is set, both pages say
+  "Qolumns is run by Billiom Limited, a company registered in England and Wales." without a number. Either
+  add it in Vercel (production), or tell me the number and I will write it into the brand config instead.
+- [ ] **Is Bluum's template on Meta named `estimate_ready`?** Qolumns finds an existing template by that name.
+  If Bluum's was made with our button in T-176, it is, and nothing will ever be created for Bluum again. If
+  it was made by hand in WhatsApp Manager under another name, tell me before Bluum reconnects: a reconnect
+  would then create `estimate_ready` beside it. (Opening the page never creates anything, whatever its name.)
+
+### 2. In the Meta dashboard (one change)
+
+- [ ] **Subscribe the webhook field `smb_message_echoes`** (WhatsApp → Configuration → Webhook fields), next
+  to `messages` and `account_update`. It is what tells us the owner has replied from the WhatsApp Business
+  app, so the assistant can stay out of that chat for 24 hours.
+  - It only exists for a number that is also on the WhatsApp Business app. Bluum's number is Meta's 555
+    number, which has no app, so nothing changes for Bluum.
+  - Meta's message carries the owner's own words. Qolumns reads only who it was sent to and when; the words
+    are not stored and not logged.
+  - Without the field, everything else works: the assistant just cannot tell when the owner has stepped in.
+  - Still leave `history` and `smb_app_state_sync` unsubscribed.
+- Nothing else changes in Meta. Embedded Signup v5 uses the same configuration id and app id.
+
+### 3. What changed, item by item
+
+1. **Silent assistant.** On every connected number the assistant now says nothing unless a customer asks for
+   a price for something the business offers.
+   - Each new message is put to the AI with the business's own services, what each includes and excludes,
+     and its service area. No list of words or trades is in the code.
+   - Not a price request, or any doubt: no reply, and the message's text is not kept (only that it arrived,
+     from whom and when).
+   - A price request: short plain replies, no numbered menu, no "reply 1 for…", no confirmation step. It
+     asks only for what is missing, then sends the link. Often that is one reply.
+   - **What it asks for:** what the job is (only if the message did not say); a name (only if WhatsApp gave
+     none); an email (only if the business requires both email and phone); the ZIP or postcode (only if the
+     business limits where it works); photos (only if the service requires them).
+   - After the link it is quiet again until a new price request.
+   - **Owner takes over:** built. Needs the Meta step above.
+2. **Template: automatic.** The button is gone. Connecting looks for the template on Meta: used if it is
+   there, created if not. The page shows the status only (Approved, In review, Rejected with Meta's reason),
+   read from Meta each time the page opens. Opening the page never creates anything.
+3. **Test message note.** "Will probably not arrive" is gone. One line sits before the button, in your words.
+4. **Personal number warning.** One line, in your words, in the text that introduces Meta's window. The
+   three-answer question from T-176 is removed.
+5. **Subscription lapse.** No active subscription: no replies, no template, no approval notice, no test
+   message, no new connection. The connection is kept. The page shows your line.
+6. **Embedded Signup v5.** Done. A number already on the WhatsApp Business app can connect and keeps working
+   in the app (v5 has that on by default). Existing connections are untouched.
+7. **Pro and above.** Which plans have WhatsApp comes from the plan definitions (today: Pro and Business).
+   Other plans see one upgrade line with a link to the plans and no connect button. An existing connection
+   on such a plan goes silent and is kept.
+8. **Small photo copies.** A photo sent on WhatsApp is stored privately as before, and now gets a small copy
+   beside it for the dashboard and the quote page. The upload limits of the request form apply (photos up to
+   10 MB, PDFs up to 25 MB; other types are not kept).
+9. **Privacy and Terms.** Both say who runs Qolumns. Terms have the governing law line and a WhatsApp
+   section. Both dated 17 November 2026.
+
+### 4. Decisions I took (say if you want any changed)
+
+- [ ] **An unpaid subscription pauses the assistant at once.** The database has four statuses: active,
+  trialing, past due, cancelled. You listed "unpaid" as a reason to pause, so past due (a failed payment the
+  card company is still retrying) pauses WhatsApp. The quote limit still gives a past-due business grace.
+  One line to change if you want WhatsApp to have the same grace.
+- [ ] **No email is asked for on WhatsApp**, unless the business set "email and phone both required". The
+  customer's WhatsApp number is already a way to reach them. The cost: a customer whose estimate is approved
+  more than 24 hours later hears about it only if the template is approved (no email to fall back on).
+- [ ] **No confirmation step.** The request is made as soon as the last answer is in.
+- [ ] **A reply it cannot use is asked for once more, then it goes quiet** and drops the request, rather than
+  keep asking in someone's chat.
+- [ ] **One sentence added to the Privacy page** that you did not ask for: a WhatsApp message is read by an AI
+  model to see whether it asks for a price, and one that does not is not answered and its text is not kept.
+  It is true of the new assistant, so I thought it should be said.
+- [ ] **One small library added** (`jpeg-js`, no dependencies of its own). The small copies of form photos
+  are made in the customer's browser; a WhatsApp photo never passes through one, so the server has to make
+  the copy, and that needs something that can read a JPEG.
+
+### 5. The live AI check is separate and optional
+
+- `scripts/hardcore-test/verify-t177-live.mts` puts real-sounding messages to the real model and reports
+  what it did. It is not part of the regression set and never fails a ticket: a live model's answers vary a
+  little between runs.
+- The required checks use a stand-in for the model, so they are the same every run.
+- One run of the optional live script after the last change, no further tuning: 12 of 12 messages that are not
+  a price request stayed silent, and 4 of 4 price requests were answered for the right service.
+
+### Later (seen, not changed)
+
+- The live model sometimes treats a bare "can I get a quote for a new garage door?" as already describing the
+  job, and sends the link without first asking what needs doing. The estimate page then asks for what is
+  missing. Seen in two of five runs before the wording was tightened once; not chased further.
+- Each message on a quiet chat costs one small AI call. A busy number that is also on the WhatsApp Business
+  app will make many.
+- Several photos sent at once arrive as separate calls; two arriving in the same instant can overwrite each
+  other in the chat's list of photos (as before this ticket).
+- A connection made before this ticket that has no template shows "Not set up yet" and asks for a reconnect;
+  nothing creates one from the page, by design.
+- With a lapsed subscription the page still shows "Try it"; pressing the button answers with the paused line.
+- One older unit test reads the whole repository and runs close to its 5-second limit; it timed out once
+  when everything ran at the same time, and passes on its own.
+- On a phone, "Connect manually · with your own Meta app" still wraps onto three lines.
+- `Docs/design/ai-capabilities.md` (the list of what the AI does) has no row yet for "decides whether a
+  WhatsApp message is a price request". Nothing on the site claims it, so nothing is wrong; it should be
+  added before the site says anything about the WhatsApp assistant.

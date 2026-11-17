@@ -200,6 +200,40 @@ export function offeredPlans(): PlanDefinition[] {
   return PLANS.filter((p) => p.offered)
 }
 
+/**
+ * The subscription statuses under which a business keeps its plan's quote
+ * limit. `past_due` is a payment that failed and is being retried: the limit
+ * holds meanwhile. (The database knows four statuses: active, trialing,
+ * past_due, canceled.)
+ */
+export const LIVE_SUBSCRIPTION_STATUSES: readonly string[] = ['active', 'trialing', 'past_due']
+
+export function subscriptionLive(status: string | null | undefined): boolean {
+  return typeof status === 'string' && LIVE_SUBSCRIPTION_STATUSES.includes(status)
+}
+
+/**
+ * T-177: is the subscription paid up? Stricter than `subscriptionLive`: an
+ * unpaid one (`past_due`) is not. The WhatsApp assistant speaks only for a
+ * business whose plan is active, by the owner's rule ("lapsed, unpaid,
+ * cancelled, suspended" all pause it).
+ */
+export const PAID_UP_SUBSCRIPTION_STATUSES: readonly string[] = ['active', 'trialing']
+
+export function subscriptionPaidUp(status: string | null | undefined): boolean {
+  return typeof status === 'string' && PAID_UP_SUBSCRIPTION_STATUSES.includes(status)
+}
+
+/** Does this plan include a channel? (T-177: the plan definitions decide, never a plan's name) */
+export function planHasChannel(planId: string | null | undefined, channel: PlanChannel): boolean {
+  return Boolean(getPlan(planId)?.channels.includes(channel))
+}
+
+/** The plans a new business can choose that include a channel, in the order they are offered */
+export function offeredPlansWithChannel(channel: PlanChannel): PlanDefinition[] {
+  return offeredPlans().filter((p) => p.channels.includes(channel))
+}
+
 export function noSubscriptionLimit(region: string | null | undefined): number {
   return freeAllowance(region).quotes
 }

@@ -224,6 +224,8 @@ export interface IncomingMessage {
   mediaId?: string
   mimeType?: string
   caption?: string
+  /** T-177: the name WhatsApp shows for the sender, when Meta sent one */
+  profileName?: string
 }
 
 export interface WebhookEntry {
@@ -255,8 +257,8 @@ export function parseWebhookPayload(body: unknown): WebhookEntry[] {
             phone_number_id: string
           }
           contacts?: Array<{
-            profile: { name: string }
-            wa_id: string
+            profile?: { name?: string }
+            wa_id?: string
           }>
           messages?: Array<{
             id: string
@@ -302,6 +304,8 @@ export function parseWebhookPayload(body: unknown): WebhookEntry[] {
           timestamp: msg.timestamp,
           type: msg.type as IncomingMessage['type'],
         }
+        const profile = (value.contacts || []).find((c) => c.wa_id === msg.from)?.profile?.name
+        if (typeof profile === 'string' && profile.trim()) message.profileName = profile.trim()
 
         if (msg.type === 'text' && msg.text) {
           message.text = msg.text.body

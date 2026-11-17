@@ -6,7 +6,7 @@
 // port, so one running web app serves both scripts, one after the other):
 //
 //   CRON_SECRET=local-cron-t153 DEMO_DAILY_CAP=8 DEMO_IP_LIMIT_PER_HOUR=3 \
-//   WHATSAPP_GRAPH_BASE_URL=http://127.0.0.1:8799 \
+//   WHATSAPP_GRAPH_BASE_URL=http://127.0.0.1:8799 WHATSAPP_INTENT_BASE_URL=http://127.0.0.1:8799/ai \
 //   NEXT_PUBLIC_WHATSAPP_APP_ID=900000000000175 NEXT_PUBLIC_WHATSAPP_CONFIG_ID=900000000000176 \
 //   WHATSAPP_APP_SECRET=local-app-secret-t175 WHATSAPP_VERIFY_TOKEN=local-verify-t175 \
 //   WHATSAPP_ENCRYPTION_KEY=local-encryption-key-t175 pnpm dev:web
@@ -28,6 +28,7 @@ import crypto from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { ROOT, loadEnv, makeSupabase, sessionCookieHeader, http as call, expectOk, shortId, runStamp } from './lib.mjs'
 import { garageDoorsPackUS } from '../../apps/web/src/lib/vertical-packs/garage-doors-us'
+import { offeredPlansWithChannel } from '../../packages/shared/src/plans'
 
 type Row = Record<string, unknown>
 const MOCK_PORT = 8799
@@ -36,6 +37,8 @@ const CONFIG_ID = '900000000000176'
 const APP_SECRET = 'local-app-secret-t175'
 const VERIFY_TOKEN = 'local-verify-t175'
 const TEMPLATE_NAME = 'estimate_ready'
+/** The one message in this script that the stand-in model calls a price request */
+const PRICE_REQUEST = 'How much for a new single steel garage door, 9 ft wide, installed?'
 
 const cfg = loadEnv()
 const sb = makeSupabase(cfg)
@@ -136,6 +139,16 @@ const mock = http.createServer((req, res) => {
     const refuse = (status: number, code: number, message: string, subcode?: number) => send(status, { error: { message, type: 'OAuthException', code, ...(subcode && { error_subcode: subcode }) } })
     const parts = url.pathname.split('/').filter(Boolean)
     const version = parts.shift()
+    // T-177: a stand-in for the AI model that decides whether a message is a price request (WHATSAPP_INTENT_BASE_URL).
+    // Here its answer is fixed: the one message this script uses to ask for a price is one, with the job described,
+    // for the business's first service. verify-t177 covers the assistant itself.
+    if (version === 'ai') {
+      const prompt = String(((body?.contents as Array<{ parts?: Array<{ text?: string }> }> | undefined)?.[0]?.parts?.[0]?.text) ?? '')
+      const message = /<<<MESSAGE\n([\s\S]*?)\nMESSAGE>>>/.exec(prompt)?.[1] ?? ''
+      const serviceId = /- id: (\S+)/.exec(prompt)?.[1] ?? null
+      const yes = message === PRICE_REQUEST && Boolean(serviceId)
+      return send(200, { candidates: [{ content: { parts: [{ text: JSON.stringify({ wants_price: yes, service_id: yes ? serviceId : null, confidence: 0.95, job_described: true }) }] } }] })
+    }
     calls.push({ method: req.method ?? 'GET', path: `/${parts.join('/')}`, query, token, body })
     if (version !== 'v27.0') return refuse(400, 2635, `unexpected Graph API version ${version}`)
 
@@ -257,6 +270,8 @@ async function business(name: string) {
   const setup = await call('POST', `${app}/api/auth/setup-tenant`, { headers: cookie, body: { businessName: name } })
   const tenantId = (setup.ok ? setup.json.tenantId : (await sb.select('user_profiles', `id=eq.${user.id}&select=tenant_id`))[0].tenant_id) as string
   expectOk('tenant', await call('PUT', `${app}/api/tenant`, { headers: cookie, body: { region: 'US', currency: 'USD', taxEnabled: false, taxRate: 0, serviceAreaMode: 'none', serviceAreaValues: [] } }))
+  // T-177: WhatsApp is for a plan that includes it, with a live subscription
+  await sb.insert('subscriptions', { tenant_id: tenantId, plan_id: offeredPlansWithChannel('whatsapp')[0]!.id, status: 'active' })
   return { cookie, cookieHeader, tenantId, name }
 }
 type Biz = Awaited<ReturnType<typeof business>>
@@ -279,7 +294,6 @@ async function addService(biz: Biz) {
 const connect = async (biz: Biz, account: MockAccount) =>
   expectOk('connect', await call('POST', `${app}/api/whatsapp/connect`, { headers: biz.cookie, body: { code: newCode(account), wabaId: account.wabaId, phoneNumberId: account.number.id, businessId: account.businessId } }))
 const templateOf = (biz: Biz) => call('GET', `${app}/api/whatsapp/template`, { headers: biz.cookie })
-const createTemplate = (biz: Biz) => call('POST', `${app}/api/whatsapp/template`, { headers: biz.cookie })
 const statusOf = (biz: Biz) => call('POST', `${app}/api/whatsapp/status`, { headers: biz.cookie })
 const sendTest = (biz: Biz, toPhone: string) => call('POST', `${app}/api/whatsapp/send`, { headers: biz.cookie, body: { toPhone, message: 'This is a test message from your connection. It is working.' } })
 const deliveryOf = (biz: Biz | null, messageId: string) => call('GET', `${app}/api/whatsapp/send?messageId=${encodeURIComponent(messageId)}`, biz ? { headers: biz.cookie } : {})
@@ -301,12 +315,13 @@ const says = (account: MockAccount, from: string, text: string) =>
 const reports = (account: MockAccount, messageId: string, to: string, status: string, errorCode?: number) =>
   webhook(account, { statuses: [{ id: messageId, status, timestamp: String(Math.floor(Date.now() / 1000)), recipient_id: to, ...(errorCode && { errors: [{ code: errorCode, title: 'Re-engagement message', message: 'Re-engagement message' }] }) }] })
 
-/** A customer asks for a quote on WhatsApp, all the way to "submitted". Returns the quote's id. */
-async function chatToQuote(biz: Biz, account: MockAccount, from: string, email: string): Promise<string | null> {
-  for (const line of ['Hi, I need a quote', 'A new single steel garage door, 9 ft wide, please', 'Megan Grant', email, 'skip', '12 Elm Street, St Louis, MO 63021', 'skip', 'yes']) {
-    const status = await says(account, from, line)
-    if (status !== 200) return null
-  }
+/**
+ * A customer asks for a price on WhatsApp. T-177: the assistant asks only for what is missing, and here
+ * nothing is (the message describes the job, WhatsApp gives the name), so one message makes the request.
+ * Returns the quote's id.
+ */
+async function chatToQuote(biz: Biz, account: MockAccount, from: string): Promise<string | null> {
+  if ((await says(account, from, PRICE_REQUEST)) !== 200) return null
   const rows = (await sb.select('whatsapp_conversations', `tenant_id=eq.${biz.tenantId}&customer_phone=eq.${from}&select=intake_state,intake_data&order=created_at.desc&limit=1`)) as Row[]
   const data = (rows[0]?.intake_data ?? {}) as { _quoteId?: string }
   return rows[0]?.intake_state === 'completed' && data._quoteId ? data._quoteId : null
@@ -341,31 +356,29 @@ if (probed.connect?.appId !== APP_ID || probed.connect?.configId !== CONFIG_ID |
 check('the web app runs with the local test settings', true)
 
 // =====================================================================================
-section('1. The message template: create once, and Meta’s review read live')
+section('1. The message template: set up once, and Meta’s review read live')
+// T-177: there is no button. Connecting sets the template up (used if Meta has it, created if not).
 const A = await business(`Kent Garage Doors ${shortId()}`)
 const accA = newAccount()
 await connect(A, accA)
-const t0 = await templateOf(A)
-check('before it exists the page is shown the wording, with the business’s name and a sample link', t0.ok && t0.json.template.state === 'none' && t0.json.template.name === TEMPLATE_NAME && String(t0.json.template.text).includes(`Your estimate from ${A.name} is ready`) && /\/q\/…/.test(t0.json.template.text) && !String(t0.json.template.text).includes('{{'), t0.json?.template)
-check('reading it asks Meta with the business’s own token, on its own account', templateCalls(accA, 'GET').length === 1 && templateCalls(accA, 'GET')[0]!.token === accA.token && templateCalls(accA, 'GET')[0]!.query.name === TEMPLATE_NAME)
-
-const t1 = await createTemplate(A)
 const posted = templateCalls(accA, 'POST')
 const definition = posted[0]?.body ?? {}
 const bodyComponent = ((definition.components as Row[] | undefined) ?? [])[0] ?? {}
 const bodyText = String(bodyComponent.text ?? '')
-check('creating it sends Meta one utility template, in the business’s language', t1.ok && posted.length === 1 && posted[0]!.token === accA.token && definition.name === TEMPLATE_NAME && definition.language === 'en_US' && definition.category === 'UTILITY', { status: t1.status, definition })
+check('connecting sends Meta one utility template, in the business’s language', posted.length === 1 && posted[0]!.token === accA.token && definition.name === TEMPLATE_NAME && definition.language === 'en_US' && definition.category === 'UTILITY', { definition })
 check('its wording names the business, has one variable (the link), and does not start or end with it', bodyText.includes(`Your estimate from ${A.name} is ready`) && (bodyText.match(/\{\{\d+\}\}/g) ?? []).join() === '{{1}}' && !/^\s*\{\{/.test(bodyText) && !/\}\}\s*$/.test(bodyText), bodyText)
 const example = String(((bodyComponent.example as { body_text?: string[][] } | undefined)?.body_text ?? [[]])[0]?.[0] ?? '')
 check('Meta is given an example of the variable: a link of the right shape, to no real estimate', /\/q\/example\?token=example$/.test(example), example)
-check('the page is told it is in review, with the category Meta gave it', t1.json?.template?.state === 'pending' && t1.json.template.metaStatus === 'PENDING' && t1.json.template.category === 'UTILITY', t1.json?.template)
-check('no response carries the token', ![t0, t1].some((r) => JSON.stringify(r.json).includes(accA.token)))
-
-const t2 = await createTemplate(A)
-check('pressing Create again makes no second template', t2.ok && t2.json.template.state === 'pending' && templateCalls(accA, 'POST').length === 1 && accA.templates.length === 1)
+const getsBefore = templateCalls(accA, 'GET').length
+const t1 = await templateOf(A)
+check('the page is shown the wording, with the business’s name and a sample link, and that it is in review', t1.ok && t1.json.template.state === 'pending' && t1.json.template.metaStatus === 'PENDING' && t1.json.template.category === 'UTILITY' && t1.json.template.name === TEMPLATE_NAME && String(t1.json.template.text).includes(`Your estimate from ${A.name} is ready`) && /\/q\/…/.test(t1.json.template.text) && !String(t1.json.template.text).includes('{{'), t1.json?.template)
+check('reading it asks Meta with the business’s own token, on its own account', templateCalls(accA, 'GET').length === getsBefore + 1 && templateCalls(accA, 'GET').at(-1)!.token === accA.token && templateCalls(accA, 'GET').at(-1)!.query.name === TEMPLATE_NAME)
+check('no response carries the token', !JSON.stringify(t1.json).includes(accA.token))
+await connect(A, accA)
+check('connecting again makes no second template', templateCalls(accA, 'POST').length === 1 && accA.templates.length === 1)
 
 accA.templates[0]!.status = 'APPROVED'
-check('once Meta approves it, a refresh says so', (await templateOf(A)).json?.template?.state === 'approved')
+check('once Meta approves it, the page says so', (await templateOf(A)).json?.template?.state === 'approved')
 accA.templates[0]!.status = 'REJECTED'
 accA.templates[0]!.rejected_reason = 'PROMOTIONAL'
 accA.templates[0]!.category = 'MARKETING'
@@ -387,26 +400,23 @@ accA.ignoreNameFilter = false
 // two businesses
 const B = await business(`Rival Doors ${shortId()}`)
 const accB = newAccount()
-await connect(B, accB)
-const tB = (await templateOf(B)).json?.template
-check('another business sees its own account only: A’s approved template is not B’s', tB?.state === 'none' && String(tB?.text).includes(B.name) && !String(tB?.text).includes(A.name) && templateCalls(accB, 'GET').every((c) => c.token === accB.token), tB)
+// someone made the template at the very moment B connects: Meta's list is empty, then its "create" says "already exists"
 accB.hideTemplatesOnce = true
 accB.templates.push({ id: metaId(), name: TEMPLATE_NAME, language: 'en_US', status: 'PENDING', category: 'UTILITY', rejected_reason: 'NONE', components: [{ type: 'BODY', text: 'Your estimate from Rival is ready. Open it here: {{1}}\n\nThank you.' }] })
-const raced = await createTemplate(B)
-check('when Meta says the template already exists, the one that exists is shown (no error)', raced.ok && raced.json.template.state === 'pending' && accB.templates.length === 1 && templateCalls(accB, 'POST').length === 1, { status: raced.status, json: raced.json })
+await connect(B, accB)
+const tB = (await templateOf(B)).json?.template
+check('when Meta says the template already exists, the one that exists is used: no second one, no error', accB.templates.length === 1 && templateCalls(accB, 'POST').length === 1 && tB?.state === 'pending', { templates: accB.templates.length, state: tB?.state })
+check('another business sees its own account only: A’s approved template is not B’s', tB?.state === 'pending' && String(tB?.text).includes('Rival') && !String(tB?.text).includes(A.name) && templateCalls(accB, 'GET').every((c) => c.token === accB.token), tB)
 
 // who may not
-check('signed out: 401 for reading and for creating', (await call('GET', `${app}/api/whatsapp/template`)).status === 401 && (await call('POST', `${app}/api/whatsapp/template`)).status === 401)
+check('signed out: 401 for reading; and there is no way to ask for one to be created', (await call('GET', `${app}/api/whatsapp/template`)).status === 401 && [404, 405].includes((await call('POST', `${app}/api/whatsapp/template`, { headers: A.cookie })).status) && accA.templates.filter((t) => t.name === TEMPLATE_NAME).length === 1)
 const notConnected = await templateOf(probe)
-check('a business with no connection has no template to read or create (404)', notConnected.status === 404 && (await createTemplate(probe)).status === 404, notConnected.json)
+check('a business with no connection has no template to read (404)', notConnected.status === 404, notConnected.json)
 
 // Meta refusing
 accA.refuseTemplatesWith = 190
 const expired = await templateOf(A)
 check('when Meta says the connection has expired, the page is told to reconnect, in plain words', expired.status === 502 && /Reconnect WhatsApp/.test(expired.json?.error?.message ?? '') && !JSON.stringify(expired.json).includes(accA.token), expired.json)
-accA.refuseTemplatesWith = 80008
-const refusedCreate = await createTemplate(A)
-check('a refusal from Meta is reported with its code and nothing else of Meta’s', [502, 422].includes(refusedCreate.status) && /code 80008/.test(refusedCreate.json?.error?.message ?? '') && !/stand-in/.test(JSON.stringify(refusedCreate.json)), refusedCreate.json)
 accA.refuseTemplatesWith = null
 
 // =====================================================================================
@@ -464,19 +474,23 @@ const [c1, c2, c3, c4, c5] = [customer(11), customer(12), customer(13), customer
 const sentBeforeChats = sent.length
 // five customers ask on WhatsApp at once; one more asks on the request form
 const [q1, q2, q3, q4, q5, web] = await Promise.all([
-  chatToQuote(C, accC, c1, 'megan.one@example.com'),
-  chatToQuote(C, accC, c2, 'megan.two@example.com'),
-  chatToQuote(C, accC, c3, 'megan.three@example.com'),
-  chatToQuote(C, accC, c4, 'megan.four@example.com'),
-  chatToQuote(C, accC, c5, 'megan.five@example.com'),
+  chatToQuote(C, accC, c1),
+  chatToQuote(C, accC, c2),
+  chatToQuote(C, accC, c3),
+  chatToQuote(C, accC, c4),
+  chatToQuote(C, accC, c5),
   call('POST', `${app}/api/public/quotes`, {
     body: { tenantKey: site.tenant_key, serviceId: serviceC, customer: { name: 'Form Customer', email: 'form.customer@example.com' }, job: { postcodeOrZip: '63021', answers: [{ fieldId: '_project_description', value: 'New garage door please, single steel one' }, { fieldId: 'door_size', value: 'Single (8 or 9 ft wide, 7 ft tall)' }, { fieldId: 'door_style', value: 'Steel, non-insulated' }] }, source: { type: 'widget' } },
   }),
 ])
 const qWeb = web.ok ? (web.json.quoteId as string) : null
-check('five customers ask on WhatsApp and each chat ends in a request that names its quote', [q1, q2, q3, q4, q5].every(Boolean), { q1, q2, q3, q4, q5 })
+check('five customers ask for a price on WhatsApp and each chat ends in a request that names its quote', [q1, q2, q3, q4, q5].every(Boolean), { q1, q2, q3, q4, q5 })
 const chatReplies = sent.slice(sentBeforeChats)
-check('every reply in those chats went out as an ordinary message, from the business’s own number', chatReplies.length >= 40 && chatReplies.every((m) => m.type === 'text' && m.token === accC.token), chatReplies.length)
+check('every reply in those chats went out as an ordinary message, from the business’s own number', chatReplies.length === 5 && chatReplies.every((m) => m.type === 'text' && m.token === accC.token), chatReplies.length)
+for (const reply of chatReplies) {
+  const first = linkIn(reply.text)
+  if (first) secretsSeen.add(new URL(first).searchParams.get('token')!)
+}
 if (![q1, q2, q3, q4, q5, qWeb].every(Boolean)) {
   check('the requests could be made', false, { web: web.status })
   finish()
@@ -504,10 +518,11 @@ check('the message is kept with the chat, without the link (it carries the estim
 await ageInbound(C, c2, 30)
 mark = sent.length
 const a2 = await approve(C, q2 as string)
-check('approved after the 24 hours with no template: the estimate is sent as ever, and nothing goes out on WhatsApp', a2.ok && a2.json.status === 'sent' && !('whatsapp' in a2.json) && sent.length === mark && (await quoteRow(q2 as string))?.status === 'sent', a2.json)
+check('approved after the 24 hours while the template is still in review: the estimate is sent as ever, and nothing goes out on WhatsApp', a2.ok && a2.json.status === 'sent' && !('whatsapp' in a2.json) && sent.length === mark && (await quoteRow(q2 as string))?.status === 'sent', a2.json)
 
 // (c) after the 24 hours, with the approved template
-const madeC = await createTemplate(C)
+// the template was set up when C connected; Meta now approves it
+const madeC = { ok: accC.templates.length === 1 && accC.templates[0]!.status === 'PENDING' }
 accC.templates[0]!.status = 'APPROVED'
 await ageInbound(C, c3, 30)
 mark = sent.length
@@ -562,7 +577,7 @@ if (logFile && existsSync(logFile)) {
   const leaked = [...secretsSeen].filter((s) => log.includes(s))
   check(`no token, code, secret or estimate link is in the log (${secretsSeen.size} values looked for)`, leaked.length === 0, leaked.map((s) => `${s.slice(0, 6)}…`))
   const phones = [phone, c1, c2, c3, c4, c5].filter((p) => log.includes(p))
-  check('no customer’s phone number or message is in the log', phones.length === 0 && !log.includes('See you at five then') && !log.includes('megan.one@example.com'), phones)
+  check('no customer’s phone number or message is in the log', phones.length === 0 && !log.includes('See you at five then') && !log.includes(PRICE_REQUEST), phones)
   check('Meta’s reason for an undelivered message is logged by its code alone', /\[WhatsApp Webhook\] Meta did not deliver a message: code 131047/.test(log))
 } else notChecked.push('The web app’s log (set WEB_LOG to its file).')
 
@@ -612,31 +627,10 @@ for (const width of [390, 1440]) {
   const flat = async (selector: string) => (await p.locator(selector).innerText()).replace(/\s+/g, ' ')
   const sideways = () => p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
 
-  // --- the question before Meta's window
-  const question = await flat('[data-testid=number-question]')
-  check(`${width}: before Meta’s window the page asks which app the number is on, with three answers`, /Which app is this number on today\?/.test(question) && /The WhatsApp Business app/.test(question) && /Ordinary WhatsApp/.test(question) && /a new number/.test(question) && (await p.locator('[data-testid=number-question] input[type=radio]').count()) === 3)
-  check(`${width}: until it is answered, “Connect WhatsApp” cannot be pressed`, (await button.isDisabled()) && (await p.locator('[data-testid=number-question-hint]').count()) === 1)
-  check(`${width}: the help text carries the same warning`, /Do not connect a number that is on ordinary WhatsApp/.test(await flat('[data-testid=personal-number-help]')) && /WhatsApp Business app first/.test(await flat('[data-testid=personal-number-help]')))
-
-  await p.locator('[data-testid=number-app-personal]').check()
-  await p.locator('[data-testid=personal-number-stop]').waitFor({ timeout: 10_000 })
-  const stop = await flat('[data-testid=personal-number-stop]')
-  check(`${width}: ordinary WhatsApp: the page stops, says what connecting would do, and shows how to move the number first`, /Stop: move the number first/.test(stop) && /no longer works in WhatsApp on your phone/.test(stop) && /keeps your chats/.test(stop) && (await p.locator('[data-testid=personal-number-stop] ol li').count()) >= 4 && (await button.isDisabled()), stop.slice(0, 140))
-  await p.waitForTimeout(400)
-  const loginsWhileStopped = await p.evaluate(() => (window as unknown as { __fb?: { logins: unknown[] } }).__fb?.logins.length ?? 0)
-  await button.click({ force: true }).catch(() => undefined)
-  check(`${width}: Meta’s window cannot be opened while it is stopped`, (await p.evaluate(() => (window as unknown as { __fb?: { logins: unknown[] } }).__fb?.logins.length ?? 0)) === loginsWhileStopped)
-  const stopLook = await p.locator('[data-testid=personal-number-stop]').evaluate((el) => getComputedStyle(el).backgroundColor)
-  check(`${width}: the stop is not a yellow box, and nothing scrolls sideways`, stopLook !== YELLOW && (await sideways()) <= 0, { stopLook })
-  await p.screenshot({ path: path.join(outDir, `whatsapp-personal-number-${width}.png`), fullPage: true })
-
-  await p.locator('[data-testid=number-app-new]').check()
+  // --- before Meta's window (T-177: one warning line; the three-answer question is gone, verify-t177 covers the line)
   await p.waitForFunction(() => !(document.querySelector('[data-testid=connect-whatsapp]') as HTMLButtonElement).disabled, null, { timeout: 15_000 })
-  // the pointer is still over the button from the press above: move it off, so the colour read is not the hover colour
-  await p.mouse.move(2, 2)
-  await p.waitForTimeout(250)
   const look = await button.evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, h: Math.round(el.getBoundingClientRect().height) }))
-  check(`${width}: “a new number” (and the Business app) unlock the button; it is juniper and 44 high or more`, (await p.locator('[data-testid=personal-number-stop]').count()) === 0 && look.bg === JUNIPER && look.h >= 44, look)
+  check(`${width}: “Connect WhatsApp” is ready with no question to answer first; it is juniper and 44 high or more`, (await p.locator('[data-testid=number-question]').count()) === 0 && look.bg === JUNIPER && look.h >= 44, look)
 
   // --- connect
   await p.evaluate((v) => { (window as unknown as { __fbPlan: unknown }).__fbPlan = v }, { message: { type: 'WA_EMBEDDED_SIGNUP', event: 'FINISH', data: { phone_number_id: accP.number.id, waba_id: accP.wabaId, business_id: accP.businessId } }, code: newCode(accP) } as Row)
@@ -656,37 +650,38 @@ for (const width of [390, 1440]) {
   const steps = await flat('[data-testid=steps-left]')
   const paymentNote = await flat('[data-testid=payment-note]')
   check(`${width}: payment is not a step: “Nothing left to do”`, /Nothing left to do/.test(steps) && !/step left|steps left/i.test(steps) && (await p.locator('[data-testid=register-step]').count()) === 0, steps.slice(0, 80))
-  check(`${width}: and it does not promise answers the number cannot give yet`, metaNumber ? /once Meta approves its name/.test(steps) && !/answers the customers who message it/.test(steps) : /answers the customers who message it/.test(steps))
+  check(`${width}: and it does not promise answers the number cannot give yet`, metaNumber ? /once Meta approves its name/.test(steps) && !/is listening for price requests/.test(steps) : /is listening for price requests/.test(steps))
   check(`${width}: the note says the first 1,000 need no card, and when a card is needed`, /You don’t need a card to start/.test(paymentNote) && /first 1,000/.test(paymentNote) && /without a card/.test(paymentNote) && /messages your business starts/.test(paymentNote) && (await p.locator('[data-testid=payment-link]').getAttribute('href'))?.includes(accP.wabaId) === true, paymentNote.slice(0, 160))
   accP.funding = metaId()
   await p.getByRole('button', { name: 'Check again' }).click()
   await p.waitForFunction(() => /Meta has a card for this account/.test(document.querySelector('[data-testid=payment-note]')?.textContent ?? ''), null, { timeout: 15_000 })
   check(`${width}: once Meta shows a card, “Check again” says so`, (await p.locator('[data-testid=payment-link]').count()) === 0)
 
-  // --- the message template
+  // --- the message template (T-177: set up by connecting; the page shows its status and has no button for it)
   const templates = p.locator('[data-testid=message-templates]')
-  await p.locator('[data-testid=template-card]').waitFor({ timeout: 15_000 })
-  const cardBefore = await flat('[data-testid=template-card]')
-  check(`${width}: “Message templates” shows the wording, with the business’s name, and one button to create it`, /Message templates/.test(await templates.innerText()) && cardBefore.includes(`Your estimate from ${P.name} is ready`) && (await p.locator('[data-testid=template-create]').count()) === 1 && (await p.locator('[data-testid=template-status]').count()) === 0, cardBefore.slice(0, 120))
-  const createLook = await p.locator('[data-testid=template-create]').evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, h: Math.round(el.getBoundingClientRect().height) }))
-  await p.locator('[data-testid=template-create]').click()
   await p.locator('[data-testid=template-status]').waitFor({ timeout: 15_000 })
-  check(`${width}: after “Create the template” it is in review with Meta`, (await flat('[data-testid=template-status]')) === 'In review with Meta' && accP.templates.length === 1 && createLook.bg === JUNIPER && createLook.h >= 44, createLook)
+  const cardBefore = await flat('[data-testid=template-card]')
+  check(`${width}: “Message templates” shows the wording, with the business’s name, in review with Meta, and no button`, /Message templates/.test(await templates.innerText()) && cardBefore.includes(`Your estimate from ${P.name} is ready`) && (await flat('[data-testid=template-status]')) === 'In review with Meta' && accP.templates.length === 1 && (await p.locator('[data-testid=message-templates] button').count()) === 0, cardBefore.slice(0, 120))
   await p.screenshot({ path: path.join(outDir, `whatsapp-template-in-review-${width}.png`), fullPage: true })
+  const reopen = async () => {
+    await p.reload({ waitUntil: 'networkidle' })
+    await p.locator('[data-testid=template-status]').waitFor({ timeout: 15_000 })
+  }
   accP.templates[0]!.status = 'APPROVED'
-  await p.locator('[data-testid=template-refresh]').click()
+  await reopen()
   await p.waitForFunction(() => document.querySelector('[data-testid=template-status]')?.textContent === 'Approved', null, { timeout: 15_000 })
   const approvedText = await flat('[data-testid=template-explain]')
-  check(`${width}: “Refresh” shows Meta’s approval, and says when it is used and that Meta charges for it`, /more than 24 hours after the customer last wrote/.test(approvedText) && /Meta charges/.test(approvedText), approvedText)
+  check(`${width}: opening the page again shows Meta’s approval, and says when it is used and that Meta charges for it`, /more than 24 hours after the customer last wrote/.test(approvedText) && /Meta charges/.test(approvedText), approvedText)
   accP.templates[0]!.status = 'REJECTED'
   accP.templates[0]!.rejected_reason = 'INVALID_FORMAT'
-  await p.locator('[data-testid=template-refresh]').click()
+  await reopen()
   await p.locator('[data-testid=template-reason]').waitFor({ timeout: 15_000 })
   check(`${width}: a rejection shows Meta’s reason`, (await flat('[data-testid=template-status]')) === 'Rejected by Meta' && /laid out/.test(await flat('[data-testid=template-reason]')))
   accP.templates[0]!.status = 'APPROVED'
   accP.templates[0]!.rejected_reason = 'NONE'
-  await p.locator('[data-testid=template-refresh]').click()
+  await reopen()
   await p.waitForFunction(() => document.querySelector('[data-testid=template-status]')?.textContent === 'Approved', null, { timeout: 15_000 })
+  check(`${width}: none of that created a second template`, accP.templates.length === 1)
 
   // --- the test message (to the stand-in: nobody is messaged)
   const testsBefore = sent.length
@@ -695,11 +690,7 @@ for (const width of [390, 1440]) {
   await p.locator('[data-testid=test-note]').waitFor({ timeout: 15_000 })
   const testNote = await flat('[data-testid=test-note]')
   check(`${width}: the button is free again as soon as the send has answered`, (await flat('[data-testid=send-test]')) === 'Send a test message' && !(await p.locator('[data-testid=send-test]').isDisabled()))
-  check(
-    `${width}: a test message to a phone that has not written is not called “sent”: the page says why it will not arrive`,
-    sent.length === testsBefore + 1 && sent.at(-1)!.to === '15555550199' && !/^Sent\./.test(testNote) && (metaNumber ? /until it has approved the display name/.test(testNote) : /in the last 24 hours/.test(testNote)),
-    testNote.slice(0, 200)
-  )
+  check(`${width}: a test message goes out from the business’s own number, and the page says “Sent.” (what to do first is said before the button)`, sent.length === testsBefore + 1 && sent.at(-1)!.to === '15555550199' && /^Sent\./.test(testNote.trim()) && /Send “Hi” to your business number from your phone first/.test(await flat('[data-testid=test-message-line]')), testNote.slice(0, 120))
   if (!metaNumber) {
     await reports(accP, sent.at(-1)!.id, '15555550199', 'delivered')
     await p.waitForFunction(() => /^Delivered\./.test(document.querySelector('[data-testid=test-note]')?.textContent ?? ''), null, { timeout: 30_000 }).catch(() => undefined)
