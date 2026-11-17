@@ -1,6 +1,6 @@
 import crypto from 'crypto'
-
-const WHATSAPP_API_URL = 'https://graph.facebook.com/v18.0'
+import { decryptSecret, encryptSecret } from './whatsapp-crypto'
+import { graphApiUrl } from './whatsapp-graph'
 
 /**
  * WhatsApp Cloud API client
@@ -41,10 +41,10 @@ export interface WhatsAppMessageResponse {
 export async function sendTextMessage(
   config: WhatsAppConfig,
   params: SendMessageParams
-): Promise<{ success: boolean; messageId?: string; error?: string }> {
+): Promise<{ success: boolean; messageId?: string; error?: string; errorCode?: number }> {
   try {
     const response = await fetch(
-      `${WHATSAPP_API_URL}/${config.phoneNumberId}/messages`,
+      `${graphApiUrl()}/${config.phoneNumberId}/messages`,
       {
         method: 'POST',
         headers: {
@@ -65,11 +65,13 @@ export async function sendTextMessage(
     )
 
     if (!response.ok) {
-      const error = await response.json()
-      console.error('WhatsApp API error:', error)
+      const error = (await response.json().catch(() => ({}))) as { error?: { message?: string; code?: number } }
+      // Meta's code only: the message can name the number it was sent to
+      console.error(`[WhatsApp] send refused: HTTP ${response.status}, code ${error.error?.code ?? 'none'}`)
       return {
         success: false,
         error: error.error?.message || `HTTP ${response.status}`,
+        errorCode: error.error?.code,
       }
     }
 
@@ -79,7 +81,7 @@ export async function sendTextMessage(
       messageId: data.messages[0]?.id,
     }
   } catch (error) {
-    console.error('WhatsApp send error:', error)
+    console.error('[WhatsApp] send failed:', error instanceof Error ? error.name : 'unknown error')
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -93,10 +95,10 @@ export async function sendTextMessage(
 export async function sendTemplateMessage(
   config: WhatsAppConfig,
   params: SendTemplateParams
-): Promise<{ success: boolean; messageId?: string; error?: string }> {
+): Promise<{ success: boolean; messageId?: string; error?: string; errorCode?: number }> {
   try {
     const response = await fetch(
-      `${WHATSAPP_API_URL}/${config.phoneNumberId}/messages`,
+      `${graphApiUrl()}/${config.phoneNumberId}/messages`,
       {
         method: 'POST',
         headers: {
@@ -120,11 +122,13 @@ export async function sendTemplateMessage(
     )
 
     if (!response.ok) {
-      const error = await response.json()
-      console.error('WhatsApp API error:', error)
+      const error = (await response.json().catch(() => ({}))) as { error?: { message?: string; code?: number } }
+      // Meta's code only: the message can name the number it was sent to
+      console.error(`[WhatsApp] send refused: HTTP ${response.status}, code ${error.error?.code ?? 'none'}`)
       return {
         success: false,
         error: error.error?.message || `HTTP ${response.status}`,
+        errorCode: error.error?.code,
       }
     }
 
@@ -134,7 +138,7 @@ export async function sendTemplateMessage(
       messageId: data.messages[0]?.id,
     }
   } catch (error) {
-    console.error('WhatsApp send error:', error)
+    console.error('[WhatsApp] send failed:', error instanceof Error ? error.name : 'unknown error')
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -151,7 +155,7 @@ export async function downloadMedia(
 ): Promise<{ success: boolean; data?: Buffer; contentType?: string; error?: string }> {
   try {
     // First get the media URL
-    const urlResponse = await fetch(`${WHATSAPP_API_URL}/${mediaId}`, {
+    const urlResponse = await fetch(`${graphApiUrl()}/${mediaId}`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
       },
@@ -180,7 +184,7 @@ export async function downloadMedia(
 
     return { success: true, data, contentType }
   } catch (error) {
-    console.error('WhatsApp media download error:', error)
+    console.error('[WhatsApp] media download failed:', error instanceof Error ? error.name : 'unknown error')
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -189,19 +193,18 @@ export async function downloadMedia(
 }
 
 /**
- * Verify webhook signature from WhatsApp
+ * Verify a webhook call's signature: Meta signs the raw body with the app's
+ * secret (HMAC-SHA256, hex, "sha256=" in front). Compared in constant time.
  */
 export function verifyWebhookSignature(
   payload: string,
   signature: string,
   appSecret: string
 ): boolean {
-  const expectedSignature = crypto
-    .createHmac('sha256', appSecret)
-    .update(payload)
-    .digest('hex')
-
-  return `sha256=${expectedSignature}` === signature
+  if (!appSecret || !signature) return false
+  const expected = Buffer.from(`sha256=${crypto.createHmac('sha256', appSecret).update(payload).digest('hex')}`)
+  const given = Buffer.from(signature)
+  return expected.length === given.length && crypto.timingSafeEqual(expected, given)
 }
 
 /**
@@ -327,33 +330,13 @@ export function parseWebhookPayload(body: unknown): WebhookEntry[] {
 }
 
 /**
- * Simple encryption for storing access tokens
- * In production, use a proper secret management service
+ * Storing a business's access token. T-175: the work is in whatsapp-crypto.ts
+ * (no built-in fallback key; authenticated encryption for new values).
  */
-const ENCRYPTION_KEY = process.env.WHATSAPP_ENCRYPTION_KEY || 'default-key-change-in-production!'
-
 export function encryptToken(token: string): string {
-  const iv = crypto.randomBytes(16)
-  const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
-  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv)
-  let encrypted = cipher.update(token, 'utf8', 'hex')
-  encrypted += cipher.final('hex')
-  return iv.toString('hex') + ':' + encrypted
+  return encryptSecret(token)
 }
 
 export function decryptToken(encryptedToken: string): string {
-  const parts = encryptedToken.split(':')
-  const ivHex = parts[0]
-  const encrypted = parts[1]
-
-  if (!ivHex || !encrypted) {
-    throw new Error('Invalid encrypted token format')
-  }
-
-  const iv = Buffer.from(ivHex, 'hex')
-  const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
-  const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
-  let decrypted = decipher.update(encrypted, 'hex', 'utf8')
-  decrypted += decipher.final('utf8')
-  return decrypted
+  return decryptSecret(encryptedToken)
 }

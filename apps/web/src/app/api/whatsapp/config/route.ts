@@ -1,240 +1,79 @@
-import { createClient } from '@/lib/supabase/server'
-import { encryptToken } from '@/lib/whatsapp'
 import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { currentTenant } from '@/lib/current-tenant'
+import { disconnect, embeddedSignupAvailable, loadConnection, manualNeedsSecret, saveManualConnection } from '@/lib/whatsapp-connect'
+import { GRAPH_API_VERSION } from '@/lib/whatsapp-graph'
+import { EMBEDDED_SIGNUP_VERSION } from '@/lib/whatsapp-signup'
 
 export const dynamic = 'force-dynamic'
 
 /**
+ * T-175: the WhatsApp settings of the signed-in business.
+ *
+ * The stored row is server-only since migration 42, so every read and write is
+ * made here with the service role, for the caller's own tenant and no other.
+ * No response carries a token or a secret: the view is built field by field
+ * (lib/whatsapp-state.ts).
+ */
+
+/**
  * GET /api/whatsapp/config
- * Get WhatsApp configuration for current tenant
+ * The connection as the page shows it, what the page needs to open Meta's
+ * Embedded Signup (two public ids), and the two values of the manual method's
+ * webhook step.
  */
 export async function GET() {
-  try {
-    const supabase = await createClient()
-
-    // Verify authentication
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      )
-    }
-
-    // Get user's tenant
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.tenant_id) {
-      return NextResponse.json(
-        { error: { code: 'NO_TENANT', message: 'User has no tenant' } },
-        { status: 404 }
-      )
-    }
-
-    // Get WhatsApp config
-    const { data: config } = await supabase
-      .from('whatsapp_configs')
-      .select('id, phone_number_id, display_phone_number, is_active, created_at, updated_at')
-      .eq('tenant_id', profile.tenant_id)
-      .single()
-
-    // T-112: values the business must paste into Meta's webhook configuration.
-    // Auth'd dashboard route only — the verify token is a shared handshake
-    // string, not a secret credential.
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const setup = {
+  const auth = await currentTenant()
+  if (!auth.ok) return auth.response
+  const admin = createAdminClient()
+  const config = await loadConnection(admin, auth.tenantId)
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, '')
+  return NextResponse.json({
+    configured: Boolean(config),
+    config,
+    connect: {
+      available: embeddedSignupAvailable(),
+      appId: process.env.NEXT_PUBLIC_WHATSAPP_APP_ID || null,
+      configId: process.env.NEXT_PUBLIC_WHATSAPP_CONFIG_ID || null,
+      graphVersion: GRAPH_API_VERSION,
+      signupVersion: EMBEDDED_SIGNUP_VERSION,
+    },
+    // T-112: what a business pastes into its OWN Meta app (manual method). The
+    // verify token is a handshake string, not a credential.
+    setup: {
       webhookUrl: `${appUrl}/api/whatsapp/webhook`,
       verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || null,
-    }
-
-    return NextResponse.json({
-      configured: !!config,
-      setup,
-      config: config
-        ? {
-            phoneNumberId: config.phone_number_id,
-            displayPhoneNumber: config.display_phone_number,
-            isActive: config.is_active,
-            createdAt: config.created_at,
-            updatedAt: config.updated_at,
-          }
-        : null,
-    })
-  } catch (error) {
-    console.error('WhatsApp config GET error:', error)
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
-      { status: 500 }
-    )
-  }
-}
-
-interface UpdateConfigRequest {
-  phoneNumberId: string
-  displayPhoneNumber: string
-  accessToken: string
-  isActive: boolean
+    },
+    manualNeedsSecret: config?.method === 'manual' ? await manualNeedsSecret(admin, auth.tenantId) : false,
+  })
 }
 
 /**
- * PUT /api/whatsapp/config
- * Update WhatsApp configuration for current tenant
+ * PUT /api/whatsapp/config  { phoneNumberId, displayPhoneNumber?, accessToken?, appSecret?, isActive? }
+ * The manual method: save (or update) a connection through the business's own
+ * Meta app. The token is checked with Meta, on the server, before it is saved.
  */
 export async function PUT(request: Request) {
-  try {
-    const supabase = await createClient()
-
-    // Verify authentication
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      )
-    }
-
-    // Get user's tenant
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.tenant_id) {
-      return NextResponse.json(
-        { error: { code: 'NO_TENANT', message: 'User has no tenant' } },
-        { status: 404 }
-      )
-    }
-
-    const tenantId = profile.tenant_id
-    const body: UpdateConfigRequest = await request.json()
-
-    // Validate required fields
-    if (!body.phoneNumberId || !body.displayPhoneNumber || !body.accessToken) {
-      return NextResponse.json(
-        { error: { code: 'VALIDATION_ERROR', message: 'phoneNumberId, displayPhoneNumber, and accessToken are required' } },
-        { status: 400 }
-      )
-    }
-
-    // Encrypt the access token
-    const encryptedToken = encryptToken(body.accessToken)
-
-    // Check if config exists
-    const { data: existingConfig } = await supabase
-      .from('whatsapp_configs')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .single()
-
-    if (existingConfig) {
-      // Update existing config
-      const { error } = await supabase
-        .from('whatsapp_configs')
-        .update({
-          phone_number_id: body.phoneNumberId,
-          display_phone_number: body.displayPhoneNumber,
-          access_token_encrypted: encryptedToken,
-          is_active: body.isActive,
-        })
-        .eq('tenant_id', tenantId)
-
-      if (error) {
-        console.error('WhatsApp config update error:', error)
-        return NextResponse.json(
-          { error: { code: 'DB_ERROR', message: 'Failed to update configuration' } },
-          { status: 500 }
-        )
-      }
-    } else {
-      // Create new config
-      const { error } = await supabase.from('whatsapp_configs').insert({
-        tenant_id: tenantId,
-        phone_number_id: body.phoneNumberId,
-        display_phone_number: body.displayPhoneNumber,
-        access_token_encrypted: encryptedToken,
-        is_active: body.isActive,
-      })
-
-      if (error) {
-        console.error('WhatsApp config create error:', error)
-        return NextResponse.json(
-          { error: { code: 'DB_ERROR', message: 'Failed to create configuration' } },
-          { status: 500 }
-        )
-      }
-    }
-
-    return NextResponse.json({ ok: true })
-  } catch (error) {
-    console.error('WhatsApp config PUT error:', error)
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
-      { status: 500 }
-    )
-  }
+  const auth = await currentTenant()
+  if (!auth.ok) return auth.response
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
+  const result = await saveManualConnection(createAdminClient(), auth.tenantId, body ?? {})
+  if (!result.ok) return NextResponse.json({ error: { code: result.code, message: result.message } }, { status: result.status })
+  return NextResponse.json({ ok: true, config: result.connection })
 }
 
 /**
  * DELETE /api/whatsapp/config
- * Remove WhatsApp configuration for current tenant
+ * Disconnect: Meta is asked to stop sending us the account's messages, and the
+ * stored token is removed with the row.
  */
 export async function DELETE() {
+  const auth = await currentTenant()
+  if (!auth.ok) return auth.response
   try {
-    const supabase = await createClient()
-
-    // Verify authentication
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      )
-    }
-
-    // Get user's tenant
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.tenant_id) {
-      return NextResponse.json(
-        { error: { code: 'NO_TENANT', message: 'User has no tenant' } },
-        { status: 404 }
-      )
-    }
-
-    // Delete config
-    await supabase
-      .from('whatsapp_configs')
-      .delete()
-      .eq('tenant_id', profile.tenant_id)
-
-    return NextResponse.json({ ok: true })
-  } catch (error) {
-    console.error('WhatsApp config DELETE error:', error)
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
-      { status: 500 }
-    )
+    const result = await disconnect(createAdminClient(), auth.tenantId)
+    return NextResponse.json({ ok: true, ...result })
+  } catch {
+    return NextResponse.json({ error: { code: 'DB_ERROR', message: 'Could not disconnect. Try again.' } }, { status: 500 })
   }
 }

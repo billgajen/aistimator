@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
-import { PRODUCT_NAME } from '@qolumns/shared'
+import { PRODUCT_NAME, SUPPORT_EMAIL } from '@qolumns/shared'
 
 export const metadata: Metadata = {
   title: `Terms of Service — ${PRODUCT_NAME}`,
@@ -47,7 +47,7 @@ const SECTIONS = [
   },
   {
     title: '10. Contact',
-    body: 'Questions about these terms: contact us through your dashboard or the email address on our website.',
+    body: `Questions about these terms: email ${SUPPORT_EMAIL}, or contact us through your dashboard.`,
   },
 ]
 

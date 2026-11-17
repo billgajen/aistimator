@@ -9,6 +9,7 @@ import { DEMO_RETENTION_HOURS } from '@qolumns/shared'
 import { cleanUpDemoRequests } from '@/lib/demo/demo-cleanup'
 import { deleteFromR2, isR2Configured } from '@/lib/r2'
 import { businessReplyTo } from '@/lib/business-email'
+import { checkWhatsAppTokens } from '@/lib/whatsapp-renewal'
 
 /**
  * GET /api/cron/lifecycle — Vercel Cron (daily, see vercel.json)
@@ -22,6 +23,8 @@ import { businessReplyTo } from '@/lib/business-email'
  *    keeps each replaced token in quotes.link_token_hashes).
  * 3. T-153: delete visitors' demo requests (and their uploads) older than
  *    24 hours.
+ * 4. T-175: WhatsApp connections close to running out are renewed with Meta,
+ *    or the business is emailed to reconnect (lib/whatsapp-renewal.ts).
  *
  * Auth: Vercel sends `Authorization: Bearer ${CRON_SECRET}` automatically.
  * Fails closed if CRON_SECRET is unset.
@@ -196,8 +199,16 @@ export async function GET(request: Request) {
     console.error('[Lifecycle] Demo clean-up failed:', demoError)
   }
 
+  // ---- 4. T-175: WhatsApp connections close to running out -----------------
+  let whatsapp = { checked: 0, renewed: 0, warned: 0 }
+  try {
+    whatsapp = await checkWhatsAppTokens(supabase)
+  } catch (whatsappError) {
+    console.error('[Lifecycle] WhatsApp renewal check failed:', whatsappError instanceof Error ? whatsappError.name : 'unknown error')
+  }
+
   console.log(
-    `[Lifecycle] Done: expired=${expiredCount} remindersSent=${remindersSent} remindersFailed=${remindersFailed} demoDeleted=${demo.quotes}`
+    `[Lifecycle] Done: expired=${expiredCount} remindersSent=${remindersSent} remindersFailed=${remindersFailed} demoDeleted=${demo.quotes} whatsappRenewed=${whatsapp.renewed} whatsappWarned=${whatsapp.warned}`
   )
-  return NextResponse.json({ expired: expiredCount, remindersSent, remindersFailed, demoDeleted: demo })
+  return NextResponse.json({ expired: expiredCount, remindersSent, remindersFailed, demoDeleted: demo, whatsapp })
 }

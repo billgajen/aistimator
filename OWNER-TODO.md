@@ -1211,3 +1211,123 @@ Steps 2 to 5 are `scripts/deploy-t174-settings.sh` (`--dry-run` shows what each 
   T-144 and the WhatsApp section above).
 - The T-149 note "Later (custom domain)" is this ticket. Quote links, QR codes and embed code made after the
   switch carry `qolumns.com`; the ones already given out keep working on the old address, for good.
+
+## T-175 — Connect WhatsApp in one click (Meta Embedded Signup)
+
+- **Built and on a preview. Not committed, not on production.** Preview (web only, no database, behind the Vercel
+  login): `https://estimator-gvtv063hc-gajendrans-projects-1a87e0b4.vercel.app`. The WhatsApp page needs a sign-in, so it is not on the preview; its screenshots are in
+  the results folder of `verify-t175`.
+- **Nothing has run against the real Meta.** Every check used a stand-in on this computer. The first real run
+  is yours, after the steps below.
+
+### 1. Settings to add (names only; all five in Vercel, production; the worker needs none)
+
+| Name | What it is | Secret? |
+|---|---|---|
+| `NEXT_PUBLIC_WHATSAPP_APP_ID` | The Meta app's App ID (`4654271271562035`) | No |
+| `NEXT_PUBLIC_WHATSAPP_CONFIG_ID` | The Embedded Signup configuration ID (`1566858898811795`) | No |
+| `WHATSAPP_APP_SECRET` | Meta app → App settings → Basic → App secret | **Yes** |
+| `WHATSAPP_VERIFY_TOKEN` | A long random string you invent. The same string goes into Meta's webhook settings | Treat as one |
+| `WHATSAPP_ENCRYPTION_KEY` | Encrypts each business's stored token. Make it with `openssl rand -hex 32` | **Yes** |
+
+- Add each with `printf '%s' 'VALUE' | npx vercel env add NAME --environment production --sensitive --yes`
+  (the two `NEXT_PUBLIC_` ones with `--no-sensitive`). They take effect at the next production deploy.
+- **Keep a copy of `WHATSAPP_ENCRYPTION_KEY` somewhere safe and never change it.** With a different key every
+  stored connection becomes unreadable and every business has to connect again.
+- Until all five are set, the page shows "One-click connect isn't switched on yet" and nothing connects.
+
+### 2. To put it live (when you say so)
+
+1. `bash scripts/deploy-migration-42.sh` (first: the new code reads the new columns).
+2. The five settings above.
+3. Commit, then `npx vercel deploy --prod`. The worker is not touched.
+4. The Meta dashboard list below (the webhook can only be verified once step 3 is live).
+
+### 3. What to do in the Meta dashboard
+
+**App settings → Basic**
+- [ ] App icon, 1024 × 1024, with no Meta or WhatsApp logo in it.
+- [ ] Privacy policy URL: `https://qolumns.com/privacy` (checked: the page is live).
+- [ ] Terms of Service URL: `https://qolumns.com/terms` (checked: the page is live).
+- [ ] User data deletion → Data deletion instructions URL: `https://qolumns.com/privacy` (section 8 says how).
+- [ ] App domains: `qolumns.com` and `estimator-web-phi.vercel.app`.
+- [ ] Category: Business and pages. Contact email: `hello@qolumns.com`. App purpose: for clients (other
+      businesses use it).
+- [ ] Website platform → Site URL: `https://qolumns.com`.
+- [ ] Copy the **App secret** from here into `WHATSAPP_APP_SECRET` (step 1). Do not paste it anywhere else.
+
+**WhatsApp → Configuration → Webhook** (after the web app is live with the settings)
+- [ ] Callback URL: `https://qolumns.com/api/whatsapp/webhook`
+- [ ] Verify token: the value you gave `WHATSAPP_VERIFY_TOKEN`. Press Verify and save.
+- [ ] Webhook fields: subscribe **`messages`** and **`account_update`**. Those two only.
+- [ ] **Do not subscribe** `history`, `smb_app_state_sync` or `smb_message_echoes`. They carry a business's
+      contact list and old chats from the WhatsApp Business app. Qolumns ignores them, and not subscribing
+      means they are never sent to us at all.
+
+**Facebook Login for Business** (you have done these; listed so they can be ticked)
+- [x] The six Client OAuth switches on; both addresses in the allowed domains and redirect URIs.
+- [ ] Configuration `1566858898811795`: permissions `whatsapp_business_management` and
+      `whatsapp_business_messaging`; asset: WhatsApp accounts. Nothing else.
+
+**WhatsApp → Embedded Signup Builder → "Check a launch config"**
+- [ ] Paste `{"setup":{},"featureType":"whatsapp_business_app_onboarding","sessionInfoVersion":"3"}`. It
+      should resolve to **v4** with WhatsApp Business app onboarding on. If it says otherwise, tell me what it says.
+
+**App roles**
+- [ ] Anyone who will test before App Review needs a role on the app (admin, developer or tester). In
+      development mode nobody else can finish the sign-up.
+
+**Then, in this order:** business verification of the portfolio → App Review for the two permissions
+(`Docs/meta-app-review.md` has the two recordings and the answers) → switch the app to Live.
+
+### 4. The first real run (after steps 2 and 3)
+
+1. On `https://qolumns.com/app/whatsapp` press **Connect WhatsApp** and go through Meta's window to
+   **Finish**. Use a business and number of your own.
+2. The page should show **Connected** with the number. If it shows "Finish registering the number", the
+   number already has a two-step PIN: enter it.
+3. From your own phone send `Hi, I need a quote` to that number. A reply should arrive in a few seconds.
+4. Press **Send a test message** to your own phone.
+5. Add a payment method in WhatsApp Manager and press **Check again**.
+6. **Tell me what happened at each step, and paste any error words exactly.** Four things are only known
+   once a real account is tried (they are listed in the changelog under "Not proven"), and I will fix what
+   differs.
+
+### 5. For you to decide
+
+- [ ] **Embedded Signup v4 or v5.** You said v4, and that is what this uses. Meta's docs now say v5 is the
+  latest (20 October 2026). v4 still works and is what your configuration runs. v5 turns the "use the number I
+  already have in the WhatsApp Business app" option on by default. Moving is one line; the code already reads
+  v5's messages. Say if you want it.
+- [ ] **A number that is also on the WhatsApp Business app.** Supported, and built. On such a number Qolumns
+  **only answers a message that asks for a quote, an estimate or a price**, because the owner's other chats
+  (suppliers, friends, existing jobs) arrive on the same number. Everything else is left for the owner to
+  answer in the app. On a number connected only for Qolumns, every first message is answered, as before. Say if
+  you want it different (answer everything, or let each business choose).
+- [ ] **Meta asks for a "sync" of the Business app's contacts and chats within 24 hours**, or the business has
+  to connect again. Qolumns makes the two requests and keeps nothing. If you would rather not make them at
+  all, the choice is to not offer Business app numbers.
+- [ ] **The payment step's wording.** Meta's own pages disagree: one says a payment method is needed before
+  any message; the pricing page says the first 1,000 replies a month per number are free and delivered without
+  one. The page says "Meta asks every business for one before it will keep delivering your messages", which is
+  true either way.
+- [ ] **Privacy and Terms.** I changed three sentences: Privacy now names Meta as a processor (for a business
+  that connects WhatsApp) and gives `hello@qolumns.com` for privacy and deletion requests; Terms gives the same
+  address. Both used to say "the email address on our website", and the site shows none. Read them and say
+  if you want different words.
+- [ ] **"WhatsApp quoting" on the Pricing page** stays "Coming later" until the first real run works. It is
+  also listed for Pro and Business only, but nothing in the code holds the WhatsApp page back from Starter.
+  Say which you want once it is live.
+
+- [ ] **Two T-175 previews are listed in Vercel** (the one above and an earlier one, `estimator-9k0g93js7…`).
+  Say if you want them deleted after the deploy.
+
+### Later (seen, not changed)
+
+- "Connect manually" keeps its long walkthrough; on a phone it is a lot of text.
+- The checkbox "Answer messages on this number" in the manual form is 24 px, in a 44 px row.
+- A business cannot see its WhatsApp conversations in the dashboard, only the quotes they produce.
+- Quoting does not yet send a WhatsApp message when the business approves an estimate (the customer has the
+  link from the chat, and the email).
+- The two-step PIN Qolumns sets when it registers a number is stored (encrypted) and not shown to the
+  business. A business that later moves the number elsewhere may need it.

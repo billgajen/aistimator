@@ -536,3 +536,67 @@ export function generateQuoteReminderEmailHtml(data: {
 </html>
   `.trim()
 }
+
+/**
+ * T-175: the business's WhatsApp connection is about to run out (Meta gives
+ * each connection 60 days) and could not be renewed for it. One click on the
+ * WhatsApp page reconnects it.
+ */
+export function generateWhatsAppRenewalEmailHtml(data: {
+  businessName: string
+  displayPhoneNumber: string
+  /** whole days left; 0 = today; negative = already run out */
+  daysLeft: number
+  /** the last day, written out */
+  expiresOn: string
+  whatsappUrl: string
+}): string {
+  const when = data.daysLeft < 0 ? 'has run out' : data.daysLeft === 0 ? 'runs out today' : `runs out in ${data.daysLeft} day${data.daysLeft === 1 ? '' : 's'}`
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reconnect WhatsApp</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="padding: 40px;">
+              <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: #1b2823;">
+                Your WhatsApp connection ${when}
+              </h1>
+              <p style="margin: 0 0 32px; color: #6b7280; font-size: 14px;">
+                ${escapeHtml(data.businessName)} · ${escapeHtml(data.displayPhoneNumber)}
+              </p>
+              <p style="margin: 0 0 16px; color: #374151; font-size: 16px; line-height: 1.5;">
+                Meta gives each WhatsApp connection 60 days. Yours ${data.daysLeft < 0 ? 'ended' : 'ends'} on
+                <strong>${escapeHtml(data.expiresOn)}</strong>. ${
+                  data.daysLeft < 0
+                    ? `${PRODUCT_NAME} can no longer answer customers on this number.`
+                    : `After that, ${PRODUCT_NAME} can no longer answer customers on this number.`
+                }
+              </p>
+              <p style="margin: 0 0 24px; color: #374151; font-size: 16px; line-height: 1.5;">
+                Reconnecting takes one click and keeps the same number.
+              </p>
+              <a href="${data.whatsappUrl}" style="display: inline-block; padding: 12px 24px; background-color: #205e56; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600;">
+                Reconnect WhatsApp
+              </a>
+              <p style="margin: 32px 0 0; color: #9ca3af; font-size: 12px;">
+                Powered by ${PRODUCT_NAME}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+}

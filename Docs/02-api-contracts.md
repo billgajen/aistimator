@@ -409,26 +409,80 @@ Response:
 
 ⸻
 
-WhatsApp APIs (v2 ticketed, define now)
+WhatsApp APIs (T-111, T-112; rewritten in T-175)
 
-POST /api/whatsapp/webhook
+Every dashboard route below needs a signed-in user and acts on that user's own business only. The stored row
+(`whatsapp_configs`) is server-only since migration 42: the routes read and write it with the service role. No
+response ever carries an access token, an app secret or a PIN.
 
-Receives inbound messages and media events from WhatsApp Cloud API.
-Response:
-
-{ "received": true }
-
-POST /api/whatsapp/send
-
-Sends outbound message with quote link (and optionally summary).
-Request:
+GET /api/whatsapp/config
+The connection as the page shows it, and what the page needs to open Meta's Embedded Signup.
 
 {
-  "tenantId": "tnt_1",
-  "toPhone": "+44...",
-  "message": "Your estimate is ready",
-  "quoteViewUrl": "https://app.yourdomain.com/q/qte_123?token=..."
+  "configured": true,
+  "config": {
+    "method": "embedded",            // or "manual"
+    "phoneNumberId": "1065…", "displayPhoneNumber": "+1 555-0100", "verifiedName": "Kent Garage Doors",
+    "isActive": true, "alsoOnBusinessApp": false, "connectedAt": "…",
+    "token": { "state": "ok", "expiresAt": "…", "daysLeft": 60 },   // state: no_expiry | ok | expiring (< 14 days) | expired
+    "registered": true, "messagesReady": false,
+    "paymentUrl": "https://business.facebook.com/wa/manage/home/?waba_id=…"
+  },
+  "connect": { "available": true, "appId": "…", "configId": "…", "graphVersion": "v27.0", "signupVersion": "v4" },
+  "setup": { "webhookUrl": "https://qolumns.com/api/whatsapp/webhook", "verifyToken": "…" },   // manual method only
+  "manualNeedsSecret": false
 }
+
+POST /api/whatsapp/connect   { "code", "wabaId"?, "phoneNumberId"?, "businessId"?, "onBusinessApp"? }
+Finishes a connection started in Embedded Signup. `code` is from the login callback (it lives 30 seconds); the ids
+are from Meta's message event and are never trusted: the server exchanges the code, asks Meta whose token it is,
+reads the account's numbers with that token, and only connects a number Meta lists under it. Then it subscribes the
+app to the account, registers the number (not a WhatsApp Business app number) and stores the token encrypted.
+→ { "ok": true, "config": { … }, "registrationProblem": null | "…" }
+Errors: 400 INVALID_REQUEST, 403 NOT_YOUR_ACCOUNT / NOT_YOUR_NUMBER, 422 CODE_REFUSED / TOKEN_REFUSED / NO_NUMBER /
+WHICH_NUMBER / WHICH_ACCOUNT, 502 META_REFUSED, 503 NOT_AVAILABLE. Nothing is saved on an error.
+
+POST /api/whatsapp/status
+Asks Meta how the connection stands (the number's name, whether a payment method is on the account, whether the
+token is still good), stores it. → { "ok": true, "config": { … }, "problem": null | "…" }. 404 NOT_CONNECTED.
+
+POST /api/whatsapp/register   { "pin"? }
+Finishes registering a number Meta refused at connect time. `pin` is the number's own six-digit two-step PIN when
+it has one. → { "ok": true, "config": { … } }. 400 INVALID_PIN, 422 REGISTRATION_REFUSED.
+
+PUT /api/whatsapp/config   { "phoneNumberId", "displayPhoneNumber"?, "accessToken"?, "appSecret"?, "isActive"? }
+The manual method (a business with its own Meta app). A new connection needs the token and the app secret; the
+token is checked with Meta against the number, on the server, before anything is saved. Left empty on an update,
+the stored token and secret are kept. 400 VALIDATION_ERROR, 409 NUMBER_IN_USE, 422 VERIFICATION_FAILED.
+
+DELETE /api/whatsapp/config
+Disconnect: asks Meta to stop sending us the account's messages (embedded connections) and deletes the row, and the
+token with it. The number is not deregistered. → { "ok": true, "removed": true, "metaToldToStop": true }
+
+POST /api/whatsapp/verify   { "useStored": true } | { "phoneNumberId", "accessToken" }
+A read-only check of credentials with Meta. Nothing is stored.
+
+POST /api/whatsapp/send   { "toPhone", "message", "conversationId"? }
+Sends a text from the business's own number (the page's test message). 402 PAYMENT_NEEDED, 422 OUTSIDE_WINDOW
+(the person has not messaged the number in the last 24 hours) / RECONNECT, 502 SEND_FAILED.
+
+GET /api/whatsapp/webhook
+Meta's handshake: answers `hub.challenge` when `hub.verify_token` matches `WHATSAPP_VERIFY_TOKEN`; otherwise 403.
+
+POST /api/whatsapp/webhook
+One address for every business's incoming messages.
+- `X-Hub-Signature-256` is checked on every call (HMAC-SHA256 of the raw body). A call is acted on only when it is
+  signed by the Meta app the number is connected through: the platform's app (`WHATSAPP_APP_SECRET`) for an
+  embedded connection, the business's own app secret for a manual one. No signature, or one that proves nothing:
+  401, and nothing is read from the call.
+- A message is routed by `metadata.phone_number_id` to the one business whose row has that id, stored, and passed
+  to the intake engine; replies are sent with that business's own token. A repeated delivery is ignored.
+- On a number that stays on the WhatsApp Business app, a new conversation is answered only when the message asks
+  for a quote, an estimate or a price.
+- `account_update` with PARTNER_REMOVED, PARTNER_APP_UNINSTALLED, ACCOUNT_DELETED or ACCOUNT_OFFBOARDED (platform
+  signature only) deletes the stored connection of that account.
+- Other fields are ignored. Nothing about a customer is logged.
+Response: { "received": true }
 
 Response:
 

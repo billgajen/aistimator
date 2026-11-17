@@ -182,6 +182,16 @@ Indexes: `(tenant_id, created_at desc)` where not completed; the same where also
 ## RLS
 - All tenant tables restricted by `tenant_id` for authenticated users.
 - Public quote view uses a token and only returns specific quote data.
+### WhatsApp channel (migration 25; T-175, migration 42)
+- whatsapp_configs: one row per business, **server-only** (no policy or grant for a signed-in browser since
+  migration 42). tenant_id (unique), phone_number_id (unique: the webhook routes by it), display_phone_number,
+  verified_name, access_token_encrypted, is_active, connection_method (manual | embedded), waba_id, business_id,
+  number_kind (new_number | business_app), token_expires_at, expiry_warned_at, app_secret_encrypted (manual only),
+  registered_at, registration_pin_encrypted, messages_ready_at, connected_at. Every `_encrypted` value is
+  AES-256-GCM under `WHATSAPP_ENCRYPTION_KEY` (lib/whatsapp-crypto.ts); values from before T-175 are AES-256-CBC
+  and still read.
+- whatsapp_conversations, whatsapp_messages: unchanged (migration 25).
+
 ### SMS channel (T-136, migration 27)
 - sms_configs: tenant_id (unique), phone_number (E.164, unique), messaging_service_sid, is_active, a2p_brand_registered, a2p_campaign_registered
 - sms_conversations: same shape as whatsapp_conversations + consent_notice_sent

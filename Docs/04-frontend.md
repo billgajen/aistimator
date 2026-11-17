@@ -227,6 +227,15 @@ Routes:
   - /app/settings/billing (was /app/billing, which redirects here)
   - /app/settings/notifications (the field is "Send notifications to")
 - /app/analytics, /app/whatsapp (in the menu since T-160)
+  - **WhatsApp page (T-175).** Not connected: one main button, "Connect WhatsApp" (Meta's Embedded Signup opens in
+    Meta's own window), and under it "Connect manually" (closed; the T-112 form and walkthrough, which now also
+    asks for the business's own App Secret). Connected through Meta: the number and its name; "What happens next";
+    what is left to do ("Finish registering the number" with a PIN box when Meta refused it, "Add a payment method
+    in WhatsApp Manager" with a link and "Check again", until Meta reports one or a message goes out); "Try it"
+    (a test message to the owner's own phone); from 14 days before the 60-day token ends, a warning with "Reconnect
+    WhatsApp" (one click, same number); "Disconnect WhatsApp", which asks first. Connected manually: the manual
+    form to update, test or disconnect. Components: `components/whatsapp/{ConnectWhatsApp,ConnectedCard,ManualConnect}.tsx`.
+    No token or secret is ever given to the page.
 - /app/sms (no menu item; reachable by URL, behaviour unchanged)
 
 Unfinished requests (T-151, T-160): people who gave their details and did not finish. The list (the Unfinished tab)

@@ -15,6 +15,166 @@
 
 ## Issues & Resolutions
 
+### 2026-11-16: T-175 — Connect WhatsApp in one click (Meta Embedded Signup) (AD-053)
+
+**Status: built and on a preview. Not committed. Not on production.** Migration 42 is written and applied to the
+local database only. Preview (web only, no database, behind the Vercel login): `https://estimator-gvtv063hc-gajendrans-projects-1a87e0b4.vercel.app`.
+
+**Nothing was sent to Meta or to anyone on WhatsApp.** Every check ran against a stand-in for Meta's Graph API
+on this machine. The real flow has not been run: the Meta app's secret is not set anywhere yet, and the app is
+in development mode.
+
+#### What Meta's docs say today (read 2026-11-16; they differ from the ticket in three places)
+
+- **Embedded Signup is at v5** (20 October 2026). v2 and v3 were retired on 15 October 2026; v4 is still served
+  and is what a configuration made from Meta's template runs. **This uses v4, as the ticket says.** v5 is
+  chosen by one field in the launch options, turns the WhatsApp Business app option on by default, and renames
+  the account id in Meta's message; the code already reads both shapes, and moving is one constant
+  (`EMBEDDED_SIGNUP_VERSION`, `lib/whatsapp-signup.ts`). The owner decides when.
+- **Graph API v27.0** (4 November 2026). One constant, `GRAPH_API_VERSION` (`lib/whatsapp-graph.ts`); the old
+  code said v18.0 in two places.
+- **Payment method.** Meta's onboarding pages say billing must be set up before a business can send. Its
+  pricing page says replies inside the customer's 24-hour window are delivered free up to 1,000 a month per
+  number, and stop after that with no payment method (charged since 1 October 2026). So messages do flow at
+  first without one. The page shows the step as the ticket asks, in words that are true either way.
+- **A number already on the WhatsApp Business app is supported** by Meta's current flow (app version 2.24.17
+  or later). Three things follow, all built: the number is not registered again; Meta requires two "sync"
+  requests within 24 hours or the business has to connect again; and the number is not only for quotes
+  (decision 2 below).
+- **Whether the 60-day token can be renewed is not confirmed.** Meta documents an exchange call for the token
+  family; no page says it for an Embedded Signup token. The daily job tries it and treats a refusal as normal.
+
+#### What was built
+
+**1. Connect** (`components/whatsapp/ConnectWhatsApp.tsx`, `lib/whatsapp-signup.ts`, `POST /api/whatsapp/connect`,
+`lib/whatsapp-connect.ts`, `lib/whatsapp-graph.ts`)
+- One main button, "Connect WhatsApp". It loads Meta's SDK on that page only and opens Embedded Signup with our
+  configuration. Meta's window posts a message naming the account and number; the login callback hands over a
+  code (which lives 30 seconds). The page sends both to the server and does nothing else with them.
+- A message is listened to only from Meta's own address. Meta's sample checks that the address *ends with*
+  `facebook.com`, which `evilfacebook.com` passes; ours compares the host.
+- **On the server**, in order: exchange the code; ask Meta whose token it is (ours, valid, and granted for
+  that account); **read the account's phone numbers with that token and find the number in them**; subscribe
+  our app to the account's webhooks; register the number with a new six-digit PIN; store the token.
+- **The ids from the browser are never trusted.** A row is written only for a number Meta lists under the
+  token that the code produced. A business that sends another business's account id or number id gets 403 and
+  nothing is saved. If Meta's message did not arrive, the server works the account out from the token.
+- Meta's message for a WhatsApp Business app number can name the account alone: the server takes the
+  account's one such number, and asks the business to choose again if there are several.
+- **Registration refused** (most often: the number already has a two-step PIN): the connection is saved, the
+  page shows "Finish registering the number" with a PIN box (`POST /api/whatsapp/register`).
+
+**2. After connecting** (`components/whatsapp/ConnectedCard.tsx`, `lib/whatsapp-state.ts`)
+- The number and its name, the date, "What happens next", and what is left to do.
+- **The payment step** shows until Meta reports a payment method on the account (`Check again`,
+  `POST /api/whatsapp/status`) **or a message goes out** (a reply to a customer, or the page's test message).
+  If Meta later refuses a message for the payment method (its code 131042), the step comes back. The link is
+  WhatsApp Manager's Overview, where Meta's docs send a business to press "Add payment method".
+- **"Try it":** one test message to the owner's own phone, from the business's number.
+- **Sixty days.** The page warns from 14 days out, with "Reconnect WhatsApp" (the same button; one click, same
+  number). The daily job (`lib/whatsapp-renewal.ts`, in `/api/cron/lifecycle`) tries to renew a token with 30
+  days or less left; if Meta will not, and under 14 days are left, it emails the business, at most every 6
+  days.
+- **Disconnect** asks first, asks Meta to stop sending us the account's messages, and deletes the row and the
+  token with it. The number is **not deregistered**: that would stop it working with the Cloud API for
+  anything else the business uses, and Meta forbids it for a Business app number.
+- When Meta tells us a business removed the app (`account_update`), the stored token is deleted.
+
+**3. Webhook** (`app/api/whatsapp/webhook/route.ts`, `lib/whatsapp-webhook.ts`)
+- One address. **The signature is checked on every call.** It used to be skipped when no secret was set, which
+  is how production stands today.
+- A message goes to the business whose row has the phone number id Meta named, and its reply is sent with
+  that business's own token. Delivery receipts and repeats are looked up inside that business only.
+- A delivery Meta repeats is handled once.
+- It goes into the existing intake engine unchanged. No pricing or quote logic changed.
+
+**4. The manual method** is kept, under "Connect manually" (`components/whatsapp/ManualConnect.tsx`).
+- **It now asks for the business's own App Secret.** A manual connection's webhook calls are signed by the
+  business's own Meta app, not ours, so with the signature required there has to be a secret to check them
+  against. It is stored encrypted like the token. A manual connection saved without one answers no message
+  and the page says so. No business has a manual connection in production.
+- The token is checked with Meta on the server when it is saved (it was a separate call from the browser).
+- A number another business holds cannot be taken by hand (409).
+
+#### Decisions made here (for the owner to confirm)
+
+1. **v4, not v5** (above).
+2. **A number that stays on the WhatsApp Business app is answered only when the message asks for a quote, an
+   estimate or a price.** Since T-111 any first message starts the quote conversation, because the number was
+   only for quotes. A Business app number also carries the owner's other chats, and answering every one of
+   them with "I'll get you an instant quote" would be wrong more often than right. Anything else is stored and
+   left for the owner to answer in the app. A number connected just for Qolumns is unchanged. One function,
+   `shouldAnswer`.
+3. **The two sync requests for a Business app number are made, and nothing they produce is kept.** Meta
+   requires them. The webhook ignores every field except `messages` and `account_update`, and the Meta app
+   should not be subscribed to `history`, `smb_app_state_sync` or `smb_message_echoes`, so the business's
+   contacts and old chats never reach us.
+4. **Migration 42** (the ticket did not mention one). Needed for the account id, the expiry and the method.
+
+#### Found in the existing code and fixed, because the rules require it
+
+- **Tokens were encrypted with a key written in the code** when `WHATSAPP_ENCRYPTION_KEY` was not set. There is
+  no fallback now: without the key nothing is encrypted and connecting is refused. New values are AES-256-GCM
+  (a stored value that was altered does not decrypt); older values still read.
+- **A signed-in browser could read and write its WhatsApp row directly**, including the encrypted token and the
+  phone number id the webhook routes by. Migration 42 makes the table server-only.
+- **The webhook logged each customer's phone number.** Nothing about a customer is logged now.
+- **Updating a manual connection without retyping the token overwrote the stored token** with the word
+  "unchanged". The stored token is kept.
+- The signature was compared with `===`; it is compared in constant time.
+- Delivery receipts were matched across all businesses by message id; they are matched inside one business.
+
+#### Migration 42 (`00000000000042_whatsapp_embedded_signup.sql`, `scripts/deploy-migration-42.sh`)
+
+Additive and re-runnable. Twelve columns on `whatsapp_configs`, three checks, two indexes, and the removal of
+the policy and grants that let a signed-in browser reach the table. No row changes. **Deploy order: the
+migration first, then the web app.**
+
+#### Legal pages
+
+Both exist on `qolumns.com` (200). Three sentences changed: Privacy now names Meta among the processors (for a
+business that connects WhatsApp) and gives the address for privacy and deletion requests; Terms gives the same
+address. Both said "the email address on our website", and the site shows none.
+
+#### Verified (2026-11-16, local stack, Meta mocked)
+
+- `verify-t175.mts`: **110/110**. Connect for a new number, for a Business app number and for a number
+  with a PIN; the order and content of the calls to Meta; what is stored and that it decrypts to the right
+  token; the ways of connecting that must fail; the payment step; the handshake; unsigned, wrongly signed
+  and altered calls refused; routing to the right business with the right token; a repeat ignored; the quiet
+  rule; a payment refusal; account removal; the warning, the renewal and a refused renewal; reconnect;
+  disconnect; the manual method with its own secret; no secret, phone number or message in the web app's log;
+  and the page at 390 and 1440 with a stand-in for Meta's SDK.
+- Unit tests: web 801, worker 534, mobile 11. New: `apps/web/src/__tests__/whatsapp-t175.test.ts` (23).
+- `pnpm lint`, the build's own lint and `pnpm typecheck` pass. Builds: web and worker.
+- Full regression, t146 to t175, all pass in one run: 20, 33, 29, 35, 27, 35, 66, 39, 26, 44, 31, 96, 116, 96 (t160),
+  77 (t162), 78 (t164), 148, 182 (t167), 149 (t169), 412, 97, 78, 83 (t174), 110 (t175).
+
+**Seen and left**
+- `hasPlanChannel` exists and nothing calls it: the WhatsApp page is not held back from any plan, though the
+  plans list WhatsApp for Pro and Business only. Not changed; in `OWNER-TODO.md`.
+- A second preview is listed in Vercel (`estimator-9k0g93js7…`): it was built before the last small change
+  (a line telling the business when a content blocker stops Meta's script) and is replaced by the one above.
+
+**Not proven**
+- **Anything against the real Meta.** Not the sign-up window, not the code exchange, not registration, not a
+  message. The first real run is the owner's, after the secret is set (`OWNER-TODO.md`).
+- Whether Meta renews an Embedded Signup token (above).
+- Whether Meta reports a payment method through the field the status check reads (`primary_funding_id`): its
+  docs show the field for Solution Partners only. If it does not, the step clears when a message goes out.
+- Whether the two ids on the WhatsApp Manager link open it on the right account (Meta documents the address
+  without them; it ignores what it does not use).
+- The renewal email in an inbox (locally there is no email provider; the unit test stops at what is handed to
+  Postmark).
+
+**Files:** `supabase/migrations/00000000000042_whatsapp_embedded_signup.sql`, `scripts/deploy-migration-42.sh`,
+`apps/web/src/lib/{whatsapp,whatsapp-crypto,whatsapp-graph,whatsapp-connect,whatsapp-webhook,whatsapp-state,whatsapp-signup,whatsapp-renewal,email-templates}.ts`,
+`apps/web/src/app/api/whatsapp/{config,connect,status,register,verify,send,webhook}/route.ts`,
+`apps/web/src/app/api/cron/lifecycle/route.ts`, `apps/web/src/app/(dashboard)/app/whatsapp/page.tsx`,
+`apps/web/src/components/whatsapp/*`, `apps/web/src/app/{privacy,terms}/page.tsx`,
+`packages/shared/src/database.types.ts`, `Docs/meta-app-review.md`, `scripts/hardcore-test/verify-t175.mts`,
+tests and docs.
+
 ### 2026-11-16: T-174 — Move to qolumns.com, cleaner quote links, Home's examples reordered, a new sample name (AD-052)
 
 **Live 2026-11-16 22:39 UTC** (commit `8a048cb`). The product is at `https://qolumns.com`. No migration, and
@@ -6557,6 +6717,26 @@ if (pricingResult.estimatedTotal <= 0) {
 - Email is sent from the main domain, and only after the email provider has verified it.
 
 **Rejected:** redirecting the old address (breaks the embed, above); a flag column for "random link" (the link's ending, `slug_changed_at` and the history table already say it); redirecting in the app only (the redirect would not exist between the DNS change and the next deploy), or on Vercel only (nothing in the repo would say so and nothing could check it locally).
+
+---
+
+### AD-053: WhatsApp connections: Meta proves ownership, every webhook call is signed, the row is server-only (T-175)
+
+**Decision:** a business's WhatsApp number is connected through Meta's Embedded Signup under the platform's Meta app (or, by hand, through the business's own app). Three rules hold for both:
+1. **A number is connected only when Meta shows the token covers it.** The account and number ids arrive from the browser and are never trusted: the server reads the account's numbers with the token the sign-up produced and connects only a number in that list.
+2. **A webhook call is acted on only when it is signed by the Meta app the number is connected through:** the platform's secret for an embedded connection, the business's own stored secret for a manual one. There is no setting, and no missing setting, that skips the check.
+3. **The stored row is server-only.** No browser session can read or write `whatsapp_configs`; the API routes do, with the service role, for the caller's own business. Tokens and secrets are encrypted with `WHATSAPP_ENCRYPTION_KEY`, which has no fallback, and are never logged or returned.
+
+**Why:** one address receives every business's customer messages, and the phone number id in a call decides whose they are. If a business could name a number it does not own, or a caller could post unsigned, one business would read another's customers. Before T-175 the row was writable from the browser and the signature was optional.
+
+**Rules that follow:**
+- Never deregister a number on disconnect. Unsubscribe our app and delete the token; the number is the business's.
+- Never keep what Meta's Business app "sync" produces. The webhook handles `messages` and `account_update` and ignores every other field.
+- A number that stays on the WhatsApp Business app is answered only when a message asks for a quote (`shouldAnswer`).
+- One Graph API version and one Embedded Signup version, each a constant. Calls to Meta are made in `lib/whatsapp-graph.ts` only, on the server.
+- A new column that holds a secret is named `…_encrypted` and is left out of `CONNECTION_VIEW_COLUMNS`; the page's view is built field by field.
+
+**Rejected:** trusting the ids in Meta's browser message (anyone can post a message to a page); one platform secret for manual connections too (their calls are signed by another app, so the check would have to be skipped for them); deregistering on disconnect (it breaks the number for the business's other tools, and Meta forbids it for a Business app number); keeping the browser-readable policy and hiding the token column (the phone number id is as sensitive as the token for routing).
 
 ---
 

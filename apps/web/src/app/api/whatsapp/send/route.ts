@@ -1,158 +1,121 @@
-import { createClient } from '@/lib/supabase/server'
-import { sendTextMessage, decryptToken } from '@/lib/whatsapp'
 import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { currentTenant } from '@/lib/current-tenant'
+import { sendTextMessage, decryptToken } from '@/lib/whatsapp'
+import { META_ERROR } from '@/lib/whatsapp-graph'
 
 export const dynamic = 'force-dynamic'
 
 interface SendMessageRequest {
-  toPhone: string
-  message: string
-  conversationId?: string
+  toPhone?: unknown
+  message?: unknown
+  conversationId?: unknown
 }
 
+/** Meta's code for "this person has not messaged the business in the last 24 hours" */
+const OUTSIDE_WINDOW = 131047
+
 /**
- * POST /api/whatsapp/send
- * Send a WhatsApp message (authenticated, for dashboard use)
+ * POST /api/whatsapp/send  { toPhone, message, conversationId? }
+ * Send a WhatsApp message from the signed-in business's own number (the
+ * dashboard's test message). T-175: the stored token is read with the service
+ * role for the caller's own tenant; a message that goes out marks the number
+ * as working, and Meta's two usual refusals are said in plain words.
  */
 export async function POST(request: Request) {
+  const auth = await currentTenant()
+  if (!auth.ok) return auth.response
+  const tenantId = auth.tenantId
   try {
-    const supabase = await createClient()
-
-    // Verify authentication
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
+    const body = (await request.json().catch(() => null)) as SendMessageRequest | null
+    const toPhone = typeof body?.toPhone === 'string' ? body.toPhone.replace(/[^\d]/g, '') : ''
+    const message = typeof body?.message === 'string' ? body.message.trim() : ''
+    if (toPhone.length < 7 || toPhone.length > 15 || !message || message.length > 4096) {
       return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      )
-    }
-
-    // Get user's tenant
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.tenant_id) {
-      return NextResponse.json(
-        { error: { code: 'NO_TENANT', message: 'User has no tenant' } },
-        { status: 404 }
-      )
-    }
-
-    const tenantId = profile.tenant_id
-
-    // Parse request
-    const body: SendMessageRequest = await request.json()
-
-    if (!body.toPhone || !body.message) {
-      return NextResponse.json(
-        { error: { code: 'VALIDATION_ERROR', message: 'toPhone and message are required' } },
+        { error: { code: 'VALIDATION_ERROR', message: 'Enter a phone number with its country code, and a message.' } },
         { status: 400 }
       )
     }
 
-    // Get WhatsApp config for tenant
-    const { data: waConfig } = await supabase
+    const admin = createAdminClient()
+    const { data: waConfig } = await admin
       .from('whatsapp_configs')
       .select('phone_number_id, display_phone_number, access_token_encrypted, is_active')
       .eq('tenant_id', tenantId)
-      .single()
+      .maybeSingle()
 
     if (!waConfig) {
-      return NextResponse.json(
-        { error: { code: 'WHATSAPP_NOT_CONFIGURED', message: 'WhatsApp is not configured for this tenant' } },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: { code: 'WHATSAPP_NOT_CONFIGURED', message: 'WhatsApp is not connected.' } }, { status: 400 })
     }
-
     if (!waConfig.is_active) {
-      return NextResponse.json(
-        { error: { code: 'WHATSAPP_DISABLED', message: 'WhatsApp is disabled for this tenant' } },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: { code: 'WHATSAPP_DISABLED', message: 'WhatsApp is switched off for this business.' } }, { status: 400 })
     }
 
-    // Decrypt access token
-    const accessToken = decryptToken(waConfig.access_token_encrypted)
-
-    // Send the message
     const result = await sendTextMessage(
-      {
-        phoneNumberId: waConfig.phone_number_id,
-        accessToken,
-      },
-      {
-        to: body.toPhone,
-        text: body.message,
-      }
+      { phoneNumberId: waConfig.phone_number_id as string, accessToken: decryptToken(waConfig.access_token_encrypted as string) },
+      { to: toPhone, text: message }
     )
 
     if (!result.success) {
-      return NextResponse.json(
-        { error: { code: 'SEND_FAILED', message: result.error || 'Failed to send message' } },
-        { status: 500 }
-      )
+      if (result.errorCode === META_ERROR.PAYMENT) {
+        await admin.from('whatsapp_configs').update({ messages_ready_at: null }).eq('tenant_id', tenantId)
+        return NextResponse.json(
+          { error: { code: 'PAYMENT_NEEDED', message: 'Meta did not send it: the WhatsApp account needs a payment method. Add one in WhatsApp Manager, then try again.' } },
+          { status: 402 }
+        )
+      }
+      if (result.errorCode === OUTSIDE_WINDOW) {
+        return NextResponse.json(
+          { error: { code: 'OUTSIDE_WINDOW', message: 'WhatsApp only lets a business message someone who has messaged it in the last 24 hours. Send any message from that phone to your number first, then try again.' } },
+          { status: 422 }
+        )
+      }
+      if (result.errorCode === META_ERROR.TOKEN) {
+        return NextResponse.json({ error: { code: 'RECONNECT', message: 'The connection has expired or was removed. Reconnect WhatsApp, then try again.' } }, { status: 422 })
+      }
+      return NextResponse.json({ error: { code: 'SEND_FAILED', message: 'Meta did not send the message. Check the number and try again.' } }, { status: 502 })
     }
 
-    // Store outbound message
-    let conversationId = body.conversationId
+    // a message went out: nothing is blocking this number
+    await admin.from('whatsapp_configs').update({ messages_ready_at: new Date().toISOString() }).eq('tenant_id', tenantId).is('messages_ready_at', null)
 
+    // Keep the message with its conversation (the business's own, by row-level security)
+    let conversationId = typeof body?.conversationId === 'string' ? body.conversationId : undefined
     if (!conversationId) {
-      // Find or create conversation
-      const { data: existingConversation } = await supabase
+      const { data: existing } = await auth.supabase
         .from('whatsapp_conversations')
         .select('id')
         .eq('tenant_id', tenantId)
-        .eq('customer_phone', body.toPhone)
+        .eq('customer_phone', toPhone)
         .eq('status', 'active')
-        .single()
-
-      if (existingConversation) {
-        conversationId = existingConversation.id
-      } else {
-        const { data: newConversation } = await supabase
+        .limit(1)
+      conversationId = (existing?.[0]?.id as string | undefined) ?? undefined
+      if (!conversationId) {
+        const { data: created } = await auth.supabase
           .from('whatsapp_conversations')
-          .insert({
-            tenant_id: tenantId,
-            customer_phone: body.toPhone,
-            status: 'active',
-          })
+          .insert({ tenant_id: tenantId, customer_phone: toPhone, status: 'active' })
           .select('id')
           .single()
-
-        conversationId = newConversation?.id
+        conversationId = created?.id as string | undefined
       }
     }
-
     if (conversationId) {
-      await supabase.from('whatsapp_messages').insert({
+      await auth.supabase.from('whatsapp_messages').insert({
         tenant_id: tenantId,
         conversation_id: conversationId,
         wa_message_id: result.messageId,
         direction: 'outbound',
         message_type: 'text',
         from_phone: waConfig.display_phone_number,
-        to_phone: body.toPhone,
-        content: body.message,
+        to_phone: toPhone,
+        content: message,
         status: 'sent',
       })
     }
 
-    return NextResponse.json({
-      ok: true,
-      messageId: result.messageId,
-    })
+    return NextResponse.json({ ok: true, messageId: result.messageId })
   } catch (error) {
-    console.error('WhatsApp send error:', error)
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
-      { status: 500 }
-    )
+    console.error('[WhatsApp send] failed:', error instanceof Error ? error.name : 'unknown error')
+    return NextResponse.json({ error: { code: 'INTERNAL_ERROR', message: 'Could not send the message.' } }, { status: 500 })
   }
 }

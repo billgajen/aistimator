@@ -992,6 +992,24 @@ export interface WhatsAppConfig {
   display_phone_number: string
   access_token_encrypted: string
   is_active: boolean
+  /** T-175 (migration 42): how the number was connected */
+  connection_method: 'manual' | 'embedded'
+  /** T-175: the WhatsApp Business Account (always set for an embedded connection) */
+  waba_id: string | null
+  business_id: string | null
+  verified_name: string | null
+  /** T-175: 'business_app' = the number also stays on the WhatsApp Business app */
+  number_kind: 'new_number' | 'business_app' | null
+  /** T-175: when the stored token expires; null = it does not */
+  token_expires_at: string | null
+  expiry_warned_at: string | null
+  /** T-175: manual connections only; the business's own Meta app secret, encrypted */
+  app_secret_encrypted: string | null
+  registered_at: string | null
+  registration_pin_encrypted: string | null
+  /** T-175: Meta reports a payment method, or a message has gone out */
+  messages_ready_at: string | null
+  connected_at: string | null
   created_at: string
   updated_at: string
 }

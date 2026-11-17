@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
-import { PRODUCT_NAME } from '@qolumns/shared'
+import { PRODUCT_NAME, SUPPORT_EMAIL } from '@qolumns/shared'
 
 export const metadata: Metadata = {
   title: `Privacy Policy — ${PRODUCT_NAME}`,
@@ -23,7 +23,7 @@ const SECTIONS = [
   },
   {
     title: '4. Where data lives',
-    body: 'Data is stored with our infrastructure providers: Supabase (database, EU region), Cloudflare (file storage and processing), Vercel (hosting), Stripe (payments), Postmark (email) and Google (AI processing). Uploads are stored privately and served only via time-limited signed links or the controlled quote page. Each business sees only its own customers’ details and photos; no other business can.',
+    body: 'Data is stored with our infrastructure providers: Supabase (database, EU region), Cloudflare (file storage and processing), Vercel (hosting), Stripe (payments), Postmark (email), Google (AI processing) and, for a business that connects its WhatsApp number, Meta (WhatsApp messages to and from that number). Uploads are stored privately and served only via time-limited signed links or the controlled quote page. Each business sees only its own customers’ details and photos; no other business can.',
   },
   {
     title: '5. How long we keep it',
@@ -39,7 +39,8 @@ const SECTIONS = [
   },
   {
     title: '8. Contact',
-    body: 'Privacy questions or requests: contact us through your dashboard or the email address on our website.',
+    // T-175: the address is written out (it is also where a deletion request goes; Meta's app settings link here)
+    body: `Privacy questions or requests, including a request to delete your data: email ${SUPPORT_EMAIL}, or contact us through your dashboard. A business that has connected its WhatsApp number can remove our access at any time with Disconnect on its WhatsApp page.`,
   },
 ]
 
