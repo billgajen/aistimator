@@ -17,6 +17,28 @@
 
 ### 2026-11-17: T-178 — No quote is ever lost: the worker's limiter fails open, a failed quote is never silent, a customer is never stopped at submit (AD-058, AD-059)
 
+**Deployed 2026-11-17 21:02 UTC** (commit `4a08ec9`). No migration.
+1. Worker: `npx wrangler deploy --env production`, version `d0450982-775a-4a98-b797-360de78ce7b8`. Its secrets
+   were listed by name first: neither Upstash value is set, so the limiter is off (`/health` says
+   `hasRedis: false`). The owner adds them (OWNER-TODO, T-178).
+2. Web: `npx vercel deploy --prod --yes`, deployment `dpl_8Nd9X47kLCDeeRU3ppc7ktsh1kKy`, serving `qolumns.com`.
+
+Live checks, read-only (no request was submitted, no WhatsApp message sent, nothing created):
+- `/`, `/login`, `/quote/example-home-services`, `/privacy`: 200. Worker `/health`: ok; `/trigger` with no token: 401.
+- WhatsApp webhook: wrong verify token 403; unsigned POST 401 "Missing signature"; wrong signature 401 "Invalid signature".
+- **The quote link page's limit:** 65 views of the demo business's link in 21 seconds. Views 1 to 60: 200.
+  Views 61 to 65: **429** with `Retry-After` (39 to 40 seconds) and "Too many tries in a short time. Please
+  wait a minute and try again." Before this deploy the same run gave 60 pages and then five 200s carrying the
+  "too many" words.
+- The retry route with no code, and with a made-up code: 403.
+- `bash scripts/retry-failed-quote.sh --list` (reads only): one failed quote in production,
+  `qte_b2696651e64b956566642c9a` (Bluum, 20:07 UTC, the `cache` error). **Not retried**: a retry emails a real
+  customer, so it is the owner's call.
+
+**Not tried on production:** submitting a request (so the new submit rule, the failed-quote email and the
+60-second line were seen only on this machine), anything signed in, and the worker's limiter with real Upstash
+values.
+
 #### What broke on production (2026-11-17)
 
 **A. Every quote failed after about four minutes.**

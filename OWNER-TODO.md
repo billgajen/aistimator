@@ -1745,6 +1745,11 @@ sends nothing. Three to check or change (Dashboard → Authentication):
 
 ## T-178 — No quote is ever lost
 
+**Deployed 2026-11-17 21:02 UTC:** commit `4a08ec9`, worker version `d0450982-775a-4a98-b797-360de78ce7b8`, web
+`dpl_8Nd9X47kLCDeeRU3ppc7ktsh1kKy`. No migration. Live checks (read-only): `/`, `/login` and the demo quote
+link 200; the webhook refuses a wrong token (403) and unsigned or wrongly signed calls (401); 65 views of the
+demo quote link in a minute gave 60 pages and then 429 from the 61st.
+
 ### 1. What you must do
 
 - [ ] **Add the two Upstash values to the worker again, when you are ready. It is safe now.** After this
@@ -1764,7 +1769,8 @@ sends nothing. Three to check or change (Dashboard → Authentication):
   `apps/worker/.dev.vars` as `UPSTASH_REDIS_URL=…` and `UPSTASH_REDIS_TOKEN=…` and tell me. That was not done,
   so **the limiter has not been run against a real Upstash database**: it was run in the Workers runtime
   against a stand-in that speaks Upstash's REST format (see Docs/CHANGELOG.md, T-178).
-- [ ] **Retry today's failed quotes if you want them priced.**
+- [ ] **One quote is marked failed in production: `qte_b2696651e64b956566642c9a` (Bluum, 20:07 UTC).** I did
+  not retry it, because a retry emails the customer. Retry it, or contact the customer yourself:
   ```
   bash scripts/retry-failed-quote.sh --list            # failed quotes, and any stuck for 15 minutes or more
   bash scripts/retry-failed-quote.sh qte_…              # price one again
