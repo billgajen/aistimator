@@ -4,9 +4,9 @@
  * Two conditions, both read from what already exists:
  *   - its plan includes the WhatsApp channel (the plan definitions in
  *     @qolumns/shared decide; no plan is named here);
- *   - its subscription is paid up (`subscriptionPaidUp`: active or on trial).
- *     A cancelled one is not, and neither is an unpaid one (`past_due`),
- *     although the quote limit gives that one grace.
+ *   - its subscription is live (`subscriptionLive`: the same rule, and the
+ *     same grace, as the quote limit: a payment that failed and is being
+ *     retried, `past_due`, still counts; a cancelled subscription does not).
  * A business with no subscription is on the free allowance, which has no
  * WhatsApp.
  *
@@ -15,7 +15,7 @@
  * connection. An existing connection is kept, never disconnected: it speaks
  * again the moment the plan is active.
  */
-import { offeredPlansWithChannel, planHasChannel, subscriptionPaidUp } from '@qolumns/shared'
+import { offeredPlansWithChannel, planHasChannel, subscriptionLive } from '@qolumns/shared'
 import type { createAdminClient } from '@/lib/supabase/server'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -28,7 +28,7 @@ export type WhatsAppAccess =
 /** Pure: the rule, from a subscription row (or none) */
 export function whatsappAccessFor(subscription: { plan_id?: string | null; status?: string | null } | null | undefined): WhatsAppAccess {
   if (!subscription || !planHasChannel(subscription.plan_id, 'whatsapp')) return { allowed: false, why: 'plan' }
-  if (!subscriptionPaidUp(subscription.status)) return { allowed: false, why: 'subscription' }
+  if (!subscriptionLive(subscription.status)) return { allowed: false, why: 'subscription' }
   return { allowed: true }
 }
 

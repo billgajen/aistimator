@@ -201,27 +201,18 @@ export function offeredPlans(): PlanDefinition[] {
 }
 
 /**
- * The subscription statuses under which a business keeps its plan's quote
- * limit. `past_due` is a payment that failed and is being retried: the limit
- * holds meanwhile. (The database knows four statuses: active, trialing,
- * past_due, canceled.)
+ * The subscription statuses under which a business has its plan. `past_due`
+ * is a payment that failed and is being retried: the plan holds meanwhile,
+ * and ends when the subscription is cancelled. (The database knows four
+ * statuses: active, trialing, past_due, canceled.)
+ *
+ * One rule, read by the quote limit and by the WhatsApp assistant (T-177:
+ * the owner chose the same grace for both).
  */
 export const LIVE_SUBSCRIPTION_STATUSES: readonly string[] = ['active', 'trialing', 'past_due']
 
 export function subscriptionLive(status: string | null | undefined): boolean {
   return typeof status === 'string' && LIVE_SUBSCRIPTION_STATUSES.includes(status)
-}
-
-/**
- * T-177: is the subscription paid up? Stricter than `subscriptionLive`: an
- * unpaid one (`past_due`) is not. The WhatsApp assistant speaks only for a
- * business whose plan is active, by the owner's rule ("lapsed, unpaid,
- * cancelled, suspended" all pause it).
- */
-export const PAID_UP_SUBSCRIPTION_STATUSES: readonly string[] = ['active', 'trialing']
-
-export function subscriptionPaidUp(status: string | null | undefined): boolean {
-  return typeof status === 'string' && PAID_UP_SUBSCRIPTION_STATUSES.includes(status)
 }
 
 /** Does this plan include a channel? (T-177: the plan definitions decide, never a plan's name) */

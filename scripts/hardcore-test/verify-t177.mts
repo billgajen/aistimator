@@ -357,8 +357,8 @@ const lapsedPhone = customer(1)
 // the model WOULD say these are price requests: the silence below is the plan's doing, and the model is never asked
 modelAnswers.set('Hi, how much would a new single steel garage door cost, 9 ft wide, installed?', { service: REPLACEMENT })
 modelAnswers.set('How much for a new double garage door?', { service: REPLACEMENT })
-// the two statuses the database has that are not paid up: cancelled, and unpaid (a failed payment being retried)
-for (const status of ['canceled', 'past_due'] as const) {
+// the one status the database has that is not live: cancelled
+for (const status of ['canceled'] as const) {
   await setPlan(F.tenantId, WITH_WHATSAPP, status)
   const lapsed = expectOk('config', await configOf(F))
   const sentBefore = sent.length
@@ -368,12 +368,14 @@ for (const status of ['canceled', 'past_due'] as const) {
 }
 check('the connection is kept, not disconnected', (await rowOf(F))?.is_active === true && expectOk('config', await configOf(F)).configured === true)
 const keptWhilePaused = await messagesOf(F, lapsedPhone)
-check('a message that arrives while paused is kept without its text (the 24 hours still count from it)', keptWhilePaused.length === 2 && keptWhilePaused.every((m) => m.direction === 'inbound' && m.content === null), keptWhilePaused)
+check('a message that arrives while paused is kept without its text (the 24 hours still count from it)', keptWhilePaused.length === 1 && keptWhilePaused.every((m) => m.direction === 'inbound' && m.content === null), keptWhilePaused)
 check('while paused the AI model is not even asked', modelAsked.length === 0, modelAsked.length)
 await setPlan(F.tenantId, WITHOUT_WHATSAPP)
 check('an existing connection on a plan without WhatsApp goes silent too, and is kept', (await says(accF, lapsedPhone, 'How much for a new double garage door?')).length === 0 && (await rowOf(F))?.is_active === true && modelAsked.length === 0)
 await setPlan(F.tenantId, WITH_WHATSAPP, 'trialing')
 check('a subscription on trial counts as active', expectOk('config', await configOf(F)).access?.allowed === true)
+await setPlan(F.tenantId, WITH_WHATSAPP, 'past_due')
+check('a payment that failed and is being retried (past due) does not pause WhatsApp: the same grace as the quote limit', expectOk('config', await configOf(F)).access?.allowed === true)
 await setPlan(F.tenantId, WITH_WHATSAPP)
 
 // =====================================================================================

@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import jpeg from 'jpeg-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { GOVERNING_LAW, OPERATOR, PLANS, PRODUCT_NAME, offeredPlansWithChannel, operatorStatement, planHasChannel, subscriptionLive, subscriptionPaidUp } from '@qolumns/shared'
+import { GOVERNING_LAW, OPERATOR, PLANS, PRODUCT_NAME, offeredPlansWithChannel, operatorStatement, planHasChannel, subscriptionLive } from '@qolumns/shared'
 import type { WhatsAppConversation, WhatsAppIntakeState } from '@qolumns/shared'
 
 const createQuoteFromIntake = vi.fn()
@@ -577,17 +577,26 @@ describe('T-177 items 5 and 7: the plan must include WhatsApp, and the subscript
     const has = PLANS.find((p) => p.offered && p.channels.includes('whatsapp'))!.id
     const lacks = PLANS.find((p) => p.offered && !p.channels.includes('whatsapp'))!.id
     for (const status of ['active', 'trialing']) expect(whatsappAccessFor({ plan_id: has, status }), status).toEqual({ allowed: true })
-    // cancelled, unpaid (a failed payment being retried), and anything a later billing change may add
-    for (const status of ['canceled', 'past_due', 'unpaid', 'incomplete', 'incomplete_expired', 'paused', '', null]) {
+    // cancelled, and anything a later billing change may add
+    for (const status of ['canceled', 'unpaid', 'incomplete', 'incomplete_expired', 'paused', '', null]) {
       expect(whatsappAccessFor({ plan_id: has, status }), String(status)).toEqual({ allowed: false, why: 'subscription' })
-      expect(subscriptionPaidUp(status)).toBe(false)
+      expect(subscriptionLive(status)).toBe(false)
     }
-    // the quote limit keeps its grace for an unpaid subscription; the assistant does not
-    expect(subscriptionLive('past_due')).toBe(true)
     // a plan without WhatsApp, and no plan at all (the free allowance)
     expect(whatsappAccessFor({ plan_id: lacks, status: 'active' })).toEqual({ allowed: false, why: 'plan' })
     expect(whatsappAccessFor(null)).toEqual({ allowed: false, why: 'plan' })
     expect(whatsappAccessFor({ plan_id: null, status: 'active' })).toEqual({ allowed: false, why: 'plan' })
+  })
+
+  it('a payment that failed and is being retried (past due) does not pause WhatsApp: it has the same grace as the quote limit', () => {
+    const has = PLANS.find((p) => p.offered && p.channels.includes('whatsapp'))!.id
+    expect(whatsappAccessFor({ plan_id: has, status: 'past_due' })).toEqual({ allowed: true })
+    // one rule for both: the assistant and the quote limit read the same function
+    expect(subscriptionLive('past_due')).toBe(true)
+    expect(code('apps/web/src/lib/whatsapp-access.ts')).toContain('subscriptionLive(subscription.status)')
+    expect(code('apps/web/src/lib/plan-limits.ts')).toContain('subscriptionLive(subscription.status as string)')
+    // and when the subscription is then cancelled, it pauses
+    expect(whatsappAccessFor({ plan_id: has, status: 'canceled' })).toEqual({ allowed: false, why: 'subscription' })
   })
 
   it('the two lines the page shows: the owner’s words when paused, the plans that have it (from the definitions) when not included', () => {
