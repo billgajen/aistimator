@@ -506,7 +506,7 @@ describe('sign-in line and settings wording', () => {
     const auth = read('apps/web/src/app/(auth)/layout.tsx')
     expect(auth).toContain('{HERO.headline}')
     expect(auth).not.toContain('AI-powered estimates for your business')
-    expect(HERO.headline).toBe('Instant quotes on your website, in your prices.')
+    expect(HERO.headline).toBe('Instant quotes for your customers, in your prices.')
   })
 
   it('"Notification Email (Override)" is "Send notifications to"', () => {

@@ -16,6 +16,10 @@ import { SCREEN_WORDS } from '@/lib/marketing/screen-words'
  *   RangeScreen      the estimate while a detail is unconfirmed: a range
  *   PriceCheckScreen setup's "Check your prices"
  *   NumbersScreen    Home's numbers for the last 30 days
+ *   UnderstoodScreen a customer's message beside what the product made of it (T-173).
+ *                    Not one screen of the product: a summary of three results that
+ *                    each appear on a real one (the form's service suggestion, the
+ *                    question screen, the price breakdown).
  *
  * A screen is a picture: wrap it in <Picture> so a screen reader hears one
  * sentence and the keyboard skips it. The customer's screens take the
@@ -285,6 +289,58 @@ export function NumbersScreen({
             <p className="mt-1 text-xs text-text-muted">{n.change}</p>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * T-173: a customer's message on one side, what the product made of it on the
+ * other. Each row is a result the product really produces for these words
+ * (Docs/design/ai-capabilities.md: service-match, words-against-answers,
+ * extras-from-description); the rows are gathered here for the home page and
+ * do not sit together on one product screen.
+ */
+export function UnderstoodScreen({
+  wroteTitle,
+  message,
+  understoodTitle,
+  rows,
+  primaryColor,
+  className = '',
+}: {
+  wroteTitle: string
+  message: string
+  understoodTitle: string
+  rows: Array<{ id: string; label: string; value: string; text: string }>
+  primaryColor: string
+  className?: string
+}) {
+  return (
+    <div
+      className={`grid gap-6 rounded-3xl border border-border bg-white p-6 text-left shadow-warm-lg sm:grid-cols-2 sm:gap-8 ${className}`}
+      style={brandStyleVars(primaryColor)}
+      data-testid="understood-screen"
+    >
+      <div>
+        <SectionLabel as="p">{wroteTitle}</SectionLabel>
+        <p className="rounded-2xl bg-surface p-4 text-sm leading-relaxed text-text-primary" data-testid="understood-message">
+          {message}
+        </p>
+      </div>
+      <div>
+        <SectionLabel as="p">{understoodTitle}</SectionLabel>
+        <dl className="space-y-4" data-testid="understood-rows">
+          {rows.map((row) => (
+            <div key={row.id} data-understood={row.id}>
+              <dt className="text-xs font-medium text-text-muted">{row.label}</dt>
+              <dd className="mt-0.5 text-sm text-text-secondary">
+                <span className="font-semibold text-text-primary">{row.value}</span>
+                <span className="block">{row.text}</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
       </div>
     </div>
   )

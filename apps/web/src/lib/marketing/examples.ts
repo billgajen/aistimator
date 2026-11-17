@@ -36,7 +36,7 @@ export interface MarketingExample {
   /** T-167: a quantity the template has measured from photos, priced at the template's rate (painting only) */
   measured: { item: string; quantity: number; unit: string; rate: number; amount: number } | null
   /** T-167: an extra the template sells that a customer's own words can add, at the template's price */
-  extra: { label: string; amount: number; phrase: string } | null
+  extra: { label: string; amount: number; phrase: string; service: string } | null
 }
 
 interface Pick {
@@ -103,7 +103,7 @@ function build(p: Pick): MarketingExample {
     const addon = from?.addons?.find((a) => a.label === p.extra!.addon)
     const heard = addon?.triggerKeywords?.some((k) => p.extra!.phrase.toLowerCase().includes(k.toLowerCase()))
     if (!addon || !heard) throw new Error(`"${p.extra.addon}" is not an extra of ${p.extra.service} that "${p.extra.phrase}" asks for`)
-    extra = { label: addon.label, amount: addon.price, phrase: p.extra.phrase }
+    extra = { label: addon.label, amount: addon.price, phrase: p.extra.phrase, service: p.extra.service }
   }
 
   return {

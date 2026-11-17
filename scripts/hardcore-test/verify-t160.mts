@@ -543,7 +543,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
   const signupLine = await po.getByTestId('auth-line').innerText()
   await po.goto(`${cfg.appUrl}/`, { waitUntil: 'networkidle' })
   const heroLine = (await po.locator('h1').first().innerText()).replace(/\s+/g, ' ').trim()
-  check('sign-in and sign-up read "Instant quotes on your website, in your prices.", the same as the home page’s headline', loginLine === HERO.headline && signupLine === HERO.headline && heroLine === HERO.headline, { loginLine, heroLine })
+  check('sign-in and sign-up read "Instant quotes for your customers, in your prices." (T-173), the same as the home page’s headline', loginLine === HERO.headline && signupLine === HERO.headline && heroLine === HERO.headline, { loginLine, heroLine })
   await ctxOut.close()
 
   check('no browser alert() fired anywhere', dialogs.length === 0, dialogs)

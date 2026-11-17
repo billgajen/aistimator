@@ -15,6 +15,147 @@
 
 ## Issues & Resolutions
 
+### 2026-11-17: T-173 — Bot and spam protection, the open database rules closed, home page changes (AD-054, AD-055)
+
+**Not committed, not deployed.** Preview (web only, protection off, behind the Vercel login): `https://estimator-k45gv5sb0-gajendrans-projects-1a87e0b4.vercel.app`.
+
+**Found first, and worse than spam: three open doors in the database (all in production, read-only check 2026-11-17).**
+Listing what a stranger can reach turned up rules in the database itself that the product never needed, because
+every public page reads and writes through the server:
+1. **Anyone could read every quote.** The rule "Public can view quotes by token" compared no token. The site's
+   public key (it is in every page's JavaScript) was enough to list every quote of every business: customer
+   details, prices, the pricing trace. Proven locally (2,441 quotes readable); production had the same rule and
+   4 quotes.
+2. **A signed-in business could move itself into another business.** "Users can update own profile" let a user
+   change its own `tenant_id` (and `role`). Done locally: the account then read the other business.
+3. **Every sign-up was a platform admin.** New accounts got the role `admin`, and `/admin` and `/api/admin/*`
+   check for that word. All 3 production accounts had it. Shown locally by `verify-t173`: with that role an
+   ordinary account lists other businesses.
+4. Also: the public key could list every business's key, its services (with their work steps) and its form
+   settings, and insert rows into `quote_feedback`, `assets`, `quote_requests` and `widget_analytics`; a
+   signed-in business could change its own `subscriptions` row (its plan), once it had one.
+
+**Migration 43** (`00000000000043_close_open_database_rules.sql`, `scripts/deploy-migration-43.sh`) closes all of
+them and needs no web deploy to take effect (AD-054):
+- drops the nine "Public can …" rules above and "Users can update own subscription";
+- takes every table privilege away from signed-out callers (`anon`), now and for tables made later;
+- a guard on `user_profiles`: `id`, `tenant_id` and `role` change only through the service role;
+- every existing profile becomes `owner` (once), new sign-ups are `owner`, and `admin` is the platform's own
+  role, granted only by `scripts/set-platform-admin.sh you@example.com`. **After the migration nobody is a
+  platform admin until that script is run.**
+- Web: `lib/roles.ts` names the two roles; `setup-tenant` gives `owner`; checkout writes the Stripe customer id
+  through the server. No price or checkout logic changed.
+
+**A1. What a stranger can call, and what each can cost** (the list is in `OWNER-TODO.md`, T-173, section 2).
+
+**A2. Rate limits** (AD-055)
+- Every limit is in one file, `apps/web/src/lib/rate-limit-config.ts`. The `RATE_LIMIT_*` settings are gone.
+- A scope has one or more windows; each counts per address and per key (the business, the quote or a hash of the
+  email address). Request submission has a minute, an hour and a day window, so a slow attack on one business
+  stops at 200 requests a day instead of using up its plan; the per-minute figure alone allowed 43,200.
+- New: quote page actions (accept, decline, question, answers), sign-up, log-in, password reset, the form's
+  settings and its view counter. A quote's own allowance is counted only for a caller who holds its link, so
+  someone who knows a quote's id cannot lock the real customer out.
+- A blocked call gets 429 with a plain message and the wait ("Too many tries in a short time. Please wait a
+  minute and try again."). The request form shows it with "Your answers are still here. Nothing you typed has
+  been lost." and a **Try again** button that sends the same request; "Start Over" is shown only when there is
+  nothing to send again. The same screen is used when the human check or the server fails.
+- Upstash down or slow: the request goes ahead after at most 1.5 seconds and the log says
+  `[RateLimit] FAILING OPEN`. Not configured: `[RateLimit] PROTECTION OFF`, once.
+
+**A3. Human check (Cloudflare Turnstile)**
+- It was already in the form, the embed, the demo and the unfinished-request route (invisible unless Cloudflare
+  asks for a tap), verified on the server. New: on sign-up.
+- On only when **both** keys are set (`TURNSTILE_SECRET_KEY` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY`). With only
+  the secret set no browser could make a token and every request would have been refused; now that is
+  "protection off" with a log line.
+- The refusal no longer says "refresh the page" (that loses the answers).
+- The embed was run from another origin with the check on: the token is made inside the form's own frame, so
+  the other site handles none of it.
+
+**A4. Known gaps**
+- `quote_feedback`: the open rule and the grant are gone (migration 43). The route already checked the quote's
+  token and wrote through the server.
+- **Uploads: storage enforced nothing.** The size and type were checked only as declared; the signed address
+  accepted any file of any size (tried: a file 50 times the declared size, and a JPEG address used for HTML,
+  both stored). A public upload address is now signed for exactly the declared size and type, so storage itself
+  refuses anything else (403). The limits are unchanged (10 MB photo, 25 MB document, 10 files).
+- The demo's daily cap and per-address limit are unchanged (`verify-t153` in the regression run).
+
+**A5. Sign-up, log-in and password reset go through our server; the emails go through Postmark**
+- New routes: `POST /api/auth/signup`, `/login`, `/forgot-password`, `/reset-password`, `/confirm`
+  (`lib/auth-flow.ts`). The server asks Supabase for the link (admin API: Supabase sends nothing) and sends the
+  email itself (`lib/auth-emails.ts`): "Confirm your email for Qolumns", "Reset your Qolumns password", "You
+  already have a Qolumns account". Plain words, one button, from the product's own address.
+- **There was no password reset in the product.** Built: "Forgot your password?" on the log-in page,
+  `/forgot-password`, `/reset-password`.
+- The link in an email opens `/auth/confirm`, a page with one button. The link is used only when the button is
+  pressed (a POST): mail scanners open every link in an email and would otherwise spend it first.
+- Sign-up and reset answer the same whether or not the address has an account; the difference arrives by email.
+- Without Postmark: on a laptop the link is written to the server log; in production the caller is told the
+  email could not be sent.
+
+**Part B. Home page**
+- Headline: "Instant quotes for your customers, in your prices." (also the page title, the auth pages' line and
+  the social preview).
+- "What it notices", in the owner's order: what your customer wrote; what the photos show (the walls and the
+  label are its two examples); something extra they mention ("When they mention something extra, it adds your
+  line for it, at your price."); when it can't tell, it asks (unchanged).
+- **The first example is worded for what the product does, not for what was asked.** The ticket asked for "what
+  the AI understood: the service, the size of the job, key details". The product does not work the service or
+  the size out from a message: the customer picks the service and answers the size question, and no quantity
+  was ever taken from a description on a request without photos (0 of 2,153). What it does is read the message
+  against those: it suggests the right service when the words fit another, asks when the words give a different
+  size, and adds an extra they asked for. All three were seen on one live request (local stack, real AI) and are
+  checked again by `verify-t173`. `Docs/design/ai-capabilities.md` has a new row, `words-against-answers`, and
+  `service-match` is claimable now that it has been seen working. The owner decides whether this wording stays.
+
+**Checks**
+- `verify-t173`: **100 of 100**. It runs stand-ins for Upstash, Cloudflare's token check and Postmark; the
+  browser gets its token from Cloudflare with Cloudflare's published test key.
+- Unit tests: web 841 (was 801), worker 534, mobile 11. `pnpm lint`, `pnpm typecheck`, and the web and worker builds pass.
+- Full regression (protection off), `verify-t146` to `verify-t175`: all 24 scripts pass. 21 passed as they were.
+  Three failed on one check each, each for something this ticket changes on purpose, and pass with that check
+  brought up to date: `verify-t171` (it counted sign-up's hidden honeypot field as a field under 44 px; it now
+  skips a field no person can reach), `verify-t172` (it expected storage to accept two dishonest small copies;
+  storage now refuses them, and the script puts them in storage directly to keep testing the check made before
+  serving), `verify-t174` (it looked for the sign-up page's own redirect address; the server now builds the
+  link). Four more were updated before the run for the new headline and example order (`verify-t154`, `t160`,
+  `t167`, `t174`).
+- **Local stack:** restarting the local Supabase failed once during this ticket: the tool starts Postgres 17 (the
+  linked project's version, cached in `supabase/.temp/postgres-version`) on data made by Postgres 15. Moving
+  that file aside fixes it; the data was untouched. The file is kept beside it as `postgres-version.t173-backup`.
+
+**Not proven**
+- Anything against the real Upstash, the real Turnstile keys or a real inbox: no account exists yet.
+- Migration 43 on production: it has run on the local database only.
+- "Allow new users to sign up" switched off on the hosted Supabase. Tried on the local auth server only (v2.186):
+  a stranger's direct sign-up is refused (`signup_disabled`) and our server's sign-up, confirm, log-in and reset
+  all still work.
+
+**Still open after this ticket (not changed)**
+- A stranger can still call Supabase's own sign-up, log-in and reset addresses directly with the public key,
+  past our routes. Supabase's own limits apply there (2 emails an hour from its built-in sender). Switching
+  off "Allow new users to sign up" in Supabase, after the web deploy, closes the sign-up one (above); the owner's
+  step, in `OWNER-TODO.md`. Direct log-in and reset calls stay, under Supabase's limits.
+- The quote's read routes (the quote, its PDF, a photo) have the link token and no rate limit.
+- The dashboard's own upload route (`/api/uploads/init`, signed-in) still signs only the key.
+- An account email's link is in the address of the page it opens, so the host's request log holds it (single
+  use, one hour).
+
+**Files:** `supabase/migrations/00000000000043_close_open_database_rules.sql`,
+`scripts/{deploy-migration-43,set-platform-admin}.sh`, `apps/web/src/lib/{rate-limit,rate-limit-config,quote-action-limit,turnstile,postmark,auth-flow,auth-emails,auth-route,roles,admin,r2}.ts`,
+`apps/web/src/middleware.ts`, `apps/web/src/app/api/auth/{signup,login,forgot-password,reset-password,confirm,setup-tenant}/route.ts`,
+`apps/web/src/app/api/public/{quotes,leads,uploads/init,widget/config,widget/analytics}/route.ts`,
+`apps/web/src/app/api/public/quotes/[quoteId]/{accept,decline,feedback,clarify}/route.ts`,
+`apps/web/src/app/api/billing/checkout/route.ts`, `apps/web/src/app/(auth)/{login,signup,forgot-password,reset-password,auth/confirm}/page.tsx`,
+`apps/web/src/components/{auth/auth-form,embed/EstimateWidget,marketing/home/WhatItNotices,marketing/screens/ProductScreens}.tsx`,
+`apps/web/src/lib/marketing/{home-copy,examples,ai-claims}.ts`, `apps/web/src/app/layout.tsx`, `apps/web/.env.example`,
+`apps/web/src/__tests__/{t173,rate-limit,turnstile}.test.ts` (and five older tests updated for the new headline, order and shared classes),
+`scripts/hardcore-test/verify-t173.mts`, `Docs/design/ai-capabilities.md`, `Docs/{02-api-contracts,03-data-model,04-frontend}.md`, `OWNER-TODO.md`.
+
+---
+
 ### 2026-11-16: T-175 — Connect WhatsApp in one click (Meta Embedded Signup) (AD-053)
 
 **Deployed 2026-11-17 00:13 UTC** (commit `25ba389`). The worker is not touched.
@@ -6759,6 +6900,39 @@ if (pricingResult.estimatedTotal <= 0) {
 - A new column that holds a secret is named `…_encrypted` and is left out of `CONNECTION_VIEW_COLUMNS`; the page's view is built field by field.
 
 **Rejected:** trusting the ids in Meta's browser message (anyone can post a message to a page); one platform secret for manual connections too (their calls are signed by another app, so the check would have to be skipped for them); deregistering on disconnect (it breaks the number for the business's other tools, and Meta forbids it for a Business app number); keeping the browser-readable policy and hiding the token column (the phone number id is as sensitive as the token for routing).
+
+---
+
+### AD-054: The database trusts nobody but the server (T-173)
+
+**Decision:** a signed-out caller (the public key) holds no privilege on any table, and no rule is written for "public". Every public page and route reads and writes through the server with the service role, and checks the quote's link token or the business's key there. A signed-in user reaches only its own business's rows, and cannot change the columns that say which business it belongs to or what role it has: `user_profiles.id`, `tenant_id` and `role` change only through the service role (a guard trigger), as `tenants.slug` and `tenants.is_demo` already did. `role` is `owner` for every sign-up; `admin` is the platform's own role and is granted only by `scripts/set-platform-admin.sh`.
+
+**Why:** the public key is in every page's JavaScript, so a rule for "public" is a rule for everyone on the internet. Three such rules had been written as conveniences and were never needed: one let anyone read every quote, because it compared no token. A user-editable profile row decided which business a user was in, and a default value decided who was a platform admin.
+
+**Rules that follow:**
+- A new table gets row-level security, a service-role rule and, when a dashboard reads it directly, a rule scoped to the caller's own business. Never a rule whose condition is `true` or does not name the caller.
+- A column that grants access (which business, which role, which plan, a flag like `is_demo`) is never writable by the user it grants access to. Guard it with a trigger or keep the table server-only.
+- A check for platform admin uses `PLATFORM_ADMIN_ROLE` (`lib/roles.ts`); no route or trigger hands that role out.
+- `scripts/deploy-migration-43.sh` prints the count of "Public can …" rules and of grants to signed-out callers; both stay 0.
+
+**Rejected:** fixing the quotes rule to compare a token (the database cannot see the token the server hashes, and the server already checks it); an environment list of admin addresses (a second place to keep in step with the accounts); leaving the rules for signed-out reads of services and form settings "because the form needs them" (the form reads them through the server).
+
+---
+
+### AD-055: Public limits live in one file, count per address and per key, and fail open (T-173)
+
+**Decision:** every public rate limit is a row in `apps/web/src/lib/rate-limit-config.ts`: a scope, and for each window the calls allowed from one address and for one key (the business, the quote, or a hash of the email address). A request is counted before anything is read or written. Request submission has a minute, an hour and a day window. With Upstash not configured, slow (1.5 seconds) or failing, the request goes ahead and the log says so. The human check (Turnstile) is on only when both its keys are set, and fails open when Cloudflare does not answer.
+
+**Why:** the per-minute limits alone let a patient attacker send one business tens of thousands of requests a day and use up its plan; a limit per business per day stops that without touching its neighbours. One file, because limits spread across settings and routes had drifted (three routes had none). Fail open, because a limiter or a bot check that is down must not take quoting down with it: the plan limits and the demo's database caps still hold.
+
+**Rules that follow:**
+- A new public route names a scope from the config file and checks it first. A limit is never typed in a route or read from a setting.
+- A counter for something a stranger can name (a quote id) is counted only after the caller has shown the link token, so it cannot be used to lock the real customer out.
+- No address, business id or email address is logged when a request is blocked; an email address is stored in the limiter only as a hash.
+- A refusal that is not the customer's fault (429, the human check, a server fault) keeps what they typed and offers to send it again. No message says "refresh the page".
+- Sign-up, log-in and reset go through `/api/auth/*`; the browser does not call Supabase's auth directly. Account emails are sent by `lib/auth-flow.ts` through Postmark, and a link in one is used by a button press, never by opening it.
+
+**Rejected:** limits read from environment settings (the ticket: one config file); blocking when Upstash is down (takes the product down with a third party); Supabase's own captcha setting (it would also demand a token on every log-in made by our server); a test-only header that switches protection off (a switch an attacker could find).
 
 ---
 

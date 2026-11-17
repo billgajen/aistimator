@@ -37,7 +37,7 @@ import {
   type ApprovalOutcome,
 } from '@qolumns/shared'
 import { approveByLink, loadApprovalLink } from '@/lib/approval-link'
-import { getScopeLimits } from '@/lib/rate-limit'
+import { getScopeWindows } from '@/lib/rate-limit'
 
 // ---------------------------------------------------------------------------
 // A tiny in-memory stand-in for the service-role client: enough of the query
@@ -361,7 +361,7 @@ describe('T-156: a link reaches its own quote and tenant, nothing else', () => {
 
 describe('T-156: rate limits and logs', () => {
   it('a per-IP and per-link limit on the endpoint', () => {
-    expect(getScopeLimits('approval_link')).toMatchObject({ ipLimit: 10, tenantLimit: 5 })
+    expect(getScopeWindows('approval_link')[0]).toMatchObject({ perIp: 10, perKey: 5 })
     const route = readFileSync(join(__dirname, '..', 'app', 'api', 'public', 'approval', '[token]', 'route.ts'), 'utf8')
     expect(route).toMatch(/checkPublicRateLimit\('approval_link', \{ ip: getClientIp\(request\), tenantKey: keyPart \}\)/)
   })

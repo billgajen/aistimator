@@ -181,7 +181,7 @@ describe('T-167: each trade page claims only what the AI does for that trade', (
   it('painting: the measured wall and the extra are the template’s own, at its prices', () => {
     const painting = marketingExample('painting')
     expect(painting.measured).toEqual({ item: 'Exterior walls', quantity: 920, unit: 'sqft', rate: 2.5, amount: 2300 })
-    expect(painting.extra).toEqual({ label: 'Trim, doors & baseboards', amount: 200, phrase: 'and the trim too' })
+    expect(painting.extra).toEqual({ label: 'Trim, doors & baseboards', amount: 200, phrase: 'and the trim too', service: 'Interior Painting' })
   })
 })
 
@@ -194,20 +194,24 @@ describe('T-167: the message, the demo beat and "What it notices"', () => {
   })
 
   it('four examples, each beside a real screen, before "Your prices"', () => {
-    // T-174: what the customer wrote and what the photos show lead; the label is third
-    expect(NOTICES.examples.map((e) => e.id)).toEqual(['extra', 'walls', 'label', 'range'])
+    // T-173 (the owner's order): what the customer wrote, what the photos show (the walls and the
+    // label are its two examples), an extra they mention, then the question
+    expect(NOTICES.examples.map((e) => e.id)).toEqual(['words', 'photos', 'extra', 'range'])
     expect(NOTICES.examples.map((e) => e.title)).toEqual([
-      'An extra your customer asked for',
-      'Walls, measured from photos',
-      'Model and size, read from a photo',
+      'What your customer wrote',
+      'What the photos show',
+      'Something extra they mention',
       'When it can’t tell, it asks',
     ])
-    const walls = NOTICES.examples.find((e) => e.id === 'walls')
-    expect(walls && 'note' in walls ? walls.note : null).toBe('It’s an estimate. Your customer checks it and you confirm the price.')
+    const photos = NOTICES.examples[1]
+    expect(photos.parts.map((p) => p.title)).toEqual(['Walls, measured from photos', 'Model and size, read from a photo'])
+    expect(photos.parts[0].note).toBe('It’s an estimate. Your customer checks it and you confirm the price.')
+    expect(NOTICES.examples[2].text).toBe('When they mention something extra, it adds your line for it, at your price.')
+    expect(NOTICES.examples[3].text).toBe('Your customer sees a range and one quick question. Their answer sets the estimate, from your prices.')
     // no accuracy figure anywhere in the section
     expect(JSON.stringify(NOTICES)).not.toMatch(/\d\s?%|accurate|accuracy|never wrong/i)
     const section = code('apps/web/src/components/marketing/home/WhatItNotices.tsx')
-    for (const screen of ['<QuestionScreen', '<TakeoffScreen', '<LedgerScreen', '<RangeScreen']) expect(section).toContain(screen)
+    for (const screen of ['<UnderstoodScreen', '<QuestionScreen', '<TakeoffScreen', '<LedgerScreen', '<RangeScreen']) expect(section).toContain(screen)
     // no icon stands in for a screen
     expect(section).not.toMatch(/<svg|lucide|Icon\b/)
     const home = code('apps/web/src/app/page.tsx')

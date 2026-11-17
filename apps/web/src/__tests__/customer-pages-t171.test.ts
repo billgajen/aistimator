@@ -267,10 +267,14 @@ describe('T-171: the billing page, and the small leftovers', () => {
   })
 
   it('login and sign-up fields are 44 px tall, and the link to the other page is a clear link', () => {
-    for (const f of ['login', 'signup']) {
+    // T-173: the account pages share their field and link classes (components/auth/auth-form.tsx)
+    const shared = code('apps/web/src/components/auth/auth-form.tsx')
+    expect(shared).toContain("AUTH_INPUT =\n  'w-full min-h-[44px] rounded-xl border border-field bg-white")
+    expect(shared).toContain("AUTH_LINK = 'inline-flex min-h-[24px] items-center font-semibold text-primary underline underline-offset-4'")
+    for (const f of ['login', 'signup', 'forgot-password', 'reset-password']) {
       const src = code(`apps/web/src/app/(auth)/${f}/page.tsx`)
-      expect(src, f).toContain('w-full min-h-[44px] rounded-xl border border-field bg-white')
-      expect(src, f).toContain('inline-flex min-h-[24px] items-center font-semibold text-primary underline underline-offset-4')
+      expect(src, f).toContain('className={AUTH_INPUT}')
+      expect(src, f).toContain('className={AUTH_LINK}')
       expect(src, f).not.toMatch(/className="text-primary hover:underline"/)
     }
   })

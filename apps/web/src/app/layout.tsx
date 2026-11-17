@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   // T-154: absolute URLs for the social preview image
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   title: PRODUCT_NAME,
-  description: 'Instant quotes on your website, in your prices.',
+  description: 'Instant quotes for your customers, in your prices.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

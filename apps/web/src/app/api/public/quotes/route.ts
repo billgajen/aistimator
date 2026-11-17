@@ -4,7 +4,7 @@ import { decideTestRequest, publicSource } from '@/lib/test-quotes'
 import { createAdminClient } from '@/lib/supabase/server'
 import { createQuoteSubmission } from '@/lib/quote-intake'
 import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
-import { verifyTurnstileToken } from '@/lib/turnstile'
+import { verifyTurnstileToken, HUMAN_CHECK_FAILED_MESSAGE } from '@/lib/turnstile'
 import { checkDemoAllowance, demoBusyResponse } from '@/lib/demo/demo-guard'
 import { NextResponse } from 'next/server'
 
@@ -108,7 +108,8 @@ export async function POST(request: Request) {
         {
           error: {
             code: 'VERIFICATION_FAILED',
-            message: 'Security check failed. Please refresh the page and try again.',
+            // T-173: the message never sends the person away from the form; their answers stay and they can try again
+            message: HUMAN_CHECK_FAILED_MESSAGE,
           },
         },
         { status: 403 }

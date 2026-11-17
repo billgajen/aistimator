@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
 import { getRegion, DEMO_LOGO_PATH } from '@qolumns/shared'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import { hasCustomBranding } from '@/lib/plan-features'
@@ -21,6 +22,10 @@ export async function GET(request: Request) {
         { status: 400 }
       )
     }
+
+    // T-173: by address and by business, before the database is read
+    const rate = await checkPublicRateLimit('widget_config', { ip: getClientIp(request), tenantKey })
+    if (!rate.allowed) return rateLimitedResponse(rate)
 
     const supabase = createAdminClient()
 

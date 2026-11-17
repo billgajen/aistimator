@@ -597,7 +597,8 @@ if (!process.env.PLAYWRIGHT_DIR) {
     for (const [pathname, link] of [['/login', 'signup-link'], ['/signup', 'login-link']] as const) {
       await p.goto(`${cfg.appUrl}${pathname}`, { waitUntil: 'networkidle' })
       const auth = await p.evaluate((testid) => {
-        const fields = [...document.querySelectorAll('form input')].filter((i) => !['hidden', 'checkbox'].includes(i.getAttribute('type') ?? '')).map((i) => Math.round(i.getBoundingClientRect().height))
+        // T-173: sign-up has an off-screen honeypot field no person can see or reach (inside aria-hidden); it is not a field to tap
+        const fields = [...document.querySelectorAll('form input')].filter((i) => !['hidden', 'checkbox'].includes(i.getAttribute('type') ?? '') && !i.closest('[aria-hidden=true]')).map((i) => Math.round(i.getBoundingClientRect().height))
         const a = document.querySelector(`[data-testid=${testid}]`) as HTMLElement
         const cs = getComputedStyle(a)
         return { fields, link: { h: Math.round(a.getBoundingClientRect().height), underline: cs.textDecorationLine, weight: Number(cs.fontWeight), text: a.innerText.trim() } }

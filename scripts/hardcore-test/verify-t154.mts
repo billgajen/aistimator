@@ -90,7 +90,7 @@ const og = await fetch(`${app}/opengraph-image`)
 const ogBytes = og.ok ? (await og.arrayBuffer()).byteLength : 0
 check('the social preview image renders', og.ok && og.headers.get('content-type') === 'image/png' && ogBytes > 5000, ogBytes)
 const head = await (await fetch(`${app}/`)).text()
-check('home <title> and description carry the new message', head.includes('<title>Instant quotes on your website, in your prices — Qolumns</title>') && head.includes('og:image'))
+check('home <title> and description carry the new message', head.includes('<title>Instant quotes for your customers, in your prices — Qolumns</title>') && head.includes('og:image'))
 
 await browser.close()
 console.log(`\nScreenshots: ${out}`)

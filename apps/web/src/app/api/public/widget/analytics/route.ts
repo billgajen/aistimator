@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
 import { NextResponse } from 'next/server'
 
 /**
@@ -41,6 +42,10 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
+
+    // T-173: by address and by business, before any row is written
+    const rate = await checkPublicRateLimit('widget_analytics', { ip: getClientIp(request), tenantKey: body.tenantKey })
+    if (!rate.allowed) return rateLimitedResponse(rate)
 
     const supabase = createAdminClient()
 

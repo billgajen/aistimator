@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { limitQuoteAction, limitQuoteAndBusinessActions } from '@/lib/quote-action-limit'
 import { quoteTokenFilter } from '@/lib/tokens'
 import { NextResponse } from 'next/server'
 import { isShownEarly } from '@qolumns/shared'
@@ -22,6 +23,11 @@ export async function POST(
 ) {
   try {
     const { quoteId } = params
+
+    // T-173: by address, before anything is read
+    const limited = await limitQuoteAction(request)
+    if (limited) return limited
+
     const body = (await request.json()) as SubmitFeedbackRequest
 
     if (!body.token) {
@@ -80,6 +86,10 @@ export async function POST(
         { status: 410 }
       )
     }
+
+    // T-173: the token is good; count it for this quote and for the whole business
+    const busy = await limitQuoteAndBusinessActions(quoteId, quote.tenant_id)
+    if (busy) return busy
 
     // Check quote is in a valid state for feedback
     // T-147: a customer looking at an estimate shown before approval can ask a

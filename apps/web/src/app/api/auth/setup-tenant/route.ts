@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { OWNER_ROLE } from '@/lib/roles'
 
 interface SetupTenantRequest {
   businessName: string
@@ -76,7 +77,8 @@ export async function POST(request: Request) {
     const { error: profileError } = await adminClient.from('user_profiles').insert({
       id: user.id,
       tenant_id: tenant.id,
-      role: 'admin',
+      // T-173: a business's own account. The platform's own role is never given here (lib/roles.ts)
+      role: OWNER_ROLE,
       display_name: user.email?.split('@')[0] || 'Admin',
     })
 

@@ -39,22 +39,41 @@ function getR2Client(): S3Client {
 }
 
 /**
- * Generate a signed URL for uploading a file directly to R2
+ * Generate a signed URL for uploading a file directly to R2.
+ *
+ * T-173: pass `exactSizeBytes` and the address is good for exactly that many
+ * bytes of exactly that content type: both headers are part of the
+ * signature, so storage itself refuses anything else (403). Without it, as
+ * before, only the key is signed and storage accepts whatever is sent; the
+ * size and type the caller declared are then only a promise.
  */
 export async function generateUploadUrl(
   key: string,
   contentType: string,
-  expiresInSeconds: number = 3600
+  expiresInSeconds: number = 3600,
+  exactSizeBytes?: number
 ): Promise<string> {
   const client = getR2Client()
+
+  if (exactSizeBytes === undefined) {
+    const command = new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+      ContentType: contentType,
+    })
+    return getSignedUrl(client, command, { expiresIn: expiresInSeconds })
+  }
 
   const command = new PutObjectCommand({
     Bucket: R2_BUCKET_NAME,
     Key: key,
     ContentType: contentType,
+    ContentLength: exactSizeBytes,
   })
-
-  return getSignedUrl(client, command, { expiresIn: expiresInSeconds })
+  return getSignedUrl(client, command, {
+    expiresIn: expiresInSeconds,
+    signableHeaders: new Set(['content-type', 'content-length']),
+  })
 }
 
 /**

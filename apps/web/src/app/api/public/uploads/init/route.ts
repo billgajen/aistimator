@@ -123,7 +123,8 @@ export async function POST(request: Request) {
 
     for (const file of body.files) {
       // Validate file has required fields
-      if (!file.fileName || !file.contentType || !file.sizeBytes) {
+      // T-173: the size is signed into the upload address, so it must be a whole number of bytes
+      if (!file.fileName || !file.contentType || !Number.isInteger(file.sizeBytes) || file.sizeBytes <= 0) {
         errors.push({ fileName: file.fileName || 'unknown', error: 'Missing required fields' })
         continue
       }
@@ -178,7 +179,9 @@ export async function POST(request: Request) {
 
       if (isR2Configured()) {
         // Generate real R2 signed URL for direct upload
-        uploadUrl = await generateUploadUrl(r2Key, file.contentType, 3600) // 1 hour expiry
+        // T-173: good for exactly the declared size and type; storage refuses anything else,
+        // so the limits checked above hold for what is really uploaded, not only for what was declared
+        uploadUrl = await generateUploadUrl(r2Key, file.contentType, 3600, file.sizeBytes) // 1 hour expiry
       } else {
         // Fallback for development without R2: use local API endpoint
         console.warn('[Upload] R2 not configured, using local fallback')
@@ -193,7 +196,7 @@ export async function POST(request: Request) {
       // here is simply not uploaded; the photo itself is unaffected.
       let smallUploadUrl: string | undefined
       if (assetType === 'image' && isR2Configured() && smallPhotoDeclarationOk(file.small)) {
-        smallUploadUrl = await generateUploadUrl(smallPhotoKey(r2Key), file.small.contentType, 3600)
+        smallUploadUrl = await generateUploadUrl(smallPhotoKey(r2Key), file.small.contentType, 3600, file.small.sizeBytes)
       }
 
       uploads.push({

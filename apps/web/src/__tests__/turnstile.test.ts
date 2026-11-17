@@ -23,6 +23,7 @@ describe('isTurnstileEnabled', () => {
   it('is false without a secret and true with one', () => {
     expect(isTurnstileEnabled()).toBe(false)
     vi.stubEnv('TURNSTILE_SECRET_KEY', 'sk')
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site')
     expect(isTurnstileEnabled()).toBe(true)
   })
 })
@@ -37,6 +38,7 @@ describe('verifyTurnstileToken', () => {
 
   it('rejects a missing token when the secret is configured', async () => {
     vi.stubEnv('TURNSTILE_SECRET_KEY', 'sk')
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site')
     const fetchMock = mockSiteverify({})
     const result = await verifyTurnstileToken(undefined, '1.2.3.4')
     expect(result).toEqual({ ok: false, reason: 'missing-token' })
@@ -45,6 +47,7 @@ describe('verifyTurnstileToken', () => {
 
   it('accepts a token Cloudflare verifies', async () => {
     vi.stubEnv('TURNSTILE_SECRET_KEY', 'sk')
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site')
     mockSiteverify({ body: { success: true } })
     const result = await verifyTurnstileToken('tok', '1.2.3.4')
     expect(result.ok).toBe(true)
@@ -52,6 +55,7 @@ describe('verifyTurnstileToken', () => {
 
   it('rejects a token Cloudflare rejects', async () => {
     vi.stubEnv('TURNSTILE_SECRET_KEY', 'sk')
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site')
     mockSiteverify({ body: { success: false, 'error-codes': ['invalid-input-response'] } })
     const result = await verifyTurnstileToken('tok', '1.2.3.4')
     expect(result).toEqual({ ok: false, reason: 'rejected' })
@@ -59,6 +63,7 @@ describe('verifyTurnstileToken', () => {
 
   it('fails open on siteverify HTTP errors', async () => {
     vi.stubEnv('TURNSTILE_SECRET_KEY', 'sk')
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site')
     mockSiteverify({ status: 503 })
     const result = await verifyTurnstileToken('tok', '1.2.3.4')
     expect(result.ok).toBe(true)
@@ -66,6 +71,7 @@ describe('verifyTurnstileToken', () => {
 
   it('fails open when siteverify is unreachable', async () => {
     vi.stubEnv('TURNSTILE_SECRET_KEY', 'sk')
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site')
     mockSiteverify({ reject: true })
     const result = await verifyTurnstileToken('tok', '1.2.3.4')
     expect(result.ok).toBe(true)
@@ -73,6 +79,7 @@ describe('verifyTurnstileToken', () => {
 
   it('omits unknown IPs from the verification request', async () => {
     vi.stubEnv('TURNSTILE_SECRET_KEY', 'sk')
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site')
     const fetchMock = mockSiteverify({ body: { success: true } })
     await verifyTurnstileToken('tok', 'unknown')
     const init = (fetchMock.mock.calls[0] as unknown as [string, { body: string }])[1]

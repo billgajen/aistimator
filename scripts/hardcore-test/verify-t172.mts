@@ -29,13 +29,14 @@
 // Test data uses made-up names.
 import path from 'node:path'
 import { mkdirSync, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { spawn } from 'node:child_process'
 import { ROOT, loadEnv, makeSupabase, sessionCookieHeader, http, expectOk, pollQuote, uploadAssets, shortId, saveJson, runStamp } from './lib.mjs'
 import { runCheckerCases, isSettingsFlag } from './t172-checker-cases.mts'
 import { garageDoorsPackUS } from '../../apps/web/src/lib/vertical-packs/garage-doors-us'
 import { servicePayload } from '../../apps/web/src/lib/onboarding-service'
 import { SHOW_WORTH_CHECKING } from '../../apps/web/src/lib/quote-understanding'
-import { SMALL_PHOTO_MAX_BYTES, SMALL_PHOTO_MAX_EDGE } from '../../apps/web/src/lib/small-photo'
+import { SMALL_PHOTO_MAX_BYTES, SMALL_PHOTO_MAX_EDGE, smallPhotoKey } from '../../apps/web/src/lib/small-photo'
 import { CHECKER_SETTINGS_VERSION } from '../../packages/shared/src/checker'
 import { validateQuote, type GeneratedQuoteForValidation, type ServiceConfigForValidation } from '../../apps/worker/src/ai/quote-validator'
 import { createAiClient } from '../../apps/worker/src/ai/factory'
@@ -356,7 +357,19 @@ if (!process.env.PLAYWRIGHT_DIR) {
     const padded = new Uint8Array(SMALL_PHOTO_MAX_BYTES + 4096)
     padded.set(roomBytes.slice(0, 4096))
     const putBig = await http('PUT', lieBig.smallUploadUrl!, { headers: { 'Content-Type': 'image/webp' }, body: padded })
-    check('(two dishonest small copies were stored: an HTML page sent as WebP, and a WebP over the size limit)', putHtml.status === 200 && putBig.status === 200, { html: putHtml.status, big: putBig.status })
+    // T-173: an upload address is now signed for exactly the declared size and type, so storage itself refuses both
+    check('storage refuses a small copy that is not the declared size: an HTML page sent as WebP, and a WebP over the size limit (T-173)', putHtml.status === 403 && putBig.status === 403, { html: putHtml.status, big: putBig.status })
+    // The check before serving is still the second layer (for an address signed before T-173, or any other way in):
+    // put the two dishonest copies into storage directly, as the service does, and carry on
+    {
+      const req = createRequire(path.join(ROOT, 'apps/web/package.json'))
+      const env = Object.fromEntries(readFileSync(path.join(ROOT, 'apps/web/.env.local'), 'utf8').split('\n').filter((l) => /^R2_[A-Z_]+=/.test(l)).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1).replace(/^["']|["']$/g, '')]))
+      const { S3Client, PutObjectCommand } = req('@aws-sdk/client-s3')
+      const client = new S3Client({ region: 'auto', endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`, credentials: { accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY } })
+      const smallKeyOf = async (id: string) => smallPhotoKey(((await sb.select('assets', `id=eq.${id}&select=r2_key`))[0] as { r2_key: string }).r2_key)
+      await client.send(new PutObjectCommand({ Bucket: env.R2_BUCKET_NAME, Key: await smallKeyOf(lieHtml.assetId), Body: new TextEncoder().encode('<!doctype html><script>document.title="not a photo"</script>'), ContentType: 'image/webp' }))
+      await client.send(new PutObjectCommand({ Bucket: env.R2_BUCKET_NAME, Key: await smallKeyOf(lieBig.assetId), Body: padded, ContentType: 'image/webp' }))
+    }
 
     const q = await submit(a, springId, 'Wanda Pemberton', [{ fieldId: 'spring_count', value: 'Two' }], [assetId, older.assetIds[0]!, lieHtml.assetId, lieBig.assetId])
     const keyOf = async (id: string) => (await sb.select('assets', `id=eq.${id}&select=r2_key,size_bytes`))[0] as { r2_key: string; size_bytes: number }

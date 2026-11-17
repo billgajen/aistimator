@@ -19,7 +19,8 @@ export const MESSAGE_LINE = says(['photo-notes', 'pricing-engine'], 'The AI work
 const FREE = FREE_ALLOWANCE.US!.quotes
 
 export const HERO = {
-  headline: 'Instant quotes on your website, in your prices.',
+  /** T-173 (the owner's words): "for your customers" replaces "on your website"; a business needs no website to use it */
+  headline: 'Instant quotes for your customers, in your prices.',
   /** T-167: what the AI does, in one plain sentence, then where the price comes from (T-168: the owner's wording) */
   subline: says(
     ['photo-notes', 'pricing-engine'],
@@ -129,43 +130,78 @@ export const CONTROL = {
 
 /**
  * T-167: "What it notices". Four things the product does with a request, each
- * beside the real screen where the result appears. Every sentence rests on a
- * row of Docs/design/ai-capabilities.md (`says`). The figures in the screens
- * are the templates' own prices (lib/marketing/examples.ts).
+ * beside the screen where the result appears. Every sentence rests on a row
+ * of Docs/design/ai-capabilities.md (`says`). The figures in the screens are
+ * the templates' own prices (lib/marketing/examples.ts).
+ *
+ * T-173 (the owner's order, general enough for any trade):
+ *   1 words   what the customer wrote, beside what the product made of it
+ *   2 photos  what the photos show; the walls and the label are its two examples
+ *   3 extra   something extra they mention
+ *   4 range   when it can't tell, it asks
+ *
+ * The first is worded for what the product does, checked live on 2026-11-17:
+ * the customer picks the service and answers the size question; the product
+ * reads their message AGAINST those, suggests the right service when the
+ * words fit another, and asks when the words give a different size. It does
+ * not work the service or the size out from a message alone, so nothing here
+ * says it does.
  */
 export const NOTICES = {
   heading: 'What it notices',
-  /**
-   * T-174: the two every trade recognises come first (what the customer wrote,
-   * what the photos show); the label, which three trades have, is third.
-   */
   examples: [
     {
-      id: 'extra',
-      title: 'An extra your customer asked for',
-      text: says(['extras-from-description'], 'When they write “and the trim too”, it adds your trim line, at your price.'),
-      screen: 'The price breakdown of an estimate: the trim line carries a note that it was added from the customer’s description.',
-    },
-    {
-      id: 'walls',
-      title: 'Walls, measured from photos',
-      text: says(['photo-measurement'], 'For exterior painting it works out the wall area from your customer’s photos, using a door as its ruler.'),
-      /**
-       * T-174 (the owner's words). The customer is shown the wall reading to
-       * check: as a question before the price settles in most runs, and on
-       * the estimate in every run (Docs/design/ai-capabilities.md, section 1).
-       */
-      note: says(['photo-measurement', 'confirm-question'], 'It’s an estimate. Your customer checks it and you confirm the price.'),
-      screen: 'Part of an estimate: the exterior walls priced by the square foot, with the area marked as worked out from the customer’s photos.',
-    },
-    {
-      id: 'label',
-      title: 'Model and size, read from a photo',
+      id: 'words',
+      title: 'What your customer wrote',
       text: says(
-        ['label-reading', 'confirm-question'],
-        'It reads the capacity and fuel off a tank label, the size off a rating plate, the rating off a panel. Then it checks the reading with your customer.'
+        ['service-match', 'words-against-answers', 'extras-from-description'],
+        'It reads their message against the service they picked and the answers they gave. When the words say something else, it asks.'
       ),
-      screen: 'The question a customer is asked after sending a photo of a tank label: the capacity that was read from it, with “Yes, 50 gal is right” chosen.',
+      /** The customer's message. It holds the size ("three bedrooms") and the painting example's own phrase for the extra. */
+      wroteTitle: 'Your customer wrote',
+      message: 'Hi, I need three bedrooms repainted, and the trim too. The walls are dark blue and I want them white.',
+      understoodTitle: 'What it understood',
+      understood: {
+        service: { label: 'The service', text: says(['service-match'], 'It fits what they wrote.') },
+        size: { label: 'The size of the job', value: 'Three rooms', text: says(['words-against-answers'], 'They answered one room, so it asks which is right.') },
+        extra: { label: 'A detail', text: says(['extras-from-description'], 'They asked for it, so your line for it is added, at your price.') },
+      },
+      screen:
+        'A customer’s message, and beside it what the product made of it: the service fits what they wrote, the size differs from their answer so it asks, and the extra they asked for is added.',
+    },
+    {
+      id: 'photos',
+      title: 'What the photos show',
+      text: says(['photo-notes'], 'It reads the photos your customer sends for anything that affects the job. Two examples of what it can read:'),
+      parts: [
+        {
+          id: 'walls',
+          title: 'Walls, measured from photos',
+          text: says(['photo-measurement'], 'For exterior painting it works out the wall area from your customer’s photos, using a door as its ruler.'),
+          /**
+           * T-174 (the owner's words). The customer is shown the wall reading to
+           * check: as a question before the price settles in most runs, and on
+           * the estimate in every run (Docs/design/ai-capabilities.md, section 1).
+           */
+          note: says(['photo-measurement', 'confirm-question'], 'It’s an estimate. Your customer checks it and you confirm the price.'),
+          screen: 'Part of an estimate: the exterior walls priced by the square foot, with the area marked as worked out from the customer’s photos.',
+        },
+        {
+          id: 'label',
+          title: 'Model and size, read from a photo',
+          text: says(
+            ['label-reading', 'confirm-question'],
+            'It reads the capacity and fuel off a tank label, the size off a rating plate, the rating off a panel. Then it checks the reading with your customer.'
+          ),
+          screen: 'The question a customer is asked after sending a photo of a tank label: the capacity that was read from it, with “Yes, 50 gal is right” chosen.',
+        },
+      ],
+    },
+    {
+      id: 'extra',
+      title: 'Something extra they mention',
+      text: says(['extras-from-description'], 'When they mention something extra, it adds your line for it, at your price.'),
+      screen: 'The price breakdown of an estimate: the trim line carries a note that it was added from the customer’s description.',
     },
     {
       id: 'range',
@@ -269,6 +305,6 @@ export const FINAL_CTA = 'Your next customer could have your price tonight.'
 export const FINAL_QUIET_LINK = 'Or try it as a customer first'
 
 export const PAGE_META = {
-  title: `Instant quotes on your website, in your prices — ${PRODUCT_NAME}`,
+  title: `Instant quotes for your customers, in your prices — ${PRODUCT_NAME}`,
   description: `Customers answer a few questions and send photos, and see your price straight away. You get the lead and confirm it. ${freeOfferLabel()}.`,
 }

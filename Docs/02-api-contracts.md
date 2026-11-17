@@ -19,6 +19,36 @@
   - 429 rate limited
   - 500 server error
 
+## Rate limits and the human check (T-173)
+- Every public route counts the call before it reads or writes anything. The limits are in
+  `apps/web/src/lib/rate-limit-config.ts` (per address, and per business, quote or email address; some scopes
+  also by hour and by day). Over a limit: **429** with
+  `{ "error": { "code": "RATE_LIMITED", "message": "Too many tries in a short time. Please wait a minute and try again.", "retryAfterSeconds": 42 } }`
+  and a `Retry-After` header. With Upstash not configured, slow or failing, the call goes ahead.
+- `POST /api/public/quotes`, `POST /api/public/leads` and `POST /api/auth/signup` take `turnstileToken`. With both
+  Turnstile keys set, a missing or bad token is **403** `VERIFICATION_FAILED`; with either unset the field is ignored.
+  They also take the hidden field `website`, which must be empty.
+- The quote actions (`accept`, `decline`, `feedback`, `clarify`) are limited by address first, then, once the
+  quote's link token has been checked, per quote and per business.
+- `POST /api/public/uploads/init`: `sizeBytes` must be a whole number. The `uploadUrl` (and `smallUploadUrl`) is
+  signed for exactly that size and the declared `contentType`; a PUT of anything else is refused by storage (403).
+
+## Account routes (T-173)
+The browser does not call Supabase's auth directly. All answer `{ "ok": true }` or the standard error envelope.
+- `POST /api/auth/signup` `{ "email", "password", "businessName", "plan"?, "turnstileToken"?, "website"? }`.
+  Makes the unconfirmed account and emails its confirmation link through Postmark. The answer is the same when
+  the address already has an account (that address is emailed "You already have an account"). 400 for a bad
+  email, a password under 8 characters or no business name; 503 `EMAIL_NOT_SENT`.
+- `POST /api/auth/login` `{ "email", "password" }`. Sets the session cookies. 401 `INVALID_LOGIN` (the same for a
+  wrong password and an unknown address); 403 `EMAIL_NOT_CONFIRMED`.
+- `POST /api/auth/forgot-password` `{ "email" }`. Emails a reset link if the address has an account; the answer
+  is the same either way.
+- `POST /api/auth/confirm` (a form post: `type` = `signup` | `recovery`, `token_hash`). Uses the link from an
+  account email and answers **303**: to `/app` or `/reset-password`, or to `/login?notice=link-expired` /
+  `/forgot-password?notice=link-expired`. It is the button on `/auth/confirm`; opening that page uses nothing up.
+- `POST /api/auth/reset-password` `{ "password" }`. Signed-in only (the reset link signs the person in). 401 otherwise.
+- `/api/admin/*` and `/admin` need the role `admin`, which no sign-up has (`lib/roles.ts`; migration 43).
+
 ## Security notes
 - Quote view tokens have an expiry (`tokenExpiresAt`). Expired tokens return 403.
 - Future hardening: Consider HMAC-signed tokens for quote view URLs to prevent enumeration.

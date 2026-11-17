@@ -180,14 +180,15 @@ async function local() {
   // ------------------------------------------------------------------------------------
   section('2. Home copy and the sample name (A1, A3)')
   const home = (await page('/')).html.replace(/<!-- -->/g, '')
-  const titles = ['An extra your customer asked for', 'Walls, measured from photos', 'Model and size, read from a photo', 'When it can’t tell, it asks']
+  // T-173 changed the order again (the owner's): the message, the photos (the walls and the label are its two examples), extras, the question
+  const titles = ['What your customer wrote', 'What the photos show', 'Walls, measured from photos', 'Model and size, read from a photo', 'Something extra they mention', 'When it can’t tell, it asks']
   const positions = titles.map((t) => home.indexOf(`>${t}<`))
-  check('Home, "What it notices": what the customer wrote, what the photos show, then the label, then the question', positions.every((p) => p > 0) && positions.every((p, i) => i === 0 || p > positions[i - 1]!), positions)
+  check('Home, "What it notices": what the customer wrote, what the photos show (the walls, then the label), extras, then the question', positions.every((p) => p > 0) && positions.every((p, i) => i === 0 || p > positions[i - 1]!), positions)
   check('the label example is "Model and size, read from a photo"; the old title is gone', !home.includes('A label, read'))
   const note = 'It’s an estimate. Your customer checks it and you confirm the price.'
-  const wallsAt = positions[1]!
-  check('under "Walls, measured from photos": the estimate line', home.indexOf(note) > wallsAt && home.indexOf(note) < positions[2]!, NOTICES.examples.find((e) => e.id === 'walls'))
-  check('no accuracy figure in the section', !/accura|\d\s?% (of the time|accurate)|never wrong/i.test(home.slice(positions[0]!, positions[3]! + 600)))
+  const wallsAt = positions[2]!
+  check('under "Walls, measured from photos": the estimate line', home.indexOf(note) > wallsAt && home.indexOf(note) < positions[3]!, NOTICES.examples[1].parts[0])
+  check('no accuracy figure in the section', !/accura|\d\s?% (of the time|accurate)|never wrong/i.test(home.slice(positions[0]!, positions[5]! + 600)))
   for (const [name, pathname] of [['Home', '/'], ['Features', '/features'], ['the login page', '/login'], ['the demo', '/demo'], ['the water heater page', '/trades/water-heaters']] as const) {
     const html = (await page(pathname)).html
     check(`${name}: no "Priya" on the page`, html.length > 1000 && !/priya/i.test(html))
@@ -274,9 +275,11 @@ async function local() {
   const auth = JSON.parse(dry('auth').replace(/^[^{]*/, '').replace(/[^}]*$/, '')) as { site_url: string; uri_allow_list: string }
   check('Site URL is the new address', auth.site_url === NEW, auth.site_url)
   check('the allowed redirect URLs are the new and the previous address', JSON.stringify(auth.uri_allow_list.split(',')) === JSON.stringify([`${NEW}/**`, `https://${OLD_HOST}/**`]), auth.uri_allow_list)
-  // the sign-up page sends people back to the address they signed up on, so both must be allowed
-  const signup = execFileSync('grep', ['-n', 'emailRedirectTo', path.join(ROOT, 'apps/web/src/app/(auth)/signup/page.tsx')], { encoding: 'utf8' })
-  check('sign-up sends the confirmation back to the address it was opened on', signup.includes('${window.location.origin}/auth/callback'), signup.trim())
+  // T-173: sign-up goes through the server, which builds the link in the confirmation email. In production it uses
+  // the configured main address, never the address in the request (that could be pointed at someone else's site),
+  // so a sign-up started on the previous address is confirmed on the new one.
+  const flow = readFileSync(path.join(ROOT, 'apps/web/src/lib/auth-flow.ts'), 'utf8')
+  check('the confirmation link is built from the configured main address in production', flow.includes("if (process.env.NODE_ENV === 'production') return configured || 'http://localhost:3000'") && flow.includes('return `${origin}/auth/confirm?type=${type}&token_hash=${encodeURIComponent(tokenHash)}`'))
   const cors = JSON.parse(dry('cors').replace(/^[^{]*/, '').replace(/[^}]*$/, '')) as { rules: Array<{ allowed: { origins: string[] } }> }
   check('photo uploads are accepted from both addresses (bucket CORS)', [NEW, `https://${OLD_HOST}`].every((o) => cors.rules[0]!.allowed.origins.includes(o)), cors.rules[0]!.allowed.origins)
 
@@ -409,7 +412,8 @@ async function local() {
       note: (el.querySelector('[data-testid=notice-note]') as HTMLElement | null)?.innerText ?? null,
       screens: el.querySelectorAll('[data-product-screen]').length,
     })))
-    check(`${width}: Home shows the four examples in the new order, each with its screen`, JSON.stringify(notices.map((n) => n.id)) === JSON.stringify(['extra', 'walls', 'label', 'range']) && notices.every((n) => n.screens === 1) && notices[2]!.title === 'Model and size, read from a photo', notices.map((n) => n.title))
+    const partTitles = await p.locator('[data-testid=notice-part] h4').allInnerTexts()
+    check(`${width}: Home shows the four examples in the new order (T-173), each with its screen`, JSON.stringify(notices.map((n) => n.id)) === JSON.stringify(['words', 'photos', 'extra', 'range']) && notices.every((n) => n.screens === (n.id === 'photos' ? 2 : 1)) && partTitles[1] === 'Model and size, read from a photo', notices.map((n) => n.title))
     check(`${width}: only the walls example carries the estimate line`, notices[1]!.note === note && notices.filter((n) => n.note).length === 1, notices[1]!.note)
     const sideways = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
     check(`${width}: Home does not scroll sideways`, sideways <= 0, sideways)
@@ -567,7 +571,7 @@ async function live() {
   check(`the demo form on ${MAIN} reads "Step 1 of 5" at 390`, (await p.locator('[data-testid=step-count]').first().innerText()).trim() === 'Step 1 of 5')
   await p.goto(`${NEW}/`, { waitUntil: 'networkidle' })
   const titles = await p.locator('[data-testid=notices] [data-testid=notice] h3').allInnerTexts()
-  check('Home on the new address: the examples are in the new order', JSON.stringify(titles) === JSON.stringify(['An extra your customer asked for', 'Walls, measured from photos', 'Model and size, read from a photo', 'When it can’t tell, it asks']), titles)
+  check('Home on the new address: the examples are in the new order', JSON.stringify(titles.slice(0, 2).concat(titles.slice(-2))) === JSON.stringify(['What your customer wrote', 'What the photos show', 'Something extra they mention', 'When it can’t tell, it asks']), titles)
   check('Home on the new address: "Megan G.", and the estimate line under the walls example', /megan g\./i.test(await p.locator('main').innerText()) && (await p.locator('[data-testid=notice-note]').innerText()).startsWith('It’s an estimate.'))
   if (real) {
     const snippet = embedSnippet({ appOrigin: OLD, tenantKey: String(real.tenant_key), placement: 'inline', experience: 'form' })

@@ -37,6 +37,18 @@ confirm it before the price settles (38 confirm questions; 2 quotes priced witho
 price" is the default way of sending (show, then confirm); a business can switch a service to send
 automatically. No accuracy figure, as always.
 
+**Home's "What it notices" (T-173).** The owner's new order: what the customer wrote, what the photos show
+(the walls and the label are its two examples, worded as T-174 left them), an extra they mention, then the
+question. The first example shows a customer's message beside what the product made of it, and was asked for as
+"the service, the size of the job, key details". **The product does not work the service or the size out from a
+message alone**: the customer picks the service and answers the size question, and no quantity was ever taken
+from a description on a request without photos (0 of 2,153 such quotes). What it does, and what the example
+therefore says, is read the message against those: `service-match` (the service fits what they wrote, or it
+suggests another), `words-against-answers` (the words give a different size, so it asks) and
+`extras-from-description` (the extra they asked for is added). All three were seen working on one live request on
+2026-11-17. The example's three rows are gathered for the home page; they do not sit together on one product
+screen (the suggestion is on the form, the question on the question screen, the extra in the price breakdown).
+
 ## 1. What it reads from a job (claimable)
 
 | id | What it does | When it runs | What the customer sees | What the business sees | Code | Evidence |
@@ -47,6 +59,7 @@ automatically. No accuracy figure, as always.
 | `confirm-question` | A reading that changes the price is shown back to the customer to confirm before it sets the estimate. | Label readings and photo measurements. | The question screen (above). | "Waiting for the customer" on the quote. | `agents/quality-gate.ts`, `identification.ts` `identificationQuestion` | 74 confirm questions. The demo's own sample label: every one of 18 real runs that returned a result gave a range and a question (section 6). |
 | `range-and-question` | When something that sets the price is unclear, the customer gets a range and one quick question, not a guess. | Any service. At most one round. | A range (for the sample label: $1,890 to $2,410) and the question. Their answer re-prices the job from the business's prices with no AI call. | The quote waits for the customer's answer. | `agents/quality-gate.ts`, `reprice-snapshot.ts` | 180 quotes asked a question; 170 were answered and re-priced. |
 | `extras-from-description` | Notices when the customer's own words ask for an extra the business sells, and adds that extra at the business's price. | A service with add-ons, when the customer wrote a description. | The line, with "Added for you — detected from your description". | The line marked "(auto-recommended)". | `ai/signals.ts` `detectAddonsFromDescription` | Stage ran on 1,121 quotes; 35 quotes got such a line (for example "Trim, fascia, and doors"). |
+| `words-against-answers` | Notices when the customer's own words give a different size from the answer they gave on the form, and asks which is right before the price settles. It checks the words against the answer; it does not work a size out from a message alone. | Any service, when the customer wrote a description and answered a quantity question. | One question, in the product's words for that request, for example: "You mentioned needing three bedrooms painted in your note, but selected 1 room on the form… What should we allow for?" | "Asked the customer" on the quote, with the answer. | `apps/worker/src/ai/wording.ts` (`quantityConcern`), `agents/quality-gate.ts` | 6 stored quotes carry such a question (4 from a description). **Seen working live on the local stack, 2026-11-17 (T-173):** a request for Interior Painting answering 1 room and writing "three bedrooms repainted, and the trim too" came back waiting for the customer with that question, priced at 1 room, with the trim line added. |
 | `photo-notes` | Reads general things from photos: condition, access, anything that complicates the job. They feed questions and the business's view, never a price. | Any request with photos. | Notes under the estimate. | Signals on the quote. | `ai/signals.ts` `extractSignalsFromImages` | 126 quotes made the photo-reading call (274 calls). |
 | `worth-considering` | Lists work the customer may also need, from what it read, with no price. | When it read something no price line uses. | "Worth considering — From your description, you may also need: …", no amounts. | The same. | `ai/signal-recommendations.ts` | 100 quotes carry at least one. |
 | `scope-wording` | Writes the estimate's scope summary, assumptions and exclusions in plain words, inside the business's own scope. A fixed word guard then repairs or removes banned words (T-148). | Every priced quote. | The scope and notes on the quote page. | The same, editable. | `ai/wording.ts`, `shared/wording-repair.ts` | 1,493 quotes. |
@@ -57,7 +70,7 @@ automatically. No accuracy figure, as always.
 |---|---|---|---|---|
 | `price-sentence` | Turns pricing written in plain English ("$375 per room, heavy prep adds $250") into a price list, shown back to the business to check and edit. The business confirms it; nothing is priced from an unchecked sentence. | Setup, and the service editor. | `apps/web/src/app/api/services/ai-draft/compile`, `components/services/PricingComposer.tsx` | Exercised by the hardcore harness (`scripts/hardcore-test/run.mjs`). No per-call log exists. |
 | `service-draft` | Drafts a service for a trade without a template: its questions, scope and price structure, from a description. | Setup, "any other trade". | `apps/web/src/app/api/services/ai-draft`, `apps/worker/src/ai/service-draft.ts` | Same harness. No per-call log exists. |
-| `service-match` | Checks that what the customer described fits the service they picked, and suggests the right one when it does not. | Request intake, when the customer wrote a description. | `apps/web/src/lib/ai/service-matcher.ts`, `lib/quote-intake.ts` | Code path only; no log. **Do not put it on a page until it has been seen working in a live check.** |
+| `service-match` | Checks that what the customer described fits the service they picked, and suggests the right one when it does not. It does not pick the service from a message: the customer picks, and this checks the pick. | Request intake, when the customer wrote a description (and the business has not switched the check off). | `apps/web/src/lib/ai/service-matcher.ts`, `lib/quote-intake.ts` | Nothing is stored for a suggestion, so there is no count. 4 stored quotes went to the business as a general enquiry because no service fitted. **Seen working live on the local stack, 2026-11-17 (T-173):** a request sent to Wallpaper Installation that said "I need three bedrooms repainted" was answered "Did you mean Interior Painting?" and nothing was created. Claimable since then. |
 
 ## 3. Product checks that are not AI (say them without the word "AI")
 

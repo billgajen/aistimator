@@ -143,7 +143,8 @@ describe('T-172: small copies in the code', () => {
 
   it('the upload route gives a small copy its own signed address only for a photo, only when the declaration passes, and limits are unchanged', () => {
     expect(init).toContain("if (assetType === 'image' && isR2Configured() && smallPhotoDeclarationOk(file.small))")
-    expect(init).toContain('generateUploadUrl(smallPhotoKey(r2Key), file.small.contentType, 3600)')
+    // T-173: the address is good for exactly the declared size and type
+    expect(init).toContain('generateUploadUrl(smallPhotoKey(r2Key), file.small.contentType, 3600, file.small.sizeBytes)')
     expect(init).toContain('const MAX_IMAGE_SIZE = 10 * 1024 * 1024')
     expect(init).toContain('const MAX_DOC_SIZE = 25 * 1024 * 1024')
     expect(init).toContain('const MAX_FILES_PER_REQUEST = 10')

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { PLATFORM_ADMIN_ROLE } from '@/lib/roles'
 
 export interface AdminContext {
   supabase: SupabaseClient
@@ -8,7 +9,7 @@ export interface AdminContext {
 }
 
 /**
- * Verify that the current user is an admin
+ * Verify that the current user is a platform admin
  * Returns admin context if authorized, null otherwise
  */
 export async function verifyAdmin(): Promise<AdminContext | null> {
@@ -30,7 +31,7 @@ export async function verifyAdmin(): Promise<AdminContext | null> {
     .eq('id', user.id)
     .single()
 
-  if (!profile || profile.role !== 'admin') {
+  if (!profile || profile.role !== PLATFORM_ADMIN_ROLE) {
     return null
   }
 

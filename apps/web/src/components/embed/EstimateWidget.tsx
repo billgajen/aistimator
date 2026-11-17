@@ -517,6 +517,8 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
   const [fieldAnswers, setFieldAnswers] = useState<Record<string, string | number | boolean | string[]>>({})
   const [honeypot, setHoneypot] = useState('')
   const { containerRef: turnstileRef, getToken: getTurnstileToken } = useTurnstile(TURNSTILE_SITE_KEY)
+  // T-173: a submission that was held back (too many tries, the human check, a server fault) can be sent again as it is
+  const [canResend, setCanResend] = useState(false)
   // T-151: the request is saved as soon as the contact step is done
   const lead = useUnfinishedLead({ tenantKey, testToken, honeypot, getTurnstileToken })
   const [savingContact, setSavingContact] = useState(false)
@@ -604,6 +606,7 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
   }, [loadWidgetConfig])
 
   async function handleSubmit() {
+    setCanResend(false)
     setStep('submitting')
 
     try {
@@ -658,6 +661,8 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
           return
         }
         setError(data.error?.message || 'Failed to submit')
+        // T-173: held back, not refused for what was typed: every answer is still here and can be sent again
+        setCanResend(response.status === 429 || response.status >= 500 || data.error?.code === 'VERIFICATION_FAILED')
 
         // Handle service mismatch with suggestion
         if (data.error?.code === 'SERVICE_MISMATCH' && data.error?.suggestedService) {
@@ -687,7 +692,8 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
         )
       }
     } catch {
-      setError('Failed to submit quote request')
+      setError('We could not reach the server. Check your connection and try again.')
+      setCanResend(true)
       setStep('error')
     }
   }
@@ -792,6 +798,7 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
           message={error}
           suggestedService={suggestedService}
           onRetry={loadWidgetConfig}
+          onResend={canResend ? handleSubmit : undefined}
           onSelectSuggested={suggestedService ? () => {
             setSelectedService(suggestedService.id)
             setSuggestedService(null)
@@ -1037,11 +1044,14 @@ function ErrorState({
   message,
   suggestedService,
   onRetry,
+  onResend,
   onSelectSuggested,
 }: {
   message: string | null
   suggestedService?: { id: string; name: string } | null
   onRetry: () => void
+  /** T-173: send the same request again; given only when nothing typed was at fault */
+  onResend?: () => void
   onSelectSuggested?: () => void
 }) {
   return (
@@ -1060,12 +1070,25 @@ function ErrorState({
         </div>
       )}
 
-      <button
-        onClick={onRetry}
-        className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-xl hover:border-border-strong transition"
-      >
-        Start Over
-      </button>
+      {onResend ? (
+        <>
+          <p className="text-sm text-text-secondary mb-4" data-testid="answers-kept">Your answers are still here. Nothing you typed has been lost.</p>
+          <button
+            onClick={onResend}
+            data-testid="resend-request"
+            className="min-h-[44px] px-5 py-3 text-sm font-semibold bg-primary text-on-primary rounded-xl hover:bg-primary-hover transition"
+          >
+            Try again
+          </button>
+        </>
+      ) : (
+        <button
+          onClick={onRetry}
+          className="px-5 py-3 text-sm font-semibold text-text-secondary bg-surface border border-border rounded-xl hover:border-border-strong transition"
+        >
+          Start Over
+        </button>
+      )}
     </div>
   )
 }

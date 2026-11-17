@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
-import { verifyTurnstileToken } from '@/lib/turnstile'
+import { verifyTurnstileToken, HUMAN_CHECK_FAILED_MESSAGE } from '@/lib/turnstile'
 import { verifyTestToken } from '@/lib/test-quote-token'
 import { checkContact, contactRequirementOf } from '@/lib/contact-rules'
 import { hashLeadToken, newLeadToken } from '@/lib/request-leads'
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   const rate = await checkPublicRateLimit('leads', { ip, tenantKey: body.tenantKey })
   if (!rate.allowed) return rateLimitedResponse(rate)
   const turnstile = await verifyTurnstileToken(body.turnstileToken, ip)
-  if (!turnstile.ok) return fail(403, 'VERIFICATION_FAILED', 'Security check failed. Please refresh the page and try again.')
+  if (!turnstile.ok) return fail(403, 'VERIFICATION_FAILED', HUMAN_CHECK_FAILED_MESSAGE)
 
   const supabase = createAdminClient()
   const { data: site } = await supabase.from('tenant_sites').select('tenant_id, is_active').eq('tenant_key', body.tenantKey).maybeSingle()

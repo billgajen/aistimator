@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getPlan, stripePriceIdFor, stripePriceEnvKey, type PlanInterval } from '@qolumns/shared'
 import {
   getStripeClient,
@@ -112,8 +112,10 @@ export async function POST(request: Request) {
     )
 
     // Update subscription with customer ID if new
+    // T-173: the subscription row is written by the server only (migration 43
+    // removed the rule that let a signed-in business change its own row)
     if (!subscription?.stripe_customer_id) {
-      await supabase
+      await createAdminClient()
         .from('subscriptions')
         .update({ stripe_customer_id: customerId })
         .eq('tenant_id', tenantId)

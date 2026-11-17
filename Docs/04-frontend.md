@@ -37,7 +37,7 @@ that claims what its template does not do. The words "AI" and what it does are t
 
 Home page (T-165, reordered in T-167; `Docs/design/system.md` decides the look), top to bottom, one idea per
 section, and no two neighbours sharing a layout or a background:
-1. **Hero** (paper): "Instant quotes on your website, in your prices.", then one line on what the AI does and where
+1. **Hero** (paper): "Instant quotes for your customers, in your prices.", then one line on what the AI does and where
    the price comes from, the one yellow button ("Try it free: 10 quotes, no card") and a quiet "Try it as a
    customer". Under it the **product demo** (`HeroDemo`, T-168): **three frames of the same height, side by
    side, one idea each**, built from the product's own parts in the example business's colour. 1 "Your customer
@@ -58,9 +58,13 @@ section, and no two neighbours sharing a layout or a background:
    priority.
 2. **What homeowners want** (grey): three large figures in three columns side by side (the figure, the short line
    under it, then its linked source), one column on a phone (T-168; T-167 had them one to a row).
-3. **What it notices** (paper): the message line and four examples, each beside the real screen where the result
-   appears (`WhatItNotices`): a label read and confirmed, walls measured from photos, an extra added from the
-   customer's own words, a range and one question. No icons. Nothing moves.
+3. **What it notices** (paper): the message line and four examples, each beside the screen where the result
+   appears (`WhatItNotices`). T-173, the owner's order: **what your customer wrote** (a message beside what was
+   made of it: the service fits, the size differs from their answer so it asks, an extra is added; the full
+   width); **what the photos show** (its two examples side by side: walls measured from photos, a label read
+   and confirmed); **something extra they mention**; **when it can't tell, it asks**. The first is worded for
+   what the product does: it reads the message against the service picked and the answers given, and does not
+   work the service or the size out from a message (`Docs/design/ai-capabilities.md`). No icons. Nothing moves.
 4. **Your prices. You stay in control.** (mint): a plain-English price sentence and the price list it becomes (the
    page's one moment, `PriceSentence`), then the three control points in one column. Two prices, two lines. A
    minimum charge is never one of the lines: it is a floor, not an item.
@@ -188,6 +192,7 @@ Routes:
 - /industries (optional)
 - /login
 - /signup
+- /forgot-password, /reset-password, /auth/confirm (T-173)
 - /legal/privacy
 - /legal/terms
 - /help (docs embedded here)
@@ -274,6 +279,19 @@ A business with no quotes yet sees one line in 5 ("No quotes yet. When a custome
 whose turn it is.") and in 6 ("Nothing has happened yet. New requests, opens and answers will show here."), and the
 four numbers without a change line. Setup tests are in none of the counts. On a phone everything is one column in
 this order; the three counts stack and the four numbers sit two by two.
+
+**Account pages (T-173).** Log-in, sign-up, "Forgot your password?" (`/forgot-password`) and "Choose a new
+password" (`/reset-password`) post to `/api/auth/*`; none calls Supabase from the browser. They share their field,
+label and link classes and the error and note boxes (`components/auth/auth-form.tsx`). Sign-up runs the invisible
+human check and has the hidden honeypot field. A refusal shows its plain message above the form and leaves what
+was typed. `/auth/confirm` is the page a link in an account email opens: one button ("Confirm my email" or
+"Choose a new password"), which posts the link; opening the page uses nothing up. `/reset-password` without a
+session goes to `/forgot-password` with a note.
+
+**A request that is held back (T-173).** When a request is refused for a reason that is not the customer's (too
+many tries, the human check, a server fault, no connection), the form's error screen says so, adds "Your answers
+are still here. Nothing you typed has been lost." and shows **Try again**, which sends the same request. "Start
+Over" is shown only when there is nothing to send again.
 
 Sign-in and sign-up (T-160) show the home page's headline under the product name (`HERO.headline` in
 `lib/marketing/home-copy.ts`), so they always match the home page. T-165: at desktop width the login page shows a real estimate

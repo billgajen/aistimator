@@ -1,122 +1,107 @@
 /**
- * Public endpoint rate limiting (Upstash Redis, fixed window).
+ * Public endpoint rate limiting (Upstash Redis, fixed windows).
  *
- * Protects unauthenticated intake endpoints (/api/public/quotes, uploads/init,
- * widget/chat) with per-IP and per-tenant-key counters. These run BEFORE any
- * DB writes or AI calls — the worker's rate limiter only guards AI processing
- * and only applies on the queue path (SYNC_QUOTE_PROCESSING=false).
+ * Every limit is in lib/rate-limit-config.ts. A scope has one or more
+ * windows; in each, one counter is kept per IP address and one per key (the
+ * business, the quote or the email address). A call is refused when any
+ * counter is over its limit. The check runs before any database write or AI
+ * call. (The worker's own limiter only guards AI processing on the queue path.)
  *
- * Fail-open by design (same decision as plan-limits): missing Redis config or
- * Redis errors must never block legitimate quote requests.
+ * Fail-open by design (same decision as plan-limits): with Upstash not
+ * configured, slow or returning errors, the request goes ahead and the
+ * failure is logged. A limiter must never take the product down with it.
  */
 
 import { Redis } from '@upstash/redis'
+import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
+import { RATE_LIMITS, RATE_LIMIT_TIMEOUT_MS, blockedMessage, type LimitWindow, type RateLimitScope } from './rate-limit-config'
 
-export type RateLimitScope = 'quotes' | 'uploads' | 'chat' | 'marketing' | 'quote_page' | 'leads' | 'approval_link'
-
-export interface ScopeLimits {
-  /** Max requests per window from a single IP */
-  ipLimit: number
-  /** Max requests per window across a tenant key (all IPs) */
-  tenantLimit: number
-  windowSeconds: number
-}
+export type { RateLimitScope, LimitWindow }
 
 export interface RateLimitResult {
   allowed: boolean
-  limitType?: 'ip' | 'tenant'
+  /** Which counter refused it: the caller's address, or the business / quote / email address */
+  limitType?: 'ip' | 'key'
   retryAfterSeconds: number
 }
 
 /**
  * Store abstraction so the decision logic is unit-testable without Redis.
- * Must atomically increment each key and ensure a TTL is set.
+ * Must atomically increment each key and make sure it expires.
  */
 export interface RateLimitStore {
-  incrementWithExpiry(keys: string[], ttlSeconds: number): Promise<number[]>
+  incrementWithExpiry(keys: Array<{ key: string; ttlSeconds: number }>): Promise<number[]>
 }
 
-const DEFAULT_LIMITS: Record<RateLimitScope, ScopeLimits> = {
-  // Runs the full AI pipeline synchronously — strictest limit
-  quotes: { ipLimit: 5, tenantLimit: 30, windowSeconds: 60 },
-  // Issues presigned R2 URLs and creates asset rows (up to 10 files/request)
-  uploads: { ipLimit: 20, tenantLimit: 100, windowSeconds: 60 },
-  // Each turn is a Gemini call
-  chat: { ipLimit: 15, tenantLimit: 100, windowSeconds: 60 },
-  // T-144: Conversions API relay (signup events) — a person signs up once
-  marketing: { ipLimit: 5, tenantLimit: 1000, windowSeconds: 60 },
-  // T-149: the hosted quote page /quote/{slug} (a page view: two DB reads)
-  quote_page: { ipLimit: 60, tenantLimit: 2000, windowSeconds: 60 },
-  // T-151: unfinished requests (contact step + progress updates): DB writes only
-  leads: { ipLimit: 20, tenantLimit: 300, windowSeconds: 60 },
-  // T-156: the one-tap approval link (the "tenant" key is the link's hash;
-  // the database also caps presses per link, so this holds without Redis)
-  approval_link: { ipLimit: 10, tenantLimit: 5, windowSeconds: 60 },
+export function getScopeWindows(scope: RateLimitScope): readonly LimitWindow[] {
+  return RATE_LIMITS[scope]
 }
 
-function envInt(name: string, fallback: number): number {
-  const raw = process.env[name]
-  if (!raw) return fallback
-  const parsed = parseInt(raw, 10)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+/** Attacker-supplied values go into keys: no whitespace, capped length */
+function safe(value: string, max: number): string {
+  return value.replace(/\s/g, '').slice(0, max) || 'unknown'
 }
 
-export function getScopeLimits(scope: RateLimitScope): ScopeLimits {
-  const upper = scope.toUpperCase()
-  const defaults = DEFAULT_LIMITS[scope]
-  return {
-    ipLimit: envInt(`RATE_LIMIT_${upper}_IP`, defaults.ipLimit),
-    tenantLimit: envInt(`RATE_LIMIT_${upper}_TENANT`, defaults.tenantLimit),
-    windowSeconds: envInt('RATE_LIMIT_WINDOW_SECONDS', defaults.windowSeconds),
-  }
+/** One counter the request touches */
+export interface WindowCounter {
+  key: string
+  ttlSeconds: number
+  limit: number
+  type: 'ip' | 'key'
+  /** Seconds until this counter's window ends */
+  resetsInSeconds: number
 }
 
 /**
- * Pure decision logic: given post-increment counts for [ip, tenant] keys,
- * decide whether the request is allowed and which limit was hit.
+ * The counters for one request: for each window, the IP's and (when a key is
+ * given) the key's. Keys are bucketed by the window's start, so a window ends
+ * on the clock, not a fixed time after the first call.
  */
-export function evaluateCounts(
-  counts: Array<number | null>,
-  limits: ScopeLimits,
+export function buildCounters(
+  scope: RateLimitScope,
+  identifiers: { ip?: string; key?: string },
   nowSeconds: number
-): RateLimitResult {
-  const windowStart = Math.floor(nowSeconds / limits.windowSeconds)
-  const retryAfterSeconds = Math.max(1, (windowStart + 1) * limits.windowSeconds - nowSeconds)
-
-  const [ipCount, tenantCount] = counts
-  if (typeof ipCount === 'number' && ipCount > limits.ipLimit) {
-    return { allowed: false, limitType: 'ip', retryAfterSeconds }
+): WindowCounter[] {
+  const counters: WindowCounter[] = []
+  for (const window of getScopeWindows(scope)) {
+    const windowStart = Math.floor(nowSeconds / window.seconds)
+    const resetsInSeconds = Math.max(1, (windowStart + 1) * window.seconds - nowSeconds)
+    const base = { ttlSeconds: window.seconds + 1, resetsInSeconds }
+    if (identifiers.ip !== undefined) {
+      counters.push({ ...base, type: 'ip', limit: window.perIp, key: `rl:web:${scope}:${window.seconds}:ip:${safe(identifiers.ip, 64)}:${windowStart}` })
+    }
+    if (identifiers.key !== undefined) {
+      counters.push({ ...base, type: 'key', limit: window.perKey, key: `rl:web:${scope}:${window.seconds}:key:${safe(identifiers.key, 128)}:${windowStart}` })
+    }
   }
-  if (typeof tenantCount === 'number' && tenantCount > limits.tenantLimit) {
-    return { allowed: false, limitType: 'tenant', retryAfterSeconds }
-  }
-  return { allowed: true, retryAfterSeconds }
+  return counters
 }
 
-export function buildWindowKeys(
-  scope: RateLimitScope,
-  ip: string,
-  tenantKey: string,
-  windowSeconds: number,
-  nowSeconds: number
-): string[] {
-  const windowStart = Math.floor(nowSeconds / windowSeconds)
-  // Attacker-supplied values go into keys: cap length, strip whitespace
-  const safeIp = ip.replace(/\s/g, '').slice(0, 64) || 'unknown'
-  const safeTenant = tenantKey.replace(/\s/g, '').slice(0, 128) || 'unknown'
-  return [
-    `rl:web:${scope}:ip:${safeIp}:${windowStart}`,
-    `rl:web:${scope}:tenant:${safeTenant}:${windowStart}`,
-  ]
+/**
+ * Pure decision: given each counter's value after this request was counted,
+ * is the request allowed? When several counters are over, the caller is told
+ * to wait for the longest of them.
+ */
+export function evaluateCounters(counters: WindowCounter[], counts: Array<number | null | undefined>): RateLimitResult {
+  let blocked: WindowCounter | null = null
+  counters.forEach((counter, i) => {
+    const count = counts[i]
+    if (typeof count === 'number' && count > counter.limit) {
+      if (!blocked || counter.resetsInSeconds > blocked.resetsInSeconds) blocked = counter
+    }
+  })
+  if (!blocked) return { allowed: true, retryAfterSeconds: 0 }
+  const over: WindowCounter = blocked
+  return { allowed: false, limitType: over.type, retryAfterSeconds: over.resetsInSeconds }
 }
 
 class UpstashStore implements RateLimitStore {
   constructor(private redis: Redis) {}
 
-  async incrementWithExpiry(keys: string[], ttlSeconds: number): Promise<number[]> {
+  async incrementWithExpiry(keys: Array<{ key: string; ttlSeconds: number }>): Promise<number[]> {
     const pipeline = this.redis.pipeline()
-    for (const key of keys) {
+    for (const { key, ttlSeconds } of keys) {
       pipeline.incr(key)
       pipeline.expire(key, ttlSeconds)
     }
@@ -133,12 +118,18 @@ function getStore(): RateLimitStore | null {
   const url = process.env.UPSTASH_REDIS_REST_URL
   const token = process.env.UPSTASH_REDIS_REST_TOKEN
   if (!url || !token) {
-    console.warn('[RateLimit] Upstash Redis not configured — public rate limiting disabled')
+    console.warn('[RateLimit] PROTECTION OFF: Upstash Redis is not configured (UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN), so no public rate limit applies')
     cachedStore = null
     return cachedStore
   }
-  cachedStore = new UpstashStore(new Redis({ url, token }))
+  // No retries: a limiter that waits on a failing store slows every request
+  cachedStore = new UpstashStore(new Redis({ url, token, retry: { retries: 0 } }))
   return cachedStore
+}
+
+/** Whether rate limiting is switched on (Upstash is configured) */
+export function rateLimitingConfigured(): boolean {
+  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
 }
 
 /** Test hook: inject a fake store (pass undefined to reset to env-based). */
@@ -146,40 +137,62 @@ export function setRateLimitStoreForTesting(store: RateLimitStore | null | undef
   cachedStore = store
 }
 
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`no answer in ${ms} ms`)), ms)
+    work.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        clearTimeout(timer)
+        reject(error)
+      }
+    )
+  })
+}
+
 /**
- * Check and consume one request against the scope's per-IP and per-tenant
- * fixed-window limits. Fails open on missing config or Redis errors.
+ * Count one request against the scope's limits and say whether it may go
+ * ahead. `ip` and `key` are each optional: pass only the one a check is for.
+ * Fails open when Upstash is not configured, slow or failing.
  */
+export async function checkRateLimit(
+  scope: RateLimitScope,
+  identifiers: { ip?: string; key?: string }
+): Promise<RateLimitResult> {
+  const store = getStore()
+  if (!store) return { allowed: true, retryAfterSeconds: 0 }
+
+  try {
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    const counters = buildCounters(scope, identifiers, nowSeconds)
+    if (counters.length === 0) return { allowed: true, retryAfterSeconds: 0 }
+    const counts = await withTimeout(store.incrementWithExpiry(counters), RATE_LIMIT_TIMEOUT_MS)
+    const result = evaluateCounters(counters, counts)
+    if (!result.allowed) {
+      // The scope and which counter only: never the address, the business or the email
+      console.warn(`[RateLimit] Blocked ${scope} request (${result.limitType} limit, ${result.retryAfterSeconds}s left)`)
+    }
+    return result
+  } catch (error) {
+    console.error(`[RateLimit] FAILING OPEN: Upstash did not answer for ${scope}; the request went ahead unchecked:`, error instanceof Error ? error.message : 'unknown error')
+    return { allowed: true, retryAfterSeconds: 0 }
+  }
+}
+
+/** The older name and shape: per IP and per business key */
 export async function checkPublicRateLimit(
   scope: RateLimitScope,
   identifiers: { ip: string; tenantKey: string }
 ): Promise<RateLimitResult> {
-  const limits = getScopeLimits(scope)
-  const store = getStore()
-  if (!store) {
-    return { allowed: true, retryAfterSeconds: 0 }
-  }
+  return checkRateLimit(scope, { ip: identifiers.ip, key: identifiers.tenantKey })
+}
 
-  try {
-    const nowSeconds = Math.floor(Date.now() / 1000)
-    const keys = buildWindowKeys(
-      scope,
-      identifiers.ip,
-      identifiers.tenantKey,
-      limits.windowSeconds,
-      nowSeconds
-    )
-    const counts = await store.incrementWithExpiry(keys, limits.windowSeconds + 1)
-    const result = evaluateCounts(counts, limits, nowSeconds)
-    if (!result.allowed) {
-      // Log the limit type only — never log the raw IP beyond what's needed
-      console.warn(`[RateLimit] Blocked ${scope} request (${result.limitType} limit)`)
-    }
-    return result
-  } catch (error) {
-    console.error('[RateLimit] Redis error — failing open:', error)
-    return { allowed: true, retryAfterSeconds: 0 }
-  }
+/** An email address as a rate-limit key: lower-cased and hashed, so no address is stored in Redis */
+export function emailKey(email: string): string {
+  return createHash('sha256').update(email.trim().toLowerCase()).digest('hex').slice(0, 32)
 }
 
 /** Extract the client IP from proxy headers (Vercel sets x-forwarded-for). */
@@ -192,18 +205,20 @@ export function getClientIp(request: Request | { headers: Headers }): string {
   return request.headers.get('x-real-ip')?.trim() || 'unknown'
 }
 
-/** Standard 429 response. Message is neutral — no billing/config details. */
+/** Standard 429 response. The message is plain and gives no billing or configuration detail. */
 export function rateLimitedResponse(result: RateLimitResult): NextResponse {
+  const retryAfterSeconds = result.retryAfterSeconds || 60
   return NextResponse.json(
     {
       error: {
         code: 'RATE_LIMITED',
-        message: 'Too many requests. Please wait a moment and try again.',
+        message: blockedMessage(retryAfterSeconds),
+        retryAfterSeconds,
       },
     },
     {
       status: 429,
-      headers: { 'Retry-After': String(result.retryAfterSeconds || 60) },
+      headers: { 'Retry-After': String(retryAfterSeconds) },
     }
   )
 }

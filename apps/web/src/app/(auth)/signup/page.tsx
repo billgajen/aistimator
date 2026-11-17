@@ -2,18 +2,23 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { MetaPixel, trackMeta } from '@/components/marketing/MetaPixel'
+import { useTurnstile } from '@/components/embed/useTurnstile'
+import { AUTH_INPUT, AUTH_LABEL, AUTH_LINK, AuthError, Honeypot, postAuth } from '@/components/auth/auth-form'
+
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [businessName, setBusinessName] = useState('')
+  const [honeypot, setHoneypot] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
-  const supabase = createClient()
+  // T-173: the human check, invisible unless Cloudflare asks for a tap
+  const { containerRef: turnstileRef, getToken: getTurnstileToken } = useTurnstile(TURNSTILE_SITE_KEY)
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,23 +31,21 @@ export default function SignupPage() {
       // for the billing page to pre-select. Never starts checkout.
       const plan = new URLSearchParams(window.location.search).get('plan')
 
-      // Sign up the user - tenant is created automatically via database trigger
-      const { error: signUpError } = await supabase.auth.signUp({
+      // T-173: sign-up goes through our server (rate limit, human check, and
+      // the confirmation email sent by us). The business is created when the
+      // address is confirmed, by the database trigger, as before.
+      const turnstileToken = await getTurnstileToken()
+      const result = await postAuth('/api/auth/signup', {
         email,
         password,
-        options: {
-          data: {
-            business_name: businessName,
-            ...(plan && /^[a-z0-9_]{1,40}$/.test(plan) && { selected_plan: plan }),
-          },
-          // T-150: the verification link signs them in and sends them on to
-          // /app, which takes a business with no services straight to setup
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=/app`,
-        },
+        businessName,
+        ...(plan && { plan }),
+        turnstileToken: turnstileToken || undefined,
+        website: honeypot || undefined,
       })
-
-      if (signUpError) {
-        setError(signUpError.message)
+      if (!result.ok) {
+        // what was typed stays in the form
+        setError(result.message)
         return
       }
 
@@ -59,7 +62,7 @@ export default function SignupPage() {
       // Show success message - user needs to verify email
       setSuccess(true)
     } catch {
-      setError('An unexpected error occurred')
+      setError('Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -68,7 +71,7 @@ export default function SignupPage() {
   // Show success message after signup
   if (success) {
     return (
-      <div className="text-center">
+      <div className="text-center" data-testid="signup-sent">
         <div className="mb-4 flex justify-center">
           <svg className="h-16 w-16 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -76,13 +79,10 @@ export default function SignupPage() {
         </div>
         <h1 className="mb-2 font-display text-xl font-bold text-text-primary">Check your email</h1>
         <p className="mb-6 text-text-secondary">
-          We sent a verification link to <span className="font-medium">{email}</span>.
-          Click the link to activate your account.
+          We sent a link to <span className="font-medium">{email}</span>.
+          Open it to confirm your address and finish creating your account.
         </p>
-        <Link
-          href="/login"
-          className="inline-flex min-h-[24px] items-center text-sm font-semibold text-primary underline underline-offset-4"
-        >
+        <Link href="/login" className={`${AUTH_LINK} text-sm`}>
           Back to login
         </Link>
       </div>
@@ -95,12 +95,10 @@ export default function SignupPage() {
       <h1 className="mb-6 text-center font-display text-xl font-bold text-text-primary">Create your account</h1>
 
       <form onSubmit={handleSignup} className="space-y-4">
-        {error && (
-          <div className="rounded-xl bg-danger-light p-3 text-sm text-danger">{error}</div>
-        )}
+        <AuthError message={error} />
 
         <div>
-          <label htmlFor="businessName" className="mb-1.5 block text-sm font-medium text-text-primary">
+          <label htmlFor="businessName" className={AUTH_LABEL}>
             Business name
           </label>
           <input
@@ -109,42 +107,49 @@ export default function SignupPage() {
             value={businessName}
             onChange={(e) => setBusinessName(e.target.value)}
             required
-            className="w-full min-h-[44px] rounded-xl border border-field bg-white px-3 py-2 text-base text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2"
+            maxLength={120}
+            className={AUTH_INPUT}
             placeholder="Acme Services"
           />
         </div>
 
         <div>
-          <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-text-primary">
+          <label htmlFor="email" className={AUTH_LABEL}>
             Email
           </label>
           <input
             id="email"
             type="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full min-h-[44px] rounded-xl border border-field bg-white px-3 py-2 text-base text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2"
+            className={AUTH_INPUT}
             placeholder="you@example.com"
           />
         </div>
 
         <div>
-          <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-text-primary">
+          <label htmlFor="password" className={AUTH_LABEL}>
             Password
           </label>
           <input
             id="password"
             type="password"
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
-            className="w-full min-h-[44px] rounded-xl border border-field bg-white px-3 py-2 text-base text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2"
+            className={AUTH_INPUT}
             placeholder="••••••••"
           />
           <p className="mt-1 text-xs text-text-muted">Minimum 8 characters</p>
         </div>
+
+        <Honeypot value={honeypot} onChange={setHoneypot} />
+        {/* The human check mounts here only if Cloudflare asks for a tap */}
+        <div ref={turnstileRef} className="flex justify-center empty:hidden" />
 
         <Button type="submit" loading={loading} className="w-full">
           {loading ? 'Creating account...' : 'Create account'}
@@ -153,7 +158,7 @@ export default function SignupPage() {
 
       <p className="mt-6 text-center text-sm text-text-secondary">
         Already have an account?{' '}
-        <Link href="/login" className="inline-flex min-h-[24px] items-center font-semibold text-primary underline underline-offset-4" data-testid="login-link">
+        <Link href="/login" className={AUTH_LINK} data-testid="login-link">
           Log in
         </Link>
       </p>

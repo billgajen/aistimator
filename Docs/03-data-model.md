@@ -181,7 +181,14 @@ Indexes: `(tenant_id, created_at desc)` where not completed; the same where also
 
 ## RLS
 - All tenant tables restricted by `tenant_id` for authenticated users.
-- Public quote view uses a token and only returns specific quote data.
+- **Signed-out callers (the public key) hold no privilege on any table, and there is no rule for "public"**
+  (migration 43, T-173, AD-054). The public quote view, the form and every other public page read and write
+  through the server (service role), which checks the quote's link token or the business's key.
+- `user_profiles`: `role` is `owner` (every sign-up) or `admin` (the platform's own role; granted only by
+  `scripts/set-platform-admin.sh`). A guard trigger lets only the service role change `id`, `tenant_id` or
+  `role`; a user can change its own `display_name`.
+- `subscriptions`: read by the business, written by the server only.
+- Guarded columns on `tenants`: `slug` (migration 32), `is_demo` (migration 36).
 ### WhatsApp channel (migration 25; T-175, migration 42)
 - whatsapp_configs: one row per business, **server-only** (no policy or grant for a signed-in browser since
   migration 42). tenant_id (unique), phone_number_id (unique: the webhook routes by it), display_phone_number,

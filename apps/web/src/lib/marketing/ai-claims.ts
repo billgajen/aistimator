@@ -23,6 +23,7 @@ export const CAPABILITIES = [
   'confirm-question',
   'range-and-question',
   'extras-from-description',
+  'words-against-answers',
   'photo-notes',
   'worth-considering',
   'scope-wording',
@@ -35,8 +36,12 @@ export const CAPABILITIES = [
 ] as const
 export type Capability = (typeof CAPABILITIES)[number]
 
-/** Listed in the inventory, but not to be put on a page until it has been seen working in a live check */
-export const NOT_YET_ON_A_PAGE: readonly Capability[] = ['service-match']
+/**
+ * Listed in the inventory, but not to be put on a page until it has been seen
+ * working in a live check. Empty since T-173: `service-match` was seen working
+ * on the local stack on 2026-11-17 (the inventory has the run).
+ */
+export const NOT_YET_ON_A_PAGE: readonly Capability[] = []
 
 const registry = new Map<string, readonly Capability[]>()
 

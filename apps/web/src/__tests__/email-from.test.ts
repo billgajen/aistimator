@@ -196,6 +196,7 @@ describe('every sender says who the email is for', () => {
     'apps/web/src/app/api/public/quotes/[quoteId]/feedback/route.ts': ['business'], // customer question
     'apps/web/src/lib/lead-hold.ts': ['business'], // new lead waiting
     'apps/web/src/lib/plan-limits.ts': ['business'], // plan limit reached
+    'apps/web/src/lib/auth-flow.ts': ['business'], // T-173: confirm your email, reset your password, you already have an account
     'apps/web/src/lib/whatsapp-renewal.ts': ['business'], // T-175: reconnect WhatsApp before it runs out
     // worker: customer quote, business "new quote", review request, customer estimate
     'apps/worker/src/email/index.ts': ['customer', 'business', 'business', 'customer'],

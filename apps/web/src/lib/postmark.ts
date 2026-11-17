@@ -8,6 +8,17 @@ import type { EmailSender } from '@qolumns/shared'
 
 const POSTMARK_API_URL = 'https://api.postmarkapp.com/email'
 
+/**
+ * Where emails are posted. T-173: outside production a test can point this at
+ * a stand-in (POSTMARK_API_BASE_URL) to read what would have been sent; in
+ * production it is always Postmark.
+ */
+function postmarkUrl(): string {
+  const override = process.env.POSTMARK_API_BASE_URL
+  if (override && process.env.NODE_ENV !== 'production') return `${override.replace(/\/+$/, '')}/email`
+  return POSTMARK_API_URL
+}
+
 interface EmailMessage {
   /**
    * T-159: who the email is for decides the sender name. To a customer it is
@@ -51,7 +62,7 @@ export async function sendEmail(message: EmailMessage): Promise<PostmarkResponse
   }
 
   try {
-    const response = await fetch(POSTMARK_API_URL, {
+    const response = await fetch(postmarkUrl(), {
       method: 'POST',
       headers: {
         Accept: 'application/json',

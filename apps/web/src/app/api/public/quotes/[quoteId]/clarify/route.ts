@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { limitQuoteAction, limitQuoteAndBusinessActions } from '@/lib/quote-action-limit'
 import { enqueueQuoteJob, repriceQuoteNow } from '@/lib/queue'
 import { recordMeasurementExamples } from '@/lib/measurement-memory'
 import { quoteTokenMatches } from '@/lib/tokens'
@@ -21,6 +22,11 @@ export async function POST(
 ) {
   try {
     const { quoteId } = params
+
+    // T-173: by address, before anything is read
+    const limited = await limitQuoteAction(request)
+    if (limited) return limited
+
     const body: ClarifyQuoteRequest = await request.json()
 
     if (!body.token) {
@@ -71,6 +77,10 @@ export async function POST(
         { status: 401 }
       )
     }
+
+    // T-173: the token is good; count it for this quote and for the whole business
+    const busy = await limitQuoteAndBusinessActions(quoteId, quote.tenant_id)
+    if (busy) return busy
 
     // Validate status is awaiting_clarification
     if (quote.status !== 'awaiting_clarification') {

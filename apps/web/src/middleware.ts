@@ -1,12 +1,15 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { PLATFORM_ADMIN_ROLE } from '@/lib/roles'
 
 // Routes that require authentication
 const PROTECTED_ROUTES = ['/app', '/setup']
 // Routes that require admin role
 const ADMIN_ROUTES = ['/admin']
 // Routes that should redirect to /app if already authenticated
-const AUTH_ROUTES = ['/login', '/signup']
+const AUTH_ROUTES = ['/login', '/signup', '/forgot-password']
+// T-173: choosing a new password needs the session the reset link gives
+const RESET_ROUTE = '/reset-password'
 
 /** `/app` and `/app/...`, never `/approve` or `/apple` */
 export function underRoute(pathname: string, route: string): boolean {
@@ -60,6 +63,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
+  // T-173: without a session there is no password to change: ask for a new link
+  if (pathname === RESET_ROUTE && !user) {
+    return NextResponse.redirect(new URL('/forgot-password?notice=link-expired', request.url))
+  }
+
   // Check admin role for admin routes
   if (isAdminRoute && user) {
     const { data: profile } = await supabase
@@ -68,7 +76,7 @@ export async function middleware(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    if (!profile || profile.role !== PLATFORM_ADMIN_ROLE) {
       // Redirect non-admin users to dashboard
       return NextResponse.redirect(new URL('/app', request.url))
     }

@@ -306,6 +306,7 @@ Code for every item is already built; these are the steps that unlock it.
 
 ## Rate limiting (found at the T-153 deploy, 2026-11-10)
 
+- **Since T-173 the limits are in one file, with more doors covered and different figures: see T-173, sections 2 and 3. The list below is as it stood on 2026-11-10.**
 - [ ] **Configure Upstash Redis — it is not set anywhere in production**, so every rate limit below is off (they fail
   open by design). Create an Upstash Redis database, then set:
   - Vercel (Production): `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`;
@@ -323,7 +324,8 @@ Code for every item is already built; these are the steps that unlock it.
   - Worker queue consumer: the AI-processing limiter (100 global, 10 per business per window) and its stats endpoint.
 
   The demo's own limits (`DEMO_DAILY_CAP`, `DEMO_IP_LIMIT_PER_HOUR`) are counted in the database and already apply.
-- [ ] **`quote_feedback` still allows anonymous inserts** (policy "Public can insert feedback", `WITH CHECK (true)`, plus
+- [x] **`quote_feedback` allowed anonymous inserts**: closed by migration 43 (T-173), with eight other open rules. See T-173, section 1.
+- (as written in T-157) **`quote_feedback` still allows anonymous inserts** (policy "Public can insert feedback", `WITH CHECK (true)`, plus
   `GRANT INSERT … TO anon`), although the public feedback route writes with the service role and checks the quote's
   token first. Anyone with the public anon key could insert rows straight into the table. Left as it is in T-157 on
   purpose; drop the policy and the grant in a later migration.
@@ -1333,3 +1335,143 @@ Steps 2 to 5 are `scripts/deploy-t174-settings.sh` (`--dry-run` shows what each 
   link from the chat, and the email).
 - The two-step PIN Qolumns sets when it registers a number is stored (encrypted) and not shown to the
   business. A business that later moves the number elsewhere may need it.
+
+## T-173 — Bot and spam protection, the open database rules, home page changes
+
+- **Built and on a preview. Not committed, not on production.** Preview (web only, protection off, behind the
+  Vercel login): `https://estimator-k45gv5sb0-gajendrans-projects-1a87e0b4.vercel.app`. It has no database (placeholder
+  settings), so Home, Log in, Sign up, Forgot password, Pricing, Features and the trade pages show; signing in,
+  the demo and quote links do not.
+- **Nothing has run against the real Upstash, the real Turnstile keys or a real inbox.** Every check used a
+  stand-in on this computer. The accounts in section 3 do not exist yet.
+
+### 1. Do this first: three open doors in the production database
+
+Found while listing what a stranger can reach. All three are in production today (read-only check, 2026-11-17).
+
+- [ ] **Anyone can read every quote.** A database rule ("Public can view quotes by token") never compared a
+  token. The site's public key, which is in every page's JavaScript, is enough to list every quote with its
+  customer's details and prices. Production holds 4 quotes.
+- [ ] **A signed-in business can move itself into another business** by changing one value on its own profile.
+- [ ] **Every sign-up counts as a platform admin** and can open `/admin`. All 3 production accounts have the role.
+- Also: the public key can list every business's services and form settings, and insert rows into four tables.
+
+**The fix is migration 43, and it needs no web deploy:**
+
+1. `bash scripts/deploy-migration-43.sh`. It prints before and after. Expected after: `public_rules 0`,
+   `signed_out_grants 0`, `profile_guard 1`, `platform_admins 0`.
+2. `bash scripts/set-platform-admin.sh you@example.com` with your own sign-in address. **Until you run it,
+   nobody can open `/admin`, you included.**
+3. Nothing else changes for a business or a customer: every public page already reads through the server.
+
+- [ ] **Decide whether to tell anyone.** 4 quotes were readable. Whether any was read cannot be known from here:
+  the database keeps no record of reads. Supabase's own API logs (Dashboard → Logs → API) may show requests to
+  `/rest/v1/quotes` from outside the app, for as long as your plan keeps them.
+
+### 2. What a stranger can call today, and what each can cost (A1)
+
+| Door | What it can cost | Before this ticket | After |
+|---|---|---|---|
+| `POST /api/public/quotes` (form, embed, demo) | An AI run, emails, rows, one of the business's plan quotes | Limit and human check coded but off (no keys); honeypot on | Limits per address and per business by minute, hour and day; human check; honeypot |
+| `POST /api/public/widget/chat` | One AI call per turn | Limit coded, off | Limit, plus an hourly one |
+| `POST /api/public/uploads/init` | Storage, rows | Limit coded, off. Size and type checked only as declared | Limit; storage refuses a file that is not the declared size and type |
+| `POST`, `PATCH /api/public/leads` | Rows | Limit and human check coded, off | Same, on with the keys |
+| Quote page: accept, decline, question, answers | Emails to the business, rows, a re-price | Link token only, no limit | Limits per address, per quote and per business |
+| `GET` a quote, its PDF, a photo | Storage reads | Link token only | Unchanged (see "Still open") |
+| `POST /api/public/approval/:token` | An email to the customer | Limit coded, off; 10 presses per link in the database | Same, on with the keys |
+| `GET /api/public/widget/config`, `POST …/widget/analytics` | Reads; rows | None | Limits |
+| `POST /api/marketing/event` | The Meta relay | Limit coded, off | Same, on with the keys |
+| Sign-up, log-in | Accounts, emails | Straight to Supabase from the browser; Supabase's own limits (2 emails an hour) | Through our server: limits per address and per email, human check on sign-up, emails by Postmark |
+| Password reset | Emails | **Did not exist** | Built, with the same limits |
+| WhatsApp, SMS and Stripe webhooks; the daily cron | Nothing | Signed, or a secret | Unchanged |
+| The database itself, with the public key | Everything in section 1 | Open rules | Closed by migration 43 |
+
+### 3. What you must set up (A6)
+
+Everything works without these: protection is then **off**, and the server log says so once
+(`[RateLimit] PROTECTION OFF`, `[Turnstile] PROTECTION OFF`).
+
+**Accounts to create**
+
+- [ ] **Upstash**: one Redis database (the free plan is enough to start; pick a region near Vercel's).
+- [ ] **Cloudflare Turnstile**: one widget, in your existing Cloudflare account. Hostnames: `qolumns.com` and
+  `estimator-web-phi.vercel.app`. Mode: **Managed**. The form runs inside its own frame on our address, so a
+  business's own website does not need to be listed.
+
+**Settings (names only)**
+
+| Name | Where | What it is | Secret? |
+|---|---|---|---|
+| `UPSTASH_REDIS_REST_URL` | Vercel, production | The database's REST address | No |
+| `UPSTASH_REDIS_REST_TOKEN` | Vercel, production | Its REST token | **Yes** |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Vercel, production | The widget's site key | No |
+| `TURNSTILE_SECRET_KEY` | Vercel, production | The widget's secret key | **Yes** |
+| `UPSTASH_REDIS_URL`, `UPSTASH_REDIS_TOKEN` | Worker (`npx wrangler secret put … --env production`) | The same database, for the worker's own AI limiter. Note the different names | Token: **yes** |
+
+- Add each with `printf '%s' 'VALUE' | npx vercel env add NAME --environment production --sensitive --yes`
+  (`--no-sensitive` for the two that are not secret). They take effect at the next production deploy.
+- **Set both Turnstile keys in the same deploy.** With only one, the check stays off (and says so).
+- `POSTMARK_API_TOKEN` and `POSTMARK_FROM_EMAIL` are already set; the account emails use them.
+- No new setting holds a limit. Limits are in `apps/web/src/lib/rate-limit-config.ts`.
+
+**Supabase settings (A5)**
+
+None has to change for the emails to go through Postmark: the server now makes each link itself and Supabase
+sends nothing. Three to check or change (Dashboard → Authentication):
+
+- [ ] **"Confirm email"**: keep **on**.
+- [ ] **"Email OTP expiration"**: keep at **3600** seconds. The emails say "for one hour".
+- [ ] **"Minimum password length"**: set to **8** (it is 6; our own routes already ask for 8).
+- [ ] **"Allow new users to sign up"**: switch it **off**, but only **after** the new web app is live (step 2
+  of section 4). The old sign-up page calls Supabase directly and would stop working. With it off, a stranger
+  cannot make an account by calling Supabase directly; our own sign-up still works, because the server makes the
+  account. Tried on the local auth server, not on the hosted one: after switching it off, sign up once with a
+  spare address. If that fails, switch it back on and tell me.
+- The email templates and the "SMTP settings" page are no longer used by the product. Leave them.
+
+### 4. To put it live (when you say so)
+
+1. `bash scripts/deploy-migration-43.sh`, then `bash scripts/set-platform-admin.sh <your address>` (section 1).
+   This can go today, ahead of everything else.
+2. Commit, then `npx vercel deploy --prod`. The worker is not touched. Protection is still off at this point,
+   and everything works as before plus the new sign-in routes and the home page.
+3. Create the two accounts and add the settings (section 3), then deploy the web app once more.
+   Switch off "Allow new users to sign up" in Supabase now.
+4. Check live: send yourself a request from the form, sign up with a spare address and confirm from the
+   email, and use "Forgot your password?".
+
+### 5. For you to decide
+
+- [ ] **The first home example.** You asked for "what the AI understood: the service, the size of the job, key
+  details". The product does not work the service or the size out from a message: your customer picks the
+  service and answers the size question. What it does is read their message against those. So the example
+  reads: the service "fits what they wrote"; the size "They answered one room, so it asks which is right"; a
+  detail "They asked for it, so your line for it is added, at your price". All three were seen working on a
+  live request. If you want it to say the AI works the service and size out, the product has to do that
+  first: a ticket of its own.
+- [ ] **The limits.** They are my starting figures: 5 requests a minute, 15 an hour and 40 a day from one
+  address; 20 a minute, 60 an hour and 200 a day for one business. A business that expects more than 200
+  requests a day needs the daily figure raised. One file, one line each.
+- [ ] **Log-in is held after 5 wrong passwords a minute for one email.** That also lets someone who knows a
+  customer's email address hold up their log-in for a minute at a time. The usual trade; say if you want it
+  looser.
+- [ ] **The dashboard's own uploads** (signed-in) still accept a file that differs from what was declared.
+  Not a stranger's door, so I left it. One line to make it the same.
+
+### Still open after this ticket
+
+- A stranger can still call Supabase's own sign-up, log-in and reset addresses directly, past our routes.
+  Sign-up: closed by the Supabase switch in section 3. Log-in and reset: Supabase's own limits apply there
+  (its built-in sender allows 2 emails an hour), and the product no longer depends on that sender.
+- The quote, its PDF and its photos are read with the link token and have no rate limit.
+- Someone who signs up with an address they do not own cannot confirm it. If the real owner later signs up
+  with the same address, the first password given stays until they use "Forgot your password?".
+
+### Later (seen, not changed)
+
+- On the range example on Home, the "Confirm details" button is a pale butter colour.
+- The request form's error screen shows a warning emoji above the message.
+- The log-in page does not show a note when it is reached from the old sign-in callback's error
+  (`/login?error=auth_callback_error`).
+- "Check your email" after sign-up has no "send it again" button; signing up again with the same address
+  sends a new link.

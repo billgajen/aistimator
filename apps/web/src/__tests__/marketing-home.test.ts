@@ -76,7 +76,7 @@ describe('T-154: no grades, seals or engine words on the marketing site', () => 
 
 describe('T-154: the approved copy', () => {
   it('the hero says what it is', () => {
-    expect(HERO.headline).toBe('Instant quotes on your website, in your prices.')
+    expect(HERO.headline).toBe('Instant quotes for your customers, in your prices.')
     // T-167, reworded in T-168 (the owner's wording): what the AI does in one plain sentence, then where the price comes from
     expect(HERO.subline).toBe('The AI reads what your customer tells you and the photos they send, and works out the job. The price comes from your own price list, and you confirm it.')
     // T-167: the trades row and its heading are gone; the links sit in step 1 of "Set up in minutes", ending with this pill
