@@ -17,8 +17,32 @@
 
 ### 2026-11-16: T-175 — Connect WhatsApp in one click (Meta Embedded Signup) (AD-053)
 
-**Status: built and on a preview. Not committed. Not on production.** Migration 42 is written and applied to the
-local database only. Preview (web only, no database, behind the Vercel login): `https://estimator-gvtv063hc-gajendrans-projects-1a87e0b4.vercel.app`.
+**Deployed 2026-11-17 00:13 UTC** (commit `25ba389`). The worker is not touched.
+1. The owner set `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN` and `WHATSAPP_ENCRYPTION_KEY` in Vercel production.
+   The first check found none of them on the project, so the deploy stopped there; the owner added them and it
+   went on. The two public ids (`NEXT_PUBLIC_WHATSAPP_APP_ID`, `NEXT_PUBLIC_WHATSAPP_CONFIG_ID`) were set with them.
+2. Checks before the commit: `pnpm lint` and `pnpm typecheck` pass; unit tests web 801, worker 534, mobile 11;
+   `verify-t175` 110/110.
+3. Migration 42: `bash scripts/deploy-migration-42.sh`. Production had 0 WhatsApp connections; after it,
+   latest `00000000000042`, 12 new columns, 1 policy (service role), 0 grants to a browser session.
+4. Web: `npx vercel deploy --prod`, deployment `dpl_B6YEx4aCvK3Foa2DNpqWnZqNasUG`, target production, serving
+   `qolumns.com`.
+
+Live checks, read-only (no WhatsApp message was sent, and nothing was sent to Meta):
+- `/`, `/privacy`, `/terms` and `/login` return 200; Privacy and Terms show `hello@qolumns.com`.
+- The webhook's handshake with a wrong verify token, and with none: 403.
+- A webhook POST of `{}` with no signature: 401 "Missing signature"; with a wrong signature: 401 "Invalid
+  signature".
+- Also: `/api/whatsapp/config` signed out 401; `/app/whatsapp` signed out goes to the login page; the old
+  address 200; the worker's health check 200; the public quote API 404 for a made-up token.
+
+A temporary icon for the Meta app is at `Docs/design/meta-app-icon.png` (1024 × 1024: the wordmark in paper on
+juniper, drawn from the display font and `PRODUCT_NAME`; no other mark).
+
+The two T-175 previews are deleted, as the owner asked.
+
+**Still the owner's, before a business can connect:** the Meta dashboard list in `OWNER-TODO.md` (the webhook
+has not been set in the Meta app, so Meta sends us nothing yet), then the first real run.
 
 **Nothing was sent to Meta or to anyone on WhatsApp.** Every check ran against a stand-in for Meta's Graph API
 on this machine. The real flow has not been run: the Meta app's secret is not set anywhere yet, and the app is
@@ -153,8 +177,6 @@ address. Both said "the email address on our website", and the site shows none.
 **Seen and left**
 - `hasPlanChannel` exists and nothing calls it: the WhatsApp page is not held back from any plan, though the
   plans list WhatsApp for Pro and Business only. Not changed; in `OWNER-TODO.md`.
-- A second preview is listed in Vercel (`estimator-9k0g93js7…`): it was built before the last small change
-  (a line telling the business when a content blocker stops Meta's script) and is replaced by the one above.
 
 **Not proven**
 - **Anything against the real Meta.** Not the sign-up window, not the code exchange, not registration, not a

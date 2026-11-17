@@ -1214,13 +1214,16 @@ Steps 2 to 5 are `scripts/deploy-t174-settings.sh` (`--dry-run` shows what each 
 
 ## T-175 — Connect WhatsApp in one click (Meta Embedded Signup)
 
-- **Built and on a preview. Not committed, not on production.** Preview (web only, no database, behind the Vercel
-  login): `https://estimator-gvtv063hc-gajendrans-projects-1a87e0b4.vercel.app`. The WhatsApp page needs a sign-in, so it is not on the preview; its screenshots are in
-  the results folder of `verify-t175`.
-- **Nothing has run against the real Meta.** Every check used a stand-in on this computer. The first real run
-  is yours, after the steps below.
+- [x] **Deployed 2026-11-17 00:13 UTC** (commit `25ba389`, web `dpl_B6YEx4aCvK3Foa2DNpqWnZqNasUG`): migration 42
+  first, then the web app. The worker was not touched. Checked live, read-only: Home, Privacy and Terms load;
+  the webhook refuses a wrong verify token (403) and a call with no valid signature (401). The two previews
+  are **deleted**.
+- **Nothing has run against the real Meta yet.** Every check before the deploy used a stand-in on this
+  computer, and no WhatsApp message has been sent. The page is live at `https://qolumns.com/app/whatsapp`, and
+  the first real run is yours, after section 3 below.
+- A temporary icon for the Meta app is at `Docs/design/meta-app-icon.png` (1024 × 1024).
 
-### 1. Settings to add (names only; all five in Vercel, production; the worker needs none)
+### 1. Settings (done 2026-11-17: all five are in Vercel production)
 
 | Name | What it is | Secret? |
 |---|---|---|
@@ -1236,7 +1239,7 @@ Steps 2 to 5 are `scripts/deploy-t174-settings.sh` (`--dry-run` shows what each 
   stored connection becomes unreadable and every business has to connect again.
 - Until all five are set, the page shows "One-click connect isn't switched on yet" and nothing connects.
 
-### 2. To put it live (when you say so)
+### 2. Putting it live (steps 1 to 3 done; step 4 is yours)
 
 1. `bash scripts/deploy-migration-42.sh` (first: the new code reads the new columns).
 2. The five settings above.
@@ -1246,7 +1249,7 @@ Steps 2 to 5 are `scripts/deploy-t174-settings.sh` (`--dry-run` shows what each 
 ### 3. What to do in the Meta dashboard
 
 **App settings → Basic**
-- [ ] App icon, 1024 × 1024, with no Meta or WhatsApp logo in it.
+- [ ] App icon: upload `Docs/design/meta-app-icon.png` (1024 × 1024, the wordmark on juniper; temporary).
 - [ ] Privacy policy URL: `https://qolumns.com/privacy` (checked: the page is live).
 - [ ] Terms of Service URL: `https://qolumns.com/terms` (checked: the page is live).
 - [ ] User data deletion → Data deletion instructions URL: `https://qolumns.com/privacy` (section 8 says how).
@@ -1319,12 +1322,11 @@ Steps 2 to 5 are `scripts/deploy-t174-settings.sh` (`--dry-run` shows what each 
   also listed for Pro and Business only, but nothing in the code holds the WhatsApp page back from Starter.
   Say which you want once it is live.
 
-- [ ] **Two T-175 previews are listed in Vercel** (the one above and an earlier one, `estimator-9k0g93js7…`).
-  Say if you want them deleted after the deploy.
-
 ### Later (seen, not changed)
 
 - "Connect manually" keeps its long walkthrough; on a phone it is a lot of text.
+- The temporary Meta app icon is the full wordmark across a square. If Meta shows it small or in a circle, a
+  single-letter mark would read better.
 - The checkbox "Answer messages on this number" in the manual form is 24 px, in a 44 px row.
 - A business cannot see its WhatsApp conversations in the dashboard, only the quotes they produce.
 - Quoting does not yet send a WhatsApp message when the business approves an estimate (the customer has the
