@@ -1749,6 +1749,11 @@ sends nothing. Three to check or change (Dashboard → Authentication):
 link 200; the webhook refuses a wrong token (403) and unsigned or wrongly signed calls (401); 65 views of the
 demo quote link in a minute gave 60 pages and then 429 from the 61st.
 
+**Follow-up deployed 2026-11-17 22:37 UTC:** commit `c8bd969`, web only, `dpl_CxEb1478nDPagcBT13xmZGVLUpLA`.
+The full regression set passed first (t146 to t177, t173 104/104, t178 52/52). It found one fault of mine: the
+quote link page kept showing a changed or switched-off link's old page (in production from 21:02 to 22:37 UTC);
+fixed in this deploy.
+
 ### 1. What you must do
 
 - **The worker's rate limiter stays off, by design (your decision, 2026-11-17).** The worker has no Upstash

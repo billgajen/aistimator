@@ -41,6 +41,13 @@ values.
 
 #### Follow-up, same day: the worker's limiter stays off; the website's protections never block a real customer (AD-060)
 
+**Deployed 2026-11-17 22:37 UTC** (commit `c8bd969`). Web only: `dpl_CxEb1478nDPagcBT13xmZGVLUpLA`, serving
+`qolumns.com`. The worker was not deployed (only a comment in `wrangler.toml` changed; version `d0450982` stays).
+Live checks, read-only: `/`, `/login` and the demo quote link 200; an unknown quote link 404; the webhook
+refuses a wrong token (403) and unsigned or wrongly signed calls (401); 65 views of the demo quote link in one
+minute gave 60 pages, then 429 from the 61st (so Upstash answers the middleware inside the new half second).
+Not tried on production: a request with no human-check token (it would submit a real request), and either switch.
+
 **Decision 1 (owner): the worker's Upstash secrets are not added. The worker's rate limiter stays off, by design.**
 The website's limits (Vercel) are the brake on abuse; a second limiter in front of pricing has only ever cost
 quotes. The code stays, fail-open (AD-058), so that if the two secrets ever are set it cannot fail a quote. The
