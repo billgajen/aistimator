@@ -324,7 +324,11 @@ describe('the quote link page’s limit, in the middleware', () => {
   })
 
   it('the page no longer checks its own limit (it would count each view twice), and the middleware does', () => {
-    expect(read('apps/web/src/app/quote/[slug]/page.tsx')).not.toContain('checkPublicRateLimit')
+    const page = read('apps/web/src/app/quote/[slug]/page.tsx')
+    expect(page).not.toContain('checkPublicRateLimit')
+    // the page still reads the request's headers: without that, a link that was changed or switched off
+    // kept showing its old page (found by verify-t149 and verify-t174 after the check moved)
+    expect(page).toMatch(/^\s*headers\(\)$/m)
     const middleware = read('apps/web/src/middleware.ts')
     expect(middleware).toContain('quotePageLimit(')
     expect(middleware).toContain('tooManyPageResponse(')
@@ -404,3 +408,160 @@ describe('what the customer sent, for the business', () => {
     expect(requestDetails(null, new Map())).toEqual({ description: null, answers: [], postcode: null, address: null, quantity: null })
   })
 })
+
+// =====================================================================================
+// T-178 follow-up (AD-060): the two protections never block a real customer
+// =====================================================================================
+import { afterEach } from 'vitest'
+import { SITEVERIFY_TIMEOUT_MS, isTurnstileEnabled, turnstileSwitchedOff, verifyTurnstileToken } from '@/lib/turnstile'
+import { RATE_LIMIT_TIMEOUT_MS, rateLimitsSwitchedOff } from '@/lib/rate-limit-config'
+import { checkRateLimit, rateLimitingConfigured, setRateLimitStoreForTesting } from '@/lib/rate-limit'
+
+describe('the human check blocks only on a clear "failed" answer', () => {
+  const answers = (body: unknown, ok = true, status = 200) => vi.stubGlobal('fetch', vi.fn(async () => ({ ok, status, json: async () => body })))
+  beforeEach(() => {
+    vi.stubEnv('TURNSTILE_SECRET_KEY', 'secret-fixture')
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-fixture')
+    vi.stubEnv('TURNSTILE_OFF', '')
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('Cloudflare says the token is bad, or used or expired → blocked', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    for (const code of ['invalid-input-response', 'timeout-or-duplicate']) {
+      answers({ success: false, 'error-codes': [code] })
+      expect(await verifyTurnstileToken('token', '203.0.113.9')).toEqual({ ok: false, reason: 'rejected' })
+    }
+  })
+
+  it('no token at all (the script never loaded, or was blocked) → goes ahead, and the log says so', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    for (const none of [undefined, '']) expect(await verifyTurnstileToken(none, '203.0.113.9')).toEqual({ ok: true, unchecked: 'no-token' })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(warn.mock.calls.flat().join(' ')).toContain('FAILING OPEN')
+  })
+
+  it('Cloudflare unreachable, slow, erroring, or answering "no" for a reason that is not the visitor’s → goes ahead, logged', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new TypeError('fetch failed secret-fixture')
+    }))
+    expect(await verifyTurnstileToken('token', '203.0.113.9')).toEqual({ ok: true, unchecked: 'no-answer' })
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new DOMException('The operation timed out', 'TimeoutError')
+    }))
+    expect(await verifyTurnstileToken('token', '203.0.113.9')).toEqual({ ok: true, unchecked: 'no-answer' })
+    answers({}, false, 503)
+    expect(await verifyTurnstileToken('token', '203.0.113.9')).toEqual({ ok: true, unchecked: 'no-answer' })
+    for (const code of ['internal-error', 'invalid-input-secret', 'missing-input-secret', 'bad-request']) {
+      answers({ success: false, 'error-codes': [code] })
+      expect(await verifyTurnstileToken('token', '203.0.113.9')).toEqual({ ok: true, unchecked: 'not-the-visitor' })
+    }
+    answers({ unexpected: true })
+    expect((await verifyTurnstileToken('token', '203.0.113.9')).ok).toBe(true)
+    const logged = error.mock.calls.flat().join(' ')
+    expect(logged.match(/FAILING OPEN/g)!.length).toBeGreaterThanOrEqual(8)
+    expect(logged).toContain('TimeoutError')
+    expect(logged).not.toContain('secret-fixture')
+  })
+
+  it('Cloudflare is given half a second, no more', async () => {
+    expect(SITEVERIFY_TIMEOUT_MS).toBe(500)
+    const timeout = vi.spyOn(AbortSignal, 'timeout')
+    answers({ success: true })
+    await verifyTurnstileToken('token', '203.0.113.9')
+    expect(timeout).toHaveBeenCalledWith(500)
+  })
+
+  it('one switch turns it off, with both keys still set', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    expect(isTurnstileEnabled()).toBe(true)
+    vi.stubEnv('TURNSTILE_OFF', 'true')
+    expect(turnstileSwitchedOff()).toBe(true)
+    expect(isTurnstileEnabled()).toBe(false)
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await verifyTurnstileToken('a-token-cloudflare-would-reject', '203.0.113.9')).toEqual({ ok: true, unchecked: 'off' })
+    expect(fetchMock).not.toHaveBeenCalled()
+    for (const value of ['1', 'TRUE', ' on ']) {
+      vi.stubEnv('TURNSTILE_OFF', value)
+      expect(turnstileSwitchedOff()).toBe(true)
+    }
+    for (const value of ['', '0', 'false', 'no']) {
+      vi.stubEnv('TURNSTILE_OFF', value)
+      expect(turnstileSwitchedOff()).toBe(false)
+    }
+  })
+
+  it('in the browser, a script that never loads or a token that never comes does not hold the form', () => {
+    const hook = read('apps/web/src/components/embed/useTurnstile.ts')
+    expect(hook).toContain('export const SCRIPT_TIMEOUT_MS = 4_000')
+    expect(hook).toContain('export const TOKEN_TIMEOUT_MS = 8_000')
+    expect(hook).toContain('setTimeout(() => resolve(null), SCRIPT_TIMEOUT_MS)')
+    expect(hook).toContain("'before-interactive-callback'")
+    // every caller sends the request whether or not a token came back
+    for (const path of ['apps/web/src/components/embed/EstimateWidget.tsx', 'apps/web/src/components/embed/useUnfinishedLead.ts', 'apps/web/src/app/(auth)/signup/page.tsx']) {
+      expect(read(path)).toMatch(/turnstileToken: \w+ \|\| undefined|turnstileToken\b/)
+    }
+  })
+})
+
+describe('the website’s rate limits: half a second, fail open, one switch', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+    setRateLimitStoreForTesting(undefined)
+  })
+
+  it('Upstash is given half a second, then the request goes ahead and the log says so', async () => {
+    expect(RATE_LIMIT_TIMEOUT_MS).toBe(500)
+    vi.useFakeTimers()
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    setRateLimitStoreForTesting({ incrementWithExpiry: () => new Promise<number[]>(() => undefined) })
+    const pending = checkRateLimit('quotes', { ip: '203.0.113.9', key: 'tnt_fixture' })
+    await vi.advanceTimersByTimeAsync(499)
+    let settled = false
+    void pending.then(() => (settled = true))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(settled).toBe(false)
+    await vi.advanceTimersByTimeAsync(2)
+    expect(await pending).toEqual({ allowed: true, retryAfterSeconds: 0 })
+    expect(error.mock.calls.flat().join(' ')).toContain('FAILING OPEN')
+  })
+
+  it('a store that throws → goes ahead, logged', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    setRateLimitStoreForTesting({
+      incrementWithExpiry: async () => {
+        throw new Error('down')
+      },
+    })
+    expect((await checkRateLimit('quotes', { ip: '203.0.113.9' })).allowed).toBe(true)
+    expect(error.mock.calls.flat().join(' ')).toContain('FAILING OPEN')
+  })
+
+  it('RATE_LIMITS_OFF=true turns every limit off, with Upstash still configured, here and in the middleware', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://limits.test')
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'token-fixture')
+    expect(rateLimitingConfigured()).toBe(true)
+    vi.stubEnv('RATE_LIMITS_OFF', 'true')
+    expect(rateLimitsSwitchedOff()).toBe(true)
+    expect(rateLimitingConfigured()).toBe(false)
+    setRateLimitStoreForTesting(undefined)
+    expect(await checkRateLimit('quotes', { ip: '203.0.113.9', key: 'tnt_fixture' })).toEqual({ allowed: true, retryAfterSeconds: 0 })
+    const never = vi.fn()
+    expect((await checkRateLimitEdge('quote_page', { ip: '203.0.113.9' }, { url: 'https://limits.test', token: 'token-fixture', off: 'true' }, never as unknown as typeof fetch)).allowed).toBe(true)
+    expect(never).not.toHaveBeenCalled()
+    expect(rateLimitsSwitchedOff({ RATE_LIMITS_OFF: 'false' })).toBe(false)
+    expect(rateLimitsSwitchedOff({})).toBe(false)
+  })
+})
+

@@ -36,12 +36,12 @@ describe('verifyTurnstileToken', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('rejects a missing token when the secret is configured', async () => {
+  it('lets a request with no token through (T-178): the script may never have loaded in the browser', async () => {
     vi.stubEnv('TURNSTILE_SECRET_KEY', 'sk')
     vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site')
     const fetchMock = mockSiteverify({})
     const result = await verifyTurnstileToken(undefined, '1.2.3.4')
-    expect(result).toEqual({ ok: false, reason: 'missing-token' })
+    expect(result).toEqual({ ok: true, unchecked: 'no-token' })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 

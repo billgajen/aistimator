@@ -20,7 +20,7 @@
 **Deployed 2026-11-17 21:02 UTC** (commit `4a08ec9`). No migration.
 1. Worker: `npx wrangler deploy --env production`, version `d0450982-775a-4a98-b797-360de78ce7b8`. Its secrets
    were listed by name first: neither Upstash value is set, so the limiter is off (`/health` says
-   `hasRedis: false`). The owner adds them (OWNER-TODO, T-178).
+   `hasRedis: false`). **They stay unset: the owner decided the worker's limiter stays off** (follow-up below).
 2. Web: `npx vercel deploy --prod --yes`, deployment `dpl_8Nd9X47kLCDeeRU3ppc7ktsh1kKy`, serving `qolumns.com`.
 
 Live checks, read-only (no request was submitted, no WhatsApp message sent, nothing created):
@@ -38,6 +38,56 @@ Live checks, read-only (no request was submitted, no WhatsApp message sent, noth
 **Not tried on production:** submitting a request (so the new submit rule, the failed-quote email and the
 60-second line were seen only on this machine), anything signed in, and the worker's limiter with real Upstash
 values.
+
+#### Follow-up, same day: the worker's limiter stays off; the website's protections never block a real customer (AD-060)
+
+**Decision 1 (owner): the worker's Upstash secrets are not added. The worker's rate limiter stays off, by design.**
+The website's limits (Vercel) are the brake on abuse; a second limiter in front of pricing has only ever cost
+quotes. The code stays, fail-open (AD-058), so that if the two secrets ever are set it cannot fail a quote. The
+task "add the Upstash secrets to the worker" is removed from OWNER-TODO.
+
+**Asked: for the website's limiter and for Turnstile, does each fail open, wait 500 ms at most, log when it is
+failing, and have one switch to turn it off?**
+
+| | Before | Now |
+|---|---|---|
+| Website limiter: fails open on error or timeout | yes | yes |
+| Website limiter: waits at most 500 ms | **no, 1.5 seconds** | yes (`RATE_LIMIT_TIMEOUT_MS = 500`, for the routes and the middleware) |
+| Website limiter: logs when failing | yes (`[RateLimit] FAILING OPEN`) | yes |
+| Website limiter: one switch | **no** (only by removing an Upstash value) | yes, `RATE_LIMITS_OFF=true` |
+| Turnstile: fails open on error or timeout | yes for Cloudflare down; **no for a request with no token** | yes, both |
+| Turnstile: waits at most 500 ms | **no, 5 seconds** on the server; **no limit** on the script loading in the browser, 90 seconds for a token | 500 ms on the server; in the browser 4 seconds for the script, 8 for a token (90 only while the person is answering a challenge Cloudflare put on screen) |
+| Turnstile: logs when failing | yes for Cloudflare down | yes, every case (`[Turnstile] FAILING OPEN: …`) |
+| Turnstile: one switch | **no** (only by removing a key) | yes, `TURNSTILE_OFF=true` |
+
+**Asked: does Turnstile block only on a clear "failed" answer?** It did not. It also refused (403) any request
+that came with no token, which is what a customer sends when the script is blocked, never loads or gives up in
+their browser; and if the script stalled without an error, the form waited on it with no limit. Now
+(`lib/turnstile.ts`, `components/embed/useTurnstile.ts`):
+- **Blocked:** only when Cloudflare answers `success: false` with `invalid-input-response` (not a real token) or
+  `timeout-or-duplicate` (used or expired). The form makes a fresh token for every send, so a real customer does
+  not produce either, and "Try again" makes another.
+- **Goes ahead, logged:** no token; Cloudflare unreachable; no answer in 500 ms; an HTTP error; or a "no" that is
+  not about the visitor (`internal-error`, a bad or missing secret, a malformed call).
+- **In the browser:** the script is given 4 seconds and a token 8; after that the request is sent without one.
+- **What this costs, plainly:** a bot that sends no token is no longer stopped by the human check. The rate
+  limits (5 requests a minute and 40 a day from one address; 20 a minute and 200 a day for one business) and
+  the hidden field are what stop it. That is the trade the rule makes on purpose.
+
+**Found by the full regression run: the quote link page showed a stale business.** Moving the limit check out
+of `/quote/{slug}` (this ticket) also removed the page's `headers()` read. Without it Next.js reuses the page's
+database lookups, so a link that had been changed kept showing the old page instead of redirecting, and a
+business switched off kept its page instead of a 404 (`verify-t149` 33/35, `verify-t174` 81/83). It was in
+production from 21:02 UTC until the follow-up deploy. Fix: the page reads the headers again, with a comment
+saying why and a unit test. The first T-178 run skipped the regression set, which is how this got out; the
+"full set for a ticket that touches the quote flow" rule was right.
+
+**Checks after these changes:** lint and typecheck pass; unit tests web 962 (9 new), worker 551; web and worker
+builds pass. **The full regression set passes:** `verify-t146` to `verify-t177` (26 scripts, 2,288 checks; t149 and
+t174 after the fix above), `verify-t173` 104/104 on its own server (updated: a made-up token is refused, no
+token is not; Cloudflare hanging, down or answering `internal-error` lets the request through, 546 ms when
+hanging; the limiter hanging is served in 612 ms; the old `SERVICE_MISMATCH` check now sends a complete request
+and expects it accepted), and `verify-t178` 52/52 on its own server.
 
 #### What broke on production (2026-11-17)
 
@@ -59,8 +109,9 @@ values.
   error word for word, and a queued job logs `Rate limiter FAILING OPEN (Error)` and is priced anyway; with the
   new import the same calls reach the stand-in (`get`, `get`, then `incr`, `expire`, `incr`, `expire`) and the
   job is priced; with a stand-in that never answers, pricing starts 2.1 seconds after the job is picked up.
-- **Not proven: the limiter against a real Upstash database.** `apps/worker/.dev.vars` has no Upstash values,
-  so the run above used a stand-in. See OWNER-TODO, T-178.
+- **Not proven, and not going to be: the limiter against a real Upstash database.** `apps/worker/.dev.vars`
+  has no Upstash values, so the run above used a stand-in; and the owner has since decided the worker's limiter
+  stays off (follow-up below), so there is nothing left to prove it against.
 
 **B. A customer was refused at submit with `SERVICE_MISMATCH`.**
 - *What happened:* a customer chose a service, answered its questions, added photos and wrote in "Anything
@@ -629,7 +680,7 @@ them and needs no web deploy to take effect (AD-054):
   minute and try again."). The request form shows it with "Your answers are still here. Nothing you typed has
   been lost." and a **Try again** button that sends the same request; "Start Over" is shown only when there is
   nothing to send again. The same screen is used when the human check or the server fails.
-- Upstash down or slow: the request goes ahead after at most 1.5 seconds and the log says
+- Upstash down or slow: the request goes ahead after at most 1.5 seconds (half a second since T-178, AD-060) and the log says
   `[RateLimit] FAILING OPEN`. Not configured: `[RateLimit] PROTECTION OFF`, once.
 
 **A3. Human check (Cloudflare Turnstile)**
@@ -7490,6 +7541,9 @@ if (pricingResult.estimatedTotal <= 0) {
 
 ### AD-055: Public limits live in one file, count per address and per key, and fail open (T-173)
 
+> **Changed by AD-060 (T-178):** the wait is 500 ms, a missing human-check token no longer refuses a request,
+> and each protection has one off switch.
+
 **Decision:** every public rate limit is a row in `apps/web/src/lib/rate-limit-config.ts`: a scope, and for each window the calls allowed from one address and for one key (the business, the quote, or a hash of the email address). A request is counted before anything is read or written. Request submission has a minute, an hour and a day window. With Upstash not configured, slow (1.5 seconds) or failing, the request goes ahead and the log says so. The human check (Turnstile) is on only when both its keys are set, and fails open when Cloudflare does not answer.
 
 **Why:** the per-minute limits alone let a patient attacker send one business tens of thousands of requests a day and use up its plan; a limit per business per day stops that without touching its neighbours. One file, because limits spread across settings and routes had drifted (three routes had none). Fail open, because a limiter or a bot check that is down must not take quoting down with it: the plan limits and the demo's database caps still hold.
@@ -7579,6 +7633,9 @@ listed unpaid as a reason to pause); making the real model's answers a required 
 
 ### AD-058: The worker's rate limiter fails open (T-178)
 
+> **Owner's decision, 2026-11-17 (AD-060):** the worker's Upstash secrets are not set, so this limiter is off,
+> by design. The rule below is what makes it safe if they ever are.
+
 **Decision:** on the queue, the rate limiter can only delay a job that is over the limit. Any limiter error, or
 no answer within 2 seconds, means the quote is processed and the error's name is logged. The limiter is never
 the reason a quote fails or waits. This is AD-055's rule (the website's limits fail open) applied to the worker.
@@ -7630,6 +7687,42 @@ A wrong hold costs the business a minute; a wrong refusal costs it the customer.
 **Rejected:** keeping the refusal but passing the answers to the matcher (still lets a model overrule a
 customer's explicit choice); switching the request to the suggested service automatically (its answers belong
 to the first service's questions); asking the customer "did you mean…" (the same refusal with a nicer face).
+
+---
+
+### AD-060: A protection never blocks a real customer: half a second, fail open, logged, one switch (T-178)
+
+**Decision:** every protection that sits in front of a customer's request (the website's rate limits, the human
+check) obeys four rules, and the worker has no limiter switched on at all:
+1. **It fails open.** An error, a timeout, or no clear answer means the request goes ahead.
+2. **It waits at most 500 ms** for its third party on the server.
+3. **It logs when it is failing open** (`FAILING OPEN`), so a broken protection is visible.
+4. **One setting turns it off** without removing its keys: `RATE_LIMITS_OFF=true`, `TURNSTILE_OFF=true`.
+
+The human check blocks only on a clear "failed" from Cloudflare: a token it says is not real, or is used or
+expired. A request with no token goes ahead. The worker's Upstash secrets are deliberately not set (owner's
+decision, 2026-11-17): the worker's limiter stays off, and its code stays fail-open (AD-058) in case they ever are.
+
+**Why:** in one day a limiter failed every quote, and the human check turned out to refuse any customer whose
+browser did not load Cloudflare's script. Both were protections against an attack that was not happening,
+paid for with real requests. Abuse is bounded by the plan limits, the rate limits and the hidden field; a lost
+customer is not recoverable.
+
+**Rules that follow:**
+- This changes AD-055 in three places: the wait is 500 ms, not 1.5 seconds; a missing human-check token no
+  longer refuses a request; and there are two switches (AD-055 rejected settings for the limits' numbers, which
+  still stands: the numbers are in one file).
+- A new protection is added only with all four rules and a test for each.
+- A bot that sends no token is not stopped by the human check. Do not "fix" that by refusing missing tokens;
+  tighten a rate limit instead.
+- In the browser the form never waits on a third party without a time limit (4 seconds for the script, 8 for a
+  token, longer only while the person is answering a challenge on screen).
+- On Vercel a changed setting takes effect on the next deployment, so "one switch" means: set it, redeploy.
+
+**Rejected:** refusing a request with no token but accepting one that says "the script did not load" (a bot can
+say that too); a longer server wait "to be safe" (it is the customer who waits); removing Turnstile (it still
+stops forged and replayed tokens, and costs nothing when it is unsure); switching the worker's limiter on now
+that it fails open (the owner's call: it protects nothing the website's limits do not).
 
 ---
 

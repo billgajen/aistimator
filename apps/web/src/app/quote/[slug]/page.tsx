@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { resolveQuoteLink, supabaseQuoteLinkStore, markFirstVisit } from '@/lib/quote-link'
@@ -35,6 +36,12 @@ export default async function QuoteLinkPage({ params, searchParams }: QuotePageP
   // T-178: this page's rate limit (`quote_page`) is checked in the middleware,
   // where a blocked visitor can be answered with a real 429. A page that is
   // already rendering can only answer 200.
+  //
+  // Reading the request's headers is what makes every visit look the business
+  // up afresh. Without it the lookups for a link are reused, and a link that
+  // was changed or switched off keeps showing its old page (the limit check
+  // that used to sit here read them; taking it away broke exactly that).
+  headers()
 
   const result = await resolve(params.slug)
   if (result.kind === 'redirect') permanentRedirect(`/quote/${result.slug}`)

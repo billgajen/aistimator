@@ -307,11 +307,10 @@ Code for every item is already built; these are the steps that unlock it.
 ## Rate limiting (found at the T-153 deploy, 2026-11-10)
 
 - **Since T-173 the limits are in one file, with more doors covered and different figures: see T-173, sections 2 and 3. The list below is as it stood on 2026-11-10.**
-- [ ] **Configure Upstash Redis — it is not set anywhere in production**, so every rate limit below is off (they fail
-  open by design). Create an Upstash Redis database, then set:
-  - Vercel (Production): `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`;
-  - worker: `npx wrangler secret put UPSTASH_REDIS_URL --env production` and `UPSTASH_REDIS_TOKEN` (note the
-    different names), then redeploy both.
+- [x] **Upstash Redis is configured in Vercel** (seen 2026-11-17, T-178: `UPSTASH_REDIS_REST_URL` and
+  `UPSTASH_REDIS_REST_TOKEN` are set, and the limits block as they should). **The worker gets no Upstash values:
+  its limiter stays off, by design** (your decision, T-178, AD-060). The earlier instruction to add them to the
+  worker is withdrawn.
 
   Unprotected until then:
   - `POST /api/public/quotes` (5/min per IP, 30/min per business): each request runs the AI pipeline. The plan
@@ -403,7 +402,7 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
   should get "Your quote from …" once. Tap the button in the email again: "Already approved".
 - [x] **Email delivery:** the Postmark account was approved on 11 Nov 2026, so the review email and the customer's
   confirmed quote reach any address. (Written while the approval was pending.)
-- [ ] **Per-IP limit:** the `approval_link` limit uses Upstash, which isn't set up in production, so it fails open. The
+- [x] **Per-IP limit:** the `approval_link` limit uses Upstash, which is set up in Vercel since 2026-11-17. The
   per-link cap (10 presses, counted in the database) applies regardless. See "Rate limiting" above.
 - Test requests from setup keep the review email, marked "[Test]" with a banner, and the button works like any other
   (it counts toward nothing). Demo requests send no email.
@@ -1346,8 +1345,8 @@ Steps 2 to 5 are `scripts/deploy-t174-settings.sh` (`--dry-run` shows what each 
   address goes, so I did not grant it. Run `bash scripts/set-platform-admin.sh you@example.com` with the
   address you sign in to Qolumns with. Until then `/admin` is closed to everyone, you included. Then
   `bash scripts/set-platform-admin.sh --list` should say 1.
-- [ ] **Rate limits and the human check are off** until you add the Upstash and Turnstile settings (section 3)
-  and deploy the web app once more.
+- [x] **Rate limits and the human check are on** (the Upstash and Turnstile settings were in Vercel by
+  2026-11-17; T-178 checked the limiter live). See T-178 for how each fails open and its off switch.
 - [ ] **Try by hand, with a spare address:** sign up, confirm from the email, log out, and use "Forgot your
   password?". None of that was tried on production (each is a real request), and no real inbox has received
   these emails yet.
@@ -1416,7 +1415,7 @@ Everything works without these: protection is then **off**, and the server log s
 | `UPSTASH_REDIS_REST_TOKEN` | Vercel, production | Its REST token | **Yes** |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Vercel, production | The widget's site key | No |
 | `TURNSTILE_SECRET_KEY` | Vercel, production | The widget's secret key | **Yes** |
-| `UPSTASH_REDIS_URL`, `UPSTASH_REDIS_TOKEN` | Worker (`npx wrangler secret put … --env production`) | The same database, for the worker's own AI limiter. Note the different names | Token: **yes** |
+| ~~`UPSTASH_REDIS_URL`, `UPSTASH_REDIS_TOKEN`~~ | Worker | **Not to be set** (T-178, AD-060): the worker's limiter stays off, by design | — |
 
 - Add each with `printf '%s' 'VALUE' | npx vercel env add NAME --environment production --sensitive --yes`
   (`--no-sensitive` for the two that are not secret). They take effect at the next production deploy.
@@ -1752,23 +1751,14 @@ demo quote link in a minute gave 60 pages and then 429 from the 61st.
 
 ### 1. What you must do
 
-- [ ] **Add the two Upstash values to the worker again, when you are ready. It is safe now.** After this
-  deploy the limiter cannot fail or hold up a quote: any error, or no answer in 2 seconds, and the quote is
-  priced anyway.
-  ```
-  cd apps/worker
-  npx wrangler secret put UPSTASH_REDIS_URL --env production     # Upstash console → your database → REST API → "UPSTASH_REDIS_REST_URL" (https://….upstash.io)
-  npx wrangler secret put UPSTASH_REDIS_TOKEN --env production   # same place → "UPSTASH_REDIS_REST_TOKEN"
-  ```
-  The worker's names differ from the website's (`…_REST_URL`, `…_REST_TOKEN` in Vercel); the values are the same two.
-  Then send one test request by hand. It should be priced as usual. To see the limiter working:
-  `npx wrangler tail --env production` while you send it, or Cloudflare dashboard → Workers → estimator-worker →
-  Logs. You should see `Processing job` and no line saying `FAILING OPEN`. If you do see `FAILING OPEN`, the
-  quote is still priced; tell me the word in brackets after it.
-- [ ] **Optional, for a proof on this machine against the real database:** put the same two values in
-  `apps/worker/.dev.vars` as `UPSTASH_REDIS_URL=…` and `UPSTASH_REDIS_TOKEN=…` and tell me. That was not done,
-  so **the limiter has not been run against a real Upstash database**: it was run in the Workers runtime
-  against a stand-in that speaks Upstash's REST format (see Docs/CHANGELOG.md, T-178).
+- **The worker's rate limiter stays off, by design (your decision, 2026-11-17).** The worker has no Upstash
+  values and none are to be added. Its code stays in place and fails open, so nothing breaks if they ever are.
+  Nothing for you to do. (Recorded in Docs/CHANGELOG.md, AD-060.)
+- **Two switches you now have** (Vercel → estimator-web → Settings → Environment Variables, then redeploy; a
+  changed setting only takes effect on the next deployment):
+  - `RATE_LIMITS_OFF=true` turns every website rate limit off, without removing the Upstash values.
+  - `TURNSTILE_OFF=true` turns the human check off, without removing its keys.
+  Remove the setting (or set it to `false`) and redeploy to turn it back on.
 - [ ] **One quote is marked failed in production: `qte_b2696651e64b956566642c9a` (Bluum, 20:07 UTC).** I did
   not retry it, because a retry emails the customer. Retry it, or contact the customer yourself:
   ```
@@ -1800,6 +1790,18 @@ demo quote link in a minute gave 60 pages and then 429 from the 61st.
 
 - [x] The website's limiter is on (Upstash is configured in Vercel). It counted correctly but answered a
   blocked page view with status 200; it now answers 429.
+- [x] **The website's limiter and the human check, against your four rules** (both now meet all four):
+  - Fail open on an error or a timeout: yes, both. Before, the human check refused any request that came with no
+    token, which is what a browser sends when Cloudflare's script is blocked or never loads.
+  - Wait 500 ms at most: yes, both. Before: 1.5 seconds (limiter), 5 seconds (human check).
+  - Log when failing: yes, both (`FAILING OPEN` in the Vercel logs).
+  - One switch: yes, both (above). Before: neither.
+- [x] **The human check blocks only when Cloudflare clearly says the token is bad** (not real, used or
+  expired). No token, Cloudflare unreachable or slow, or a script that never loads: the request goes ahead. In
+  the browser the form waits 4 seconds for the script and 8 for a token, never longer unless the person is
+  answering a challenge.
+  **The cost:** a bot that sends no token is not stopped by the human check any more; the rate limits and the
+  hidden field stop it.
 - [x] Workers Logs are on for production (7 days). A deploy from a `wrangler.toml` without the
   `[observability]` block would switch them off again.
 - [x] A request the web app could not hand to the worker used to stay "queued" for ever. It is now marked

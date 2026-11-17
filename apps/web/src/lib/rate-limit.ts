@@ -15,7 +15,7 @@
 import { Redis } from '@upstash/redis'
 import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
-import { RATE_LIMIT_TIMEOUT_MS, blockedMessage, type LimitWindow, type RateLimitScope } from './rate-limit-config'
+import { RATE_LIMIT_TIMEOUT_MS, blockedMessage, rateLimitsSwitchedOff, type LimitWindow, type RateLimitScope } from './rate-limit-config'
 import { buildCounters, evaluateCounters, getScopeWindows, type RateLimitResult, type WindowCounter } from './rate-limit-counters'
 
 export type { RateLimitScope, LimitWindow, RateLimitResult, WindowCounter }
@@ -49,6 +49,11 @@ let cachedStore: RateLimitStore | null | undefined
 
 function getStore(): RateLimitStore | null {
   if (cachedStore !== undefined) return cachedStore
+  if (rateLimitsSwitchedOff()) {
+    console.warn('[RateLimit] PROTECTION OFF: switched off with RATE_LIMITS_OFF, so no public rate limit applies')
+    cachedStore = null
+    return cachedStore
+  }
   const url = process.env.UPSTASH_REDIS_REST_URL
   const token = process.env.UPSTASH_REDIS_REST_TOKEN
   if (!url || !token) {
@@ -63,7 +68,7 @@ function getStore(): RateLimitStore | null {
 
 /** Whether rate limiting is switched on (Upstash is configured) */
 export function rateLimitingConfigured(): boolean {
-  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
+  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) && !rateLimitsSwitchedOff()
 }
 
 /** Test hook: inject a fake store (pass undefined to reset to env-based). */
@@ -111,7 +116,7 @@ export async function checkRateLimit(
     }
     return result
   } catch (error) {
-    console.error(`[RateLimit] FAILING OPEN: Upstash did not answer for ${scope}; the request went ahead unchecked:`, error instanceof Error ? error.message : 'unknown error')
+    console.error(`[RateLimit] FAILING OPEN: Upstash did not answer for ${scope} (${RATE_LIMIT_TIMEOUT_MS} ms limit); the request went ahead unchecked:`, error instanceof Error ? error.message : 'unknown error')
     return { allowed: true, retryAfterSeconds: 0 }
   }
 }

@@ -24,9 +24,12 @@
   `apps/web/src/lib/rate-limit-config.ts` (per address, and per business, quote or email address; some scopes
   also by hour and by day). Over a limit: **429** with
   `{ "error": { "code": "RATE_LIMITED", "message": "Too many tries in a short time. Please wait a minute and try again.", "retryAfterSeconds": 42 } }`
-  and a `Retry-After` header. With Upstash not configured, slow or failing, the call goes ahead.
+  and a `Retry-After` header. With Upstash not configured, slow (500 ms) or failing, the call goes ahead.
+  `RATE_LIMITS_OFF=true` turns every limit off.
 - `POST /api/public/quotes`, `POST /api/public/leads` and `POST /api/auth/signup` take `turnstileToken`. With both
-  Turnstile keys set, a missing or bad token is **403** `VERIFICATION_FAILED`; with either unset the field is ignored.
+  Turnstile keys set, a token Cloudflare clearly rejects (not real, used or expired) is **403**
+  `VERIFICATION_FAILED`. **A request with no token goes ahead** (T-178, AD-060), as does one whose token
+  Cloudflare could not judge within 500 ms. With either key unset, or `TURNSTILE_OFF=true`, the field is ignored.
   They also take the hidden field `website`, which must be empty.
 - The quote actions (`accept`, `decline`, `feedback`, `clarify`) are limited by address first, then, once the
   quote's link token has been checked, per quote and per business.

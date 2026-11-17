@@ -113,6 +113,10 @@ let upstashMode: 'ok' | 'down' | 'hang' = 'ok'
 let upstashCalls = 0
 const upstashKeys = new Set<string>()
 const siteverifyCalls: Array<{ token: string; ok: boolean }> = []
+/** T-178: how the stand-in for Cloudflare behaves ('ok' = judge the token) */
+let siteverifyMode: 'ok' | 'hang' | 'down' | 'internal' = 'ok'
+/** A token the stand-in for Cloudflare clearly rejects (a request with NO token is no longer refused) */
+const BAD_TOKEN = { turnstileToken: 'made-up-token' }
 interface Mail { From: string; To: string; Subject: string; HtmlBody: string; TextBody: string; Tag?: string }
 const mails: Mail[] = []
 
@@ -152,6 +156,9 @@ const mock = nodeHttp.createServer((req, res) => {
       return send(200, results)
     }
     if (url.pathname === '/turnstile/siteverify') {
+      if (siteverifyMode === 'hang') return // never answers
+      if (siteverifyMode === 'down') return send(503, { error: 'stand-in is down' })
+      if (siteverifyMode === 'internal') return send(200, { success: false, 'error-codes': ['internal-error'] })
       const form = new URLSearchParams(raw)
       const token = form.get('response') ?? ''
       const ok = form.get('secret') === TURNSTILE_SECRET && token === GOOD_TOKEN
@@ -245,7 +252,8 @@ const bInterior = await addService(b, 'Interior Painting')
 {
   const before = upstashCalls
   const probe = await call('GET', `/api/public/widget/config?tenantKey=${a.tenantKey}`, { ip: newIp() })
-  const noToken = await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, aInterior, person('Setup Check'), []) })
+  // T-178: a request with no token goes ahead, so the probe sends a token the stand-in refuses
+  const noToken = await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, aInterior, person('Setup Check'), [], BAD_TOKEN) })
   const usesStandIns = probe.ok && upstashCalls > before && noToken.status === 403
   check('(the web app is running with the stand-ins for Upstash and the human check)', usesStandIns, { config: probe.status, limiterCalls: upstashCalls - before, noToken: noToken.status })
   if (!usesStandIns) {
@@ -317,16 +325,28 @@ section('B. The human check, on the server')
 // =====================================================================================
 {
   const who = person('Nadia Whitlock')
-  const none = await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, aInterior, who, []) })
-  const bad = await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, aInterior, who, [], { turnstileToken: 'made-up-token' }) })
-  check('a request with no token is refused (403), and one with a made-up token too', none.status === 403 && none.json?.error?.code === 'VERIFICATION_FAILED' && bad.status === 403, { none: none.status, bad: bad.status })
-  check('the message is plain and never says to refresh the page (that would lose the answers)', typeof none.json?.error?.message === 'string' && !/refresh|reload|captcha|turnstile|token/i.test(none.json.error.message), none.json?.error?.message)
+  // T-178 (AD-060): only a token Cloudflare clearly rejects blocks. No token at all (the script never loaded in
+  // the browser) goes ahead; it is then refused here for its made-up service, not for the check.
+  const none = await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, 'svc_does_not_exist', who, []) })
+  const bad = await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, aInterior, who, [], BAD_TOKEN) })
+  check('a request with a token Cloudflare rejects is refused (403)', bad.status === 403 && bad.json?.error?.code === 'VERIFICATION_FAILED', { bad: bad.status })
+  check('a request with NO token is not refused by the check (the script may never have loaded in the customer’s browser)', none.status !== 403 && none.json?.error?.code !== 'VERIFICATION_FAILED' && none.json?.error?.code === 'INVALID_SERVICE', { status: none.status, code: none.json?.error?.code })
+  check('the message is plain and never says to refresh the page (that would lose the answers)', typeof bad.json?.error?.message === 'string' && !/refresh|reload|captcha|turnstile|token/i.test(bad.json.error.message), bad.json?.error?.message)
+  // Cloudflare slow, down, or answering "no" for a reason that is not the visitor's: the request goes ahead
+  for (const [mode, words] of [['hang', 'not answering at all'], ['down', 'answering with an error'], ['internal', 'saying "internal-error"']] as const) {
+    siteverifyMode = mode
+    const t0 = Date.now()
+    const through = await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, 'svc_does_not_exist', who, [], { turnstileToken: 'any-token' }) })
+    const ms = Date.now() - t0
+    siteverifyMode = 'ok'
+    check(`with Cloudflare ${words}, the request goes ahead${mode === 'hang' ? ' after about half a second (under 2.5 seconds here)' : ''}`, through.json?.error?.code === 'INVALID_SERVICE' && ms < 2500, { code: through.json?.error?.code, ms })
+  }
   const good = await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, 'svc_does_not_exist', who, [], { turnstileToken: GOOD_TOKEN }) })
   check('a request with a good token gets past the check (it is then refused for its made-up service, not for the check)', good.status !== 403 && good.status !== 429 && good.json?.error?.code !== 'VERIFICATION_FAILED', { status: good.status, code: good.json?.error?.code })
   const trap = await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, aInterior, who, [], { turnstileToken: GOOD_TOKEN, website: 'http://spam.example' }) })
   check('the honeypot is still a second layer: a filled hidden field is refused even with a good token', trap.status === 400, trap.status)
-  const lead = await call('POST', '/api/public/leads', { ip: newIp(), body: { tenantKey: a.tenantKey, serviceId: aInterior, customer: who } })
-  check('the unfinished-request route asks for the token too', lead.status === 403, lead.status)
+  const lead = await call('POST', '/api/public/leads', { ip: newIp(), body: { tenantKey: a.tenantKey, serviceId: aInterior, customer: who, ...BAD_TOKEN } })
+  check('the unfinished-request route refuses a rejected token too', lead.status === 403, lead.status)
   const rows = await sb.select('quote_requests', `tenant_id=eq.${a.tenantId}&select=id`)
   check('none of that created a request', rows.length === 0, rows.length)
 }
@@ -336,23 +356,23 @@ section('C. Rate limits: they trigger, they are per address and per business, an
 // =====================================================================================
 {
   await earlyInTheMinute(30)
-  // per address, on request submission (each call is refused early for its missing token; it still counts)
+  // per address, on request submission (each call is refused early for its rejected token; it still counts)
   const ip = newIp()
   const perIp = RATE_LIMITS.quotes[0].perIp
   const statuses: number[] = []
-  for (let i = 0; i < perIp + 1; i++) statuses.push((await call('POST', '/api/public/quotes', { ip, body: quoteBody(a, aInterior, person('Flood One'), []) })).status)
+  for (let i = 0; i < perIp + 1; i++) statuses.push((await call('POST', '/api/public/quotes', { ip, body: quoteBody(a, aInterior, person('Flood One'), [], BAD_TOKEN) })).status)
   const blocked = await call('POST', '/api/public/quotes', { ip, body: quoteBody(a, aInterior, person('Flood One'), [], { turnstileToken: GOOD_TOKEN }) })
   check(`request submission: ${perIp} calls a minute from one address, then 429`, statuses.slice(0, perIp).every((s) => s === 403) && statuses[perIp] === 429 && blocked.status === 429, statuses)
   const wait = Number(blocked.headers.get('retry-after'))
   check('the blocked caller gets a plain message and how long to wait', blocked.json?.error?.code === 'RATE_LIMITED' && blocked.json.error.message === blockedMessage(blocked.json.error.retryAfterSeconds) && wait >= 1 && wait <= 61 && !/limit|plan|redis|upstash/i.test(blocked.json.error.message), { message: blocked.json?.error?.message, retryAfter: wait })
-  check('another address is not held up', (await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, aInterior, person('Other Caller'), []) })).status === 403)
+  check('another address is not held up', (await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, aInterior, person('Other Caller'), [], BAD_TOKEN) })).status === 403)
 
   // per business, from many addresses
   const perKey = RATE_LIMITS.quotes[0].perKey
   const flood: number[] = []
-  for (let i = 0; i < perKey + 1; i++) flood.push((await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(b, bInterior, person('Flood Two'), []) })).status)
+  for (let i = 0; i < perKey + 1; i++) flood.push((await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(b, bInterior, person('Flood Two'), [], BAD_TOKEN) })).status)
   const used = flood.filter((s) => s === 403).length
-  const otherBusiness = await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, aInterior, person('Other Business'), []) })
+  const otherBusiness = await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, aInterior, person('Other Business'), [], BAD_TOKEN) })
   check(`one business under attack from many addresses is throttled at ${perKey} a minute`, used <= perKey && flood[flood.length - 1] === 429, { passed: used, last: flood[flood.length - 1] })
   check('…and the business next to it is untouched', otherBusiness.status === 403, otherBusiness.status)
 
@@ -371,11 +391,11 @@ section('C. Rate limits: they trigger, they are per address and per business, an
   // sign-up, log-in and reset, by address and by email
   const victim = `flood-${shortId()}@example.test`
   const su: number[] = []
-  for (let i = 0; i < RATE_LIMITS.signup[0].perKey + 1; i++) su.push((await call('POST', '/api/auth/signup', { ip: newIp(), body: { email: victim, password: newPassword(), businessName: 'Flood Co' } })).status)
+  for (let i = 0; i < RATE_LIMITS.signup[0].perKey + 1; i++) su.push((await call('POST', '/api/auth/signup', { ip: newIp(), body: { email: victim, password: newPassword(), businessName: 'Flood Co', ...BAD_TOKEN } })).status)
   check(`sign-up: one email address can be tried ${RATE_LIMITS.signup[0].perKey} times a minute, whatever address it comes from`, su.slice(0, -1).every((s) => s === 403) && su[su.length - 1] === 429, su)
   const suIp = newIp()
   const su2: number[] = []
-  for (let i = 0; i < RATE_LIMITS.signup[0].perIp + 1; i++) su2.push((await call('POST', '/api/auth/signup', { ip: suIp, body: { email: `flood-${shortId()}@example.test`, password: newPassword(), businessName: 'Flood Co' } })).status)
+  for (let i = 0; i < RATE_LIMITS.signup[0].perIp + 1; i++) su2.push((await call('POST', '/api/auth/signup', { ip: suIp, body: { email: `flood-${shortId()}@example.test`, password: newPassword(), businessName: 'Flood Co', ...BAD_TOKEN } })).status)
   check(`sign-up: ${RATE_LIMITS.signup[0].perIp} a minute from one address`, su2.slice(0, -1).every((s) => s === 403) && su2[su2.length - 1] === 429, su2)
   const li: number[] = []
   for (let i = 0; i < RATE_LIMITS.login[0].perKey; i++) li.push((await call('POST', '/api/auth/login', { ip: newIp(), body: { email: b.email, password: 'not-the-password' } })).status)
@@ -415,8 +435,8 @@ const newcomer = { email: `megan.grant+${shortId()}@example.test`, password: new
 {
   // (each of these uses its own address: one email address is allowed two sign-up tries a minute)
   const unchecked = `megan.grant+${shortId()}@example.test`
-  const noToken = await call('POST', '/api/auth/signup', { ip: newIp(), body: { ...newcomer, email: unchecked } })
-  check('sign-up without the human check is refused (403), and nothing is emailed', noToken.status === 403 && mailTo(unchecked).length === 0, noToken.status)
+  const noToken = await call('POST', '/api/auth/signup', { ip: newIp(), body: { ...newcomer, email: unchecked, ...BAD_TOKEN } })
+  check('sign-up with a token Cloudflare rejects is refused (403), and nothing is emailed', noToken.status === 403 && mailTo(unchecked).length === 0, noToken.status)
   const trap = await call('POST', '/api/auth/signup', { ip: newIp(), body: { ...newcomer, email: `bot-${shortId()}@example.test`, turnstileToken: GOOD_TOKEN, website: 'http://spam.example' } })
   check('a sign-up with the hidden field filled is answered as normal and does nothing', trap.status === 200 && mails.every((m) => !m.To.startsWith('bot-')), trap.status)
   const weak = await call('POST', '/api/auth/signup', { ip: newIp(), body: { ...newcomer, email: `megan.grant+${shortId()}@example.test`, password: 'short', turnstileToken: GOOD_TOKEN } })
@@ -591,7 +611,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
     await p.getByLabel('ZIP code').fill('63021')
     // now, with everything typed, this address makes too many requests
     await earlyInTheMinute(40)
-    for (let i = 0; i < RATE_LIMITS.quotes[0].perIp; i++) await call('POST', '/api/public/quotes', { ip, body: quoteBody(b, bInterior, who, []) })
+    for (let i = 0; i < RATE_LIMITS.quotes[0].perIp; i++) await call('POST', '/api/public/quotes', { ip, body: quoteBody(b, bInterior, who, [], BAD_TOKEN) })
     await p.getByRole('button', { name: 'Get my estimate' }).click()
     const kept = await p.locator('[data-testid=answers-kept]').waitFor({ timeout: 60_000 }).then(() => true, () => false)
     const words = kept ? (await p.locator('[data-testid=request-form]').innerText()).replace(/\s+/g, ' ') : ''
@@ -782,10 +802,10 @@ section('K. The home page’s first example is what the product does (live, with
 {
   const who = person('Megan Grant')
   const message = NOTICES.examples[0].message
-  const wrongPick = await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, aWallpaper, who, [{ fieldId: '_project_description', value: message }, { fieldId: 'wall_count', value: 3 }], { turnstileToken: GOOD_TOKEN }), timeoutMs: 300_000 })
+  const wrongPick = await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, aWallpaper, who, [{ fieldId: '_project_description', value: message }, { fieldId: 'wall_count', value: 3 }, { fieldId: 'needs_removal', value: false }], { turnstileToken: GOOD_TOKEN, assetIds: await roomPhoto(a) }), timeoutMs: 300_000 })
   // T-178: this used to be refused with "did you mean Interior Painting?" (SERVICE_MISMATCH). A request that
   // answers one of the chosen service's questions is never refused for what its note says: the customer chose it.
-  check('the service: sent to Wallpaper Installation with one of its questions answered, the home page’s message is accepted, not refused', wrongPick.status === 200 && !wrongPick.json?.error && typeof wrongPick.json?.quoteId === 'string', wrongPick.json?.error)
+  check('the service: sent to Wallpaper Installation with its questions answered and a photo, the home page’s message is accepted, not refused', wrongPick.status === 200 && !wrongPick.json?.error && typeof wrongPick.json?.quoteId === 'string', wrongPick.json?.error)
   const q = await submitted(await call('POST', '/api/public/quotes', { ip: newIp(), body: quoteBody(a, aInterior, who, [{ fieldId: '_project_description', value: message }, { fieldId: 'room_count', value: 1 }], { turnstileToken: GOOD_TOKEN, assetIds: await roomPhoto(a) }), timeoutMs: 300_000 }))
   const row = (await sb.select('quotes', `id=eq.${q.id}&select=status,pricing_json,clarification_questions_json`))[0] as { status: string; pricing_json: { breakdown: Array<Row> }; clarification_questions_json: Array<{ question: string; targetSignalKey?: string }> | null }
   const question = (row.clarification_questions_json ?? []).find((c) => c.targetSignalKey === 'room_count')
@@ -809,7 +829,7 @@ section('L. If Upstash is down or slow, requests still go through')
   const hungMs = Date.now() - t1
   upstashMode = 'ok'
   check('with the limiter returning errors, the request is served', down.status === 200, { status: down.status, ms: downMs })
-  check('with the limiter not answering at all, the request is served after a short wait (under 4 seconds), not left hanging', hung.status === 200 && hungMs < 4000, { status: hung.status, ms: hungMs })
+  check('with the limiter not answering at all, the request is served after about half a second (under 2.5 seconds here), not left hanging', hung.status === 200 && hungMs < 2500, { status: hung.status, ms: hungMs })
   const after = await call('GET', `/api/public/widget/config?tenantKey=${a.tenantKey}`, { ip: newIp() })
   check('when it is back, limits apply again', after.status === 200 && upstashCalls > 0)
 }

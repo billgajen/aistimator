@@ -10,10 +10,11 @@
  * Same counters, keys and decision as lib/rate-limit.ts (rate-limit-counters.ts);
  * the only difference is how Upstash is called: its REST pipeline through
  * fetch, with no SDK, because the middleware cannot load Node modules. It
- * fails open the same way (AD-055): not configured, slow (1.5 seconds) or
- * failing means the request goes ahead and the log says so.
+ * fails open the same way (AD-055, AD-060): not configured, slow (half a second) or
+ * failing means the request goes ahead and the log says so. `RATE_LIMITS_OFF=true`
+ * switches it off with every other limit.
  */
-import { RATE_LIMIT_TIMEOUT_MS, blockedMessage, type RateLimitScope } from './rate-limit-config'
+import { RATE_LIMIT_TIMEOUT_MS, blockedMessage, rateLimitsSwitchedOff, type RateLimitScope } from './rate-limit-config'
 import { buildCounters, evaluateCounters, type RateLimitResult } from './rate-limit-counters'
 
 const OPEN: RateLimitResult = { allowed: true, retryAfterSeconds: 0 }
@@ -22,11 +23,12 @@ export async function checkRateLimitEdge(
   scope: RateLimitScope,
   identifiers: { ip?: string; key?: string },
   // Read by name (the Edge runtime only promises `process.env.NAME`); a test passes its own
-  store: { url?: string; token?: string } = { url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN },
+  store: { url?: string; token?: string; off?: string } = { url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN, off: process.env.RATE_LIMITS_OFF },
   fetchImpl: typeof fetch = fetch
 ): Promise<RateLimitResult> {
   const { url, token } = store
-  if (!url || !token) return OPEN
+  // not configured, or switched off with the one switch (RATE_LIMITS_OFF)
+  if (!url || !token || rateLimitsSwitchedOff({ RATE_LIMITS_OFF: store.off })) return OPEN
   try {
     const counters = buildCounters(scope, identifiers, Math.floor(Date.now() / 1000))
     if (counters.length === 0) return OPEN

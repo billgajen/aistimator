@@ -8,9 +8,8 @@
  * steady attack on one business from using up its plan: the per-minute
  * figure alone would allow tens of thousands of requests a day.
  *
- * Change a number here and nowhere else. `RATE_LIMITS_OFF` in
- * lib/rate-limit.ts is not a setting: limits are off only when Upstash is not
- * configured.
+ * Change a number here and nowhere else. Limits are off when Upstash is not
+ * configured, or when the one switch `RATE_LIMITS_OFF=true` is set (below).
  */
 export interface LimitWindow {
   /** Length of the window in seconds */
@@ -85,8 +84,17 @@ export const RATE_LIMITS = {
 
 export type RateLimitScope = keyof typeof RATE_LIMITS
 
-/** How long a call to Upstash may take before the request goes ahead without it */
-export const RATE_LIMIT_TIMEOUT_MS = 1500
+/** How long a call to Upstash may take before the request goes ahead without it (T-178: was 1500) */
+export const RATE_LIMIT_TIMEOUT_MS = 500
+
+/**
+ * T-178: the one switch that turns every public rate limit off, without
+ * removing the Upstash settings: RATE_LIMITS_OFF=true. For the day the
+ * limiter itself is the problem. The numbers above are still not settings.
+ */
+export function rateLimitsSwitchedOff(env: Record<string, string | undefined> = process.env): boolean {
+  return ['1', 'true', 'yes', 'on'].includes((env.RATE_LIMITS_OFF ?? '').trim().toLowerCase())
+}
 
 /** What a blocked caller is told. Plain, and with no detail an attacker could use. */
 export function blockedMessage(retryAfterSeconds: number): string {

@@ -141,7 +141,8 @@ describe('T-173: the human check', () => {
     expect((await verifyTurnstileToken(undefined, '1.2.3.4')).ok).toBe(true)
     vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site')
     expect(isTurnstileEnabled()).toBe(true)
-    expect(await verifyTurnstileToken(undefined, '1.2.3.4')).toEqual({ ok: false, reason: 'missing-token' })
+    // T-178: with the check on, a request with no token still goes ahead (and the log says so)
+    expect(await verifyTurnstileToken(undefined, '1.2.3.4')).toEqual({ ok: true, unchecked: 'no-token' })
   })
 
   it('checks the token with Cloudflare, and only a test outside production can point it elsewhere', async () => {
