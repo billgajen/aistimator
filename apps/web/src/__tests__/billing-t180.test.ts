@@ -27,6 +27,7 @@ import { freeQuotesLeftEmail, paymentFailedEmail } from '@/lib/billing-emails'
 import { whatsappAccessFor } from '@/lib/whatsapp-access'
 import { STRIPE_WEBHOOK_EVENTS, isHandledStripeEvent } from '@/lib/stripe-events'
 import { PLUS_TAX } from '@/lib/marketing/plan-claims'
+import { pendingChangeLine, pendingPlanChange } from '@/lib/billing-pending'
 
 const ROOT = join(__dirname, '..', '..', '..', '..')
 const read = (file: string) => readFileSync(join(ROOT, file), 'utf8')
@@ -146,6 +147,12 @@ describe('T-180: prices are shown before tax, and say so', () => {
     }
     // the yearly price on the Pricing page says it too
     expect(read('apps/web/src/app/pricing/page.tsx')).toContain('a year {PLUS_TAX} (two months free)')
+  })
+
+  it('the Terms no longer speak of metered overage (no plan has it)', () => {
+    const terms = read('apps/web/src/app/terms/page.tsx')
+    expect(terms).not.toMatch(/metered overage \(where applicable\)|per-estimate rate/)
+    expect(terms).toContain("body: 'You can cancel at any time; access continues to the end of the paid period. Fees are non-refundable except where required by law.',")
   })
 
   it('the Terms say who takes the payment and that tax is added, and carry the new date', () => {
@@ -277,6 +284,46 @@ describe('T-180: what a Stripe subscription becomes in our row', () => {
     const kept = decideSync(unknown, row({ plan_id: 'plan_us_pro' }), now)
     expect(kept.write && kept.row.plan_id).toBe('plan_us_pro')
     expect(decideSync(unknown, null, now)).toEqual({ write: false, why: 'unknown_plan' })
+  })
+})
+
+describe('T-180: a downgrade that is waiting for the end of the paid period', () => {
+  const END = 1_802_592_000
+  const withSchedule = (phases: Array<{ start_date: number; price: string }> | null, status = 'active') =>
+    ({
+      ...stripeSubscription({ price: 'price_pro_m', end: END }),
+      schedule: phases ? { id: 'sub_sched_1', status, phases: phases.map((p) => ({ start_date: p.start_date, items: [{ price: p.price }] })) } : null,
+    }) as unknown as Stripe.Subscription
+
+  it('reads the next plan and the day it starts from Stripe’s schedule', () => {
+    const pending = pendingPlanChange(withSchedule([{ start_date: 1_800_000_000, price: 'price_pro_m' }, { start_date: END, price: 'price_starter_m' }]), PRICE_ENV)
+    expect(pending).toEqual({ planId: 'plan_us_starter', planName: 'Starter', interval: 'monthly', at: new Date(END * 1000).toISOString() })
+  })
+
+  it('nothing is waiting without a schedule, with one that only repeats the current price, or with one that is over', () => {
+    expect(pendingPlanChange(withSchedule(null), PRICE_ENV)).toBeNull()
+    expect(pendingPlanChange(withSchedule([{ start_date: 1_800_000_000, price: 'price_pro_m' }, { start_date: END, price: 'price_pro_m' }]), PRICE_ENV)).toBeNull()
+    expect(pendingPlanChange(withSchedule([{ start_date: END, price: 'price_starter_m' }], 'released'), PRICE_ENV)).toBeNull()
+    // a schedule that was not expanded (only its id) says nothing; so does a price that is not one of ours
+    expect(pendingPlanChange({ ...stripeSubscription(), schedule: 'sub_sched_1' } as unknown as Stripe.Subscription, PRICE_ENV)).toBeNull()
+    expect(pendingPlanChange(withSchedule([{ start_date: END, price: 'price_someone_elses' }]), PRICE_ENV)).toBeNull()
+  })
+
+  it('the line is the owner’s: "Changes to <plan> on <date>", with the interval only when the plan’s name would not show the change', () => {
+    const starter = { planId: 'plan_us_starter', planName: 'Starter', interval: 'monthly' as const, at: '2026-12-18T00:00:00.000Z' }
+    expect(pendingChangeLine(starter, 'Pro', 'December 18, 2026')).toBe('Changes to Starter on December 18, 2026.')
+    expect(pendingChangeLine({ ...starter, planName: 'Pro' }, 'Pro', 'December 18, 2027')).toBe('Changes to Pro, billed monthly, on December 18, 2027.')
+  })
+
+  it('it is read from Stripe when the billing page asks, and never stored or shown once the plan is set to end', () => {
+    const route = read('apps/web/src/app/api/billing/pending/route.ts')
+    expect(route).toContain("stripe.subscriptions.retrieve(row.stripe_subscription_id, { expand: ['schedule'] })")
+    expect(route).not.toMatch(/\.(update|upsert|insert)\(/)
+    const page = read('apps/web/src/app/(dashboard)/app/settings/billing/page.tsx')
+    expect(page).toContain('{pending && currentPlan && !subscription?.cancelAt && (')
+    expect(page).toContain('data-testid="pending-change"')
+    // the billing page's main data still never calls Stripe
+    expect(read('apps/web/src/app/api/billing/route.ts')).not.toMatch(/getStripeClient|stripe\./)
   })
 })
 

@@ -141,6 +141,10 @@ routes, one webhook and one admin route. Plan numbers come from `packages/shared
   yearly to monthly takes effect at the end of the paid period), cancel at the end of the paid period,
   change the card, past invoices. **400** `NO_CUSTOMER` when the business has never bought (and for a test
   account).
+- `GET /api/billing/pending` → `{ pending: null | { planId, planName, interval, at } }`. A plan change that is
+  waiting for the end of the paid period (a downgrade asked for in the portal). The billing page shows it as
+  "Changes to <plan> on <date>." It is read from Stripe when asked and never stored; any trouble reading it
+  is `pending: null`. It is null once the plan is set to end, and for a business with no paid plan.
 - `GET /api/billing/notice` → `{ notice: null | { kind, line, action, actionLabel, email? } }`. The line the
   dashboard shows on every page: `payment_failed` ("Your payment didn't go through. Update your card to keep
   your quotes running.", `action: "portal"`) or `suspended` (`action: "email"`). Suspended wins.

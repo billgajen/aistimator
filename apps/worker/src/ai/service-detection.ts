@@ -13,8 +13,13 @@
  *
  * Checks made in code, on every answer:
  * - AD-008: the phrase must be a literal part of what the customer wrote
- * - AD-010: the matched service's name must share a key word with the phrase
- * - AD-014: the place the phrase is about must not conflict with the service
+ * - AD-010 (as revised by AD-064): the model's choice of service stands unless
+ *   the business's own configuration points at a DIFFERENT one of its services
+ *   (`betterNamedService`). It is no longer dropped for lacking a word that is
+ *   in the service's name: a customer says "skirting", not the service's name.
+ * - AD-014: the place the phrase is about must not conflict with the service's
+ *   name, unless the service's own configuration speaks of that very thing
+ *   (AD-064: the business's configuration overrules the list in this file)
  * - T-179: a phrase the customer declines ("I don't need…") or only asks
  *   about ("is … included?") is not a request; neither is work the chosen
  *   service already covers (its scope, options and add-ons)
@@ -74,16 +79,19 @@ const LOCATION_CONTEXTS: Record<string, string[]> = {
  */
 function detectLocationContextConflict(
   matchedPhrase: string,
-  serviceName: string
+  service: ServiceForMatching
 ): { hasConflict: boolean; phraseContext?: string; serviceContext?: string } {
   const phraseLower = matchedPhrase.toLowerCase()
-  const serviceNameLower = serviceName.toLowerCase()
+  const serviceNameLower = service.name.toLowerCase()
 
-  // Find which context(s) the phrase matches
+  // Find which context(s) the phrase matches, and the words that put it there
   const phraseContexts: string[] = []
+  const phraseWords: string[] = []
   for (const [context, keywords] of Object.entries(LOCATION_CONTEXTS)) {
-    if (keywords.some(kw => phraseLower.includes(kw))) {
+    const found = keywords.filter(kw => phraseLower.includes(kw))
+    if (found.length > 0) {
       phraseContexts.push(context)
+      phraseWords.push(...found)
     }
   }
 
@@ -100,6 +108,11 @@ function detectLocationContextConflict(
   if (phraseContexts.length > 0 && serviceContexts.length > 0) {
     const overlaps = phraseContexts.some(pc => serviceContexts.includes(pc))
     if (!overlaps) {
+      // AD-064: the business's own configuration overrules this list. If the service itself speaks
+      // of the very thing the customer named (in its description, what it includes, or an option or
+      // add-on), the customer is asking for that service's work, whatever the service is called.
+      const own = [service.description ?? '', ...(service.scopeIncludes ?? []), ...(service.addons ?? []), ...(service.detection_keywords ?? [])].join(' ').toLowerCase()
+      if (phraseWords.some(word => own.includes(word))) return { hasConflict: false }
       return {
         hasConflict: true,
         phraseContext: phraseContexts[0],
@@ -122,6 +135,11 @@ export interface ServiceForMatching {
   /** T-179: what the service covers and does not, as the business configured it */
   scopeIncludes?: string[] | null
   scopeExcludes?: string[] | null
+  /**
+   * T-180 follow-up: the labels of its options and add-ons. They are part of what the service does
+   * (work a customer may ask for by that name), so the model is given them like the chosen service's.
+   */
+  addons?: string[] | null
 }
 
 /** T-179: the service the customer chose, as the business configured it */
@@ -161,8 +179,12 @@ export const DETECTION_MIN_CONFIDENCE = 0.9
 /** At most this many "not offered" requests are kept from one note */
 export const MAX_NOT_OFFERED = 2
 
+// Words of the language that carry no meaning of their own in a request. There
+// is NO trade or type-of-work word here (AD-064): until T-180 this list also
+// held "cleaning", "repair", "installation", "removal", "painting", "fixing"
+// and "service", so the one word a request shared with the right service was
+// thrown away before the two were compared.
 const COMMON_WORDS = new Set([
-  'cleaning', 'repair', 'installation', 'removal', 'painting', 'fixing', 'service',
   'also', 'need', 'want', 'some', 'the', 'a', 'an', 'my', 'our', 'your',
   'might', 'could', 'would', 'should', 'please', 'can', 'you', 'me', 'as', 'well', 'too',
   'i', 'we', 'they', 'it', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
@@ -180,7 +202,54 @@ export function keyWords(phrase: string): string[] {
     .filter((w) => w.length > 3 && !COMMON_WORDS.has(w))
 }
 
-const stem = (word: string) => word.toLowerCase().replace(/(ing|ed|es|s)$/, '')
+/** A word cut back far enough that its plain forms meet: "ceilings" and "ceiling", "painted" and "painting", "services" and "service" */
+export function stem(word: string): string {
+  let w = word.toLowerCase()
+  if (w.endsWith('ies') && w.length > 4) w = `${w.slice(0, -3)}y`
+  else if (w.endsWith('s') && !w.endsWith('ss') && w.length > 3) w = w.slice(0, -1)
+  if (w.length > 5 && w.endsWith('ing')) w = w.slice(0, -3)
+  else if (w.length > 4 && w.endsWith('ed')) w = w.slice(0, -2)
+  if (w.length > 3 && w.endsWith('e')) w = w.slice(0, -1)
+  return w
+}
+
+const wordsOf = (text: string) => text.toLowerCase().split(/[^a-z0-9'-]+/).filter((w) => w.length > 2)
+
+/** The words a service's own configuration uses for what it does: its name, description, what it includes, its options and add-ons, its other names. Never its "does NOT include" list. */
+function vocabularyOf(service: ServiceForMatching): Set<string> {
+  return new Set(wordsOf([service.name, service.description ?? '', ...(service.scopeIncludes ?? []), ...(service.addons ?? []), ...(service.detection_keywords ?? [])].join(' ')).map(stem))
+}
+
+/**
+ * AD-064 (revises AD-010): does the business's own configuration say the model
+ * picked the WRONG one of its services? Returns the service the request's
+ * words point at instead, or null when the model's choice stands.
+ *
+ * The request points at another service when both are true:
+ *   - that service's NAME has a word of the request which the chosen
+ *     service's configuration (name, description, includes) does not use;
+ *   - every word of the request that the chosen service does use is in that
+ *     other service's name too (so the chosen one explains nothing more).
+ * So a request that names one service and was matched to its neighbour is
+ * caught, with no list of trades: the words are the business's own. A request
+ * in the customer's own words for the same thing (a word that is in no
+ * service's name at all) is left to the model, which is given every
+ * service's description and scope and is what can tell a synonym.
+ * Pure.
+ */
+export function betterNamedService(phrase: string, chosen: ServiceForMatching, offered: ServiceForMatching[]): ServiceForMatching | null {
+  const asked = [...new Set(keyWords(phrase).map(stem))]
+  if (asked.length === 0) return null
+  const uses = vocabularyOf(chosen)
+  const supported = asked.filter((w) => uses.has(w))
+  for (const other of offered) {
+    if (other.id === chosen.id) continue
+    const otherName = new Set(wordsOf(other.name).map(stem))
+    const pointsThere = asked.some((w) => otherName.has(w) && !uses.has(w))
+    if (pointsThere && supported.every((w) => otherName.has(w))) return other
+  }
+  return null
+}
 
 /** The sentence of `text` that contains `phrase` (with the mark that ends it) */
 export function sentenceAround(text: string, phrase: string): string {
@@ -222,14 +291,7 @@ export function declinedOrOnlyAsked(text: string, phrase: string): boolean {
 export function coveredByMainService(phrase: string, main: MainServiceContext): boolean {
   const words = keyWords(phrase)
   if (words.length === 0) return false
-  const covered = new Set(
-    [main.name, main.description ?? '', ...(main.scopeIncludes ?? []), ...(main.addons ?? [])]
-      .join(' ')
-      .toLowerCase()
-      .split(/[^a-z0-9'-]+/)
-      .filter((w) => w.length > 2)
-      .map(stem)
-  )
+  const covered = new Set(wordsOf([main.name, main.description ?? '', ...(main.scopeIncludes ?? []), ...(main.addons ?? [])].join(' ')).map(stem))
   return words.every((w) => covered.has(stem(w)))
 }
 
@@ -337,9 +399,13 @@ export function validateDetection(raw: unknown, main: MainServiceContext, descri
     const service = typeof r.serviceId === 'string' ? byId.get(r.serviceId) : undefined
     if (!service) {
       if (r.serviceId === null || r.serviceId === undefined || r.serviceId === '' || r.serviceId === 'null') {
-        // Not one of the business's services. If its words name one of them after all, it is not "not offered".
-        const words = keyWords(phrase)
-        const namesAService = availableServices.some((s) => words.some((w) => s.name.toLowerCase().includes(stem(w))))
+        // Not one of the business's services. If its words name one of them after all (every word of that
+        // service's name is in the phrase), it is not "not offered": it is dropped rather than guessed at.
+        const said = new Set(wordsOf(phrase).map(stem))
+        const namesAService = availableServices.some((s) => {
+          const name = wordsOf(s.name).map(stem)
+          return name.length > 0 && name.every((w) => said.has(w))
+        })
         if (!namesAService && notOffered.length < MAX_NOT_OFFERED && !notOffered.some((n) => n.words.toLowerCase() === phrase.toLowerCase())) {
           notOffered.push({ words: phrase.slice(0, 160) })
         }
@@ -350,23 +416,16 @@ export function validateDetection(raw: unknown, main: MainServiceContext, descri
     }
     if (services.some((s) => s.serviceId === service.id)) continue
 
-    // AD-010: the service's name must share a key word with what was asked for
-    const serviceNameLower = service.name.toLowerCase()
-    const phraseWords = keyWords(phrase)
-    if (phraseWords.length > 0) {
-      const matches = phraseWords.some((word) => {
-        if (serviceNameLower.includes(word)) return true
-        const singular = word.replace(/s$/, '')
-        return serviceNameLower.includes(singular) || serviceNameLower.includes(`${word}s`)
-      })
-      if (!matches) {
-        console.log(`[ServiceDetection] REJECTING mismatched service: "${service.name}" doesn't match the request's ${phraseWords.length} key words`)
-        continue
-      }
+    // AD-064 (revises AD-010): the model's choice stands unless the business's own configuration
+    // points at a different one of its services
+    const better = betterNamedService(phrase, service, availableServices)
+    if (better) {
+      console.log(`[ServiceDetection] REJECTING mismatched service: the request's words name ${better.id} ("${better.name}"), not ${service.id} ("${service.name}")`)
+      continue
     }
 
     // AD-014: the place the phrase is about must not conflict with the service
-    const contextConflict = detectLocationContextConflict(phrase, service.name)
+    const contextConflict = detectLocationContextConflict(phrase, service)
     if (contextConflict.hasConflict) {
       console.log(`[ServiceDetection] REJECTING context conflict (AD-014): phrase context vs service context "${contextConflict.serviceContext}" for ${service.id} ("${service.name}")`)
       continue

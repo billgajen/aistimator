@@ -51,7 +51,7 @@ import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
 import type { QualityGateResult, ClarificationQuestion } from '@qolumns/shared'
 import { AiUsageMeter, CHECKER_SETTINGS_VERSION, serviceSuggestionOf, suggestedServiceReason, alsoAskedOf, MAX_ADDED_SECTIONS, sectionPriceWaits } from '@qolumns/shared'
 import type { AlsoAsked } from '@qolumns/shared'
-import { priceSection, withoutMentionsOf } from './section-pricing'
+import { priceSection, withoutMentionsOf, namedWithoutACard } from './section-pricing'
 import { declinedOrOnlyAsked, coveredByMainService, sentenceAround } from './ai/service-detection'
 import type { MainServiceContext } from './ai/service-detection'
 import type { WordingContext } from './ai/wording'
@@ -214,6 +214,8 @@ interface QuoteData {
     detection_keywords?: string[]
     scope_includes?: string[] | null
     scope_excludes?: string[] | null
+    /** T-180 follow-up: the labels of its options and add-ons (from its pricing rules) */
+    addons?: string[] | null
   }>
   businessOwnerEmail?: string
   pricingRules?: PricingRules
@@ -1924,8 +1926,8 @@ export async function processQuote(
   if (alsoAsked.length > 0) content.alsoAsked = alsoAsked
   // … and the main service's wording never says a service the customer can add here is "not included"
   if (!reprice) {
-    const offeredNames = alsoAsked.filter((a) => a.state === 'offered' && a.serviceName).map((a) => a.serviceName as string)
-    if (offeredNames.length > 0) content = withoutMentionsOf(content, offeredNames)
+    const offered = alsoAsked.filter((a) => a.state === 'offered' && a.serviceName)
+    if (offered.length > 0) content = withoutMentionsOf(content, offered.map((a) => a.serviceName as string), offered.map((a) => a.words))
   }
 
   // 4.6 Evaluate confidence-based fallbacks
@@ -2098,6 +2100,18 @@ export async function processQuote(
   crossServicePricing.length = 0
   crossServicePricing.push(...(repairedCross ?? []))
   const wordingUnresolved = wordingRepair.unresolved
+
+  // T-180 follow-up: the wording names another offered service, yet the quote has no card for it.
+  // The wording model read the note as asking for that service and detection returned nothing.
+  // Logged and kept on the trace (business-only); the quote itself is not changed. No customer
+  // words are logged, only the ids.
+  if (!options.section) {
+    const missed = namedWithoutACard(content, quoteData.otherServices ?? [], content.alsoAsked ?? [])
+    if (missed.length > 0) {
+      pricingTrace.detectionMiss = { serviceIds: missed.map((s) => s.id) }
+      console.warn(`[Processor] DETECTION MISS on ${quoteId}: the wording names ${missed.map((s) => s.id).join(', ')} but the quote has no card for it`)
+    }
+  }
   if (wordingRepair.record.found > 0) {
     // Business-only: the dashboard trace page shows it; the public API never reads the trace
     pricingTrace.wordingRepair = wordingRepair.record
@@ -2847,12 +2861,27 @@ async function loadQuoteData(
   }
 
   // Load other services for cross-service detection (include description for AI matching)
-  const { data: otherServices } = await supabase
+  const { data: otherServiceRows } = await supabase
     .from('services')
     .select('id, name, description, detection_keywords, scope_includes, scope_excludes')
     .eq('tenant_id', quote.tenant_id)
     .eq('active', true)
     .neq('id', serviceId)
+  // T-180 follow-up: … and the labels of their options and add-ons. They are part of what each
+  // service does, and the model that reads the customer's note is given them (a customer may ask
+  // for an add-on's work in words that are in neither the service's name nor its description).
+  const addonLabels = new Map<string, string[]>()
+  if (otherServiceRows && otherServiceRows.length > 0) {
+    const { data: otherRules } = await supabase
+      .from('service_pricing_rules')
+      .select('service_id, rules_json')
+      .in('service_id', otherServiceRows.map((s) => s.id))
+    for (const row of (otherRules ?? []) as Array<{ service_id: string; rules_json: PricingRules | null }>) {
+      const labels = (row.rules_json?.addons ?? []).map((a) => a.label).filter((label): label is string => typeof label === 'string' && label.trim().length > 0)
+      if (labels.length > 0) addonLabels.set(row.service_id, labels)
+    }
+  }
+  const otherServices = (otherServiceRows ?? []).map((s) => ({ ...s, ...(addonLabels.has(s.id) && { addons: addonLabels.get(s.id) }) }))
 
   return {
     quote: {
@@ -3460,7 +3489,7 @@ async function detectCrossServiceMentionsWithAI(
   gemini: AiClient | null,
   projectDescription: string,
   main: MainServiceContext,
-  otherServices: Array<{ id: string; name: string; description?: string; detection_keywords?: string[]; scope_includes?: string[] | null; scope_excludes?: string[] | null }>
+  otherServices: Array<{ id: string; name: string; description?: string; detection_keywords?: string[]; scope_includes?: string[] | null; scope_excludes?: string[] | null; addons?: string[] | null }>
 ): Promise<AlsoAskedDetection> {
   console.log(`[CrossService] Description length: ${projectDescription?.length || 0}`)
   console.log(`[CrossService] Available services: ${otherServices.map((s) => s.name).join(', ') || 'none'}`)
@@ -3490,6 +3519,7 @@ async function detectCrossServiceMentionsWithAI(
         detection_keywords: s.detection_keywords,
         scopeIncludes: s.scope_includes,
         scopeExcludes: s.scope_excludes,
+        addons: s.addons,
       }))
 
       const aiDetected = await detectServicesFromDescription(gemini, main, projectDescription, servicesForMatching)

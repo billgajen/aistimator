@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { formatMoney, getPlan } from '@qolumns/shared'
 import { COMING_LATER, PLUS_TAX, planLines } from '@/lib/marketing/plan-claims'
 import type { BillingResponse, PlanInfo } from '@qolumns/shared'
+import { pendingChangeLine, type PendingPlanChange } from '@/lib/billing-pending'
 
 export default function BillingPage() {
   return (
@@ -32,6 +33,8 @@ function BillingPageContent() {
   // T-134: monthly or annual (two months free)
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  // T-180: a downgrade asked for in the portal, waiting for the end of the paid period
+  const [pending, setPending] = useState<PendingPlanChange | null>(null)
 
   // Auto-hide toast
   useEffect(() => {
@@ -72,6 +75,13 @@ function BillingPageContent() {
         }
         const result: BillingResponse = await response.json()
         setData(result)
+        // Is a plan change waiting? Asked only for a business with a paid plan; never holds the page up.
+        if (result.subscription.plan && result.canManage && !result.subscription.testAccount) {
+          fetch('/api/billing/pending')
+            .then((res) => (res.ok ? res.json() : null))
+            .then((json: { pending?: PendingPlanChange | null } | null) => setPending(json?.pending ?? null))
+            .catch(() => undefined)
+        }
         if (success) {
           setToast(
             result.subscription.plan
@@ -268,6 +278,11 @@ function BillingPageContent() {
         {subscription?.cancelAt && currentPlan && !subscription.paymentFailed && (
           <p className="mt-4 rounded-xl bg-mist p-3 text-sm text-text-secondary" data-testid="cancel-note">
             Your {currentPlan.name} plan ends on {longDate(subscription.cancelAt)}. It works as normal until then. To keep it, open &ldquo;Manage billing&rdquo;.
+          </p>
+        )}
+        {pending && currentPlan && !subscription?.cancelAt && (
+          <p className="mt-4 rounded-xl bg-mist p-3 text-sm text-text-secondary" data-testid="pending-change">
+            {pendingChangeLine(pending, currentPlan.name, longDate(pending.at))} Until then your {currentPlan.name} plan works as normal.
           </p>
         )}
         {!currentPlan && subscription?.endedPlanName && (

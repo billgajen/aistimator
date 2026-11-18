@@ -853,6 +853,11 @@ export interface PricingTrace {
   aiUsage?: AiUsageSummary
   /** T-148: banned customer words found in the generated wording and how they were repaired (business-only) */
   wordingRepair?: WordingRepairRecord
+  /**
+   * T-180 follow-up: the wording named these other offered services, but the quote carries no card
+   * for them (the detection step missed what the wording model read). Business-only; ids, no words.
+   */
+  detectionMiss?: { serviceIds: string[] }
 }
 
 export interface Quote {

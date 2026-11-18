@@ -7,13 +7,15 @@
  * Fixture names are generic on purpose.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { buildDetectionPrompt, validateDetection, declinedOrOnlyAsked, coveredByMainService, sentenceAround, keyWords, detectServicesFromDescription, DETECTION_MIN_CONFIDENCE } from '../ai/service-detection'
+import { buildDetectionPrompt, validateDetection, declinedOrOnlyAsked, coveredByMainService, sentenceAround, keyWords, stem, betterNamedService, detectServicesFromDescription, DETECTION_MIN_CONFIDENCE } from '../ai/service-detection'
 import type { MainServiceContext, ServiceForMatching } from '../ai/service-detection'
 import { buildPrefillPrompt, readPrefill, prefillSectionAnswers } from '../ai/cross-service'
-import { fieldsForService, cleanAnswers, questionsFor, quantityKeysOf, labelledAnswers, withoutMentionsOf } from '../section-pricing'
+import { fieldsForService, cleanAnswers, questionsFor, quantityKeysOf, labelledAnswers, withoutMentionsOf, namedWithoutACard } from '../section-pricing'
 import type { SectionRun } from '../quote-processor'
 import type { SectionQuestion, WidgetField } from '@qolumns/shared'
 import type { AiClient } from '../ai/client'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -83,10 +85,19 @@ describe('every answer of the model is checked in code', () => {
     expect(check([request({ matchedPhrase: 'beta' })]).services).toEqual([])
   })
 
-  it('AD-010: the matched service’s name must share a key word with what was asked for', () => {
+  it('AD-010 as revised (AD-064): a request that names one service and was matched to its neighbour is dropped', () => {
     const text = 'An alpha visit please. I also need the gamma units fitted.'
     expect(check([request({ matchedPhrase: 'I also need the gamma units fitted' })], text).services).toEqual([])
     expect(check([request({ serviceId: 'svc_gamma', matchedPhrase: 'I also need the gamma units fitted' })], text).services.map((s) => s.serviceId)).toEqual(['svc_gamma'])
+  })
+
+  it('AD-064: a request in the customer’s own words, with no word of the service’s name in it, is kept on the model’s match', () => {
+    // "the beta job" is in Service Beta's description; "that other thing" is in nothing at all.
+    // Before T-180 both were dropped: the old check wanted a word of the request in the service's NAME.
+    for (const phrase of ['I also need that other thing done', 'I also need the job done']) {
+      const text = `An alpha visit please. ${phrase} while you are here.`
+      expect(check([request({ matchedPhrase: phrase })], text).services.map((s) => s.serviceId), phrase).toEqual(['svc_beta'])
+    }
   })
 
   it('"I don’t need X" is not a request, whatever the model says', () => {
@@ -141,6 +152,146 @@ describe('every answer of the model is checked in code', () => {
     expect(keyWords('I also need the gamma units fitted')).toEqual(['gamma', 'units', 'fitted'])
     expect(declinedOrOnlyAsked('I need service beta. I do not need service gamma.', 'service beta')).toBe(false)
     expect(declinedOrOnlyAsked('I need service beta. I do not need service gamma.', 'service gamma')).toBe(true)
+  })
+})
+
+describe('T-180 follow-up: the miss found on production (the filter that failed, with the model stood in for)', () => {
+  // The business's three services as configured, and the answer the real model gave to the customer's
+  // note in three runs out of three. The model was right. The check in code threw it away.
+  const WALLPAPER: MainServiceContext = {
+    name: 'Wallpaper Installation',
+    description: 'Wallpaper hung per wall, with optional removal of existing paper.',
+    scopeIncludes: ['Wall prep: patching, light sanding and primer where needed', 'Professional hanging with pattern matching', 'Trimming and finishing around outlets and fixtures'],
+    scopeExcludes: ['Drywall repair beyond minor patching', 'Wallpaper cost unless we supply it'],
+    addons: ['Wall liner'],
+  }
+  const INTERIOR: ServiceForMatching = { id: 'svc_interior', name: 'Interior Painting', description: 'Interior repaint — walls and ceilings painted per room, with prep work priced from your photos.', scopeIncludes: ['Two coats of interior latex paint on walls and ceilings', 'All standard paint and materials'], scopeExcludes: ['Moving heavy furniture'] }
+  const EXTERIOR: ServiceForMatching = { id: 'svc_exterior', name: 'Exterior Painting', description: 'Exterior siding, stucco and masonry painted per square foot — wall area measured from your photos.', scopeIncludes: ['Two coats of exterior acrylic paint', 'Power washing and surface prep'], scopeExcludes: ['Siding or rotten wood replacement'] }
+  const BOTH = [EXTERIOR, INTERIOR]
+  const NOTE = 'I also want painting for skirting and ceilings.  Brilliant White paint.'
+  const answer = (over: Record<string, unknown> = {}) => ({ serviceId: 'svc_interior', serviceName: 'Interior Painting', confidence: 0.95, matchedPhrase: 'painting for skirting and ceilings', reason: 'The customer explicitly asks to paint the skirting and ceilings.', ...over })
+  const validate = (requests: unknown[], note = NOTE) => {
+    quiet()
+    return validateDetection({ requests }, WALLPAPER, note, BOTH)
+  }
+
+  it('the request is kept: "painting for skirting and ceilings" is a card for the service the model named', () => {
+    const result = validate([answer()])
+    expect(result.services.map((s) => [s.serviceId, s.serviceName, s.matchedPhrase])).toEqual([['svc_interior', 'Interior Painting', 'painting for skirting and ceilings']])
+    expect(result.notOffered).toEqual([])
+  })
+
+  it('why it was dropped: the type-of-work word was thrown away as "common", and the rest is in no service’s name', () => {
+    // the word the request shares with the right service is a key word now
+    expect(keyWords('painting for skirting and ceilings')).toEqual(['painting', 'skirting', 'ceilings'])
+    // no word list of trades in the code: the filler list is language only
+    const source = readFileSync(join(__dirname, '..', 'ai', 'service-detection.ts'), 'utf8')
+    const fillers = source.slice(source.indexOf('const COMMON_WORDS = new Set(['), source.indexOf('])', source.indexOf('const COMMON_WORDS = new Set([')))
+    for (const trade of ['cleaning', 'repair', 'installation', 'removal', 'painting', 'fixing', 'service']) expect(fillers, trade).not.toContain(`'${trade}'`)
+    // and nothing asks for a word of the request to be in the service's name any more
+    expect(betterNamedService('painting for skirting and ceilings', INTERIOR, BOTH)).toBeNull()
+  })
+
+  it('the same request in other words is kept too: no word of the note needs to be in the service’s name', () => {
+    for (const [note, phrase] of [
+      ['I also want painting for skirtings and ceilings. I want Brilliant White Paint.', 'painting for skirtings and ceilings'],
+      ['Could you also do the skirting boards in white while you are here?', 'Could you also do the skirting boards in white'],
+      ['We would like the ceilings done too.', 'We would like the ceilings done too'],
+      ['Also need the woodwork glossed.', 'Also need the woodwork glossed'],
+    ] as const) {
+      expect(validate([answer({ matchedPhrase: phrase })], note).services.map((s) => s.serviceId), note).toEqual(['svc_interior'])
+    }
+  })
+
+  it('the business’s own configuration still overrules a wrong choice between its services', () => {
+    // the customer names the outside; the model said the inside service: dropped, not guessed at
+    const outside = 'I also want the exterior painting done.'
+    expect(validate([answer({ matchedPhrase: 'I also want the exterior painting done' })], outside).services).toEqual([])
+    expect(betterNamedService('I also want the exterior painting done', INTERIOR, BOTH)?.id).toBe('svc_exterior')
+    // … and the right one is kept
+    expect(validate([answer({ serviceId: 'svc_exterior', matchedPhrase: 'I also want the exterior painting done' })], outside).services.map((s) => s.serviceId)).toEqual(['svc_exterior'])
+    // a phrase that mentions the other service in passing, but is about the chosen one's own work, stands
+    expect(betterNamedService('I also want the inside walls painted, the exterior is fine', INTERIOR, BOTH)).toBeNull()
+  })
+
+  it('AD-014 gives way to the business’s configuration: work a service lists as its own is not "the wrong place"', () => {
+    // the list in code reads "gutters" as the roof and the service's name as the outside of the house
+    const asked = 'Also the gutters and fascia need painting.'
+    const picked = answer({ serviceId: 'svc_exterior', serviceName: 'Exterior Painting', matchedPhrase: 'the gutters and fascia need painting' })
+    quiet()
+    // with nothing in the service's configuration about gutters, the old answer stands: dropped
+    expect(validateDetection({ requests: [picked] }, WALLPAPER, asked, BOTH).services).toEqual([])
+    // the business configured it as an option of that service: kept
+    const withOption = [{ ...EXTERIOR, addons: ['Gutters, fascia & soffits', 'Front door repaint'] }, INTERIOR]
+    expect(validateDetection({ requests: [picked] }, WALLPAPER, asked, withOption).services.map((s) => s.serviceId)).toEqual(['svc_exterior'])
+    // and the case the check was made for is still caught: a leak in the bathroom is not the roof service's
+    const roof: ServiceForMatching = { id: 'svc_roof', name: 'Roof Leak Repair', description: 'Leaks in tiled and flat roofs found and repaired.', scopeIncludes: ['Replacing slipped tiles'] }
+    const leak = 'There is also a leak around the shower seal.'
+    expect(validateDetection({ requests: [{ serviceId: 'svc_roof', confidence: 0.95, matchedPhrase: 'a leak around the shower seal' }] }, WALLPAPER, leak, [roof]).services).toEqual([])
+  })
+
+  it('the other services’ options and add-ons are in the prompt, like the chosen service’s', () => {
+    const prompt = buildDetectionPrompt(WALLPAPER, NOTE, [{ ...INTERIOR, addons: ['Trim, doors & baseboards', 'Accent wall'] }, EXTERIOR])
+    expect(prompt).toContain('- id: svc_interior\n  name: Interior Painting')
+    expect(prompt).toMatch(/name: Interior Painting\n {2}about: [^\n]+\n {2}includes: [^\n]+\n {2}options and add-ons: Trim, doors & baseboards; Accent wall\n/)
+    // the processor loads them from the business's pricing rules
+    const processor = readFileSync(join(__dirname, '..', 'quote-processor.ts'), 'utf8')
+    expect(processor).toMatch(/\.from\('service_pricing_rules'\)\s*\n\s*\.select\('service_id, rules_json'\)\s*\n\s*\.in\('service_id', otherServiceRows\.map/)
+  })
+
+  it('every other check still applies to it: declined, only asked about, not in the note, not confident', () => {
+    expect(validate([answer()], 'I do not want painting for skirting and ceilings.').services).toEqual([])
+    expect(validate([answer()], 'Is painting for skirting and ceilings included?').services).toEqual([])
+    expect(validate([answer({ matchedPhrase: 'paint the skirting and the ceilings' })]).services).toEqual([])
+    expect(validate([answer({ confidence: 0.6 })]).services).toEqual([])
+  })
+
+  it('a request for something none of the services covers is still "not offered", unless it names a service in full', () => {
+    const boat = validate([answer({ serviceId: null, serviceName: null, matchedPhrase: 'can you also paint my boat' })], 'Wallpaper for the hall, and can you also paint my boat?')
+    expect(boat).toEqual({ services: [], notOffered: [{ words: 'can you also paint my boat' }] })
+    const named = validate([answer({ serviceId: null, serviceName: null, matchedPhrase: 'I also want exterior painting' })], 'I also want exterior painting.')
+    expect(named).toEqual({ services: [], notOffered: [] })
+  })
+
+  it('plain word forms meet', () => {
+    expect([stem('ceilings'), stem('ceiling')]).toEqual(['ceil', 'ceil'])
+    expect([stem('painting'), stem('painted'), stem('paint')]).toEqual(['paint', 'paint', 'paint'])
+    expect([stem('services'), stem('service')]).toEqual(['servic', 'servic'])
+    expect([stem('boxes'), stem('box')]).toEqual(['box', 'box'])
+  })
+
+  it('with a card on the quote, the wording’s restatement of that work goes: by the service’s name, or in the customer’s words', () => {
+    // what production's wording said, on the quote that got no card
+    const content = {
+      exclusions: ['Drywall repair beyond minor patching', 'Wallpaper material cost unless supplied directly by us', 'Painting of baseboards, trim, or ceilings'],
+      notes: 'We noticed your note about painting the baseboards and ceilings in Brilliant White; additional services like interior painting can be quoted separately upon request. Once we finalize your wallpaper pattern choice, we will get everything locked in!',
+    }
+    expect(withoutMentionsOf(content, ['Interior Painting'], ['painting for skirting and ceilings'])).toEqual({
+      exclusions: ['Drywall repair beyond minor patching', 'Wallpaper material cost unless supplied directly by us'],
+      notes: 'Once we finalize your wallpaper pattern choice, we will get everything locked in!',
+    })
+    // one shared word is not enough to remove a line of the business's own
+    expect(withoutMentionsOf({ exclusions: ['Painting the garage floor'] }, [], ['painting for skirting and ceilings']).exclusions).toEqual(['Painting the garage floor'])
+  })
+
+  it('a detection miss is seen: the wording names another offered service and the quote has no card for it', () => {
+    const services = [{ id: 'svc_interior', name: 'Interior Painting' }, { id: 'svc_exterior', name: 'Exterior Painting' }]
+    const wording = { notes: 'Additional services like interior painting can be quoted separately upon request.', exclusions: ['Painting of baseboards, trim, or ceilings'] }
+    expect(namedWithoutACard(wording, services, [])).toEqual([{ id: 'svc_interior', name: 'Interior Painting' }])
+    // with its card on the quote there is nothing to report
+    expect(namedWithoutACard(wording, services, [{ serviceId: 'svc_interior' }])).toEqual([])
+    // a "not offered" notice is not a card for that service
+    expect(namedWithoutACard(wording, services, [{ serviceId: null }])).toEqual([{ id: 'svc_interior', name: 'Interior Painting' }])
+    // the whole name only, and wording that names no service says nothing
+    expect(namedWithoutACard({ notes: 'Our interior paintings are lovely.' }, services, [])).toEqual([])
+    expect(namedWithoutACard({ notes: 'We will confirm the pattern with you.' }, services, [])).toEqual([])
+    expect(namedWithoutACard({}, services, [])).toEqual([])
+  })
+
+  it('the processor logs it with ids only and keeps it on the trace', () => {
+    const processor = readFileSync(join(__dirname, '..', 'quote-processor.ts'), 'utf8')
+    expect(processor).toContain('pricingTrace.detectionMiss = { serviceIds: missed.map((s) => s.id) }')
+    expect(processor).toMatch(/console\.warn\(`\[Processor\] DETECTION MISS on \$\{quoteId\}: the wording names \$\{missed\.map\(\(s\) => s\.id\)\.join\(', '\)\}/)
   })
 })
 

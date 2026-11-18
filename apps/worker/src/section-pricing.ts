@@ -29,6 +29,7 @@ import type { QuoteSection, ReviewMode, SectionAnswer, SectionQuestion, WidgetFi
 import { processQuote, SECTION_QUANTITY_KEY } from './quote-processor'
 import type { SectionRun } from './quote-processor'
 import { snapToOption } from './answer-options'
+import { keyWords, stem } from './ai/service-detection'
 import type { Env } from './index'
 
 type AnswerValue = string | number | boolean | string[]
@@ -287,10 +288,18 @@ export async function priceSection(supabase: SupabaseClient, env: Env, input: Pr
  * Only whole items and whole sentences are removed; nothing is rewritten.
  * Pure. The names are the business's own service names.
  */
-export function withoutMentionsOf<T extends { exclusions?: string[]; notes?: string }>(content: T, serviceNames: readonly string[]): T {
+export function withoutMentionsOf<T extends { exclusions?: string[]; notes?: string }>(content: T, serviceNames: readonly string[], askedWords: readonly string[] = []): T {
   const names = serviceNames.map((n) => n.trim().toLowerCase()).filter((n) => n.length >= 3)
-  if (names.length === 0) return content
-  const mentions = (text: string) => names.some((n) => text.toLowerCase().includes(n))
+  // T-180 follow-up: the customer's own words for the work that got a card. A line that restates that
+  // work without naming the service ("<the work> of <the places>" under Not included) is the same
+  // mistake. Two shared words are needed, so one common word never removes a line of the business's own.
+  const asked = askedWords.map((words) => new Set(keyWords(words).map(stem))).filter((set) => set.size >= 2)
+  if (names.length === 0 && asked.length === 0) return content
+  const restates = (text: string) => {
+    const said = new Set(keyWords(text).map(stem))
+    return asked.some((set) => [...set].filter((w) => said.has(w)).length >= 2)
+  }
+  const mentions = (text: string) => names.some((n) => text.toLowerCase().includes(n)) || restates(text)
   const exclusions = content.exclusions?.filter((item) => !mentions(item))
   const notes =
     typeof content.notes === 'string'
@@ -300,5 +309,36 @@ export function withoutMentionsOf<T extends { exclusions?: string[]; notes?: str
           .trim()
       : content.notes
   return { ...content, ...(exclusions && { exclusions }), ...(typeof notes === 'string' && { notes }) }
+}
+
+/**
+ * T-180 follow-up (a T-179 miss found on production): the wording names
+ * another of the business's services, but the quote carries no card for it.
+ * The model that writes the wording read the customer's note as asking for
+ * that service, and the detection step produced nothing. That is a DETECTION
+ * MISS: it is logged and kept on the quote's trace, so it can be found and
+ * counted. Nothing is changed on the quote. Pure. Returns the services named.
+ */
+export function namedWithoutACard(
+  content: { scopeSummary?: string; assumptions?: string[]; exclusions?: string[]; notes?: string },
+  otherServices: ReadonlyArray<{ id: string; name: string }>,
+  alsoAsked: ReadonlyArray<{ serviceId?: string | null }>
+): Array<{ id: string; name: string }> {
+  const text = [content.scopeSummary ?? '', ...(content.assumptions ?? []), ...(content.exclusions ?? []), content.notes ?? ''].join('\n').toLowerCase()
+  if (!text.trim()) return []
+  const carded = new Set(alsoAsked.map((a) => a.serviceId).filter(Boolean))
+  return otherServices
+    .filter((s) => !carded.has(s.id))
+    .filter((s) => {
+      const name = s.name.trim().toLowerCase()
+      if (name.length < 3) return false
+      const at = text.indexOf(name)
+      if (at < 0) return false
+      // the whole name, not part of a longer word
+      const before = text[at - 1] ?? ' '
+      const after = text[at + name.length] ?? ' '
+      return !/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after)
+    })
+    .map((s) => ({ id: s.id, name: s.name }))
 }
 

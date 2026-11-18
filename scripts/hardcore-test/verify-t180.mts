@@ -175,6 +175,7 @@ const setUsage = (tenantId: string, periodKey: string, count: number) => sb.inse
 const subscriptionRow = async (tenantId: string) => ((await sb.select('subscriptions', `tenant_id=eq.${tenantId}&select=*`)) as Row[])[0] ?? null
 const billing = async (b: Business) => expectOk('billing', await call('GET', `${app}/api/billing`, { headers: b.cookie })) as { subscription: Row; usage: Row; canCheckout: boolean; canManage: boolean; freeQuotesLeftLine: string | null; suspended: boolean }
 const notice = async (b: Business) => (expectOk('notice', await call('GET', `${app}/api/billing/notice`, { headers: b.cookie })) as { notice: Row | null }).notice
+const waitingChange = async (b: Business) => (expectOk('pending', await call('GET', `${app}/api/billing/pending`, { headers: b.cookie })) as { pending: Row | null }).pending
 const whatsappAccess = async (b: Business) => (expectOk('whatsapp config', await call('GET', `${app}/api/whatsapp/config`, { headers: b.cookie })) as { access: { allowed: boolean; why: string | null } }).access
 const heldQuotes = async (tenantId: string) => (await sb.select('quotes', `tenant_id=eq.${tenantId}&status=eq.pending_review&content_json->>limitHold=eq.true&select=id,quote_request_id`)) as Row[]
 /** A free test account (T-177): a live row Stripe has never heard of, as scripts/set-test-plan.sh makes */
@@ -663,6 +664,15 @@ try {
   check('downgrade to Starter monthly in the portal: Stripe says it happens at the end of the billing period, and charges nothing now', /updated at the end of your current billing period/i.test(downAsk.review) && !/Amount due today/i.test(downAsk.review), downAsk.review.slice(0, 260))
   check('…nothing changes now: still Pro, yearly, 200 quotes a month, WhatsApp still on', afterAsk?.plan_id === 'plan_us_pro' && afterAsk.billing_interval === 'annual' && afterAsk.status === 'active' && (await billing(free)).usage.planLimit === 200 && (await whatsappAccess(free)).allowed === true, { plan: afterAsk?.plan_id, interval: afterAsk?.billing_interval })
   check('…Stripe holds the change: Starter monthly, starting the moment the paid year ends', held1.price === priceOf('plan_us_starter', 'monthly') && held1.startsAt !== null && held1.startsAt === held1.periodEnd, held1)
+  const waitingG = await waitingChange(free)
+  check('…the billing page is told what is waiting: Starter, monthly, on the day the paid year ends', waitingG?.planName === 'Starter' && waitingG.interval === 'monthly' && new Date(String(waitingG.at)).getTime() === (held1.periodEnd ?? 0) * 1000, waitingG)
+  const waitPage = await signedInPage(free)
+  await waitPage.goto(`${app}/app/settings/billing`, { waitUntil: 'networkidle' })
+  await waitPage.getByTestId('pending-change').waitFor({ timeout: 30_000 }).catch(() => undefined)
+  const waitLine = (await waitPage.getByTestId('pending-change').innerText().catch(() => '')).replace(/\s+/g, ' ')
+  check('…and says "Changes to Starter on <date>", with Pro still shown as the plan', /^Changes to Starter on [A-Z][a-z]+ \d{1,2}, \d{4}\. Until then your Pro plan works as normal\.$/.test(waitLine) && (await waitPage.getByTestId('current-plan').innerText()).trim() === 'Pro plan, billed yearly', waitLine)
+  await waitPage.screenshot({ path: path.join(outDir, 'billing-downgrade-waiting.png'), fullPage: true })
+  await waitPage.context().close()
 
   // Cancel
   const cancelReview = await cancelInPortal(free)
@@ -670,7 +680,7 @@ try {
   check('cancel in the portal: Stripe says it stays available to the end of the billing period', /still be available until the end of your billing period/i.test(cancelReview), cancelReview.slice(0, 200))
   check('…the webhook stores the end date, and the plan is still live until then', cancelled.row?.status === 'active' && cancelled.row.plan_id === 'plan_us_pro' && new Date(String(cancelled.row.cancel_at)).getTime() > Date.now() + 300 * 86_400_000, { status: cancelled.row?.status, cancel_at: cancelled.row?.cancel_at })
   const afterCancel = await stripe.subscriptions.retrieve(String(starterRow?.stripe_subscription_id))
-  check('…cancelling drops the downgrade that was waiting (the plan simply ends)', afterCancel.schedule === null && afterCancel.cancel_at !== null)
+  check('…cancelling drops the downgrade that was waiting (the plan simply ends), and the page is told nothing is waiting', afterCancel.schedule === null && afterCancel.cancel_at !== null && (await waitingChange(free)) === null)
   const cancelledBilling = await billing(free)
   const stillPriced = await submit(free)
   check('…the billing data carries the end date, and a request is still priced meanwhile', cancelledBilling.subscription.cancelAt === cancelled.row?.cancel_at && cancelledBilling.subscription.cancelAtPeriodEnd === true && (cancelledBilling.subscription.plan as Row).id === 'plan_us_pro' && stillPriced.ok && !held(stillPriced))
@@ -760,12 +770,14 @@ try {
   const meanwhile = await submit(retry.b)
   const proMeanwhile = await subscriptionRow(retry.b.tenantId)
   check('a downgrade to Starter is asked for: Stripe holds it for the end of the paid period, and until then the business is on Pro', /updated at the end of your current billing period/i.test(askDown.review) && waiting.price === priceOf('plan_us_starter', 'monthly') && proMeanwhile?.plan_id === 'plan_us_pro' && (await billing(retry.b)).usage.planLimit === 200 && meanwhile.ok && !held(meanwhile), { review: askDown.review.slice(0, 160), waiting, plan: proMeanwhile?.plan_id })
+  const waitingI = await waitingChange(retry.b)
+  check('…the billing page is told: changes to Starter on the day the paid period ends', waitingI?.planName === 'Starter' && new Date(String(waitingI.at)).getTime() === (waiting.periodEnd ?? 0) * 1000, waitingI)
   const toPeriodEnd = Math.ceil(((waiting.periodEnd ?? 0) - (await stripe.testHelpers.testClocks.retrieve(retry.clock)).frozen_time) / 86_400) + 1
   await advance(retry.clock, toPeriodEnd)
   const landedDown = await deliverUntil(retry.b.tenantId, (row) => row?.plan_id === 'plan_us_starter')
   const starterRenewal = (await stripe.invoices.list({ customer: retry.customer, limit: 1 })).data[0]
   check('the paid period ends: the plan becomes Starter by webhook, and the renewal is charged at Starter\'s price', landedDown.row?.plan_id === 'plan_us_starter' && landedDown.row.billing_interval === 'monthly' && landedDown.row.status === 'active' && starterRenewal?.subtotal === 4900 && starterRenewal.status === 'paid' && (await billing(retry.b)).usage.planLimit === 50, { plan: landedDown.row?.plan_id, renewal: starterRenewal?.subtotal, events: landedDown.events })
-  check('…Starter has no WhatsApp, so the assistant is off from then (the plan definitions decide)', (await whatsappAccess(retry.b)).why === 'plan')
+  check('…Starter has no WhatsApp, so the assistant is off from then (the plan definitions decide), and nothing is waiting any more', (await whatsappAccess(retry.b)).why === 'plan' && (await waitingChange(retry.b)) === null)
 
   await cancelInPortal(retry.b)
   const retryCancelled = await deliverUntil(retry.b.tenantId, (row) => Boolean(row?.cancel_at))

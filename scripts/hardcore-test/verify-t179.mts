@@ -159,7 +159,7 @@ await patch('services', `id=eq.${gammaId}`, { auto_send: true, hold_until_approv
 const submit = (customer: Row, note: string, serviceId = alphaId) =>
   call('POST', `${app}/api/public/quotes`, { body: { tenantKey, serviceId, customer, job: { postcodeOrZip: '63021', answers: [{ fieldId: '_project_description', value: note }] }, assetIds: [], source: { type: 'widget' } }, timeoutMs: 120_000 })
 const quoteRow = async (quoteId: string) =>
-  ((await sb.select('quotes', `id=eq.${quoteId}&select=status,service_id,pricing_json,content_json,review_hold,approved_at,quality_gate_json`)) as Row[])[0]!
+  ((await sb.select('quotes', `id=eq.${quoteId}&select=status,service_id,pricing_json,content_json,pricing_trace_json,review_hold,approved_at,quality_gate_json`)) as Row[])[0]!
 async function settle(quoteId: string, timeoutMs = 420_000): Promise<Row> {
   const until = Date.now() + timeoutMs
   let row = await quoteRow(quoteId)
@@ -193,6 +193,9 @@ notePlan.set('NOTE-BOAT', { requests: [{ serviceId: null, serviceName: null, con
 notePlan.set('NOTE-DECLINED', { requests: [{ serviceId: betaId, serviceName: BETA.name, confidence: 0.99, matchedPhrase: WORDS.declined, reason: 'Mentions the beta job.' }] })
 notePlan.set('NOTE-QUESTION', { requests: [{ serviceId: betaId, serviceName: BETA.name, confidence: 0.99, matchedPhrase: WORDS.declined, reason: 'Mentions the beta job.' }] })
 notePlan.set('NOTE-COVERED', { requests: [{ serviceId: null, serviceName: null, confidence: 0.99, matchedPhrase: WORDS.inspection, reason: 'Asks for an inspection.' }] })
+// T-180 follow-up (AD-064): the customer's own words, with no word of any service's name in them
+const OWN_WORDS = 'I would also like that other thing sorted out'
+notePlan.set('NOTE-OWNWORDS', { requests: [{ serviceId: betaId, serviceName: BETA.name, confidence: 0.95, matchedPhrase: OWN_WORDS, reason: 'Asks for the beta job in other words.' }] })
 notePlan.set('NOTE-BOTH', { requests: [{ serviceId: gammaId, serviceName: GAMMA.name, confidence: 0.95, matchedPhrase: WORDS.gamma, reason: 'Asks for gamma units.' }], answers: {} })
 
 // =====================================================================================
@@ -242,6 +245,19 @@ check(
 check('no "other services you mentioned" estimate is made any more', !(rBeta!.content_json as Row).crossServicePricing)
 const vBeta = await view(qBeta!.id, qBeta!.token)
 check('the customer’s page is given the card and may add it', vBeta.ok && vBeta.json?.alsoAsked?.[0]?.serviceName === BETA.name && vBeta.json?.canChangeSections === true && !vBeta.json?.sections, vBeta.json?.alsoAsked)
+
+// T-180 follow-up (AD-064). On production the real model named the right other service for a note
+// that had no word of that service's name in it, and a check in code threw the answer away. The
+// model is stood in for here, so this proves the checks in code: such an answer becomes a card.
+const ownWords = await submit(who('Nadia Ferrand'), `NOTE-OWNWORDS An alpha visit please. ${OWN_WORDS}.`)
+const rOwnWords = await settle(ownWords.json.quoteId as string)
+const askedOwnWords = askedOf(rOwnWords)
+check(
+  `a request in the customer’s own words (no word of ${BETA.name}’s name in it) is a card for the service the model named`,
+  ownWords.ok && askedOwnWords.length === 1 && askedOwnWords[0]!.serviceId === betaId && askedOwnWords[0]!.state === 'offered' && askedOwnWords[0]!.words === OWN_WORDS,
+  askedOwnWords
+)
+check('… and the wording was not flagged as naming a service the quote has no card for', !(rOwnWords.pricing_trace_json as Row | null)?.detectionMiss)
 
 // =====================================================================================
 section('2. Test 1: everything known → add → total is A + B, tax once')

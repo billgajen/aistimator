@@ -2521,3 +2521,71 @@ is unsupported, so nothing was built around it.
 - **`/admin/tenants` shows a plan's price from the old `plans` table,** not from `plans.ts`.
 - **The Home usage banner is still butter-coloured** (a known gap in the design file).
 - **Business is still marked to confirm** in `plans.ts` ($199, 600 quotes). It stays off the site.
+
+
+## T-179 miss on production (found 18 November), and two small T-180 items
+
+**Fixed, checked, committed and pushed. Nothing is deployed yet.** No request was sent to production. I read
+production twice, read-only: the three service configurations and that one quote; and which migration it is at.
+
+### 1. What waits for you
+
+- [ ] **Migration 44, then tell me (or I look again).** The fix is in the worker, and its checks pass, but I
+  did not deploy the worker: this worker build also carries T-180's new "sent" counter, which needs a
+  database function that migration 44 creates. Production was still at migration 43 when my checks finished.
+  Deployed first, every sent quote would log a failed count and "estimates sent" would stop counting. As soon
+  as migration 44 is in, I deploy the worker (`npx wrangler deploy --env production`).
+- [ ] **"Vercel is set"** when the live Stripe script has run and the settings are in Vercel. Then I deploy the
+  web app, run the read-only live checks, and record the deploy.
+- [ ] **Re-test by hand after the worker is live:** the same request as quote `qte_99acc0a15ce6d59d082e70f1`
+  (wallpaper, with the note about painting). The estimate should carry a card for the painting service with
+  the customer's words, and the wording should not say "quoted separately" or list the painting under "Not
+  included". The old quote itself is not changed.
+
+### 2. What the model returned, and what dropped it
+
+- With the real model, three runs of three: the right service, confidence 0.95, the phrase "painting for
+  skirting and ceilings". **The model was right.**
+- **A check in code (AD-010) threw the answer away.** It wanted a word of the customer's phrase to be in the
+  service's name, after first discarding "painting" as a common word. "Skirting" and "ceilings" are in no
+  service's name. The other checks all passed.
+- A second check (AD-014, a list of places) was found dropping a right answer for an add-on of the
+  outside-painting service ("gutters and fascia"). Fixed the same way.
+
+### 3. The fix, in short
+
+- Code no longer asks for a word of the request in the service's name, and holds no list of types of work.
+  The model's choice is overruled only when your own configuration points at a different one of your services.
+- The model is now given each other service's options and add-ons. With that, "the trim and doors painted"
+  became a card too (it had been "not one of your services").
+- When a card is on the quote, the wording loses any "not included" line or sentence about that work, whether
+  it names the service or uses the customer's words.
+- If the wording ever names another of your services on a quote with no card for it, that is logged as a
+  detection miss and kept on the quote's trace (`pricing_trace_json.detectionMiss`).
+- The billing page says "Changes to Starter on <date>." when a downgrade is waiting.
+- The Terms no longer mention metered overage. That whole sentence went, so "5. Billing" no longer says that
+  plans are billed in advance; it starts "You can cancel at any time".
+
+### 4. Checks
+
+- The full regression set: 30 scripts, 2,651 checks, all pass (`verify-t179` 99/99, `verify-t180` 108/108).
+- Unit tests: worker 587, web 1,060, mobile 11. Lint, typecheck and both builds pass.
+- The optional live check with the real model, `npx tsx scripts/hardcore-test/verify-t179-live.mts`: your
+  note word for word and five other explicit requests all got a card (6 of 6); two notes that ask for nothing
+  extra got none. It is a report, never a gate.
+
+### Not proven
+
+- **Production.** Nothing was sent there. The reproduction and the end-to-end run were on this machine with
+  the real model and a local copy of the three services.
+- **Other trades.** The live check uses the painting services only.
+
+### Later (seen, not changed)
+
+- The list of places behind AD-014 is still in the code. It can now only drop a match that the service's own
+  configuration does not support.
+- The detection miss is recorded, not shown anywhere in the dashboard.
+- "We would like the skirting boards done in white too" (no word for the kind of work) got a card in one run
+  and "not one of your services" in two earlier ones, before the add-ons were given to the model.
+- The billing page's "Changes to …" line asks Stripe each time the page opens; nothing about it is stored.
+

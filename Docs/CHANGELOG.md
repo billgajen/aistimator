@@ -15,6 +15,127 @@
 
 ## Issues & Resolutions
 
+### 2026-11-18: T-179 miss found on production: an explicit "I also want X" produced no card (AD-064); two small T-180 items
+
+**Not deployed yet (see "Deploy state" at the end of this entry).** No request was sent to production. Production
+was read twice, read-only: the business's three service configurations and the one quote, and which migration
+it is at.
+
+Checks: `pnpm lint` and `pnpm typecheck` pass; web and worker build. Unit tests: worker 587 (13 new), web
+1,060 (5 new), mobile 11. **The full regression set passes: 30 scripts, `verify-t146` to `verify-t180`, 2,651
+checks,** including `verify-t179` 99/99 (its own servers, the model stood in for) and `verify-t180` 108/108
+(the Stripe sandbox). `verify-t173` 104/104 and `verify-t178` 52/52 on their own servers; the other 26
+together (2,288). The owner asked for "verify-t179, verify-t180, the pricing regression": the whole set was
+run, since the fix is in the worker and the quote flow. The optional live check `verify-t179-live`: 6 of 6
+cards with the real model. The web unit suite was run with two workers (`--maxWorkers=2`): T-162's
+repo-search test has a five-second limit and timed out twice in the default run while the machine was busy
+(load average 20), as recorded under T-180; nothing it checks was changed.
+
+#### What happened
+
+Quote `qte_99acc0a15ce6d59d082e70f1` (18 November). The customer chose one of a business's three services and
+wrote, as stored: "I also want painting for skirting and ceilings.  Brilliant White paint." The other service
+that covers that work is on offer. The quote came back with no `alsoAsked` and no card. The `cross_service`
+stage had run (3.4 seconds in the timings). The wording model had read the note: its notes said "additional
+services like interior painting can be quoted separately upon request" and its exclusions listed "Painting of
+baseboards, trim, or ceilings".
+
+#### Reproduced with the real model, on this machine
+
+The three services were recreated from their production configuration (kept outside the repo) and the note
+sent to the worker's own detection code with the real model. Three runs out of three:
+
+- **The model was right:** the other service's id, confidence 0.95, `matchedPhrase` "painting for skirting and
+  ceilings".
+- AD-008 (the phrase is literally in the note): passed. Confidence (0.9): passed. Declined or only asked:
+  no. Covered by the chosen service: no. AD-014 (location): passed.
+- **AD-010 dropped it.** That check wanted a "key word" of the phrase to be in the matched service's NAME. Its
+  list of words to ignore held seven type-of-work words ("cleaning", "repair", "installation", "removal",
+  "painting", "fixing", "service"), so "painting", the one word the request shared with the service's name,
+  was thrown away first. What was left ("skirting", "ceilings") is in no service's name. Dropped, silently.
+- A request with no detail at all ("I also want some painting") would have passed: with no key words left the
+  check did not apply. The more a customer said, the likelier the drop.
+
+The stand-in in `verify-t179` could not have shown this: the mistake was in what code did with a real answer.
+
+#### The fix (AD-064; `apps/worker/src/ai/service-detection.ts`, `quote-processor.ts`, `section-pricing.ts`)
+
+1. **The model's choice of service is no longer thrown away for lacking a word of the service's name.** It is
+   overruled only when the business's own configuration points at a DIFFERENT one of its services
+   (`betterNamedService`): another service's name has a word of the request that the chosen service's
+   configuration does not use, and the chosen service explains nothing the other's name does not. "Gutter
+   cleaning" matched to a window service is still dropped when the business has a gutter service.
+2. **No trade or type-of-work word is left in the code's word list.** The list of ignored words is language
+   only (pronouns, modal verbs, prepositions).
+3. **The location check (AD-014) gives way to the business's configuration.** Found on the way with the real
+   model: "the gutters and fascia need painting" was matched, rightly, to the outside-painting service (which
+   has that as an add-on) and dropped, because the list in code reads "gutters" as the roof and the service's
+   name as the exterior. Now, when the service's own description, includes or add-ons speak of the very thing
+   the customer named, there is no conflict. The case AD-014 was made for (a bathroom leak matched to a roof
+   service) is still dropped.
+4. **The model is given each other service's options and add-ons,** as it already was for the chosen service
+   (loaded from `service_pricing_rules`). With the real model, "I would also like the trim and doors painted"
+   and "also repaint the baseboards" went from "not one of your services" to a card in two runs out of two.
+   Nothing was added to the prompt's fixed text.
+5. **"Not offered" only when no service is named in full.** A request the model says no service covers is
+   dropped (rather than shown as not offered) only if every word of some service's name is in it.
+6. **The wording's clean-up also knows the customer's words.** `withoutMentionsOf` removed a "not included"
+   line or a sentence of the notes that named the offered service. It now also removes one that restates the
+   work in the customer's own words (two shared words are needed, so one common word never removes a line the
+   business wrote).
+7. **A detection miss is seen.** After the wording is final, `namedWithoutACard` looks for another offered
+   service's name in the wording (scope, assumptions, exclusions, notes) on a quote with no card for it. If
+   found: a warning in the log with the quote and service ids (no customer words), and
+   `pricing_trace_json.detectionMiss = { serviceIds }` on the quote, so misses can be found in the database
+   after the logs are gone. The quote is not changed.
+
+End to end on this machine with the real model and the fixed worker: the card is on the quote ("painting for
+skirting and ceilings", with that service's own question), the customer's page is given it, the exclusions no
+longer list the painting and the notes no longer say "quoted separately".
+
+#### Checks added
+
+- Unit tests, model stood in for (`several-services-t179.test.ts`, 13 new): the answer the real model gave is
+  kept; why it was dropped; the same request in four other wordings; a wrong choice between two services is
+  still overruled; AD-014 gives way to an add-on and still catches the bathroom leak; the other services'
+  add-ons are in the prompt; the clean-up of production's own wording; the detection miss.
+- `verify-t179`: one more request, in the customer's own words with no word of the service's name (99 checks).
+- `scripts/hardcore-test/verify-t179-live.mts`, optional and never a gate (like `verify-t177-live`): the note
+  from production word for word, five other explicit requests for something extra, and two notes that ask for
+  nothing. It calls the worker's detection code with the real model, needs nothing running, and says for each
+  whether the model named the service and whether a check in code dropped a right answer. This run: 6 of 6
+  cards, 2 of 2 without.
+
+#### Two small T-180 items in the same pass
+
+- **The billing page says when a downgrade is waiting:** "Changes to Starter on December 18, 2026. Until then
+  your Pro plan works as normal." `GET /api/billing/pending` reads Stripe's schedule for the subscription when
+  the page opens (`lib/billing-pending.ts`); nothing is stored and no migration was needed (migration 44 was
+  being applied to production by the owner at the time). This is the one place a billing page reads Stripe
+  directly: see the note added to AD-062.
+- **Terms:** the sentence about metered overage is gone from "5. Billing" (with it, "billed monthly in
+  advance"; the section now starts "You can cancel at any time"). The date stays 18 November 2026.
+
+#### Deploy state
+
+- **Committed and pushed. Nothing deployed.**
+- **The worker is not deployed, although the fix is in the worker and its checks pass.** The same worker
+  build carries T-180's atomic "sent" counter, which calls `increment_usage_counter`, a function that exists
+  only after migration 44. Production was still at migration 43 when the checks finished (read-only look).
+  Deployed before it, every sent quote would log a failed counter and "estimates sent" would stop counting.
+  The order in OWNER-TODO (T-180) stands: migration 44, then the worker. The worker goes out as soon as 44 is in.
+- **The web app waits for the owner's "Vercel is set"** (the billing line, the Terms, and all of T-180's web
+  side).
+
+**Files:** `apps/worker/src/ai/service-detection.ts`, `apps/worker/src/{quote-processor.ts,section-pricing.ts}`,
+`packages/shared/src/database.types.ts`, `apps/worker/src/__tests__/several-services-t179.test.ts`,
+`scripts/hardcore-test/{verify-t179.mts,verify-t179-live.mts,verify-t180.mts}`,
+`apps/web/src/lib/billing-pending.ts`, `apps/web/src/app/api/billing/pending/route.ts`,
+`apps/web/src/app/(dashboard)/app/settings/billing/page.tsx`, `apps/web/src/app/terms/page.tsx`,
+`apps/web/src/__tests__/billing-t180.test.ts`, `Docs/02-api-contracts.md`, `OWNER-TODO.md`
+
+---
+
 ### 2026-11-18: T-180 — Stripe live billing, end to end: Managed Payments, the atomic usage counter, the paying journey (AD-062, AD-063)
 
 **Built, not deployed.** Nothing was pushed to production and production was not read. Every Stripe call went
@@ -7421,6 +7542,10 @@ if (pricingResult.estimatedTotal <= 0) {
 
 ### AD-010: Cross-Service Name-Request Relevance
 
+> **Revised by AD-064 (2026-11-18):** the check no longer asks for a word of the request in the service's
+> name. It dropped an explicit, correctly matched request on production. The model's choice is now overruled
+> only when the request's words point at a different one of the business's services.
+
 **Decision:** Cross-service recommendations are rejected if the SERVICE NAME doesn't contain keywords from the customer's REQUEST.
 
 **Rationale:**
@@ -8199,6 +8324,9 @@ every event costs one request and removes two whole classes of bug: events out o
 - The customer's statement, the receipts and the tax are Stripe's. We show plan prices before tax and say that
   tax is added by Stripe.
 - The billing page reads our row, never Stripe. If the two ever disagree the fix is in the sync.
+  **One read-through (same day):** a downgrade that is waiting for the end of the paid period is Stripe's own
+  schedule, not a fact about the plan the business has. `GET /api/billing/pending` reads it from Stripe when
+  the billing page opens, stores nothing, and answers "nothing waiting" on any failure.
 
 **Rejected:** keeping the old handlers that wrote from each event's payload (they also read fields that current
 API versions no longer send: the period on the subscription, the subscription on the invoice); a "Pay" button
@@ -8235,6 +8363,44 @@ single statement fixes the first; only deciding and counting together fixes the 
 rush); a row lock on the month's counter (the free allowance is summed over every month, and the first quote of
 a month has no row to lock); counting in Redis (off in production by decision, AD-060); checking the limit in a
 database constraint (the limit is not in the database).
+
+### AD-064: The model matches a request to a service; code overrules it only with the business's own configuration (revises AD-010, softens AD-014)
+
+**Decision:** when the model says a customer's words ask for one of the business's other services, the checks
+in code are of two kinds only:
+1. **Facts code can verify:** the phrase is literally in the note (AD-008), the confidence, a valid service id,
+   the customer did not decline it or only ask whether it is included, the chosen service does not already
+   cover it.
+2. **Contradiction from the business's own configuration:** the request's words point at a different one of the
+   business's services (`betterNamedService`), or at a place that conflicts with the service's name AND that
+   the service's own description, includes and add-ons never speak of (AD-014 as softened).
+
+Code never again requires a word of the request to be in the service's name, and holds no list of trades or
+types of work. The model is given every service's description, includes, "does not include" and add-ons.
+
+**Why:** AD-010 asked code to confirm the model's match by finding a shared word in the service's name. A
+customer says "skirting" and "ceilings"; a service is called by its trade. The only shared word was the
+type-of-work word, which a hardcoded list threw away. Telling a customer's word for a thing from the service's
+name for it is exactly what the model is for, and what a word list cannot do. Code is good at catching a match
+that the business's own configuration contradicts, so that is what it now does.
+
+**Rules that follow:**
+- A new check on the model's match must be a fact or a contradiction from configuration, never "confirm it
+  with a keyword".
+- Nothing a business does is named in code or in the prompt's fixed text. What the model should know about a
+  service goes in the service's configuration, which it is given (AD-061).
+- A right answer dropped by a check in code is a bug in the check. `verify-t179-live` reports them by name.
+- A detection miss is recorded (`pricing_trace_json.detectionMiss`), not guessed at: the quote is never changed
+  on the wording's say-so.
+- The location list of AD-014 stays in code for now. It can only drop a match that the service's
+  configuration does not support.
+
+**Rejected:** widening AD-010 from the service's name to its description (still fails on a synonym: "skirting"
+is nowhere in a service that lists "baseboards"); keeping the type-of-work list and adding to it (the
+anti-hardcoding rule, and it was the cause); removing every check and trusting the model (a wrong neighbour of
+the right service is the one mistake configuration can catch); tuning the prompt until the cases pass (the
+model was right; and live-model answers are never a gate); creating the card from the wording model's mention
+(the wording model writes text, it does not decide what is offered).
 
 ---
 
