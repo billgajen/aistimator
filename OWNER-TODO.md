@@ -2159,3 +2159,123 @@ production twice, read-only: the three service configurations and that one quote
   and "not one of your services" in two earlier ones, before the add-ons were given to the model.
 - The billing page's "Changes to …" line asks Stripe each time the page opens; nothing about it is stored.
 
+
+## T-181 — Small site fixes + Meta app review readiness
+
+**Built 18 November 2026, committed and pushed. Not deployed.** Quick checks only, as asked: build, lint,
+typecheck, unit tests, and each changed page loaded on this machine. No regression scripts were run.
+
+### 1. What was done, item by item
+
+1. **Home headline: already done (T-173), skipped.** The page, the title, the description, the social tags and
+   the social image all read "Instant quotes for your customers, in your prices." The old line is nowhere.
+2. **"What it notices": fixed.** The price breakdown now reads "Walls & ceilings, 3 rooms" ($1,125), visit and
+   setup $75, trim $200, total $1,400, to match "three bedrooms" in the message. It was 2 rooms, $1,025.
+   - The same example feeds the Painting page, which now shows 3 rooms and $1,200 too.
+   - Left as it was: "They answered one room, so it asks which is right." That line is the point of the first
+     example (the words differ from the answer, so it asks). Say if you want it to read "three" as well.
+3. **Plan cards: rewritten.** Each line now says what the business gets. Home's cards list them too (they had
+   only the price). No text-message line is on any page. "plus tax" is kept; Pricing's note under the cards
+   now also says "Billed in advance, monthly or yearly." Prices, limits and Stripe are untouched.
+   - Starter and Pro: "Customers see your price straight away, on your website or from a link you share";
+     "Every customer gets their own estimate page to open, accept and come back to".
+   - Pro adds: "Estimates under your brand alone, with no badge of ours"; "See how your estimates compare
+     with your final invoices".
+   - Still marked "Coming later" on Pricing (Home lists live lines only): "Quotes inside WhatsApp, on your own
+     number"; "An app for pricing a job while you are on site".
+   - Starter's line under its name on Pricing: "Instant quotes for your customers, with or without a website"
+     (it said "Instant estimates on your website").
+   - The same lines show on the Billing page's plan cards (one list feeds all three).
+4. **Audience: changed in three places.** Under the hero: "For any business that quotes for its work, small to
+   corporate. No website? Use your quote link." The footer: "…quotes for any business, small or large." The
+   Pricing page's description: "…plans for businesses of any size." The trade pages still speak to their own
+   trade ("For HVAC contractors"); say if those should change too.
+5. **Meta review: one thing was missing in code, now added.** See the next section.
+
+### 2. Meta app review: what the site has
+
+- **Privacy Policy** `https://qolumns.com/privacy` and **Terms** `https://qolumns.com/terms`: both live, both
+  answer 200, also to Meta's own crawler (checked 18 November, read-only).
+- **Data deletion: a page of its own, `/data-deletion` ("Delete your data"), added in this ticket** and linked
+  from every page's footer. It says how a customer asks, how a business asks, what Disconnect does for a
+  WhatsApp number, and what a deletion covers. It promises nothing the Privacy Policy and Terms do not.
+  **It is not live until this ticket is deployed** (today it answers 404 on qolumns.com). Until then the
+  Meta field can stay on `/privacy`, whose last section says where to write.
+- **App icon:** `Docs/design/meta-app-icon.png` (1024 × 1024, the wordmark on juniper). Still the temporary one.
+
+### 3. Your steps in the Meta dashboard, in order
+
+- [ ] **Deploy T-181 first** (say the word), so `/data-deletion` exists.
+- [ ] **App settings, Basic.** Most of this was listed under T-175; tick what is already there.
+  - App icon: upload `Docs/design/meta-app-icon.png`.
+  - Privacy policy URL: `https://qolumns.com/privacy`.
+  - Terms of Service URL: `https://qolumns.com/terms`.
+  - User data deletion, "Data deletion instructions URL": `https://qolumns.com/data-deletion`.
+  - Category: Business and pages. App domains: `qolumns.com`. Website: `https://qolumns.com`.
+  - Contact email: `hello@qolumns.com`.
+- [ ] **Business details only you have** (Meta asks for them in Basic settings and in business verification):
+  - Legal business name: Billiom Limited. Registered address: [yours]. Company number: [yours].
+  - Business phone: [yours]. Business website: `https://qolumns.com`.
+  - Data Protection Officer contact (name, email, address), if the form asks for one: [yours].
+  - Verification documents (certificate of incorporation, or a bill at the registered address): [yours].
+- [ ] **Business verification** of the portfolio the app belongs to. Meta does not start App Review before it.
+- [ ] **Two screen recordings, one per permission** (Meta does not accept one for both, or screenshots). The
+  step-by-step for each is in `Docs/meta-app-review.md`. In short:
+  - *Messaging:* signed out, sign in as the test business, open WhatsApp (shows Connected and the number),
+    send a test message from "Try it" to your own phone, and show it arriving in WhatsApp.
+  - *Management (the connect flow):* sign in as a second test business with no connection, press Connect
+    WhatsApp, go through Meta's window to Finish, show the page saying Connected and the message template it
+    set up, then the same template in WhatsApp Manager.
+  - English on screen, 1080p, no sound, nothing private in view, no real customer messaged.
+- [ ] **A way in for the reviewer:** a Qolumns account made for them (a business with one service), its email
+  and password in the form's "access instructions" box only. Never in this repo.
+- [ ] **Request advanced access** for the two permissions with the texts below, then, once approved, switch the
+  app to **Live**.
+- [ ] **After Live:** connect a real number, message it, see the reply. Then tell me, and "Quotes inside
+  WhatsApp" can lose its "Coming later" (one line in `lib/marketing/plan-claims.ts`).
+
+### 4. Draft justifications (short; the fuller ones are in `Docs/meta-app-review.md`)
+
+**`whatsapp_business_messaging`**
+
+> Qolumns lets a business give its customers a price for its services. A business connects its own WhatsApp
+> number through Embedded Signup. When one of its customers messages that number asking for a price, we reply
+> in the same chat on the business's behalf: we ask only for what the price needs, then send a link to the
+> estimate, priced from that business's own price list. When the business approves the estimate we tell the
+> same customer it is ready. We message only customers who wrote to the business first; we send no marketing.
+> We need this permission to receive those messages, download the photos a customer sends, and send the replies.
+
+**`whatsapp_business_management`**
+
+> We use this permission to set up and keep the connection a business makes through Embedded Signup: to read
+> the phone number it chose, to subscribe our app to that account's webhooks (and unsubscribe on Disconnect),
+> to create one utility template in its account ("estimate_ready", which tells a customer their estimate is
+> ready when more than 24 hours have passed) and read that template's review status, and to learn from the
+> `account_update` webhook when a business has removed our app, so we delete the token we hold. We do not edit
+> or delete templates and we do not change the business's account settings.
+
+**The data questions, in one line each**
+
+- *How is the data used?* To prepare the estimate for the business the customer wrote to. Each business sees
+  only its own customers.
+- *Is it shared or sold?* Shared only with that business and the processors named in the Privacy Policy. Never
+  sold, never used for advertising.
+- *How is it deleted?* `https://qolumns.com/data-deletion`.
+
+### 5. Small things seen on the way (not fixed, as asked)
+
+- Pricing says "50 estimates a month"; Home says "50 quotes a month".
+- Pricing's answer to "Can I cancel anytime?" says "Plans are monthly with no contract", though a plan can be
+  yearly.
+- On Pricing's dark Pro card the two underlined lines (they link to the demo) each wrap onto a second line.
+- On Home, Starter's card has two lines and Pro's has four, so Starter has empty space above its button.
+- Pricing's Starter and Pro cards are different heights for the same reason.
+- The Meta app icon is still the temporary wordmark.
+
+### Not checked
+
+- No regression script was run. `verify-t155` and `verify-t167` had words this ticket changed written into
+  them; I updated those lines but did not run the scripts. They run at the next regression.
+- `/data-deletion` was added to the list of marketing pages the layout checks walk; those checks were not run.
+- The changed pages were looked at on this machine at 1280 and 390 px wide, not on production.
+

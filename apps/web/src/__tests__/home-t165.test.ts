@@ -208,7 +208,8 @@ describe('T-165: login and small fixes', () => {
   it('footer links are 44 px tall on a phone', () => {
     const footer = code('components/marketing/SiteFooter.tsx')
     expect(footer).toContain("const FOOT_LINK = 'inline-flex min-h-[44px] items-center")
-    expect(footer.match(/className=\{FOOT_LINK\}/g)).toHaveLength(13)
+    // T-181: fourteen, with "Delete your data"
+    expect(footer.match(/className=\{FOOT_LINK\}/g)).toHaveLength(14)
   })
 
   it('one wordmark component draws the name everywhere', () => {

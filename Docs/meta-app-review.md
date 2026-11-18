@@ -1,4 +1,10 @@
-# Meta App Review for Qolumns (T-175, rewritten in T-176, updated in T-177)
+# Meta App Review for Qolumns (T-175, rewritten in T-176, updated in T-177 and T-181)
+
+**T-181 (18 November 2026):** the site has a page of its own for deleting data, `https://qolumns.com/data-deletion`
+(live once T-181 is deployed; until then the Privacy Policy's last section does the job). The owner's steps, the
+list of app and business details, and a short justification for each permission are in `OWNER-TODO.md` under
+T-181. The longer answers below still stand; they now say "a business", since the site no longer limits itself
+to trades.
 
 **T-177 changed three things that matter here** (they apply once T-177 is deployed):
 - **The template is automatic.** There is no "Create the template" button. Connecting a number sets the
@@ -96,7 +102,7 @@ message "Your estimate from Bluum is ready. Open it here: …" arrives.
 
 **What to write in the form** (plain words; your own, not copied from another app's submission):
 
-> Qolumns lets a trade business (a painter, a plumber, an HVAC company) give its customers a price estimate.
+> Qolumns lets a business of any size give its customers a price estimate for its services.
 > A business connects its own WhatsApp number to Qolumns through Embedded Signup. When one of its customers
 > sends that number a message asking for a price for one of the business's services, Qolumns replies in the
 > same chat on the business's behalf: it asks only for what it still needs (what the job is, the postcode
@@ -164,8 +170,9 @@ section of this file). Meta accepts that.
   the estimate for the business the customer wrote to. Each business sees only its own customers.
 - **Do you share the data?** With the business the customer wrote to, and with the processors named in the
   privacy policy (`https://qolumns.com/privacy`). It is not sold and not used for advertising.
-- **How does a user delete their data?** `https://qolumns.com/privacy`, section 8: by email to
-  `hello@qolumns.com`. A business removes our access to its WhatsApp account itself, with Disconnect.
+- **How does a user delete their data?** `https://qolumns.com/data-deletion` (T-181; before it is deployed,
+  `https://qolumns.com/privacy`, section 8): by email to `hello@qolumns.com`. A business removes our access to
+  its WhatsApp account itself, with Disconnect.
 - **Where is the access token kept?** On our servers only, encrypted, one per business; it is never sent to a
   browser and never logged. It is deleted when the business disconnects or removes the app.
 - **Why not `whatsapp_business_manage_events`?** We do not ask for it. It is for the Marketing Messages API

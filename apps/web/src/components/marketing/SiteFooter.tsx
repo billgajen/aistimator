@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { freeOfferLabel, PRODUCT_NAME } from '@qolumns/shared'
 import { Wordmark } from '@/components/brand/Wordmark'
-import { FOOTER } from '@/lib/marketing/site-copy'
+import { DATA_DELETION, FOOTER } from '@/lib/marketing/site-copy'
 
 /**
  * Marketing site footer — shared across all public pages.
@@ -44,6 +44,7 @@ export function SiteFooter() {
               <li><Link href="/signup" className={FOOT_LINK}>{freeOfferLabel()}</Link></li>
               <li><Link href="/terms" className={FOOT_LINK}>Terms of service</Link></li>
               <li><Link href="/privacy" className={FOOT_LINK}>Privacy policy</Link></li>
+              <li><Link href={DATA_DELETION.href} className={FOOT_LINK}>{DATA_DELETION.label}</Link></li>
             </ul>
           </div>
         </div>

@@ -317,6 +317,7 @@ describe('T-167: honest words only', () => {
     const pricing = code('apps/web/src/app/pricing/page.tsx')
     expect(pricing).toContain('PRICING_DEMO_LINKS.hostedPages')
     expect(pricing).toContain('<Link href={PRICING_DEMO_LINKS.href}')
-    expect(siteCopy.PRICING_DEMO_LINKS).toEqual({ href: '/demo', hostedPages: 'Hosted estimate pages', branding: 'Your branding on every estimate' })
+    // T-181: the two lines are worded as what the business gets; they are still the two that link to the demo
+    expect(siteCopy.PRICING_DEMO_LINKS).toEqual({ href: '/demo', hostedPages: 'Every customer gets their own estimate page to open, accept and come back to', branding: 'Estimates under your brand alone, with no badge of ours' })
   })
 })

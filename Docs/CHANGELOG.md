@@ -15,6 +15,81 @@
 
 ## Issues & Resolutions
 
+### 2026-11-18: T-181 — Small site fixes + Meta app review readiness
+
+**Built, not deployed.** Quick checks only, as the ticket asked: web build, `pnpm lint`, `pnpm typecheck`, web
+unit tests 1,072 (9 new in `site-t181.test.ts`; run with two workers), and each changed page answering 200 on
+this machine (`/`, `/pricing`, `/painting`, `/trades`, `/features`, `/terms`, `/privacy`, `/data-deletion`,
+`/demo`, `/login`), looked at in a browser at 1280 and 390 px with no sideways scroll. **No regression script
+was run.** Production was read only as a visitor would: `/privacy` and `/terms` answer 200, also to Meta's
+crawler; `/data-deletion` answers 404 there until this is deployed.
+
+#### Item by item
+
+1. **Home headline: already done, skipped.** Since T-173 the page, the title, the description, the social tags
+   and the social image read "Instant quotes for your customers, in your prices." The old line is nowhere in
+   the code.
+2. **"What it notices": the example priced a different job from the one in the customer's message.** The
+   message says "three bedrooms"; the price breakdown said "Walls & ceilings, 2 rooms".
+   - *Root cause:* the message is in `home-copy.ts`, the breakdown comes from the painting example in
+     `examples.ts`, and nothing tied the two numbers together.
+   - *Resolution:* the painting example is 3 rooms (`answer: '3'`, quantity 3). Its figures come from the
+     painting template's own rates, so the breakdown is $1,125 + $75 + the $200 extra = $1,400 (it was $1,025).
+     A unit test now holds the message's "three bedrooms" and the example's 3 rooms together.
+   - The Painting page uses the same example and now shows 3 rooms and $1,200.
+   - Not changed: "They answered one room, so it asks which is right", which is what that example is about.
+3. **Plan cards say what the business gets** (`lib/marketing/plan-claims.ts`, `site-copy.ts`).
+   - Every plan line is reworded from a feature's name to its result. The feature behind each, and whether it
+     is live, are unchanged; `Docs/design/ai-capabilities.md` section 7 lists the new words beside the old.
+   - **Text messages are off the site entirely** (the owner's "no SMS anywhere"): the line has `shown: false`
+     and `planLines` leaves it out. This changes T-170's rule "no plan line is dropped" for this one line. The
+     plans still include the channel; `plans.ts` is untouched.
+   - WhatsApp stays "Coming later", with its note corrected: it has run for our own test business since 17
+     November, and no other business can connect until Meta has reviewed the app.
+   - Home's plan cards now list a plan's live lines (they had the price only). Pricing lists the ones still to
+     come as well.
+   - "plus tax" is kept on both; Pricing's note under the cards adds "Billed in advance, monthly or yearly."
+     Starter's line under its name on Pricing no longer says "on your website".
+   - One word had to change for the claims rule (`ai-claims-t167.test.ts`): "to read" in a line about the
+     customer's estimate page is a word reserved for what the product reads, so the line says "to open".
+4. **Audience:** the hero's small line, the footer's tagline and the Pricing description no longer limit the
+   site to contractors, home-service or service businesses. Trade pages still speak to their own trade.
+5. **Meta app review.**
+   - Already in place: the Privacy Policy and Terms (public, 200), the app icon file, the webhook, the minimum
+     permissions, and `Docs/meta-app-review.md` with both recordings and the long answers.
+   - **Missing, added:** a data deletion page of its own, `/data-deletion` (`app/data-deletion/page.tsx`),
+     linked from the footer. Meta's "Data deletion instructions URL" had pointed at the Privacy Policy. The
+     page says how a customer asks, how a business asks, what Disconnect does (checked against
+     `lib/whatsapp-connect.ts`: Meta is asked to stop, the row and its token are deleted), and what a deletion
+     covers. It repeats the policy's promises (the 30-day export window) and adds none.
+   - The owner's steps, the business details only the owner has, and a short justification for each
+     permission are in OWNER-TODO under T-181. The justifications no longer say "a trade business".
+
+#### Tests and scripts changed for the new words (not loosened)
+
+`marketing-t170.test.ts` (the plan lines; no text-message line), `ai-claims-t167.test.ts` (the two demo-link
+lines), `customer-pages-t171.test.ts` (five lines still to come for Business, not six), `home-t165.test.ts`
+(fourteen footer links), `marketing-home.test.ts` (the hero's small line; the painting example's $1,200; the
+new page in the list of marketing files). `verify-t155.mts` (the small line) and `verify-t167.mts` (the two
+demo-link lines now come from the copy file; two lines still to come on Pricing, not three; Pricing no longer
+needs its exception for the word "accuracy") were edited and parse, **but were not run.**
+`scripts/hardcore-test/browser.mjs` lists `/data-deletion` among the marketing pages.
+
+#### Constraints
+
+- A plan line is a result in plain words, and still claims only what its `found` note supports.
+- Nothing on the site says text messages; do not add the line back without the owner.
+- `/data-deletion` must change whenever the Privacy Policy's or the Terms' deletion wording changes.
+- Small visual things seen and left alone are listed in OWNER-TODO (T-181, section 5).
+
+**Files:** `apps/web/src/lib/marketing/{examples.ts,plan-claims.ts,site-copy.ts,home-copy.ts}`,
+`apps/web/src/app/{page.tsx,pricing/page.tsx,data-deletion/page.tsx}`,
+`apps/web/src/components/marketing/SiteFooter.tsx`, `apps/web/src/__tests__/site-t181.test.ts` and the five
+tests above, `scripts/hardcore-test/{browser.mjs,verify-t155.mts,verify-t167.mts}`,
+`Docs/design/ai-capabilities.md`, `Docs/meta-app-review.md`, `OWNER-TODO.md`
+
+---
+
 ### 2026-11-18: T-179 miss found on production: an explicit "I also want X" produced no card (AD-064); two small T-180 items
 
 **Deployed 2026-11-18:** the worker first (see "Deploy state" at the end of this entry), then the web app with

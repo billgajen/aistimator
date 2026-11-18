@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { DEMO_BUSINESS_NAME, DEMO_LOGO_PATH, DEMO_PRIMARY_COLOR, DEMO_SLUG, formatMoney, freeOfferLabel, FREE_ALLOWANCE } from '@qolumns/shared'
-import { PLUS_TAX, sitePlans } from '@/lib/marketing/plan-claims'
+import { PLUS_TAX, planLines, sitePlans } from '@/lib/marketing/plan-claims'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { FounderNote } from '@/components/marketing/FounderNote'
@@ -216,6 +216,18 @@ export default function HomePage() {
               <p className={`mt-1 text-xs ${def.recommended ? 'text-on-primary/70' : 'text-text-muted'}`}>
                 per month, {PLUS_TAX} · {def.quoteLimit.toLocaleString('en-US')} quotes a month
               </p>
+              {/* T-181: what the plan gives, in the same words as Pricing (lib/marketing/plan-claims.ts).
+                  Only what a business can use today; Pricing also lists what is still to come. */}
+              <ul className="mt-4 flex-1 space-y-2 text-sm" data-testid="plan-lines">
+                {planLines(def)
+                  .filter((line) => line.live)
+                  .map((line) => (
+                    <li key={line.label} className="flex gap-2" data-testid="plan-line">
+                      <span aria-hidden="true" className={def.recommended ? 'text-on-primary' : 'text-secondary'}>✓</span>
+                      <span className={def.recommended ? 'text-on-primary' : 'text-text-secondary'}>{line.label}</span>
+                    </li>
+                  ))}
+              </ul>
               <Link
                 href={`/signup?plan=${def.id}`}
                 className={`motion-press mt-6 inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 text-sm font-semibold ${def.recommended ? 'bg-white text-primary hover:bg-mint' : 'border border-field bg-background text-text-primary hover:bg-surface'}`}

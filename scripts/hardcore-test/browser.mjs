@@ -44,4 +44,5 @@ export const MARKETING_PAGES = [
   '/demo',
   '/privacy',
   '/terms',
+  '/data-deletion', // T-181
 ]

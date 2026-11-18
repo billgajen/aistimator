@@ -57,7 +57,7 @@ for (const [label, ctx] of [['390 px', phone], ['1440 px', desk]] as const) {
   const hero = await p.getByTestId('hero').innerText()
 
   // 1. the small line
-  check(`${label} home: "No website? Use your quote link." under the buttons`, hero.includes('For contractors and home-service businesses. No website? Use your quote link.') && !hero.includes('No website needed'))
+  check(`${label} home: "No website? Use your quote link." under the buttons`, hero.includes('For any business that quotes for its work, small to corporate. No website? Use your quote link.') && !hero.includes('No website needed'))
   // 2. no time claim
   const main = await p.locator('main').innerText()
   check(`${label} home: "Add it anywhere", no "in a minute"`, main.includes('Add it anywhere') && !/in a minute/i.test(main))

@@ -147,9 +147,11 @@ const PICKS: Record<string, Pick> = {
     pack: paintingPackUS,
     service: 'Interior Painting',
     question: 'How many rooms?',
-    answer: '2',
+    // T-181: three rooms, the number in the customer's message on Home ("three bedrooms"); it was 2,
+    // so the price breakdown beside that message priced a different job. The total follows the template's rates.
+    answer: '3',
     photo: null,
-    steps: [{ name: 'Walls & ceilings', qty: 2, label: 'Walls & ceilings, 2 rooms' }],
+    steps: [{ name: 'Walls & ceilings', qty: 3, label: 'Walls & ceilings, 3 rooms' }],
     baseFee: true,
     customerName: 'Alex R.',
     measured: { service: 'Exterior Painting', step: 'Exterior walls', quantity: 920 },

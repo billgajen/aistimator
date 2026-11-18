@@ -28,6 +28,7 @@ import { HERO, MESSAGE_LINE, NOTICES } from '../../apps/web/src/lib/marketing/ho
 import { FEATURE_STEPS } from '../../apps/web/src/lib/marketing/features-copy'
 import { SCREEN_WORDS } from '../../apps/web/src/lib/marketing/screen-words'
 import { planLines, sitePlans } from '../../apps/web/src/lib/marketing/plan-claims'
+import { PRICING_DEMO_LINKS } from '../../apps/web/src/lib/marketing/site-copy'
 
 const cfg = loadEnv()
 const outDir = path.join(ROOT, 'scripts/hardcore-test/results', `${runStamp()}-t167-${shortId()}`)
@@ -58,7 +59,8 @@ for (const pathname of MARKETING_PAGES) {
   for (const problem of findConfidenceLanguage(text)) pageProblems.push(`${pathname}: ${problem}`)
   const slogan = SLOGANS.exec(text)
   // Pricing's plan lines name a plan feature, "Accuracy insights from finished jobs" (not a promise; listed in OWNER-TODO)
-  if (slogan && !(pathname === '/pricing' && /^accura/i.test(slogan[0]) && !SLOGANS.test(text.replace(/Accuracy insights from finished jobs/g, '')))) pageProblems.push(`${pathname}: "${slogan[0]}"`)
+  // (T-181: that plan line no longer has the word in it, so Pricing needs no exception)
+  if (slogan) pageProblems.push(`${pathname}: "${slogan[0]}"`)
   const sets = /AI (sets|prices|quotes|calculates|decides the price)/i.exec(text)
   if (sets) aiSetsPrice.push(`${pathname}: ${sets[0]}`)
 }
@@ -295,14 +297,16 @@ if (!process.env.PLAYWRIGHT_DIR) {
   await pr.goto(`${cfg.appUrl}/pricing`, { waitUntil: 'networkidle' })
   const links = await pr.locator('[data-testid=plan-demo-link]').evaluateAll((els) => els.map((el) => ({ text: (el as HTMLElement).innerText.trim(), href: el.getAttribute('href') })))
   // T-170: how many there are follows the plans the page shows (it was "four or more", when three plans were shown)
-  const demoLinksWanted = sitePlans().flatMap((plan) => planLines(plan)).filter((l) => l.label === 'Hosted estimate pages' || l.label === 'Your branding on every estimate').length
-  check('"Hosted estimate pages" and "Your branding on every estimate" link to /demo on every plan that lists them', links.length === demoLinksWanted && links.length >= 3 && links.every((l) => l.href === '/demo') && links.some((l) => l.text === 'Hosted estimate pages') && links.some((l) => l.text === 'Your branding on every estimate'), links.length)
+  // T-181: the two lines are worded as what the business gets; their words come from the copy file
+  const DEMO_LINES: string[] = [PRICING_DEMO_LINKS.hostedPages, PRICING_DEMO_LINKS.branding]
+  const demoLinksWanted = sitePlans().flatMap((plan) => planLines(plan)).filter((l) => DEMO_LINES.includes(l.label)).length
+  check('the estimate-page line and the own-brand line link to /demo on every plan that lists them', links.length === demoLinksWanted && links.length >= 3 && links.every((l) => l.href === '/demo') && DEMO_LINES.every((label) => links.some((l) => l.text === label)), links)
   const pricingText = (await pr.locator('main').innerText()).replace(/\s+/g, ' ')
   // T-170: a plan line that is not live yet says so
   const later = await pr.locator('[data-testid=plan-line][data-live=false]').evaluateAll((els) => els.map((el) => (el as HTMLElement).innerText.replace(/\s+/g, ' ').trim()))
   // (the owner's decision: Business is left off the page until a line of its own is live, so these are Pro's)
   const laterWanted = sitePlans().flatMap((plan) => planLines(plan).filter((l) => !l.live).map((l) => l.label))
-  check(`Pricing marks every line that is not live yet "Coming later" (T-170): ${[...new Set(laterWanted)].join(', ')}`, later.length === laterWanted.length && later.length >= 3 && later.every((l) => l.endsWith('Coming later')) && laterWanted.every((label) => later.some((l) => l.includes(label))), later)
+  check(`Pricing marks every line that is not live yet "Coming later" (T-170): ${[...new Set(laterWanted)].join(', ')}`, later.length === laterWanted.length && later.length >= 2 && later.every((l) => l.endsWith('Coming later')) && laterWanted.every((label) => later.some((l) => l.includes(label))), later)
   check('Pricing no longer lists "AI chat", and its answer says the AI works out the job', !/AI chat/.test(pricingText) && pricingText.includes('The AI works out the job; the price is calculated from the prices you set.'))
   await pctx.close()
   await browser.close()

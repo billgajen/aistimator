@@ -38,6 +38,7 @@ const MARKETING_FILES = [
   'app/painting/page.tsx',
   'app/terms/page.tsx',
   'app/privacy/page.tsx',
+  'app/data-deletion/page.tsx', // T-181
   'app/opengraph-image.tsx',
   'components/marketing/TradeLanding.tsx',
   'components/marketing/ProductStrip.tsx',
@@ -84,7 +85,8 @@ describe('T-154: the approved copy', () => {
   })
 
   it('T-155: the small line under the hero buttons doesn’t contradict "on your website"', () => {
-    expect(HERO.smallLine).toBe('For contractors and home-service businesses. No website? Use your quote link.')
+    // T-181: any business, small to corporate (it named contractors and home-service businesses only)
+    expect(HERO.smallLine).toBe('For any business that quotes for its work, small to corporate. No website? Use your quote link.')
     expect(code('app/page.tsx')).toContain('{HERO.smallLine}')
     // trade pages keep their own line (T-167: it carries the message; its words live in site-copy.ts)
     expect(code('components/marketing/TradeLanding.tsx')).toContain('{TRADE_SMALL_LINE}')
@@ -192,7 +194,10 @@ describe('T-154: visuals priced from the packs', () => {
     }
     expect(marketingExample().total).toBe(375) // the home page: the demo's spring pair
     expect(marketingExample('water-heaters').total).toBe(2150)
-    expect(marketingExample('painting').total).toBe(825)
+    // T-181: three rooms, as in the customer's message on Home ($75 + 3 × $375); it was two rooms, $825
+    expect(marketingExample('painting').total).toBe(1200)
+    expect(marketingExample('painting').lines.map((l) => l.label)).toContain('Walls & ceilings, 3 rooms')
+    expect(marketingExample('painting').answer).toBe('3')
   })
 
   it('every trade page has its own example', () => {

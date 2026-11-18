@@ -224,9 +224,16 @@ describe('T-170: Pricing says only what a business can use today', () => {
 
   it('a line that is not live is listed after the live ones and marked "Coming later"', () => {
     const [starter, pro, business] = offeredPlans()
-    expect(planLines(starter!).map((l) => [l.label, l.live])).toEqual([['Website widget', true], ['Hosted estimate pages', true]])
-    expect(planLines(pro!).filter((l) => !l.live).map((l) => l.label)).toEqual(['Quoting by text (SMS)', 'WhatsApp quoting', 'On-site app for your phone'])
-    expect(planLines(business!).filter((l) => !l.live).map((l) => l.label)).toEqual(['Quoting by text (SMS)', 'WhatsApp quoting', 'On-site app for your phone', 'LiDAR room scanning on site', 'Multiple team members', 'Priority support'])
+    // T-181: each line says what the business gets, and text messages are not on the site at all
+    expect(planLines(starter!).map((l) => [l.label, l.live])).toEqual([
+      ['Customers see your price straight away, on your website or from a link you share', true],
+      ['Every customer gets their own estimate page to open, accept and come back to', true],
+    ])
+    expect(planLines(pro!).filter((l) => l.live).map((l) => l.label).slice(2)).toEqual(['Estimates under your brand alone, with no badge of ours', 'See how your estimates compare with your final invoices'])
+    expect(planLines(pro!).filter((l) => !l.live).map((l) => l.label)).toEqual(['Quotes inside WhatsApp, on your own number', 'An app for pricing a job while you are on site'])
+    expect(planLines(business!).filter((l) => !l.live).map((l) => l.label)).toEqual(['Quotes inside WhatsApp, on your own number', 'An app for pricing a job while you are on site', 'Measure a room by scanning it with your phone', 'Logins for your whole team', 'Faster answers from us when you need help'])
+    for (const plan of offeredPlans()) expect(planLines(plan).map((l) => l.label).join(' '), plan.id).not.toMatch(/\bSMS\b|text message|by text/i)
+    expect(PLAN_CHANNEL_LINES.sms.shown).toBe(false)
     for (const plan of offeredPlans()) {
       const lines = planLines(plan)
       const firstLater = lines.findIndex((l) => !l.live)
@@ -272,6 +279,7 @@ describe('T-170: Pricing says only what a business can use today', () => {
     for (const line of [...Object.values(PLAN_CHANNEL_LINES), ...Object.values(PLAN_FEATURE_LINES), PLAN_HOSTED_PAGES]) expect(line.found.length, line.label).toBeGreaterThan(30)
     // every channel and every feature a plan on offer includes has a line
     for (const plan of offeredPlans()) {
+      // (T-181: the text-message channel keeps its record of what was found, and is shown nowhere)
       for (const channel of plan.channels) expect(PLAN_CHANNEL_LINES[channel], channel).toBeTruthy()
       for (const key of ['custom_branding', 'calibration_insights', 'lidar_scanning', 'multiple_users', 'priority_support'] as const) if (plan.features[key]) expect(planLines(plan).some((l) => l.label === PLAN_FEATURE_LINES[key]!.label), `${plan.id} ${key}`).toBe(true)
     }

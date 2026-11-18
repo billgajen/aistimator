@@ -9,7 +9,8 @@ import { MESSAGE_LINE } from './home-copy'
 
 export const FOOTER = {
   /** Under the wordmark */
-  tagline: says(['photo-notes', 'pricing-engine'], 'Instant, professional quotes for service businesses. The AI works out the job. Your prices work out the cost.'),
+  // T-181: any business, small to corporate (it used to name one kind of business)
+  tagline: says(['photo-notes', 'pricing-engine'], 'Instant, professional quotes for any business, small or large. The AI works out the job. Your prices work out the cost.'),
   /** After the copyright line */
   closing: MESSAGE_LINE,
 } as const
@@ -39,11 +40,18 @@ export const PRICING_AI_FAQ = {
   ),
 } as const
 
+/**
+ * T-181: the page that says how to have data deleted. Its address is also what goes in the Meta app's
+ * "Data deletion instructions URL" (OWNER-TODO, T-181). The footer links to it.
+ */
+export const DATA_DELETION = { href: '/data-deletion', label: 'Delete your data' } as const
+
 /** Pricing page: the two plan lines that are shown, not only told (they link to the live demo) */
 export const PRICING_DEMO_LINKS = {
   href: '/demo',
-  hostedPages: 'Hosted estimate pages',
-  branding: 'Your branding on every estimate',
+  // T-181: said as what the business gets, not as the feature's name
+  hostedPages: 'Every customer gets their own estimate page to open, accept and come back to',
+  branding: 'Estimates under your brand alone, with no badge of ours',
 } as const
 
 /** /demo: under the estimate */

@@ -135,18 +135,27 @@ of those things exist yet is in `apps/web/src/lib/marketing/plan-claims.ts`, whi
 not live is listed after the live ones and marked "Coming later"; none is dropped and none is shown as live that
 is not. Checked against the code and the production setup on 2026-11-16.
 
+**T-181 (2026-11-18):** each line is now worded as what the business gets, not as the feature's name (the
+feature behind each is unchanged; the old names were "Website widget", "Hosted estimate pages", "Your branding
+on every estimate", "Accuracy insights from finished jobs", "Quoting by text (SMS)", "WhatsApp quoting", "On-site
+app for your phone", "LiDAR room scanning on site", "Multiple team members", "Priority support"). Text messages
+are no longer on the site at all, not even as "Coming later" (the owner's decision); the plans still include the
+channel. WhatsApp has run for our own test business since 17 November, and stays "coming later" until Meta has
+reviewed the app, because no other business can connect a number before that. Home's plan cards list the live
+lines only.
+
 | Line on Pricing | Plans | Today | What was found |
 |---|---|---|---|
-| Website widget | all | live | The embed code and the hosted quote link work on every plan. |
-| Hosted estimate pages | all | live | Every estimate has its own page. |
-| Your branding on every estimate | Pro, Business | live | Enforced by plan (`hasCustomBranding`): the "Prepared with Qolumns" badge is left off the estimate. The business's logo and colour are on every plan, Starter included, so the line promises a little more than the plan adds. |
-| Accuracy insights from finished jobs | Pro, Business | live | Analytics has the panel (T-143): it compares estimates with the final invoices a business records on a quote. **It is not held back from Starter or the free allowance**: no code checks `calibration_insights`. True for Pro and Business; not exclusive to them. |
-| Quoting by text (SMS) | Pro, Business | **coming later** | Built (`lib/sms-intake.ts`, `/app/sms`). Production runs it in test mode with no number provider, so no business has a number. |
-| WhatsApp quoting | Pro, Business | **coming later** | Built, with a setup page in the dashboard. Production has no WhatsApp keys and no conversation has ever run (section 4, `whatsapp-conversation`). Sharing the quote link in a WhatsApp chat works on every plan and is not this. |
-| On-site app for your phone | Pro, Business | **coming later** | Built (`apps/mobile`). It is in no app store and no business has it. |
-| LiDAR room scanning on site | Business | **coming later** | Built in the on-site app (T-138), in a build that has never been shipped. Nothing checks `lidar_scanning`. |
-| Multiple team members | Business | **coming later** | Not built: there is no way to invite a second person to a business. |
-| Priority support | Business | **coming later** | The site has no support address (`SUPPORT_EMAIL` is empty), so there is no support to give priority in. |
+| Customers see your price straight away, on your website or from a link you share | all | live | The embed code and the hosted quote link work on every plan. |
+| Every customer gets their own estimate page to open, accept and come back to | all | live | Every estimate has its own page. |
+| Estimates under your brand alone, with no badge of ours | Pro, Business | live | Enforced by plan (`hasCustomBranding`): the "Prepared with Qolumns" badge is left off the estimate. The business's logo and colour are on every plan, Starter included, so the line promises a little more than the plan adds. |
+| See how your estimates compare with your final invoices | Pro, Business | live | Analytics has the panel (T-143): it compares estimates with the final invoices a business records on a quote. **It is not held back from Starter or the free allowance**: no code checks `calibration_insights`. True for Pro and Business; not exclusive to them. |
+| Quoting by text message | Pro, Business | **not shown on the site (T-181)** | Built (`lib/sms-intake.ts`, `/app/sms`). Production runs it in test mode with no number provider, so no business has a number. |
+| Quotes inside WhatsApp, on your own number | Pro, Business | **coming later** | Built, with a setup page in the dashboard. Production has no WhatsApp keys and no conversation has ever run (section 4, `whatsapp-conversation`). Sharing the quote link in a WhatsApp chat works on every plan and is not this. |
+| An app for pricing a job while you are on site | Pro, Business | **coming later** | Built (`apps/mobile`). It is in no app store and no business has it. |
+| Measure a room by scanning it with your phone | Business | **coming later** | Built in the on-site app (T-138), in a build that has never been shipped. Nothing checks `lidar_scanning`. |
+| Logins for your whole team | Business | **coming later** | Not built: there is no way to invite a second person to a business. |
+| Faster answers from us when you need help | Business | **coming later** | The site has no support address (`SUPPORT_EMAIL` is empty), so there is no support to give priority in. |
 
 **Also changed on that page:** the plans' own taglines name things that are not live ("Website, text and WhatsApp
 — plus the on-site app", "On-site measurement with LiDAR scanning"), so Pricing shows a line of its own for Pro

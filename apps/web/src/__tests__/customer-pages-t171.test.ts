@@ -262,7 +262,8 @@ describe('T-171: the billing page, and the small leftovers', () => {
     expect(billing).not.toMatch(/FeatureItem|label="LiDAR scanning"|label="Quoting by text/)
     // Business stays on offer there, with its lines marked
     const business = offeredPlans().find((p) => p.id === 'plan_us_business')!
-    expect(planLines(business).filter((l) => !l.live).length).toBe(6)
+    // T-181: five, not six: text messages are no longer on any page
+    expect(planLines(business).filter((l) => !l.live).length).toBe(5)
     expect(read('apps/web/src/app/api/billing/route.ts')).toContain('offeredPlans().map((p) => toPlanInfo(p))')
   })
 

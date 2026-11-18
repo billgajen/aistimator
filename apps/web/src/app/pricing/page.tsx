@@ -4,7 +4,7 @@ import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { MAIN_CTA } from '@/lib/marketing/cta'
 import { PRICING_AI_FAQ, PRICING_DEMO_LINKS } from '@/lib/marketing/site-copy'
-import { COMING_LATER, PLUS_TAX, PRICING_DESCRIPTION, PRICING_LEAD, PRICING_TAGLINES, planLines, sitePlans } from '@/lib/marketing/plan-claims'
+import { BILLED_IN_ADVANCE, COMING_LATER, PLUS_TAX, PRICING_DESCRIPTION, PRICING_LEAD, PRICING_TAGLINES, planLines, sitePlans } from '@/lib/marketing/plan-claims'
 import { formatMoney, freeOfferLabel, FREE_ALLOWANCE, PRODUCT_NAME } from '@qolumns/shared'
 
 export const metadata: Metadata = {
@@ -173,7 +173,7 @@ export default function PricingPage() {
           })}
         </div>
         <p className="mt-8 text-center text-xs text-text-muted">
-          Prices in USD, excluding sales tax. Change or cancel your plan anytime from billing.
+          Prices in USD, excluding sales tax. {BILLED_IN_ADVANCE} Change or cancel your plan anytime from billing.
         </p>
       </section>
 
