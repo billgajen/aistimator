@@ -433,7 +433,8 @@ if (!process.env.PLAYWRIGHT_DIR) {
 
     // the footer and the skip link
     const footLinks = await p.locator('footer a').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)))
-    if (width < 500) check(`${width}: every footer link is 44 px tall`, footLinks.length === 13 && Math.min(...footLinks) >= 44, Math.min(...footLinks))
+    // T-181: fourteen links, with "Delete your data" (it was thirteen)
+    if (width < 500) check(`${width}: every footer link is 44 px tall`, footLinks.length === 14 && Math.min(...footLinks) >= 44, Math.min(...footLinks))
     // a fresh load, so Tab starts from the top of the page
     await p.goto(HOME, { waitUntil: 'domcontentloaded' })
     await p.locator('[data-testid=skip-link]').waitFor({ state: 'attached' })
