@@ -2525,26 +2525,28 @@ is unsupported, so nothing was built around it.
 
 ## T-179 miss on production (found 18 November), and two small T-180 items
 
-**Fixed, checked, committed and pushed. Nothing is deployed yet.** No request was sent to production. I read
+**Fixed, checked, committed and pushed. The worker is live (18 November, version `1ef39c4d`); the web app is
+not deployed yet.** No request was sent to production. I read
 production twice, read-only: the three service configurations and that one quote; and which migration it is at.
 
 ### 1. What waits for you
 
-- [ ] **`bash scripts/deploy-migration-44.sh` is safe to run again.** It failed on its own Before check
+- [x] **`bash scripts/deploy-migration-44.sh` is safe to run again.** (You ran it; production is at 44.) It failed on its own Before check
   (my mistake: the check counted from a column the migration creates; nothing was applied). Fixed, and this
   time run whole against a copy of the database at migration 43, and again at 44. Read-only on production, the
   fixed Before check answers: migration 43, every new count 0, 1 subscription. You should see the same line
   under "Before", then "OK", then under "After": latest 44, usage_functions 3, usage_functions_open_to_users 0,
   subscription_columns 4, tenant_columns 3, billing_guard 1, new_tables 2, subscriptions 1,
   suspended_businesses 0.
-- [ ] **Migration 44, then tell me (or I look again).** The fix is in the worker, and its checks pass, but I
+- [x] **Worker deployed after migration 44** (`/health` ok; calls with no token refused). Why it waited:
+  **Migration 44, then tell me (or I look again).** The fix is in the worker, and its checks pass, but I
   did not deploy the worker: this worker build also carries T-180's new "sent" counter, which needs a
   database function that migration 44 creates. Production was still at migration 43 when my checks finished.
   Deployed first, every sent quote would log a failed count and "estimates sent" would stop counting. As soon
   as migration 44 is in, I deploy the worker (`npx wrangler deploy --env production`).
 - [ ] **"Vercel is set"** when the live Stripe script has run and the settings are in Vercel. Then I deploy the
   web app, run the read-only live checks, and record the deploy.
-- [ ] **Re-test by hand after the worker is live:** the same request as quote `qte_99acc0a15ce6d59d082e70f1`
+- [ ] **Re-test by hand, now that the worker is live:** the same request as quote `qte_99acc0a15ce6d59d082e70f1`
   (wallpaper, with the note about painting). The estimate should carry a card for the painting service with
   the customer's words, and the wording should not say "quoted separately" or list the painting under "Not
   included". The old quote itself is not changed.

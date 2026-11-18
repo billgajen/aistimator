@@ -17,7 +17,7 @@
 
 ### 2026-11-18: T-179 miss found on production: an explicit "I also want X" produced no card (AD-064); two small T-180 items
 
-**Not deployed yet (see "Deploy state" at the end of this entry).** No request was sent to production. Production
+**Worker deployed 2026-11-18** (see "Deploy state" at the end of this entry). The web app is not deployed yet. No request was sent to production. Production
 was read twice, read-only: the business's three service configurations and the one quote, and which migration
 it is at.
 
@@ -145,12 +145,16 @@ longer list the painting and the notes no longer say "quoted separately".
 
 #### Deploy state
 
-- **Committed and pushed. Nothing deployed.**
-- **The worker is not deployed, although the fix is in the worker and its checks pass.** The same worker
-  build carries T-180's atomic "sent" counter, which calls `increment_usage_counter`, a function that exists
-  only after migration 44. Production was still at migration 43 when the checks finished (read-only look).
-  Deployed before it, every sent quote would log a failed counter and "estimates sent" would stop counting.
-  The order in OWNER-TODO (T-180) stands: migration 44, then the worker. The worker goes out as soon as 44 is in.
+- **The worker was held until migration 44 was in.** The same worker build carries T-180's atomic "sent"
+  counter, which calls `increment_usage_counter`, a function that exists only after migration 44. Production
+  was still at migration 43 when the checks finished. Deployed before it, every sent quote would have logged
+  a failed counter and "estimates sent" would have stopped counting.
+- **Migration 44: applied by the owner** (`scripts/deploy-migration-44.sh`, after the fix above). Read-only
+  afterwards: latest `00000000000044`, the three usage functions present.
+- **Worker: deployed** from commit `1ef7736`, `npx wrangler deploy --env production`, version
+  `1ef39c4d-4a59-4fbf-9d4f-2d0b6b3d5f86`. Read-only checks: `/health` ok (`hasRedis: false`, as decided in
+  AD-060; Supabase and the model present); `/section` and `/process` with no token: 401. No request was sent
+  through it. The owner re-tests the reported case by hand.
 - **The web app waits for the owner's "Vercel is set"** (the billing line, the Terms, and all of T-180's web
   side).
 
