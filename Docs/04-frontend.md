@@ -461,7 +461,9 @@ Must be:
   gave is filled in and marked "Filled in from your note. Change it if it is not right."). Once added, the
   breakdown shows each service as a section with its subtotal, then one total; an added section has "Remove"
   until the quote is accepted. Something the business does not offer shows only "We’ll confirm “…” with you
-  separately." (`components/quote/AlsoAskedCards.tsx`). The dashboard quote page shows "Customer also asked
+  separately." (`components/quote/AlsoAskedCards.tsx`). A service that holds until approved shows no price on
+  its card or once added: its part reads "<business> will confirm this part", the main price and the total stay
+  as they were, and accepting waits for the business. The dashboard quote page shows "Customer also asked
   for" with each state beside "Check the service", and the pricing in sections
   (`components/quotes/CustomerAlsoAsked.tsx`); the quote editor adds or removes a service section
   (`components/quote-editor/ServiceSectionsEditor.tsx`).

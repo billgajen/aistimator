@@ -49,7 +49,7 @@ import { initializeFusionFromStructuredSignals } from './agents/signal-fusion'
 import { evaluateQualityGate } from './agents/quality-gate'
 import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
 import type { QualityGateResult, ClarificationQuestion } from '@qolumns/shared'
-import { AiUsageMeter, CHECKER_SETTINGS_VERSION, serviceSuggestionOf, suggestedServiceReason, alsoAskedOf, MAX_ADDED_SECTIONS } from '@qolumns/shared'
+import { AiUsageMeter, CHECKER_SETTINGS_VERSION, serviceSuggestionOf, suggestedServiceReason, alsoAskedOf, MAX_ADDED_SECTIONS, sectionPriceWaits } from '@qolumns/shared'
 import type { AlsoAsked } from '@qolumns/shared'
 import { priceSection, withoutMentionsOf } from './section-pricing'
 import { declinedOrOnlyAsked, coveredByMainService, sentenceAround } from './ai/service-detection'
@@ -1896,6 +1896,7 @@ export async function processQuote(
           continue
         }
         let questions = priced.ready ? [] : priced.questions
+        const waits = sectionPriceWaits(reviewModeOf(service), priced.reviewMode)
         if (questions.length > 0 && noteAi && projectDescription) {
           const prefill = await prefillSectionAnswers(noteAi, priced.serviceName, questions, projectDescription)
           questions = questions.map((q) => (prefill[q.key] !== undefined ? { ...q, prefill: prefill[q.key] } : q))
@@ -1906,7 +1907,9 @@ export async function processQuote(
           serviceId: rec.serviceId,
           serviceName: priced.serviceName,
           state: 'offered',
-          ...(priced.ready ? { price: priced.section.subtotal } : { questions }),
+          // a service the business approves first shows the customer no price, on the card or once added
+          ...(waits ? { priceOnApproval: true } : priced.ready ? { price: priced.section.subtotal } : {}),
+          ...(!priced.ready && { questions }),
         })
       } catch (error) {
         console.error(`[Processor] Could not prepare ${rec.serviceName} as a section:`, error instanceof Error ? error.name : 'unknown error')

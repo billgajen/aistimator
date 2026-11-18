@@ -24,7 +24,7 @@ import { ROOT, loadEnv, makeSupabase, sessionCookieHeader, http as call, expectO
 import { generateQuotePdfHtml } from '../../apps/web/src/lib/pdf-template'
 import { sectionsEmailHtml } from '../../apps/web/src/lib/sections-email'
 import { requestUpdatedEmail } from '../../apps/web/src/lib/request-updated-email'
-import { notOfferedLine, questionsToAddLabel } from '../../packages/shared/src/quote-sections'
+import { notOfferedLine, questionsToAddLabel, willConfirmLine } from '../../packages/shared/src/quote-sections'
 
 type Row = Record<string, unknown>
 const MOCK_PORT = 8796
@@ -169,7 +169,7 @@ const view = (quoteId: string, token: string) => call('GET', `${app}/api/public/
 const addSection = (quoteId: string, token: string, serviceId: string, answers?: Row[]) => call('POST', `${app}/api/public/quotes/${quoteId}/sections`, { body: { token, serviceId, ...(answers && { answers }) } })
 const removeSection = (quoteId: string, token: string, serviceId: string) => call('DELETE', `${app}/api/public/quotes/${quoteId}/sections`, { body: { token, serviceId } })
 const usage = async () => Number((((await sb.select('usage_counters', `tenant_id=eq.${tenantId}&select=estimates_created`)) as Row[])[0] ?? {}).estimates_created ?? 0)
-type Asked = { id: string; words: string; serviceId: string | null; serviceName?: string; state: string; price?: number; questions?: Array<{ key: string; label: string; type: string; prefill?: unknown }> }
+type Asked = { id: string; words: string; serviceId: string | null; serviceName?: string; state: string; price?: number; priceOnApproval?: boolean; questions?: Array<{ key: string; label: string; type: string; prefill?: unknown }> }
 const askedOf = (row: Row) => (((row.content_json as Row | null)?.alsoAsked as Asked[] | undefined) ?? [])
 const pricingOf = (row: Row) => row.pricing_json as { subtotal: number; taxAmount: number; total: number; breakdown: Row[]; sections?: Array<{ serviceId: string; subtotal: number; breakdown: Array<{ label: string; amount: number; kind?: string }>; addedBy: string }> }
 
@@ -410,6 +410,79 @@ const vOld = await view(old.json.quoteId, tokenOf(old.json.quoteViewUrl))
 check('its "other services you mentioned" box is still served; it has no sections and no cards', vOld.ok && vOld.json?.crossServicePricing?.length === 1 && !vOld.json?.sections && !vOld.json?.alsoAsked && vOld.json?.pricing?.total === A_TOTAL, { cross: vOld.json?.crossServicePricing?.length })
 
 // =====================================================================================
+section('12a. An added service that holds until approved: its part has no price, the rest stays as it was')
+// the same key order every time, so two stored quotes can be compared exactly
+const stable = (value: unknown): string =>
+  JSON.stringify(value, (_key, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v as Row).sort(([a], [b]) => a.localeCompare(b))) : v))
+const betaFigure = (text: string) => /"(amount|subtotal|price|total|minimumCharge|taxAmount)":\s*(180|150|30|380|38|418)\b/.test(text)
+await patch('services', `id=eq.${betaId}`, { auto_send: false, hold_until_approved: true })
+const heldReq = await submit(who('Greta Lindqvist'), `NOTE-BETA An alpha visit please. ${WORDS.beta}.`)
+const qHeld = { id: heldReq.json.quoteId as string, token: tokenOf(heldReq.json.quoteViewUrl) }
+const rHeld = await settle(qHeld.id)
+const askedHeld = askedOf(rHeld)
+check(
+  `${ALPHA.name} still sends on its own, and the card for ${BETA.name} carries no price: the business confirms it first`,
+  rHeld.status === 'sent' && pricingOf(rHeld).total === A_TOTAL && askedHeld.length === 1 && askedHeld[0]!.state === 'offered' && askedHeld[0]!.priceOnApproval === true && askedHeld[0]!.price === undefined,
+  { status: rHeld.status, asked: askedHeld }
+)
+const vHeldBefore = await view(qHeld.id, qHeld.token)
+const beforeHeldAdd = await quoteRow(qHeld.id)
+const addHeld = await addSection(qHeld.id, qHeld.token, betaId)
+const afterHeldAdd = await quoteRow(qHeld.id)
+const pHeld = pricingOf(afterHeldAdd)
+check('adding it works, and the answer to the customer’s browser carries no figures', addHeld.status === 200 && addHeld.json?.pricing === undefined && !betaFigure(JSON.stringify(addHeld.json)), addHeld.json)
+check(
+  'the business’s copy has the whole quote: both sections, the combined total, and the part marked as waiting for approval',
+  pHeld.total === money(combinedSubtotal * (1 + TAX)) && pHeld.sections?.length === 1 && pHeld.sections[0]!.subtotal === BETA.minimum && (pHeld.sections[0] as Row).awaitingApproval === true,
+  { total: pHeld.total, section: pHeld.sections?.[0] }
+)
+check('the quote waits for the business but is NOT hidden: still shown to the customer', afterHeldAdd.status === 'pending_review' && afterHeldAdd.review_hold === 'shown', { status: afterHeldAdd.status, hold: afterHeldAdd.review_hold })
+const vHeld = await view(qHeld.id, qHeld.token)
+check(
+  `the customer still sees the main price exactly as it was ($${A_TOTAL}): same lines, subtotal, tax and total`,
+  vHeld.ok && vHeld.json.pricing.total === A_TOTAL && vHeld.json.pricing.subtotal === ALPHA.price && vHeld.json.pricing.taxAmount === vHeldBefore.json.pricing.taxAmount && stable(vHeld.json.pricing.breakdown) === stable(vHeldBefore.json.pricing.breakdown),
+  { total: vHeld.json?.pricing?.total, subtotal: vHeld.json?.pricing?.subtotal }
+)
+const heldParts = (vHeld.json?.sections ?? []) as Row[]
+check(
+  `the added part is named with no price: no lines, no subtotal (the page says "${willConfirmLine(businessName)}")`,
+  heldParts.length === 2 && heldParts[0]!.main === true && heldParts[0]!.subtotal === ALPHA.price && heldParts[1]!.serviceName === BETA.name && heldParts[1]!.awaitingApproval === true && (heldParts[1]!.lines as Row[]).length === 0 && heldParts[1]!.subtotal === 0,
+  heldParts.map((part) => [part.serviceName, part.subtotal, part.awaitingApproval])
+)
+check('nothing the customer’s page is given carries that part’s price, the combined total or a PDF link', !betaFigure(JSON.stringify(vHeld.json)) && !vHeld.json?.actions?.pdfUrl && !(vHeld.json?.alsoAsked as Asked[] | undefined)?.some((a) => a.price !== undefined))
+const acceptHeld = await call('POST', `${app}/api/public/quotes/${qHeld.id}/accept`, { body: { token: qHeld.token } })
+check('accepting is locked until the business approves', vHeld.json?.acceptQuoteEnabled === false && vHeld.json?.review?.confirmationPending === true && !acceptHeld.ok && (await quoteRow(qHeld.id)).status === 'pending_review', { accept: acceptHeld.status })
+const rmHeld = await removeSection(qHeld.id, qHeld.token, betaId)
+const afterHeldRemove = await quoteRow(qHeld.id)
+check(
+  'removing the part restores the quote exactly as it was: the same stored price, status, approval and card',
+  rmHeld.status === 200 && stable(afterHeldRemove.pricing_json) === stable(beforeHeldAdd.pricing_json) && afterHeldRemove.status === beforeHeldAdd.status && afterHeldRemove.review_hold === beforeHeldAdd.review_hold &&
+    afterHeldRemove.approved_at === beforeHeldAdd.approved_at && stable(askedOf(afterHeldRemove)) === stable(askedOf(beforeHeldAdd)) && (afterHeldRemove.content_json as Row).sectionsBefore === undefined,
+  { status: [beforeHeldAdd.status, afterHeldRemove.status], same: stable(afterHeldRemove.pricing_json) === stable(beforeHeldAdd.pricing_json) }
+)
+const vHeldAfter = await view(qHeld.id, qHeld.token)
+check('… and the customer’s page is as it was before they added it', stable(vHeldAfter.json?.pricing) === stable(vHeldBefore.json?.pricing) && !vHeldAfter.json?.sections && vHeldAfter.json?.alsoAsked?.[0]?.state === 'offered')
+// added again, then the business approves: now the part shows with its price, and the customer can accept
+await addSection(qHeld.id, qHeld.token, betaId)
+const dashHeld = await call('GET', `${app}/api/quotes/${qHeld.id}`, { headers: cookie })
+check('the business sees the full price of the waiting quote', (dashHeld.json?.quote?.pricing_json as Row | undefined)?.total === money(combinedSubtotal * (1 + TAX)), (dashHeld.json?.quote?.pricing_json as Row | undefined)?.total)
+const heldNotice = requestUpdatedEmail({ customerName: 'Greta Lindqvist', mainServiceName: ALPHA.name, changedServiceName: BETA.name, change: 'added', pricing: (await quoteRow(qHeld.id)).pricing_json as never, locale: 'en-US', awaitingApproval: true, dashboardUrl: `${app}/app/quotes/${qHeld.id}` })
+check('the business’s notice says the customer sees no price for that part until it approves', heldNotice.html.includes(`The customer sees no price for ${BETA.name} until you approve.`) && heldNotice.html.includes('$418.00'))
+// a second quote is left waiting, for the pages in section 13
+const heldPageReq = await submit(who('Oskar Brandt'), `NOTE-BETA An alpha visit please. ${WORDS.beta}.`)
+const qHeldPage = { id: heldPageReq.json.quoteId as string, token: tokenOf(heldPageReq.json.quoteViewUrl), url: String(heldPageReq.json.quoteViewUrl) }
+await settle(qHeldPage.id)
+const approveHeld = await call('POST', `${app}/api/quotes/${qHeld.id}/approve`, { headers: cookie })
+const vApproved = await view(qHeld.id, qHeld.token)
+check(
+  'once the business approves, the part shows with its price, the total is the combined one, and the customer can accept',
+  approveHeld.ok && vApproved.json?.status !== 'pending_review' && vApproved.json?.pricing?.total === money(combinedSubtotal * (1 + TAX)) && vApproved.json?.sections?.length === 2 && vApproved.json.sections[1].subtotal === BETA.minimum &&
+    vApproved.json.sections[1].awaitingApproval === undefined && vApproved.json?.acceptQuoteEnabled !== false,
+  { approve: approveHeld.status, status: vApproved.json?.status, total: vApproved.json?.pricing?.total }
+)
+await patch('services', `id=eq.${betaId}`, { auto_send: false, hold_until_approved: false })
+
+// =====================================================================================
 section('13. The pages, in a browser')
 if (!process.env.PLAYWRIGHT_DIR) {
   notChecked.push('The customer’s quote page, the dashboard and the editor in a browser (set PLAYWRIGHT_DIR).')
@@ -469,6 +542,34 @@ try {
     await ctx.close()
   }
 
+  // ---- a service that holds until approved: no price on the card or on its part; the main price stays ----
+  {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 900 }, reducedMotion: 'reduce' })
+    const page = await ctx.newPage()
+    await page.goto(qHeldPage.url)
+    await page.getByTestId('also-asked-card').waitFor({ timeout: 60_000 })
+    const card = (await page.getByTestId('also-asked-card').innerText()).replace(/\s+/g, ' ')
+    check('hold until approved: the card shows no price, only that the business will confirm this part', card.includes(BETA.name) && card.includes(willConfirmLine(businessName)) && !/\$\d/.test(card) && (await page.getByTestId('also-asked-price').count()) === 0, card)
+    await patch('services', `id=eq.${betaId}`, { auto_send: false, hold_until_approved: true })
+    await page.getByTestId('also-asked-add').click()
+    await page.getByTestId('price-section-awaiting').waitFor({ timeout: 30_000 })
+    await patch('services', `id=eq.${betaId}`, { auto_send: false, hold_until_approved: false })
+    const names = await page.getByTestId('price-section-name').allInnerTexts()
+    const subtotals = await page.getByTestId('price-section-subtotal').allInnerTexts()
+    const bodyText = (await page.locator('body').innerText()).replace(/\s+/g, ' ')
+    check(
+      'hold until approved: after adding, the main price is still there as it was, and the added part reads "<business> will confirm this part" with no price',
+      names.join('|') === `${ALPHA.name}|${BETA.name}` && subtotals.join('|') === '$200.00' && (await page.getByTestId('price-section-awaiting').innerText()).trim() === willConfirmLine(businessName) &&
+        bodyText.includes('$220.00') && !bodyText.includes('$418.00') && !bodyText.includes('$180.00') && !bodyText.includes('$380.00'),
+      { names, subtotals }
+    )
+    check('hold until approved: the customer is told they can accept once the business confirms, and there is no accept button', bodyText.includes(`You can accept once ${businessName} confirms this estimate.`) && (await page.getByRole('button', { name: /accept/i }).count()) === 0)
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    check('hold until approved: nothing runs off the side at 390px', overflow <= 1, overflow)
+    await page.screenshot({ path: path.join(outDir, 'customer-part-awaiting-390.png'), fullPage: true })
+    await ctx.close()
+  }
+
   // ---- not offered ----
   {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 900 }, reducedMotion: 'reduce' })
@@ -501,6 +602,9 @@ try {
   await page.goto(`${app}/app/quotes/${qGamma!.id}`)
   await page.getByTestId('customer-also-asked').waitFor({ timeout: 60_000 })
   check('dashboard: a service the customer added says so, and the price is shown in sections', (await page.getByTestId('also-asked-state').innerText()).trim() === 'Added by the customer' && (await page.getByTestId('quote-section').count()) === 2 && (await page.getByTestId('quote-section-subtotal').allInnerTexts()).join('|') === '$200.00|$180.00')
+  await page.goto(`${app}/app/quotes/${qHeldPage.id}`)
+  await page.getByTestId('also-asked-price-waits').waitFor({ timeout: 60_000 })
+  check('dashboard: the business is told the customer sees no price for the waiting part, and sees the full price itself', (await page.getByTestId('also-asked-price-waits').innerText()).trim() === 'The customer sees no price for this part until you approve.' && (await page.getByTestId('quote-section').count()) === 2 && (await page.locator('body').innerText()).includes('$418.00'))
   await page.goto(`${app}/app/quotes/${qBoat!.id}`)
   await page.getByTestId('customer-also-asked').waitFor({ timeout: 60_000 })
   check('dashboard: something not offered is flagged at the top of the quote', (await page.getByTestId('also-asked-state').innerText()).trim() === 'Not one of your services' && (await page.getByTestId('customer-also-asked').innerText()).includes(WORDS.boat))

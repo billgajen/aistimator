@@ -18,9 +18,12 @@ import {
   alsoAskedOf,
   alsoAskedWithStates,
   isShownEarly,
+  pricingForCustomer,
   resolveRegionContext,
   reviewAfterAdding,
   reviewModeOf,
+  sectionPriceWaits,
+  sectionsAwaitingApproval,
   withSections,
   canCustomerDecide,
 } from '@qolumns/shared'
@@ -133,8 +136,11 @@ const refuse = (status: number, code: string, message: string, questions?: Secti
 
 /**
  * The customer adds a service to their quote. Prices it (worker), stores the
- * section, recomputes the totals, and moves the quote to the strictest review
- * setting among its services.
+ * section, recomputes the totals, and makes the quote wait for the business
+ * unless every service on it sends automatically. What the customer could
+ * already see stays visible; a part whose service holds until approved is
+ * marked so the customer sees no price for that part until the business
+ * approves.
  */
 export async function addSectionForCustomer(
   supabase: Admin,
@@ -161,9 +167,21 @@ export async function addSectionForCustomer(
   }
   if (!priced.ready) return refuse(422, 'ANSWERS_NEEDED', 'A few answers are needed to price this.', priced.questions)
 
-  const section: QuoteSection = { ...priced.section, addedBy: 'customer', addedAt: new Date().toISOString() }
   const { tax, mainService } = await sectionTaxFor(supabase, quote.tenant_id, quote.service_id)
-  const sections = [...existing, section]
+  const section: QuoteSection = {
+    ...priced.section,
+    addedBy: 'customer',
+    addedAt: new Date().toISOString(),
+    // its service (or the main one) holds until approved: no price for this part until the business approves
+    ...(sectionPriceWaits(mainService.mode, priced.reviewMode) && { awaitingApproval: true }),
+  }
+  // A part already on a quote the business has since approved and sent is not waiting any more
+  const kept = quote.status === 'pending_review' ? existing : existing.map((s) => {
+        const approved = { ...s }
+        delete approved.awaitingApproval
+        return approved
+      })
+  const sections = [...kept, section]
   const nextPricing = withSections(pricing, sections, tax)
 
   // Review: the strictest setting among every service now on the quote
@@ -193,6 +211,20 @@ export async function addSectionForCustomer(
     return refuse(500, 'SAVE_FAILED', 'We could not save that just now. Please try again.')
   }
   return { ok: true, pricing: nextPricing, alsoAsked: content.alsoAsked, status: changed ? next.status : quote.status, reviewChanged: changed, section }
+}
+
+/**
+ * The quote's figures as the customer may see them (T-179): a part waiting for
+ * the business's approval is left out of every figure. Reads the tax settings
+ * only when something is waiting.
+ */
+export async function pricingForCustomerView(
+  supabase: Admin,
+  quote: { tenant_id: string; service_id: string; status: string; pricing_json: CombinedPricing }
+): Promise<{ pricing: CombinedPricing; awaiting: QuoteSection[] }> {
+  if (sectionsAwaitingApproval(quote.pricing_json, quote.status).length === 0) return { pricing: quote.pricing_json, awaiting: [] }
+  const { tax } = await sectionTaxFor(supabase, quote.tenant_id, quote.service_id)
+  return pricingForCustomer(quote.pricing_json, quote.status, tax)
 }
 
 /** The customer takes an added service off their quote again (before accepting). */

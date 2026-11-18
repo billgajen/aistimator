@@ -13,10 +13,11 @@ const STATE: Record<AlsoAsked['state'], { label: string; tone: string }> = {
  * added yet, or not one of the business's services. It sits beside T-178's
  * "Check the service" notice, never in place of it.
  *
- * `states` tells apart a service the customer added from one the business
- * added in the editor.
+ * `addedBy` tells apart a service the customer added from one the business
+ * added in the editor. `priceWaits` lists the added services whose price the
+ * customer does not see until the business approves (they hold until approved).
  */
-export function CustomerAlsoAsked({ items, addedBy }: { items: AlsoAsked[]; addedBy?: Record<string, 'customer' | 'business'> }) {
+export function CustomerAlsoAsked({ items, addedBy, priceWaits }: { items: AlsoAsked[]; addedBy?: Record<string, 'customer' | 'business'>; priceWaits?: readonly string[] }) {
   if (items.length === 0) return null
   return (
     <section className="mb-6 rounded-2xl border border-border bg-white p-5 shadow-warm-md" aria-labelledby="also-asked-title" data-testid="customer-also-asked">
@@ -32,6 +33,11 @@ export function CustomerAlsoAsked({ items, addedBy }: { items: AlsoAsked[]; adde
               <div className="min-w-0">
                 {item.serviceName && <p className="text-sm font-semibold text-text-primary">{item.serviceName}</p>}
                 <p className="break-words text-sm text-text-secondary">“{item.words}”</p>
+                {item.state === 'added' && item.serviceId && priceWaits?.includes(item.serviceId) && (
+                  <p className="mt-1 text-sm text-text-secondary" data-testid="also-asked-price-waits">
+                    The customer sees no price for this part until you approve.
+                  </p>
+                )}
                 {item.state === 'not_offered' && (
                   <p className="mt-1 text-sm text-text-secondary">No price was given. The customer was told you will confirm it with them separately.</p>
                 )}

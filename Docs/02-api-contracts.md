@@ -68,18 +68,23 @@ tax once, one accept. No migration: the shape is in `Docs/03-data-model.md`.
 
 - `GET /api/public/quotes/{id}` adds, once the customer can see a price:
   - `alsoAsked[]`: what else the customer asked for in their note. Each
-    `{ id, words, serviceId | null, serviceName?, state: "offered" | "added" | "not_offered", price?, questions? }`.
+    `{ id, words, serviceId | null, serviceName?, state: "offered" | "added" | "not_offered", price?, questions?, priceOnApproval? }`.
+    `priceOnApproval` marks a service the business approves first (hold until approved): it never has a `price`.
     `price` (before tax) is present only when nothing more needs asking; `questions[]` are
     `{ key, label, type: "number" | "text" | "select" | "boolean", options?, unit?, prefill? }`. `prefill` is what
     the note said: a suggestion for the customer to confirm, never used unconfirmed. `not_offered` has no price.
-  - `sections[]` on a combined quote: `{ serviceId, serviceName, main, lines[], minimum, subtotal, addedBy? }`,
-    the main service first. Absent on a single-service quote.
+  - `sections[]` on a combined quote: `{ serviceId, serviceName, main, lines[], minimum, subtotal, addedBy?, awaitingApproval? }`,
+    the main service first. Absent on a single-service quote. A part with `awaitingApproval: true` has no
+    price for the customer yet (`lines: []`, `subtotal: 0`): its service holds until approved and the business
+    has not approved. It is left out of `pricing.subtotal`, `taxAmount`, `total` and the range, which are then
+    the quote as it stood before the part was added; no `actions.pdfUrl` is given while a part waits.
   - `canChangeSections` (the customer can add or remove right now) and `serviceName` (the main service).
   - `pricing.subtotal`, `taxAmount` and `total` are the combined figures; `pricing.breakdown` stays the main
     service's lines.
 - `POST /api/public/quotes/{id}/sections` `{ token, serviceId, answers?: [{ fieldId, value }] }`. Adds a service
-  the customer asked for. The price comes from the worker's rules engine (no AI). Answers `{ pricing, alsoAsked,
-  status }`. **422** `ANSWERS_NEEDED` with `questions[]` when the service's own questions are not all answered
+  the customer asked for. The price comes from the worker's rules engine (no AI). Answers `{ ok, status }` and
+  no figures (the page reads the quote again; a part waiting for approval has a price the customer may not
+  see). **422** `ANSWERS_NEEDED` with `questions[]` when the service's own questions are not all answered
   (a pre-filled value does not count until it is sent). **404** `NOT_OFFERED` for a service the customer did not
   ask for or the business does not price; **409** `ALREADY_ADDED`, `TOO_MANY` (two is the limit) or
   `NOT_CHANGEABLE` (accepted, declined, or not visible to the customer); **503** `TRY_AGAIN` if the price could
@@ -88,9 +93,11 @@ tax once, one accept. No migration: the shape is in `Docs/03-data-model.md`.
 - Both are protected like `/clarify` (AD-055, AD-060): counted by address before anything is read, then the
   link token is checked (**401**), then counted for the quote and for the business (**429**). Limits fail open.
 - Adding a section moves the quote to the strictest review setting among its services: it stays sent only if
-  every service sends automatically; otherwise it is `pending_review` again (visible to the customer unless a
-  service is set to hold until approved). Removing the last added section puts it back where it stood. The
-  business gets one "Request updated" email per change, never a second quote.
+  every service sends automatically; otherwise it is `pending_review` again and cannot be accepted until the
+  business approves. It stays visible to the customer (`review_hold: "shown"`): a service set to hold until
+  approved hides only its own added part (`awaitingApproval`), never the price already seen. Removing the last
+  added section puts the quote back exactly where it stood. The business gets one "Request updated" email per
+  change, never a second quote.
 - `POST /api/quotes/{id}/sections/price` (dashboard) `{ serviceId, answers? }`: what one of the business's other
   services costs as a section. Saves nothing. **200** `{ section }`, **422** `ANSWERS_NEEDED { questions }`,
   **404** `NOT_A_SERVICE` or `NO_PRICE`.

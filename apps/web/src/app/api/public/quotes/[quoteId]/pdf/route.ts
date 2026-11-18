@@ -3,6 +3,7 @@ import { quoteTokenFilter } from '@/lib/tokens'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
+import { sectionsAwaitingApproval } from '@qolumns/shared'
 
 /**
  * GET /api/public/quotes/:quoteId/pdf
@@ -32,7 +33,7 @@ export async function GET(
     // Fetch quote with token validation
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
-      .select('id, quote_token_hash, token_expires_at, pdf_asset_id')
+      .select('id, status, pricing_json, quote_token_hash, token_expires_at, pdf_asset_id')
       .eq('id', quoteId)
       .or(quoteTokenFilter(tokenHash))
       .single()
@@ -52,8 +53,9 @@ export async function GET(
       )
     }
 
-    // Check if PDF exists
-    if (!quote.pdf_asset_id) {
+    // Check if PDF exists. (T-179: none is given while a part the customer added
+    // waits for the business's approval: a PDF carries every price.)
+    if (!quote.pdf_asset_id || sectionsAwaitingApproval(quote.pricing_json as object | null, quote.status as string).length > 0) {
       return NextResponse.json(
         { error: { code: 'PDF_NOT_FOUND', message: 'PDF is not available for this quote' } },
         { status: 404 }

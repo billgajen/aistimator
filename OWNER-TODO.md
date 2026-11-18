@@ -1849,9 +1849,12 @@ worker and the web app changed, so a deploy is the worker first, then the web ap
 - [ ] **Your email.** You should get one "Request updated" email, not a second "new quote" email. No email
   leaves this machine, so I have read its wording but never received it.
 - [ ] **The review rule.** With one service set to send automatically and the other to be reviewed, adding the
-  reviewed one should put the quote back to "Needs your approval". Check that is what you want when a service
-  is set to **hold until approved**: the customer then stops seeing any price (also the main service's, which
-  they had already seen) until you approve. That is "the strictest setting", followed literally.
+  reviewed one should put the quote back to "Needs your approval".
+- [ ] **Hold until approved (softened as you asked, 2026-11-18).** Set a second service to hold until approved,
+  ask for it in a note, and add it on the estimate. The main price and the total should stay exactly as they
+  were; the added part should read "<your business> will confirm this part" with no price; there should be no
+  accept button until you approve. Approve it: the part's price and the combined total appear. Or remove it:
+  the quote is back exactly as it was.
 - [ ] **The PDF.** Download one for a combined quote. The PDF service is not called on this machine; I read the
   page it prints, not a file.
 - [ ] **The on-site app**, if you use it: open a combined quote. It should show the combined total, both
@@ -1870,10 +1873,8 @@ worker and the web app changed, so a deploy is the worker first, then the web ap
 
 ### 3. Found on the way
 
-- [ ] **The plan's usage counter loses counts when requests arrive at the same moment.** Six requests sent
-  together counted as two. It under-counts, so it favours the business, but it is wrong, and it is what the
-  plan limit reads. It needs a counter that adds one inside the database. Not touched in this ticket (it is
-  billing). A small ticket.
+- The plan's usage counter loses counts when requests arrive at the same moment. Moved to **T-180 (Stripe)**,
+  at your instruction; see "T-180 — Stripe" below.
 
 ### Later (seen, not changed)
 
@@ -1893,3 +1894,14 @@ worker and the web app changed, so a deploy is the worker first, then the web ap
 - The dashboard list and Home still name a combined quote by its main service only.
 - The on-site app cannot add or remove a section and does not show the "also asked for" list.
 
+
+## T-180 — Stripe (not started)
+
+Carried here from T-179 at your instruction (2026-11-18). To be fixed in this ticket, not before.
+
+- [ ] **The plan's usage counter loses counts when requests arrive at the same moment.** Six requests sent
+  together counted as two (seen in verify-t179). It under-counts, so it favours the business, but it is wrong,
+  and it is the number the plan limit reads and billing will read. Cause: `incrementUsageCounter` reads the
+  count, adds one, and writes it back, so two requests at once both write the same number. It needs a counter
+  that adds one inside the database (a single `update … set estimates_created = estimates_created + 1`, or a
+  database function), and a check that sends several requests at once and counts them all.

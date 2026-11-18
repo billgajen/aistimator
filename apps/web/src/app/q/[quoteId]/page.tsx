@@ -10,7 +10,7 @@ import { useSearchParams } from 'next/navigation'
 import { brandStyleVars } from '@/lib/color'
 import { timingLabel } from '@/lib/acceptance'
 import type { QuoteViewResponse, QuoteStatus } from '@qolumns/shared'
-import { formatMoney, formatDate, isQuoteProcessing, canCustomerDecide, customerDecisionWords, splitLabelMath, PRODUCT_NAME, splitMinimum, withoutMinimumNote, crossServiceLine, SLOW_PREPARING_MS, slowPreparingLine, failedRequestTitle, failedRequestLine } from '@qolumns/shared'
+import { formatMoney, formatDate, isQuoteProcessing, canCustomerDecide, customerDecisionWords, splitLabelMath, PRODUCT_NAME, splitMinimum, withoutMinimumNote, crossServiceLine, SLOW_PREPARING_MS, slowPreparingLine, failedRequestTitle, failedRequestLine, willConfirmLine } from '@qolumns/shared'
 
 interface QuotePageProps {
   params: { quoteId: string }
@@ -560,16 +560,25 @@ export default function QuotePage({ params }: QuotePageProps) {
                           </button>
                         )}
                       </div>
-                      <PriceLines lines={section.lines} currency={pricing.currency} locale={locale} />
-                      <div className="mt-2.5 space-y-1.5">
-                        <MinimumNote minimumCharge={section.minimum?.minimumCharge} currency={pricing.currency} locale={locale} />
-                        <div className="flex justify-between border-t border-border pt-2 text-sm">
-                          <span className="text-text-secondary">{section.serviceName} subtotal</span>
-                          <span className="figure text-text-primary" data-testid="price-section-subtotal">
-                            {formatCurrency(section.subtotal, pricing.currency, locale)}
-                          </span>
-                        </div>
-                      </div>
+                      {section.awaitingApproval ? (
+                        // its service is approved by the business first: no price for this part yet, and it is not in the total
+                        <p className="border-t border-border pt-2 text-sm text-text-secondary" data-testid="price-section-awaiting">
+                          {willConfirmLine(business.name)}
+                        </p>
+                      ) : (
+                        <>
+                          <PriceLines lines={section.lines} currency={pricing.currency} locale={locale} />
+                          <div className="mt-2.5 space-y-1.5">
+                            <MinimumNote minimumCharge={section.minimum?.minimumCharge} currency={pricing.currency} locale={locale} />
+                            <div className="flex justify-between border-t border-border pt-2 text-sm">
+                              <span className="text-text-secondary">{section.serviceName} subtotal</span>
+                              <span className="figure text-text-primary" data-testid="price-section-subtotal">
+                                {formatCurrency(section.subtotal, pricing.currency, locale)}
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                   {sectionNote && (
@@ -682,6 +691,7 @@ export default function QuotePage({ params }: QuotePageProps) {
                 currency={pricing.currency}
                 locale={locale}
                 canChange={quote.canChangeSections === true && !settled}
+                businessName={business.name}
                 onAdd={addSection}
               />
             )}

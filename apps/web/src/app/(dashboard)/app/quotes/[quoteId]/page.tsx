@@ -3,7 +3,7 @@
 import { AcceptanceCard } from '@/components/quotes/AcceptanceCard'
 import type { AcceptanceDetails } from '@/lib/acceptance'
 import { useEffect, useState, useCallback } from 'react'
-import { formatMoney, quoteActions, quoteTurn, quoteTracker, customerFirstName, splitMinimum, addedSections, alsoAskedOf, alsoAskedWithStates, displaySections } from '@qolumns/shared'
+import { formatMoney, quoteActions, quoteTurn, quoteTracker, customerFirstName, splitMinimum, addedSections, alsoAskedOf, alsoAskedWithStates, displaySections, sectionsAwaitingApproval } from '@qolumns/shared'
 import { NextStepBox } from '@/components/quotes/NextStepBox'
 import { CustomerSent, ServiceSuggestionNote } from '@/components/quotes/CustomerSent'
 import { CustomerAlsoAsked } from '@/components/quotes/CustomerAlsoAsked'
@@ -445,6 +445,7 @@ export default function QuoteDetailPage({
       <CustomerAlsoAsked
         items={alsoAskedWithStates(alsoAskedOf(content), addedSections(pricing))}
         addedBy={Object.fromEntries(addedSections(pricing).map((sec) => [sec.serviceId, sec.addedBy]))}
+        priceWaits={sectionsAwaitingApproval(pricing, quote.status).map((sec) => sec.serviceId)}
       />
 
       {/* T-178: no estimate to read (it failed, or has no price yet): the customer's own answers, to quote it by hand */}

@@ -201,7 +201,7 @@ export function labelledAnswers(answers: readonly RawAnswer[], fields: readonly 
 
 export type SectionPriceResult =
   | { ok: false; reason: 'not_a_service' | 'no_price' | 'failed' }
-  | { ok: true; ready: false; serviceName: string; questions: SectionQuestion[] }
+  | { ok: true; ready: false; serviceName: string; questions: SectionQuestion[]; reviewMode: ReviewMode }
   | { ok: true; ready: true; serviceName: string; section: Omit<QuoteSection, 'addedBy' | 'addedAt'>; reviewMode: ReviewMode }
 
 export interface PriceSectionInput {
@@ -252,7 +252,7 @@ export async function priceSection(supabase: SupabaseClient, env: Env, input: Pr
     if (!run) return { ok: false, reason: 'failed' }
 
     const questions = questionsFor(run, fields, all)
-    if (questions.length > 0) return { ok: true, ready: false, serviceName: run.service.name, questions }
+    if (questions.length > 0) return { ok: true, ready: false, serviceName: run.service.name, questions, reviewMode: reviewModeOf(run.service) }
 
     const subtotal = roundMoney(run.pricing.subtotal)
     // KC-002: nothing is offered at no price

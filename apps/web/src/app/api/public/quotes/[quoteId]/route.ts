@@ -1,17 +1,18 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { quoteTokenFilter } from '@/lib/tokens'
-import { isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange, canCustomerDecide, displaySections, alsoAskedOf, alsoAskedWithStates, addedSections } from '@qolumns/shared'
+import { isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange, canCustomerDecide, displaySectionsForCustomer, alsoAskedOf, alsoAskedWithStates, addedSections } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import { hasCustomBranding } from '@/lib/plan-features'
 import { customerReadLines } from '@/lib/customer-read'
+import { pricingForCustomerView } from '@/lib/quote-sections-service'
 import type {
   QuoteViewResponse,
   QuoteViewBusiness,
   QuoteViewCustomer,
   QuoteViewAsset,
-  QuotePricing,
+  CombinedPricing,
   QuoteContent,
   CrossServicePricing,
   SignalRecommendation,
@@ -143,7 +144,16 @@ export async function GET(
         website?: string | null
       } | null
     }
-    const pricing = quote.pricing_json as QuotePricing
+    // T-179: a part the customer added whose service holds until approved has
+    // no price for them yet. It is left out of every figure below, so the rest
+    // of the quote reads exactly as it did before they added it.
+    const fullPricing = quote.pricing_json as CombinedPricing
+    const { pricing, awaiting: awaitingParts } = await pricingForCustomerView(supabase, {
+      tenant_id: quote.tenant_id as string,
+      service_id: quote.service_id as string,
+      status: quote.status,
+      pricing_json: fullPricing,
+    })
     const content = quote.content_json as QuoteContent & {
       validityDays?: number
       crossServicePricing?: CrossServicePricing[]
@@ -200,7 +210,7 @@ export async function GET(
     }
 
     // Add PDF download URL if PDF exists
-    if (quote.pdf_asset_id) {
+    if (quote.pdf_asset_id && awaitingParts.length === 0) {
       actions.pdfUrl = `${appUrl}/api/public/quotes/${quoteId}/pdf?token=${token}`
     }
 
@@ -288,8 +298,9 @@ export async function GET(
 
     // T-179: a combined quote's sections, and what else the customer asked for
     const mainServiceName = (quote.services as { name?: string } | null)?.name ?? ''
-    const combinedSections = displaySections(pricing, { serviceId: quote.service_id as string, serviceName: mainServiceName })
-    const alsoAsked = alsoAskedWithStates(alsoAskedOf(content), addedSections(pricing))
+    const combinedSections = displaySectionsForCustomer(pricing, awaitingParts, { serviceId: quote.service_id as string, serviceName: mainServiceName })
+    // (from the full quote: a part waiting for approval is still on it, so it is no longer a card)
+    const alsoAsked = alsoAskedWithStates(alsoAskedOf(content), addedSections(fullPricing))
 
     const response: QuoteViewResponse = {
       quoteId: quote.id,

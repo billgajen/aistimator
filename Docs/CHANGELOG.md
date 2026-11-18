@@ -41,6 +41,11 @@ base fee and the old per-unit model only. Now:
    automatically; otherwise it waits for the business again. The business gets one "Request updated" email per
    change (with a fresh approve link when it now needs approving), never a second quote. Removing the last
    added section puts the quote back where it stood.
+   **Hold until approved, softened (owner, 2026-11-18, before the first deploy):** adding a service that holds
+   until approved no longer hides the quote. The main price stays visible exactly as it was; the added part
+   shows "<business> will confirm this part" with no price and is left out of every figure the customer sees;
+   accepting stays locked until the business approves; removing the part restores the quote exactly. See
+   "Hold until approved: only the added part waits" below.
 7. **Something the business does not offer never gets a price.** The customer reads "We’ll confirm “their words”
    with you separately."; the business sees it at the top of the quote.
 8. **Something the main service already covers** (its scope, options, add-ons) is not another service.
@@ -50,6 +55,38 @@ For the business: "Customer also asked for" at the top of the quote, each with i
 not added yet, not one of your services), beside T-178's "Check the service" notice. The quote editor adds or
 removes a service section at that service's price; its lines are edited like any other line. The
 approve-by-email page lists the sections and the total.
+
+#### Hold until approved: only the added part waits (2026-11-18)
+
+As first built, adding a service set to hold until approved moved the whole quote to a hidden hold: the
+customer lost sight of the main price they had already seen. The owner asked for it to be softened.
+
+- **The rule** (`sectionPriceWaits`, `packages/shared/src/quote-sections.ts`): an added part waits when its own
+  service, or the quote's main service, is set to hold until approved. It is stored with
+  `awaitingApproval: true`. The quote itself goes to `pending_review` with `review_hold: 'shown'`, the same as
+  for a "show, then confirm" service: `reviewAfterAdding` never produces `'held'` any more.
+- **What the customer is given** (`pricingForCustomer`, `displaySectionsForCustomer`; used by
+  `GET /api/public/quotes/{id}`): while the quote is `pending_review`, a waiting part is left out of the
+  subtotal, the tax, the total and the range, so those are the quote as it stood before the part was added. The
+  part is listed by name with no lines and no subtotal, and the page prints "<business> will confirm this part".
+  The business's copy (`pricing_json`) always carries the full figures. Once the business approves, the quote
+  is no longer `pending_review` and the part shows with its price; nothing has to be cleared.
+- **Nowhere else leaks the price:** the add and remove calls now answer `{ ok, status }` only (they used to
+  return the stored pricing; the page reads the quote afresh anyway); no PDF link is given and the public PDF
+  route answers 404 while a part waits; the card for such a service carries no price either
+  (`alsoAsked[].priceOnApproval`, set by the worker on the first pass).
+- **Accept stays locked** by the existing rule: a `pending_review` quote cannot be accepted
+  (`canCustomerDecide`), and the page says "You can accept once <business> confirms this estimate."
+- **Removing restores exactly:** the stored price, status, approval time and card are what they were before
+  the add (checked field by field in verify-t179).
+- **Kept right over time:** saving an edit in the dashboard keeps the mark (saving is not approving). When the
+  customer adds another service to a quote the business has since approved, the earlier part's mark is dropped,
+  so a price the customer has seen is never hidden again.
+- **The business is told:** the "Request updated" email says "The customer sees no price for <service> until
+  you approve. The rest of the quote is as they saw it."; the dashboard's "Customer also asked for" says "The
+  customer sees no price for this part until you approve."
+- **Checks:** 10 more unit tests (web 1,001 in all); verify-t179 has a new section 12a and browser checks
+  (97 checks in all).
 
 #### How (the parts worth knowing)
 
@@ -7886,6 +7923,10 @@ note; and it means the customer chooses to add it, because a mention is not an o
   sections still shows a correct total.
 - **Review is the strictest setting among the services on the quote**, and a customer's change never loosens a
   hold. The business is told once per change, as an update to the same quote.
+- **Adding something never hides a price the customer has already seen.** A service that holds until approved
+  hides only its own added part (no price, "<business> will confirm this part"), which is left out of every
+  figure the customer is given until the business approves. Accepting waits for that approval. (Owner,
+  2026-11-18; replaces "the whole quote is hidden", which was the strictest setting followed literally.)
 - **What the business does not offer never gets a price**, from anyone.
 - **The customer changes sections only while they can see a price and have not decided.** The public endpoints
   are protected like every other quote action (AD-055, AD-060).

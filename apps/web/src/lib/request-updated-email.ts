@@ -3,7 +3,7 @@
  * lib/request-updated.ts). It is about the SAME quote, never a second one:
  * each service as a section with its subtotal, then the one total.
  */
-import { displaySections, formatMoney } from '@qolumns/shared'
+import { displaySections, formatMoney, sectionsAwaitingApproval } from '@qolumns/shared'
 import type { CombinedPricing } from '@qolumns/shared'
 
 const escape = (text: string) =>
@@ -31,6 +31,13 @@ export function requestUpdatedEmail(input: RequestUpdatedInput): { subject: stri
   const what = input.change === 'added' ? `added ${input.changedServiceName} to` : `took ${input.changedServiceName} off`
   const subject = `${input.isTest ? '[TEST] ' : ''}Request updated: ${name} ${what} their quote (${money(input.pricing.total)})`
   const sections = displaySections(input.pricing, { serviceName: input.mainServiceName })
+  // parts whose service holds until approved: the customer sees no price for them yet
+  const waiting = input.awaitingApproval ? sectionsAwaitingApproval(input.pricing, 'pending_review').map((s) => s.serviceName) : []
+  const next = !input.awaitingApproval
+    ? 'Nothing is needed from you: your services send their quotes automatically.'
+    : waiting.length > 0
+      ? `The customer sees no price for ${escape(waiting.join(' and '))} until you approve. The rest of the quote is as they saw it. They can accept once you approve.`
+      : 'The customer can accept it once you approve.'
   const rows = (sections ?? [{ serviceName: input.mainServiceName, subtotal: input.pricing.subtotal, main: true }])
     .map(
       (s) =>
@@ -60,7 +67,7 @@ export function requestUpdatedEmail(input: RequestUpdatedInput): { subject: stri
         <tr><td style="padding:12px 0 0;font-size:16px;font-weight:700;color:#111827;">Total</td><td style="padding:12px 0 0;font-size:16px;font-weight:700;color:#111827;text-align:right;" data-role="total">${escape(money(input.pricing.total))}</td></tr>
       </table>
       <p style="margin:16px 0 0;font-size:14px;color:#374151;" data-role="next">
-        ${input.awaitingApproval ? 'The customer can accept it once you approve.' : 'Nothing is needed from you: your services send their quotes automatically.'}
+        ${next}
       </p>
       ${input.awaitingApproval && input.approveUrl ? button(input.approveUrl, 'Approve &amp; send', 'approve') : ''}
       ${input.awaitingApproval && input.approveUrl ? `<p style="margin:12px 0 0;text-align:center;font-size:14px;"><a href="${escape(input.dashboardUrl)}" data-role="dashboard" style="color:#205E56;text-decoration:underline;">Open in dashboard to edit</a></p>` : button(input.dashboardUrl, input.awaitingApproval ? 'Review and approve' : 'Open the quote', 'dashboard')}

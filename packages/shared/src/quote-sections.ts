@@ -58,6 +58,14 @@ export interface QuoteSection {
   addedAt: string
   /** What was answered to price it */
   answers?: SectionAnswer[]
+  /**
+   * The business approves this part's price before the customer sees it (its
+   * service, or the quote's main service, is set to hold until approved).
+   * While the quote waits for approval the customer is shown this part with
+   * no price, and it is left out of every figure they see; the rest of the
+   * quote stays exactly as they saw it. Once the business approves, it shows.
+   */
+  awaitingApproval?: boolean
 }
 
 export type SectionQuestionType = 'number' | 'text' | 'select' | 'boolean'
@@ -88,6 +96,8 @@ export interface AlsoAsked {
   /** Before tax, when nothing more needs asking. Absent while questions remain. Never present for `not_offered`. */
   price?: number
   questions?: SectionQuestion[]
+  /** The business approves this service's price before a customer sees it: the card shows none */
+  priceOnApproval?: boolean
 }
 
 /** How the combined quote is taxed */
@@ -180,6 +190,8 @@ export interface DisplaySection {
   minimum: AppliedMinimum | null
   subtotal: number
   addedBy?: 'customer' | 'business'
+  /** For the customer only: this part has no price yet (no lines, no subtotal); the business will confirm it */
+  awaitingApproval?: boolean
 }
 
 /**
@@ -200,6 +212,65 @@ export function displaySections(
       const split = splitMinimum(s.breakdown)
       return { serviceId: s.serviceId, serviceName: s.serviceName, main: false, lines: split.lines, minimum: split.minimum, subtotal: sectionSubtotal(s), addedBy: s.addedBy }
     }),
+  ]
+}
+
+// ---------------------------------------------------------------------------
+// A part the business approves first (its service holds until approved)
+// ---------------------------------------------------------------------------
+
+/**
+ * Does the customer wait for the business before seeing an added part's
+ * price? Only when that part's service, or the quote's main service, is set
+ * to hold until approved. The rest of the quote is never hidden again: the
+ * customer could only add something because they could already see it.
+ */
+export function sectionPriceWaits(mainMode: ReviewMode, sectionMode: ReviewMode): boolean {
+  return mainMode === 'hold_until_approved' || sectionMode === 'hold_until_approved'
+}
+
+/** The added parts whose price the customer does not see yet: marked, on a quote still waiting for the business */
+export function sectionsAwaitingApproval(pricing: object | null | undefined, status: string): QuoteSection[] {
+  if (status !== 'pending_review') return []
+  return addedSections(pricing).filter((s) => s.awaitingApproval === true)
+}
+
+/** What the customer reads in place of that part's price */
+export function willConfirmLine(businessName: string): string {
+  return `${businessName.trim() || 'The business'} will confirm this part`
+}
+
+/**
+ * The quote's figures as the customer may see them: a part still waiting for
+ * the business is left out of the subtotal, the tax and the total, so what
+ * they see is the quote as it stood before they added it. `awaiting` lists
+ * what was left out. With nothing waiting, the pricing is returned untouched.
+ */
+export function pricingForCustomer(pricing: CombinedPricing, status: string, tax: SectionTax): { pricing: CombinedPricing; awaiting: QuoteSection[] } {
+  const awaiting = sectionsAwaitingApproval(pricing, status)
+  if (awaiting.length === 0) return { pricing, awaiting }
+  const visible = addedSections(pricing).filter((s) => !awaiting.includes(s))
+  return { pricing: withSections(pricing, visible, tax), awaiting }
+}
+
+/**
+ * The customer's sections: what `pricingForCustomer` left visible, then each
+ * waiting part with its name and nothing else (no lines, no subtotal).
+ */
+export function displaySectionsForCustomer(
+  visible: Pick<QuotePricing, 'breakdown' | 'subtotal'>,
+  awaiting: readonly QuoteSection[],
+  main: { serviceId?: string | null; serviceName: string }
+): DisplaySection[] | null {
+  const shown = displaySections(visible, main)
+  if (awaiting.length === 0) return shown
+  const mainSplit = splitMinimum(visible.breakdown)
+  const mainOnly: DisplaySection[] = [
+    { serviceId: main.serviceId ?? null, serviceName: main.serviceName, main: true, lines: mainSplit.lines, minimum: mainSplit.minimum, subtotal: mainSubtotal(visible) },
+  ]
+  return [
+    ...(shown ?? mainOnly),
+    ...awaiting.map((s): DisplaySection => ({ serviceId: s.serviceId, serviceName: s.serviceName, main: false, lines: [], minimum: null, subtotal: 0, addedBy: s.addedBy, awaitingApproval: true })),
   ]
 }
 
@@ -278,9 +349,13 @@ export interface ReviewState {
  * What a customer's change (adding a section) does to a quote's review state.
  *
  * - Every service auto-sends: nothing changes.
- * - Otherwise the quote waits for the business. A quote a check already held
- *   stays held by that check. A quote the customer could see stays visible
- *   ('shown') unless one of its services is set to hold until approved.
+ * - Otherwise the quote waits for the business, and the customer cannot
+ *   accept until it approves. What the customer could already see stays
+ *   visible ('shown'): adding something never hides a price they have seen.
+ *   A service set to hold until approved hides only its own part
+ *   (`sectionPriceWaits`, `awaitingApproval` on the section).
+ * - A quote a check already held stays held by that check; 'held' is never
+ *   loosened.
  * - A quote the customer has already been sent goes back to waiting: the
  *   business approved a different request. Its earlier state is returned so
  *   it can be restored if the customer removes what they added.
@@ -288,7 +363,7 @@ export interface ReviewState {
 export function reviewAfterAdding(current: ReviewState, modes: readonly ReviewMode[]): { next: ReviewState; changed: boolean } {
   const strictest = strictestReviewMode(modes)
   if (strictest === 'auto_send') return { next: current, changed: false }
-  const wanted: ReviewHoldKind = strictest === 'hold_until_approved' ? 'held' : 'shown'
+  const wanted: ReviewHoldKind = 'shown'
   if (current.status === 'pending_review') {
     // a check's hold is never loosened; 'held' is never loosened to 'shown'
     const keep = current.reviewHold === 'check' || current.reviewHold === 'held'

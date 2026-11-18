@@ -14,14 +14,19 @@ import {
   alsoAskedWithStates,
   computeAccuracy,
   displaySections,
+  displaySectionsForCustomer,
   editedSectionBreakdown,
   hasSections,
   mainSubtotal,
   minimumEntry,
   notOfferedLine,
+  pricingForCustomer,
   questionsToAddLabel,
   reviewAfterAdding,
+  sectionPriceWaits,
+  sectionsAwaitingApproval,
   strictestReviewMode,
+  willConfirmLine,
   withSections,
 } from '@qolumns/shared'
 import type { AlsoAsked, CombinedPricing, QuoteSection, SectionTax } from '@qolumns/shared'
@@ -170,16 +175,85 @@ describe('review follows the strictest service on the quote', () => {
   it('a sent quote stays sent when everything on it auto-sends', () => {
     expect(reviewAfterAdding(sent, ['auto_send', 'auto_send'])).toEqual({ next: sent, changed: false })
   })
-  it('a sent quote goes back to the business when an added service is reviewed first; still visible unless one is "hold until approved"', () => {
-    expect(reviewAfterAdding(sent, ['auto_send', 'show_then_confirm'])).toEqual({ next: { status: 'pending_review', reviewHold: 'shown', approvedAt: null }, changed: true })
-    expect(reviewAfterAdding(sent, ['auto_send', 'hold_until_approved'])).toEqual({ next: { status: 'pending_review', reviewHold: 'held', approvedAt: null }, changed: true })
+  it('a sent quote goes back to the business when an added service is reviewed first, and what the customer saw stays visible: also for "hold until approved"', () => {
+    const waitingShown = { next: { status: 'pending_review', reviewHold: 'shown', approvedAt: null }, changed: true }
+    expect(reviewAfterAdding(sent, ['auto_send', 'show_then_confirm'])).toEqual(waitingShown)
+    expect(reviewAfterAdding(sent, ['auto_send', 'hold_until_approved'])).toEqual(waitingShown)
   })
-  it('a quote already waiting is never loosened: a check’s hold stays, "held" stays, "shown" tightens to "held" only for a hold service', () => {
+  it('a quote already waiting is never loosened (a check’s hold stays, "held" stays) and never hidden by an added service', () => {
     const waiting = (reviewHold: 'shown' | 'held' | 'check') => ({ status: 'pending_review', reviewHold, approvedAt: null })
     expect(reviewAfterAdding(waiting('check'), ['show_then_confirm', 'auto_send']).next.reviewHold).toBe('check')
     expect(reviewAfterAdding(waiting('held'), ['show_then_confirm', 'show_then_confirm']).next.reviewHold).toBe('held')
     expect(reviewAfterAdding(waiting('shown'), ['show_then_confirm', 'show_then_confirm'])).toEqual({ next: waiting('shown'), changed: false })
-    expect(reviewAfterAdding(waiting('shown'), ['show_then_confirm', 'hold_until_approved'])).toEqual({ next: waiting('held'), changed: true })
+    expect(reviewAfterAdding(waiting('shown'), ['show_then_confirm', 'hold_until_approved'])).toEqual({ next: waiting('shown'), changed: false })
+  })
+})
+
+describe('a part whose service holds until approved: no price for that part, the rest as it was', () => {
+  const held = beta({ awaitingApproval: true })
+  const waitingQuote = withSections(main(), [held], TAX)
+
+  it('only a "hold until approved" service (the part’s own, or the main one) makes a part wait', () => {
+    expect(sectionPriceWaits('auto_send', 'hold_until_approved')).toBe(true)
+    expect(sectionPriceWaits('hold_until_approved', 'auto_send')).toBe(true)
+    expect(sectionPriceWaits('auto_send', 'show_then_confirm')).toBe(false)
+    expect(sectionPriceWaits('show_then_confirm', 'auto_send')).toBe(false)
+  })
+
+  it('while the quote waits, the customer’s figures are the quote as it stood before they added the part', () => {
+    expect(waitingQuote).toMatchObject({ subtotal: 380, taxAmount: 38, total: 418 })
+    const seen = pricingForCustomer(waitingQuote, 'pending_review', TAX)
+    expect(seen.awaiting.map((s) => s.serviceId)).toEqual(['svc_beta'])
+    expect(seen.pricing).toEqual(main())
+    expect(JSON.stringify(seen.pricing)).not.toContain('180')
+  })
+
+  it('a measured range goes back with it', () => {
+    const ranged = withSections(main({ estimate: { grade: 'B', rangeLow: 200, rangeHigh: 260 } as CombinedPricing['estimate'] }), [held], TAX)
+    expect(ranged.estimate).toMatchObject({ rangeLow: 398, rangeHigh: 458 })
+    expect(pricingForCustomer(ranged, 'pending_review', TAX).pricing.estimate).toMatchObject({ rangeLow: 200, rangeHigh: 260 })
+  })
+
+  it('a part that does not wait stays in the customer’s figures beside one that does', () => {
+    const both = withSections(main(), [held, gamma()], TAX)
+    const seen = pricingForCustomer(both, 'pending_review', TAX)
+    expect(seen.pricing.sections?.map((s) => s.serviceId)).toEqual(['svc_gamma'])
+    expect(seen.pricing.total).toBe(withSections(main(), [gamma()], TAX).total)
+    const shown = displaySectionsForCustomer(seen.pricing, seen.awaiting, { serviceId: 'svc_alpha', serviceName: 'Service Alpha' })!
+    expect(shown.map((s) => [s.serviceName, s.awaitingApproval === true])).toEqual([['Service Alpha', false], ['Service Gamma', false], ['Service Beta', true]])
+  })
+
+  it('the customer is shown the part by name with no line, no subtotal and no amount', () => {
+    const seen = pricingForCustomer(waitingQuote, 'pending_review', TAX)
+    const shown = displaySectionsForCustomer(seen.pricing, seen.awaiting, { serviceId: 'svc_alpha', serviceName: 'Service Alpha' })!
+    expect(shown).toHaveLength(2)
+    expect(shown[0]).toMatchObject({ main: true, serviceName: 'Service Alpha', subtotal: 200 })
+    expect(shown[1]).toEqual({ serviceId: 'svc_beta', serviceName: 'Service Beta', main: false, lines: [], minimum: null, subtotal: 0, addedBy: 'customer', awaitingApproval: true })
+    expect(willConfirmLine('Fixture Trading')).toBe('Fixture Trading will confirm this part')
+  })
+
+  it('once the business approves (the quote is no longer waiting) the part shows with its price', () => {
+    for (const status of ['sent', 'viewed', 'accepted']) {
+      expect(sectionsAwaitingApproval(waitingQuote, status)).toEqual([])
+      expect(pricingForCustomer(waitingQuote, status, TAX)).toEqual({ pricing: waitingQuote, awaiting: [] })
+    }
+    // nothing waiting: the same sections as everyone sees
+    expect(displaySectionsForCustomer(waitingQuote, [], { serviceName: 'Service Alpha' })).toEqual(displaySections(waitingQuote, { serviceName: 'Service Alpha' }))
+  })
+
+  it('the customer’s page, its add and remove calls and the PDF link never carry the waiting part’s price', () => {
+    const view = read('apps/web/src/app/api/public/quotes/[quoteId]/route.ts')
+    expect(view).toContain('pricingForCustomerView(')
+    expect(view).toContain('displaySectionsForCustomer(pricing, awaitingParts')
+    expect(view).toContain('quote.pdf_asset_id && awaitingParts.length === 0')
+    const sections = read('apps/web/src/app/api/public/quotes/[quoteId]/sections/route.ts')
+    expect(sections).toContain('NextResponse.json({ ok: true, status: result.status })')
+    expect(sections).not.toContain('alsoAsked: result.alsoAsked')
+    expect(read('apps/web/src/app/api/public/quotes/[quoteId]/pdf/route.ts')).toContain('sectionsAwaitingApproval(')
+    // saving an edit in the dashboard is not approving: the mark is kept
+    expect(read('apps/web/src/app/api/quotes/[quoteId]/route.ts')).toContain('before?.awaitingApproval === true && { awaitingApproval: true }')
+    // accepting stays locked while the quote waits
+    expect(read('apps/web/src/app/api/public/quotes/[quoteId]/accept/route.ts')).toContain('canCustomerDecide(quote.status)')
   })
 })
 
@@ -246,6 +320,8 @@ const SERVICES = [
   { id: 'svc_beta', name: 'Service Beta', tax_exempt: false, auto_send: false, hold_until_approved: false },
   { id: 'svc_gamma', name: 'Service Gamma', tax_exempt: false, auto_send: true, hold_until_approved: false },
 ]
+// the same business with Service Beta set to "hold until approved"
+const SERVICES_BETA_HOLDS = SERVICES.map((row) => (row.id === 'svc_beta' ? { ...row, hold_until_approved: true } : row))
 const quote = (over: Partial<SectionQuoteRow> = {}): SectionQuoteRow => ({
   id: 'qte_fixture',
   tenant_id: 'tnt_fixture',
@@ -301,6 +377,51 @@ describe('the customer adds and removes a service', () => {
     expect(url).toBe('http://worker.test/section')
     expect(init.headers.Authorization).toBe('Bearer worker-token-fixture')
     expect(JSON.parse(init.body)).toMatchObject({ quoteId: 'qte_fixture', serviceId: 'svc_beta', answers: [] })
+  })
+
+  it('a "hold until approved" service is added without hiding the quote: its part is marked, the main price stays, accepting waits', async () => {
+    workerAnswers({ ...pricedBeta, reviewMode: 'hold_until_approved' })
+    const { db, updates } = fakeDb(SERVICES_BETA_HOLDS)
+    const before = quote({ status: 'viewed', approved_at: '2026-11-17T09:00:00.000Z' })
+    const result = await addSectionForCustomer(db, before, { serviceId: 'svc_beta' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const saved = updates[0]!
+    // still shown to the customer (never 'held'), waiting for the business, so accepting is locked
+    expect(saved).toMatchObject({ status: 'pending_review', review_hold: 'shown', approved_at: null })
+    expect(result.section).toMatchObject({ serviceId: 'svc_beta', awaitingApproval: true })
+    // the business's copy carries the full figures; the customer's is the quote as it was
+    expect(saved.pricing_json).toMatchObject({ subtotal: 380, total: 418 })
+    expect(pricingForCustomer(saved.pricing_json as CombinedPricing, 'pending_review', TAX).pricing).toEqual(before.pricing_json)
+
+    // removing it restores the quote exactly: figures, status, approval
+    const waiting = quote({ status: 'pending_review', review_hold: 'shown', approved_at: null, pricing_json: saved.pricing_json as CombinedPricing, content_json: saved.content_json as SectionQuoteRow['content_json'] })
+    const removed = await removeSectionForCustomer(db, waiting, 'svc_beta')
+    expect(removed).toMatchObject({ ok: true, status: 'viewed' })
+    expect(updates[1]).toMatchObject({ status: 'viewed', approved_at: '2026-11-17T09:00:00.000Z', review_hold: null })
+    expect(updates[1]!.pricing_json).toEqual(before.pricing_json)
+    expect((updates[1]!.content_json as Row).alsoAsked).toEqual(before.content_json?.alsoAsked)
+    expect((updates[1]!.content_json as Row).sectionsBefore).toBeUndefined()
+  })
+
+  it('a service reviewed first but not held is added with its price showing', async () => {
+    workerAnswers(pricedBeta)
+    const { db } = fakeDb(SERVICES)
+    const result = await addSectionForCustomer(db, quote(), { serviceId: 'svc_beta' })
+    expect(result.ok && result.section?.awaitingApproval).toBeUndefined()
+  })
+
+  it('a part the business has since approved is not hidden again when the customer adds another', async () => {
+    workerAnswers({ success: true, ready: true, serviceName: 'Service Gamma', reviewMode: 'auto_send', section: { serviceId: 'svc_gamma', serviceName: 'Service Gamma', breakdown: gamma().breakdown, subtotal: gamma().subtotal } })
+    const { db, updates } = fakeDb(SERVICES_BETA_HOLDS)
+    const approved = quote({ status: 'sent', approved_at: '2026-11-17T13:00:00.000Z', pricing_json: withSections(main(), [beta({ awaitingApproval: true })], TAX) })
+    const result = await addSectionForCustomer(db, approved, { serviceId: 'svc_gamma' })
+    expect(result.ok).toBe(true)
+    const saved = updates[0]!.pricing_json as CombinedPricing
+    expect(saved.sections?.map((s) => [s.serviceId, s.awaitingApproval === true])).toEqual([['svc_beta', false], ['svc_gamma', false]])
+    // the quote waits again (Service Beta is reviewed first), with every price still showing
+    expect(updates[0]).toMatchObject({ status: 'pending_review', review_hold: 'shown' })
+    expect(pricingForCustomer(saved, 'pending_review', TAX).awaiting).toEqual([])
   })
 
   it('a service that needs answers is not added until they are given: the questions come back', async () => {
@@ -397,6 +518,11 @@ describe('emails and the accuracy report', () => {
     expect(mail.html).toContain('$180.00')
     expect(mail.html).toContain('$38.00')
     expect(mail.html).toContain('data-role="approve"')
+    expect(mail.html).toContain('The customer can accept it once you approve.')
+    // a part whose service holds until approved: the business is told the customer sees no price for it
+    const waitingMail = requestUpdatedEmail({ customerName: 'Megan Grant', mainServiceName: 'Service Alpha', changedServiceName: 'Service Beta', change: 'added', pricing: withSections(main(), [beta({ awaitingApproval: true })], TAX), locale: 'en-US', awaitingApproval: true, dashboardUrl: 'https://app.test/app/quotes/q1', approveUrl: 'https://app.test/approve/t' })
+    expect(waitingMail.html).toContain('The customer sees no price for Service Beta until you approve. The rest of the quote is as they saw it. They can accept once you approve.')
+    expect(waitingMail.html).toContain('$418.00')
     const removed = requestUpdatedEmail({ customerName: 'Megan Grant', mainServiceName: 'Service Alpha', changedServiceName: 'Service Beta', change: 'removed', pricing: main(), locale: 'en-US', awaitingApproval: false, dashboardUrl: 'https://app.test/app/quotes/q1', isTest: true })
     expect(removed.subject).toBe('[TEST] Request updated: Megan Grant took Service Beta off their quote ($220.00)')
     expect(removed.html).not.toContain('data-role="approve"')

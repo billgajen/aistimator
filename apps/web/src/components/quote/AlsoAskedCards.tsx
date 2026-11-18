@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { formatMoney, notOfferedLine, questionsToAddLabel } from '@qolumns/shared'
+import { formatMoney, notOfferedLine, questionsToAddLabel, willConfirmLine } from '@qolumns/shared'
 import type { AlsoAsked, SectionQuestion } from '@qolumns/shared'
 import { SectionLabel } from '@/components/quote/document-parts'
 
@@ -16,6 +16,9 @@ import { SectionLabel } from '@/components/quote/document-parts'
  * confirm or change. Adding puts the service on this same quote as a section:
  * one total, one accept. Nothing is added until the customer presses the
  * button.
+ *
+ * A service the business approves first (it holds until approved) shows no
+ * price, on the card or once added: only "<business> will confirm this part".
  *
  * Something the business does not offer never gets a price: only "We'll
  * confirm … with you separately."
@@ -32,6 +35,7 @@ export function AlsoAskedCards({
   currency,
   locale,
   canChange,
+  businessName,
   onAdd,
 }: {
   items: AlsoAsked[]
@@ -39,6 +43,7 @@ export function AlsoAskedCards({
   locale: string
   /** The customer can add a service right now (they can see a price and have not decided) */
   canChange: boolean
+  businessName: string
   onAdd: (serviceId: string, answers: Array<{ fieldId: string; value: AnswerValue }>) => Promise<AddResult>
 }) {
   // A service already on the quote shows as a section of the price, not here
@@ -56,7 +61,7 @@ export function AlsoAskedCards({
               <p className="text-sm text-text-primary">{notOfferedLine(item.words)}</p>
             </div>
           ) : (
-            <OfferedCard key={item.id} item={item} currency={currency} locale={locale} canChange={canChange} onAdd={onAdd} />
+            <OfferedCard key={item.id} item={item} currency={currency} locale={locale} canChange={canChange} businessName={businessName} onAdd={onAdd} />
           )
         )}
       </div>
@@ -69,12 +74,14 @@ function OfferedCard({
   currency,
   locale,
   canChange,
+  businessName,
   onAdd,
 }: {
   item: AlsoAsked
   currency: string
   locale: string
   canChange: boolean
+  businessName: string
   onAdd: (serviceId: string, answers: Array<{ fieldId: string; value: AnswerValue }>) => Promise<AddResult>
 }) {
   const [questions, setQuestions] = useState<SectionQuestion[]>(item.questions ?? [])
@@ -116,8 +123,13 @@ function OfferedCard({
           <p className="mt-1 break-words text-sm text-text-secondary" data-testid="also-asked-words">
             You also asked for: “{item.words}”
           </p>
+          {item.priceOnApproval && (
+            <p className="mt-1 text-sm text-text-secondary" data-testid="also-asked-on-approval">
+              {willConfirmLine(businessName)}
+            </p>
+          )}
         </div>
-        {!needsAnswers && typeof item.price === 'number' && (
+        {!needsAnswers && !item.priceOnApproval && typeof item.price === 'number' && (
           <p className="figure whitespace-nowrap text-lg font-medium text-text-primary" data-testid="also-asked-price">
             {formatMoney(item.price, currency, locale)}
           </p>

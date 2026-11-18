@@ -220,12 +220,14 @@ Indexes: `(tenant_id, created_at desc)` where not completed; the same where also
   - `quotes.pricing_json.breakdown` is the MAIN service's lines, exactly as on any quote.
   - `quotes.pricing_json.sections[]` are the added services (at most two): `serviceId`, `serviceName`,
     `breakdown[]` (that service's lines, with its own marked minimum entry while its floor applies), `subtotal`,
-    `taxExempt?`, `addedBy` (`customer` | `business`), `addedAt`, `answers[]` (`key`, `label`, `value`). The key
+    `taxExempt?`, `addedBy` (`customer` | `business`), `addedAt`, `answers[]` (`key`, `label`, `value`),
+    `awaitingApproval?` (the customer added it and its service, or the main one, holds until approved: while
+    the quote is `pending_review` the customer sees no price for this part). The key
     is absent on a single-service quote, which is how every older quote stays as it was.
   - `quotes.pricing_json.subtotal`, `taxAmount` and `total` are the combined figures: main + every section, tax
     worked out once on the taxed amount (a tax-exempt service's section is left out of it).
   - `quotes.content_json.alsoAsked[]`: what else the customer asked for (`id`, `words`, `serviceId` | null,
-    `serviceName`, `state`, `price?`, `questions?`). Written by the worker on the first pass; replaces
+    `serviceName`, `state`, `price?`, `questions?`, `priceOnApproval?`). Written by the worker on the first pass; replaces
     `crossServicePricing`, which only quotes made before T-179 carry.
   - `quotes.content_json.sectionsBefore` (`status`, `approvedAt`, `reviewHold`): where a sent quote stood before
     a customer's added service sent it back for review; used to put it back if they remove it.

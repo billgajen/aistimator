@@ -38,7 +38,9 @@ async function open(request: Request, quoteId: string, token: unknown): Promise<
   return { quote, supabase }
 }
 
-const view = (result: { pricing: unknown; alsoAsked: unknown; status: string }) => NextResponse.json({ pricing: result.pricing, alsoAsked: result.alsoAsked, status: result.status })
+// The page reads the quote afresh after a change. No figures are returned here:
+// a part waiting for the business's approval has a price the customer may not see yet.
+const view = (result: { status: string }) => NextResponse.json({ ok: true, status: result.status })
 
 /**
  * POST /api/public/quotes/:quoteId/sections  { token, serviceId, answers? }

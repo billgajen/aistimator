@@ -498,6 +498,8 @@ export async function PATCH(
           ...(row.tax_exempt === true && { taxExempt: true }),
           addedBy: before?.addedBy ?? 'business',
           addedAt: before?.addedAt ?? nowIso,
+          // still waiting for this business's approval: saving an edit is not approving
+          ...(before?.awaitingApproval === true && { awaitingApproval: true }),
           ...((before?.answers ?? sent.answers) && { answers: (before?.answers ?? sent.answers ?? []).slice(0, 40) }),
         })
       }
