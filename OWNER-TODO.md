@@ -1834,10 +1834,13 @@ fixed in this deploy.
 
 ## T-179 — One request, several services
 
-**Built and checked on this machine. Not deployed, not pushed.** One commit on `main`. No migration. Both the
-worker and the web app changed, so a deploy is the worker first, then the web app.
+**Deployed 2026-11-18 08:10 UTC.** Commits `24c2d67` and `6f1afc6`, worker version `7335f6e5`, web deployment
+`dpl_4qZ8P2PR8chMivBXC4X499ktGmp5`. No migration.
 
-### 1. What to check by hand (after you deploy, with a test business that has two or three services)
+### 1. What to check by hand (with a test business that has two or three services)
+
+- [ ] **Open one existing estimate** from a customer's link (any earlier quote). The page that serves it
+  changed, and a real link is the one thing I cannot open: its token is never stored.
 
 - [ ] **A real note, a real model.** Send a request on the quote link for one service and write, in "Anything
   else about the job?", that you also want another of the business's services. Open the estimate. You should

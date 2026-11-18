@@ -17,7 +17,29 @@
 
 ### 2026-11-17: T-179 — One request, several services: other services the customer asked for can be added to the same quote (AD-061)
 
-**Built, not deployed. One commit, not pushed.** No migration.
+**Deployed 2026-11-18 08:10 UTC** (commits `24c2d67` and `6f1afc6`). No migration: none was needed and none
+was run.
+1. Worker: `npx wrangler deploy --env production`, version `7335f6e5-6717-4863-9801-3f29ae83f097`. `/health`
+   ok (`hasRedis: false`, as decided in AD-060); the new `/section` with no token: 401.
+2. Web: `npx vercel deploy --prod --yes`, deployment `dpl_4qZ8P2PR8chMivBXC4X499ktGmp5`, serving `qolumns.com`.
+
+Checks before the deploy (on `6f1afc6`): lint, typecheck; unit tests web 1,001, worker 574, mobile 11;
+verify-t179 97/97; verify-t178 52/52; and, although the deploy list did not ask for it, verify-t146 to
+verify-t177 again (26 scripts, 2,288/2,288), because the change touches the customer's quote page and the
+worker. verify-t173 was not run again (it passed 104/104 on `24c2d67`; nothing it covers changed). Web build
+and worker dry run pass.
+
+Live checks, read-only (no request was submitted, no WhatsApp message sent, nothing created):
+- `/`, `/login` and the demo quote link `/quote/example-home-services`: 200.
+- An existing business's quote link (`/quote/{its slug}`, the slug read from the database): 200, with its form.
+- An unknown quote link: 404.
+- WhatsApp webhook: wrong verify token 403; unsigned POST 401 "Missing signature"; wrong signature 401
+  "Invalid signature".
+- The new public endpoint `POST /api/public/quotes/{id}/sections` with no token: 401. A quote view with a
+  made-up token: 404.
+- **Not proven on production:** a customer's own estimate page (`/q/{id}?token=…`) through the changed view
+  route, and the whole add / remove flow. A link's token is never stored and making a request is a real
+  request. Opening one existing estimate by hand settles the first; OWNER-TODO (T-179) lists the rest.
 
 #### What it does
 
