@@ -17,8 +17,12 @@
 
 ### 2026-11-18: T-183 — Approval the business can trust, line names, quote wording, faster test runs; a guard that was dead in production builds (AD-066, AD-067)
 
-Built and pushed, **not deployed**. Worker and web both changed; no migration. **One fault found on the way is
-live on production until this is deployed (section 6).**
+**Deployed 2026-11-18** (commit `27f5d89`), worker first, then web. No migration. No checks were run for the
+deploy, by the owner's instruction: both levels had passed the same evening. The fault in section 6 is fixed on production.
+- Worker `81062d59-cf49-4945-8d51-04884d051655`; web `dpl_84pMofDaG47ncAH7SE8QwnSmTtug`, serving `qolumns.com`.
+- After: `https://qolumns.com/` 200 and the quote page `/q/…` 200. The quote page was asked for with a made-up
+  link (no real customer link is held here; raw links are never stored), so it shows the page is served, not
+  that a real quote opens.
 
 **What T-181 and T-182 had already done of this ticket: nothing.** One thing from T-182 saved work: the on-site
 app shows the server's own lines (AD-065), so the new line names and sources reach its price screen with no

@@ -2476,8 +2476,9 @@ You do not have the account yet. When you do:
 
 ## T-183 — Approval the business can trust, quote wording, faster test runs
 
-Built and pushed 18 November 2026. **Not deployed.** The worker and the web app both changed; there is no
-migration and nothing in Stripe. To put it live: "deploy T-183" (worker first, then web).
+**Deployed 18 November 2026** (worker `81062d59-cf49-4945-8d51-04884d051655`, then web
+`dpl_84pMofDaG47ncAH7SE8QwnSmTtug`; no migration). `qolumns.com` and the quote page answer 200. The
+quote page was asked for with a made-up link, so please open one real customer link yourself.
 
 ### Read this first: one fault is live on production until this is deployed
 
@@ -2492,9 +2493,9 @@ migration and nothing in Stripe. To put it live: "deploy T-183" (worker first, t
 - **How I know:** two regression scripts passed against the development server and failed against a built
   web app, in the same checks. I have not read production's own build (I cannot); it is made by the same tool
   from the same files.
-- **Fixed in this ticket.** It goes live with "deploy T-183". The checks now also read every built web app
-  for this kind of fault.
-- [ ] **Decide: deploy T-183 soon** (recommended), since this is live. Nothing else is needed from you.
+- **Fixed in this ticket, and live since the deploy on 18 November.** The checks now also read every built
+  web app for this kind of fault.
+- [x] **Deploy T-183.** Done 18 November.
 
 ### What changed, in one line each
 
