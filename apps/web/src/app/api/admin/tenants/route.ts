@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { isFreeTestAccount } from '@qolumns/shared'
 import { verifyAdmin } from '@/lib/admin'
 import { NextResponse } from 'next/server'
 
@@ -34,8 +35,11 @@ export async function GET(request: Request) {
         currency,
         created_at,
         updated_at,
+        suspended_at,
         subscriptions!tenant_id (
           status,
+          stripe_customer_id,
+          stripe_subscription_id,
           plans!plan_id (
             name,
             price_cents
@@ -111,6 +115,9 @@ export async function GET(request: Request) {
         planName: plan?.name || 'Free',
         planPrice: plan?.price_cents || 0,
         quoteCount: quoteCounts[tenant.id] || 0,
+        // T-180: the suspend switch, and a plan nobody pays for (never revenue)
+        suspendedAt: (tenant as { suspended_at?: string | null }).suspended_at ?? null,
+        testAccount: isFreeTestAccount(subscription as { status?: string; stripe_customer_id?: string | null; stripe_subscription_id?: string | null } | null),
       }
     })
 

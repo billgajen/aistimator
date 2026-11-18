@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { DEMO_BUSINESS_NAME, DEMO_LOGO_PATH, DEMO_PRIMARY_COLOR, DEMO_SLUG, formatMoney, freeOfferLabel, FREE_ALLOWANCE } from '@qolumns/shared'
-import { sitePlans } from '@/lib/marketing/plan-claims'
+import { PLUS_TAX, sitePlans } from '@/lib/marketing/plan-claims'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { FounderNote } from '@/components/marketing/FounderNote'
@@ -214,7 +214,7 @@ export default function HomePage() {
               <p className={`text-sm font-semibold ${def.recommended ? 'text-on-primary/80' : 'text-text-secondary'}`}>{def.name}</p>
               <p className="figure mt-2 text-3xl font-medium">{formatMoney((def.monthlyPrice.USD ?? 0) / 100, 'USD', 'en-US', { decimals: 0 })}</p>
               <p className={`mt-1 text-xs ${def.recommended ? 'text-on-primary/70' : 'text-text-muted'}`}>
-                per month · {def.quoteLimit.toLocaleString('en-US')} quotes a month
+                per month, {PLUS_TAX} · {def.quoteLimit.toLocaleString('en-US')} quotes a month
               </p>
               <Link
                 href={`/signup?plan=${def.id}`}

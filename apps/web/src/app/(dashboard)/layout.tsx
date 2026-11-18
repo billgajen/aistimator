@@ -7,6 +7,7 @@ import { PRODUCT_NAME, QUOTE_TURN_COPY } from '@qolumns/shared'
 import { UNFINISHED_CHANGED_EVENT } from '@/lib/unfinished-leads'
 import { NEEDS_YOU_MARK } from '@/lib/status-tone'
 import { Wordmark } from '@/components/brand/Wordmark'
+import { AccountNotice } from '@/components/billing/AccountNotice'
 
 /**
  * Dashboard shell — "the studio desk", panel edition.
@@ -108,6 +109,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         <main className="mx-auto max-w-[1860px] px-4 py-8 sm:px-8 sm:py-10">
+          {/* T-180: a failed payment or a paused account, on every page */}
+          <AccountNotice pathname={pathname} />
           {children}
         </main>
       </div>

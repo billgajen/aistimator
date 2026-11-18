@@ -115,7 +115,9 @@ describe('T-153: demo requests count toward nothing and email no one', () => {
   it('intake: outside any plan, never usage', () => {
     const intake = read('apps/web/src/lib/quote-intake.ts')
     expect(intake).toContain("const outsidePlan = isTest || input.isDemo === true")
-    expect(intake).toMatch(/if \(!outsidePlan\) \{\s*\n\s*await incrementUsageCounter/)
+    // T-180: counting is the claim; a request outside the plan never makes one
+    expect(intake).toContain('if (!outsidePlan && !expectHold) claim = await claimPlanQuote(supabase, tenantId)')
+    expect(intake).not.toMatch(/incrementUsageCounter/)
     // a demo quote is not a "test" quote (no Test badge, no test semantics)
     expect(intake).toContain('is_test: isTest,')
   })

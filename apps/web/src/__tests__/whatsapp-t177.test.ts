@@ -805,7 +805,8 @@ describe('T-177 item 9: the Privacy and Terms pages', () => {
     for (const page of ['apps/web/src/app/privacy/page.tsx', 'apps/web/src/app/terms/page.tsx']) {
       const src = code(page)
       expect(src, page).toContain('{operatorStatement(process.env.NEXT_PUBLIC_COMPANY_NUMBER)}')
-      expect(src, page).toContain('Last updated: 17 November 2026')
+      // T-180 added a paragraph to the Terms (payments and tax), so its date moved on a day
+      expect(src, page).toContain(page.includes('terms') ? 'Last updated: 18 November 2026' : 'Last updated: 17 November 2026')
       expect(src, page).not.toMatch(/Billiom|company number \d/)
     }
     expect(read('apps/web/.env.example')).toMatch(/^NEXT_PUBLIC_COMPANY_NUMBER=$/m)

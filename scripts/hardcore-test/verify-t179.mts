@@ -107,6 +107,11 @@ const cookie = { Cookie: cookieHeader }
 const setup = await call('POST', `${app}/api/auth/setup-tenant`, { headers: cookie, body: { businessName } })
 const tenantId = (setup.ok ? setup.json.tenantId : (await sb.select('user_profiles', `id=eq.${user.id}&select=tenant_id`))[0].tenant_id) as string
 expectOk('tenant', await call('PUT', `${app}/api/tenant`, { headers: cookie, body: { region: 'US', currency: 'USD', taxEnabled: true, taxRate: 0.1, serviceAreaMode: 'none', serviceAreaValues: [] } }))
+// T-180: this script sends more than ten requests. Until the usage counter was made exact, six sent
+// together counted as two, so the business never reached the ten free quotes; now every request is
+// counted and the eleventh would be held. The business is put on a plan (a free test account, as
+// scripts/set-test-plan.sh makes), which is what a business sending this many requests has.
+await sb.insert('subscriptions', { tenant_id: tenantId, plan_id: 'plan_us_pro', status: 'active', current_period_start: new Date().toISOString() })
 const taxRow = ((await sb.select('tenants', `id=eq.${tenantId}&select=tax_enabled,tax_rate`)) as Row[])[0]!
 const TAX = Number(taxRow.tax_rate) // stored as a decimal
 const site = await sb.insert('tenant_sites', { tenant_id: tenantId, domain: 'localhost', tenant_key: `tkey_${shortId()}${shortId()}${shortId()}`, is_active: true })

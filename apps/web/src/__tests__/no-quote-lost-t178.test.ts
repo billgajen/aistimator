@@ -19,12 +19,18 @@ vi.mock('@/lib/ai/service-matcher', async (original) => ({
 }))
 vi.mock('@/lib/queue', () => ({ enqueueQuoteJob: (job: unknown) => enqueueQuoteJob(job) }))
 vi.mock('@/lib/failed-quote', () => ({ markQuoteFailed: (db: unknown, id: string, reason: string) => markQuoteFailed(db, id, reason) }))
-vi.mock('@/lib/usage', () => ({ incrementUsageCounter: vi.fn(async () => undefined) }))
-vi.mock('@/lib/plan-limits', () => ({
-  checkPlanLimit: vi.fn(async () => ({ allowed: true, overageAvailable: false, used: 1, limit: 100, per: 'month' })),
-  maybeNotifyLimitReached: vi.fn(async () => undefined),
-  recordOverageQuote: vi.fn(async () => undefined),
-}))
+vi.mock('@/lib/plan-limits', () => {
+  const status = { allowed: true, overageAvailable: false, used: 1, limit: 100, per: 'month' }
+  return {
+    checkPlanLimit: vi.fn(async () => status),
+    // T-180: the quote is counted by the claim
+    claimPlanQuote: vi.fn(async () => ({ claimed: true, reason: 'ok', counted: true, overage: false, status: { ...status, used: 2 }, period: '202611' })),
+    releasePlanQuote: vi.fn(async () => undefined),
+    maybeWarnFreeQuotesLeft: vi.fn(async () => undefined),
+    maybeNotifyLimitReached: vi.fn(async () => undefined),
+    recordOverageQuote: vi.fn(async () => undefined),
+  }
+})
 vi.mock('@/lib/lead-hold', () => ({ leadHoldContent: vi.fn(), leadHeldMessage: vi.fn(), notifyLeadHeld: vi.fn() }))
 
 import { createQuoteSubmission, type QuoteIntakeInput } from '@/lib/quote-intake'

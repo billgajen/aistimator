@@ -39,8 +39,9 @@ describe('T-165: one free offer (the owner’s pricing decision)', () => {
 
   it('so checkout sends no trial period: it charges from the day a plan is chosen', () => {
     // the route takes the trial from the plan, and only from the plan
-    expect(code('app/api/billing/checkout/route.ts')).toMatch(/const trialDays = plan\.trialDays && !subscription\?\.stripe_subscription_id \? plan\.trialDays : undefined/)
-    expect(code('lib/stripe.ts')).toMatch(/\.\.\.\(params\.trialDays \? \{ trial_period_days: params\.trialDays \} : \{\}\)/)
+    // (T-180: checkout was rewritten for Managed Payments; the rule is the same)
+    expect(code('app/api/billing/checkout/route.ts')).toContain('trialDays: plan.trialDays && !row?.stripe_customer_id ? plan.trialDays : undefined,')
+    expect(code('lib/stripe.ts')).toContain('...(input.trialDays ? { trial_period_days: input.trialDays } : {}),')
   })
 
   it('the free offer is the same everywhere: 10 quotes, no card', () => {

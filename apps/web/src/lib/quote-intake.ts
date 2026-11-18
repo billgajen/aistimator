@@ -12,8 +12,8 @@
 import { descriptionRequired } from '@/lib/contact-rules'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { enqueueQuoteJob } from '@/lib/queue'
-import { incrementUsageCounter } from '@/lib/usage'
-import { checkPlanLimit, maybeNotifyLimitReached, recordOverageQuote } from '@/lib/plan-limits'
+import { checkPlanLimit, claimPlanQuote, maybeNotifyLimitReached, maybeWarnFreeQuotesLeft, recordOverageQuote, releasePlanQuote } from '@/lib/plan-limits'
+import type { PlanClaim } from '@/lib/plan-limits'
 import { leadHoldContent, leadHeldMessage, notifyLeadHeld } from '@/lib/lead-hold'
 import { markQuoteFailed } from '@/lib/failed-quote'
 import { validateServiceMatch } from '@/lib/ai/service-matcher'
@@ -107,22 +107,25 @@ export async function createQuoteSubmission(
     )
   }
 
-  // 3b. Enforce plan limit (T-101/T-102) — before any records are created.
-  // Over the limit: metered overage lets the quote proceed (active paid plans
-  // with overage pricing); otherwise hard block. Customer-facing message is
-  // deliberately neutral: never expose the business's billing state.
+  // 3b. The plan limit (T-101/T-102), read early. This first look only decides
+  // which of the cheap steps below to skip for a request that will be held; the
+  // decision that counts is the claim at step 9b (T-180), made and counted in
+  // one step inside the database. Customer-facing wording stays neutral: the
+  // business's billing state is never shown.
   const planLimit = await checkPlanLimit(supabase, tenantId)
   // T-150: a test request is outside the plan: never held, never metered.
   // T-153: so is a demo request (it also never counts as usage)
   const isTest = input.isTest === true
   const outsidePlan = isTest || input.isDemo === true
-  const isOverageQuote = !outsidePlan && !planLimit.allowed && planLimit.overageAvailable
   // T-134 (AD-026): over the limit with overage off → capture as an unpriced
-  // lead (never lose a submission); no AI runs, the business is told to upgrade
-  const limitHold = !outsidePlan && !planLimit.allowed && !planLimit.overageAvailable
-  if (limitHold) {
+  // lead (never lose a submission); no AI runs, the business is told to upgrade.
+  // T-180: the same for a business a platform admin has suspended.
+  const expectHold = !outsidePlan && !planLimit.allowed && !planLimit.overageAvailable
+  if (expectHold) {
     console.warn(
-      `[Quotes] Plan limit reached for tenant (${planLimit.used}/${planLimit.limit}) — capturing as held lead`
+      planLimit.suspended
+        ? '[Quotes] Business is suspended — capturing as held lead'
+        : `[Quotes] Plan limit reached for tenant (${planLimit.used}/${planLimit.limit}) — capturing as held lead`
     )
   }
 
@@ -151,7 +154,7 @@ export async function createQuoteSubmission(
     assetIds: input.assetIds,
   })
 
-  if (!limitHold && !input.skipServiceMatch && serviceMatchMode !== 'off' && projectDescription && descriptionOnly) {
+  if (!expectHold && !input.skipServiceMatch && serviceMatchMode !== 'off' && projectDescription && descriptionOnly) {
     // Every active service, with what each covers, so the matcher judges on the business's own words
     const { data: allServices } = await supabase
       .from('services')
@@ -297,7 +300,7 @@ export async function createQuoteSubmission(
   // 6a. T-151: a service with no questions of its own needs the free-text
   // description (the business has nothing else to go on); with questions it
   // is optional. Counted from the same rows the widget shows.
-  if (input.requireDescriptionWithoutQuestions && !isGeneralInquiry && !limitHold) {
+  if (input.requireDescriptionWithoutQuestions && !isGeneralInquiry && !expectHold) {
     const questionIds = new Set<string>()
     for (const row of widgetConfigRows || []) {
       const fields = (row.config_json as { fields?: WidgetField[] } | null)?.fields || []
@@ -409,6 +412,18 @@ export async function createQuoteSubmission(
   const { token, hash } = generateQuoteToken()
   const tokenExpiry = getTokenExpiry(30) // 30 days
 
+  // 9b. T-180 (AD-063): is this a priced quote? Decided AND counted in one step
+  // inside the database, so requests arriving together cannot pass a limit that
+  // has one place left, and none is lost from the count. One request is one
+  // quote, however many services it comes to carry (T-179).
+  let claim: PlanClaim | null = null
+  if (!outsidePlan && !expectHold) claim = await claimPlanQuote(supabase, tenantId)
+  const limitHold = !outsidePlan && (expectHold || claim?.claimed === false)
+  const holdStatus = claim?.status ?? planLimit
+  if (limitHold && !expectHold) {
+    console.warn(`[Quotes] Limit reached at the claim (${holdStatus.used}/${holdStatus.limit}) — capturing as held lead`)
+  }
+
   // 10. Create quote record with status 'queued'
   // For general inquiries, use the selected service's document type but mark status as ready
   const { data: quote, error: quoteError } = await supabase
@@ -455,6 +470,8 @@ export async function createQuoteSubmission(
 
   if (quoteError || !quote) {
     console.error('Failed to create quote:', quoteError)
+    // The quote was counted but could not be saved: give the count back
+    if (claim) await releasePlanQuote(supabase, tenantId, claim)
     // Clean up quote request
     await supabase.from('quote_requests').delete().eq('id', quoteRequest.id)
     return respond(
@@ -481,16 +498,19 @@ export async function createQuoteSubmission(
 
   // 12. Held leads (T-134) are not priced, so they don't consume the plan
   if (limitHold) {
-    await notifyLeadHeld({
-      tenantId,
-      businessName: tenant.name,
-      customerName: input.customer.name,
-      serviceName: service.name,
-      quoteId: quote.id,
-      used: planLimit.used,
-      limit: planLimit.limit,
-      per: planLimit.per,
-    })
+    // A suspended business is not told to "pick a plan": the hold is ours, not its plan's
+    if (!holdStatus.suspended) {
+      await notifyLeadHeld({
+        tenantId,
+        businessName: tenant.name,
+        customerName: input.customer.name,
+        serviceName: service.name,
+        quoteId: quote.id,
+        used: holdStatus.used,
+        limit: holdStatus.limit,
+        per: holdStatus.per,
+      })
+    }
     const appUrlHeld = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     return respond({
       quoteId: quote.id,
@@ -502,17 +522,18 @@ export async function createQuoteSubmission(
     })
   }
 
-  // 12a. Increment usage counter for estimates_created (T-150: not for tests)
-  if (!outsidePlan) {
-    await incrementUsageCounter(supabase, tenantId, 'estimates_created')
-    // 12b. If this consumed the last quote in the plan, notify the business once (T-101)
+  // 12a. The quote was counted by the claim at 9b (T-150: never for tests; T-180: no
+  // separate "add one" step). Tell the business, once each: two free quotes left, and
+  // the last quote of the allowance or the month used (T-101).
+  if (claim?.claimed) {
+    await maybeWarnFreeQuotesLeft(supabase, tenantId, tenant.name, claim.status)
     await maybeNotifyLimitReached(supabase, tenantId, tenant.name)
   }
 
   // 12c. Meter this quote to Stripe when it's beyond the plan limit (T-102).
   // Uses the quote ID as the idempotency identifier — retries can't double-bill.
-  if (isOverageQuote) {
-    await recordOverageQuote(planLimit, quote.id)
+  if (claim?.overage) {
+    await recordOverageQuote(claim.status, quote.id)
   }
 
   // 13. Enqueue job for processing (skip for general inquiries - they need manual review)

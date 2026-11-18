@@ -195,7 +195,8 @@ describe('every sender says who the email is for', () => {
     'apps/web/src/app/api/public/quotes/[quoteId]/decline/route.ts': ['business'], // quote declined
     'apps/web/src/app/api/public/quotes/[quoteId]/feedback/route.ts': ['business'], // customer question
     'apps/web/src/lib/lead-hold.ts': ['business'], // new lead waiting
-    'apps/web/src/lib/plan-limits.ts': ['business'], // plan limit reached
+    'apps/web/src/lib/plan-limits.ts': ['business', 'business'], // two free quotes left (T-180); plan limit reached
+    'apps/web/src/lib/billing-sync.ts': ['business'], // your payment didn't go through (T-180)
     'apps/web/src/lib/auth-flow.ts': ['business'], // T-173: confirm your email, reset your password, you already have an account
     'apps/web/src/lib/whatsapp-renewal.ts': ['business'], // T-175: reconnect WhatsApp before it runs out
     'apps/web/src/lib/failed-quote.ts': ['business'], // T-178: a request could not be priced (the worker's copy, apps/worker/src/failed-quote.ts, is also 'business')

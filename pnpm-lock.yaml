@@ -135,8 +135,8 @@ importers:
         specifier: ^18.3.0
         version: 18.3.1(react@18.3.1)
       stripe:
-        specifier: ^20.2.0
-        version: 20.2.0(@types/node@20.19.30)
+        specifier: ^23.1.0
+        version: 23.1.0(@types/node@20.19.30)
     devDependencies:
       '@types/node':
         specifier: ^20.14.0
@@ -4736,10 +4736,6 @@ packages:
   qrcode-generator@2.0.4:
     resolution: {integrity: sha512-mZSiP6RnbHl4xL2Ap5HfkjLnmxfKcPWpWe/c+5XxCuetEenqmNFf1FH/ftXPCtFG5/TDobjsjz6sSNL0Sr8Z9g==}
 
-  qs@6.14.1:
-    resolution: {integrity: sha512-4EK3+xJl8Ts67nLYNwqw/dsFVnCf+qR7RgXSK9jEEm9unao3njwMDdmsdvoKBKHzxd7tCYz5e5M+SnMjdtXGQQ==}
-    engines: {node: '>=0.6'}
-
   queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
 
@@ -5198,11 +5194,11 @@ packages:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
     engines: {node: '>=8'}
 
-  stripe@20.2.0:
-    resolution: {integrity: sha512-m8niTfdm3nPP/yQswRWMwQxqEUcTtB3RTJQ9oo6NINDzgi7aPOadsH/fPXIIfL1Sc5+lqQFKSk7WiO6CXmvaeA==}
-    engines: {node: '>=16'}
+  stripe@23.1.0:
+    resolution: {integrity: sha512-fVUfMSfTPoukfoV//MUKAx2+YxyKmYaYtnAL9VkfnHfaPNQylFdWZMD+zgUFerI8rjbaiER8Vzj2XEUQ2AhAsQ==}
+    engines: {node: '>=20'}
     peerDependencies:
-      '@types/node': '>=16'
+      '@types/node': '>=20'
     peerDependenciesMeta:
       '@types/node':
         optional: true
@@ -11167,10 +11163,6 @@ snapshots:
 
   qrcode-generator@2.0.4: {}
 
-  qs@6.14.1:
-    dependencies:
-      side-channel: 1.1.0
-
   queue-microtask@1.2.3: {}
 
   range-parser@1.2.1: {}
@@ -11769,9 +11761,7 @@ snapshots:
 
   strip-json-comments@3.1.1: {}
 
-  stripe@20.2.0(@types/node@20.19.30):
-    dependencies:
-      qs: 6.14.1
+  stripe@23.1.0(@types/node@20.19.30):
     optionalDependencies:
       '@types/node': 20.19.30
 

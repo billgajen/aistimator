@@ -306,8 +306,14 @@ describe('T-173: migration 43 and the roles', () => {
   })
 
   it('the subscription row is written by the server', () => {
+    // T-180: Checkout no longer writes the row at all (Stripe's customer is tied to the business by
+    // the session's own reference). The one writer is the sync, called with the service-role client
+    // by the webhook and by the return from Checkout.
     const checkout = route('billing/checkout')
-    expect(checkout).toMatch(/await createAdminClient\(\)\s+\.from\('subscriptions'\)\s+\.update\(\{ stripe_customer_id: customerId \}\)/)
+    expect(checkout).not.toMatch(/\.from\('subscriptions'\)[\s\S]{0,80}\.(update|upsert|insert)\(/)
+    expect(code('apps/web/src/lib/billing-sync.ts')).toMatch(/admin\.from\('subscriptions'\)\.upsert\(/)
+    expect(route('webhooks/stripe')).toMatch(/const admin = createAdminClient\(\)/)
+    expect(route('billing/confirm')).toMatch(/syncSubscriptionFromStripe\(createAdminClient\(\), stripe, subscriptionId/)
   })
 
   it('the deploy scripts exist and hold no address or key', () => {

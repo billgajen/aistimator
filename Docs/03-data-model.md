@@ -165,6 +165,12 @@ Indexes: `(tenant_id, created_at desc)` where not completed; the same where also
 - status
 - current_period_end
 
+T-180 (migration 44): `billing_interval` (`monthly` | `annual`), `cancel_at` (when a cancelled plan ends),
+`payment_failed_at` and `payment_failed_notified_at` (the failed payment now being retried, and its one email).
+One row per business, written only by `lib/billing-sync.ts` from what Stripe says. `status` is one of active,
+trialing, past_due (the plan still works) or canceled ("no plan"; the Stripe customer id is kept, the Stripe
+subscription id is cleared). A row with no Stripe customer and no Stripe subscription is a free test account.
+
 ### usage_counters
 - id
 - tenant_id
@@ -172,6 +178,23 @@ Indexes: `(tenant_id, created_at desc)` where not completed; the same where also
 - estimates_created
 - estimates_sent
 - created_at
+
+T-180 (migration 44, AD-063): never read-then-written. `claim_plan_quote(tenant, period, limit, per)` checks the
+limit and adds one in a single step, one business at a time; `release_plan_quote` gives a claim back;
+`increment_usage_counter` adds one to a counter with no limit (estimates sent). Service role only.
+
+### stripe_events (T-180, migration 44)
+- id (Stripe's event id), type, received_at, processed_at (null until its handler finished)
+- The webhook's ledger: a repeated event is answered without being handled again. Service role only.
+
+### admin_activity_logs (T-180, migration 44)
+- id, admin_user_id, action, resource_type, resource_id, details_json, created_at
+- What a platform admin did (suspend, restore, retry, view). The admin area had written to this table since it
+  was built, but no migration created it until 44. Service role only.
+
+### tenants: billing columns (T-180, migration 44)
+- `suspended_at`, `suspended_reason`: the platform admin's suspend switch (new requests held, WhatsApp silent,
+  sent quotes still open). `free_warning_sent_at`: the one "2 free quotes left" email.
 
 ## Indexes
 - quotes: (tenant_id, created_at desc), (tenant_id, status), (quote_request_id)
@@ -188,7 +211,8 @@ Indexes: `(tenant_id, created_at desc)` where not completed; the same where also
   `scripts/set-platform-admin.sh`). A guard trigger lets only the service role change `id`, `tenant_id` or
   `role`; a user can change its own `display_name`.
 - `subscriptions`: read by the business, written by the server only.
-- Guarded columns on `tenants`: `slug` (migration 32), `is_demo` (migration 36).
+- Guarded columns on `tenants`: `slug` (migration 32), `is_demo` (migration 36), `suspended_at`, `suspended_reason`
+  and `free_warning_sent_at` (migration 44).
 ### WhatsApp channel (migration 25; T-175, migration 42)
 - whatsapp_configs: one row per business, **server-only** (no policy or grant for a signed-in browser since
   migration 42). tenant_id (unique), phone_number_id (unique: the webhook routes by it), display_phone_number,

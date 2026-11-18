@@ -2,8 +2,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCurrentPeriod } from './usage'
 import { sendEmail, isPostmarkConfigured } from './postmark'
 import { generateLimitReachedEmailHtml } from './email-templates'
+import { freeQuotesLeftEmail } from './billing-emails'
 import { getStripeClient, reportOverageMeterEvent, formatPrice } from './stripe'
-import { getPlan, freeAllowance, noSubscriptionLimit, subscriptionLive } from '@qolumns/shared'
+import { getPlan, freeAllowance, freeQuotesLeftLine, noSubscriptionLimit, subscriptionLive } from '@qolumns/shared'
 import { businessEmailFor } from './business-email'
 
 /** Legacy (GB) monthly allowance for tenants without a subscription — kept for callers/tests. */
@@ -30,6 +31,11 @@ export interface PlanLimitStatus {
   overagePriceCents: number | null
   /** Stripe customer to meter overage events against */
   stripeCustomerId: string | null
+  /**
+   * T-180: a platform admin suspended the business. Nothing new is priced
+   * (requests are held, like at the limit) until it is restored.
+   */
+  suspended?: boolean
 }
 
 /**
@@ -99,7 +105,7 @@ export async function checkPlanLimit(
         .from('usage_counters')
         .select('period_yyyymm, estimates_created')
         .eq('tenant_id', tenantId),
-      supabase.from('tenants').select('region').eq('id', tenantId).single(),
+      supabase.from('tenants').select('region, suspended_at').eq('id', tenantId).single(),
     ])
 
     // T-134: limits, overage and features come from the plan definitions in
@@ -120,7 +126,7 @@ export async function checkPlanLimit(
       period
     )
 
-    return evaluateLimit(
+    const status = evaluateLimit(
       used,
       limit,
       {
@@ -131,6 +137,9 @@ export async function checkPlanLimit(
       },
       per
     )
+    // T-180: a suspended business prices nothing, whatever its plan says
+    const suspended = Boolean((tenant as { suspended_at?: string | null } | null)?.suspended_at)
+    return suspended ? { ...status, allowed: false, overageAvailable: false, overagePriceCents: null, suspended: true } : status
   } catch (error) {
     console.error('[PlanLimits] Failed to check plan limit, allowing request:', error)
     return {
@@ -143,6 +152,121 @@ export async function checkPlanLimit(
       overagePriceCents: null,
       stripeCustomerId: null,
     }
+  }
+}
+
+/** What `claimPlanQuote` decided for one request */
+export interface PlanClaim {
+  /** true: this request is a priced quote (and it has been counted, unless `counted` is false) */
+  claimed: boolean
+  /** why it was not claimed; 'ok' when it was */
+  reason: 'ok' | 'limit' | 'suspended'
+  /** false only when the count could not be written (the request still goes ahead) */
+  counted: boolean
+  /** counted beyond the limit, as metered overage (a plan that has it) */
+  overage: boolean
+  /** the plan's terms, with `used` as it stands after this claim */
+  status: PlanLimitStatus
+  /** the period the claim was counted in (needed to give it back) */
+  period: string
+}
+
+/**
+ * T-180 (AD-063): decide whether one request is a priced quote AND count it,
+ * in one step inside the database (`claim_plan_quote`, migration 44).
+ *
+ * Before, the limit was read in one step and the count written in another, so
+ * requests arriving together could all pass a limit with one place left, and
+ * the count itself lost updates. Now the database takes one business at a
+ * time: 20 requests at once are 20 claims, and the 10 free quotes or the
+ * plan's monthly number hold exactly.
+ *
+ * The limit and what it counts (this month, or in total) come from the plan
+ * definitions through `checkPlanLimit`; the database is only told the number.
+ * One request is one quote, however many services it carries (T-179).
+ *
+ * Fails open: if the database call fails, the request is priced and the miss
+ * is logged. A billing fault must never cost a customer's request (T-101).
+ * Needs the service-role client.
+ */
+export async function claimPlanQuote(supabase: SupabaseClient, tenantId: string): Promise<PlanClaim> {
+  const period = getCurrentPeriod()
+  const status = await checkPlanLimit(supabase, tenantId)
+  const claim = async (limit: number) =>
+    supabase.rpc('claim_plan_quote', { p_tenant_id: tenantId, p_period: period, p_limit: limit, p_per: status.per })
+  const read = (data: unknown) => (Array.isArray(data) ? data[0] : data) as { claimed?: boolean; used?: number; reason?: string } | null
+
+  try {
+    const first = await claim(status.unlimited ? 0 : status.limit)
+    const row = read(first.data)
+    if (first.error || !row) throw new Error(first.error?.code ?? first.error?.message ?? 'no answer')
+    const used = typeof row.used === 'number' ? row.used : status.used
+
+    if (row.claimed) {
+      return { claimed: true, reason: 'ok', counted: true, overage: false, status: { ...status, used, allowed: true, suspended: false }, period }
+    }
+    if (row.reason === 'suspended') {
+      return { claimed: false, reason: 'suspended', counted: false, overage: false, status: { ...status, used, allowed: false, overageAvailable: false, suspended: true }, period }
+    }
+    // Over the limit. A plan with metered overage counts it anyway and bills it (T-102).
+    if (status.overageAvailable) {
+      const extra = await claim(0)
+      const extraRow = read(extra.data)
+      if (extra.error || !extraRow?.claimed) throw new Error(extra.error?.code ?? 'overage claim refused')
+      return { claimed: true, reason: 'ok', counted: true, overage: true, status: { ...status, used: extraRow.used ?? used + 1, allowed: false }, period }
+    }
+    return { claimed: false, reason: 'limit', counted: false, overage: false, status: { ...status, used, allowed: false }, period }
+  } catch (error) {
+    console.error('[PlanLimits] Could not claim a quote, pricing the request anyway (not counted):', error instanceof Error ? error.message : 'unknown')
+    return { claimed: true, reason: 'ok', counted: false, overage: false, status, period }
+  }
+}
+
+/** Give a claim back: the quote could not be saved after it was counted. Never throws. */
+export async function releasePlanQuote(supabase: SupabaseClient, tenantId: string, claim: PlanClaim): Promise<void> {
+  if (!claim.claimed || !claim.counted) return
+  try {
+    const { error } = await supabase.rpc('release_plan_quote', { p_tenant_id: tenantId, p_period: claim.period })
+    if (error) console.error('[PlanLimits] Could not give a claim back:', error.code ?? error.message)
+  } catch (error) {
+    console.error('[PlanLimits] Could not give a claim back:', error instanceof Error ? error.message : 'unknown')
+  }
+}
+
+/**
+ * T-180: the one "2 free quotes left" email. Sent once per business, ever:
+ * the stamp on the tenant is claimed first, so two requests arriving together
+ * send one email. Only for the free allowance. Never throws.
+ */
+export async function maybeWarnFreeQuotesLeft(
+  supabase: SupabaseClient,
+  tenantId: string,
+  businessName: string,
+  status: PlanLimitStatus
+): Promise<void> {
+  try {
+    if (status.per !== 'total') return
+    const line = freeQuotesLeftLine(status.used, status.limit)
+    if (!line) return
+
+    const { data: claimed } = await supabase
+      .from('tenants')
+      .update({ free_warning_sent_at: new Date().toISOString() })
+      .eq('id', tenantId)
+      .is('free_warning_sent_at', null)
+      .select('id')
+    if (!claimed || claimed.length === 0) return // already sent
+
+    if (!isPostmarkConfigured()) return
+    const to = await businessEmailFor(tenantId)
+    if (!to) return
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+    const email = freeQuotesLeftEmail({ businessName, used: status.used, limit: status.limit, billingUrl: `${appUrl}/app/settings/billing` })
+    if (!email) return
+    await sendEmail({ from: { kind: 'business' }, to, subject: email.subject, htmlBody: email.html, tag: 'free-quotes-left' })
+    console.log('[PlanLimits] Free-quotes-left notice sent')
+  } catch (error) {
+    console.error('[PlanLimits] Failed to send the free-quotes-left notice:', error instanceof Error ? error.message : 'unknown')
   }
 }
 

@@ -9,58 +9,25 @@ export function getCurrentPeriod(): string {
 }
 
 /**
- * Increment usage counter for a tenant
- * Uses upsert to create record if it doesn't exist
+ * Add one to a usage counter, inside the database (T-180, AD-063).
+ *
+ * Until T-180 this read the count, added one and wrote it back, so requests
+ * arriving at the same moment all wrote the same number (six counted as two).
+ * It is one statement now (`increment_usage_counter`, migration 44).
+ *
+ * A PRICED QUOTE IS NOT COUNTED HERE: `claimPlanQuote` (lib/plan-limits.ts)
+ * checks the limit and counts in one step. This is for counters with no limit
+ * of their own (estimates sent). Needs the service-role client.
  */
 export async function incrementUsageCounter(
   supabase: SupabaseClient,
   tenantId: string,
   field: 'estimates_created' | 'estimates_sent'
 ): Promise<void> {
-  const period = getCurrentPeriod()
-
-  // First try to get existing record
-  const { data: existing } = await supabase
-    .from('usage_counters')
-    .select('id, estimates_created, estimates_sent')
-    .eq('tenant_id', tenantId)
-    .eq('period_yyyymm', period)
-    .single()
-
-  if (existing) {
-    // Update existing record
-    const updates: Record<string, number> = {}
-    if (field === 'estimates_created') {
-      updates.estimates_created = existing.estimates_created + 1
-    } else {
-      updates.estimates_sent = existing.estimates_sent + 1
-    }
-
-    const { error } = await supabase
-      .from('usage_counters')
-      .update(updates)
-      .eq('id', existing.id)
-
-    if (error) {
-      console.error('Failed to update usage counter:', error)
-    }
-  } else {
-    // Create new record
-    const { error } = await supabase.from('usage_counters').insert({
-      tenant_id: tenantId,
-      period_yyyymm: period,
-      estimates_created: field === 'estimates_created' ? 1 : 0,
-      estimates_sent: field === 'estimates_sent' ? 1 : 0,
-    })
-
-    if (error) {
-      // Could be race condition, try update instead
-      if (error.code === '23505') {
-        // Unique constraint violation - record was created by another request
-        await incrementUsageCounter(supabase, tenantId, field)
-      } else {
-        console.error('Failed to create usage counter:', error)
-      }
-    }
-  }
+  const { error } = await supabase.rpc('increment_usage_counter', {
+    p_tenant_id: tenantId,
+    p_period: getCurrentPeriod(),
+    p_field: field,
+  })
+  if (error) console.error('Failed to update usage counter:', error.code ?? error.message)
 }

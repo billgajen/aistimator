@@ -1,164 +1,86 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { getPlan, stripePriceIdFor, stripePriceEnvKey, type PlanInterval } from '@qolumns/shared'
-import {
-  getStripeClient,
-  isStripeConfigured,
-  getOrCreateStripeCustomer,
-  createCheckoutSession,
-} from '@/lib/stripe'
 import { NextResponse } from 'next/server'
+import { requireTenant } from '@/lib/auth-tenant'
+import { createAdminClient } from '@/lib/supabase/server'
+import { getPlan, isFreeTestAccount, stripePriceIdFor, stripePriceEnvKey, subscriptionLive, type PlanInterval } from '@qolumns/shared'
+import { getStripeClient, createCheckoutSession } from '@/lib/stripe'
 import type { CreateCheckoutRequest, CreateCheckoutResponse } from '@qolumns/shared'
 
+export const dynamic = 'force-dynamic'
+
+const refuse = (status: number, code: string, message: string) => NextResponse.json({ error: { code, message } }, { status })
+
 /**
- * POST /api/billing/checkout
- * Create a Stripe Checkout session for subscription
+ * POST /api/billing/checkout (T-134, T-180)
+ * Start Stripe Checkout for a plan: the business's first purchase, or its next
+ * one after a plan ended. Stripe is the seller (Managed Payments, AD-062).
+ *
+ * Refused, with nothing created on Stripe:
+ *   - a free test account (T-177): it has its plan without paying, and must
+ *     never be sold one by accident;
+ *   - a business that already has a paid plan: it changes plan in the portal,
+ *     so it can never end up with two subscriptions.
  */
 export async function POST(request: Request) {
   try {
-    // Check Stripe configuration
-    if (!isStripeConfigured()) {
-      return NextResponse.json(
-        { error: { code: 'STRIPE_NOT_CONFIGURED', message: 'Stripe is not configured' } },
-        { status: 503 }
-      )
-    }
+    const stripe = getStripeClient()
+    if (!stripe) return refuse(503, 'STRIPE_NOT_CONFIGURED', 'Stripe is not configured')
 
-    const stripe = getStripeClient()!
-    const body: CreateCheckoutRequest = await request.json()
+    const body = (await request.json().catch(() => null)) as CreateCheckoutRequest | null
+    if (!body?.planId) return refuse(400, 'VALIDATION_ERROR', 'planId is required')
 
-    if (!body.planId) {
-      return NextResponse.json(
-        { error: { code: 'VALIDATION_ERROR', message: 'planId is required' } },
-        { status: 400 }
-      )
-    }
-
-    const supabase = await createClient()
-
-    // Verify authentication
+    const auth = await requireTenant()
+    if (!auth.ok) return auth.response
+    const { supabase, tenantId } = auth
     const {
       data: { user },
-      error: userError,
     } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      )
-    }
-
-    // Get user's tenant and profile
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.tenant_id) {
-      return NextResponse.json(
-        { error: { code: 'NO_TENANT', message: 'User has no tenant' } },
-        { status: 404 }
-      )
-    }
-
-    const tenantId = profile.tenant_id
-
-    // Get tenant details
-    const { data: tenant } = await supabase
-      .from('tenants')
-      .select('id, name')
-      .eq('id', tenantId)
-      .single()
-
-    if (!tenant) {
-      return NextResponse.json(
-        { error: { code: 'TENANT_NOT_FOUND', message: 'Tenant not found' } },
-        { status: 404 }
-      )
-    }
 
     // T-134: plans come from the shared definitions; only offered plans are purchasable
     const plan = getPlan(body.planId)
-    if (!plan || !plan.offered) {
-      return NextResponse.json({ error: { code: 'PLAN_NOT_FOUND', message: 'Plan not found' } }, { status: 404 })
-    }
+    if (!plan || !plan.offered) return refuse(404, 'PLAN_NOT_FOUND', 'Plan not found')
     const interval: PlanInterval = body.interval === 'annual' ? 'annual' : 'monthly'
     const currency = 'USD'
     // Stripe price ids are account-specific → env (STRIPE_PRICE_<PLAN>_<INTERVAL>_<CURRENCY>)
     const stripePriceId = stripePriceIdFor(plan.id, interval, currency, process.env)
     if (!stripePriceId) {
       console.error(`[Checkout] Missing env ${stripePriceEnvKey(plan.id, interval, currency)}`)
-      return NextResponse.json(
-        { error: { code: 'NO_STRIPE_PRICE', message: 'This plan is not available for checkout yet' } },
-        { status: 400 }
-      )
+      return refuse(400, 'NO_STRIPE_PRICE', 'This plan is not available for checkout yet')
     }
 
-    // Get or create subscription record to get Stripe customer ID
-    const { data: subscription } = await supabase
+    // The subscription row is read with the service role: it is the server's record (T-173)
+    const { data: subscription } = await createAdminClient()
       .from('subscriptions')
-      .select('stripe_customer_id, stripe_subscription_id, plan_id')
+      .select('status, stripe_customer_id, stripe_subscription_id')
       .eq('tenant_id', tenantId)
-      .single()
+      .maybeSingle()
+    const row = subscription as { status: string; stripe_customer_id: string | null; stripe_subscription_id: string | null } | null
 
-    // Get or create Stripe customer
-    const customerId = await getOrCreateStripeCustomer(
-      stripe,
-      tenantId,
-      user.email!,
-      tenant.name,
-      subscription?.stripe_customer_id
-    )
-
-    // Update subscription with customer ID if new
-    // T-173: the subscription row is written by the server only (migration 43
-    // removed the rule that let a signed-in business change its own row)
-    if (!subscription?.stripe_customer_id) {
-      await createAdminClient()
-        .from('subscriptions')
-        .update({ stripe_customer_id: customerId })
-        .eq('tenant_id', tenantId)
+    if (isFreeTestAccount(row)) {
+      return refuse(409, 'TEST_ACCOUNT', 'This is a test account. It has its plan without paying, so there is nothing to buy.')
+    }
+    if (row && subscriptionLive(row.status) && row.stripe_subscription_id) {
+      return refuse(409, 'ALREADY_SUBSCRIBED', 'You already have a plan. Change it from "Manage billing".')
     }
 
-    // Build URLs
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const successUrl = `${appUrl}/app/settings/billing?success=true`
-    const cancelUrl = `${appUrl}/app/settings/billing?canceled=true`
-
-    // One free trial per business: only when it has never had a Stripe subscription
-    const trialDays = plan.trialDays && !subscription?.stripe_subscription_id ? plan.trialDays : undefined
-    // Metered overage only for plans that opt in (AD-026: offered plans don't)
-    const meteredPriceId = plan.overageEnabled
-      ? process.env[`STRIPE_METERED_PRICE_${plan.id.replace(/^plan_/, '').toUpperCase()}`] || undefined
-      : undefined
     const session = await createCheckoutSession(stripe, {
-      customerId,
       priceId: stripePriceId,
       tenantId,
-      successUrl,
-      cancelUrl,
-      meteredPriceId,
-      trialDays,
+      // {CHECKOUT_SESSION_ID} is filled in by Stripe: the billing page confirms it, so the plan
+      // shows at once without waiting for the webhook
+      successUrl: `${appUrl}/app/settings/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${appUrl}/app/settings/billing?canceled=true`,
+      customerId: row?.stripe_customer_id ?? null,
+      customerEmail: user?.email ?? null,
+      // No plan has a trial (AD-047). If one ever does: once per business.
+      trialDays: plan.trialDays && !row?.stripe_customer_id ? plan.trialDays : undefined,
     })
 
-    if (!session.url) {
-      return NextResponse.json(
-        { error: { code: 'CHECKOUT_FAILED', message: 'Failed to create checkout session' } },
-        { status: 500 }
-      )
-    }
-
-    const response: CreateCheckoutResponse = {
-      checkoutUrl: session.url,
-    }
-
+    if (!session.url) return refuse(500, 'CHECKOUT_FAILED', 'Failed to create checkout session')
+    const response: CreateCheckoutResponse = { checkoutUrl: session.url }
     return NextResponse.json(response)
   } catch (error) {
-    console.error('Checkout error:', error)
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
-      { status: 500 }
-    )
+    console.error('Checkout error:', error instanceof Error ? error.message : 'unknown')
+    return refuse(500, 'INTERNAL_ERROR', 'Internal server error')
   }
 }

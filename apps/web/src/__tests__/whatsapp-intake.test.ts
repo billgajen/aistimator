@@ -13,22 +13,27 @@ vi.mock('@/lib/whatsapp', () => ({
 }))
 vi.mock('@/lib/r2', () => ({ uploadToR2: vi.fn(async () => undefined), isR2Configured: () => true }))
 vi.mock('@/lib/queue', () => ({ enqueueQuoteJob: vi.fn(async () => undefined) }))
-vi.mock('@/lib/usage', () => ({ incrementUsageCounter: vi.fn(async () => undefined) }))
 vi.mock('@/lib/lead-hold', async () => {
   const actual = await vi.importActual<Record<string, unknown>>('@/lib/lead-hold')
   return { ...actual, notifyLeadHeld: vi.fn(async () => undefined) }
 })
-vi.mock('@/lib/plan-limits', () => ({
-  checkPlanLimit: vi.fn(async () => ({ allowed: true, overageAvailable: false, used: 0, limit: 50 })),
-  maybeNotifyLimitReached: vi.fn(async () => undefined),
-  recordOverageQuote: vi.fn(async () => undefined),
-}))
+vi.mock('@/lib/plan-limits', () => {
+  const status = { allowed: true, overageAvailable: false, used: 0, limit: 50, unlimited: false, per: 'month', overagePriceCents: null, stripeCustomerId: null }
+  return {
+    checkPlanLimit: vi.fn(async () => status),
+    // T-180: the quote is counted by the claim (decided and counted in one step in the database)
+    claimPlanQuote: vi.fn(async () => ({ claimed: true, reason: 'ok', counted: true, overage: false, status: { ...status, used: 1 }, period: '202611' })),
+    releasePlanQuote: vi.fn(async () => undefined),
+    maybeWarnFreeQuotesLeft: vi.fn(async () => undefined),
+    maybeNotifyLimitReached: vi.fn(async () => undefined),
+    recordOverageQuote: vi.fn(async () => undefined),
+  }
+})
 
 import { processIntakeMessage, sendIntakeResponse } from '@/lib/whatsapp-intake'
 import { sendTextMessage } from '@/lib/whatsapp'
-import { checkPlanLimit } from '@/lib/plan-limits'
+import { checkPlanLimit, claimPlanQuote } from '@/lib/plan-limits'
 import { enqueueQuoteJob } from '@/lib/queue'
-import { incrementUsageCounter } from '@/lib/usage'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { WhatsAppConversation, WhatsAppIntakeState, WhatsAppIntakeData } from '@qolumns/shared'
 
@@ -195,7 +200,7 @@ describe('WhatsApp intake — replies and transitions are pinned (T-136)', () =>
       allowed: false, overageAvailable: false, used: 50, limit: 50, unlimited: false, per: 'month', overagePriceCents: null, stripeCustomerId: null,
     })
     vi.mocked(enqueueQuoteJob).mockClear()
-    vi.mocked(incrementUsageCounter).mockClear()
+    vi.mocked(claimPlanQuote).mockClear()
     const data = {
       serviceId: 'svc_1', serviceName: 'Exterior Painting', projectDescription: 'Front wall',
       customerName: 'Sam', customerEmail: 'sam@example.com', customerPhone: '447700900123', jobAddress: 'BS7 8AA',
@@ -207,7 +212,7 @@ describe('WhatsApp intake — replies and transitions are pinned (T-136)', () =>
     expect(db.inserted.quotes?.[0]).toMatchObject({ status: 'pending_review', content_json: { limitHold: true } })
     expect(db.inserted.quote_requests?.length).toBe(1) // the lead is saved
     expect(enqueueQuoteJob).not.toHaveBeenCalled() // not priced
-    expect(incrementUsageCounter).not.toHaveBeenCalled() // doesn't consume the plan
+    expect(claimPlanQuote).not.toHaveBeenCalled() // doesn't consume the plan: no claim is made for a held lead
   })
 
   it('sends replies through the WhatsApp Cloud API', async () => {

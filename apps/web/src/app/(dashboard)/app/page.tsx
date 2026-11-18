@@ -1,7 +1,7 @@
 import { syncSelectedPlan } from '@/lib/signup-choices'
 import { createClient } from '@/lib/supabase/server'
 import { headers } from 'next/headers'
-import { QUOTE_GROUP_STATUSES, QUOTE_TURN_COPY, agoWords, formatMoney, getRegion, quoteActivityLine, quoteTurn } from '@qolumns/shared'
+import { QUOTE_GROUP_STATUSES, QUOTE_TURN_COPY, agoWords, formatMoney, freeQuotesLeftLine, getRegion, quoteActivityLine, quoteTurn } from '@qolumns/shared'
 import { buildChecklist } from '@/lib/setup-checklist'
 import {
   buildHomeActivity,
@@ -323,7 +323,8 @@ export default async function DashboardPage() {
           tone="warn"
           title={
             free
-              ? `${planLimit.used} of your ${planLimit.limit} free quotes used`
+              ? // T-180: "2 free quotes left. Pick a plan to keep pricing every request."
+                freeQuotesLeftLine(planLimit.used, planLimit.limit) ?? `${planLimit.used} of your ${planLimit.limit} free quotes used`
               : `${usagePercent}% of your monthly quote limit used (${planLimit.used}/${planLimit.limit})`
           }
           text={
@@ -331,7 +332,7 @@ export default async function DashboardPage() {
               ? 'After your free quotes, new requests are saved as leads but not priced until you pick a plan.'
               : 'At the limit, new requests are saved as leads but not priced until you upgrade or the month resets.'
           }
-          cta="View plans"
+          cta={free ? 'Pick a plan' : 'View plans'}
         />
       )}
 

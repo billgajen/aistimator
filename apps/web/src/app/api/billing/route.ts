@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { getStripeClient, getSubscriptionDetails } from '@/lib/stripe'
 import { toPlanInfo } from '@/lib/plans-view'
-import { getPlan, offeredPlans, freeAllowance, usageLevel } from '@qolumns/shared'
+import { getPlan, offeredPlans, freeAllowance, freeQuotesLeftLine, isFreeTestAccount, subscriptionLive, usageLevel } from '@qolumns/shared'
 import { usedForAllowance } from '@/lib/plan-limits'
 import { NextResponse } from 'next/server'
 import type { BillingResponse, PlanInfo, SubscriptionInfo, BillingUsage } from '@qolumns/shared'
@@ -65,7 +64,7 @@ export async function GET() {
     const usageCounter = (usageRows ?? []).find((r) => r.period_yyyymm === currentPeriod) ?? null
 
     // T-134: plans come from the shared definitions, not the plans table
-    const { data: tenantRow } = await supabase.from('tenants').select('region, currency, selected_plan').eq('id', tenantId).single()
+    const { data: tenantRow } = await supabase.from('tenants').select('region, currency, selected_plan, suspended_at').eq('id', tenantId).single()
     const tenantRegion = (tenantRow as { region?: string } | null)?.region ?? null
 
     let subscriptionInfo: SubscriptionInfo = {
@@ -76,29 +75,32 @@ export async function GET() {
       stripeCustomerId: null,
     }
 
-    const currentPlan = subscription ? getPlan(subscription.plan_id as string) : null
+    // T-180: a plan is held only while the subscription is live (active, trialing, or a payment
+    // being retried). An ended one is "no plan": the page shows the free allowance again.
+    const live = Boolean(subscription && subscriptionLive(subscription.status as string))
+    const storedPlan = subscription ? getPlan(subscription.plan_id as string) : null
+    const currentPlan = live ? storedPlan : null
+    const testAccount = isFreeTestAccount(subscription)
     if (subscription) {
-      let cancelAtPeriodEnd = false
-      if (subscription.stripe_subscription_id) {
-        const stripe = getStripeClient()
-        if (stripe) {
-          const stripeSubscription = await getSubscriptionDetails(stripe, subscription.stripe_subscription_id)
-          if (stripeSubscription) cancelAtPeriodEnd = stripeSubscription.cancel_at_period_end
-        }
-      }
+      // Everything here is what the webhook stored from Stripe; this route never calls Stripe
+      const cancelAt = live ? ((subscription.cancel_at as string | null) ?? null) : null
       subscriptionInfo = {
         status: subscription.status as SubscriptionInfo['status'],
         plan: currentPlan ? toPlanInfo(currentPlan) : null,
-        currentPeriodEnd: subscription.current_period_end,
-        cancelAtPeriodEnd,
+        currentPeriodEnd: live ? subscription.current_period_end : null,
+        cancelAtPeriodEnd: Boolean(cancelAt),
+        cancelAt,
         stripeCustomerId: subscription.stripe_customer_id,
+        interval: live ? ((subscription.billing_interval as 'monthly' | 'annual' | null) ?? null) : null,
+        testAccount,
+        paymentFailed: subscription.status === 'past_due',
+        endedPlanName: !live ? storedPlan?.name ?? null : null,
       }
     }
 
     const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
-    const live = subscription && ['active', 'trialing', 'past_due'].includes(subscription.status as string)
     // T-152: a live plan counts this month; without one, the free allowance
     // (US: 10 in total, never resets; legacy GB: 50 a month)
     const allowance = live && currentPlan ? null : freeAllowance(tenantRegion)
@@ -138,6 +140,11 @@ export async function GET() {
       usage,
       availablePlans,
       selectedPlanId: (tenantRow as { selected_plan?: string | null } | null)?.selected_plan ?? null,
+      // Checkout is for a business with no plan now; a test account is never offered it (T-177)
+      canCheckout: !live && !testAccount,
+      canManage: Boolean(subscription?.stripe_customer_id),
+      freeQuotesLeftLine: per === 'total' ? freeQuotesLeftLine(created, planLimit) : null,
+      suspended: Boolean((tenantRow as { suspended_at?: string | null } | null)?.suspended_at),
     }
 
     return NextResponse.json(response)

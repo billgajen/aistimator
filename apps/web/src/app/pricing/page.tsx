@@ -4,7 +4,7 @@ import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { MAIN_CTA } from '@/lib/marketing/cta'
 import { PRICING_AI_FAQ, PRICING_DEMO_LINKS } from '@/lib/marketing/site-copy'
-import { COMING_LATER, PRICING_DESCRIPTION, PRICING_LEAD, PRICING_TAGLINES, planLines, sitePlans } from '@/lib/marketing/plan-claims'
+import { COMING_LATER, PLUS_TAX, PRICING_DESCRIPTION, PRICING_LEAD, PRICING_TAGLINES, planLines, sitePlans } from '@/lib/marketing/plan-claims'
 import { formatMoney, freeOfferLabel, FREE_ALLOWANCE, PRODUCT_NAME } from '@qolumns/shared'
 
 export const metadata: Metadata = {
@@ -117,13 +117,17 @@ export default function PricingPage() {
                   /month
                 </span>
               </p>
+              {/* T-180: Stripe adds the tax at checkout */}
+              <p className={`mt-1 text-xs ${plan.highlight ? 'text-white/60' : 'text-text-muted'}`} data-testid="plus-tax">
+                {PLUS_TAX}
+              </p>
               <div className={plan.highlight ? 'tape-rule-light mt-6' : 'tape-rule mt-6'} />
               <p className={`mt-5 text-sm ${plan.highlight ? 'text-white/90' : 'text-text-primary'}`}>
                 <span className="figure font-medium">{plan.estimates}</span> estimates a month
               </p>
               {plan.annual && (
                 <p className={`mt-1 text-xs ${plan.highlight ? 'text-white/60' : 'text-text-muted'}`}>
-                  or <span className="figure">{plan.annual}</span> a year (two months free)
+                  or <span className="figure">{plan.annual}</span> a year {PLUS_TAX} (two months free)
                 </p>
               )}
               <ul className={`mt-5 flex-1 space-y-2.5 text-sm ${plan.highlight ? 'text-white/85' : 'text-text-secondary'}`} data-testid="plan-lines">

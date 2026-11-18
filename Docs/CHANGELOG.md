@@ -15,6 +15,199 @@
 
 ## Issues & Resolutions
 
+### 2026-11-18: T-180 — Stripe live billing, end to end: Managed Payments, the atomic usage counter, the paying journey (AD-062, AD-063)
+
+**Built, not deployed.** Nothing was pushed to production and production was not read. Every Stripe call went
+to the sandbox "Qolumns sandbox" with Stripe's test cards; no real charge, no email off this machine, no
+WhatsApp message. What the owner runs to go live is in OWNER-TODO (T-180, section 1). Migration 44 goes first.
+
+Checks: `pnpm lint` and `pnpm typecheck` pass; web and worker build. Unit tests: web 1,052 (51 new in
+`billing-t180.test.ts`), worker 574, mobile 11. `verify-t180` 98/98 against the sandbox (the counter, the free
+journey, the test account, suspend and restore, then in a browser on Stripe's own pages: pay Starter, upgrade,
+yearly, downgrade, cancel, a declined card, a renewal that fails then succeeds, a renewal that fails until
+Stripe gives up, the same event twice). `verify-t177` 99/99, `verify-t178` 52/52, `verify-t179` 97/97. Also
+run, because this changes the billing page and how usage is counted: `verify-t152` 66/66, `verify-t165`
+148/148, `verify-t171` 97/97. **Not run:** the rest of the regression set (t146 to t176) and `verify-t173`.
+The ticket named t177 to t179; this change touches the quote flow, the worker and a migration, so the full set
+is due before it is deployed.
+
+**`verify-t179` needed its test business put on a plan.** It sends more than ten requests. Six of them go at
+the same moment, and until now those counted as two, so the business never reached its ten free quotes. With
+the count exact, the eleventh request was held and the script's page check waited for a price that was never
+coming. No other regression script sends requests at the same moment from a business without a plan (t176
+does, and its business has one).
+
+**One unit test is sensitive to how busy the machine is:** T-162's "the old embed names are nowhere in the
+app" runs eight repo-wide searches inside vitest's five-second limit. It passed in the first full runs of this
+ticket; later, with the machine busy, it timed out in three full runs, and passed again on its own and in a
+full run with two workers (`npx vitest run --maxWorkers=2`: 1,052/1,052). Nothing it checks was changed, and
+the test was not altered.
+
+#### Follow-up, same day: the owner's four changes
+
+1. **A downgrade takes effect at the end of the paid period; an upgrade stays immediate, with proration.**
+   - The portal settings gain `schedule_at_period_end` with two conditions: a cheaper price
+     (`decreasing_item_amount`) and a shorter interval (`shortening_interval`, yearly to monthly).
+     `proration_behavior` stays `always_invoice`, which now only ever charges (an upgrade).
+   - Stripe's docs say a period-end downgrade works only "between prices that have the same product", and
+     Starter and Pro are separate products. Tried in the sandbox on a Managed Payments subscription before
+     building on it: it works between them. Stripe attaches a schedule, keeps Pro until the period ends, then
+     renews as Starter at Starter's price and sends `customer.subscription.updated`, which the existing sync
+     stores. No code changed outside the setup script.
+   - Cancelling while a downgrade is waiting drops the downgrade; the plan simply ends.
+   - **Not built:** the billing page does not say that a downgrade is waiting (Stripe's portal does). Our row
+     holds the plan the business has now, which is right; showing the next one needs the schedule read and
+     stored. In OWNER-TODO, Later.
+2. **"plus tax" beside every plan price,** small and plain: the Pricing page (under the monthly price, and in
+   the yearly line), Home's plan cards, and the billing page's plan cards. One constant, `PLUS_TAX` in
+   `lib/marketing/plan-claims.ts`.
+3. **Terms:** a second paragraph under "5. Billing", in the owner's words: "Payments are processed by Stripe,
+   which acts as the seller of record through Link. Applicable sales tax or VAT is added at checkout." "Last
+   updated" is 18 November 2026 on the Terms (Privacy keeps 17 November). The first paragraph of that section
+   still speaks of "metered overage (where applicable)", which no offered plan has; left as written.
+4. **Plan numbers confirmed by the owner:** Starter 50 quotes for $49 a month ($490 a year), Pro 200 quotes for
+   $99 ($990), 10 free quotes in total. Their `TODO-OWNER` marks are gone from `plans.ts`. Business keeps its
+   marks ($199, 600 quotes) and stays off the site.
+
+Tests changed with them: `verify-t180` (the portal's rules; a downgrade asked for changes nothing now; on a
+test clock it lands at the period end at Starter's price), `verify-t177` and `whatsapp-t177.test.ts` (the
+Terms' date), `customer-pages-t171.test.ts` (an import line), three new unit tests in `billing-t180.test.ts`.
+
+#### Found before building
+
+- **Managed Payments supports everything the code needs.** Stripe's docs (read 2026-11-18: overview, how it
+  works, eligibility, set up, update a Checkout integration, tax) and then the sandbox itself: a Checkout
+  session with our parameters, a plan change, monthly to yearly, cancel at period end, the customer portal and
+  a card change all work on a Managed Payments subscription. Nothing had to be built around.
+- **The webhook could not have worked.** It read `subscription.current_period_start` and
+  `invoice.subscription`. Current API versions send the period on the subscription's item and the invoice's
+  subscription under `parent`. Every subscription event threw (an invalid date), and both payment events
+  returned early. Nobody has bought a plan, so it never showed.
+- **The Stripe SDK was three major versions behind** (20.2.0) and had no types for Managed Payments. Now 23.1.0,
+  which pins the account's own API version (`2026-10-28.endive`).
+- **Checkout made a new Stripe customer on every attempt.** It saved the customer id on the `subscriptions`
+  row, but a business that has never bought has no row (`plan_id` is required), so the update wrote nothing.
+- **"Price this lead" never counted.** The route added one through the signed-in business's own database
+  client, which may not write `usage_counters`; the error was logged and ignored.
+- **The admin log was never kept.** The admin area writes to `admin_activity_logs`; no migration created it.
+- **A cancel in the portal arrives as a date** (`cancel_at`), not as `cancel_at_period_end`. The billing page
+  read only the flag, and asked Stripe for it on every page load.
+- **`incomplete` and `paused` were stored as `active`,** which would have given a plan nobody paid for.
+- **The setup script lived in `apps/web/scripts/`,** not `scripts/`. It stays there.
+
+#### What was built
+
+**1. The counter (AD-063; migration 44; `lib/plan-limits.ts`, `lib/usage.ts`, worker `usage.ts`)**
+- *Before:* read the count, add one, write it back; the limit checked in one step and counted in another.
+- *Now:* `claim_plan_quote` decides and counts in one step, one business at a time. `claimPlanQuote` is called
+  where a quote is made (`lib/quote-intake.ts`, `lib/messaging/intake-engine.ts`,
+  `api/quotes/[quoteId]/process`), just before the quote is saved; the claim is given back if the save fails.
+  The early read of the limit stays, only to skip the cheap steps for a request that will be held.
+- 20 requests at once count as 20. From zero, 20 at once on the free allowance are 10 priced and 10 held. With
+  45 of Starter's 50 used, 20 at once are 5 priced and 15 held.
+- Over a plan's monthly limit a request is **held**: no offered plan has overage.
+
+**2. Plans, prices, portal, webhook (`apps/web/scripts/stripe-setup-plans.mts`)**
+- One script for the sandbox (now) and live (later, `--live`: asks for the key without showing it, shows the
+  account, asks for the account's name to be typed). `--dry-run` changes nothing. It can be run again and again.
+- Products "Qolumns Starter", "Qolumns Pro", "Qolumns Business" (the name from `PRODUCT_NAME`), each with tax
+  code `txcd_10103001` (software as a service, business use). Prices: $49 and $490, $99 and $990, $199 and
+  $1,990, USD, no trial. A price in Stripe that no longer matches `plans.ts` stops the script.
+- Portal (the default configuration): switch between the plans the site shows (Starter and Pro), monthly or
+  yearly; an upgrade at once with the difference charged, a downgrade at the end of the paid period (see the
+  follow-up above; first built as "charged or credited at once"); cancel at the end of the period; change the
+  card; invoices.
+- One webhook endpoint, `https://qolumns.com/api/webhooks/stripe`, for the five events in
+  `lib/stripe-events.ts`, at the SDK's API version. In the sandbox it is created switched off.
+- It prints the `STRIPE_PRICE_*` lines and never a key or a signing secret.
+
+**3. Checkout, the return, the portal (`lib/stripe.ts`, `api/billing/checkout`, `api/billing/confirm`)**
+- Checkout is a Managed Payments session: `managed_payments.enabled`, the price, and the business three ways
+  (`client_reference_id`, session metadata, subscription metadata). A first purchase passes the email and lets
+  Checkout make the customer; a business that bought before passes its customer.
+- Refused before Stripe is called: a free test account (409 `TEST_ACCOUNT`), a business with a plan (409
+  `ALREADY_SUBSCRIBED`).
+- Back from Checkout the billing page calls `POST /api/billing/confirm`, which stores the plan from Stripe at
+  once, through the same function as the webhook.
+
+**4. The webhook (AD-062; `api/webhooks/stripe`, `lib/billing-sync.ts`, `lib/stripe-events.ts`)**
+- Five events; each re-reads the subscription from Stripe and stores it. `decideSync` is the pure rule.
+- `stripe_events` is the ledger: a finished event is answered `duplicate: true` and nothing is touched.
+- Status: active, trialing and past_due keep the plan; everything else is "no plan" (`storedSubscriptionStatus`).
+- An ended subscription leaves `status: canceled`, no Stripe subscription id, the customer id kept.
+
+**5. The business's journey**
+- 8 of 10 free quotes: one email ("2 free quotes left", `lib/billing-emails.ts`), once per business
+  (`tenants.free_warning_sent_at`), and the line on Home and Billing ("1 free quote left" at 9).
+- 10 of 10: the existing email; the next request is held.
+- Pick a plan: Checkout, back to `/app/settings/billing` showing it; usage counts this month against the plan.
+- Upgrade, downgrade, monthly to yearly, cancel: in the portal; the row follows by webhook. A cancelled plan
+  shows its end date and works until then; then "no plan" and requests are held.
+
+**6. A failed payment**
+- `past_due`: `AccountNotice` in the dashboard layout shows "Your payment didn't go through. Update your card to
+  keep your quotes running." on every page, with a button to the portal. One email per failure
+  (`payment_failed_notified_at`, claimed where empty; cleared when a payment succeeds).
+- Everything keeps working while Stripe retries. When Stripe gives up (unpaid or cancelled): no plan, requests
+  held, WhatsApp silent. One rule for both: `subscriptionLive`.
+
+**7. The suspend switch (`api/admin/tenants/[tenantId]/suspend`, `/admin/tenants`)**
+- Platform admin only, a reason required, written to `admin_activity_logs`. While suspended: the claim says no
+  (requests held, the customer told the estimate is coming), a held lead cannot be priced, WhatsApp is silent
+  (`lib/whatsapp-access.ts`), the dashboard says the account is paused. Sent quotes still open. A guard trigger
+  keeps the columns server-only. Stripe is not touched.
+
+**8. Free test accounts**
+- `isFreeTestAccount`: a live row with no Stripe customer. The billing page says "Test account", shows no
+  price to pay and offers neither Checkout nor the portal; Checkout refuses it. `/admin/tenants` says "Test
+  account, not billed".
+
+#### Found while verifying (all by `verify-t180`)
+
+- **The billing page showed "Free" after a paid checkout** until it was reloaded. The page cleaned the address
+  on arrival, which re-ran its loader; the second load raced the first (the one that had confirmed) and won.
+  The loader now runs once and reads the address itself.
+- **The portal's plan list is only sent when asked for** (`expand`), so the check of it read an empty list.
+- **Switching only the interval:** the portal has already picked the same plan on the other tab, so there is no
+  "Select" to press.
+- **A past-due subscription shows a different portal:** one "Update payment method" button that pays the unpaid
+  invoice with the chosen card straight away. So fixing the card recovers the plan at once, not at Stripe's
+  next retry.
+- **A new card added in the portal becomes the customer's default, but the subscription keeps its own card**
+  until "Update payment method" is used on the subscription.
+- **In the sandbox Stripe tried a failing card four times in about two weeks, then cancelled** the subscription.
+- **A card declined at Checkout leaves a customer behind in Stripe** (Checkout makes it when the card is tried),
+  with no subscription. Nothing reaches us and nothing is stored. Left as it is.
+
+#### Constraints and how this relates to earlier work
+
+- AD-026 (subscription only, no overage on offered plans) is now also what Managed Payments allows.
+- AD-039 (the free allowance is counted in total by summing the monthly rows) holds: the claim sums them
+  inside the lock. No lifetime counter was added.
+- AD-047 (no trial): no price has one; the script refuses a Stripe price that does. The trial mechanism in
+  Checkout stays, driven by the plan data.
+- AD-057 (WhatsApp silent on lapse) and T-177's grace: unchanged, and now also silent when suspended.
+- AD-060: the claim fails open like the protections. The worker's limiter is untouched.
+- AD-061: one request is one claim; sections claim nothing.
+- T-134's held leads and T-152's wording are reused for every hold (limit, lapse, suspension). A suspended
+  business is not sent the "pick a plan" email.
+- T-173 (migration 43): the subscription row is still written only by the server; Checkout no longer writes it
+  at all.
+- Tests changed for the new shape, not loosened: `dashboard-simplify`, `public-demo`, `email-from`,
+  `home-t165`, `no-quote-lost-t178`, `t173`, `whatsapp-intake`.
+
+**Files:** `supabase/migrations/00000000000044_stripe_billing.sql`, `scripts/deploy-migration-44.sh`,
+`apps/web/scripts/stripe-setup-plans.mts`, `packages/shared/src/{plans.ts,api.types.ts}`,
+`apps/web/src/lib/{stripe.ts,stripe-events.ts,billing-sync.ts,billing-emails.ts,billing-notice.ts,plan-limits.ts,usage.ts,quote-intake.ts,whatsapp-access.ts,messaging/intake-engine.ts}`,
+`apps/web/src/app/api/{billing,billing/checkout,billing/confirm,billing/notice,webhooks/stripe,quotes/[quoteId]/process,admin/tenants,admin/tenants/[tenantId]/suspend}`,
+`apps/web/src/app/(dashboard)/{layout.tsx,app/page.tsx,app/settings/billing/page.tsx}`,
+`apps/web/src/app/admin/tenants/page.tsx`, `apps/web/src/components/billing/AccountNotice.tsx`,
+`apps/worker/src/usage.ts`, `apps/web/package.json` (stripe 23.1.0), `apps/web/.env.example`,
+tests `apps/web/src/__tests__/billing-t180.test.ts`, `scripts/hardcore-test/verify-t180.mts`,
+`Docs/{02-api-contracts.md,03-data-model.md}`, `OWNER-TODO.md`
+
+---
+
 ### 2026-11-17: T-179 — One request, several services: other services the customer asked for can be added to the same quote (AD-061)
 
 **Deployed 2026-11-18 08:10 UTC** (commits `24c2d67` and `6f1afc6`). No migration: none was needed and none
@@ -7960,6 +8153,88 @@ needs its own answers); a second quote for the second service (two links, two ac
 request); pricing it from the note with AI-filled answers (the AI would be answering for the customer); keeping
 the rough estimate as a "from" price beside the card (two prices for one thing); a new table for sections (the
 quote's own JSON already holds its price, and old quotes need no migration).
+
+### AD-062: Stripe is the seller (Managed Payments); our row is what Stripe says, read again every time (T-180)
+
+**Decision:** plans are sold through Stripe Managed Payments. Stripe is the merchant of record: it takes the
+payment, works out and pays the sales tax and VAT, sends the receipts, and handles disputes and refunds. Our side
+is small and has one shape:
+
+1. **A subscription starts only in Checkout,** with `managed_payments.enabled`. No code creates one through the
+   API, attaches an invoice item, raises an invoice, or sets a subscription's card (Managed Payments allows none
+   of these). Checkout is sent none of the settings Managed Payments owns (tax, payment method types, invoice
+   settings, adaptive pricing).
+2. **Every change after that is made on Stripe's pages** (our portal link, or Stripe's own customer site) and
+   reaches us by webhook. A business with a plan is never sent to Checkout again.
+3. **One function writes the `subscriptions` row** (`syncSubscriptionFromStripe`). Every webhook event, and the
+   return from Checkout, calls it with a subscription id; it reads the subscription from Stripe again and stores
+   what Stripe says now. It never trusts the event's own copy.
+4. **The same event twice changes nothing.** Each event id is recorded before it is handled and marked when it
+   is done; a finished one is answered and skipped. One that did not finish is handled again, which is safe
+   because of rule 3.
+5. **Four statuses, one rule.** Stripe's status is stored as active, trialing, past_due or canceled
+   (`storedSubscriptionStatus`). Active, trialing and past_due keep the plan (`subscriptionLive`): a failed
+   payment being retried changes nothing but a notice. Everything else is "no plan": requests are held, the
+   WhatsApp assistant is silent. The quote limit and WhatsApp read the same rule.
+6. **The plan definitions stay the source of plan numbers.** Stripe holds prices; price ids are settings
+   (`STRIPE_PRICE_*`), created by `apps/web/scripts/stripe-setup-plans.mts` from `plans.ts`.
+7. **A free test account** is a live row with no Stripe customer. It is never offered Checkout or the portal and
+   is not revenue: revenue is what Stripe holds.
+8. **Suspending is ours, not Stripe's.** The platform admin's switch holds new requests and silences WhatsApp;
+   it does not touch the subscription.
+
+**Why:** selling software to businesses in many countries means registering for, working out and paying tax in
+each. Managed Payments takes that on. The price is that Stripe owns the checkout, the tax and the money trail,
+so anything we build on top must not assume we can create or adjust a charge ourselves. Reading Stripe again on
+every event costs one request and removes two whole classes of bug: events out of order, and events repeated.
+
+**Rules that follow:**
+- Never add a way to charge that is not Checkout or the portal (a per-quote overage, a one-off invoice, an
+  add-on line). Over a plan's limit a request is held, not billed (AD-026). A new way to charge is a new
+  decision, checked against Stripe's Managed Payments docs first.
+- Never store or decide from an event's payload. Add an event type only to `STRIPE_WEBHOOK_EVENTS`, and have it
+  call the sync.
+- The Stripe SDK pins the API version; the webhook endpoint is created with the same version by the setup
+  script. Upgrading the SDK means recreating the endpoint (the script says so when they differ).
+- The customer's statement, the receipts and the tax are Stripe's. We show plan prices before tax and say that
+  tax is added by Stripe.
+- The billing page reads our row, never Stripe. If the two ever disagree the fix is in the sync.
+
+**Rejected:** keeping the old handlers that wrote from each event's payload (they also read fields that current
+API versions no longer send: the period on the subscription, the subscription on the invoice); a "Pay" button
+of our own on Elements (not supported with Managed Payments); creating the Stripe customer before Checkout (it
+left a new, unused customer on every abandoned checkout, since a business with no plan has no row to keep the
+id in); making the webhook idempotent by comparing fields (a ledger of event ids is exact and cheap); letting a
+business with a plan open Checkout again (two subscriptions for one business).
+
+### AD-063: A priced quote is claimed and counted in one step, inside the database (T-180)
+
+**Decision:** whether a request is a priced quote is decided, and counted, by one database function
+(`claim_plan_quote`), which takes one business at a time (a transaction-scoped advisory lock on the business).
+The server passes the limit and whether it is per month or in total, from the plan definitions; the database
+compares, adds one and answers yes, or answers no. A suspended business always gets no. The three places a quote
+is made (the form, WhatsApp and SMS, "Price this lead") all claim; none adds one on its own. If the quote then
+cannot be saved, the claim is given back. The "sent" counter is a single `+ 1` statement too.
+
+**Why:** the count was read, increased in the server and written back, so requests arriving together wrote the
+same number (six counted as two, seen in T-179). And the limit was checked in one step and counted in another,
+so a rush could pass a limit that had one place left. Both become a billing fault once plans are paid for. A
+single statement fixes the first; only deciding and counting together fixes the second.
+
+**Rules that follow:**
+- Never read a usage count to decide and then write it. Decide through the claim.
+- Plan numbers do not move into the database: the function is told the limit (AD-026: one source for plans).
+- One request is one quote, however many services it comes to carry (AD-061). Adding or removing a section
+  claims nothing.
+- A request outside the plan (a setup test, the public demo) makes no claim.
+- The claim fails open: if the database cannot answer, the request is priced and the miss is logged. A billing
+  fault never costs a customer's request (T-101, AD-060's spirit).
+- The functions are for the service role only. A signed-in business cannot count, uncount or claim.
+
+**Rejected:** a single `update … set n = n + 1` alone (it fixes the lost counts but not the limit under a
+rush); a row lock on the month's counter (the free allowance is summed over every month, and the first quote of
+a month has no row to lock); counting in Redis (off in production by decision, AD-060); checking the limit in a
+database constraint (the limit is not in the database).
 
 ---
 

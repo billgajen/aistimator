@@ -111,6 +111,57 @@ tax once, one accept. No migration: the shape is in `Docs/03-data-model.md`.
   `{ success, ready, section | questions }`. Reads only.
 - Usage: adding or removing a section counts nothing. One request is one quote.
 
+## Billing (T-180, AD-062, AD-063)
+Stripe is the seller (Managed Payments): it charges, adds the tax, sends the receipts. Our side is four signed-in
+routes, one webhook and one admin route. Plan numbers come from `packages/shared/src/plans.ts`; price ids from the
+`STRIPE_PRICE_<PLAN>_<INTERVAL>_USD` settings. No route here returns a card detail or a key.
+
+- `GET /api/billing` → `{ subscription, usage, availablePlans, selectedPlanId, canCheckout, canManage,
+  freeQuotesLeftLine, suspended }`. It reads only what the webhook stored; it never calls Stripe.
+  - `subscription.status`: `active`, `trialing`, `past_due` (a payment failed and is being retried: the plan
+    still works), `canceled` (had a plan, it ended) or `none`. `subscription.plan` is the plan the business has
+    **now**: `null` for `none` and for `canceled`.
+  - New in T-180: `interval` (`monthly` | `annual` | null), `cancelAt` (when a cancelled plan ends; it works
+    until then; `cancelAtPeriodEnd` is true whenever it is set), `paymentFailed`, `endedPlanName`, and
+    `testAccount` (a free test account: a plan with no Stripe customer; nothing to buy or manage).
+  - `canCheckout`: the business has no plan now and is not a test account. `canManage`: it has a Stripe customer.
+  - `freeQuotesLeftLine`: "2 free quotes left. Pick a plan to keep pricing every request." at 8 of 10, the same
+    with "1 free quote" at 9; otherwise null.
+  - `usage` is unchanged (`per` `total` for the free allowance, `month` for a plan).
+- `POST /api/billing/checkout` `{ planId, interval?: "monthly" | "annual" }` → `{ checkoutUrl }`. A Managed
+  Payments Checkout session for the plan's price. **409** `TEST_ACCOUNT` for a free test account; **409**
+  `ALREADY_SUBSCRIBED` when the business has a paid plan (it changes plan in the portal); 404 `PLAN_NOT_FOUND`;
+  400 `NO_STRIPE_PRICE` when the price setting is missing; 503 `STRIPE_NOT_CONFIGURED`. Stripe sends the
+  business back to `/app/settings/billing?success=true&session_id=…` or `?canceled=true`.
+- `POST /api/billing/confirm` `{ sessionId }` → `{ confirmed: boolean }`. Called by the billing page on the way
+  back from Checkout: stores the plan from Stripe at once (the same function the webhook uses, so doing both
+  changes nothing). **404** if the session is not this business's own.
+- `POST /api/billing/portal` → `{ portalUrl }`. Stripe's customer portal: switch between Starter and Pro,
+  monthly or yearly (an upgrade takes effect at once and the difference is charged then; a cheaper plan or
+  yearly to monthly takes effect at the end of the paid period), cancel at the end of the paid period,
+  change the card, past invoices. **400** `NO_CUSTOMER` when the business has never bought (and for a test
+  account).
+- `GET /api/billing/notice` → `{ notice: null | { kind, line, action, actionLabel, email? } }`. The line the
+  dashboard shows on every page: `payment_failed` ("Your payment didn't go through. Update your card to keep
+  your quotes running.", `action: "portal"`) or `suspended` (`action: "email"`). Suspended wins.
+- `POST /api/webhooks/stripe` (Stripe only; signed with `STRIPE_WEBHOOK_SECRET`). Handles exactly
+  `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`,
+  `invoice.payment_failed`, `invoice.paid`; each re-reads the subscription from Stripe and stores it. Answers
+  `{ received: true }`; `{ received: true, duplicate: true }` for an event already handled (nothing is touched);
+  `{ received: true, handled: false }` for any other event type; **400** for a missing or wrong signature;
+  **500** when storing failed (Stripe sends it again).
+- `POST /api/admin/tenants/:tenantId/suspend` `{ suspended: boolean, reason?: string }` (platform admin only;
+  a reason is required to suspend) → `{ tenantId, suspended, changed }`. 403 for anyone else, 400 without a
+  reason, 404, 400 `DEMO_BUSINESS`. Written to `admin_activity_logs`. `GET /api/admin/tenants` items carry
+  `suspendedAt` and `testAccount`.
+- Requests while a business has no room (the 10 free quotes are used, the plan's monthly number is reached, the
+  plan has ended, or the business is suspended): `POST /api/public/quotes` still answers 200 with
+  `status: "held"` and the neutral message; the quote is saved `pending_review` with `content_json.limitHold`.
+  Nothing is lost and nothing about billing is shown to the customer.
+- `POST /api/quotes/:quoteId/process` (price a held lead): **402** `PLAN_LIMIT_REACHED` when there is still no
+  room, **403** `ACCOUNT_PAUSED` when the business is suspended. A lead priced here is now counted.
+- `GET /api/whatsapp/config` `access.why` can also be `suspended`.
+
 ## Account routes (T-173)
 The browser does not call Supabase's auth directly. All answer `{ "ok": true }` or the standard error envelope.
 - `POST /api/auth/signup` `{ "email", "password", "businessName", "plan"?, "turnstileToken"?, "website"? }`.
@@ -504,15 +555,8 @@ T-158 (whose turn it is, AD-043). Query: `search`, `status`, `limit`, `cursor`, 
 
 Billing and Webhooks
 
-POST /api/stripe/webhook
-
-Stripe webhook handler for subscription and payment events.
-Notes:
-	•	Verify Stripe signature
-	•	Update subscriptions and quotes.paidAt where relevant
-Response:
-
-{ "received": true }
+See "Billing (T-180, AD-062, AD-063)" near the top of this file. The Stripe webhook is
+`POST /api/webhooks/stripe` (this section used to give an address that never existed).
 
 
 ⸻

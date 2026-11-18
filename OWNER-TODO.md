@@ -50,7 +50,8 @@ Code for every item is already built; these are the steps that unlock it.
 
 ## T-134 — Subscription-only USD plans
 
-- [ ] **Confirm the plan numbers** in `packages/shared/src/plans.ts` (every `TODO-OWNER`): Starter $49/50
+- [x] (T-180, 2026-11-18: you confirmed Starter, Pro and the 10 free quotes; only Business is still marked.)
+  **Confirm the plan numbers** in `packages/shared/src/plans.ts` (every `TODO-OWNER`): Starter $49/50
   quotes, Pro $99/200 (14-day trial), Business $199/600, annual = two months free, and the US pre-trial
   allowance of 10 test quotes (`NO_SUBSCRIPTION_LIMIT.US`).
 - [ ] **Create the Stripe test products and prices:**
@@ -1588,6 +1589,14 @@ sends nothing. Three to check or change (Dashboard → Authentication):
 - [ ] **The business's name is written into the template.** If a business changes its name later, the template
   keeps the old one until it is deleted in WhatsApp Manager and created again.
 
+### Left on this machine and in the sandbox
+
+- `apps/web/.env.local` now has the six sandbox `STRIPE_PRICE_…` lines (the file is not in git).
+- The sandbox has the three products, six prices, the portal settings and the switched-off webhook endpoint,
+  and two archived products named "Probe …" from my first test of Managed Payments. No customer, subscription
+  or test clock was left.
+- The local database is at migration 44.
+
 ### Not proven
 
 - Nothing here has run against the real Meta: creating a template, Meta's review statuses, sending a template,
@@ -1898,13 +1907,165 @@ fixed in this deploy.
 - The on-site app cannot add or remove a section and does not show the "also asked for" list.
 
 
-## T-180 — Stripe (not started)
+## T-180 — Stripe live billing
 
-Carried here from T-179 at your instruction (2026-11-18). To be fixed in this ticket, not before.
+**Built 2026-11-18. Not deployed, and not committed.** Tested in the Stripe sandbox "Qolumns sandbox" with
+Stripe's test cards only. No real charge was made, no email left this machine, no WhatsApp message was sent,
+and production was not touched or read. Results are under "5. What was checked".
 
-- [ ] **The plan's usage counter loses counts when requests arrive at the same moment.** Six requests sent
-  together counted as two (seen in verify-t179). It under-counts, so it favours the business, but it is wrong,
-  and it is the number the plan limit reads and billing will read. Cause: `incrementUsageCounter` reads the
-  count, adds one, and writes it back, so two requests at once both write the same number. It needs a counter
-  that adds one inside the database (a single `update … set estimates_created = estimates_created + 1`, or a
-  database function), and a check that sends several requests at once and counts them all.
+Nothing below is live until you do section 1.
+
+### 1. What you run to go live, in this order
+
+- [ ] **1. Look at five settings in the LIVE Stripe account ("Qolumns").** I could not see the live account.
+  - Settings, Managed Payments: on.
+  - Settings, Business, Public details: the **support email** is one you read. Stripe writes there when a
+    customer asks it for help with a payment, and may refund without you if nobody answers in 48 hours.
+  - Settings, Billing, Subscriptions and emails, "Manage failed payments": Smart Retries on. "If all retries
+    fail": either "cancel the subscription" or "mark as unpaid" works with our code (both end the plan). The
+    sandbox is set to cancel, after four tries over about two weeks.
+  - The same page, "Send emails when card payments fail": your choice. If it is on, a business gets Stripe's
+    email as well as ours (see "Decisions", 5).
+  - Settings, Checkout and Payment Links: add your Terms and Privacy links (`https://qolumns.com/terms`,
+    `/privacy`). Managed Payments shows them under its own.
+- [ ] **2. The database first:** `bash scripts/deploy-migration-44.sh`. It only adds things; the site that is
+  live today keeps working with it. It prints Before and After and what to expect.
+- [ ] **3. Create the live products, prices, portal settings and webhook:**
+  `cd apps/web && npx tsx scripts/stripe-setup-plans.mts --live`
+  - It asks for the live secret key (what you type is not shown), prints the account's name, and asks you to
+    type that name before it creates anything. It charges nobody.
+  - To see first what it would do: add `--dry-run`.
+  - It ends by printing six lines that start `STRIPE_PRICE_`. They are not secret.
+- [ ] **4. Vercel, Production, Environment Variables:**
+  - add the six `STRIPE_PRICE_…` lines from step 3;
+  - set `STRIPE_WEBHOOK_SECRET` to the new endpoint's signing secret (Stripe dashboard, Developers, Webhooks,
+    the `qolumns.com/api/webhooks/stripe` endpoint, "Signing secret"). The script does not print it;
+  - check `STRIPE_SECRET_KEY` is the live key of the new "Qolumns" account, not the retired one.
+- [ ] **5. Tell me to deploy** (the worker, then the web app). This ticket was build only.
+- [ ] **6. After the deploy, one real purchase, if you want one:** buy Starter with your own card, see the plan
+  on Billing, open "Manage billing", cancel, and refund it in the Stripe dashboard. Then in the dashboard,
+  Developers, Webhooks: the endpoint's deliveries should all say 200.
+- [ ] **7. For the suspend switch:** `bash scripts/set-platform-admin.sh you@example.com` (if you have not),
+  then `/admin/tenants`.
+
+### 2. The setting names (Vercel, Production)
+
+| Name | Value |
+|---|---|
+| `STRIPE_PRICE_US_STARTER_MONTHLY_USD` | printed by step 3 |
+| `STRIPE_PRICE_US_STARTER_ANNUAL_USD` | printed by step 3 |
+| `STRIPE_PRICE_US_PRO_MONTHLY_USD` | printed by step 3 |
+| `STRIPE_PRICE_US_PRO_ANNUAL_USD` | printed by step 3 |
+| `STRIPE_PRICE_US_BUSINESS_MONTHLY_USD` | printed by step 3 |
+| `STRIPE_PRICE_US_BUSINESS_ANNUAL_USD` | printed by step 3 |
+| `STRIPE_WEBHOOK_SECRET` | the endpoint's signing secret, from the Stripe dashboard |
+| `STRIPE_SECRET_KEY` | already there: check it is the new account's live key |
+
+`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` is not read by any code; it can stay or go.
+
+### 3. What Managed Payments changed (nothing was blocked)
+
+Read from Stripe's Managed Payments docs on 2026-11-18 and then tried in the sandbox. Nothing our code does
+is unsupported, so nothing was built around it.
+
+- **Stripe is the seller.** Checkout, the receipt and Stripe's emails say "Sold through Onelink" (Stripe's name
+  for it on those pages), not Qolumns.
+- **The card statement reads `LINK.COM* QOLUMNS.COM`,** not `QOLUMNS.COM` alone. Stripe adds the prefix; it
+  cannot be removed.
+- **Tax is added on top.** $49 became $53.35 for a New York address in the sandbox. Our pages show prices
+  before tax and say "plus tax" beside each one (the Pricing page, Home, Billing); the Terms say it too. To make $49 the price including tax, change "Include tax in
+  prices" in Stripe's Tax settings before step 3 (a price's tax setting cannot be changed afterwards).
+- **"Charge in USD" is not fully in our hands.** Prices are in USD and you are paid in USD. But Managed
+  Payments always shows a customer outside the US their own currency at checkout (Stripe converts). It cannot
+  be switched off.
+- **A plan can only be bought through Checkout.** No code creates a subscription, an invoice or an extra charge
+  any other way, and none may. So there is no per-quote overage: over the limit, a request is held.
+- **Customers can also manage their plan on Stripe's own site** (cancel, change card), not only from our
+  "Manage billing". Either way the change reaches us the same way.
+- **Stripe sends the receipts, invoices and renewal notices itself.** Ours are only the product's own emails.
+- **Stripe may refund a payment or close a dispute without asking you.** We are not told by webhook; see Later.
+- **The Stripe library had to be brought up to date** (version 20 to 23). The old webhook code read two fields
+  that current Stripe no longer sends (a subscription's period, an invoice's subscription), so it would have
+  stored nothing: an error on every subscription event, and every payment event skipped. It is rewritten.
+
+### 4. Decisions I made (say if you want any changed)
+
+1. **Over the monthly limit: hold.** `plans.ts` has no overage on Starter, Pro or Business, so the 51st request
+   of a Starter month is saved and not priced, like the 11th free one. It is priced when the month turns or
+   the business moves up a plan.
+2. **An upgrade takes effect at once and the difference is charged then. A downgrade takes effect at the end
+   of the paid period** (your change, same day). "Downgrade" is a cheaper price or yearly to monthly. So Pro
+   yearly to Pro monthly waits for the year to end, and so does Starter yearly to Pro monthly (its price per
+   payment is lower), while Starter yearly to Pro yearly is at once. Cancelling while a downgrade is waiting
+   drops the downgrade.
+3. **The portal offers Starter and Pro only,** as you wrote. Business has prices but is not in the portal, so a
+   business on a plan cannot move to Business by itself. The billing page still lets a business with no plan
+   pick Business (T-171's rule). Tell me if Business should be hidden there too, or added to the portal (one
+   line in the script).
+4. **After a plan ends the business is back on the free allowance,** which is 10 priced quotes in total, ever.
+   One that has priced 10 or more gets every request held. One that priced fewer than 10 in its life would
+   still get the rest free. That is what `plans.ts` says today.
+5. **"One email" is ours.** We send one "Your payment didn't go through" per failed payment, however many
+   times Stripe retries. Stripe can send its own as well (section 1, step 1).
+6. **The "2 free quotes left" email is sent once per business, ever.** The line on Home and Billing shows for
+   as long as one or two are left (it says "1 free quote left" at nine).
+7. **The sandbox webhook endpoint is switched off.** You asked for it to be created in the sandbox; it points at
+   the live site, which would refuse every sandbox event (wrong secret) and Stripe would email you about the
+   failures. The live one is created switched on.
+8. **Suspend is a button on `/admin/tenants`** (with a required reason), not a script. It is logged with who
+   and why. It does not touch the Stripe subscription: a suspended business that pays keeps being charged
+   until you cancel it in Stripe.
+9. **A business with a plan cannot open Checkout again.** The plan cards show no "Select Plan"; one "Change
+   plan" button opens the portal.
+10. **A suspended business's dashboard says** "Your account is paused. New requests are being saved, not
+    priced. Quotes you have already sent still open." with "Email us". The reason is never shown.
+
+### 5. What was checked
+
+- `verify-t180` against the sandbox: **98/98.** Without a browser: the setup (products, prices, tax code,
+  portal, webhook), 20 requests at once counted as 20, the free 10 and Starter's 50 holding exactly under a
+  rush, the warning at 8, the hold at 10, the test account, suspend and restore, a forged webhook. Then in a
+  browser on Stripe's own pages with test cards: pay Starter and land on Billing showing it; upgrade to Pro;
+  switch to yearly; downgrade; cancel; a card declined at checkout; a renewal that fails, shows the notice on
+  five dashboard pages and sends one email, then succeeds when the card is fixed; a renewal that fails four
+  times until Stripe cancels; the same webhook event twice. Renewals were made to happen with Stripe's test
+  clocks. To run it again: the two commands at the top of `scripts/hardcore-test/verify-t180.mts`.
+- Unit tests: web 1,052 (51 new), worker 574, mobile 11. Lint and typecheck pass. The web app and the worker build.
+  One older unit test (T-162's search for the old embed names) timed out in three full runs while this
+  machine was busy; it passes on its own and in a full run with two workers (1,052/1,052). Nothing it checks
+  was changed.
+- Also run: `verify-t177` 99/99, `verify-t178` 52/52, `verify-t179` 97/97, and three that cover the billing
+  page and the usage count: `verify-t152` 66/66, `verify-t165` 148/148, `verify-t171` 97/97.
+- **`verify-t179`'s test business had to be put on a plan.** It sends more than ten requests; six at once used
+  to count as two, so it never reached the ten free quotes. Now every request counts and the eleventh was held.
+- **Not run:** the rest of the regression set (t146 to t176) and `verify-t173`. You named t177 to t179. The
+  full set should be run before this is deployed (it changes the quote flow, the worker and the database).
+
+### Not proven
+
+- **Anything in the live account.** Every check used the sandbox. The script's `--live` run has never been
+  done; its guards were tried (a key that is not live is refused; a made-up live key gets nowhere).
+- **Stripe's own emails and the card statement text.** The sandbox sends no email and makes no statement.
+- **How long the live account retries a card.** The sandbox tried four times in about two weeks, then
+  cancelled. Yours follows the setting in section 1, step 1.
+- **A customer in another currency or country.** Only a US address was used.
+- **Bluum in production.** The test-account rules were checked with a stand-in business on this machine.
+
+### Later (seen, not changed)
+
+- **A refund or a lost dispute does not end the plan.** Stripe can refund without us; the subscription stays
+  active unless Stripe also cancels it. No webhook event for either is handled.
+- **The billing page does not say that a downgrade is waiting.** After a business asks for Starter in the
+  portal, our page shows Pro (which it still has) with no note until the period ends. Stripe's portal says
+  "Your service will be updated on <date>".
+- **The Terms' "5. Billing" still mentions "metered overage (where applicable)".** No plan on offer has it.
+  Your new paragraph sits under it.
+- **No revenue report.** Stripe's dashboard is the record. Free test accounts are marked "Test account, not
+  billed" on `/admin/tenants`.
+- **A card declined at Checkout leaves an empty customer in Stripe** (Stripe makes it when the card is tried).
+  A later purchase makes another. Harmless clutter.
+- **The legacy plans' per-quote overage** (pre-US plans, no subscribers) is still in the code and cannot bill
+  under Managed Payments.
+- **`/admin/tenants` shows a plan's price from the old `plans` table,** not from `plans.ts`.
+- **The Home usage banner is still butter-coloured** (a known gap in the design file).
+- **Business is still marked to confirm** in `plans.ts` ($199, 600 quotes). It stays off the site.

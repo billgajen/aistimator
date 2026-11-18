@@ -96,10 +96,12 @@ describe('T-152: the free allowance is 10 quotes in total', () => {
 
   it('tests and unfinished requests never reach the counter', () => {
     const intake = read('apps/web/src/lib/quote-intake.ts')
-    // the counter increment is skipped for test requests (T-150)…
+    // a test request is never counted (T-150)…
     // (T-153: the guard is `outsidePlan`, which is a test or a demo request)
+    // (T-180: counting IS the claim, made in one step in the database; there is no separate "add one")
     expect(intake).toContain('const outsidePlan = isTest || input.isDemo === true')
-    expect(intake).toMatch(/if \(!outsidePlan\) \{\s*\n\s*await incrementUsageCounter/)
+    expect(intake).toContain('if (!outsidePlan && !expectHold) claim = await claimPlanQuote(supabase, tenantId)')
+    expect(intake).not.toMatch(/incrementUsageCounter/)
     // …and the lead endpoints (T-151) never touch usage at all
     for (const f of ['apps/web/src/app/api/public/leads/route.ts', 'apps/web/src/app/api/public/leads/[leadId]/route.ts']) {
       expect(read(f)).not.toMatch(/incrementUsageCounter|usage_counters/)

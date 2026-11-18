@@ -434,11 +434,24 @@ export interface PlanInfo {
 }
 
 export interface SubscriptionInfo {
+  /** 'none' = never had a plan; 'canceled' = had one and it ended (both are "no plan": `plan` is null) */
   status: 'active' | 'past_due' | 'canceled' | 'trialing' | 'none'
+  /** The plan the business has NOW. Null when it has none (never bought, or ended). */
   plan: PlanInfo | null
   currentPeriodEnd: string | null
+  /** True when the plan is set to end (see `cancelAt`) */
   cancelAtPeriodEnd: boolean
   stripeCustomerId: string | null
+  /** T-180: when a cancelled plan ends; it works until then */
+  cancelAt?: string | null
+  /** T-180: monthly or annual billing (null for a free test account or no plan) */
+  interval?: 'monthly' | 'annual' | null
+  /** T-180: a free test account (T-177): has its plan without paying; never offered Checkout or the portal */
+  testAccount?: boolean
+  /** T-180: a payment failed and is being retried; the plan still works */
+  paymentFailed?: boolean
+  /** T-180: the name of a plan that has ended (for "Your Pro plan has ended") */
+  endedPlanName?: string | null
 }
 
 export interface BillingUsage {
@@ -465,6 +478,14 @@ export interface BillingResponse {
   availablePlans: PlanInfo[]
   /** T-150: the plan picked on the pricing page before signup (pre-selected; never starts checkout) */
   selectedPlanId?: string | null
+  /** T-180: may this business start Checkout? (no plan now, and not a test account) */
+  canCheckout?: boolean
+  /** T-180: may it open the Stripe portal? (it has a Stripe customer) */
+  canManage?: boolean
+  /** T-180: "2 free quotes left. Pick a plan to keep pricing every request." Null when there is nothing to say. */
+  freeQuotesLeftLine?: string | null
+  /** T-180: a platform admin paused the account: new requests are saved, not priced */
+  suspended?: boolean
 }
 
 export interface CreateCheckoutRequest {

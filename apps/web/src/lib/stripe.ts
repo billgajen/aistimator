@@ -1,92 +1,86 @@
 import Stripe from 'stripe'
 
-// Initialize Stripe client
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY
+/**
+ * Stripe (T-180, AD-062). The account uses Managed Payments: Stripe is the
+ * merchant of record. It sells the plan, works out and pays the sales tax and
+ * VAT, sends the receipts and handles disputes. What that asks of this code:
+ *   - a subscription is only ever created by Checkout, with
+ *     `managed_payments.enabled`; never through the API;
+ *   - each product carries a tax code Managed Payments accepts
+ *     (scripts/stripe-setup-plans.mts sets it);
+ *   - Checkout is sent none of the settings Managed Payments owns (tax,
+ *     payment method types, invoice settings, adaptive pricing);
+ *   - the subscription's default card is never set through the API: the
+ *     customer changes it in the portal.
+ * The SDK pins the API version, so what the webhook receives has the shapes
+ * the SDK's types describe (the period is on the subscription's item, an
+ * invoice's subscription is under `parent`).
+ */
+
+function secretKey(): string | undefined {
+  return process.env.STRIPE_SECRET_KEY?.trim() || undefined
+}
 
 export function getStripeClient(): Stripe | null {
-  if (!stripeSecretKey) {
+  const key = secretKey()
+  if (!key) {
     console.warn('Stripe not configured: STRIPE_SECRET_KEY missing')
     return null
   }
-
-  return new Stripe(stripeSecretKey, {
-    typescript: true,
-  })
+  return new Stripe(key)
 }
 
 export function isStripeConfigured(): boolean {
-  return !!stripeSecretKey
+  return Boolean(secretKey())
 }
 
-/**
- * Create or get a Stripe customer for a tenant
- */
-export async function getOrCreateStripeCustomer(
-  stripe: Stripe,
-  tenantId: string,
-  email: string,
-  name: string,
-  existingCustomerId?: string | null
-): Promise<string> {
-  // Return existing customer if we have one
-  if (existingCustomerId) {
-    return existingCustomerId
-  }
-
-  // Create new customer
-  const customer = await stripe.customers.create({
-    email,
-    name,
-    metadata: {
-      tenant_id: tenantId,
-    },
-  })
-
-  return customer.id
+/** What Checkout is asked for. Pure, so a test can read exactly what is sent. */
+export interface CheckoutInput {
+  priceId: string
+  tenantId: string
+  successUrl: string
+  cancelUrl: string
+  /** A business that has bought before keeps its Stripe customer (its invoices stay in one place) */
+  customerId?: string | null
+  /** A first purchase: Checkout creates the customer, with this address filled in */
+  customerEmail?: string | null
+  /** T-134: free-trial days. No plan has one (AD-047); the mechanism stays, driven by the plan data. */
+  trialDays?: number
 }
 
-/**
- * Create a Stripe Checkout session for subscription
- */
-export async function createCheckoutSession(
-  stripe: Stripe,
-  params: {
-    customerId: string
-    priceId: string
-    tenantId: string
-    successUrl: string
-    cancelUrl: string
-    /** Metered overage price to attach (T-102) — no quantity, billed via meter events */
-    meteredPriceId?: string
-    /** T-134: free-trial days (card is always collected) */
-    trialDays?: number
-  }
-): Promise<Stripe.Checkout.Session> {
-  return stripe.checkout.sessions.create({
-    customer: params.customerId,
+export function checkoutSessionParams(input: CheckoutInput): Stripe.Checkout.SessionCreateParams {
+  return {
     mode: 'subscription',
-    line_items: [
-      {
-        price: params.priceId,
-        quantity: 1,
-      },
-      // Metered items must not specify quantity
-      ...(params.meteredPriceId ? [{ price: params.meteredPriceId }] : []),
-    ],
-    success_url: params.successUrl,
-    cancel_url: params.cancelUrl,
-    metadata: {
-      tenant_id: params.tenantId,
-    },
-    // T-134: card required even for trials
-    payment_method_collection: 'always',
+    // AD-062: Stripe is the seller. It adds the tax, picks the payment methods and sends the receipt.
+    managed_payments: { enabled: true },
+    line_items: [{ price: input.priceId, quantity: 1 }],
+    ...(input.customerId ? { customer: input.customerId } : input.customerEmail ? { customer_email: input.customerEmail } : {}),
+    // which business this is, three ways: the session, its metadata, and the subscription it creates
+    client_reference_id: input.tenantId,
+    metadata: { tenant_id: input.tenantId },
     subscription_data: {
-      ...(params.trialDays ? { trial_period_days: params.trialDays } : {}),
-      metadata: {
-        tenant_id: params.tenantId,
-      },
+      ...(input.trialDays ? { trial_period_days: input.trialDays } : {}),
+      metadata: { tenant_id: input.tenantId },
     },
-  })
+    success_url: input.successUrl,
+    cancel_url: input.cancelUrl,
+  }
+}
+
+/**
+ * Create a Stripe Checkout session for a plan. A stored customer id that this
+ * Stripe account does not know (one left from an old test account) is dropped
+ * and Checkout makes a new customer.
+ */
+export async function createCheckoutSession(stripe: Stripe, input: CheckoutInput): Promise<Stripe.Checkout.Session> {
+  try {
+    return await stripe.checkout.sessions.create(checkoutSessionParams(input))
+  } catch (error) {
+    const stale = input.customerId && error instanceof Stripe.errors.StripeInvalidRequestError && error.code === 'resource_missing' && error.param === 'customer'
+    if (!stale) throw error
+    console.warn('[Stripe] Stored customer is unknown to this Stripe account; Checkout will create a new one')
+    return stripe.checkout.sessions.create(checkoutSessionParams({ ...input, customerId: null }))
+  }
 }
 
 /**

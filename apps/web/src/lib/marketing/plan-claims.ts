@@ -25,6 +25,13 @@ export interface PlanLine {
 
 export const COMING_LATER = 'Coming later'
 
+/**
+ * T-180: said, small and plain, beside every plan price (the Pricing page, Home's plan cards, the billing
+ * page's plan cards). Stripe sells the plan and adds the sales tax or VAT at checkout, so the price a
+ * business sees here is before tax.
+ */
+export const PLUS_TAX = 'plus tax'
+
 export const PLAN_CHANNEL_LINES: Record<PlanChannel, PlanLine> = {
   widget: {
     label: 'Website widget',

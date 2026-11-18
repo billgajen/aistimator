@@ -28,6 +28,8 @@ const SECTIONS = [
   {
     title: '5. Billing',
     body: 'Paid plans are billed monthly in advance, with metered overage (where applicable) billed in arrears at your plan’s per-estimate rate. You can cancel at any time; access continues to the end of the paid period. Fees are non-refundable except where required by law.',
+    // T-180 (the owner's wording): who takes the payment, and the tax
+    more: 'Payments are processed by Stripe, which acts as the seller of record through Link. Applicable sales tax or VAT is added at checkout.',
   },
   {
     title: '6. Your customers’ data',
@@ -69,7 +71,7 @@ export default function TermsPage() {
         <h1 className="font-display text-4xl font-extrabold tracking-tight text-text-primary">
           Terms of Service
         </h1>
-        <p className="mt-3 text-sm text-text-muted">Last updated: 17 November 2026</p>
+        <p className="mt-3 text-sm text-text-muted">Last updated: 18 November 2026</p>
         {/* T-177: who runs the product. The company number comes from NEXT_PUBLIC_COMPANY_NUMBER. */}
         <p className="mt-3 leading-relaxed text-text-secondary" data-testid="operator">
           {operatorStatement(process.env.NEXT_PUBLIC_COMPANY_NUMBER)}
@@ -80,6 +82,11 @@ export default function TermsPage() {
             <section key={section.title}>
               <h2 className="font-display text-lg font-bold text-text-primary">{section.title}</h2>
               <p className="mt-2 leading-relaxed text-text-secondary">{section.body}</p>
+              {'more' in section && section.more ? (
+                <p className="mt-3 leading-relaxed text-text-secondary" data-testid="payments-and-tax">
+                  {section.more}
+                </p>
+              ) : null}
             </section>
           ))}
         </div>

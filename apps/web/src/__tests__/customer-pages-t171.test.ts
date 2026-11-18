@@ -255,7 +255,7 @@ describe('T-171: the request form', () => {
 describe('T-171: the billing page, and the small leftovers', () => {
   it('the billing page lists a plan’s lines from the list the public Pricing page reads', () => {
     const billing = code('apps/web/src/app/(dashboard)/app/settings/billing/page.tsx')
-    expect(billing).toContain("import { COMING_LATER, planLines } from '@/lib/marketing/plan-claims'")
+    expect(billing).toContain("import { COMING_LATER, PLUS_TAX, planLines } from '@/lib/marketing/plan-claims'")
     expect(billing).toContain('const lines = definition ? planLines(definition) : []')
     expect(billing).toContain('{COMING_LATER}')
     // its own list of feature names is gone, so the two pages cannot disagree

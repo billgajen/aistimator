@@ -1,13 +1,14 @@
 /**
  * POST /api/quotes/[quoteId]/process — price a lead that was held because the
- * plan limit was reached (T-134). Re-checks the limit (the business upgrades
- * first), counts the quote, and runs the normal pipeline with a fresh token.
+ * plan limit was reached (T-134). The business picks a plan first; then this
+ * claims a quote (the limit is checked and the quote counted in one step
+ * inside the database, T-180) and runs the normal pipeline with a fresh token.
+ * A suspended business cannot price a held lead until it is restored.
  */
 
 import { NextResponse } from 'next/server'
 import { requireTenant } from '@/lib/auth-tenant'
-import { checkPlanLimit, maybeNotifyLimitReached } from '@/lib/plan-limits'
-import { incrementUsageCounter } from '@/lib/usage'
+import { claimPlanQuote, maybeNotifyLimitReached, maybeWarnFreeQuotesLeft, recordOverageQuote, releasePlanQuote } from '@/lib/plan-limits'
 import { enqueueQuoteJob } from '@/lib/queue'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { markQuoteFailed } from '@/lib/failed-quote'
@@ -37,16 +38,30 @@ export async function POST(_request: Request, { params }: { params: { quoteId: s
     )
   }
 
-  const limit = await checkPlanLimit(supabase, tenantId)
-  if (!limit.allowed && !limit.overageAvailable) {
+  // The count is the server's record, so the claim uses the service role (T-173). Until
+  // T-180 this route added one through the signed-in business's own client, which the
+  // database refuses, so a lead priced here was never counted.
+  const admin = createAdminClient()
+  const claim = await claimPlanQuote(admin, tenantId)
+  if (!claim.claimed) {
     return NextResponse.json(
-      { error: { code: 'PLAN_LIMIT_REACHED', message: `Monthly limit reached (${limit.used}/${limit.limit}) — upgrade to price this lead` } },
-      { status: 402 }
+      claim.reason === 'suspended'
+        ? { error: { code: 'ACCOUNT_PAUSED', message: 'Your account is paused, so this lead cannot be priced yet' } }
+        : {
+            error: {
+              code: 'PLAN_LIMIT_REACHED',
+              message:
+                claim.status.per === 'total'
+                  ? `Your ${claim.status.limit} free quotes are used. Pick a plan to price this lead.`
+                  : `Monthly limit reached (${claim.status.used}/${claim.status.limit}). Upgrade to price this lead.`,
+            },
+          },
+      { status: claim.reason === 'suspended' ? 403 : 402 }
     )
   }
 
   const { token, hash } = generateQuoteToken()
-  await supabase
+  const { error: updateError } = await supabase
     .from('quotes')
     .update({
       status: 'queued',
@@ -55,10 +70,17 @@ export async function POST(_request: Request, { params }: { params: { quoteId: s
       token_expires_at: getTokenExpiry(30).toISOString(),
     })
     .eq('id', quote.id)
+  if (updateError) {
+    // counted but not started: give the count back
+    await releasePlanQuote(admin, tenantId, claim)
+    return NextResponse.json({ error: { code: 'UPDATE_FAILED', message: 'Could not start pricing — try again' } }, { status: 500 })
+  }
 
-  await incrementUsageCounter(supabase, tenantId, 'estimates_created')
   const { data: tenant } = await supabase.from('tenants').select('name').eq('id', tenantId).single()
-  await maybeNotifyLimitReached(supabase, tenantId, (tenant as { name?: string } | null)?.name || 'Your business')
+  const businessName = (tenant as { name?: string } | null)?.name || 'Your business'
+  await maybeWarnFreeQuotesLeft(admin, tenantId, businessName, claim.status)
+  await maybeNotifyLimitReached(admin, tenantId, businessName)
+  if (claim.overage) await recordOverageQuote(claim.status, quote.id)
 
   try {
     await enqueueQuoteJob({
@@ -70,7 +92,7 @@ export async function POST(_request: Request, { params }: { params: { quoteId: s
     })
   } catch (error) {
     console.error('[Process] Failed to enqueue held lead:', error)
-    await markQuoteFailed(createAdminClient(), quote.id, 'The request could not be handed to the pricing worker')
+    await markQuoteFailed(admin, quote.id, 'The request could not be handed to the pricing worker')
     return NextResponse.json({ error: { code: 'QUEUE_FAILED', message: 'Could not start pricing — try again' } }, { status: 502 })
   }
   return NextResponse.json({ queued: true })

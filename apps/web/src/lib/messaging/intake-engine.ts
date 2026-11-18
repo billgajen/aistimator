@@ -19,8 +19,8 @@ import { uploadAllowed, uploadKindOf } from '../upload-limits'
 import { smallPhotoKey } from '../small-photo'
 import { makeSmallCopy } from '../small-photo-make'
 import { enqueueQuoteJob } from '../queue'
-import { incrementUsageCounter } from '../usage'
-import { checkPlanLimit, maybeNotifyLimitReached, recordOverageQuote } from '../plan-limits'
+import { checkPlanLimit, claimPlanQuote, maybeNotifyLimitReached, maybeWarnFreeQuotesLeft, recordOverageQuote, releasePlanQuote } from '../plan-limits'
+import type { PlanClaim } from '../plan-limits'
 import type { IntakeContext } from './types'
 import { leadHoldContent, leadHeldMessage, notifyLeadHeld } from '../lead-hold'
 
@@ -657,15 +657,20 @@ export async function createQuoteFromIntake(
   }
 
   try {
-    // Enforce plan limit (T-101/T-102) before creating any records.
-    // Over the limit with overage available → proceed and meter; otherwise block.
-    // Neutral customer-facing message — never expose the business's billing state.
+    // The plan limit (T-101/T-102), read before any record is created. The
+    // decision that counts is the claim below (T-180), made and counted in one
+    // step inside the database. Neutral customer-facing message — never expose
+    // the business's billing state.
     const planLimit = await checkPlanLimit(supabase, tenantId)
-    const isOverageQuote = !planLimit.allowed && planLimit.overageAvailable
-    // T-134 (AD-026): over the limit with overage off → capture as an unpriced lead
-    const limitHold = !planLimit.allowed && !planLimit.overageAvailable
-    if (limitHold) {
-      console.warn(`[Intake] Plan limit reached (${planLimit.used}/${planLimit.limit}) — capturing as held lead`)
+    // T-134 (AD-026): over the limit with overage off → capture as an unpriced lead.
+    // T-180: the same for a business a platform admin has suspended.
+    const expectHold = !planLimit.allowed && !planLimit.overageAvailable
+    if (expectHold) {
+      console.warn(
+        planLimit.suspended
+          ? '[Intake] Business is suspended — capturing as held lead'
+          : `[Intake] Plan limit reached (${planLimit.used}/${planLimit.limit}) — capturing as held lead`
+      )
     }
 
     // Get tenant details
@@ -720,6 +725,12 @@ export async function createQuoteFromIntake(
     const { token, hash } = generateQuoteToken()
     const tokenExpiry = getTokenExpiry(30)
 
+    // T-180 (AD-063): is this a priced quote? Decided AND counted in one step inside the database
+    let claim: PlanClaim | null = null
+    if (!expectHold) claim = await claimPlanQuote(supabase, tenantId)
+    const limitHold = expectHold || claim?.claimed === false
+    const holdStatus = claim?.status ?? planLimit
+
     // Create quote record
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
@@ -752,6 +763,8 @@ export async function createQuoteFromIntake(
       .single()
 
     if (quoteError || !quote) {
+      // The quote was counted but could not be saved: give the count back
+      if (claim) await releasePlanQuote(supabase, tenantId, claim)
       throw new Error(`Failed to create quote: ${quoteError?.message}`)
     }
 
@@ -774,16 +787,19 @@ export async function createQuoteFromIntake(
 
     // T-134: held leads are not priced and don't consume the plan
     if (limitHold) {
-      await notifyLeadHeld({
-        tenantId,
-        businessName: tenant.name,
-        customerName: data.customerName,
-        serviceName: data.serviceName || 'your service',
-        quoteId: quote.id,
-        used: planLimit.used,
-        limit: planLimit.limit,
-        per: planLimit.per,
-      })
+      // A suspended business is not told to "pick a plan": the hold is ours, not its plan's
+      if (!holdStatus.suspended) {
+        await notifyLeadHeld({
+          tenantId,
+          businessName: tenant.name,
+          customerName: data.customerName,
+          serviceName: data.serviceName || 'your service',
+          quoteId: quote.id,
+          used: holdStatus.used,
+          limit: holdStatus.limit,
+          per: holdStatus.per,
+        })
+      }
       return {
         success: true,
         newState: 'completed',
@@ -792,15 +808,16 @@ export async function createQuoteFromIntake(
       }
     }
 
-    // Increment usage counter
-    await incrementUsageCounter(supabase, tenantId, 'estimates_created')
-
-    // If this consumed the last quote in the plan, notify the business once (T-101)
-    await maybeNotifyLimitReached(supabase, tenantId, tenant.name)
+    // The quote was counted by the claim above (T-180). Tell the business, once each:
+    // two free quotes left, and the last quote of the allowance or the month used (T-101)
+    if (claim?.claimed) {
+      await maybeWarnFreeQuotesLeft(supabase, tenantId, tenant.name, claim.status)
+      await maybeNotifyLimitReached(supabase, tenantId, tenant.name)
+    }
 
     // Meter this quote to Stripe when it's beyond the plan limit (T-102)
-    if (isOverageQuote) {
-      await recordOverageQuote(planLimit, quote.id)
+    if (claim?.overage) {
+      await recordOverageQuote(claim.status, quote.id)
     }
 
     // Enqueue for processing

@@ -12,6 +12,8 @@ interface TenantItem {
   planName: string
   planPrice: number
   quoteCount: number
+  suspendedAt: string | null
+  testAccount: boolean
 }
 
 export default function AdminTenantsPage() {
@@ -20,6 +22,31 @@ export default function AdminTenantsPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [nextCursor, setNextCursor] = useState<string | null>(null)
+  // T-180: the suspend switch. The row being suspended shows a reason field; restoring needs none.
+  const [suspending, setSuspending] = useState<string | null>(null)
+  const [reason, setReason] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const setSuspended = async (tenantId: string, suspended: boolean, why: string) => {
+    setSaving(true)
+    setError(null)
+    try {
+      const response = await fetch(`/api/admin/tenants/${tenantId}/suspend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ suspended, reason: why }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error?.message || 'Could not change the business')
+      setTenants((prev) => prev.map((t) => (t.tenantId === tenantId ? { ...t, suspendedAt: result.suspended ? new Date().toISOString() : null } : t)))
+      setSuspending(null)
+      setReason('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not change the business')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const fetchTenants = useCallback(async (cursor?: string | null, append = false) => {
     try {
@@ -127,11 +154,18 @@ export default function AdminTenantsPage() {
                 <td className="px-4 py-3">
                   <div className="text-sm font-medium text-text-primary">{tenant.name}</div>
                   <code className="text-xs text-text-muted">{tenant.tenantId}</code>
+                  {tenant.suspendedAt && (
+                    <div className="mt-1">
+                      <span className="inline-flex items-center rounded-full bg-danger-light px-2 py-1 text-xs font-medium text-danger" data-testid="suspended-tag">
+                        Suspended
+                      </span>
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <div className="text-sm text-text-primary">{tenant.planName}</div>
                   <div className="text-xs text-text-muted">
-                    ${(tenant.planPrice / 100).toFixed(0)}/mo
+                    {tenant.testAccount ? 'Test account, not billed' : `$${(tenant.planPrice / 100).toFixed(0)}/mo`}
                   </div>
                 </td>
                 <td className="px-4 py-3">{getStatusBadge(tenant.subscriptionStatus)}</td>
@@ -141,13 +175,75 @@ export default function AdminTenantsPage() {
                 <td className="whitespace-nowrap px-4 py-3 text-sm text-text-muted">
                   {new Date(tenant.createdAt).toLocaleDateString()}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-sm">
+                <td className="px-4 py-3 text-sm">
                   <Link
                     href={`/admin/quotes?tenantId=${tenant.tenantId}`}
                     className="text-primary hover:underline"
                   >
                     View Quotes
                   </Link>
+                  {/* T-180: apart from the link above, as a destructive action is (design: Layout) */}
+                  <div className="mt-3 border-t border-border pt-3">
+                    {tenant.suspendedAt ? (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => setSuspended(tenant.tenantId, false, '')}
+                        className="rounded-lg border border-field px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-background disabled:opacity-50"
+                      >
+                        Restore
+                      </button>
+                    ) : suspending === tenant.tenantId ? (
+                      <form
+                        className="flex flex-col gap-2"
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          setSuspended(tenant.tenantId, true, reason)
+                        }}
+                      >
+                        <label className="text-xs text-text-muted" htmlFor={`reason-${tenant.tenantId}`}>
+                          Reason (required; the business never sees it)
+                        </label>
+                        <input
+                          id={`reason-${tenant.tenantId}`}
+                          value={reason}
+                          onChange={(e) => setReason(e.target.value)}
+                          maxLength={500}
+                          className="w-56 rounded-lg border border-field px-3 py-1.5 text-sm focus:outline-none focus:ring-2"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="submit"
+                            disabled={saving || !reason.trim()}
+                            className="rounded-lg bg-danger px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                          >
+                            Suspend
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSuspending(null)
+                              setReason('')
+                            }}
+                            className="rounded-lg border border-field px-3 py-1.5 text-sm font-medium text-text-primary"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSuspending(tenant.tenantId)
+                          setReason('')
+                        }}
+                        className="rounded-lg border border-danger px-3 py-1.5 text-sm font-medium text-danger hover:bg-danger-light"
+                      >
+                        Suspend…
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

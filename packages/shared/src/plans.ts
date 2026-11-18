@@ -9,8 +9,13 @@
  * Stripe price IDs differ per Stripe account and mode, so they are NOT here:
  * they come from env vars named by `stripePriceEnvKey()`.
  *
- * TODO-OWNER: the US prices and limits below are the indicative tiers from
- * tickets/T-134 ("owner to confirm final numbers before go-live").
+ * Confirmed by the owner for the Stripe launch (T-180, 2026-11-18): Starter is
+ * 50 quotes a month for $49 ($490 a year); Pro is 200 quotes a month for $99
+ * ($990 a year); the free allowance is 10 priced quotes in total. Stripe is the
+ * merchant of record (Managed Payments), so sales tax and VAT are added on top
+ * by Stripe at checkout; the numbers here are before tax.
+ * TODO-OWNER: Business (off the site) still has the indicative numbers from
+ * tickets/T-134.
  */
 
 export type PlanInterval = 'monthly' | 'annual'
@@ -67,8 +72,8 @@ function annualFromMonthly(monthly: Record<string, number>): Record<string, numb
   return Object.fromEntries(Object.entries(monthly).map(([cur, cents]) => [cur, cents * 10]))
 }
 
-const US_STARTER_MONTHLY = { USD: 4900 } // TODO-OWNER: confirm $49
-const US_PRO_MONTHLY = { USD: 9900 } // TODO-OWNER: confirm $99
+const US_STARTER_MONTHLY = { USD: 4900 } // confirmed (T-180)
+const US_PRO_MONTHLY = { USD: 9900 } // confirmed (T-180)
 const US_BUSINESS_MONTHLY = { USD: 19900 } // TODO-OWNER: confirm $199
 
 export const PLANS: PlanDefinition[] = [
@@ -79,7 +84,7 @@ export const PLANS: PlanDefinition[] = [
     tagline: 'Instant estimates on your website',
     monthlyPrice: US_STARTER_MONTHLY,
     annualPrice: annualFromMonthly(US_STARTER_MONTHLY),
-    quoteLimit: 50, // TODO-OWNER: confirm
+    quoteLimit: 50, // confirmed (T-180)
     channels: ['widget'],
     features: { ...BASE_FEATURES },
     overageEnabled: false,
@@ -91,7 +96,7 @@ export const PLANS: PlanDefinition[] = [
     tagline: 'Website, text and WhatsApp — plus the on-site app',
     monthlyPrice: US_PRO_MONTHLY,
     annualPrice: annualFromMonthly(US_PRO_MONTHLY),
-    quoteLimit: 200, // TODO-OWNER: confirm
+    quoteLimit: 200, // confirmed (T-180)
     channels: ['widget', 'sms', 'whatsapp', 'mobile_app'],
     features: { ...BASE_FEATURES, custom_branding: true, calibration_insights: true },
     overageEnabled: false,
@@ -175,7 +180,7 @@ export interface FreeAllowance {
 
 export const FREE_ALLOWANCE: Record<string, FreeAllowance> = {
   GB: { quotes: 50, per: 'month' },
-  US: { quotes: 10, per: 'total' }, // TODO-OWNER: confirm the free allowance
+  US: { quotes: 10, per: 'total' }, // confirmed (T-180)
 }
 
 export function freeAllowance(region: string | null | undefined): FreeAllowance {
@@ -214,6 +219,46 @@ export const LIVE_SUBSCRIPTION_STATUSES: readonly string[] = ['active', 'trialin
 export function subscriptionLive(status: string | null | undefined): boolean {
   return typeof status === 'string' && LIVE_SUBSCRIPTION_STATUSES.includes(status)
 }
+
+/**
+ * T-180: Stripe's subscription status as one of the four the database knows.
+ * Only `active`, `trialing` and `past_due` keep a plan (LIVE_SUBSCRIPTION_STATUSES).
+ * Everything else means the plan is not held: `unpaid` and `canceled` (Stripe
+ * gave up, or the paid period ended), `incomplete` and `incomplete_expired`
+ * (the first payment never went through), `paused`. Nothing here grants a plan
+ * that was not paid for; an unknown status is treated as not paid.
+ */
+export type StoredSubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled'
+
+export function storedSubscriptionStatus(stripeStatus: string | null | undefined): StoredSubscriptionStatus {
+  if (stripeStatus === 'active' || stripeStatus === 'trialing' || stripeStatus === 'past_due') return stripeStatus
+  return 'canceled'
+}
+
+/**
+ * T-177, T-180: a free test account is a live subscription row that Stripe has
+ * never heard of (no customer, no subscription), put there by
+ * scripts/set-test-plan.sh. It is never billed, never offered Checkout or the
+ * portal, and is not revenue: revenue is what Stripe holds.
+ */
+export function isFreeTestAccount(
+  subscription: { status?: string | null; stripe_customer_id?: string | null; stripe_subscription_id?: string | null } | null | undefined
+): boolean {
+  return Boolean(subscription && subscriptionLive(subscription.status) && !subscription.stripe_customer_id && !subscription.stripe_subscription_id)
+}
+
+/** T-180: the free allowance warns once, when this many free quotes are left */
+export const FREE_QUOTES_LEFT_WARNING = 2
+
+/** T-180: the line for the dashboard and the email when the free allowance is nearly used. Null when there is nothing to say. */
+export function freeQuotesLeftLine(used: number, limit: number): string | null {
+  const left = limit - used
+  if (limit <= 0 || left <= 0 || left > FREE_QUOTES_LEFT_WARNING) return null
+  return `${left} free ${left === 1 ? 'quote' : 'quotes'} left. Pick a plan to keep pricing every request.`
+}
+
+/** T-180: a card payment failed and Stripe is retrying. Shown on every dashboard page, and the email's first line. */
+export const PAYMENT_FAILED_LINE = "Your payment didn't go through. Update your card to keep your quotes running."
 
 /** Does this plan include a channel? (T-177: the plan definitions decide, never a plan's name) */
 export function planHasChannel(planId: string | null | undefined, channel: PlanChannel): boolean {
