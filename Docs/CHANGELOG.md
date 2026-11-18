@@ -17,7 +17,8 @@
 
 ### 2026-11-18: T-179 miss found on production: an explicit "I also want X" produced no card (AD-064); two small T-180 items
 
-**Worker deployed 2026-11-18** (see "Deploy state" at the end of this entry). The web app is not deployed yet. No request was sent to production. Production
+**Deployed 2026-11-18:** the worker first (see "Deploy state" at the end of this entry), then the web app with
+T-180 (deployment `dpl_41s7h4F7zAULMLwM9RXR6JJDBKkD`; the live checks are in the T-180 entry below). No request was sent to production. Production
 was read twice, read-only: the business's three service configurations and the one quote, and which migration
 it is at.
 
@@ -155,8 +156,8 @@ longer list the painting and the notes no longer say "quoted separately".
   `1ef39c4d-4a59-4fbf-9d4f-2d0b6b3d5f86`. Read-only checks: `/health` ok (`hasRedis: false`, as decided in
   AD-060; Supabase and the model present); `/section` and `/process` with no token: 401. No request was sent
   through it. The owner re-tests the reported case by hand.
-- **The web app waits for the owner's "Vercel is set"** (the billing line, the Terms, and all of T-180's web
-  side).
+- **Web: deployed** after the owner's "Vercel is set", `dpl_41s7h4F7zAULMLwM9RXR6JJDBKkD` (the billing line,
+  the Terms, and all of T-180's web side). Live checks: the T-180 entry below.
 
 **Files:** `apps/worker/src/ai/service-detection.ts`, `apps/worker/src/{quote-processor.ts,section-pricing.ts}`,
 `packages/shared/src/database.types.ts`, `apps/worker/src/__tests__/several-services-t179.test.ts`,
@@ -169,9 +170,36 @@ longer list the painting and the notes no longer say "quoted separately".
 
 ### 2026-11-18: T-180 — Stripe live billing, end to end: Managed Payments, the atomic usage counter, the paying journey (AD-062, AD-063)
 
-**Built, not deployed.** Nothing was pushed to production and production was not read. Every Stripe call went
-to the sandbox "Qolumns sandbox" with Stripe's test cards; no real charge, no email off this machine, no
-WhatsApp message. What the owner runs to go live is in OWNER-TODO (T-180, section 1). Migration 44 goes first.
+**Deployed 2026-11-18** (T-180, with the T-179 fix and the two small items; commits up to `b1ad978`).
+1. Migration 44: applied by the owner with `scripts/deploy-migration-44.sh` (after its Before check was fixed;
+   see the entry above). Read-only afterwards: latest `00000000000044`, the three usage functions present.
+2. Worker: `npx wrangler deploy --env production`, version `1ef39c4d-4a59-4fbf-9d4f-2d0b6b3d5f86`. `/health` ok
+   (`hasRedis: false`, as decided in AD-060); `/section` and `/process` with no token: 401.
+3. The live Stripe setup script and the Vercel settings: done by the owner ("Vercel is set"). Read by name
+   only before the web deploy: the six `STRIPE_PRICE_*` names, `STRIPE_WEBHOOK_SECRET` and `STRIPE_SECRET_KEY`
+   are in Vercel Production.
+4. Web: `npx vercel deploy --prod --yes`, deployment `dpl_41s7h4F7zAULMLwM9RXR6JJDBKkD`, serving `qolumns.com`.
+
+Live checks, read-only (no request was submitted, no checkout started, no WhatsApp message sent, nothing
+created):
+- `/`, `/login`, `/pricing`, `/terms`, `/privacy` and the demo quote link `/quote/example-home-services`: 200.
+- An unknown quote link: 404.
+- WhatsApp webhook: wrong verify token 403; unsigned POST 401 "Missing signature"; wrong signature 401
+  "Invalid signature".
+- Stripe webhook `/api/webhooks/stripe`: unsigned POST 400 "Missing signature"; wrong signature 400 "Invalid
+  signature". (Either answer means the Stripe key and the webhook secret are set: without them it answers 500.)
+- Signed out: `/api/billing`, `/api/billing/pending`, `/api/billing/notice` and `POST /api/billing/checkout`
+  401; the admin suspend route 403.
+- The new words are live: Pricing and Home say "plus tax"; the Terms carry the seller-of-record paragraph and
+  "billed in advance, monthly or yearly", no longer mention metered overage, and are dated 18 November 2026.
+- **Not proven on production:** anything signed in or paid. No plan was bought, so Checkout, the return to
+  Billing, a real webhook delivery (which is what proves the webhook secret is the right one), the portal and
+  the "Changes to …" line have only been seen in the sandbox. The T-179 fix was not exercised on production:
+  the owner re-tests by hand. OWNER-TODO lists both.
+
+**As built (before the deploy):** every Stripe call went to the sandbox "Qolumns sandbox" with Stripe's test
+cards; no real charge, no email off this machine, no WhatsApp message. What the owner ran to go live is in
+OWNER-TODO (T-180, section 1). Migration 44 went first.
 
 Checks, on the final code (after the follow-up below): `pnpm lint` and `pnpm typecheck` pass; web and worker
 build. Unit tests: web 1,055 (54 new in `billing-t180.test.ts`), worker 574, mobile 11. **The full regression
