@@ -17,7 +17,25 @@
 
 ### 2026-11-18: T-182 — Mobile app: audit, fixes, and the on-site path (AD-065)
 
-Built and pushed, **not deployed**. The app runs in Expo Go; the server side is two routes only the app uses.
+**Web deployed 2026-11-18** (commit `9070b3f`). Web only: no worker change, no migration, nothing in Stripe.
+The app itself runs in Expo Go from the owner's Mac; the server side is two routes only the app uses.
+- Web: `npx vercel deploy --prod --yes`, deployment `dpl_BrEMsLf6ECx4vzDkCBf6UUTLiydu`, serving `qolumns.com`.
+- The full regression set had been run once on this commit before the deploy (31 scripts, 2,706 checks, below).
+
+Live checks, read-only (nothing submitted, nothing created):
+- `/`, `/login`, `/pricing` and the demo quote link `/quote/example-home-services`: 200. An unknown quote
+  link: 404.
+- WhatsApp webhook: wrong verify token 403, unsigned POST 401. Stripe webhook: unsigned POST 400.
+- `POST /api/app/quotes` with no sign-in: 401 (`UNAUTHORIZED`). `GET /api/app/quotes/:id` with no sign-in: 401.
+- **Not proven live:** that the two app routes answer in their new shape. That needs a sign-in to production,
+  which these checks do not make. The owner's first quote from the phone (a name and no email) proves it.
+
+Owner's decisions, 2026-11-18: the customer's email stays optional on site; the app icon, splash and brand
+fonts go in the TestFlight ticket; editing a quote stays in the dashboard; the plan-limit wording is reworded
+before the App Store submission (a step in OWNER-TODO's TestFlight list); the app's own upload and form routes
+are a small later ticket (OWNER-TODO backlog item 11).
+
+**As built (before the deploy):**
 
 #### What the audit found
 

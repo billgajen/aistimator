@@ -2297,16 +2297,21 @@ that cover these pages; all pass (two needed a count updated: 14 footer links, t
 
 ## T-182 — Mobile app: audit, fixes, ready to test on your phone
 
-Built and pushed. **Not deployed.** The app itself is never "deployed" at this stage: it runs from your Mac
-into Expo Go on your phone. What is not deployed is the web server's side (two routes only the app uses).
+**Web deployed 18 November 2026** (web only, `dpl_BrEMsLf6ECx4vzDkCBf6UUTLiydu`, serving `qolumns.com`; no
+migration, no worker change, nothing in Stripe). The app itself is never "deployed" at this stage: it runs
+from your Mac into Expo Go on your phone. You can start the phone test below now.
 
-### Read this first: the phone test needs the web deployed
+### The web server's side is live
 
-- [ ] **Say "deploy T-182" before you test against production.** The app talks to the web server, and two
-  app-only routes changed in this ticket (below, "What changed on the server"). Production still has the old
-  ones. Against the old ones the app opens and signs in, but a quote with no customer email is refused, the
-  price screen has no minimum note, no sections and no photos, and a lost signal can make a quote twice.
-  The deploy is web only: no migration, no worker change, nothing in Stripe.
+- [x] **Deploy the web before the phone test.** Done 18 November. The two app-only routes (below, "What
+  changed on the server") are on production.
+- Read-only live checks after the deploy, all as expected: `/`, `/login`, `/pricing` and the demo quote link
+  200; an unknown quote link 404; the WhatsApp webhook refuses a wrong token (403) and an unsigned call (401);
+  the Stripe webhook refuses an unsigned call (400); `POST /api/app/quotes` and `GET /api/app/quotes/:id`
+  without a sign-in are refused (401).
+- **Not proven by those checks:** that the two app routes answer in their new shape on production. That needs
+  a sign-in, and I do not sign in to production. Your first quote from the phone proves it (step 2 below: a
+  quote with only a name is accepted).
 
 ### It runs in Expo Go. No Apple account, no Xcode.
 
@@ -2412,24 +2417,20 @@ If any of these fails on your phone, send me what you saw (a screenshot is enoug
 - Not changed: pricing, the quote flow, the worker, Stripe, the database. One helper that reads a label
   reading back was moved into the shared package; the customer pages use it from there and their tests pass.
 
-### Decisions for you (my recommendation first)
+### Decisions (yours, 18 November 2026)
 
-1. **Deploy the web before the phone test.** Recommended: yes, say "deploy T-182".
-2. **Customer email optional on site.** Done, because the on-site path sends the link by the share sheet.
-   Recommended: keep. Say if you want the email required again.
-3. **App icon and splash.** There are none yet. Not needed for Expo Go; needed for TestFlight. Recommended: the
-   "Q" of the wordmark in juniper on paper; I draw it in the TestFlight ticket and you approve it.
-4. **Brand fonts in the app.** It uses the iPhone's own font today. Recommended: add the three brand fonts in
-   the TestFlight ticket, with the icon.
-5. **Editing a quote or adding a service in the app.** Not built; the app shows sections, the dashboard edits
-   them. Recommended: leave it in the dashboard for now.
-6. **Words at the plan limit.** The app says plans are changed on the web. Apple's rules do not allow an app
-   to point people at a purchase outside the app. Fine for Expo Go and TestFlight. Recommended: reword before
-   the App Store submission.
-7. **The app's own upload route.** Photos go through the public upload route, which is rate limited by
-   network address. If a limit is hit the app waits and retries by itself; it never skips the limit.
-   Recommended: a small later ticket gives the signed-in app its own upload and form routes, so a busy
-   shared network can never slow a trade down.
+1. **Deploy the web before the phone test.** Decided: yes. Done the same day.
+2. **Customer email on site.** Decided: stays optional (the name is required).
+3. **App icon and splash.** Decided: in the TestFlight ticket. Not needed for Expo Go.
+4. **Brand fonts in the app.** Decided: in the TestFlight ticket, with the icon. The app uses the iPhone's
+   own font until then.
+5. **Editing a quote or adding a service.** Decided: dashboard only. The app shows sections; it does not edit.
+6. **Words at the plan limit.** Decided: reword before the App Store submission. The app says plans are
+   changed on the web, and Apple's rules do not allow an app to point people at a purchase outside the app.
+   Fine for Expo Go and TestFlight. It is a step in the TestFlight list below.
+7. **The app's own upload route.** Decided: a small later ticket (backlog item 11 at the top of this file,
+   and under "Later" below). Until then photos go through the public upload route, which is rate limited by
+   network address; if a limit is hit the app waits and retries by itself and never skips the limit.
 
 ### Later: what the Apple Developer account and TestFlight need
 
@@ -2446,11 +2447,19 @@ You do not have the account yet. When you do:
   the app has no sign-up).
 - [ ] **For TestFlight:** `npx eas build --profile production --platform ios`, then `npx eas submit`. Testers
   inside your team get it at once; outside testers wait for a short review.
-- [ ] From me, in that ticket: the icon and splash, the brand fonts, the EAS settings file, the encryption
-  declaration (the app uses only standard HTTPS), and the plan-limit wording (decision 6).
+- [ ] **Before the App Store submission: reword the plan-limit text in the app** (decision 6). Today a held
+  request and a paused account say that plans are changed on the web. Apple does not allow an app to point
+  people at a purchase outside the app, so the text must say what happened and that the request is saved,
+  with no mention of where to pay. Not needed for Expo Go or TestFlight. Mine to do in that ticket.
+- [ ] From me, in that ticket: the icon and splash, the brand fonts, the EAS settings file and the encryption
+  declaration (the app uses only standard HTTPS).
 
 ### Later
 
+- **A small ticket: the app's own upload and form routes** (decision 7; backlog item 11). The signed-in app
+  gets its own routes for starting a photo upload and reading a service's questions, limited per business
+  and not per network address, so a busy shared network can never slow a trade down. The public routes and
+  their limits stay as they are.
 - Photos sent from the app get no small copy (only the web form makes one). Already in the backlog (item 10).
 - Notifications on the phone when a customer accepts (backlog).
 - Android. The code is shared, but nothing was checked on Android.
