@@ -16,14 +16,7 @@
  *
  * Pure. Nothing here is logged.
  */
-import { findConfidenceLanguage, formatNumber, unitDisplayLabel } from '@qolumns/shared'
-
-/**
- * The audit line the pipeline writes for a label reading
- * (shared/identification.ts): `Read from <where> (photo N): "<words>" → <value> (<rule>)`
- * or, with no transcription, `Read from <where>: <value>`.
- */
-const READING = /^Read from (.+?)(?: \(photo (\d+)\))?: (?:"(.*)" → )?(.+)$/
+import { findConfidenceLanguage, formatNumber, parseReadingEvidence, unitDisplayLabel } from '@qolumns/shared'
 
 export interface LabelReading {
   /** Where it was read, as the pipeline names it: "the tank's rating label" */
@@ -32,15 +25,14 @@ export interface LabelReading {
   value: string
 }
 
-/** A label reading taken apart, or null when the text is not one */
+/**
+ * A label reading taken apart, or null when the text is not one. The line is
+ * written and read back in one place (shared/identification.ts); the customer
+ * is given only where and what, never the words read off the label.
+ */
 export function parseReading(evidence: unknown): LabelReading | null {
-  if (typeof evidence !== 'string') return null
-  const m = READING.exec(evidence.trim())
-  if (!m) return null
-  const [, where = '', , , rest = ''] = m
-  // the rule's name in brackets says how the words became the value; the value is enough
-  const value = rest.replace(/ \([^()]*\)$/, '').trim()
-  return where && value ? { where, value } : null
+  const reading = parseReadingEvidence(evidence)
+  return reading ? { where: reading.where, value: reading.value } : null
 }
 
 /** "the tank's rating label" as the customer's own: "your tank's rating label" */

@@ -186,3 +186,37 @@ export function resolveIdentification(opts: {
   }
   return null
 }
+
+// ---------------------------------------------------------------------------
+// Reading the audit line back (T-171; moved here in T-182 so the app words it too)
+// ---------------------------------------------------------------------------
+
+/**
+ * The audit line `resolveIdentification` writes:
+ * `Read from <where> (photo N): "<words>" → <value> (<rule>)` or, with no
+ * transcription, `Read from <where>: <value>`.
+ */
+const READING_LINE = /^Read from (.+?)(?: \(photo (\d+)\))?: (?:"(.*)" → )?(.+)$/
+
+export interface ParsedReading {
+  /** Where it was read, as the pipeline names it: "the tank's rating label" */
+  where: string
+  /** What it came to: "50 gal" */
+  value: string
+  /** Which photo it was read from, when the line says */
+  photo?: number
+  /** The words read off the label, when the line carries them. The business's to see, never the customer's. */
+  words?: string
+}
+
+/** A label reading taken apart, or null when the text is not one */
+export function parseReadingEvidence(evidence: unknown): ParsedReading | null {
+  if (typeof evidence !== 'string') return null
+  const m = READING_LINE.exec(evidence.trim())
+  if (!m) return null
+  const [, where = '', photo, words, rest = ''] = m
+  // the rule's name in brackets says how the words became the value; the value is enough
+  const value = rest.replace(/ \([^()]*\)$/, '').trim()
+  if (!where || !value) return null
+  return { where, value, ...(photo && { photo: Number(photo) }), ...(words && { words }) }
+}

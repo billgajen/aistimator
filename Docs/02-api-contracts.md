@@ -711,12 +711,24 @@ GET /api/app/bootstrap
 409 `NO_SITE` when the tenant has no active widget site (the app uses the widget's form).
 
 POST /api/app/quotes
-Request: `{ "serviceId", "customer": { "name", "email", "phone?" }, "job?": { "address?", "postcodeOrZip?", "answers": [{ "fieldId", "value" }] }, "assetIds?": [] }`
-Same intake as `POST /api/public/quotes` (field and photo validation, plan limits, queue), without bot checks or the AI service match. `source_json = { "type": "app", "userId" }`.
-200: `{ "quoteId", "status": "queued", "quoteViewUrl", "tokenExpiresAt" }`. The app keeps `quoteViewUrl` (and its token) on the device.
+Request: `{ "serviceId", "customer": { "name", "email?", "phone?" }, "job?": { "address?", "postcodeOrZip?", "answers": [{ "fieldId", "value" }] }, "assetIds?": [], "scan?", "clientRequestId?" }`
+Same intake as `POST /api/public/quotes` (field and photo validation, plan limits, queue), without bot checks or the AI service match. `source_json = { "type": "app", "userId", "clientRequestId?" }`.
+200: `{ "quoteId", "status": "queued" | "held", "quoteViewUrl", "tokenExpiresAt" }`. The app keeps `quoteViewUrl` (and its token) on the device. `held` = saved, not priced (the plan limit was reached, or the account is paused).
+T-182:
+- Only `customer.name` is required. `email` is optional (on site the link goes by the phone's share sheet); a malformed one is 400.
+- `clientRequestId` (8 to 64 letters, digits, `-` or `_`; anything else is 400) makes a repeat safe. When this business already has a request with that id, nothing is made or counted and the answer is `{ "quoteId", "status", "alreadyCreated": true }` with no `quoteViewUrl` (raw links are never stored; the app asks `POST /api/quotes/:id/link` for one once the quote is approved). The lookup is by tenant: another business sending the same id gets a quote of its own.
 
 GET /api/app/quotes/:quoteId
 200 `AppQuoteView`: `{ id, status, businessName, serviceName, customerName, createdAt, pricing: { total, currency, estimate? }, takeoff: [], questions: [] }`. `questions` is non-empty only while `awaiting_clarification`. 404 for another tenant's quote.
+T-182 adds, all shaped in `apps/web/src/lib/app-quote-view.ts` from the shared rules:
+- `mainServiceName`; `customer: { name, email, phone }` (null when not given); `dates: { sentAt, viewedAt, acceptedAt, paidAt, declinedAt, expiresAt }` (for the status wording in `quote-turn.ts`).
+- `lines: [{ label, amount }]`: the main service's price lines, **without** the minimum top-up. `minimum?: { minimumCharge, topUp }` when a minimum applied (AD-048: a note, never a line). `totals: { subtotal, tax?: { label, amount }, total }`.
+- `sections?: [{ serviceName, addedBy, subtotal, lines, minimum?, awaitingApproval? }]` and `mainSubtotal?` on a combined quote (T-179). `pricing.total` is the one total for everything. `takeoff` is the main service's only (until T-182 an added service's lines were appended to it).
+- `held: true` for a request saved at the plan limit or by a paused account (no price).
+- `request: { description, answers: [{ label, value }], postcode, address, quantity }`: what was sent, each answer under the business's own question (T-178).
+- `photos: [{ id, url }]`: the request's photos (up to 10), each a signed storage address that lasts 5 minutes (the small copy when there is one). Only assets of this quote's request that belong to this tenant. Empty while the quote is `queued` or `generating`, and when storage is not set up. The dashboard's photo route answers with a redirect instead; a phone does not carry the sign-in across one.
+
+The app also uses these dashboard routes with its bearer: `GET /api/quotes?group=`, `POST /api/quotes/:id/approve`, `POST /api/quotes/:id/link` (`{ "force": true }`), `POST /api/quotes/:id/process` (402 `PLAN_LIMIT_REACHED`, 403 `ACCOUNT_PAUSED`), `GET /api/billing/notice`, `PUT /api/quotes/:id/final-invoice`. None of them changed in T-182.
 
 POST /api/app/quotes/:quoteId/answers
 Request: `{ "answers": [{ "questionId", "answer" }], "quoteToken?": "…" }`

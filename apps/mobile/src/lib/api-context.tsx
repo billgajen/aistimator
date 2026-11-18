@@ -6,15 +6,7 @@ import { getAccessToken } from './supabase'
 const ApiContext = createContext<Api | null>(null)
 
 export function ApiProvider({ children }: { children: ReactNode }) {
-  const api = useMemo(
-    () =>
-      createApi({
-        baseUrl: config.apiUrl,
-        getAccessToken,
-        readFile: async (uri) => (await fetch(uri)).blob(),
-      }),
-    []
-  )
+  const api = useMemo(() => createApi({ baseUrl: config.apiUrl, getAccessToken }), [])
   return <ApiContext.Provider value={api}>{children}</ApiContext.Provider>
 }
 

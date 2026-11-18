@@ -706,11 +706,46 @@ export interface AppBootstrapResponse {
 
 export interface AppCreateQuoteRequest {
   serviceId: string
-  customer: CustomerInput
+  /** T-182: on site only the name is needed; the link goes by the phone's share sheet */
+  customer: { name: string; email?: string; phone?: string }
   job?: Omit<JobInput, 'quantity'>
   assetIds?: string[]
   /** T-138: LiDAR room scan (RoomScanPayload), validated server-side */
   scan?: unknown
+  /**
+   * T-182: an id the app makes once for a quote it is sending. Sending the same
+   * id again (the answer was lost with the signal) returns the quote that was
+   * already made instead of making a second one.
+   */
+  clientRequestId?: string
+}
+
+/** T-182: POST /api/app/quotes. `quoteViewUrl` is absent when the request was answered from an earlier send. */
+export interface AppCreateQuoteResponse {
+  quoteId: string
+  status: QuoteStatus | 'held'
+  quoteViewUrl?: string
+  tokenExpiresAt?: string
+  /** true when `clientRequestId` matched a quote that already exists */
+  alreadyCreated?: boolean
+}
+
+/** T-182: one priced line, as the app lists it */
+export interface AppQuoteLine {
+  label: string
+  amount: number
+}
+
+/** T-182: a service added to a quote (T-179), with its own lines and subtotal */
+export interface AppQuoteSection {
+  serviceName: string
+  addedBy: 'customer' | 'business'
+  subtotal: number
+  lines: AppQuoteLine[]
+  /** That service's minimum charge, when it applied (AD-048: a note, never a line) */
+  minimum?: { minimumCharge: number; topUp: number }
+  /** The business has not approved this part yet */
+  awaitingApproval?: boolean
 }
 
 export interface AppQuoteView {
@@ -735,4 +770,34 @@ export interface AppQuoteView {
     evidence?: string
     options?: string[]
   }>
+  // ---- T-182: what the app needs to match the dashboard -----------------------
+  /** The quote's main service alone (`serviceName` lists every service on a combined quote) */
+  mainServiceName?: string
+  /** The business's own customer: how to reach them */
+  customer?: { name: string; email: string | null; phone: string | null }
+  /** Saved but not priced: the plan limit was reached, or the account is paused */
+  held?: boolean
+  /** For the status wording (packages/shared/src/quote-turn.ts) */
+  dates?: {
+    sentAt: string | null
+    viewedAt: string | null
+    acceptedAt: string | null
+    paidAt: string | null
+    declinedAt: string | null
+    expiresAt: string | null
+  }
+  /** The money rows under the lines. `tax` is absent when the quote has none. */
+  totals?: { subtotal: number; tax?: { label: string; amount: number }; total: number }
+  /** The main service's price lines, without the minimum top-up. `takeoff` says how each quantity was measured. */
+  lines?: AppQuoteLine[]
+  /** The main service's minimum charge, when it applied (AD-048: a note, never a line) */
+  minimum?: { minimumCharge: number; topUp: number }
+  /** The main service's subtotal on a combined quote (its lines and its minimum) */
+  mainSubtotal?: number
+  /** T-179: services added to this quote. The total above already includes them; it is one quote. */
+  sections?: AppQuoteSection[]
+  /** T-178: what was sent with the request, so a request that could not be priced can be quoted by hand */
+  request?: RequestDetails
+  /** The request's photos, each a short-lived signed address (never a storage path) */
+  photos?: Array<{ id: string; url: string }>
 }

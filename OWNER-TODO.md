@@ -109,6 +109,15 @@ Code for every item is already built; these are the steps that unlock it.
      small pictures on the dashboard and the quote page still load the full photo. Those photos reach storage through
      the server (or the app), not a browser, so the copy has to be made there; the serving side needs no change (it
      already falls back to the original and will use a copy at `<key>.small` once one exists).
+  11. **The on-site app's own upload and form routes (T-182 follow-up).** The app starts photo uploads and reads the
+     service's form through the public routes the website form uses, which are rate limited by network address. A
+     signed-in trade on a busy shared network could be made to wait (the app waits and retries; it never skips the
+     limit). Routes behind the app's sign-in, with the same checks on size and type, would not share that limit.
+  12. **Editing a quote in the on-site app (T-182 follow-up).** The app shows a quote's lines and sections and
+     approves it; changing a line, or adding or removing a service, is done in the dashboard.
+  13. **The app before the App Store (T-182 follow-up; the TestFlight ticket).** Icon and splash, the three brand
+     fonts, the EAS settings, the encryption declaration, and the plan-limit wording (Apple does not allow an app to
+     point at a purchase outside it). The list is in the T-182 section.
 - [x] **Disagreement path decided 2026-11-09:** both. The reviewer gets the scope answers and a 30 s cap (CHANGELOG 2026-11-09).
 
 ## T-139 — Identification signals (nameplate reading)
@@ -136,7 +145,9 @@ Code for every item is already built; these are the steps that unlock it.
 
 ## T-137 — Business mobile app
 
-- [ ] **Try it on your iPhone** (no Xcode needed): install **Expo Go** from the App Store, then on the Mac
+- [ ] **Try it on your iPhone: use the steps in the T-182 section at the end of this file** (they replace
+  this item, and point the app at production). The original note:
+  (no Xcode needed): install **Expo Go** from the App Store, then on the Mac
   `cd apps/mobile && cp .env.example .env` (fill `EXPO_PUBLIC_API_URL` with the Mac's LAN address, e.g.
   `http://192.168.1.20:3000`, and the Supabase URL/anon key) and run `npx expo start`; scan the QR code.
   Check: sign in, new quote with camera photos, price appears, confirm a question, share the link.
@@ -483,6 +494,7 @@ put back once the gap is fixed (`app/features/page.tsx`; the marketing test bans
   - An opened quote always reads "Nothing for you to do", however long ago it was opened. The app does not yet
     suggest chasing a customer who has gone quiet (product backlog item 9 above).
   - The mobile app still shows its own status words (`apps/mobile/src/lib/price.ts`). It was outside this ticket.
+    **Fixed in T-182:** the app takes its words from the same shared file as the dashboard.
 - Not built here, by the ticket: the menu, a Home redesign, a "seen" state for unfinished requests, the sign-in
   tagline (next ticket); replying to the customer inside the app (backlog item 8); a "booked" or "job done" status.
 - The live check is `scripts/hardcore-test/verify-t158.mts` (add `PLAYWRIGHT_DIR=…` for the page checks; it saves
@@ -1034,8 +1046,9 @@ Live since 2026-11-15 14:17 UTC. No price changes.
 - [ ] **The billing page no longer lists "PDF generation" and "Email notifications".** It lists exactly what
   Pricing lists, from the same source, which is how the two cannot disagree. Both are true of every plan; say
   if you want them on both pages.
-- [ ] **The business's on-site app still shows the label's raw text** under a question (`apps/mobile`). It is
-  the business's screen, so I left it.
+- [x] **The business's on-site app still shows the label's raw text** under a question (`apps/mobile`). It is
+  the business's screen, so I left it. **Fixed in T-182:** one plain line ("Read from the panel label, photo 1:
+  100"), with the label's own words on a separate line.
 
 ## T-172 — Worker fixes: the checker's settings, small photo copies, AI time limits, colour classes, the step count
 
@@ -2281,3 +2294,171 @@ that cover these pages; all pass (two needed a count updated: 14 footer links, t
 - The changed pages were looked at in a browser on this machine at 1280 and 390 px wide. On production I
   checked that they load and carry the new words, not how they look.
 
+
+## T-182 — Mobile app: audit, fixes, ready to test on your phone
+
+Built and pushed. **Not deployed.** The app itself is never "deployed" at this stage: it runs from your Mac
+into Expo Go on your phone. What is not deployed is the web server's side (two routes only the app uses).
+
+### Read this first: the phone test needs the web deployed
+
+- [ ] **Say "deploy T-182" before you test against production.** The app talks to the web server, and two
+  app-only routes changed in this ticket (below, "What changed on the server"). Production still has the old
+  ones. Against the old ones the app opens and signs in, but a quote with no customer email is refused, the
+  price screen has no minimum note, no sections and no photos, and a lost signal can make a quote twice.
+  The deploy is web only: no migration, no worker change, nothing in Stripe.
+
+### It runs in Expo Go. No Apple account, no Xcode.
+
+Everything except the LiDAR room scan runs in Expo Go. The room scan needs a development build (it is native
+code); in Expo Go the app hides the scan card and everything else works. The scan was already optional; I
+checked the code path and changed nothing in it.
+
+### Test on your iPhone, step by step
+
+**Install**
+
+- [ ] On the iPhone: **Expo Go** from the App Store (free). Nothing else.
+- [ ] On the Mac: nothing new.
+
+**On the Mac (Terminal)**
+
+```bash
+cd ~/Documents/Estimator
+pnpm install
+cd apps/mobile
+cp .env.example .env
+open -e .env
+```
+
+- [ ] In `.env`, set three values. Names only here; the values are in Vercel (the web project, Production):
+
+  | Name in `apps/mobile/.env` | Value |
+  |---|---|
+  | `EXPO_PUBLIC_API_URL` | `https://qolumns.com` (no slash at the end) |
+  | `EXPO_PUBLIC_SUPABASE_URL` | the value of `NEXT_PUBLIC_SUPABASE_URL` in Vercel, Production |
+  | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | the value of `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Vercel, Production |
+
+  The same two Supabase values are in the Supabase dashboard under Project Settings, API ("Project URL" and
+  the "anon public" key). Both are public by design. **Never put the service role key in this file.**
+  `.env` is not committed.
+
+- [ ] Start it, with the iPhone and the Mac on the same Wi-Fi:
+
+  ```bash
+  npx expo start
+  ```
+
+  A QR code appears. Open the iPhone's **Camera**, point it at the code, tap "Open in Expo Go". The first time
+  iOS asks whether Expo Go may find devices on your local network: **Allow**.
+
+- [ ] If the phone cannot connect (some Wi-Fi networks stop devices seeing each other), stop it with Ctrl+C and
+  run `npx expo start --tunnel` instead. It asks once to install a small helper; say yes.
+- [ ] If the app opens on "Qolumns is not set up yet", it names the setting that is missing. Fix `.env`, stop
+  and start `npx expo start` again (settings are read when it starts).
+
+**Sign in**
+
+- [ ] Bluum's email and password, the same ones as on the web. (The app has password sign-in only, as the web
+  has.) Bluum is a free test account on Pro, so nothing is charged; each test quote is a real quote on Bluum
+  and counts toward its 200.
+- [ ] No message goes to anyone unless you type their email address or send them the link yourself. Use your
+  own name and your own phone.
+
+**What to try**
+
+- [ ] 1. The quotes list: Bluum's quotes, each with the dashboard's words ("Needs your approval", "Waiting for
+  customer", "Could not be priced"), not "pending_review".
+- [ ] 2. **The on-site path.** New quote, pick a service, take the photos, answer the questions, type a name,
+  "Price this job". Count the taps, and do it with one hand. Each photo should say "Uploading 40%" then
+  "Uploaded" while you carry on.
+- [ ] 3. The price appears (about 20 to 60 seconds). Press **Approve & send**: the share sheet opens. Send the
+  link to yourself by Messages or WhatsApp and open it: it is the customer's estimate page.
+- [ ] 4. **Lost signal.** Start a new quote, take one photo, then switch on Airplane Mode. Finish it and press
+  "Price this job". It should say "Saved on this phone". Go back to quotes: it is at the top. Switch Airplane
+  Mode off. Within a few seconds it sends by itself and the price follows. In the dashboard there is one
+  quote, not two.
+- [ ] 5. **Closing the app.** Half-way through a quote, swipe the app away. Open it again: "Carry on with the
+  quote" is there with your photos and answers.
+- [ ] 6. A service that reads a label (if Bluum has one): the question says what was read in one line, and you
+  answer it on site.
+- [ ] 7. In the dashboard: the quotes you made are there with the same status, marked as made in the app, and
+  Billing counts each once.
+- [ ] 8. Tell me what was awkward: a button too small, a step too many, text that reads wrong.
+
+Not bugs in Expo Go: there is no room scan card, no app icon, and the splash is Expo's.
+
+### Not proven
+
+I have no iPhone and no simulator on this machine (Xcode is not installed), so **I have not seen the app
+run.** Proven without a phone: the app's code typechecks, lints, bundles for iOS in full, and its own API
+client and sending queue pass 54 checks against the real local server (`verify-t182`) and 48 unit tests.
+Not proven by anyone yet, and what your test above covers:
+
+- the camera and the photo library, and making a photo smaller before it is kept
+- photos saved in the app's own folder, and the upload progress bar moving
+- the sign-in staying after the app is closed (the keychain)
+- the share sheet
+- the keyboard not covering a field, and how the screens look
+
+If any of these fails on your phone, send me what you saw (a screenshot is enough).
+
+### What changed on the server (both are routes only the app uses)
+
+- `POST /api/app/quotes`: the customer's **email is optional** now (the name is still required). It also
+  takes an id the app makes for each quote, so sending the same quote twice answers the first one.
+- `GET /api/app/quotes/:id`: carries more (the lines, the minimum-charge note, added services as sections,
+  whether the request is held, what was sent with the request, its photos).
+- Not changed: pricing, the quote flow, the worker, Stripe, the database. One helper that reads a label
+  reading back was moved into the shared package; the customer pages use it from there and their tests pass.
+
+### Decisions for you (my recommendation first)
+
+1. **Deploy the web before the phone test.** Recommended: yes, say "deploy T-182".
+2. **Customer email optional on site.** Done, because the on-site path sends the link by the share sheet.
+   Recommended: keep. Say if you want the email required again.
+3. **App icon and splash.** There are none yet. Not needed for Expo Go; needed for TestFlight. Recommended: the
+   "Q" of the wordmark in juniper on paper; I draw it in the TestFlight ticket and you approve it.
+4. **Brand fonts in the app.** It uses the iPhone's own font today. Recommended: add the three brand fonts in
+   the TestFlight ticket, with the icon.
+5. **Editing a quote or adding a service in the app.** Not built; the app shows sections, the dashboard edits
+   them. Recommended: leave it in the dashboard for now.
+6. **Words at the plan limit.** The app says plans are changed on the web. Apple's rules do not allow an app
+   to point people at a purchase outside the app. Fine for Expo Go and TestFlight. Recommended: reword before
+   the App Store submission.
+7. **The app's own upload route.** Photos go through the public upload route, which is rate limited by
+   network address. If a limit is hit the app waits and retries by itself; it never skips the limit.
+   Recommended: a small later ticket gives the signed-in app its own upload and form routes, so a busy
+   shared network can never slow a trade down.
+
+### Later: what the Apple Developer account and TestFlight need
+
+You do not have the account yet. When you do:
+
+- [ ] **Apple Developer Program**, $99 a year. Enrol as the company (Billiom Limited): Apple asks for the
+  company's D-U-N-S number and checks it, which can take a few days.
+- [ ] **An Expo account** (free) and `npx eas init` in `apps/mobile`, which links the app to it.
+- [ ] **A development build** for the LiDAR room scan: `npx eas build --profile development --platform ios`,
+  installed on a LiDAR iPhone (a Pro model, 12 Pro or later). Then the accuracy check in the T-138 section.
+- [ ] **In App Store Connect:** a new app with the bundle id `com.qolumns.app`; the name; a 1024 px icon;
+  screenshots; the privacy policy address (`https://qolumns.com/privacy`); a support address; the privacy
+  answers (photos, contact details, sign-in); and a sign-in for Apple's reviewer (a test business, because
+  the app has no sign-up).
+- [ ] **For TestFlight:** `npx eas build --profile production --platform ios`, then `npx eas submit`. Testers
+  inside your team get it at once; outside testers wait for a short review.
+- [ ] From me, in that ticket: the icon and splash, the brand fonts, the EAS settings file, the encryption
+  declaration (the app uses only standard HTTPS), and the plan-limit wording (decision 6).
+
+### Later
+
+- Photos sent from the app get no small copy (only the web form makes one). Already in the backlog (item 10).
+- Notifications on the phone when a customer accepts (backlog).
+- Android. The code is shared, but nothing was checked on Android.
+- The free-quotes-left line ("2 free quotes left") shows in the dashboard and by email, not in the app.
+
+### Closed by this ticket
+
+- T-137's "Try it on your iPhone": replaced by the steps above.
+- T-158's note "The mobile app still shows its own status words": it uses the dashboard's words now.
+- T-171's item "The business's on-site app still shows the label's raw text": it is one plain line now, with
+  the label's words on a line of their own.

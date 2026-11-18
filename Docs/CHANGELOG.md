@@ -15,6 +15,137 @@
 
 ## Issues & Resolutions
 
+### 2026-11-18: T-182 — Mobile app: audit, fixes, and the on-site path (AD-065)
+
+Built and pushed, **not deployed**. The app runs in Expo Go; the server side is two routes only the app uses.
+
+#### What the audit found
+
+- **Built with:** Expo SDK 58 (the current one, so Expo Go runs it), React Native 0.88, React 19, expo-router;
+  one native module of our own (`modules/room-scan`, LiDAR). Sign-in is email and password against Supabase,
+  kept in the keychain; every API call carries the access token as a bearer (AD-033).
+- **Names:** no old product name anywhere in the app, its config, its bundle id (`com.qolumns.app`) or its
+  text. Nothing to rename.
+- **LiDAR:** already optional (`requireOptionalNativeModule`; the scan card is hidden when the module is not
+  there). Nothing changed.
+- **Behind the web:**
+  | What | The app before | The rule it missed |
+  |---|---|---|
+  | Status words | its own list ("Failed", "Sent to customer"), and the raw status for any it did not know | `quote-turn.ts` (T-158) |
+  | A held request (plan limit, paused account) | "$0.00 · Waiting for your approval", with an Approve card hidden only by the zero | T-134, T-152, T-180 |
+  | A request that could not be priced | "$0.00 · Failed", no request, no photos | T-178 |
+  | The minimum charge | the lines stopped adding up to the total and nothing said why | AD-048 |
+  | A combined quote | added services appended to one flat list, prefixed with the service's name | T-179 |
+  | A paused account, a failed payment | nothing | T-180 |
+  | A label reading under a question | the audit line as written: quoted label text, an arrow, the rule's name | T-171 |
+- **Broken or missing:**
+  1. **Sharing only worked on the phone that made the quote** ("created on another device. Share it from the
+     dashboard"), and the Share button showed before approval, when the customer's link shows no price.
+  2. **A lost signal lost the quote.** Photos uploaded only after "Price this job", in one go; any failure
+     threw the whole submission away, and nothing typed was saved.
+  3. **A retry could make a second quote** (and count it on the plan): nothing told the server a request was
+     a repeat.
+  4. **While the price was worked out, one failed poll stopped the screen for good.**
+  5. **A photo's size could be declared as 0** (`fileSize ?? 0`). Since T-173 the upload address is signed for
+     the exact size, so storage would refuse it.
+  6. **Yes/no and tick-box questions were a text box.** A tick-box question sent one value.
+  7. **The customer's email was required**, though the on-site path hands over the link by the share sheet.
+  8. **A missing setting crashed the app at start** (a thrown error at import).
+  9. **The session may not survive in the keychain**: it is longer than the 2,048 bytes a keychain value is
+     meant to hold.
+  10. Colours were from before T-164 (muted text, danger), and buttons and rows were 40 to 44 px.
+
+#### What was fixed
+
+**The server (two routes only the app uses; AD-065)**
+- `GET /api/app/quotes/:id` is shaped by one pure function, `lib/app-quote-view.ts`, from the shared rules:
+  the price lines without the minimum top-up, the minimum as its own fact, added services as sections with
+  their own lines, minimum and subtotal, the money rows, `held`, the dates the status wording needs, what was
+  sent with the request (the dashboard's own `requestDetails`), and the request's photos as signed addresses
+  that last five minutes (tenant-checked; never while the quote is being priced, when the app polls).
+- `POST /api/app/quotes`: `customer.email` is optional; `clientRequestId` answers the quote already made for
+  that id and tenant, and makes and counts nothing.
+- `parseReadingEvidence` moved to `packages/shared/src/identification.ts`, beside the function that writes the
+  line. The customer pages' `parseReading` calls it (the customer still gets only where and what).
+
+**The app**
+- **The on-site path** (`app/new.tsx`): service → photos → the service's questions → notes and the name →
+  "Price this job". One thing per screen; the main button in a bar at the bottom; rows and buttons 56 px and
+  more; a business with one service skips the first step; tapping a service moves on.
+- **The sending queue** (`src/lib/outbox.ts`, pure, 16 tests): a photo uploads from the moment it is taken,
+  with its progress; every answer and photo is saved on the phone; "Price this job" works with no signal and
+  the quote sends itself when the signal is back; one id per draft so it is made once; a rate limit is waited
+  out for as long as the server asks; a refused request comes back in the server's words; a draft belongs to
+  the sign-in that wrote it.
+- **The phone's side** (`src/lib/device-files.ts`): a photo is made smaller (2,400 px, JPEG) and copied into
+  the app's documents, so its size is known exactly and the phone cannot empty it from a cache; the upload
+  is `expo-file-system`'s, with progress. The business's services are kept on the phone, so a new quote can be
+  started with no signal.
+- **The quote screen** (`app/quote/[id].tsx`): status, detail and next step from `quote-turn.ts`; no figure
+  when there is no price; lines with how each was measured; the minimum note; sections; subtotal, tax, total;
+  the request and its photos; call and email buttons; one main action in the bottom bar ("Approve & send",
+  which approves and then opens the share sheet; "Send the link"; "Price this request"; "Confirm and
+  reprice"). A link is made through the dashboard's own link route when the phone has none.
+- **The list** (`app/index.tsx`): the dashboard's status pills and detail lines; quotes waiting to send, with
+  progress; the unfinished quote; the account line (paused, failed payment).
+- Questions are asked as the website form asks them (`fieldKind`: rows to tap, several for tick boxes, Yes/No,
+  number pad, long text). A missing setting shows a screen naming it. The session is stored in parts
+  (`chunked-store.ts`). Colours, sizes and status colours follow `Docs/design/system.md` (`theme.ts`,
+  `status.ts`); no yellow button, yellow only for "needs you", butter only on the grade and the scan result.
+- Two dependencies, both Expo's own and both in Expo Go: `expo-file-system`, `expo-image-manipulator`.
+
+#### What I checked and did not change
+
+- **Review by default, show-then-confirm (T-146, T-147):** a quote the business makes is hidden until it
+  approves (`decideReviewHold`, `businessCreated`). That is the intended rule for the app; the app now follows
+  it by approving before sharing.
+- **Free test accounts:** nothing in the app differs for one. `verify-t182` prices a held request on a plan
+  row with no Stripe customer.
+- **Safeguards:** the app's own routes need the sign-in (401 without). The two public routes it uses are rate
+  limited; the app waits and retries. Nothing was switched off or raised.
+
+#### Verified
+
+- **The app:** `tsc` (strict), eslint, **48 unit tests** (16 on the sending queue: background upload, the
+  real file size, a lost signal, a lost answer, the app closed mid-way, a rate limit waited out, a refused
+  request, another sign-in's draft), and the full iOS bundle (`npx expo export --platform ios`, 3.4 MB Hermes).
+- **The server's view:** 12 unit tests (`apps/web/src/__tests__/app-t182.test.ts`): the minimum is never a
+  line, sections, held, failed, no internal reason shown, a label reading read back in one place.
+- **Live, local stack, `scripts/hardcore-test/verify-t182.mts`: 54/54.** The app's own client and queue
+  against the real server, with a real sign-in and bearer: a quote with only a name; no signal, then an answer
+  lost on the way back, then sent, and exactly one request and one quote counted; another business's same id
+  is its own; $90 raised to a $120 minimum plus 10% tax = $132.00, with the minimum as a note; hidden from the
+  customer until approved, then the phone's link shows the price, and a new link works beside the old one;
+  yes/no, tick boxes and numbers stored with their types; a missing answer comes back in the server's words;
+  a section added in the dashboard shows as a section with one total and no second quote counted; at the plan
+  limit the request is saved with its photo (a real upload to storage, opened by its signed address with no
+  sign-in header) and "Price this request" answers 402; a paused account answers 403 and shows the dashboard's
+  line; a failed request shows the note, the phone number and the photo; another business gets 404 on every
+  route; a server key as the bearer is refused.
+- **Full regression set, run once at the end: 31 scripts, 2,706 checks, all pass.** `verify-t182` and the 26
+  from `t146` to `t177` (without `t173`) in one run on the standard servers; then `t173` 104/104, `t178`
+  52/52, `t179` 99/99 and `t180` 108/108, each alone with the settings at the top of its script.
+- Repo: `pnpm lint`, `pnpm typecheck`; unit tests web 1,084, worker 587, app 48; the web and worker builds.
+- One unit test failed on the way and was a fault in my new script, not in the product: a made-up customer in
+  `verify-t182` had the old sample first name that T-174's test forbids. Renamed.
+
+#### Not verified
+
+- **The app on a phone.** There is no iPhone, simulator or Xcode on this machine. The camera, the photo
+  resize, the files, the upload progress, the keychain, the share sheet, the keyboard and how the screens look
+  have been seen by nobody. Everything they call is covered by the checks above. The owner's test steps are in
+  OWNER-TODO, T-182.
+- LiDAR (unchanged; still needs a development build and the accuracy check from T-138).
+- Android.
+
+**Files:** `apps/mobile/**` (screens, `src/lib/{api,outbox,outbox-context,device-files,answers,price,status,share,chunked-store,config,supabase}`, `src/components/ui.tsx`, `src/theme.ts`, tests, README, `.env.example`), `apps/web/src/lib/app-quote-view.ts`, `apps/web/src/app/api/app/quotes/{route.ts,[quoteId]/route.ts}`, `apps/web/src/lib/customer-read.ts`, `packages/shared/src/{api.types.ts,identification.ts}`, `apps/web/src/__tests__/app-t182.test.ts`, `scripts/hardcore-test/verify-t182.mts`, `Docs/02-api-contracts.md`, `OWNER-TODO.md`.
+
+**Relation:** T-137 built the app and T-138 the scan. T-146/T-147 (review), AD-048 (minimum), T-152/T-180
+(limits, pause), T-178 (failed requests) and T-179 (sections) changed the web after it; this ticket brings the
+app to them, and AD-065 is how it stays there.
+
+---
+
 ### 2026-11-18: T-181 — Small site fixes + Meta app review readiness
 
 **Deployed 2026-11-18** (commits `bf69ae2` and `fdac578`). Web only: no worker change, no migration.
@@ -8561,6 +8692,45 @@ anti-hardcoding rule, and it was the cause); removing every check and trusting t
 the right service is the one mistake configuration can catch); tuning the prompt until the cases pass (the
 model was right; and live-model answers are never a gate); creating the card from the wording model's mention
 (the wording model writes text, it does not decide what is offered).
+
+---
+
+### AD-065: The on-site app decides nothing; a quote it sends is saved first, sent later, and made once (T-182)
+
+**Context:** the app (T-137) had drifted from the web: its own status words, "0.00" for a request with no
+price, no minimum note, no sections, nothing for a held or failed request. And the on-site path lost the quote
+when the signal dropped while it was sent. A site visit is where the signal is worst.
+
+**Decision:**
+1. **The app holds no rule and no wording of its own.** Status, next step, what can be shared, the minimum
+   charge and sections all come from `packages/shared` (`quote-turn.ts`, `quote-status.ts`,
+   `minimum-charge.ts`, `quote-sections.ts`). The server shapes the quote for the app in one pure function
+   (`apps/web/src/lib/app-quote-view.ts`). A rule changed for the web changes for the app.
+2. **A quote is written to the phone before it is sent** (`apps/mobile/src/lib/outbox.ts`). Every answer and
+   photo is saved as it happens; photos upload in the background from the moment they are taken; "Price this
+   job" only marks the draft to be sent. The queue sends it now or when the signal is back.
+3. **A quote is made once.** Each draft has one id (`clientRequestId`), sent with every attempt and stored on
+   the request (`source_json`). The server answers the quote already made for that id and that tenant, and
+   makes and counts nothing. The phone cannot tell "the request was lost" from "the answer was lost", so only
+   the server can make a repeat safe.
+4. **A safeguard is waited out, never worked round.** A rate limit's `Retry-After` is how long the queue
+   waits. The plan limit and a paused account are the server's answers (402, 403), shown as they are.
+5. **A draft belongs to the sign-in that wrote it.** It is never sent under another account on the same phone.
+6. **On site only the customer's name is required.** The link goes by the phone's share sheet. A quote the
+   business made is hidden until it approves it (unchanged: T-146, T-147), so the app approves, then shares.
+
+**Consequences:**
+- The app's two own routes changed; no dashboard route, no pricing, no worker, no migration.
+- A repeat is answered without a link (raw links are never stored): the app asks for one after approval.
+- The lookup for a repeat reads `quote_requests` by tenant and a JSON key, with no index. A business's
+  requests are few; if that changes, index `(tenant_id, (source_json->>'clientRequestId'))`.
+- The app still uses the public upload and form routes, so it shares their rate limits (backlog item 11).
+
+**Rejected:** a queue in the keychain (it is for small secrets, and the phone may empty the camera's cache, so
+photos are copied into the app's documents); a network-state library to know when to retry (a timer and "the
+app came to the front" need no dependency, and the queue already knows how long to wait); retrying without an
+id and removing duplicates afterwards (the second quote would already be counted on the plan and could already
+be priced); returning a stored link on a repeat (links are stored only as hashes, by design).
 
 ---
 
