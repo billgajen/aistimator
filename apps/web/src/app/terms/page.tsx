@@ -27,8 +27,8 @@ const SECTIONS = [
   },
   {
     title: '5. Billing',
-    // T-180: the sentence about metered overage is gone (the owner's instruction): no plan has it
-    body: 'You can cancel at any time; access continues to the end of the paid period. Fees are non-refundable except where required by law.',
+    // T-180: the sentence about metered overage is gone (no plan has it); the owner's line on when plans are billed is in its place
+    body: 'Paid plans are billed in advance, monthly or yearly. You can cancel at any time; access continues to the end of the paid period. Fees are non-refundable except where required by law.',
     // T-180 (the owner's wording): who takes the payment, and the tax
     more: 'Payments are processed by Stripe, which acts as the seller of record through Link. Applicable sales tax or VAT is added at checkout.',
   },

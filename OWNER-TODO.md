@@ -2530,6 +2530,13 @@ production twice, read-only: the three service configurations and that one quote
 
 ### 1. What waits for you
 
+- [ ] **`bash scripts/deploy-migration-44.sh` is safe to run again.** It failed on its own Before check
+  (my mistake: the check counted from a column the migration creates; nothing was applied). Fixed, and this
+  time run whole against a copy of the database at migration 43, and again at 44. Read-only on production, the
+  fixed Before check answers: migration 43, every new count 0, 1 subscription. You should see the same line
+  under "Before", then "OK", then under "After": latest 44, usage_functions 3, usage_functions_open_to_users 0,
+  subscription_columns 4, tenant_columns 3, billing_guard 1, new_tables 2, subscriptions 1,
+  suspended_businesses 0.
 - [ ] **Migration 44, then tell me (or I look again).** The fix is in the worker, and its checks pass, but I
   did not deploy the worker: this worker build also carries T-180's new "sent" counter, which needs a
   database function that migration 44 creates. Production was still at migration 43 when my checks finished.
@@ -2563,8 +2570,8 @@ production twice, read-only: the three service configurations and that one quote
 - If the wording ever names another of your services on a quote with no card for it, that is logged as a
   detection miss and kept on the quote's trace (`pricing_trace_json.detectionMiss`).
 - The billing page says "Changes to Starter on <date>." when a downgrade is waiting.
-- The Terms no longer mention metered overage. That whole sentence went, so "5. Billing" no longer says that
-  plans are billed in advance; it starts "You can cancel at any time".
+- The Terms no longer mention metered overage. "5. Billing" starts "Paid plans are billed in advance, monthly
+  or yearly." (put back at your instruction).
 
 ### 4. Checks
 

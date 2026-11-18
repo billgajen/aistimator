@@ -20,17 +20,38 @@
 # The T-180 code does NOT work without it: every request would be priced
 # without being counted (it fails open and logs "Could not claim a quote").
 #
+# The Before and After checks read only things that exist at migration 43 AND at
+# 44. The first version of this script counted suspended businesses from a
+# column this migration creates, so its Before check failed on production
+# (2026-11-18; nothing had been applied). It was then run, whole, against a
+# local copy of the database standing at migration 43: see Docs/CHANGELOG.md.
+#
 # Run from repo root:  bash scripts/deploy-migration-44.sh
+#
+# To try the script itself without touching production, point it at a stand-in
+# for the management API that runs each query on a LOCAL copy of the database:
+#   MIGRATION_TEST_API=http://127.0.0.1:8795/query bash scripts/deploy-migration-44.sh
+# With that set it never reads the keychain and never talks to Supabase.
 set -euo pipefail
 
 PROJECT_REF="ygsuzeveesgrafgpkrev"
-API="https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query"
 FILE="supabase/migrations/00000000000044_stripe_billing.sql"
 
-TOKEN="$(security find-generic-password -s 'Supabase CLI' -w)"
-if [ -z "$TOKEN" ]; then
-  echo "ERROR: could not read 'Supabase CLI' token from keychain" >&2
-  exit 1
+if [ -n "${MIGRATION_TEST_API:-}" ]; then
+  case "$MIGRATION_TEST_API" in
+    http://127.0.0.1:*|http://localhost:*) ;;
+    *) echo "ERROR: MIGRATION_TEST_API must be an address on this machine" >&2; exit 1 ;;
+  esac
+  API="$MIGRATION_TEST_API"
+  TOKEN="local-test"
+  echo "TEST RUN against ${API} (a local stand-in). Production is not touched."
+else
+  API="https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query"
+  TOKEN="$(security find-generic-password -s 'Supabase CLI' -w)"
+  if [ -z "$TOKEN" ]; then
+    echo "ERROR: could not read 'Supabase CLI' token from keychain" >&2
+    exit 1
+  fi
 fi
 
 query() {
@@ -49,6 +70,9 @@ fail_on_error() {
   fi
 }
 
+# Every line of this check must work BEFORE the migration as well as after it. So nothing here names
+# a column, table or function that the migration creates: the new ones are looked up by name in the
+# catalogue, and the count of suspended businesses reads the row as JSON (no such key before = 0).
 CHECK="SELECT
   (SELECT max(version) FROM supabase_migrations.schema_migrations) AS latest,
   (SELECT count(*) FROM pg_proc WHERE proname IN ('claim_plan_quote', 'release_plan_quote', 'increment_usage_counter')) AS usage_functions,
@@ -58,7 +82,7 @@ CHECK="SELECT
   (SELECT count(*) FROM pg_trigger WHERE tgname = 'tenants_billing_guard') AS billing_guard,
   (SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('stripe_events', 'admin_activity_logs')) AS new_tables,
   (SELECT count(*) FROM subscriptions) AS subscriptions,
-  (SELECT count(*) FROM tenants WHERE suspended_at IS NOT NULL) AS suspended_businesses;"
+  (SELECT count(*) FROM tenants t WHERE (to_jsonb(t) ->> 'suspended_at') IS NOT NULL) AS suspended_businesses;"
 
 echo "→ Checking migration history..."
 state="$(query "SELECT (SELECT max(version) FROM supabase_migrations.schema_migrations) AS latest;")"

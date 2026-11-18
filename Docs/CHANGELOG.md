@@ -116,6 +116,33 @@ longer list the painting and the notes no longer say "quoted separately".
 - **Terms:** the sentence about metered overage is gone from "5. Billing" (with it, "billed monthly in
   advance"; the section now starts "You can cancel at any time"). The date stays 18 November 2026.
 
+#### Deploy-found, same day: `scripts/deploy-migration-44.sh` failed its own Before check on production
+
+- **What broke:** the owner ran the script. It stopped at "Before" with `column "suspended_at" does not
+  exist`. Nothing had been applied (the check runs before the migration).
+- **Root cause:** the Before and After checks share one query, and it counted suspended businesses with
+  `FROM tenants WHERE suspended_at IS NOT NULL`: a column the migration itself creates. The script had never
+  been run against a database at migration 43. The migration had (through `supabase migration up`), the
+  script had not: its only target is production.
+- **Resolution:** the count reads the row as JSON (`to_jsonb(t) ->> 'suspended_at'`), which is 0 where there
+  is no such column. Every other line already looked the new things up by name in the catalogue. The
+  migration file is unchanged.
+- **Tested the way it should have been:** a copy of the local database was made, taken back to migration 43
+  (migration 44 undone in the copy), and a small local stand-in for the management API ran each of the
+  script's queries on it. The old check fails there with the same error. The fixed script ran whole: Before
+  (all zeros, migration 43), apply, record, After (3 functions, none open to users, 4 and 3 columns, the
+  guard, 2 tables, the same number of subscriptions). Run again at 44: passes and changes nothing. On the
+  copy the new functions then claimed, counted, refused a suspended business, and the log table took a row.
+  The script has a test mode for this (`MIGRATION_TEST_API`), which only accepts an address on this machine.
+- **Production, read-only (catalogue SELECTs, nothing applied):** the fixed Before check returns migration 43,
+  every new count 0, 1 subscription. Neither new table, the constraint nor the indexes exist there already;
+  the id generator has the search path it needs.
+- **New constraint for deploy scripts:** a Before check may only name things that exist before the migration,
+  and the script is run whole against a copy at the previous migration before the owner is asked to run it. A
+  unit test holds this script to the first half.
+- **Terms:** "Paid plans are billed in advance, monthly or yearly." is back at the start of "5. Billing" (the
+  owner's instruction, after the metered-overage sentence took the billing line with it).
+
 #### Deploy state
 
 - **Committed and pushed. Nothing deployed.**

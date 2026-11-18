@@ -149,10 +149,10 @@ describe('T-180: prices are shown before tax, and say so', () => {
     expect(read('apps/web/src/app/pricing/page.tsx')).toContain('a year {PLUS_TAX} (two months free)')
   })
 
-  it('the Terms no longer speak of metered overage (no plan has it)', () => {
+  it('the Terms no longer speak of metered overage (no plan has it), and say plans are billed in advance, monthly or yearly', () => {
     const terms = read('apps/web/src/app/terms/page.tsx')
     expect(terms).not.toMatch(/metered overage \(where applicable\)|per-estimate rate/)
-    expect(terms).toContain("body: 'You can cancel at any time; access continues to the end of the paid period. Fees are non-refundable except where required by law.',")
+    expect(terms).toContain("body: 'Paid plans are billed in advance, monthly or yearly. You can cancel at any time; access continues to the end of the paid period. Fees are non-refundable except where required by law.',")
   })
 
   it('the Terms say who takes the payment and that tax is added, and carry the new date', () => {
@@ -450,6 +450,29 @@ describe('T-180: a quote is claimed and counted in one step (AD-063)', () => {
       expect(src, file).toContain("supabase.rpc('increment_usage_counter'")
       expect(src, file).not.toMatch(/\.from\('usage_counters'\)/)
     }
+  })
+})
+
+describe('T-180: the script that puts migration 44 on production', () => {
+  it('its Before check names nothing the migration creates, except as a name to look up (it must work at migration 43)', () => {
+    // The first version counted suspended businesses "WHERE suspended_at IS NOT NULL": a column this
+    // migration creates. On production, at migration 43, the Before check failed (nothing was applied).
+    const script = read('scripts/deploy-migration-44.sh')
+    const check = script.slice(script.indexOf('CHECK="SELECT'), script.indexOf('suspended_businesses;"'))
+    expect(check.length).toBeGreaterThan(400)
+    const outsideQuotes = check.replace(/'[^']*'/g, "''")
+    for (const created of ['claim_plan_quote', 'release_plan_quote', 'increment_usage_counter', 'billing_interval', 'cancel_at', 'payment_failed_at', 'payment_failed_notified_at', 'suspended_at', 'suspended_reason', 'free_warning_sent_at', 'stripe_events', 'admin_activity_logs', 'tenants_billing_guard']) {
+      expect(outsideQuotes, created).not.toContain(created)
+    }
+    // every one of those names is in the migration, so the list above is the migration's own
+    const migration = read('supabase/migrations/00000000000044_stripe_billing.sql')
+    for (const created of ['suspended_at', 'stripe_events', 'claim_plan_quote', 'tenants_billing_guard']) expect(migration).toContain(created)
+  })
+
+  it('its test mode only ever talks to this machine', () => {
+    const script = read('scripts/deploy-migration-44.sh')
+    expect(script).toContain('http://127.0.0.1:*|http://localhost:*) ;;')
+    expect(script).toContain('*) echo "ERROR: MIGRATION_TEST_API must be an address on this machine" >&2; exit 1 ;;')
   })
 })
 
