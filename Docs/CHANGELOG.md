@@ -192,6 +192,10 @@ created):
   401; the admin suspend route 403.
 - The new words are live: Pricing and Home say "plus tax"; the Terms carry the seller-of-record paragraph and
   "billed in advance, monthly or yearly", no longer mention metered overage, and are dated 18 November 2026.
+- **OWNER-TODO repaired in the same push.** A slip of mine on 18 November (commit `ed980bd`) had put the
+  "Left on this machine" note into the T-176 section and then copied the T-176 to T-180 sections a second
+  time further down. Nothing was lost; the copy is removed and the note is under T-180 where it belongs.
+  Everything before T-180 is the file as it stood before this ticket, apart from the one tick under T-134.
 - **Not proven on production:** anything signed in or paid. No plan was bought, so Checkout, the return to
   Billing, a real webhook delivery (which is what proves the webhook secret is the right one), the portal and
   the "Changes to …" line have only been seen in the sandbox. The T-179 fix was not exercised on production:

@@ -1589,14 +1589,6 @@ sends nothing. Three to check or change (Dashboard → Authentication):
 - [ ] **The business's name is written into the template.** If a business changes its name later, the template
   keeps the old one until it is deleted in WhatsApp Manager and created again.
 
-### Left on this machine and in the sandbox
-
-- `apps/web/.env.local` now has the six sandbox `STRIPE_PRICE_…` lines (the file is not in git).
-- The sandbox has the three products, six prices, the portal settings and the switched-off webhook endpoint,
-  and two archived products named "Probe …" from my first test of Managed Payments. No customer, subscription
-  or test clock was left.
-- The local database is at migration 44.
-
 ### Not proven
 
 - Nothing here has run against the real Meta: creating a template, Meta's review statuses, sending a template,
@@ -1909,13 +1901,28 @@ fixed in this deploy.
 
 ## T-180 — Stripe live billing
 
-**Built 2026-11-18, committed and pushed. Not deployed.** Tested in the Stripe sandbox "Qolumns sandbox" with
+**Deployed 2026-11-18** (migration 44 by you; worker `1ef39c4d`; web `dpl_41s7h4F7zAULMLwM9RXR6JJDBKkD`, serving
+`qolumns.com`). Read-only live checks passed: the pages load, an unknown link is 404, both webhooks refuse
+unsigned and wrongly signed calls, the billing routes are closed when signed out, and the new wording is live.
+**Nothing signed in or paid was tried on production: see "Now that it is live" below.**
+
+**Built 2026-11-18.** Tested in the Stripe sandbox "Qolumns sandbox" with
 Stripe's test cards only. No real charge was made, no email left this machine, no WhatsApp message was sent,
 and production was not touched or read. Results are under "5. What was checked".
 
-Nothing below is live until you do section 1.
+### Now that it is live (yours; I tried nothing signed in and bought nothing)
 
-### 1. What you run to go live, in this order
+- [ ] **One real purchase** (step 6 below): buy Starter with your own card, land back on Billing showing the
+  plan, open "Manage billing", cancel, refund it in Stripe. This is the first time the live webhook secret,
+  the live prices and the live portal settings are really used.
+- [ ] **In Stripe, Developers, Webhooks, the `qolumns.com/api/webhooks/stripe` endpoint:** after that purchase
+  its deliveries should all say 200. A 400 there means the `STRIPE_WEBHOOK_SECRET` in Vercel is not that
+  endpoint's secret (the plan still shows, because the Billing page confirms the purchase itself, but renewals
+  and cancellations would not reach us).
+- [ ] **Bluum's Billing page:** it should say "Test account", with nothing to buy or manage.
+- [ ] **The T-179 case by hand:** see the section below.
+
+### 1. What you run to go live, in this order (done 18 November, except step 6)
 
 - [ ] **1. Look at five settings in the LIVE Stripe account ("Qolumns").** I could not see the live account.
   - Settings, Managed Payments: on.
@@ -1928,20 +1935,20 @@ Nothing below is live until you do section 1.
     email as well as ours (see "Decisions", 5).
   - Settings, Checkout and Payment Links: add your Terms and Privacy links (`https://qolumns.com/terms`,
     `/privacy`). Managed Payments shows them under its own.
-- [ ] **2. The database first:** `bash scripts/deploy-migration-44.sh`. It only adds things; the site that is
+- [x] **2. The database first:** `bash scripts/deploy-migration-44.sh`. It only adds things; the site that is
   live today keeps working with it. It prints Before and After and what to expect.
-- [ ] **3. Create the live products, prices, portal settings and webhook:**
+- [x] **3. Create the live products, prices, portal settings and webhook:**
   `cd apps/web && npx tsx scripts/stripe-setup-plans.mts --live`
   - It asks for the live secret key (what you type is not shown), prints the account's name, and asks you to
     type that name before it creates anything. It charges nobody.
   - To see first what it would do: add `--dry-run`.
   - It ends by printing six lines that start `STRIPE_PRICE_`. They are not secret.
-- [ ] **4. Vercel, Production, Environment Variables:**
+- [x] **4. Vercel, Production, Environment Variables:**
   - add the six `STRIPE_PRICE_…` lines from step 3;
   - set `STRIPE_WEBHOOK_SECRET` to the new endpoint's signing secret (Stripe dashboard, Developers, Webhooks,
     the `qolumns.com/api/webhooks/stripe` endpoint, "Signing secret"). The script does not print it;
   - check `STRIPE_SECRET_KEY` is the live key of the new "Qolumns" account, not the retired one.
-- [ ] **5. Tell me to deploy** (the worker, then the web app). This ticket was build only.
+- [x] **5. Tell me to deploy** (the worker, then the web app). Done 18 November.
 - [ ] **6. After the deploy, one real purchase, if you want one:** buy Starter with your own card, see the plan
   on Billing, open "Manage billing", cancel, and refund it in the Stripe dashboard. Then in the dashboard,
   Developers, Webhooks: the endpoint's deliveries should all say 200.
@@ -2050,451 +2057,6 @@ is unsupported, so nothing was built around it.
 
 ### Not proven
 
-- Nothing here has run against the real Meta: creating a template, Meta's review statuses, sending a template,
-  the display name status, delivery reports.
-- Whether Meta files the template under "utility". It decides by itself and may choose "marketing"; the page
-  shows what it chose.
-- Whether Meta accepts a full link as the template's variable. Its docs neither allow nor forbid it; its own
-  example does it.
-
-### Later (seen, not changed)
-
-- The WhatsApp page cannot show Meta's reason for an undelivered message (its code is logged; a column would be
-  needed to show it).
-- After approving, the dashboard does not say "also sent on WhatsApp" (the answer from the server carries it).
-- A rejected template cannot be changed or deleted from Qolumns; that is done in WhatsApp Manager.
-- When "Ordinary WhatsApp" is chosen, the warning shows twice on the page: in the stop box and in the help
-  text under the button.
-- On a phone, "Connect manually · with your own Meta app" wraps onto three lines.
-- The Meta SDK is started with `autoLogAppEvents: true`, as in Meta's sample. It concerns our own page, not
-  what a business grants.
-
-## T-177 — WhatsApp assistant v2, connect polish, legal pages
-
-- [x] **Deployed 2026-11-17 16:59 UTC** (commits `b45c6df` and `04acb95`, web `dpl_FVnAbJoWjyiRkAyuM2xN5FaxfHaV`):
-  web only, no migration, the worker not touched. Checked live, read-only: Privacy and Terms show Billiom
-  Limited and the company number; the webhook refuses a wrong verify token (403) and a call with no valid
-  signature (401). **No WhatsApp message was sent, no template was created, and no request was submitted.**
-- **Nothing signed in was tried on production.** What to try is in section 6.
-- Checks: unit tests web 929, worker 534, mobile 11; lint and typecheck pass; `verify-t177` 99/99,
-  `verify-t176` 82/82, `verify-t175` 110/110; the full regression (26 scripts, t146 to t177) and `verify-t173`
-  pass; web and worker build.
-
-### 1. The three things settled before the deploy
-
-- [x] **Bluum is on Pro, by hand, as a free test account** (17 November). One row was added in production:
-  business `tnt_4cbe2121dc1e4139b4ed84e1` ("Bluum"), plan `plan_us_pro`, status `active`, with no Stripe
-  customer and no Stripe subscription. Before, Bluum had no subscription row.
-  - It is never billed: Stripe does not know it exists.
-  - It is not revenue. The product has no revenue report yet; when the Stripe launch ticket builds one, it
-    must count Stripe subscriptions only, which leaves this row out.
-  - `bash scripts/set-test-plan.sh --list` shows every free test account (today: Bluum only).
-    `bash scripts/set-test-plan.sh tnt_4cbe2121dc1e4139b4ed84e1 --remove` puts Bluum back on the free allowance.
-  - On Bluum's Billing page, "Manage Billing" will say there is no billing account. That is expected.
-- [x] **The company number** is in Vercel as `NEXT_PUBLIC_COMPANY_NUMBER` (your choice: keep the setting). Both
-  pages show it.
-- [ ] **Is Bluum's template on Meta named `estimate_ready`?** I could not check this myself: asking Meta needs
-  Bluum's stored token, which only production can read, and your browser was not signed in to Qolumns. Nothing
-  was created. **You can see it in one look:** open Bluum's WhatsApp page and find "Message templates".
-  - It shows **Approved** or **In review with Meta**: Meta has `estimate_ready`. Nothing more to do.
-  - It shows **Not set up yet**: Bluum's template has another name. Tell me before Bluum reconnects, because a
-    reconnect would then create `estimate_ready` beside it.
-
-### 2. In the Meta dashboard (one change)
-
-- [ ] **Subscribe the webhook field `smb_message_echoes`** (yours; you said you will do it) (WhatsApp →
-  Configuration → Webhook fields), next to `messages` and `account_update`. It is what tells us the owner has replied from the WhatsApp Business
-  app, so the assistant can stay out of that chat for 24 hours.
-  - It only exists for a number that is also on the WhatsApp Business app. Bluum's number is Meta's 555
-    number, which has no app, so nothing changes for Bluum.
-  - Meta's message carries the owner's own words. Qolumns reads only who it was sent to and when; the words
-    are not stored and not logged.
-  - Without the field, everything else works: the assistant just cannot tell when the owner has stepped in.
-  - Still leave `history` and `smb_app_state_sync` unsubscribed.
-- Nothing else changes in Meta. Embedded Signup v5 uses the same configuration id and app id.
-
-### 3. What changed, item by item
-
-1. **Silent assistant.** On every connected number the assistant now says nothing unless a customer asks for
-   a price for something the business offers.
-   - Each new message is put to the AI with the business's own services, what each includes and excludes,
-     and its service area. No list of words or trades is in the code.
-   - Not a price request, or any doubt: no reply, and the message's text is not kept (only that it arrived,
-     from whom and when).
-   - A price request: short plain replies, no numbered menu, no "reply 1 for…", no confirmation step. It
-     asks only for what is missing, then sends the link. Often that is one reply.
-   - **What it asks for:** what the job is (only if the message did not say); a name (only if WhatsApp gave
-     none); an email (only if the business requires both email and phone); the ZIP or postcode (only if the
-     business limits where it works); photos (only if the service requires them).
-   - After the link it is quiet again until a new price request.
-   - **Owner takes over:** built. Needs the Meta step above.
-2. **Template: automatic.** The button is gone. Connecting looks for the template on Meta: used if it is
-   there, created if not. The page shows the status only (Approved, In review, Rejected with Meta's reason),
-   read from Meta each time the page opens. Opening the page never creates anything.
-3. **Test message note.** "Will probably not arrive" is gone. One line sits before the button, in your words.
-4. **Personal number warning.** One line, in your words, in the text that introduces Meta's window. The
-   three-answer question from T-176 is removed.
-5. **Subscription lapse.** No active subscription: no replies, no template, no approval notice, no test
-   message, no new connection. The connection is kept. The page shows your line.
-6. **Embedded Signup v5.** Done. A number already on the WhatsApp Business app can connect and keeps working
-   in the app (v5 has that on by default). Existing connections are untouched.
-7. **Pro and above.** Which plans have WhatsApp comes from the plan definitions (today: Pro and Business).
-   Other plans see one upgrade line with a link to the plans and no connect button. An existing connection
-   on such a plan goes silent and is kept.
-8. **Small photo copies.** A photo sent on WhatsApp is stored privately as before, and now gets a small copy
-   beside it for the dashboard and the quote page. The upload limits of the request form apply (photos up to
-   10 MB, PDFs up to 25 MB; other types are not kept).
-9. **Privacy and Terms.** Both say who runs Qolumns. Terms have the governing law line and a WhatsApp
-   section. Both dated 17 November 2026.
-
-### 4. Decisions I took (say if you want any changed)
-
-- [x] **Past due does not pause WhatsApp (your decision, 17 November).** WhatsApp has the same grace as the
-  quote limit: a payment that failed and is being retried keeps the assistant on; a cancelled subscription
-  pauses it. One rule is read by both.
-- [ ] **No email is asked for on WhatsApp**, unless the business set "email and phone both required". The
-  customer's WhatsApp number is already a way to reach them. The cost: a customer whose estimate is approved
-  more than 24 hours later hears about it only if the template is approved (no email to fall back on).
-- [ ] **No confirmation step.** The request is made as soon as the last answer is in.
-- [ ] **A reply it cannot use is asked for once more, then it goes quiet** and drops the request, rather than
-  keep asking in someone's chat.
-- [ ] **One sentence added to the Privacy page** that you did not ask for: a WhatsApp message is read by an AI
-  model to see whether it asks for a price, and one that does not is not answered and its text is not kept.
-  It is true of the new assistant, so I thought it should be said.
-- [ ] **One small library added** (`jpeg-js`, no dependencies of its own). The small copies of form photos
-  are made in the customer's browser; a WhatsApp photo never passes through one, so the server has to make
-  the copy, and that needs something that can read a JPEG.
-
-### 6. What to try on production (all yours; I tried nothing signed in)
-
-1. Open `https://qolumns.com/app/whatsapp` as Bluum. It should show **Connected** with no upgrade or paused
-   line, and "Message templates" with a status (see section 1 for what the status tells you).
-2. Once Meta approves the display name: send "Hi" from your phone to the number, then press **Send a test
-   message**. The page should say "Sent." and the message should arrive.
-3. `https://qolumns.com/privacy` and `/terms`: read the company line and the new WhatsApp section in Terms.
-4. After you subscribe `smb_message_echoes`, nothing visible changes for Bluum (its number has no app).
-
-### 5. The live AI check is separate and optional
-
-- `scripts/hardcore-test/verify-t177-live.mts` puts real-sounding messages to the real model and reports
-  what it did. It is not part of the regression set and never fails a ticket: a live model's answers vary a
-  little between runs.
-- The required checks use a stand-in for the model, so they are the same every run.
-- One run of the optional live script after the last change, no further tuning: 12 of 12 messages that are not
-  a price request stayed silent, and 4 of 4 price requests were answered for the right service.
-
-### Later (seen, not changed)
-
-- The live model sometimes treats a bare "can I get a quote for a new garage door?" as already describing the
-  job, and sends the link without first asking what needs doing. The estimate page then asks for what is
-  missing. Seen in two of five runs before the wording was tightened once; not chased further.
-- Each message on a quiet chat costs one small AI call. A busy number that is also on the WhatsApp Business
-  app will make many.
-- Several photos sent at once arrive as separate calls; two arriving in the same instant can overwrite each
-  other in the chat's list of photos (as before this ticket).
-- A connection made before this ticket that has no template shows "Not set up yet" and asks for a reconnect;
-  nothing creates one from the page, by design.
-- With a lapsed subscription the page still shows "Try it"; pressing the button answers with the paused line.
-- One older unit test reads the whole repository and runs close to its 5-second limit; it timed out once
-  when everything ran at the same time, and passes on its own.
-- On a phone, "Connect manually · with your own Meta app" still wraps onto three lines.
-- `Docs/design/ai-capabilities.md` (the list of what the AI does) has no row yet for "decides whether a
-  WhatsApp message is a price request". Nothing on the site claims it, so nothing is wrong; it should be
-  added before the site says anything about the WhatsApp assistant.
-
-## T-178 — No quote is ever lost
-
-**Deployed 2026-11-17 21:02 UTC:** commit `4a08ec9`, worker version `d0450982-775a-4a98-b797-360de78ce7b8`, web
-`dpl_8Nd9X47kLCDeeRU3ppc7ktsh1kKy`. No migration. Live checks (read-only): `/`, `/login` and the demo quote
-link 200; the webhook refuses a wrong token (403) and unsigned or wrongly signed calls (401); 65 views of the
-demo quote link in a minute gave 60 pages and then 429 from the 61st.
-
-**Follow-up deployed 2026-11-17 22:37 UTC:** commit `c8bd969`, web only, `dpl_CxEb1478nDPagcBT13xmZGVLUpLA`.
-The full regression set passed first (t146 to t177, t173 104/104, t178 52/52). It found one fault of mine: the
-quote link page kept showing a changed or switched-off link's old page (in production from 21:02 to 22:37 UTC);
-fixed in this deploy.
-
-### 1. What you must do
-
-- **The worker's rate limiter stays off, by design (your decision, 2026-11-17).** The worker has no Upstash
-  values and none are to be added. Its code stays in place and fails open, so nothing breaks if they ever are.
-  Nothing for you to do. (Recorded in Docs/CHANGELOG.md, AD-060.)
-- **Two switches you now have** (Vercel → estimator-web → Settings → Environment Variables, then redeploy; a
-  changed setting only takes effect on the next deployment):
-  - `RATE_LIMITS_OFF=true` turns every website rate limit off, without removing the Upstash values.
-  - `TURNSTILE_OFF=true` turns the human check off, without removing its keys.
-  Remove the setting (or set it to `false`) and redeploy to turn it back on.
-- [ ] **One quote is marked failed in production: `qte_b2696651e64b956566642c9a` (Bluum, 20:07 UTC).** I did
-  not retry it, because a retry emails the customer. Retry it, or contact the customer yourself:
-  ```
-  bash scripts/retry-failed-quote.sh --list            # failed quotes, and any stuck for 15 minutes or more
-  bash scripts/retry-failed-quote.sh qte_…              # price one again
-  ```
-  A retry emails the customer their estimate (or the business a review request) as a first run would. For a
-  request from hours ago, consider contacting the customer yourself instead.
-
-### 2. What a failed quote does now
-
-- The business gets one email: who asked, for which service, how to reach them, and a link to the request.
-- The business's quote page shows "What the customer sent": their words, each answer under the business's own
-  question, where the job is, and the photos.
-- The customer's page says "{business} has your request" and that the business will be in touch.
-- After 60 seconds of "Preparing your estimate" the customer reads "This is taking longer than usual. We’ll
-  email you as soon as it’s ready." (A customer who gave no email is told to keep the page.)
-- Why it failed is stored on the quote for us. It is not in the email and not on any page.
-
-### 3. What changed at submit
-
-- A request with any answer or photo is never refused or redirected, whatever the note says.
-- A request that is only a description, and reads like another of the business's services, is still made on
-  the service the customer chose. It is priced and held: the business sees "Check the service" with both names
-  and the reason, and the customer sees no price until the business decides.
-- "Switch to X and Submit" is gone.
-
-### 4. Settled in this ticket
-
-- [x] The website's limiter is on (Upstash is configured in Vercel). It counted correctly but answered a
-  blocked page view with status 200; it now answers 429.
-- [x] **The website's limiter and the human check, against your four rules** (both now meet all four):
-  - Fail open on an error or a timeout: yes, both. Before, the human check refused any request that came with no
-    token, which is what a browser sends when Cloudflare's script is blocked or never loads.
-  - Wait 500 ms at most: yes, both. Before: 1.5 seconds (limiter), 5 seconds (human check).
-  - Log when failing: yes, both (`FAILING OPEN` in the Vercel logs).
-  - One switch: yes, both (above). Before: neither.
-- [x] **The human check blocks only when Cloudflare clearly says the token is bad** (not real, used or
-  expired). No token, Cloudflare unreachable or slow, or a script that never loads: the request goes ahead. In
-  the browser the form waits 4 seconds for the script and 8 for a token, never longer unless the person is
-  answering a challenge.
-  **The cost:** a bot that sends no token is not stopped by the human check any more; the rate limits and the
-  hidden field stop it.
-- [x] Workers Logs are on for production (7 days). A deploy from a `wrangler.toml` without the
-  `[observability]` block would switch them off again.
-- [x] A request the web app could not hand to the worker used to stay "queued" for ever. It is now marked
-  failed and the business is emailed.
-
-### Later (seen, not changed)
-
-- The business cannot retry a failed quote itself; only the script (or a platform admin) can. A "Try pricing
-  again" button on the failed request would be a small ticket.
-- A stuck quote (queued or generating for a long time, with nothing working on it) tells nobody. The script's
-  `--list` shows them. A daily sweep that marks them failed, which emails the business, would close this.
-- When a request is refused for a missing required answer (400), the form's error screen offers only "Start
-  Over", which clears what was typed. The form itself prevents this before submit, so it is rare.
-- The "Check the service" notice uses the amber notice colour, which you have said reads as butter. It is the
-  same style as the "Customer question" box on that page; both should move together.
-- A request held with a suggestion that the AI also wants to ask the customer a question about shows the
-  suggestion only after the customer answers.
-- The form's own finish screen at 60 seconds was not opened in a browser; it uses the same line as the
-  customer's page, which was.
-- The worker's wording, add-on and validation AI calls still have no time limit of their own (see
-  "Reliability", T-157). A stalled call is the likeliest cause of a slow quote.
-- `scripts/hardcore-test/verify-t173.mts` had a check expecting the old refusal; it now expects the request to
-  be accepted. That script was not run in this ticket.
-- wrangler is at 3.114 and prints an "update to 4" notice on every command.
-
-## T-179 — One request, several services
-
-**Deployed 2026-11-18 08:10 UTC.** Commits `24c2d67` and `6f1afc6`, worker version `7335f6e5`, web deployment
-`dpl_4qZ8P2PR8chMivBXC4X499ktGmp5`. No migration.
-
-### 1. What to check by hand (with a test business that has two or three services)
-
-- [ ] **Open one existing estimate** from a customer's link (any earlier quote). The page that serves it
-  changed, and a real link is the one thing I cannot open: its token is never stored.
-
-- [ ] **A real note, a real model.** Send a request on the quote link for one service and write, in "Anything
-  else about the job?", that you also want another of the business's services. Open the estimate. You should
-  see a card "You also asked for: “your words”" with that service's name, and either its price with
-  "Add to my quote" or "Answer N questions to add it". Everything in my checks used a stand-in for the model
-  that reads the note, so **the live model's reading of a real note is the one thing not proven**. If the card
-  does not appear for a clear request, or appears for something you did not ask for, tell me the words you used.
-- [ ] **Add it, look at the total, remove it.** The total at the top should be the two services plus tax once.
-- [ ] **Your email.** You should get one "Request updated" email, not a second "new quote" email. No email
-  leaves this machine, so I have read its wording but never received it.
-- [ ] **The review rule.** With one service set to send automatically and the other to be reviewed, adding the
-  reviewed one should put the quote back to "Needs your approval".
-- [ ] **Hold until approved (softened as you asked, 2026-11-18).** Set a second service to hold until approved,
-  ask for it in a note, and add it on the estimate. The main price and the total should stay exactly as they
-  were; the added part should read "<your business> will confirm this part" with no price; there should be no
-  accept button until you approve. Approve it: the part's price and the combined total appear. Or remove it:
-  the quote is back exactly as it was.
-- [ ] **The PDF.** Download one for a combined quote. The PDF service is not called on this machine; I read the
-  page it prints, not a file.
-- [ ] **The on-site app**, if you use it: open a combined quote. It should show the combined total, both
-  service names, and the added service's lines under the takeoff. Not opened on a device here.
-- [ ] **The quote editor:** "Add another service to this quote", then Save.
-
-### 2. Decisions I made that you may want to change
-
-- The customer can add or remove a service only while they can see a price and have not accepted or declined.
-- An added service is asked only what its price needs: its required or price-critical questions, and any
-  quantity it would have measured from photos. Its optional questions are not asked.
-- Tax is worked out once on the combined amount, leaving out any service you have marked as not taxed.
-- A combined quote counts in Overall accuracy only (not By service, and not By grade either).
-- The business gets a "Request updated" email on a removal as well as on an addition.
-- A business with only one service is not told about things it does not offer (see Later).
-
-### 3. Found on the way
-
-- The plan's usage counter loses counts when requests arrive at the same moment. Moved to **T-180 (Stripe)**,
-  at your instruction; see "T-180 — Stripe" below.
-
-### Later (seen, not changed)
-
-- A business with one service gets no "not one of your services" notice: the note is only read for other
-  services when there is more than one.
-- The live model can mark a short phrase as "not one of your services" when the customer picked the wrong
-  service to begin with (seen once: "the trim too" on a wallpaper request that was really about painting).
-  It never gets a price. Not tuned.
-- "Measure the added service from the same photos" (the ticket's own Later).
-- The scope text, assumptions and "not included" list describe the main service only; an added section has
-  lines and a subtotal but no wording of its own.
-- Re-running pricing on a quote that carries added services (the retry script, a platform admin's retry)
-  prices the main service again and drops the added sections. Rare; the customer or the business adds them back.
-- The old rough-estimate code (`calculateCrossServicePricing`) is unused and still in the worker.
-- On the customer's page the added section's "Remove" is a text link; the card uses the pale blue-grey panel
-  the old "Other services you mentioned" box used.
-- The dashboard list and Home still name a combined quote by its main service only.
-- The on-site app cannot add or remove a section and does not show the "also asked for" list.
-
-
-## T-180 — Stripe live billing
-
-**Built 2026-11-18, committed and pushed. Not deployed.** Tested in the Stripe sandbox "Qolumns sandbox" with
-Stripe's test cards only. No real charge was made, no email left this machine, no WhatsApp message was sent,
-and production was not touched or read. Results are under "5. What was checked".
-
-Nothing below is live until you do section 1.
-
-### 1. What you run to go live, in this order
-
-- [ ] **1. Look at five settings in the LIVE Stripe account ("Qolumns").** I could not see the live account.
-  - Settings, Managed Payments: on.
-  - Settings, Business, Public details: the **support email** is one you read. Stripe writes there when a
-    customer asks it for help with a payment, and may refund without you if nobody answers in 48 hours.
-  - Settings, Billing, Subscriptions and emails, "Manage failed payments": Smart Retries on. "If all retries
-    fail": either "cancel the subscription" or "mark as unpaid" works with our code (both end the plan). The
-    sandbox is set to cancel, after four tries over about two weeks.
-  - The same page, "Send emails when card payments fail": your choice. If it is on, a business gets Stripe's
-    email as well as ours (see "Decisions", 5).
-  - Settings, Checkout and Payment Links: add your Terms and Privacy links (`https://qolumns.com/terms`,
-    `/privacy`). Managed Payments shows them under its own.
-- [ ] **2. The database first:** `bash scripts/deploy-migration-44.sh`. It only adds things; the site that is
-  live today keeps working with it. It prints Before and After and what to expect.
-- [ ] **3. Create the live products, prices, portal settings and webhook:**
-  `cd apps/web && npx tsx scripts/stripe-setup-plans.mts --live`
-  - It asks for the live secret key (what you type is not shown), prints the account's name, and asks you to
-    type that name before it creates anything. It charges nobody.
-  - To see first what it would do: add `--dry-run`.
-  - It ends by printing six lines that start `STRIPE_PRICE_`. They are not secret.
-- [ ] **4. Vercel, Production, Environment Variables:**
-  - add the six `STRIPE_PRICE_…` lines from step 3;
-  - set `STRIPE_WEBHOOK_SECRET` to the new endpoint's signing secret (Stripe dashboard, Developers, Webhooks,
-    the `qolumns.com/api/webhooks/stripe` endpoint, "Signing secret"). The script does not print it;
-  - check `STRIPE_SECRET_KEY` is the live key of the new "Qolumns" account, not the retired one.
-- [ ] **5. Tell me to deploy** (the worker, then the web app). This ticket was build only.
-- [ ] **6. After the deploy, one real purchase, if you want one:** buy Starter with your own card, see the plan
-  on Billing, open "Manage billing", cancel, and refund it in the Stripe dashboard. Then in the dashboard,
-  Developers, Webhooks: the endpoint's deliveries should all say 200.
-- [ ] **7. For the suspend switch:** `bash scripts/set-platform-admin.sh you@example.com` (if you have not),
-  then `/admin/tenants`.
-
-### 2. The setting names (Vercel, Production)
-
-| Name | Value |
-|---|---|
-| `STRIPE_PRICE_US_STARTER_MONTHLY_USD` | printed by step 3 |
-| `STRIPE_PRICE_US_STARTER_ANNUAL_USD` | printed by step 3 |
-| `STRIPE_PRICE_US_PRO_MONTHLY_USD` | printed by step 3 |
-| `STRIPE_PRICE_US_PRO_ANNUAL_USD` | printed by step 3 |
-| `STRIPE_PRICE_US_BUSINESS_MONTHLY_USD` | printed by step 3 |
-| `STRIPE_PRICE_US_BUSINESS_ANNUAL_USD` | printed by step 3 |
-| `STRIPE_WEBHOOK_SECRET` | the endpoint's signing secret, from the Stripe dashboard |
-| `STRIPE_SECRET_KEY` | already there: check it is the new account's live key |
-
-`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` is not read by any code; it can stay or go.
-
-### 3. What Managed Payments changed (nothing was blocked)
-
-Read from Stripe's Managed Payments docs on 2026-11-18 and then tried in the sandbox. Nothing our code does
-is unsupported, so nothing was built around it.
-
-- **Stripe is the seller.** Checkout, the receipt and Stripe's emails say "Sold through Onelink" (Stripe's name
-  for it on those pages), not Qolumns.
-- **The card statement reads `LINK.COM* QOLUMNS.COM`,** not `QOLUMNS.COM` alone. Stripe adds the prefix; it
-  cannot be removed.
-- **Tax is added on top.** $49 became $53.35 for a New York address in the sandbox. Our pages show prices
-  before tax and say "plus tax" beside each one (the Pricing page, Home, Billing); the Terms say it too. To make $49 the price including tax, change "Include tax in
-  prices" in Stripe's Tax settings before step 3 (a price's tax setting cannot be changed afterwards).
-- **"Charge in USD" is not fully in our hands.** Prices are in USD and you are paid in USD. But Managed
-  Payments always shows a customer outside the US their own currency at checkout (Stripe converts). It cannot
-  be switched off.
-- **A plan can only be bought through Checkout.** No code creates a subscription, an invoice or an extra charge
-  any other way, and none may. So there is no per-quote overage: over the limit, a request is held.
-- **Customers can also manage their plan on Stripe's own site** (cancel, change card), not only from our
-  "Manage billing". Either way the change reaches us the same way.
-- **Stripe sends the receipts, invoices and renewal notices itself.** Ours are only the product's own emails.
-- **Stripe may refund a payment or close a dispute without asking you.** We are not told by webhook; see Later.
-- **The Stripe library had to be brought up to date** (version 20 to 23). The old webhook code read two fields
-  that current Stripe no longer sends (a subscription's period, an invoice's subscription), so it would have
-  stored nothing: an error on every subscription event, and every payment event skipped. It is rewritten.
-
-### 4. Decisions I made (say if you want any changed)
-
-1. **Over the monthly limit: hold.** `plans.ts` has no overage on Starter, Pro or Business, so the 51st request
-   of a Starter month is saved and not priced, like the 11th free one. It is priced when the month turns or
-   the business moves up a plan.
-2. **An upgrade takes effect at once and the difference is charged then. A downgrade takes effect at the end
-   of the paid period** (your change, same day). "Downgrade" is a cheaper price or yearly to monthly. So Pro
-   yearly to Pro monthly waits for the year to end, and so does Starter yearly to Pro monthly (its price per
-   payment is lower), while Starter yearly to Pro yearly is at once. Cancelling while a downgrade is waiting
-   drops the downgrade.
-3. **The portal offers Starter and Pro only,** as you wrote. Business has prices but is not in the portal, so a
-   business on a plan cannot move to Business by itself. The billing page still lets a business with no plan
-   pick Business (T-171's rule). Tell me if Business should be hidden there too, or added to the portal (one
-   line in the script).
-4. **After a plan ends the business is back on the free allowance,** which is 10 priced quotes in total, ever.
-   One that has priced 10 or more gets every request held. One that priced fewer than 10 in its life would
-   still get the rest free. That is what `plans.ts` says today.
-5. **"One email" is ours.** We send one "Your payment didn't go through" per failed payment, however many
-   times Stripe retries. Stripe can send its own as well (section 1, step 1).
-6. **The "2 free quotes left" email is sent once per business, ever.** The line on Home and Billing shows for
-   as long as one or two are left (it says "1 free quote left" at nine).
-7. **The sandbox webhook endpoint is switched off.** You asked for it to be created in the sandbox; it points at
-   the live site, which would refuse every sandbox event (wrong secret) and Stripe would email you about the
-   failures. The live one is created switched on.
-8. **Suspend is a button on `/admin/tenants`** (with a required reason), not a script. It is logged with who
-   and why. It does not touch the Stripe subscription: a suspended business that pays keeps being charged
-   until you cancel it in Stripe.
-9. **A business with a plan cannot open Checkout again.** The plan cards show no "Select Plan"; one "Change
-   plan" button opens the portal.
-10. **A suspended business's dashboard says** "Your account is paused. New requests are being saved, not
-    priced. Quotes you have already sent still open." with "Email us". The reason is never shown.
-
-### 5. What was checked
-
-- `verify-t180` against the sandbox: **105/105.** Without a browser: the setup (products, prices, tax code,
-  portal, webhook), 20 requests at once counted as 20, the free 10 and Starter's 50 holding exactly under a
-  rush, the warning at 8, the hold at 10, the test account, suspend and restore, a forged webhook. Then in a
-  browser on Stripe's own pages with test cards: pay Starter and land on Billing showing it; upgrade to Pro;
-  switch to yearly; ask for a downgrade (nothing changes until the paid period ends, then the plan becomes
-  Starter and renews at Starter's price); cancel; a card declined at checkout; a renewal that fails, shows the
-  notice on five dashboard pages and sends one email, then succeeds when the card is fixed; a renewal that
-  fails four times until Stripe cancels; the same webhook event twice. Renewals were made to happen with Stripe's test
-  clocks. To run it again: the two commands at the top of `scripts/hardcore-test/verify-t180.mts`.
-- Unit tests: web 1,052 (51 new), worker 574, mobile 11. Lint and typecheck pass. The web app and the worker build.
-  One older unit test (T-162's search for the old embed names) timed out in three full runs while this
-  machine was busy; it passes on its own and in a full run with two workers (1,052/1,052). Nothing it checks
-  was changed.
-- Also run: `verify-t177` 99/99, `verify-t178` 52/52, `verify-t179` 97/97, and three that cover the billing
-  page and the usage count: `verify-t152` 66/66, `verify-t165` 148/148, `verify-t171` 97/97.
-- **`verify-t179`'s test business had to be put on a plan.** It sends more than ten requests; six at once used
-  to count as two, so it never reached the ten free quotes. Now every request counts and the eleventh was held.
-- **Not run:** the rest of the regression set (t146 to t176) and `verify-t173`. You named t177 to t179. The
-  full set should be run before this is deployed (it changes the quote flow, the worker and the database).
-
-### Not proven
-
 - **Anything in the live account.** Every check used the sandbox. The script's `--live` run has never been
   done; its guards were tried (a key that is not live is refused; a made-up live key gets nowhere).
 - **Stripe's own emails and the card statement text.** The sandbox sends no email and makes no statement.
@@ -2525,8 +2087,8 @@ is unsupported, so nothing was built around it.
 
 ## T-179 miss on production (found 18 November), and two small T-180 items
 
-**Fixed, checked, committed and pushed. The worker is live (18 November, version `1ef39c4d`); the web app is
-not deployed yet.** No request was sent to production. I read
+**Fixed, checked, committed, pushed and deployed (18 November): the worker, version `1ef39c4d`, and the web
+app, `dpl_41s7h4F7zAULMLwM9RXR6JJDBKkD`.** No request was sent to production. I read
 production twice, read-only: the three service configurations and that one quote; and which migration it is at.
 
 ### 1. What waits for you
@@ -2544,8 +2106,7 @@ production twice, read-only: the three service configurations and that one quote
   database function that migration 44 creates. Production was still at migration 43 when my checks finished.
   Deployed first, every sent quote would log a failed count and "estimates sent" would stop counting. As soon
   as migration 44 is in, I deploy the worker (`npx wrangler deploy --env production`).
-- [ ] **"Vercel is set"** when the live Stripe script has run and the settings are in Vercel. Then I deploy the
-  web app, run the read-only live checks, and record the deploy.
+- [x] **"Vercel is set"**: said, and the web app is deployed. The read-only live checks passed.
 - [ ] **Re-test by hand, now that the worker is live:** the same request as quote `qte_99acc0a15ce6d59d082e70f1`
   (wallpaper, with the note about painting). The estimate should carry a card for the painting service with
   the customer's words, and the wording should not say "quoted separately" or list the painting under "Not
