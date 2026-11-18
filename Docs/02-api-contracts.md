@@ -302,6 +302,16 @@ The worker's "Review and approve: {customer} - {service} - {price}" email has an
   - A database trigger invalidates it when the quote's status, version, pricing or wording changes by any route (`quote_changed`).
   - It approves its own quote and nothing else. It is not a session.
 - `GET /approve/{token}` (page, no login): shows the business, customer, service, price or measured range, and scope summary. **Opening it never approves.** Headers: `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex, nofollow`, `Cache-Control: no-store`.
+  - **T-183: while the link can still approve, the page shows what the price is judged by, in this order:** warnings ("Check the service", "Customer also asked for", "Worth checking"); every price line with its amount and where its quantity came from; on a combined quote each service's subtotal; tax; the one total; the customer's photos as small pictures; then the one button. The page and the review email are drawn from one result, `approvalDetail()` (`packages/shared/src/approval-detail.ts`). A used, replaced or expired link shows the short summary only.
+  - **Where a quantity came from** is stored on each price line as `source` (`photos`, `label`, `answer`, `scan`, `details`, `calculated`, `fixed`, `words`, `choice`; `packages/shared/src/quantity-source.ts`), on the main service's lines and on a section's. A line the business typed or changed in the editor has none. The business reads it as "Measured from photos", "The customer's answer", "Your fixed price" and so on; a quote priced before T-183 is read from its takeoff.
+
+GET /api/public/approval/:token/photos/:assetId (T-183; no auth; the token is the credential)
+- One of the customer's photos for the approval page. `?size=small` serves the small copy when the photo has one (T-172).
+- **302** to a signed storage address that lasts 5 minutes (`Cache-Control: private`, `Referrer-Policy: no-referrer`). Uploads stay private; there is no public address.
+- Served only while the link can still approve (not used, replaced, expired or pressed too often), and only for a photo that is on the link's own quote's request and is an image of the link's own tenant. **Everything else is 404**, the same answer as a photo that does not exist.
+- Opening a photo is not a press: nothing is counted against the link and nothing changes.
+- Rate limit: scope `approval_photo`, 120 a minute per address and per link.
+- The link's row is read fresh on every call (`noStore()`): a GET handler's database read is otherwise kept and reused by Next.
 
 POST /api/public/approval/:token (no auth; the token is the credential)
 - Rate limits:

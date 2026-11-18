@@ -139,10 +139,13 @@ const EMAILS: Record<string, string> = {
     totalFormatted: '$825.00', dashboardUrl: `${cfg.appUrl}/app/quotes/qte_example`,
   }),
 }
+// T-183: the review email is from the product itself, so it carries the product's name at the top
+// (where the logo will go) and no "Powered by" line. Every other email still says "Powered by Qolumns".
+const mustSay = (name: string) => (name.startsWith('business-review-and-approve') ? 'Qolumns' : 'Powered by Qolumns')
 for (const [name, html] of Object.entries(EMAILS)) {
   writeFileSync(path.join(outDir, `email-${name.replace(/[^a-z]+/g, '-').replace(/-$/, '')}.html`), html)
   const text = visible(html)
-  check(`email, ${name}: says "Powered by Qolumns" and neither earlier name`, text.includes('Powered by Qolumns') && oldNamesInText(text).length === 0 && oldNamesInSource(html).length === 0, { text: oldNamesInText(text), source: oldNamesInSource(html) })
+  check(`email, ${name}: says "${mustSay(name)}" and neither earlier name`, text.includes(mustSay(name)) && (mustSay(name) !== 'Qolumns' || !text.includes('Powered by')) && oldNamesInText(text).length === 0 && oldNamesInSource(html).length === 0, { text: oldNamesInText(text), source: oldNamesInSource(html) })
 }
 
 // ====================================================================
@@ -315,7 +318,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
   for (const [name, html] of Object.entries(EMAILS)) {
     const p = await anon.newPage()
     await p.setContent(html)
-    await pageCheck(p, `email as it renders, ${name}`, `email-${name.replace(/[^a-z]+/g, '-').replace(/-$/, '')}`, 'Powered by Qolumns')
+    await pageCheck(p, `email as it renders, ${name}`, `email-${name.replace(/[^a-z]+/g, '-').replace(/-$/, '')}`, mustSay(name))
     await p.close()
   }
 

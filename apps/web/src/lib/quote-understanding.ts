@@ -15,14 +15,14 @@
  *   checks     the quote checker's findings, as "Worth checking". The checker
  *              changes nothing on a quote (AD-049); these are notes. One
  *              kind is left out because the quote itself proves it wrong
- *              (see `contradictedByTheQuote`). On since T-172, and only
+ *              (see `checkerFindings`, shared). On since T-172, and only
  *              for checks made with the business's money settings: see
  *              `SHOW_WORTH_CHECKING`
  *
  * No customer contact detail is read here, and nothing here is logged.
  */
 
-import { splitMinimum } from '@qolumns/shared'
+import { checkerFindings } from '@qolumns/shared'
 import type { QuoteUnderstanding, UnderstoodItem, UnderstoodQuestion } from '@qolumns/shared'
 
 export type { QuoteUnderstanding, UnderstoodItem, UnderstoodQuestion }
@@ -132,23 +132,6 @@ function signalName(expectedSignals: unknown, key: string): string | null {
   return first.charAt(0).toLowerCase() + first.slice(1)
 }
 
-/**
- * A finding the quote itself proves wrong is not shown.
- *
- * The checker is given the service's work steps, extras and adjustments, but
- * not the business's minimum charge. So on a quote where the pricing engine
- * applied that minimum, it reports "an unconfigured minimum charge was
- * added" or "an invented fee". The breakdown carries the engine's own marked
- * minimum entry (shared/minimum-charge.ts), which is the business's setting:
- * the code knows the finding is false, and a false warning would teach the
- * business to ignore the panel. Nothing else is filtered, and the checker and
- * its log are untouched (the root fix is to tell the checker the minimum).
- */
-function contradictedByTheQuote(issue: Record<string, unknown>, minimumApplied: boolean): boolean {
-  if (!minimumApplied) return false
-  return /\bminimum\b/i.test(text(issue.description)) || /invented fee/i.test(text(issue.check))
-}
-
 export function quoteUnderstanding(
   input: UnderstandingInput,
   /** `worthChecking` overrides the flag: the unit tests hold the group's rules while it is off */
@@ -248,17 +231,8 @@ export function quoteUnderstanding(
   }
 
   // ---- The quote checker's findings (AD-049: notes only) ----------------------
-  const checks: UnderstoodItem[] = []
-  const seenChecks = new Set<string>()
-  const minimumApplied =
-    splitMinimum(list(pricing.breakdown).map((line) => ({ ...line, label: text(line.label), amount: Number(line.amount) || 0 }))).minimum !== null
-  for (const issue of worthChecking ? list(input.checker?.issues) : []) {
-    const description = text(issue.description)
-    if (!description || seenChecks.has(description)) continue
-    if (contradictedByTheQuote(issue, minimumApplied)) continue
-    seenChecks.add(description)
-    checks.push({ text: sentence(description) })
-  }
+  // The filtering and wording are shared with the approval page and the review email (T-183)
+  const checks: UnderstoodItem[] = (worthChecking ? checkerFindings(input.checker?.issues, pricing.breakdown) : []).map((finding) => ({ text: finding }))
   const checkedTotal = input.checker?.checkedTotal
   const total = pricing.total
   const checksBeforeChange =

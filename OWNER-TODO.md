@@ -2471,3 +2471,115 @@ You do not have the account yet. When you do:
 - T-158's note "The mobile app still shows its own status words": it uses the dashboard's words now.
 - T-171's item "The business's on-site app still shows the label's raw text": it is one plain line now, with
   the label's words on a line of their own.
+
+---
+
+## T-183 — Approval the business can trust, quote wording, faster test runs
+
+Built and pushed 18 November 2026. **Not deployed.** The worker and the web app both changed; there is no
+migration and nothing in Stripe. To put it live: "deploy T-183" (worker first, then web).
+
+### Read this first: one fault is live on production until this is deployed
+
+- **What:** the check that keeps certain words about a price away from customers ("exact", "firm",
+  "preliminary", "guaranteed", "guarantee") has been finding nothing in the live web app. The tool that builds
+  the web app for production changed the pattern so that it matches nothing. It works on this Mac's
+  development server, in the unit tests and in the worker, which is why nothing showed it.
+- **What it means:** when you approve a quote without editing it, the web app does not take such a word out
+  of the AI's wording, and never tells you "this wording needs editing". The worker still removes these words
+  when it first writes a quote and when it reprices one, so a customer can only have seen one where that first
+  pass had already missed it.
+- **How I know:** two regression scripts passed against the development server and failed against a built
+  web app, in the same checks. I have not read production's own build (I cannot); it is made by the same tool
+  from the same files.
+- **Fixed in this ticket.** It goes live with "deploy T-183". The checks now also read every built web app
+  for this kind of fault.
+- [ ] **Decide: deploy T-183 soon** (recommended), since this is live. Nothing else is needed from you.
+
+### What changed, in one line each
+
+- **Approval page** (the page behind "Approve & send" in the review email): warnings first, then every price
+  line with its amount and where its quantity came from, each service's subtotal on a combined quote, the one
+  total, the customer's photos as small pictures, then the one button. "Open in dashboard to edit" stays.
+- **The "Review and approve" email:** the same, in the same order, with the photos as one line ("3 photos:
+  view them on the approval page"). No "Powered by Qolumns". A marked row at the top for the Qolumns logo.
+- **Line names:** a line is named from your customer's question and the option, never the answer text:
+  "Who provides the materials: Please supply it (+15%)", not "Please supply it surcharge (+15%)". A label you
+  give the rule yourself still wins.
+- **Wording:** the scope summary's first sentence states the work. Headings and buttons are sentence case in
+  every email, the PDF and the quote page.
+- **Name with logo:** on the quote page and the PDF the business's name is beside its logo.
+- **Tests:** two commands, `pnpm check:quick` and `pnpm check:full`. The regression set now runs against a
+  built web app, as production is, which is how the fault above was found.
+
+### Check by eye (I cannot see these)
+
+- [ ] **The review email in your own mail program**, after the deploy: make a request to Bluum and read the
+  email on your phone. It has been built and its content checked, but nobody has looked at it in Gmail, Apple
+  Mail or Outlook. Look at the warnings box, the lines with the small grey source under each, and the top row
+  where "Qolumns" stands in for the logo.
+- [ ] **The approval page on your phone**, from that email: the small photos load, nothing scrolls sideways,
+  the button is easy to reach. A screenshot from this machine at phone width is in the results folder of
+  `verify-t183` (`approve-390.png`).
+- [ ] **A quote page for a business with a logo.** The name now sits to the right of the logo. If a logo
+  already has the business's name drawn into it, the name appears twice (decision 2 below).
+- [ ] **How a real model opens the scope summary.** The instruction changed; the full run printed what the
+  model wrote this time:
+  "Preparation and application of two coats to one hallway wall totaling approximately 100 sq ft during a single Service Alpha visit. All required materials will be supplied as requested to complete the specified area."
+  Read a few on real quotes after the deploy. If one still opens chattily, send it to me.
+- [ ] **The Qolumns logo file.** When you have it, give it to me: it goes in the marked row at the top of the
+  review email.
+
+### Decisions for you (my recommendation first)
+
+1. **Photos in the review email are one line, not pictures.** Recommended: keep. The photos are private, and
+   mail programs block or re-host pictures, so a line is the reliable form. The approval page shows them.
+2. **A logo that already contains the business's name.** The page cannot tell, so it shows the name beside it
+   as you asked. Recommended: leave it; if businesses complain, add a "my logo includes my name" switch in
+   Branding (a small later ticket).
+3. **Logo in emails to the customer.** They show the business's name as text today and no logo, so nothing
+   changed there. Adding the logo means giving a private file a public address. Recommended: a small later
+   ticket, with a public address for logos only.
+4. **The other emails to the business** (new quote, quote accepted, quote declined, customer feedback, plan
+   limit, WhatsApp renewal) still end "Powered by Qolumns" and have no logo row. This ticket named the review
+   email only. Recommended: change them all the same way in one small ticket when the logo file exists.
+5. **The "Request updated" email** (a customer added a service) has an Approve & send button too, and still
+   shows each service's subtotal and the total only. Recommended: give it the same detail in a later ticket.
+6. **Old quotes keep their old line names.** Only quotes priced after the deploy get the new names.
+   Recommended: leave them; a quote already sent should not change its words.
+
+### The two test commands
+
+| Command | When | Time on this Mac |
+|---|---|---|
+| `pnpm check:quick` | every ticket | 4 to 5½ minutes (three runs: 3 min 53 s, 5 min 26 s, 4 min 34 s) |
+| `pnpm check:full` | when pricing, the worker, AI prompts, billing, the quote flow APIs, emails or a migration change | about 35 minutes (one run: 35 min 8 s, of which 5 minutes were a script that hung after passing, fixed since) |
+
+- `pnpm check:failed` runs again only what failed last time. `pnpm check:quick --only t183` runs one script.
+- Before this ticket the full set took about 55 minutes, by hand, with the servers restarted five times.
+- The quick level asks no AI model (the worker runs with a stand-in), so it costs nothing and gives the same
+  answer every time. It leaves out 12 of the 32 scripts: five that check what only a real model produces, six
+  that need their own specially started servers, and the Stripe one. `Docs/testing.md` lists them.
+- Both levels build the web app and serve the built app for most scripts. That is why they are fast, and why
+  they now see what production sees.
+- Once per machine: `pnpm check:setup` (the browser tools). Already done on this Mac.
+
+### Not proven
+
+- The review email as a mail program shows it, and the approval page on a real phone (both above).
+- The wording a real model writes: the instruction is tested; the model's sentences are read by a person.
+- A quantity measured from real photos reaching the approval page end to end. The two halves are each proven:
+  the worker stores "measured from photos" for a photo reading (unit tests), and the page shows a stored
+  "measured from photos" (`verify-t183`).
+- Nothing was tried on production.
+
+### Later
+
+- A switch in Branding for "my logo includes my name" (decision 2).
+- The logo in customer emails (decision 3); the other emails to the business (decision 4); the "Request
+  updated" email (decision 5).
+- The six scripts that need their own servers cannot join the quick level while the web app honours a
+  stand-in's address only on the development server. That rule is a safeguard and stays.
+- Every earlier deploy was checked against the development server only. The full level now uses the built
+  app, so this gap is closed for the scripts in the standard set (25 of 32).
+- The emails still use their old colours (blue buttons, grey text), not the design system's. A design ticket.

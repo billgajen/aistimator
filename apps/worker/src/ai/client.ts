@@ -60,6 +60,27 @@ export function parseModelJson<T>(text: string): T {
 export interface AiEnv {
   GEMINI_API_KEY?: string
   ANTHROPIC_API_KEY?: string
+  ENVIRONMENT?: string
+  /** T-183, local checks only: 'off' makes the worker ask no model (see aiStandInOn) */
+  AI_STAND_IN?: string
+}
+
+/**
+ * T-183: the AI stand-in for the quick checks.
+ *
+ * With `AI_STAND_IN=off` a local worker asks no model at all: every consumer
+ * gets no client and takes the path it already has for that (the same path as
+ * a missing key): no reading of photos, the built-in wording, no checker. A
+ * quote priced from the customer's answers comes out the same every time, in
+ * a second or two, at no cost, which is what a check of the product's own
+ * code needs. Checks that need a real reading or real wording run at the full
+ * level, with the model (Docs/testing.md).
+ *
+ * Honoured only when ENVIRONMENT is "development". In production it is
+ * ignored, whatever it is set to.
+ */
+export function aiStandInOn(env: AiEnv): boolean {
+  return env.ENVIRONMENT === 'development' && env.AI_STAND_IN === 'off'
 }
 
 /** String-valued env entries only (model overrides are strings). */

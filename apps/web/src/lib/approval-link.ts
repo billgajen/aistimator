@@ -12,15 +12,20 @@ import {
   approvalPageOutcome,
   approvalErrorOutcome,
   approvalLinkState,
+  approvalDetail,
   formatMoney,
   getRegion,
   displaySections,
+  CHECKER_SETTINGS_VERSION,
+  type ApprovalDetail,
   type ApprovalOutcome,
   type ApprovalLinkRow,
   type QuotePricing,
 } from '@qolumns/shared'
 import type { createAdminClient } from '@/lib/supabase/server'
 import { approveQuote } from '@/lib/quote-approval'
+import { assetIdsOf } from '@/lib/quote-photos'
+import { SHOW_WORTH_CHECKING } from '@/lib/quote-understanding'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -39,7 +44,22 @@ interface QuoteRow {
   customer_json: { name?: string } | null
   tenants: { name: string; region?: string | null } | null
   services: { name: string } | null
+  /** T-183: the request's photos and the form's suggestion of another service */
+  request?: unknown
 }
+
+/** T-183: one of the customer's photos on the approval page: a path on our own site, checked against the link */
+export interface ApprovalPhoto {
+  id: string
+  /** The small copy (the original when it has none) */
+  smallUrl: string
+  url: string
+}
+
+/** The most photos the approval page lists (a request form accepts fewer) */
+export const APPROVAL_MAX_PHOTOS = 12
+
+export const approvalPhotoUrl = (token: string, assetId: string) => `/api/public/approval/${encodeURIComponent(token)}/photos/${encodeURIComponent(assetId)}`
 
 /** What the confirmation page shows: the quote's summary and nothing more */
 export interface ApprovalSummary {
@@ -51,6 +71,14 @@ export interface ApprovalSummary {
   scopeSummary?: string
   /** T-179: a combined quote's services, each with its subtotal (absent on a single-service quote) */
   sections?: Array<{ serviceName: string; subtotal: string }>
+  /**
+   * T-183: what the business judges the price by: warnings, every line with
+   * its amount and source, each service's subtotal, the total. Only while the
+   * link can still approve; a used or expired link shows the summary alone.
+   */
+  detail?: ApprovalDetail
+  /** T-183: the customer's photos, while the link can still approve */
+  photos?: ApprovalPhoto[]
 }
 
 export interface LoadedLink {
@@ -92,14 +120,17 @@ export async function loadApprovalLink(admin: Admin, token: string, now: Date = 
   if (!link) return none
   const { data: quote } = await admin
     .from('quotes')
-    .select('id, status, approved_at, pricing_json, content_json, customer_json, tenants!tenant_id ( name, region ), services!service_id ( name )')
+    .select(
+      'id, status, approved_at, pricing_json, content_json, customer_json, tenants!tenant_id ( name, region ), services!service_id ( name ), request:quote_requests!quote_request_id ( asset_ids, source_json )'
+    )
     .eq('id', link.quote_id)
     .eq('tenant_id', link.tenant_id)
     .maybeSingle()
   if (!quote) return { ...none, link: link as LinkRow }
   const q = quote as unknown as QuoteRow
+  const outcome = approvalPageOutcome(link as LinkRow, q, now)
   return {
-    outcome: approvalPageOutcome(link as LinkRow, q, now),
+    outcome,
     link: link as LinkRow,
     quote: q,
     summary: {
@@ -110,8 +141,86 @@ export async function loadApprovalLink(admin: Admin, token: string, now: Date = 
       price: priceLabel(q.pricing_json, q.tenants?.region),
       ...(q.content_json?.scopeSummary && { scopeSummary: q.content_json.scopeSummary }),
       ...sectionsSummary(q),
+      ...(outcome === 'ready' && (await judgeable(admin, token, link as LinkRow, q))),
     },
   }
+}
+
+/**
+ * T-183: everything the business judges the price by, for a link that can
+ * still approve. Read through the link's own quote and tenant, like the rest:
+ * the photos are the request's own image assets of that tenant, and the
+ * checker's findings come from the same marked rows the dashboard reads.
+ */
+async function judgeable(admin: Admin, token: string, link: LinkRow, q: QuoteRow): Promise<Pick<ApprovalSummary, 'detail' | 'photos'>> {
+  const request = (Array.isArray(q.request) ? q.request[0] : q.request) as { source_json?: unknown } | null | undefined
+  const assetIds = assetIdsOf(q.request)
+  const [images, checker] = await Promise.all([
+    assetIds.length > 0
+      ? admin.from('assets').select('id').eq('tenant_id', link.tenant_id).eq('type', 'image').in('id', assetIds)
+      : Promise.resolve({ data: [] as Array<{ id: string }> }),
+    SHOW_WORTH_CHECKING
+      ? admin
+          .from('quote_validation_logs')
+          .select('issues:validation_result->issues')
+          .eq('quote_id', link.quote_id)
+          .eq('tenant_id', link.tenant_id)
+          .neq('outcome', 'passed')
+          // only a check made with the business's money settings (T-172), as on the dashboard
+          .eq('input_snapshot->>serviceConfigVersion', CHECKER_SETTINGS_VERSION)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
+  const imageIds = new Set(((images.data ?? []) as Array<{ id: string }>).map((a) => a.id))
+  // in the order the customer sent them
+  const photoIds = assetIds.filter((id) => imageIds.has(id))
+  const region = getRegion(q.tenants?.region)
+  return {
+    detail: approvalDetail({
+      pricing: q.pricing_json,
+      content: q.content_json,
+      mainServiceName: q.services?.name ?? '',
+      requestSource: request?.source_json,
+      checkerIssues: (checker.data as { issues?: unknown } | null)?.issues,
+      photoCount: photoIds.length,
+      currency: region.currency,
+      locale: region.locale,
+    }),
+    photos: photoIds.slice(0, APPROVAL_MAX_PHOTOS).map((id) => {
+      const url = approvalPhotoUrl(token, id)
+      return { id, url, smallUrl: `${url}?size=small` }
+    }),
+  }
+}
+
+/**
+ * T-183: may this link show this photo? Only a link that can still approve
+ * (not used, replaced, expired or pressed too often), and only a photo of its
+ * own quote's request that is an image of its own tenant. Returns the storage
+ * key, or null: every refusal is the same "not found" to the caller. Opening
+ * a photo is not a press and counts nothing.
+ */
+export async function approvalPhotoKey(admin: Admin, token: string, assetId: string, now: Date = new Date()): Promise<string | null> {
+  if (!isApprovalTokenShape(token)) return null
+  const hash = await hashApprovalToken(token)
+  const { data: link } = await admin
+    .from('quote_approval_tokens')
+    .select('id, quote_id, tenant_id, expires_at, used_at, invalidated_at, attempts')
+    .eq('token_hash', hash)
+    .maybeSingle()
+  if (!link || approvalLinkState(link as LinkRow, now) !== 'valid') return null
+  const row = link as LinkRow
+  const { data: quote } = await admin
+    .from('quotes')
+    .select('id, request:quote_requests!quote_request_id ( asset_ids )')
+    .eq('id', row.quote_id)
+    .eq('tenant_id', row.tenant_id)
+    .maybeSingle()
+  if (!quote || !assetIdsOf((quote as { request?: unknown }).request).includes(assetId)) return null
+  const { data: asset } = await admin.from('assets').select('id, r2_key').eq('id', assetId).eq('tenant_id', row.tenant_id).eq('type', 'image').maybeSingle()
+  return (asset as { r2_key?: string } | null)?.r2_key ?? null
 }
 
 export interface ApproveByLinkResult {

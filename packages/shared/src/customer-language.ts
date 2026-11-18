@@ -17,14 +17,31 @@ export const CUSTOMER_BANNED_WORDS = ['exact', 'firm', 'preliminary', 'guarantee
 /** Grade labels (shared/grading.ts) — never shown to a customer */
 export const CUSTOMER_BANNED_LABELS = ['Confirmed', 'Measured', 'Concept', 'Provisional'] as const
 
-const WORD_RE = new RegExp(`\\b(${CUSTOMER_BANNED_WORDS.join('|')})\\b`, 'i')
+/**
+ * A banned word standing on its own: not part of a longer word ("exactly",
+ * "inexact", "firmly" are other words).
+ *
+ * T-183: there is NO BACKSLASH in this pattern, on purpose. It was
+ * `\\b(word|word)\\b` in a template string. The web app's production build
+ * turned that into a string holding a backspace character where `\\b` was, so
+ * in every built web app the pattern matched nothing and this guard found no
+ * banned word (the worker, built by another tool, was never affected). A
+ * pattern with no escape in it cannot be changed that way. The word edges are
+ * written out instead: the start of the text or a character that is not a
+ * letter, digit or underscore before it, and none of those after it. The
+ * checks' runner also looks at every built web app for a pattern compiled
+ * this way (scripts/checks/run.mjs).
+ */
+const WORD_CHAR = '[A-Za-z0-9_]'
+const WORD_RE = new RegExp('(^|[^A-Za-z0-9_])(' + CUSTOMER_BANNED_WORDS.join('|') + ')(?!' + WORD_CHAR + ')', 'i')
 const GRADE_RE = /\bgrade\s*[ABC]\b|\bconfidence\b/i
 
 /** Problems in one piece of customer-facing text (empty = clean). */
 export function findConfidenceLanguage(text: string): string[] {
   const problems: string[] = []
   const word = WORD_RE.exec(text)
-  if (word) problems.push(`"${word[1]}" in: ${snippet(text, word.index)}`)
+  // word[1] is the character before the word (or nothing at the start of the text)
+  if (word) problems.push(`"${word[2]}" in: ${snippet(text, word.index + word[1]!.length)}`)
   const grade = GRADE_RE.exec(text)
   if (grade) problems.push(`"${grade[0]}" in: ${snippet(text, grade.index)}`)
   return problems

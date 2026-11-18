@@ -50,6 +50,8 @@ max_retries = 3
 # Local checks only (ignored unless ENVIRONMENT = "development"; never set in production):
 # - SECTION_AI_BASE_URL  a stand-in for the model that reads a customer's note for other
 #   services (T-179). `npx wrangler dev --var SECTION_AI_BASE_URL:http://127.0.0.1:8796/note`
+# - AI_STAND_IN  "off" makes the worker ask no model and use its built-in defaults, for the
+#   quick checks (T-183, Docs/testing.md). `npx wrangler dev --var AI_STAND_IN:off`
 #
 # Optional rate limit overrides:
 # - RATE_LIMIT_GLOBAL (default: 100)

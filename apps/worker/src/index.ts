@@ -16,6 +16,7 @@ import { getSupabaseClient, updateQuoteStatus } from './supabase'
 import { processQuote } from './quote-processor'
 import { authorizeJobRequest } from './auth'
 import { PRODUCT_NAME } from '@qolumns/shared'
+import { aiStandInOn } from './ai/client'
 
 export interface Env {
   // Queue binding (production only — see wrangler.toml)
@@ -70,6 +71,8 @@ export interface Env {
   // T-179, local checks only (ignored unless ENVIRONMENT=development): a stand-in
   // for the model that reads a customer's note for other services
   SECTION_AI_BASE_URL?: string
+  /** T-183, local checks only: 'off' = ask no model (ai/client.ts) */
+  AI_STAND_IN?: string
 
   // Rate limit configuration (optional overrides)
   RATE_LIMIT_GLOBAL?: string
@@ -150,6 +153,8 @@ export default {
           hasRedis: !!rateLimiter,
           hasSupabase: !!(env.SUPABASE_URL && env.SUPABASE_SERVICE_KEY),
           hasGemini: !!env.GEMINI_API_KEY,
+          // T-183: 'stand-in' when a local worker was started to ask no model (the quick checks read this)
+          ai: aiStandInOn(env) ? 'stand-in' : 'model',
         }),
         {
           headers: { 'Content-Type': 'application/json' },

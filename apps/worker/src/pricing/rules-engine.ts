@@ -9,7 +9,7 @@
  * IMPORTANT: AI does NOT set prices. All pricing is computed from rules.
  */
 
-import { currencySymbol, roundMoney, MINIMUM_ENTRY_KIND, MINIMUM_ENTRY_LABEL, minimumChargeNote, minimumTopUp } from '@qolumns/shared'
+import { adjustmentLineLabel, currencySymbol, roundMoney, MINIMUM_ENTRY_KIND, MINIMUM_ENTRY_LABEL, minimumChargeNote, minimumTopUp } from '@qolumns/shared'
 import type { ExtractedSignals } from '../ai/signals'
 import type {
   MeasurementModel,
@@ -22,6 +22,8 @@ import type {
   PricingTraceStep,
   ExtractedSignalsV2,
   ExtractedSignal,
+  LabelField,
+  LineSource,
 } from '@qolumns/shared'
 import { evaluateFormula } from '@qolumns/shared'
 import type { CrossServiceEstimate } from '../ai/cross-service'
@@ -117,6 +119,8 @@ export interface PricingResult {
     kind?: 'minimum'
     /** T-165: on that entry, the business's minimum charge */
     minimumCharge?: number
+    /** T-183: where the line's quantity came from (set by the processor from the takeoff) */
+    source?: LineSource
   }>
   /** Confidence level (0-1), affects whether range is shown */
   confidence: number
@@ -167,6 +171,8 @@ export interface ServiceContext {
   name: string
   /** What's included in the service scope */
   scopeIncludes?: string[]
+  /** T-183: the questions of the service's request form, so a line is named in the business's words */
+  fields?: LabelField[]
 }
 
 /**
@@ -681,51 +687,6 @@ function coerceToNumber(value: unknown): number | null {
     return isNaN(parsed) ? null : parsed
   }
   return null
-}
-
-/**
- * Generate a descriptive label for a multiplier based on its condition
- * e.g., fieldId: "dent_size", equals: "large" → "Large dent size"
- */
-function generateMultiplierLabel(
-  mult: PricingRules['multipliers'][0],
-  _answers: FormAnswer[]
-): string {
-  const { fieldId, equals, value } = mult.when
-  const matchedValue = equals ?? value
-
-  // R3-1 cosmetics: customer-facing labels, never raw conditions like
-  // "Is Deep Clean: true". Always show the percentage.
-  const pct = Math.round((mult.multiplier - 1) * 100)
-  const pctSuffix = pct >= 0 ? ` (+${pct}%)` : ` (-${Math.abs(pct)}%)`
-  const kind = pct >= 0 ? 'surcharge' : 'discount'
-
-  // T-125: subtotal-conditional multipliers get an order-value label
-  if (mult.when.subject === 'subtotal' || !fieldId) {
-    const op = mult.when.operator || 'gt'
-    const relation = op === 'lt' || op === 'lte' ? 'under' : 'over'
-    return `${pct >= 0 ? 'Adjustment' : 'Discount'} for jobs ${relation} ${matchedValue}${pctSuffix}`
-  }
-
-  const humanize = (s2: string): string =>
-    s2
-      .replace(/_(input|select|field|dropdown|choice)$/i, '')
-      .replace(/^(is|has|needs|requires)_/i, '')
-      .replace(/_/g, ' ')
-      .trim()
-      .replace(/^\w/, (c) => c.toUpperCase())
-
-  // Boolean condition ("is_deep_clean equals true") -> "Deep clean surcharge (+50%)"
-  if (matchedValue === true || matchedValue === 'true' || String(matchedValue).toLowerCase() === 'yes') {
-    return `${humanize(fieldId)} ${kind}${pctSuffix}`
-  }
-
-  // Enum condition ("job_urgency equals emergency") -> "Emergency surcharge (+50%)"
-  if (typeof matchedValue === 'string') {
-    return `${humanize(matchedValue)} ${kind}${pctSuffix}`
-  }
-
-  return `${humanize(fieldId)} ${kind}${pctSuffix}`
 }
 
 // Note: getComplexityMultiplier() was removed - automatic complexity multiplier is no longer applied.
@@ -1846,7 +1807,8 @@ export function calculatePricingWithTrace(
       // The adjustment is a line of its own: round it, then add the rounded line
       const adjustmentAmount = roundMoney(runningTotal * (mult.multiplier - 1))
       if (adjustmentAmount !== 0) {
-        const label = mult.label || generateMultiplierLabel(mult, answers)
+        // T-183: named from the business's own labels (its rule's, or its question's and option's), never from the answer text
+        const label = adjustmentLineLabel(mult, serviceContext?.fields ?? [])
         const conditionKey = mult.when.subject === 'subtotal' ? 'subtotal' : mult.when.fieldId || 'condition'
         addLine(adjustmentAmount)
         multiplierAdjustment += adjustmentAmount

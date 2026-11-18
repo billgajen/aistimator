@@ -58,6 +58,9 @@ export * from './failed-request'
 export * from './service-suggestion'
 // T-179: one request, several services
 export * from './quote-sections'
+export * from './line-labels'
+export * from './quantity-source'
+export * from './approval-detail'
 
 // ID prefixes for stable, readable IDs
 export const ID_PREFIXES = {

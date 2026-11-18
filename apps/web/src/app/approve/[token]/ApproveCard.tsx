@@ -2,8 +2,108 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { approvalOutcomeCopy, PRODUCT_NAME, type ApprovalOutcome } from '@qolumns/shared'
-import type { ApprovalSummary } from '@/lib/approval-link'
+import { approvalOutcomeCopy, APPROVAL_COPY, PRODUCT_NAME, type ApprovalDetail, type ApprovalOutcome } from '@qolumns/shared'
+import type { ApprovalPhoto, ApprovalSummary } from '@/lib/approval-link'
+
+/**
+ * T-183: what the business judges the price by, in reading order: warnings
+ * first, then every line with its amount and where its quantity came from,
+ * each service's subtotal on a combined quote, and the one total. Drawn from
+ * the same result as the review email (shared/approval-detail.ts).
+ */
+function Detail({ detail }: { detail: ApprovalDetail }) {
+  return (
+    <div data-testid="approve-detail">
+      {detail.warnings.map((warning, i) => (
+        // a notice, so `tertiary` (system.md, Colour), as on the dashboard quote page
+        <div key={i} className="mt-3 rounded-xl border border-tertiary-line bg-tertiary-light p-3" role="note" data-testid="approve-warning" data-kind={warning.kind}>
+          <p className="text-xs font-semibold uppercase text-tertiary">{warning.title}</p>
+          {warning.lines.map((line, j) => (
+            <p key={j} className="mt-1 break-words text-sm text-text-primary">
+              {line}
+            </p>
+          ))}
+          {warning.kind === 'check' && <p className="mt-1 text-xs text-text-secondary">{APPROVAL_COPY.checksNote}</p>}
+        </div>
+      ))}
+
+      <div className="mt-4" data-testid="approve-lines">
+        {detail.parts.map((part, i) => (
+          <section key={i} className={i > 0 ? 'mt-4' : ''} data-testid="approve-part" data-main={part.main}>
+            {detail.combined && (
+              <h2 className="text-sm font-bold text-text-primary">
+                {part.serviceName}
+                {part.addedBy && (
+                  <span className="font-normal text-text-secondary"> ({part.addedBy === 'customer' ? APPROVAL_COPY.addedByCustomer : APPROVAL_COPY.addedByYou})</span>
+                )}
+              </h2>
+            )}
+            <ul className={`divide-y divide-border border-y border-border text-sm ${detail.combined ? 'mt-2' : ''}`}>
+              {part.lines.map((line, j) => (
+                <li key={j} className="flex justify-between gap-4 py-2" data-testid="approve-line">
+                  <span className="min-w-0">
+                    <span className="block break-words text-text-primary">{line.label}</span>
+                    {line.source && (
+                      <span className="block text-xs text-text-secondary" data-testid="approve-source">
+                        {line.source}
+                      </span>
+                    )}
+                  </span>
+                  <span className="figure shrink-0 text-text-primary">{line.amount}</span>
+                </li>
+              ))}
+            </ul>
+            {part.minimumNote && (
+              <p className="mt-2 text-xs text-text-secondary" data-testid="approve-minimum">
+                {part.minimumNote}
+              </p>
+            )}
+            {part.priceWaits && <p className="mt-2 text-xs text-text-secondary">{APPROVAL_COPY.priceWaits}</p>}
+            {detail.combined && (
+              <p className="mt-2 flex justify-between gap-4 text-sm" data-testid="approve-part-subtotal">
+                <span className="text-text-secondary">{APPROVAL_COPY.subtotal}</span>
+                <span className="figure shrink-0 font-semibold text-text-primary">{part.subtotal}</span>
+              </p>
+            )}
+          </section>
+        ))}
+        {detail.totals.tax && (
+          <p className="mt-3 flex justify-between gap-4 text-sm text-text-secondary" data-testid="approve-tax">
+            <span>{detail.totals.tax.label}</span>
+            <span className="figure shrink-0">{detail.totals.tax.amount}</span>
+          </p>
+        )}
+        <p className="mt-3 flex items-baseline justify-between gap-4 border-t border-border pt-3">
+          <span className="text-sm font-bold text-text-primary">{APPROVAL_COPY.total}</span>
+          <span className="figure shrink-0 text-2xl text-text-primary" data-testid="approve-total">
+            {detail.totals.total}
+          </span>
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/** T-183: the customer's photos, small. Tapping one opens it full size in a new tab. */
+function Photos({ photos, line }: { photos: ApprovalPhoto[]; line: string | null }) {
+  if (photos.length === 0) return null
+  return (
+    <div className="mt-4" data-testid="approve-photos">
+      {line && <p className="text-xs font-semibold uppercase text-text-secondary">{line}</p>}
+      <ul className="mt-2 grid grid-cols-4 gap-2">
+        {photos.map((photo, i) => (
+          <li key={photo.id}>
+            <a href={photo.url} target="_blank" rel="noopener noreferrer" className="block min-h-[44px] overflow-hidden rounded-lg border border-border bg-surface" aria-label={`Open photo ${i + 1} of ${photos.length}`}>
+              {/* a short-lived signed address behind our own route: next/image cannot fetch it */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photo.smallUrl} alt={`Photo ${i + 1} from the customer`} loading="lazy" className="aspect-square w-full object-cover" data-testid="approve-photo" />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
 
 /**
  * T-156: the phone-first confirmation card. One button, "Approve & send";
@@ -47,8 +147,17 @@ export function ApproveCard({ token, initialOutcome, summary }: { token: string;
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-tertiary">{summary.businessName}</p>
               <p className="mt-2 font-display text-xl font-bold text-text-primary">{summary.customerName}</p>
               <p className="text-sm text-text-secondary">{summary.serviceName}</p>
+              {/* T-183: while the link can approve, the full detail replaces the short list below */}
+              {summary.detail && <Detail detail={summary.detail} />}
+              {/* a measured range is said beside the total it surrounds; a single price is the total itself */}
+              {summary.detail && summary.price && summary.price !== summary.detail.totals.total && (
+                <p className="mt-2 text-sm text-text-secondary" data-testid="approve-range">
+                  Measured range: <span className="figure text-text-primary">{summary.price}</span>
+                </p>
+              )}
+              {summary.detail && summary.photos && <Photos photos={summary.photos} line={summary.detail.photosLine} />}
               {/* T-179: a combined quote lists each service with its subtotal, then the one total */}
-              {summary.sections && summary.sections.length > 0 && (
+              {!summary.detail && summary.sections && summary.sections.length > 0 && (
                 <ul className="mt-3 divide-y divide-border border-y border-border text-sm" data-testid="approve-sections">
                   {summary.sections.map((section, i) => (
                     <li key={i} className="flex justify-between gap-4 py-2">
@@ -58,7 +167,7 @@ export function ApproveCard({ token, initialOutcome, summary }: { token: string;
                   ))}
                 </ul>
               )}
-              {summary.price && <p className="figure mt-3 text-3xl text-text-primary" data-testid="approve-price">{summary.price}</p>}
+              {!summary.detail && summary.price && <p className="figure mt-3 text-3xl text-text-primary" data-testid="approve-price">{summary.price}</p>}
               {summary.scopeSummary && <p className="mt-3 text-sm leading-relaxed text-text-secondary">{summary.scopeSummary}</p>}
             </div>
           )}

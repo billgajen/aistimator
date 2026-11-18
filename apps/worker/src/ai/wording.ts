@@ -114,25 +114,31 @@ IMPORTANT RULES:
 3. Include relevant assumptions and exclusions
 4. Keep it concise - business owners and customers are busy
 5. Never mention or reference AI, automation, or that this was generated
-6. Write as if you ARE the business writing to the customer`
+6. Write as if you ARE the business writing to the customer
+7. The scopeSummary is part of a commercial document. Its first sentence states the work to be done. Never open it with a greeting, an introduction, or a remark about the estimate or quote itself.`
+
+/**
+ * T-183: how the scope summary opens, said once, for every document type.
+ * It names no service and no business: only the shape of the first sentence.
+ */
+export const SCOPE_SUMMARY_OPENING_RULE =
+  'scopeSummary: plain and professional. The first sentence states the work to be done. Do not open with a greeting, an introduction, or a remark about the estimate or quote itself.'
 
 /**
  * Document type specific tone instructions
  */
 const DOCUMENT_TYPE_TONES: Record<DocumentTone, string> = {
   instant_estimate: `
-TONE: Casual and Quick
-- Use a friendly, conversational tone
+TONE: Plain and Brief
+- Use plain, professional language; short sentences
 - Keep it brief and to the point
-- Use phrases like "Here's a quick estimate", "Based on what you've shared"
-- This is a ballpark figure, so communicate that it's approximate
-- Focus on speed and convenience`,
+- This is an estimate from the details provided, so the assumptions should say what it rests on
+- Do not use chatty openers or filler phrases`,
 
   formal_quote: `
 TONE: Professional and Clear
 - Use standard business language
 - Be thorough but not verbose
-- Use phrases like "Please find our quotation", "We are pleased to provide"
 - This is a binding quote, so be precise
 - Maintain professional courtesy throughout`,
 
@@ -156,7 +162,7 @@ TONE: Technical and Detailed
 /**
  * Get system prompt based on document type
  */
-function getSystemPrompt(documentType?: DocumentTone): string {
+export function getSystemPrompt(documentType?: DocumentTone): string {
   const toneInstructions = documentType ? DOCUMENT_TYPE_TONES[documentType] : DOCUMENT_TYPE_TONES.formal_quote
   return `${WORDING_SYSTEM_PROMPT_BASE}
 ${toneInstructions}`
@@ -165,7 +171,7 @@ ${toneInstructions}`
 /**
  * Prompt template for wording generation
  */
-const WORDING_PROMPT = `Write quote content for the following job request.
+export const WORDING_PROMPT = `Write quote content for the following job request.
 
 Business: {{BUSINESS_NAME}}
 Service: {{SERVICE_NAME}}
@@ -244,6 +250,7 @@ items is NOT a mismatch — handle those via exclusions/notes as usual.
 
 Guidelines:
 - scopeSummary should clearly describe the work in plain English, referencing what's included if provided
+- ${SCOPE_SUMMARY_OPENING_RULE}
 - For assumptions, PREFER using the standard assumptions provided above. Only add custom items if photos suggest something unusual.
 - For exclusions, PREFER using the standard exclusions provided above. Only add custom items if relevant to this specific job.
 - IMPORTANT: Do NOT include assumptions that contradict the customer's answers. For example:

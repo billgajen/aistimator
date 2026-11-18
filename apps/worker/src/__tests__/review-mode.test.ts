@@ -142,7 +142,7 @@ describe('T-147: customer language guard on the new surfaces', () => {
     })
     expect(html).toContain('Your estimate for Garage door')
     expect(html).toContain('Example Co will review and confirm this estimate')
-    expect(html).not.toContain('Quoted Total')
+    expect(html).not.toContain('Quoted total')
     expect(findConfidenceLanguage(html)).toEqual([])
   })
 
@@ -156,7 +156,7 @@ describe('T-147: customer language guard on the new surfaces', () => {
       currency: 'USD',
     })
     expect(html).toContain('Your quote for Garage door')
-    expect(html).toContain('Quoted Total')
-    expect(html).toContain('View Full Quote')
+    expect(html).toContain('Quoted total')
+    expect(html).toContain('View full quote')
   })
 })

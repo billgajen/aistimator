@@ -5,6 +5,7 @@
  */
 
 import { formatMoney, reviewEmailSubject, reviewHoldLine, TEST_REQUEST_BANNER } from '@qolumns/shared'
+import type { ApprovalDetail } from '@qolumns/shared'
 import { sendEmail, type PostmarkConfig } from './postmark'
 import {
   customerQuoteEmail,
@@ -192,6 +193,8 @@ export interface ReviewRequestEmailData {
   approveUrl?: string
   /** T-150: the owner's test request from setup */
   isTest?: boolean
+  /** T-183: what the business judges the price by (shared/approval-detail.ts) */
+  detail?: ApprovalDetail
 }
 
 /** T-156: the review email's subject and body (pure, for tests) */
@@ -216,6 +219,7 @@ export function buildReviewRequestEmail(appUrl: string, data: ReviewRequestEmail
     reviewReason: data.reason,
     testBanner: data.isTest ? TEST_REQUEST_BANNER : undefined,
     primaryColor: data.primaryColor,
+    detail: data.detail,
   })
   return {
     subject: reviewEmailSubject({ customerName: data.customerName, serviceName: data.serviceName, price: total, isTest: data.isTest }),

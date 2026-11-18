@@ -864,3 +864,7 @@ if (failed.length) {
   process.exit(1)
 }
 console.log(`Screenshots: ${outDir}`)
+// T-183: end now. The stand-in's server stays open while the web app keeps its connections to it,
+// which held this script open for minutes after its last check (the checks' runner stops a script
+// that runs past its time).
+process.exit(0)

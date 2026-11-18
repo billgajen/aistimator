@@ -50,14 +50,21 @@ You are building a SaaS platform that lets businesses embed an estimate widget o
 ## Quality gates
 For each ticket:
 - Add or update unit tests where practical.
-- Ensure `pnpm lint` and `pnpm typecheck` pass.
-- Ensure builds run for web and worker packages.
+- Add the ticket's own verify script, and list it in `scripts/checks/manifest.mjs`.
+- Run the quick level and make it pass: `pnpm check:quick` (lint, typecheck, unit tests, and every verify script
+  that asks no AI model).
+- Ensure builds run for web and worker packages (`pnpm build:web`, `pnpm build:worker`; the full level runs both).
 - Update docs if any contracts or behaviour changes.
 
 ### Regression runs
-- Every ticket: its own verify script, `pnpm lint`, `pnpm typecheck`, unit tests and the builds.
-- Marketing, design and copy tickets: also run only the earlier verify scripts that cover the pages changed. Say which you ran.
-- Full regression set: required for any ticket that touches pricing, the quote flow, the worker, emails or a migration; at the end of a batch of design tickets; and before launch.
+Two levels, one command each. `Docs/testing.md` has the detail.
+- **Quick, every ticket: `pnpm check:quick`.** Lint, typecheck, unit tests, then the verify scripts with the AI
+  stand-in (no model is asked), several at once. It starts and stops the local servers itself.
+- **Full: `pnpm check:full`.** The same, the builds, and the whole regression set with the real model. Required
+  for any ticket that touches pricing, the quote flow APIs, the worker, AI prompts, billing, emails or a
+  migration; at the end of a batch of design tickets; and before launch.
+- `pnpm check:failed` runs again only what failed. `pnpm check:quick --only tNNN` runs one script.
+- Say in the report which level was run and how long it took.
 - A ticket's prompt can override this either way.
 
 ## Security and privacy basics (v1)

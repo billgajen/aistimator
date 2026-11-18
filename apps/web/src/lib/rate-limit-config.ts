@@ -63,6 +63,8 @@ export const RATE_LIMITS = {
   ],
   // The one-tap approval link in the review email (the key is the link; the database also caps presses per link)
   approval_link: [{ seconds: MINUTE, perIp: 10, perKey: 5 }],
+  // A photo on the approval page (T-183): a page shows up to twelve small ones; the key is the link
+  approval_photo: [{ seconds: MINUTE, perIp: 120, perKey: 120 }],
   // The sign-up relay to Meta: a person signs up once
   marketing: [{ seconds: MINUTE, perIp: 5, perKey: 1000 }],
   // Sign-up: the key is the email address (so one address cannot be sent email after email)

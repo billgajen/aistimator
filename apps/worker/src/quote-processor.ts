@@ -49,7 +49,7 @@ import { initializeFusionFromStructuredSignals } from './agents/signal-fusion'
 import { evaluateQualityGate } from './agents/quality-gate'
 import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
 import type { QualityGateResult, ClarificationQuestion } from '@qolumns/shared'
-import { AiUsageMeter, CHECKER_SETTINGS_VERSION, serviceSuggestionOf, suggestedServiceReason, alsoAskedOf, MAX_ADDED_SECTIONS, sectionPriceWaits } from '@qolumns/shared'
+import { AiUsageMeter, CHECKER_SETTINGS_VERSION, approvalDetail, serviceSuggestionOf, suggestedServiceReason, alsoAskedOf, MAX_ADDED_SECTIONS, sectionPriceWaits } from '@qolumns/shared'
 import type { AlsoAsked } from '@qolumns/shared'
 import { priceSection, withoutMentionsOf, namedWithoutACard } from './section-pricing'
 import { declinedOrOnlyAsked, coveredByMainService, sentenceAround } from './ai/service-detection'
@@ -63,7 +63,7 @@ import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCa
 import { formatScopeAnswers } from './ai/scope-answers'
 import { fieldOptions, snapToOption, answersOutsideOptions, type OptionField } from './answer-options'
 import { identificationTargets, identifyFromLabels, applyIdentifications, weakenUnreadGuesses, pricingReferencedKeys, checkIdentifications, identificationProvenance, identificationQuestion, DEFAULT_IDENTIFICATION_TIMEOUT_MS, type IdentificationOutcome } from './ai/identification'
-import { buildTakeoff, buildReference } from './takeoff'
+import { buildTakeoff, buildReference, withLineSources } from './takeoff'
 import { calculatePricingWithTrace, getDefaultPricingRules, findLookalikeUnconditionedSteps } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@qolumns/shared'
@@ -1459,6 +1459,8 @@ export async function processQuote(
       {
         name: service.name,
         scopeIncludes: service.scope_includes,
+        // T-183: the form's own questions, so an adjustment line is named in the business's words
+        fields: [...(quoteData.widgetFields || []), ...((service.draft_config?.suggestedFields as WidgetField[] | undefined) || [])],
       },
       // Config version for trace
       'v1',
@@ -1466,6 +1468,18 @@ export async function processQuote(
       aiAddonDetectionRan
     )
   const { result: pricing, trace: pricingTrace } = priceWithSignals(structuredSignals)
+
+  // T-183: each line says where its quantity came from (photos, the
+  // customer's answer, a fixed price). Worked out once here, from the same
+  // trace the takeoff is built from, and stored on the line, so the main
+  // service and a section added later both carry it.
+  const takeoffEntries = buildTakeoff({
+    trace: pricingTrace,
+    structuredSignals,
+    workSteps: rulesWithWorkSteps.workSteps || [],
+    ...(scanEvidenceText && { scanned: { fieldIds: scannedFieldIds, evidence: scanEvidenceText } }),
+  })
+  pricing.breakdown = withLineSources(pricing.breakdown, takeoffEntries)
 
   if (options.section) {
     // T-179: priced by the rules engine from the service's full rules. Stop
@@ -1857,12 +1871,7 @@ export async function processQuote(
 
   // T-122: attach the quantity takeoff (measurement audit trail, customer-facing)
   // and the human-facing estimate reference to the document content
-  content.takeoff = buildTakeoff({
-    trace: pricingTrace,
-    structuredSignals,
-    workSteps: rulesWithWorkSteps.workSteps || [],
-    ...(scanEvidenceText && { scanned: { fieldIds: scannedFieldIds, evidence: scanEvidenceText } }),
-  })
+  content.takeoff = takeoffEntries
   content.reference = buildReference(quoteId, new Date().getFullYear())
 
   // 4.5 Detect cross-service mentions and calculate pricing (with AI + keyword fallback)
@@ -2623,6 +2632,18 @@ export async function processQuote(
             reviewHold: reviewDecision.reviewHold,
             approveUrl,
             isTest: quoteData.quote.is_test === true,
+            // T-183: the warnings, each line with its source, and the photo count,
+            // from the same builder the approval page uses
+            detail: approvalDetail({
+              pricing,
+              content,
+              mainServiceName: service.name,
+              requestSource: quoteRequest.source_json,
+              checkerIssues: validationResult?.issues,
+              photoCount: allImageAssets.length,
+              currency: pricing.currency,
+              locale: regionCtx.locale,
+            }),
           }
         )
         if (!result.success) console.error('[Processor] Review request email failed:', result.error)

@@ -15,6 +15,243 @@
 
 ## Issues & Resolutions
 
+### 2026-11-18: T-183 — Approval the business can trust, line names, quote wording, faster test runs; a guard that was dead in production builds (AD-066, AD-067)
+
+Built and pushed, **not deployed**. Worker and web both changed; no migration. **One fault found on the way is
+live on production until this is deployed (section 6).**
+
+**What T-181 and T-182 had already done of this ticket: nothing.** One thing from T-182 saved work: the on-site
+app shows the server's own lines (AD-065), so the new line names and sources reach its price screen with no
+change to the app (`verify-t183` reads them through the app's route).
+
+#### 1. The approval page and the "Review and approve" email
+
+**Problem:** the page behind "Approve & send" showed the customer, the service, one figure and the scope
+summary. The business had to open the dashboard to see what the price was made of, which is the step T-156
+removed.
+
+**Built:**
+- **One result for both** (`packages/shared/src/approval-detail.ts`, `approvalDetail()`): warnings, every price
+  line with its amount and where its quantity came from, each service of a combined quote as a part with its
+  subtotal, the minimum charge as a note (AD-048), tax, the one total, the photo count. The page and the email
+  render it, so they cannot say different things.
+- **Order on both:** warnings ("Check the service", "Customer also asked for", "Worth checking"), then the
+  lines, the total, the photos, then the one **Approve & send** button, then "Open in dashboard to edit".
+- **Where a quantity came from** is a code the worker stores on each price line (`source`: `photos`, `label`,
+  `answer`, `scan`, `details`, `calculated`, `fixed`, `words`, `choice`). `packages/shared/src/quantity-source.ts`
+  words it for the business ("Measured from photos", "The customer's answer", "Your fixed price") and holds the
+  customer's words for the same facts, which moved there from the worker's takeoff. A section added to a quote
+  (T-179) has no takeoff, so the code is on the line itself and a section carries it too. A quote priced before
+  this ticket is read from its takeoff. A line the business changes in the editor loses its source; one it
+  leaves alone keeps it (`carrySources`, in the editor's save).
+- **Checker findings** are filtered and worded in one place now (`checkerFindings`, shared; it was inside the
+  dashboard's panel builder), for the dashboard, the page and the email.
+- **Photos on the page:** small pictures, four to a row, each opening the full photo. A new route,
+  `GET /api/public/approval/:token/photos/:assetId`, answers with a redirect to a signed address that lasts five
+  minutes. The link's token is the credential: only a link that can still approve, only a photo on its own
+  quote's request that is an image of its own tenant; everything else is 404. Opening a photo is not a press.
+- **Photos in the email: one line** ("3 photos: view them on the approval page"), not pictures. The photos are
+  private, so a picture in an email would need an address that works for days from any mail server that
+  fetches it; and Outlook blocks pictures until asked, while Gmail and Apple Mail fetch them through their own
+  servers. A line is reliable everywhere and keeps the photos behind the link.
+- **The email is from the product**, so it has no "Powered by" line, and a marked row at the top where the logo
+  goes (`data-role="product-logo"`, the name as text until the file exists).
+
+**Found while verifying (a fault in the new route, fixed before it shipped):** a link that had been used still
+showed its photos. Next keeps the answer to a database read made in a GET route handler and gives it again, so
+the link's row was read once as open and reused. `dynamic = 'force-dynamic'` did not stop it. The route now
+calls `noStore()` first. The approval page was never affected (it reads the request's headers before the
+database). `verify-t183` holds it: after one tap the photo is 404.
+
+#### 2. Price line names
+
+**Problem:** a choice answered "Please supply it" produced the line "Please supply it surcharge (+15%)". The
+engine named an adjustment line from the value the rule tests for, with "surcharge" or "discount" added.
+
+**Root cause:** `generateMultiplierLabel` in the rules engine had only the rule, not the form: it could not know
+the question's label or the option's label, so it made a name out of the stored answer value.
+
+**Fix (general; no word of any business is in the code):** `adjustmentLineLabel()` in
+`packages/shared/src/line-labels.ts`, used by the engine, which is now given the service's form questions.
+1. the business's own label for the rule, when it has one;
+2. otherwise "<question>: <option> (+15%)", from the question's label and the option's label (not its stored
+   value); a yes/no question answered yes is the question itself ("<question> (+50%)");
+3. with no form question known, the question's id made readable. The name always starts with the question.
+
+**Every place lines are named or shown was checked:**
+| Where | How it gets the name |
+|---|---|
+| Main pricing, repricing after a customer's answer | the engine, in the one pricing call |
+| A service added as a section (T-179) | the same call, in section mode |
+| The editor | shows the stored names; the business can retype them; a save keeps them |
+| The on-site app's price screen | the server's lines (AD-065) |
+| The dashboard, the customer's page, the PDF, emails | the stored names |
+Work steps, extras and catalogue items were already named from the business's own labels. Quotes already
+stored keep the names they have.
+
+#### 3. Quote wording
+
+- **The scope summary's opening.** The wording prompt itself told the model to "use phrases like 'Here's a
+  quick estimate'" for the default document type. That line is gone, the tone for that type is "plain and
+  brief", and every type is told: the first sentence states the work to be done; no greeting, no introduction,
+  no remark about the estimate itself. Prompt change only; it names no service and no business.
+- **Sentence case** for headings, labels and buttons in every email (worker and web), on the PDF, the quote
+  page's error screen and the same headings in the dashboard ("Scope of work", "View your estimate", "Pricing
+  breakdown"). `Docs/design/system.md` now says it. A unit test renders every email and fails on Title Case.
+
+#### 4. The business name with the logo
+
+- Quote page and PDF: with a logo, the name is beside it; with none, the name alone, as before. The logo's
+  picture carries no alternative text of its own, because the name beside it is the text.
+- Customer emails show no logo today, so the name is always there. Nothing changed. Adding the logo to emails
+  needs a public address for a private file; it is in OWNER-TODO as a decision.
+
+#### 5. Faster test runs (AD-067)
+
+- **Two commands:** `pnpm check:quick` and `pnpm check:full` (`scripts/checks/run.mjs`, `Docs/testing.md`,
+  CLAUDE.md "Quality gates"). Also `pnpm check:failed` (only what failed last time), `pnpm check:list`,
+  `--only tNNN`, `--jobs N`, `--sets`.
+- **The runner starts and stops the servers itself**, with the settings each set of scripts needs (they were
+  written in comments at the top of seven scripts and typed by hand), and refuses to start on a port that is
+  taken. What each script needs is one line in `scripts/checks/manifest.mjs`.
+- **The AI stand-in:** at the quick level the worker is started with `AI_STAND_IN=off` and the web app with no
+  model key, so no model is asked. Honoured in local development only; the worker's `/health` says which.
+- **The standard set is served from a built web app** (`next build`, then `next start`). This is what made it
+  fast, not the parallel run on its own:
+  | Tried | Result |
+  |---|---|
+  | Scripts four at a time against the development server | no faster. It compiles each page on first use and is one process: page loads timed out at 30 s, the local database answered 504, a page being compiled answered 500. 7 of 28 scripts stopped with an error |
+  | The same against a built web app | a script that took 1 to 3 minutes takes 5 to 50 seconds; four run side by side; every script passed on its first try |
+- **A script that fails beside others is tried once more, alone**, and a pass on the second try is reported as
+  that, with the first try's log kept.
+- **What is in the quick level:** 20 of the 32 scripts. Not in it: five that check what only a real model
+  produces (`t148`, `t153`, `t169`, `t171`, `t172`), six whose scripts point the web app at their own stand-in
+  for an outside service, which the web app honours only on the development server (`t173`, `t175` to `t179`),
+  and `t180` (the Stripe sandbox). `pnpm check:quick --sets all` adds the six.
+- **Times on this machine:** quick 4 to 5½ minutes (three runs: 3 min 53 s, 5 min 26 s, 4 min 34 s); full about 35 minutes (one run: 35 min 8 s, of which 5 minutes were a script that hung after passing, fixed since). Before: about 55 minutes for the regression set
+  alone, by hand, with five restarts.
+
+#### 6. Found on the way: the customer-language guard matched nothing in a built web app
+
+**This is live on production today** (not confirmed on production itself, which I cannot read; it is the same
+build tool and the same lock file). It is fixed in this ticket and ships with its deploy.
+
+**What broke:** `findConfidenceLanguage` (T-146) finds the words a customer must never see about a price
+(`exact`, `firm`, `preliminary`, `guaranteed`, `guarantee`). In a **production build of the web app** it found
+none of them, ever.
+
+**Root cause:** the pattern was built from a template string, `\\b(word|word)\\b`. Next's production build
+folds that into one string and writes it as `"\\\b(exact|firm|…)\\\b"`: a backslash, then `\b`, which in a
+string is a backspace character. So the built pattern asked for a backspace on each side of the word. The
+development server does not fold it, the unit tests run the source, and the worker is built by another tool
+(its bundle keeps the template), so nothing showed it. The regression set had only ever run against the
+development server.
+
+**What it meant on production:**
+- The approval-time repair (T-148) did nothing: approving an unedited quote never removed a banned word from
+  the AI's wording, and "this wording needs editing" (`WORDING_NEEDS_EDIT`) could never appear.
+- A "read from the label" line holding one of the words was not left off the customer's page (T-171).
+- **Not affected:** the worker's own repair when a quote is first written and when it is repriced, which is the
+  first line of defence and removes or rewrites these words. So a customer could see one only where the
+  worker's repair had already failed to clear it. The checker and pricing never used this.
+
+**How it was found:** `verify-t156` and `verify-t148` passed against the development server and failed against
+the built web app, in the same checks, with or without the model. The stored quote had the banned sentence,
+the read was fresh, and the function run by itself refused the sentence; the built bundle showed the pattern.
+
+**Fix:**
+- The pattern has no backslash in it (`packages/shared/src/customer-language.ts`): the word's edges are written
+  out as "start of the text, or a character that is not a letter, digit or underscore" before it, and none of
+  those after it. It finds the same things; unit tests hold both the meaning and the absence of a backslash.
+- **Every built web app is now read for this fault** (`builtPatternCheck` in the runner): in a `RegExp("…")`
+  the build wrote, an odd run of backslashes before `b`, `f` or `v` is a control character inside a pattern.
+  Run on the build from before the fix, it reports this pattern; after, nothing. It was the only one in the
+  whole built app.
+- `verify-t156` is in the quick level, against the built app: a quote whose wording only deleting could fix is
+  refused at approval.
+
+#### Verified
+
+- **Unit tests:** worker 631 (44 new in `approval-t183.test.ts`: line names through the engine, sources through
+  the takeoff, the approval detail, the review email's order and content, the prompts, sentence case in every
+  worker email), web 1,115 (31 new: the detail and photos behind a link, the photo route's rules, sentence case
+  in every web email and the PDF, the name beside the logo, the guard's pattern), app 48. `pnpm lint`,
+  `pnpm typecheck`, both builds.
+- **`verify-t183`, 50 checks, at both levels** (the built web app, the worker, the local database, a real
+  browser):
+  - a choice answered "Please supply it" is priced as "Who provides the materials: Please supply it (+15%)",
+    $39 on $260, and no line starts with the answer; the same name on the dashboard, the on-site app's route
+    and the customer's page; a service added as a section is named from its option's label, not its stored id;
+  - each line carries its source; the editor's save keeps it on a line left alone and drops it from a line
+    the business changed;
+  - the approval page: the three warnings in order, every line with its amount and source, two subtotals
+    ($314.00 and $100.00), tax, one total ($455.40), two small photos after the total and before the one
+    button; no customer email address and no storage address in the page; opening it changes nothing;
+  - a photo: 302 to a signed address that lasts 300 seconds and is the photo; another business's link, another
+    business's photo, a made-up link and a made-up photo are each 404; opening photos counts nothing against
+    the link; after the one tap the quote is sent as `email_link` and the photo is 404;
+  - the review email, built by the worker's own builder from the stored quote: the order, the content, one
+    line for the photos, no "Powered by", the logo row;
+  - in a browser at 390 px: the thumbnails load, nothing scrolls sideways, the button is 318 by 52 px; on the
+    quote page the name is alone with no logo and to the right of the logo on the same row with one; every
+    heading and button there is sentence case.
+- **Quick level (`pnpm check:quick`): 28 of 28 steps, 20 scripts, 1,710 checks, every script on its first try,
+  in 4 min 34 s** (3 min 53 s and 5 min 26 s on two earlier runs). The static steps take about 30 seconds, the
+  web build 25 to 40.
+- **Full level (`pnpm check:full`), once at the end: 32 scripts, 2,756 checks, all pass, in 35 min 8 s** plus
+  6 min 37 s to run two again:
+  - The standard set (25 scripts, the real model, the built web app, four at a time) took about 8 minutes.
+    `verify-t148` 29/29 and `verify-t156` 31/31, which had failed against the built app before the guard was
+    fixed, pass.
+  - `verify-t164` (78 checks) failed one check on its first try, beside three other browsers (whether an
+    animation was still running when it was measured), and passed alone. Reported by the runner as a second
+    try.
+  - `t175` 110, `t176` 82, `t177` 99, `t178` 52, `t179` 99 and `t180` 108 passed on their own servers, started
+    by the runner.
+  - **Two failed in that run, both faults in a script and not in the product, and passed when run again with
+    `pnpm check:failed`:** `verify-t183` (my script's customer wrote "two rooms" beside an answer of 100
+    square feet, and the real model, rightly, asked which was meant; the words now agree and the script
+    answers such a question as the customer would), 50/50; and `verify-t173`, which passed all 104 checks and
+    then did not exit, because its stand-in's server stayed open, until the runner stopped it at ten minutes
+    (it ends with `process.exit` now), 104/104 in 335 s.
+- **The built-pattern check:** on the build made before the fix it reports the banned-word pattern; on every
+  build since, nothing.
+- **What the real model wrote for the scope summary in that run:** "Preparation and application of two coats
+  to one hallway wall totaling approximately 100 sq ft during a single Service Alpha visit. All required
+  materials will be supplied as requested to complete the specified area." It opens with the work. One
+  sample; read by a person, never a check.
+
+#### Not verified
+
+- **The review email in a mail program.** It is built by the worker's own builder and its HTML is checked;
+  nobody has looked at it in Gmail, Apple Mail or Outlook. Locally there is no Postmark, so the worker sends
+  none.
+- **The scope summary a real model writes.** The prompt is checked; a model's sentences are printed by the full
+  run for a person to read and are never a pass-or-fail check.
+- **A quantity measured from real photos reaching the page.** The worker's unit tests prove it stores `photos`
+  for a photo reading, and `verify-t183` proves a stored `photos` is shown as "Measured from photos". No real
+  photo was measured end to end in this ticket's own script.
+- **Nothing on production.** Not deployed.
+
+**Files:** `packages/shared/src/{line-labels,quantity-source,approval-detail,checker,index,database.types}.ts`,
+`apps/worker/src/{takeoff,quote-processor,index}.ts`, `apps/worker/src/pricing/rules-engine.ts`,
+`apps/worker/src/ai/{wording,client,factory}.ts`, `apps/worker/src/email/{templates,index}.ts`,
+`apps/worker/wrangler.toml`, `packages/shared/src/customer-language.ts`,
+`apps/web/src/lib/{approval-link,rate-limit-config,quote-understanding,email-templates,postmark,pdf-template}.ts`,
+`apps/web/src/app/approve/[token]/ApproveCard.tsx`, `apps/web/src/app/api/public/approval/[token]/photos/[assetId]/route.ts`,
+`apps/web/src/app/api/quotes/[quoteId]/route.ts`, `apps/web/src/app/q/[quoteId]/{page,error}.tsx`, three dashboard
+headings, `scripts/checks/{run,manifest}.mjs`, `scripts/hardcore-test/verify-t183.mts` (and `verify-t162.mts`: the review
+email's new footer), tests
+(`apps/worker/src/__tests__/approval-t183.test.ts`, `apps/web/src/__tests__/{approval-link,wording-t183}.test.ts`),
+`Docs/{testing,02-api-contracts}.md`, `Docs/design/system.md`, `CLAUDE.md`, `package.json`, `OWNER-TODO.md`.
+
+**Relation:** T-156 (AD-041) made approval one tap; this makes it one informed tap, and changes none of AD-041's
+rules (the page still approves nothing on its own; the token can still do one thing, once). T-169's panel and
+this page now share the checker's wording. T-179's sections and AD-048's minimum note are shown by their own
+shared rules. T-178's "Check the service" reason is not said twice in the email.
+
+---
+
 ### 2026-11-18: T-182 — Mobile app: audit, fixes, and the on-site path (AD-065)
 
 **Web deployed 2026-11-18** (commit `9070b3f`). Web only: no worker change, no migration, nothing in Stripe.
@@ -8750,6 +8987,83 @@ app came to the front" need no dependency, and the queue already knows how long 
 id and removing duplicates afterwards (the second quote would already be counted on the plan and could already
 be priced); returning a stored link on a repeat (links are stored only as hashes, by design).
 
+### AD-066: The approval page and the review email are one result; a line carries its source; a line is named in the business's words (T-183)
+
+**Context:** approving from the email (AD-041) took one tap but showed one figure. A business that could not
+see what the price was made of either opened the dashboard (the step AD-041 removed) or approved blind. And a
+line could be named from a customer's answer text with a word added ("Please supply it surcharge").
+
+**Decision:**
+1. **One pure builder for both** (`packages/shared/src/approval-detail.ts`). The page and the email render the
+   same result, in the same order: warnings, lines with amounts and sources, each service's subtotal, the
+   total, the photos, then the button. Neither works anything out for itself.
+2. **Where a quantity came from is stored on the price line** (`source`), by the worker, when it prices. The
+   words for the business and the words for the customer for the same fact live together
+   (`packages/shared/src/quantity-source.ts`). On the line, not only in the takeoff, because a section added
+   later has no takeoff. A line the business changes loses it: the figure is then the business's own.
+3. **A line is named from the business's own labels** (`packages/shared/src/line-labels.ts`): the rule's label,
+   else the question's label and the option's label. Never the stored answer value alone, and no word is added
+   that the business did not write. The engine is given the form's questions for this.
+4. **Photos are shown through the approval link, never in the email.** The link's token is the credential for
+   exactly its own quote's photos, only while it can still approve.
+5. **An email the product sends to a business is marked as the product's** (a row for the logo), and has no
+   "Powered by" line. T-183 did this for the review email; the rest are listed in OWNER-TODO.
+
+**Unchanged from AD-041:** opening the page approves nothing; only the button's POST does; the token can do one
+thing, once; presses are counted in the database. Opening a photo is not a press.
+
+**Rejected:**
+- pictures in the email (private files would need long-lived public addresses, and mail programs block or
+  re-host pictures);
+- working the source out on the page from the takeoff's customer wording (a section has none; and words meant
+  for the customer would have to be parsed);
+- renaming lines on quotes already stored (a quote already sent should not change its words).
+
+**Consequences:**
+- The public quote API returns each line's `source` to the customer's page too. It says nothing the customer is
+  not already told ("From your photos").
+- A GET route handler that reads the database with the service client must read fresh (`noStore()`): Next
+  otherwise keeps the read. The photo route does; see KC-006.
+
+### AD-067: Two levels of checks; the quick level asks no model and serves a built web app (T-183)
+
+**Context:** the regression set had grown to 31 scripts and about 55 minutes, run by hand against servers
+restarted five times with settings copied from comments. It was too slow to run on every ticket, so tickets
+ran "the scripts that cover the pages changed", chosen by judgement.
+
+**Decision:**
+1. **Quick, every ticket (`pnpm check:quick`):** lint, typecheck, unit tests, both builds, and every verify
+   script that asks no AI model and needs no specially started servers. **Full (`pnpm check:full`):** the same,
+   plus the whole set with the real model.
+2. **The AI stand-in is "no model":** a local worker started with `AI_STAND_IN=off` gives every consumer no
+   client, and each takes the path it already has for a missing key. The web app is started with no model key.
+   Deterministic, free, fast. Honoured only when `ENVIRONMENT` is `development`.
+3. **The standard set is served from a built web app** (`next build`, `next start`), not the development
+   server, so its scripts can run four at a time. The build is the web-build gate.
+4. **What a script needs is data** (`scripts/checks/manifest.mjs`): its set of servers, whether it needs the
+   real model, what it must not run beside. The runner starts and stops the servers.
+5. **A script that fails beside others is tried once more, alone, and a pass on the second try is said to be
+   that.**
+
+**Why "no model" and not scripted answers:** a stand-in that answers each of the pipeline's dozen prompt shapes
+would be a second, pretend model to keep in step with the real prompts. The no-model path is real product code
+with one behaviour. A script that needs one particular answer already brings a stand-in for that one call
+(T-175 to T-179).
+
+**Rejected:**
+- running scripts side by side against the development server (tried first: it compiles each page on first
+  use and is one process; page loads timed out, the local database answered 504, and nothing got faster);
+- letting a built web app honour a stand-in's address behind a new switch (the rule "a production build never
+  talks to a stand-in" is a safeguard; six scripts stay on the development server instead);
+- retrying a failed script silently.
+
+**Consequences:**
+- Six scripts that check what only a real model produces, six that need their own development servers and the
+  Stripe script run at the full level only. `pnpm check:quick --sets all` adds the development-server sets.
+- The quick level proves the product's own code, not the model's answers.
+- A new verify script must be listed in the manifest, or it is never run (`pnpm check:list` fails on one that
+  is not).
+
 ---
 
 ## Known Constraints
@@ -8832,6 +9146,38 @@ be priced); returning a stored link on a repeat (links are stored only as hashes
 - Quote Simulator shows warnings for missing quantity sources
 - Per-unit items display "(no source!)" in collapsed header if not configured
 - Test step shows configuration status summary
+
+---
+
+### KC-006: A GET route that reads the database must read fresh (T-183)
+
+**Constraint:** in a GET route handler, a read made with the service client (`createAdminClient`) before the
+handler has touched `request.url` is kept by Next and given again to later calls. `export const dynamic =
+'force-dynamic'` did not stop it for `/api/public/approval/:token/photos/:assetId`: a link that had been used
+was still read as open, and still showed its photos.
+
+**Rule:** call `noStore()` (from `next/cache`) at the top of such a handler. The existing public GET routes read
+`request.url` for their token or key before their first read, which is why they were never affected; the page
+`/approve/:token` reads the request's headers first.
+
+**Not fixed in the client on purpose:** giving the service client a no-store fetch would also make every page
+that uses it render on each request, which would change the marketing and demo pages.
+
+**Found by:** `verify-t183` (a photo asked for after the link was used answered 302; it must answer 404).
+
+### KC-007: A pattern built from a string must not carry a backslash escape in a template string (T-183)
+
+**Constraint:** Next's production build folds a template string whose parts are all constants into one string.
+For `` `\\b(${WORDS.join('|')})\\b` `` it wrote `"\\\b(…)\\\b"`, in which `\b` is a backspace character, so the
+pattern matched nothing in every built web app. The development server, the unit tests and the worker's build
+keep the template and were fine.
+
+**Rule:** build such a pattern with no backslash in it (write the character class out), or use a regex
+literal. The checks' runner reads every built web app for a control character inside a `RegExp("…")`
+(`built-patterns`).
+
+**Why this is a constraint and not only a fix:** nothing but a built web app shows it. The regression set runs
+against one since T-183 (AD-067).
 
 ---
 

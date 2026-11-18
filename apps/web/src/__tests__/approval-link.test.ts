@@ -36,7 +36,7 @@ import {
   APPROVAL_LINK_MAX_ATTEMPTS,
   type ApprovalOutcome,
 } from '@qolumns/shared'
-import { approveByLink, loadApprovalLink } from '@/lib/approval-link'
+import { approveByLink, loadApprovalLink, approvalPhotoKey, approvalPhotoUrl, APPROVAL_MAX_PHOTOS } from '@/lib/approval-link'
 import { getScopeWindows } from '@/lib/rate-limit'
 
 // ---------------------------------------------------------------------------
@@ -45,7 +45,7 @@ import { getScopeWindows } from '@/lib/rate-limit'
 // ---------------------------------------------------------------------------
 type Row = Record<string, unknown>
 class FakeDb {
-  tables: Record<string, Row[]> = { quote_approval_tokens: [], quotes: [] }
+  tables: Record<string, Row[]> = { quote_approval_tokens: [], quotes: [], assets: [], quote_validation_logs: [] }
   writes: Array<{ table: string; values: Row }> = []
   from(table: string) {
     return new FakeQuery(this, table)
@@ -77,6 +77,21 @@ class FakeQuery {
   }
   is(col: string, val: null) {
     this.filters.push((r) => (r[col] ?? null) === val)
+    return this
+  }
+  // T-183: the approval detail also reads the request's photos and the newest quote check
+  neq(col: string, val: unknown) {
+    this.filters.push((r) => r[col] !== val)
+    return this
+  }
+  in(col: string, vals: unknown[]) {
+    this.filters.push((r) => vals.includes(r[col]))
+    return this
+  }
+  order() {
+    return this
+  }
+  limit() {
     return this
   }
   private rows() {
@@ -238,6 +253,7 @@ describe('T-156: opening the link changes nothing', () => {
     const loaded = await loadApprovalLink(admin(db), token, NOW)
     expect(loaded.outcome).toBe('ready')
     expect(db.writes).toEqual([])
+    // T-183: a link that can approve also carries the detail the price is judged by, and the photos
     expect(loaded.summary).toEqual({
       quoteId: 'qte_a',
       businessName: 'Acme Doors',
@@ -245,6 +261,8 @@ describe('T-156: opening the link changes nothing', () => {
       serviceName: 'Spring Replacement',
       price: '$1,400.00',
       scopeSummary: 'Replace the two torsion springs and balance the door.',
+      detail: expect.objectContaining({ warnings: [], combined: false, photoCount: 0 }),
+      photos: [],
     })
     expect(JSON.stringify(loaded.summary)).not.toContain('jordan@example.com')
   })
@@ -388,5 +406,152 @@ describe('T-156: the approval page is public', () => {
     expect(underRoute('/apple', '/app')).toBe(false)
     expect(underRoute('/setup', '/setup')).toBe(true)
     expect(underRoute('/setup-guide', '/setup')).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// T-183: the approval page shows what the price is judged by
+// ---------------------------------------------------------------------------
+
+const JUDGED = {
+  pricing_json: {
+    total: 462,
+    subtotal: 420,
+    taxAmount: 42,
+    taxLabel: 'Sales tax',
+    currency: 'USD',
+    breakdown: [
+      { label: 'Walls  $2 x 90(sq ft)', amount: 180, source: 'photos' },
+      { label: 'Doors  $40 x 3(doors)', amount: 140, source: 'answer' },
+    ],
+    sections: [
+      { serviceId: 'svc_b', serviceName: 'Service B', addedBy: 'customer', addedAt: '2026-01-01T00:00:00.000Z', subtotal: 100, breakdown: [{ label: 'Visit', amount: 100, source: 'fixed' }] },
+    ],
+  },
+  content_json: { scopeSummary: 'Paint the walls.', alsoAsked: [{ id: 'a1', words: 'the other thing', serviceId: 'svc_b', serviceName: 'Service B', state: 'offered' }] },
+  request: { asset_ids: ['ast_1', 'ast_doc', 'ast_2', 'ast_other'], source_json: { type: 'widget', serviceSuggestion: { serviceId: 'svc_c', serviceName: 'Service C', reason: '' } } },
+}
+
+function withPhotos(db: FakeDb) {
+  db.tables.assets!.push(
+    { id: 'ast_1', tenant_id: 'tnt_a', type: 'image', r2_key: 'tnt_a/one.jpg' },
+    { id: 'ast_2', tenant_id: 'tnt_a', type: 'image', r2_key: 'tnt_a/two.jpg' },
+    { id: 'ast_doc', tenant_id: 'tnt_a', type: 'document', r2_key: 'tnt_a/plan.pdf' },
+    // an id on the request that belongs to another business is never shown
+    { id: 'ast_other', tenant_id: 'tnt_b', type: 'image', r2_key: 'tnt_b/theirs.jpg' }
+  )
+  db.tables.quote_validation_logs!.push({
+    quote_id: 'qte_a',
+    tenant_id: 'tnt_a',
+    outcome: 'passed_with_issues',
+    'input_snapshot->>serviceConfigVersion': 'v2',
+    issues: [{ check: 'addon', description: 'an extra was added that the customer did not ask for' }],
+  })
+}
+
+describe('T-183: the approval page shows what the price is judged by', () => {
+  it('a link that can approve carries the warnings, every line with its source, the parts and the total', async () => {
+    const db = new FakeDb()
+    withPhotos(db)
+    const token = await withLink(db, {}, JUDGED)
+    const { summary, outcome } = await loadApprovalLink(admin(db), token, NOW)
+    expect(outcome).toBe('ready')
+    expect(db.writes).toEqual([])
+    const detail = summary!.detail!
+    expect(detail.warnings.map((w) => w.title)).toEqual(['Check the service', 'Customer also asked for', 'Worth checking'])
+    expect(detail.parts.map((p) => [p.serviceName, p.subtotal])).toEqual([
+      ['Spring Replacement', '$320.00'],
+      ['Service B', '$100.00'],
+    ])
+    expect(detail.parts[0]!.lines.map((l) => [l.amount, l.source])).toEqual([
+      ['$180.00', 'Measured from photos'],
+      ['$140.00', "The customer's answer"],
+    ])
+    expect(detail.totals).toEqual({ subtotal: '$420.00', tax: { label: 'Sales tax', amount: '$42.00' }, total: '$462.00' })
+  })
+
+  it('the photos are the request’s own images of the link’s own business, in the customer’s order, behind the link', async () => {
+    const db = new FakeDb()
+    withPhotos(db)
+    const token = await withLink(db, {}, JUDGED)
+    const { summary } = await loadApprovalLink(admin(db), token, NOW)
+    expect(summary!.photos).toEqual([
+      { id: 'ast_1', url: approvalPhotoUrl(token, 'ast_1'), smallUrl: `${approvalPhotoUrl(token, 'ast_1')}?size=small` },
+      { id: 'ast_2', url: approvalPhotoUrl(token, 'ast_2'), smallUrl: `${approvalPhotoUrl(token, 'ast_2')}?size=small` },
+    ])
+    expect(summary!.detail!.photosLine).toBe('2 photos from the customer')
+    // a path on our own site: never a storage key or address
+    expect(JSON.stringify(summary)).not.toMatch(/one\.jpg|r2_key|https?:/)
+    expect(APPROVAL_MAX_PHOTOS).toBeGreaterThanOrEqual(10)
+  })
+
+  it('a used, replaced or expired link shows the summary only: no detail, no photos', async () => {
+    for (const over of [{ used_at: NOW.toISOString() }, { invalidated_at: NOW.toISOString() }, { expires_at: new Date(NOW.getTime() - HOUR).toISOString() }]) {
+      const db = new FakeDb()
+      withPhotos(db)
+      const token = await withLink(db, over, JUDGED)
+      const { summary, outcome } = await loadApprovalLink(admin(db), token, NOW)
+      expect(outcome).not.toBe('ready')
+      expect(summary!.detail).toBeUndefined()
+      expect(summary!.photos).toBeUndefined()
+    }
+  })
+
+  it('a photo is served only to a link that can still approve, and only a photo of its own quote and business', async () => {
+    const db = new FakeDb()
+    withPhotos(db)
+    const token = await withLink(db, {}, JUDGED)
+    expect(await approvalPhotoKey(admin(db), token, 'ast_1', NOW)).toBe('tnt_a/one.jpg')
+    // a document, another business's image, an id not on the request, a made-up link
+    expect(await approvalPhotoKey(admin(db), token, 'ast_doc', NOW)).toBeNull()
+    expect(await approvalPhotoKey(admin(db), token, 'ast_other', NOW)).toBeNull()
+    db.tables.assets!.push({ id: 'ast_elsewhere', tenant_id: 'tnt_a', type: 'image', r2_key: 'tnt_a/elsewhere.jpg' })
+    expect(await approvalPhotoKey(admin(db), token, 'ast_elsewhere', NOW)).toBeNull()
+    expect(await approvalPhotoKey(admin(db), 'x'.repeat(43), 'ast_1', NOW)).toBeNull()
+    expect(await approvalPhotoKey(admin(db), 'not-a-token', 'ast_1', NOW)).toBeNull()
+    // opening a photo is not a press
+    expect(db.writes).toEqual([])
+    expect(db.tables.quote_approval_tokens![0]!.attempts).toBe(0)
+  })
+
+  it('once the link is used, replaced, expired or pressed too often, its photos stop', async () => {
+    for (const over of [{ used_at: NOW.toISOString() }, { invalidated_at: NOW.toISOString() }, { expires_at: new Date(NOW.getTime() - HOUR).toISOString() }, { attempts: APPROVAL_LINK_MAX_ATTEMPTS }]) {
+      const db = new FakeDb()
+      withPhotos(db)
+      const token = await withLink(db, over, JUDGED)
+      expect(await approvalPhotoKey(admin(db), token, 'ast_1', NOW)).toBeNull()
+    }
+  })
+
+  it('the photo route: the link is the key, every refusal is one 404, it redirects to a short-lived address and is rate limited', () => {
+    const route = readFileSync(join(__dirname, '../app/api/public/approval/[token]/photos/[assetId]/route.ts'), 'utf8')
+    expect(route).toContain("checkPublicRateLimit('approval_photo'")
+    expect(route).toContain('approvalPhotoKey(createAdminClient(), token, assetId)')
+    expect(route).toContain('if (!originalKey) return notFound()')
+    // the link's state is read fresh on every call: a used link's photos stop at once (verify-t183 found a kept read)
+    expect(route).toContain("import { unstable_noStore as noStore } from 'next/cache'")
+    expect(route.indexOf('  noStore()\n')).toBeGreaterThan(-1)
+    expect(route.indexOf('  noStore()\n')).toBeLessThan(route.indexOf('checkPublicRateLimit('))
+    expect(route).toContain('generateDownloadUrl(key, DASHBOARD_PHOTO_URL_SECONDS)')
+    expect(route).toContain("photoSizeOf(new URL(request.url).searchParams.get('size'))")
+    expect(route).not.toMatch(/console\.(log|error)\([^)]*(token|signedUrl|originalKey)/)
+    expect(getScopeWindows('approval_photo')[0]).toMatchObject({ perIp: 120, perKey: 120 })
+  })
+
+  it('the card reads in order: warnings, lines, total, photos, then one Approve & send, and the dashboard link stays', () => {
+    const card = readFileSync(join(__dirname, '../app/approve/[token]/ApproveCard.tsx'), 'utf8')
+    const detail = card.slice(card.indexOf('function Detail('), card.indexOf('function Photos('))
+    const inDetail = ['data-testid="approve-warning"', 'data-testid="approve-line"', 'data-testid="approve-source"', 'data-testid="approve-part-subtotal"', 'data-testid="approve-total"'].map((m) => detail.indexOf(m))
+    expect(inDetail.every((i) => i > -1)).toBe(true)
+    expect(inDetail).toEqual([...inDetail].sort((a, b) => a - b))
+    const page = card.slice(card.indexOf('export function ApproveCard('))
+    const order = ['<Detail detail={summary.detail} />', '<Photos photos={summary.photos}', 'data-testid="approve-button"', 'data-testid="approve-dashboard"'].map((m) => page.indexOf(m))
+    expect(order.every((i) => i > -1)).toBe(true)
+    expect(order).toEqual([...order].sort((a, b) => a - b))
+    expect(page.match(/data-testid="approve-button"/g)).toHaveLength(1)
+    expect(page).toContain('Open in dashboard to edit')
+    // small copies in the list, the full photo on a tap
+    expect(card).toContain('src={photo.smallUrl}')
+    expect(card).toContain('href={photo.url}')
   })
 })

@@ -140,8 +140,9 @@ describe('T-127: defaulted quantities are visible and clarifiable', () => {
       noTax, 'GBP'
     )
     const labels = result.breakdown.map((l) => l.label)
-    expect(labels).toContain('Deep clean surcharge (+50%)')
-    expect(labels.some((l) => l.includes('Emergency surcharge (+25%)'))).toBe(true)
+    // T-183: named from the question (and the option it tests for), never from the answer with a word added
+    expect(labels).toContain('Deep clean (+50%)')
+    expect(labels).toContain('Job urgency: Emergency (+25%)')
     expect(labels.some((l) => /: true/.test(l))).toBe(false)
   })
 

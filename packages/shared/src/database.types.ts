@@ -4,6 +4,7 @@ import type { AiUsageSummary } from './ai-models'
 import type { IdentificationSpec } from './identification'
 import type { ScanSpec } from './room-scan'
 import type { WordingRepairRecord } from './wording-repair'
+import type { LineSource } from './quantity-source'
 
 /**
  * Database types for the Qolumns platform
@@ -622,6 +623,8 @@ export interface QuotePricing {
     kind?: 'minimum'
     /** T-165: on that entry, the business's minimum charge when the quote was priced */
     minimumCharge?: number
+    /** T-183: where the line's quantity came from (quantity-source.ts); absent on a line the business typed */
+    source?: LineSource
   }>
   /** Pricing notes - warnings, site visit recommendations, etc. */
   notes?: string[]
@@ -649,6 +652,8 @@ export interface TakeoffEntry {
   amount: number
   /** How the quantity/price was established, in plain words for the customer: "From your photos" */
   method: string
+  /** T-183: the same fact as a code, so the business can be told it in its own words (quantity-source.ts) */
+  source?: LineSource
   /**
    * T-146: the technical evidence behind `method` (passes, spread, decoded
    * model number). Business-facing only; the public quote API strips it.

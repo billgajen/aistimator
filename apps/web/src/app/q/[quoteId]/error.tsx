@@ -19,7 +19,7 @@ export default function QuoteError({
       <div className="text-center max-w-md px-4">
         <div className="text-danger text-5xl mb-4">⚠️</div>
         <h1 className="text-xl font-semibold text-text-primary mb-2">
-          Unable to Load Quote
+          Unable to load quote
         </h1>
         <p className="text-text-secondary mb-6">
           Something went wrong while loading your quote. Please try again.
@@ -28,7 +28,7 @@ export default function QuoteError({
           onClick={() => reset()}
           className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors"
         >
-          Try Again
+          Try again
         </button>
       </div>
     </div>

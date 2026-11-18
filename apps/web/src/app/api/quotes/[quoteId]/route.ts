@@ -27,7 +27,7 @@ import type {
   QuoteDetailResponse,
   AmendmentSummary,
 } from '@qolumns/shared'
-import { CHECKER_SETTINGS_VERSION, serviceSuggestionOf, MAX_ADDED_SECTIONS, addedSections, alsoAskedOf, alsoAskedWithStates, editedSectionBreakdown, withSections } from '@qolumns/shared'
+import { CHECKER_SETTINGS_VERSION, carrySources, serviceSuggestionOf, MAX_ADDED_SECTIONS, addedSections, alsoAskedOf, alsoAskedWithStates, editedSectionBreakdown, withSections } from '@qolumns/shared'
 import type { CombinedPricing, QuoteSection } from '@qolumns/shared'
 import { sectionTaxFor } from '@/lib/quote-sections-service'
 import { sectionsEmailHtml } from '@/lib/sections-email'
@@ -446,6 +446,8 @@ export async function PATCH(
         generatedLabels
       )
     )
+    // T-183: a line the business left alone keeps where its quantity came from; a line it changed has none
+    pricing.breakdown = carrySources(beforePricing?.breakdown, pricing.breakdown)
     pricing.subtotal = roundMoney(pricing.breakdown.reduce((sum, item) => sum + item.amount, 0))
 
     if (tenant.tax_enabled && tenant.tax_rate > 0) {
@@ -489,7 +491,8 @@ export async function PATCH(
         const lines = (sent.breakdown ?? [])
           .filter((line) => line && typeof line.label === 'string')
           .map((line) => ({ ...line, amount: roundMoney(Number(line.amount)) }))
-        const breakdown = editedSectionBreakdown(before?.breakdown, lines)
+        // T-183: a section just priced arrives with its sources; one already stored keeps them for unchanged lines
+        const breakdown = before ? carrySources(before.breakdown, editedSectionBreakdown(before.breakdown, lines)) : editedSectionBreakdown(undefined, lines)
         storedSections.push({
           serviceId: row.id,
           serviceName: row.name,

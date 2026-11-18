@@ -559,7 +559,7 @@ export default function QuoteDetailPage({
         <QuoteTracker steps={trackerSteps} />
 
         {content.scopeSummary && (
-          <Section title="Scope of Work">
+          <Section title="Scope of work">
             <p className="text-sm text-text-secondary">{content.scopeSummary}</p>
           </Section>
         )}

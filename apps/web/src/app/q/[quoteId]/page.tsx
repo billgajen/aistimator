@@ -1089,13 +1089,16 @@ function Letterhead({
     <div className="px-6 sm:px-10 pt-8 pb-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          {business.logoUrl ? (
-            <img src={business.logoUrl} alt={business.name} className="h-11 object-contain" />
-          ) : (
-            <h1 className="font-display text-2xl font-bold tracking-tight text-text-primary truncate">
+          {/* T-183: a logo never stands in for the name. With a logo, the name is beside it; with none, the name alone. */}
+          <div className="flex min-w-0 items-center gap-3" data-testid="business-identity">
+            {business.logoUrl && (
+              // the name is beside it, so the picture needs no words of its own
+              <img src={business.logoUrl} alt="" className="h-11 w-auto max-w-[9rem] shrink-0 object-contain" data-testid="business-logo" />
+            )}
+            <h1 className="min-w-0 break-words font-display text-2xl font-bold tracking-tight text-text-primary" data-testid="business-name">
               {business.name}
             </h1>
-          )}
+          </div>
           {business.tagline && (
             <p className="mt-1 text-xs text-text-secondary">{business.tagline}</p>
           )}

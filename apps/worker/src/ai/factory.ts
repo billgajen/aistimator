@@ -7,9 +7,11 @@
 
 import type { AiTask, AiUsageMeter } from '@qolumns/shared'
 import type { AiClient, AiEnv } from './client'
-import { routeFor, thinkingFor, usageSinkFor } from './client'
+import { aiStandInOn, routeFor, thinkingFor, usageSinkFor } from './client'
 import { GeminiClient } from './gemini'
 import { AnthropicClient } from './anthropic'
+
+let standInSaid = false
 
 export function createAiClient(
   task: AiTask,
@@ -17,6 +19,12 @@ export function createAiClient(
   meter?: AiUsageMeter,
   options?: { maxTokens?: number }
 ): AiClient | null {
+  // T-183: the quick checks run with no model (local development only)
+  if (aiStandInOn(env)) {
+    if (!standInSaid) console.log('[AI] AI_STAND_IN=off: no model is asked; built-in defaults are used (local checks only)')
+    standInSaid = true
+    return null
+  }
   const route = routeFor(task, env)
   const usage = usageSinkFor(meter, task, route)
 

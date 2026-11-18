@@ -151,7 +151,7 @@ export function generateCustomerEmailHtml(data: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your Quote</title>
+  <title>Your quote</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -175,7 +175,7 @@ export function generateCustomerEmailHtml(data: {
               </p>
 
               <div style="margin: 24px 0; padding: 24px; background-color: #f0f9ff; border-radius: 8px; text-align: center;">
-                <p style="margin: 0 0 4px; color: #6b7280; font-size: 14px;">Quoted Total</p>
+                <p style="margin: 0 0 4px; color: #6b7280; font-size: 14px;">Quoted total</p>
                 <p style="margin: 0; font-size: 36px; font-weight: 700; color: ${primaryColor};">
                   ${escapeHtml(data.total)}
                 </p>
@@ -189,7 +189,7 @@ export function generateCustomerEmailHtml(data: {
                 <tr>
                   <td style="text-align: center;">
                     <a href="${escapeHtml(data.quoteViewUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
-                      View Full Quote
+                      View full quote
                     </a>
                   </td>
                 </tr>

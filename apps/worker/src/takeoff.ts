@@ -9,11 +9,14 @@
  * sees. Pure functions, fully testable.
  */
 
+import { CUSTOMER_METHOD } from '@qolumns/shared'
 import type {
   PricingTrace,
   ExtractedSignalsV2,
   WorkStepConfig,
   TakeoffEntry,
+  LineSource,
+  QuotePricing,
 } from '@qolumns/shared'
 
 /**
@@ -27,12 +30,9 @@ export function buildReference(quoteId: string, year: number): string {
 
 type Signal = ExtractedSignalsV2['signals'][number]
 
-const PLAIN = {
-  photos: 'From your photos',
-  answers: 'From your answers',
-  scan: 'From the on-site room scan',
-  details: 'Estimated from your details',
-} as const
+// The customer's words live in the shared package (T-183), beside the
+// business's words for the same facts (quantity-source.ts).
+const PLAIN = CUSTOMER_METHOD
 
 /** The plain-words source of a signal-derived quantity or selection (T-146). */
 export function plainSource(signal: Signal | undefined): string {
@@ -45,6 +45,15 @@ export function plainSource(signal: Signal | undefined): string {
   }
   if (signal.basis === 'envelope') return PLAIN.details
   return PLAIN.photos
+}
+
+/** T-183: the same fact as a code (the business is told it in its own words) */
+export function signalSource(signal: Signal | undefined): LineSource {
+  if (!signal) return 'photos'
+  if (signal.source === 'form' || signal.confidence >= 1) return 'answer'
+  if (signal.basis === 'identified') return 'label'
+  if (signal.basis === 'envelope') return 'details'
+  return 'photos'
 }
 
 /**
@@ -70,7 +79,8 @@ export function buildTakeoff(opts: {
         entries.push({
           item: step.description || 'Base fee',
           amount: step.amount,
-          method: 'Standard charge for every job',
+          method: PLAIN.standardCharge,
+          source: 'fixed',
         })
         break
       }
@@ -82,20 +92,24 @@ export function buildTakeoff(opts: {
         )?.value as number | undefined
 
         let method: string
+        let source: LineSource
         let evidence: string | undefined
         switch (step.quantitySource) {
           case 'form_field': {
             const fieldId = config?.quantitySource?.fieldId
             if (fieldId && opts.scanned?.fieldIds.has(fieldId)) {
               method = PLAIN.scan
+              source = 'scan'
               evidence = opts.scanned.evidence
             } else {
-              method = 'Quantity provided by you'
+              method = PLAIN.quantityGiven
+              source = 'answer'
             }
             break
           }
           case 'constant':
-            method = 'Fixed quantity'
+            method = PLAIN.fixedQuantity
+            source = 'fixed'
             break
           case 'ai_signal': {
             const signalKey = config?.quantitySource?.signalKey
@@ -103,19 +117,23 @@ export function buildTakeoff(opts: {
               ? structuredSignals?.signals.find((s) => s.key === signalKey)
               : undefined
             method = plainSource(signal)
+            source = signalSource(signal)
             evidence = signal?.evidence
             break
           }
           case 'derived':
             // T-137 live run: a run-length line said "Fixed price"
-            method = 'Calculated from your answers'
+            method = PLAIN.calculated
+            source = 'calculated'
             break
           case 'legacy_fallback':
           case 'derived_unresolved':
             method = PLAIN.details
+            source = 'details'
             break
           default:
-            method = 'Fixed price'
+            method = PLAIN.fixedPrice
+            source = 'fixed'
         }
 
         // T-139: a line chosen by WHAT the equipment is shows how that was known
@@ -123,8 +141,10 @@ export function buildTakeoff(opts: {
           const trigger = structuredSignals?.signals.find((s) => s.key === config.triggerSignal)
           if (trigger?.source === 'form' || (trigger && trigger.confidence >= 1)) {
             method = `Selected for ${trigger.value}, as you confirmed`
+            source = 'answer'
           } else if (trigger?.basis === 'identified') {
             method = `${trigger.value} — ${plainSource(trigger).replace(/^From/, 'from')}`
+            source = 'label'
             evidence = trigger.evidence
           }
         }
@@ -139,18 +159,19 @@ export function buildTakeoff(opts: {
             }),
           amount: step.amount,
           method,
+          source,
           ...(evidence && { evidence }),
         })
         break
       }
 
       case 'addon': {
+        const detected = step.signalsUsed.some((s) => s.key === 'auto_detected')
         entries.push({
           item: step.description,
           amount: step.amount,
-          method: step.signalsUsed.some((s) => s.key === 'auto_detected')
-            ? 'Added from your description'
-            : 'Selected extra',
+          method: detected ? PLAIN.fromDescription : PLAIN.selectedExtra,
+          source: detected ? 'words' : 'choice',
         })
         break
       }
@@ -159,7 +180,8 @@ export function buildTakeoff(opts: {
         entries.push({
           item: step.description,
           amount: step.amount,
-          method: 'Adjustment from your answers',
+          method: PLAIN.adjustment,
+          source: 'answer',
         })
         break
       }
@@ -175,4 +197,30 @@ export function buildTakeoff(opts: {
   }
 
   return entries
+}
+
+/**
+ * T-183: put each line's source on the price line itself, so a service added
+ * to a quote (a section, which has no takeoff of its own) carries it too.
+ *
+ * The engine builds the breakdown from the trace, one line per step that is
+ * not tax, and the takeoff from the same trace, leaving out zero amounts and
+ * the minimum top-up. So the two are walked together: a takeoff row belongs
+ * to the next line with its amount whose label starts with its item. A line
+ * with no row (the minimum's own entry) gets nothing. Returns new lines; nothing is changed in place.
+ */
+export function withLineSources(breakdown: QuotePricing['breakdown'], takeoff: readonly TakeoffEntry[]): QuotePricing['breakdown'] {
+  let next = 0
+  return breakdown.map((line) => {
+    if (line.kind === 'minimum') return line
+    for (let i = next; i < takeoff.length; i++) {
+      const row = takeoff[i]!
+      const sameLine = line.label === row.item || line.label.startsWith(`${row.item} `)
+      if (row.source && sameLine && Math.abs(row.amount - line.amount) < 0.005) {
+        next = i + 1
+        return { ...line, source: row.source }
+      }
+    }
+    return line
+  })
 }

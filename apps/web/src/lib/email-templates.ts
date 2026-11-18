@@ -36,7 +36,7 @@ export function generateRevisedQuoteEmailHtml(data: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Updated Quote</title>
+  <title>Updated quote</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -60,7 +60,7 @@ export function generateRevisedQuoteEmailHtml(data: {
               </p>
 
               <div style="margin: 24px 0; padding: 24px; background-color: #f0f9ff; border-radius: 8px; text-align: center;">
-                <p style="margin: 0 0 4px; color: #6b7280; font-size: 14px;">Updated Total</p>
+                <p style="margin: 0 0 4px; color: #6b7280; font-size: 14px;">Updated total</p>
                 <p style="margin: 0; font-size: 36px; font-weight: 700; color: ${primaryColor};">
                   ${escapeHtml(data.total)}
                 </p>
@@ -72,7 +72,7 @@ export function generateRevisedQuoteEmailHtml(data: {
                 <tr>
                   <td style="text-align: center;">
                     <a href="${escapeHtml(data.quoteViewUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
-                      View Updated Quote
+                      View updated quote
                     </a>
                   </td>
                 </tr>
@@ -118,7 +118,7 @@ export function generateFeedbackNotificationEmailHtml(data: {
 }): string {
   const primaryColor = data.primaryColor || '#2563eb'
   const feedbackLabel = data.feedbackType === 'approval_request'
-    ? 'Review Request'
+    ? 'Review request'
     : 'Feedback'
 
   const feedbackSection = data.feedbackText
@@ -136,7 +136,7 @@ export function generateFeedbackNotificationEmailHtml(data: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Customer ${feedbackLabel}</title>
+  <title>Customer ${feedbackLabel.toLowerCase()}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -162,7 +162,7 @@ export function generateFeedbackNotificationEmailHtml(data: {
                 <tr>
                   <td style="text-align: center;">
                     <a href="${escapeHtml(data.dashboardUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
-                      View in Dashboard
+                      View in dashboard
                     </a>
                   </td>
                 </tr>
@@ -245,7 +245,7 @@ function generateLimitReachedEmailBody(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${data.per === 'total' ? 'Free quotes used' : 'Monthly Quote Limit Reached'}</title>
+  <title>${data.per === 'total' ? 'Free quotes used' : 'Monthly quote limit reached'}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -276,7 +276,7 @@ function generateLimitReachedEmailBody(
                 <tr>
                   <td style="text-align: center;">
                     <a href="${escapeHtml(data.billingUrl)}" style="display: inline-block; padding: 16px 32px; background-color: #09090b; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
-                      Upgrade Your Plan
+                      Upgrade your plan
                     </a>
                   </td>
                 </tr>
@@ -337,7 +337,7 @@ export function generateQuoteAcceptedEmailHtml(data: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quote Accepted</title>
+  <title>Quote accepted</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -367,7 +367,7 @@ export function generateQuoteAcceptedEmailHtml(data: {
                 <tr>
                   <td style="text-align: center;">
                     <a href="${escapeHtml(data.dashboardUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
-                      View in Dashboard
+                      View in dashboard
                     </a>
                   </td>
                 </tr>
@@ -419,7 +419,7 @@ export function generateQuoteDeclinedEmailHtml(data: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quote Declined</title>
+  <title>Quote declined</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -445,7 +445,7 @@ export function generateQuoteDeclinedEmailHtml(data: {
                 <tr>
                   <td style="text-align: center;">
                     <a href="${escapeHtml(data.dashboardUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
-                      View in Dashboard
+                      View in dashboard
                     </a>
                   </td>
                 </tr>
@@ -517,7 +517,7 @@ export function generateQuoteReminderEmailHtml(data: {
                 <tr>
                   <td style="text-align: center;">
                     <a href="${escapeHtml(data.quoteViewUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
-                      View Your Quote
+                      View your quote
                     </a>
                   </td>
                 </tr>

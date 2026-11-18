@@ -74,7 +74,7 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
     sections.push(`
       <div style="margin-bottom: 24px;">
         <h2 style="font-size: 14px; font-weight: 600; color: ${primaryColor}; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">
-          Scope of Work
+          Scope of work
         </h2>
         <p style="margin: 0; color: #374151; line-height: 1.6;">
           ${escapeHtml(content.scopeSummary)}
@@ -114,7 +114,7 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
     sections.push(`
       <div style="margin-bottom: 24px;">
         <h2 style="font-size: 14px; font-weight: 600; color: ${primaryColor}; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px;">
-          Pricing Breakdown
+          Pricing breakdown
         </h2>
         ${blocks}
       </div>
@@ -138,7 +138,7 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
     sections.push(`
       <div style="margin-bottom: 24px;">
         <h2 style="font-size: 14px; font-weight: 600; color: ${primaryColor}; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px;">
-          Pricing Breakdown
+          Pricing breakdown
         </h2>
         <table style="width: 100%; border-collapse: collapse;">
           <tbody>
@@ -245,9 +245,14 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
     : ''
 
   // Logo section
+  // T-183: a logo never stands in for the name. With a logo, the name is beside it; with none, the name alone.
+  const nameHtml = `<h1 data-role="business-name" style="margin: 0; font-size: 24px; font-weight: 700; color: ${primaryColor};">${escapeHtml(businessName)}</h1>`
   const logoHtml = logoUrl
-    ? `<img src="${logoUrl}" alt="${escapeHtml(businessName)}" style="max-height: 60px; max-width: 200px;" />`
-    : `<h1 style="margin: 0; font-size: 24px; font-weight: 700; color: ${primaryColor};">${escapeHtml(businessName)}</h1>`
+    ? `<table role="presentation" data-role="business-identity" style="border-collapse: collapse;"><tr>
+        <td style="padding: 0 14px 0 0; vertical-align: middle;"><img src="${logoUrl}" alt="" style="max-height: 60px; max-width: 160px;" /></td>
+        <td style="padding: 0; vertical-align: middle;">${nameHtml}</td>
+      </tr></table>`
+    : nameHtml
 
   // Identity lines under the logo/name: tagline + contact details
   const taglineHtml = branding.tagline
@@ -294,7 +299,7 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
         ${contactHtml}
       </div>
       <div style="text-align: right;">
-        <p style="margin: 0 0 4px 0; font-size: 12px; color: #6b7280;">Quote Reference</p>
+        <p style="margin: 0 0 4px 0; font-size: 12px; color: #6b7280;">Quote reference</p>
         <p style="margin: 0; font-weight: 600; color: #111827;">${escapeHtml(quoteId)}</p>
         <p style="margin: 8px 0 0 0; font-size: 12px; color: #6b7280;">Date: ${formatDate(createdAt, locale)}</p>
         ${validUntil ? `<p style="margin: 4px 0 0 0; font-size: 12px; color: #6b7280;">Valid until: ${formatDate(validUntil, locale)}</p>` : ''}
@@ -304,7 +309,7 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
     <!-- Customer Details -->
     <div style="margin-bottom: 32px;">
       <h2 style="font-size: 14px; font-weight: 600; color: ${primaryColor}; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">
-        Prepared For
+        Prepared for
       </h2>
       <p style="margin: 0; font-weight: 600; color: #111827;">${escapeHtml(customer.name)}</p>
       ${customer.email ? `<p style="margin: 4px 0 0 0; color: #6b7280;">${escapeHtml(customer.email)}</p>` : ''}

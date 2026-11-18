@@ -493,14 +493,14 @@ export default function BrandingPage() {
 
               {/* Scope */}
               <div className="mb-4">
-                <p className="text-sm font-medium text-text-secondary">Scope of Work</p>
+                <p className="text-sm font-medium text-text-secondary">Scope of work</p>
                 <p className="mt-1 text-sm text-text-secondary">{MOCK_QUOTE.content.scopeSummary}</p>
               </div>
 
               {/* Line Items */}
               {template.showLineItems && (
                 <div className="mb-4">
-                  <p className="mb-2 text-sm font-medium text-text-secondary">Pricing Breakdown</p>
+                  <p className="mb-2 text-sm font-medium text-text-secondary">Pricing breakdown</p>
                   <div className="space-y-1">
                     {MOCK_QUOTE.pricing.breakdown.map((item, i) => (
                       <div key={i} className="flex justify-between text-sm">

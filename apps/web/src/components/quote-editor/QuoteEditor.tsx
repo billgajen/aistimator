@@ -211,7 +211,7 @@ export default function QuoteEditor({
       {/* Scope summary */}
       <EditorSection>
         <TextSectionEditor
-          label="Scope of Work"
+          label="Scope of work"
           value={scopeSummary}
           onChange={setScopeSummary}
           placeholder="Describe the scope of work..."
@@ -220,7 +220,7 @@ export default function QuoteEditor({
 
       {/* Line items */}
       <EditorSection>
-        <h3 className="text-sm font-semibold text-text-primary mb-3">Pricing Breakdown</h3>
+        <h3 className="text-sm font-semibold text-text-primary mb-3">Pricing breakdown</h3>
         <LineItemEditor
           items={items}
           currency={currency}

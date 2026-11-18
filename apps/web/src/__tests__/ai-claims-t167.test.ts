@@ -269,7 +269,9 @@ describe('T-167: the screens on marketing pages say the product’s own words', 
     expect(read('apps/worker/src/ai/signals.ts') + read('apps/worker/src/pricing/rules-engine.ts') + read('apps/worker/src/quote-processor.ts')).toContain('Detected from your description')
     expect(quote).toContain('Measurement &amp; takeoff')
     expect(quote).toContain(SCREEN_WORDS.estimate.takeoffLead)
-    expect(read('apps/worker/src/takeoff.ts')).toContain(`photos: '${SCREEN_WORDS.estimate.fromPhotos}'`)
+    // T-183: the customer's words for a source moved to the shared package, beside the business's words
+    expect(read('packages/shared/src/quantity-source.ts')).toContain(`photos: '${SCREEN_WORDS.estimate.fromPhotos}'`)
+    expect(read('apps/worker/src/takeoff.ts')).toContain('const PLAIN = CUSTOMER_METHOD')
     expect(quote).toContain(SCREEN_WORDS.estimate.rangeLead)
     expect(quote).toContain(SCREEN_WORDS.estimate.rangeButton)
     expect(quote).toContain('`Estimate for ${customer.name}`')
