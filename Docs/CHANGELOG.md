@@ -17,7 +17,29 @@
 
 ### 2026-11-18: T-181 — Small site fixes + Meta app review readiness
 
-**Built, not deployed.** Quick checks only, as the ticket asked: web build, `pnpm lint`, `pnpm typecheck`, web
+**Deployed 2026-11-18** (commits `bf69ae2` and `fdac578`). Web only: no worker change, no migration.
+1. Before the deploy, the earlier checks that cover the changed pages were run on this machine (the ticket
+   itself had asked for quick checks only): `verify-t152` 66/66, `t154` 27/27, `t155` 44/44, `t162` 77/77,
+   `t164` 78/78, `t165` 148/148, `t167` 182/182, `t170` 412/412, `t171` 97/97, `t174` 83/83.
+   - Two failed first, on counts written into the scripts for things this ticket changed on purpose:
+     `verify-t165` expected 13 footer links (14 with "Delete your data") and `verify-t170` expected at least
+     three lines still to come on Pricing (two, now text messages are off the site). Both scripts were updated
+     (`fdac578`) and pass. Neither was a fault in the pages.
+   - Not run: the rest of the regression set (`verify-t173`, `t175` to `t180` and the others): nothing they
+     cover changed.
+2. Web: `npx vercel deploy --prod --yes`, deployment `dpl_ePb91348jKdKgqk9T9jPQidhrG6z`, serving `qolumns.com`.
+
+Live checks, read-only (nothing submitted, nothing created):
+- `/`, `/login`, `/pricing`, `/painting`, `/terms`, `/privacy`, the new `/data-deletion` and the demo quote link:
+  200. An unknown quote link: 404.
+- `/privacy`, `/terms` and `/data-deletion` also answer 200 to Meta's crawler.
+- WhatsApp webhook: wrong verify token 403, unsigned POST 401. Stripe webhook: unsigned POST 400.
+- Home: the headline; "Walls & ceilings, 3 rooms" and a $1,400 total, no "2 rooms"; "small to corporate", no
+  "contractors and home-service"; the plan lines on the cards; the footer's link to `/data-deletion`; no "SMS".
+- Pricing: "plus tax", "Billed in advance, monthly or yearly", two lines marked "Coming later" on Pro, no text
+  messages; $49 and $99.
+
+**As built (before the deploy):** quick checks only, as the ticket asked: web build, `pnpm lint`, `pnpm typecheck`, web
 unit tests 1,072 (9 new in `site-t181.test.ts`; run with two workers), and each changed page answering 200 on
 this machine (`/`, `/pricing`, `/painting`, `/trades`, `/features`, `/terms`, `/privacy`, `/data-deletion`,
 `/demo`, `/login`), looked at in a browser at 1280 and 390 px with no sideways scroll. **No regression script

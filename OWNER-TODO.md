@@ -2162,8 +2162,10 @@ production twice, read-only: the three service configurations and that one quote
 
 ## T-181 — Small site fixes + Meta app review readiness
 
-**Built 18 November 2026, committed and pushed. Not deployed.** Quick checks only, as asked: build, lint,
-typecheck, unit tests, and each changed page loaded on this machine. No regression scripts were run.
+**Deployed 18 November 2026** (web only, `dpl_ePb91348jKdKgqk9T9jPQidhrG6z`, serving `qolumns.com`). Read-only live
+checks passed: the changed pages and the new `/data-deletion` answer 200 (also to Meta's crawler), the new
+wording is live, and both webhooks still refuse unsigned calls. Before deploying I ran the ten earlier checks
+that cover these pages; all pass (two needed a count updated: 14 footer links, two "Coming later" lines).
 
 ### 1. What was done, item by item
 
@@ -2199,13 +2201,13 @@ typecheck, unit tests, and each changed page loaded on this machine. No regressi
 - **Data deletion: a page of its own, `/data-deletion` ("Delete your data"), added in this ticket** and linked
   from every page's footer. It says how a customer asks, how a business asks, what Disconnect does for a
   WhatsApp number, and what a deletion covers. It promises nothing the Privacy Policy and Terms do not.
-  **It is not live until this ticket is deployed** (today it answers 404 on qolumns.com). Until then the
-  Meta field can stay on `/privacy`, whose last section says where to write.
+  **It is live** (`https://qolumns.com/data-deletion` answers 200, also to Meta's crawler), so the Meta field
+  can be changed to it now.
 - **App icon:** `Docs/design/meta-app-icon.png` (1024 × 1024, the wordmark on juniper). Still the temporary one.
 
 ### 3. Your steps in the Meta dashboard, in order
 
-- [ ] **Deploy T-181 first** (say the word), so `/data-deletion` exists.
+- [x] **Deploy T-181 first**, so `/data-deletion` exists. (Done 18 November.)
 - [ ] **App settings, Basic.** Most of this was listed under T-175; tick what is already there.
   - App icon: upload `Docs/design/meta-app-icon.png`.
   - Privacy policy URL: `https://qolumns.com/privacy`.
@@ -2274,8 +2276,8 @@ typecheck, unit tests, and each changed page loaded on this machine. No regressi
 
 ### Not checked
 
-- No regression script was run. `verify-t155` and `verify-t167` had words this ticket changed written into
-  them; I updated those lines but did not run the scripts. They run at the next regression.
-- `/data-deletion` was added to the list of marketing pages the layout checks walk; those checks were not run.
-- The changed pages were looked at on this machine at 1280 and 390 px wide, not on production.
+- The rest of the regression set (`verify-t173`, `t175` to `t180` and others) was not run: nothing they cover
+  changed. The ten that cover the changed pages were run before the deploy and pass.
+- The changed pages were looked at in a browser on this machine at 1280 and 390 px wide. On production I
+  checked that they load and carry the new words, not how they look.
 
