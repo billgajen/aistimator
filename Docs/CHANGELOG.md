@@ -21,15 +21,15 @@
 to the sandbox "Qolumns sandbox" with Stripe's test cards; no real charge, no email off this machine, no
 WhatsApp message. What the owner runs to go live is in OWNER-TODO (T-180, section 1). Migration 44 goes first.
 
-Checks: `pnpm lint` and `pnpm typecheck` pass; web and worker build. Unit tests: web 1,052 (51 new in
-`billing-t180.test.ts`), worker 574, mobile 11. `verify-t180` 98/98 against the sandbox (the counter, the free
-journey, the test account, suspend and restore, then in a browser on Stripe's own pages: pay Starter, upgrade,
-yearly, downgrade, cancel, a declined card, a renewal that fails then succeeds, a renewal that fails until
-Stripe gives up, the same event twice). `verify-t177` 99/99, `verify-t178` 52/52, `verify-t179` 97/97. Also
-run, because this changes the billing page and how usage is counted: `verify-t152` 66/66, `verify-t165`
-148/148, `verify-t171` 97/97. **Not run:** the rest of the regression set (t146 to t176) and `verify-t173`.
-The ticket named t177 to t179; this change touches the quote flow, the worker and a migration, so the full set
-is due before it is deployed.
+Checks, on the final code (after the follow-up below): `pnpm lint` and `pnpm typecheck` pass; web and worker
+build. Unit tests: web 1,055 (54 new in `billing-t180.test.ts`), worker 574, mobile 11. **The full regression
+set passes: 30 scripts, `verify-t146` to `verify-t180`, 2,646 checks.** The 26 from t146 to t177 in one run on
+the standard local servers (2,288 checks), then each of these alone on its own servers: `verify-t173`
+104/104, `verify-t178` 52/52, `verify-t179` 97/97, `verify-t180` 105/105 against the Stripe sandbox (the
+counter, the free journey, the test account, suspend and restore, then in a browser on Stripe's own pages: pay
+Starter, upgrade, yearly, a downgrade asked for, cancel, a declined card, a renewal that fails then succeeds, a
+downgrade landing at the period end, a renewal that fails until Stripe gives up, the same event twice).
+Committed as `a375326` and pushed with the commit that records these results.
 
 **`verify-t179` needed its test business put on a plan.** It sends more than ten requests. Six of them go at
 the same moment, and until now those counted as two, so the business never reached its ten free quotes. With
