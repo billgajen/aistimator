@@ -5,7 +5,7 @@
  * Uses inline styles for consistent rendering across PDF generators.
  */
 
-import { formatMoney, splitMinimum, minimumChargeNote } from '@qolumns/shared'
+import { formatMoney, splitMinimum, minimumChargeNote, displaySections } from '@qolumns/shared'
 import type {
   QuotePricing,
   QuoteContent,
@@ -30,6 +30,8 @@ export interface QuotePdfData {
   validUntil?: string
   /** T-133: BCP 47 locale from the tenant's region (money + dates) */
   locale?: string
+  /** T-179: the quote's own service (the first section's heading on a combined quote) */
+  serviceName?: string
 }
 
 function formatCurrency(amount: number, currency: string, locale: string): string {
@@ -85,7 +87,39 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
   // T-165: the minimum charge is a floor, not an item: the job's real lines,
   // then one note when the minimum applied (shared/minimum-charge.ts)
   const { lines: priceLines, minimum: minimumApplied } = splitMinimum(pricing.breakdown)
-  if (template.showLineItems && (priceLines.length > 0 || minimumApplied)) {
+  // T-179: a combined quote shows each service as a section with its subtotal.
+  // (Shown whatever the "line items" setting: the sections are how the total is made up.)
+  const combined = displaySections(pricing, { serviceName: data.serviceName || 'Service' })
+  if (combined) {
+    const row = (label: string, amount: string, strong = false) => `
+          <tr>
+            <td style="padding: ${strong ? '12px 0 4px' : '10px 0'}; border-bottom: ${strong ? 'none' : '1px solid #e5e7eb'}; color: ${strong ? '#111827' : '#374151'}; ${strong ? 'font-weight: 600;' : ''}">${label}</td>
+            <td style="padding: ${strong ? '12px 0 4px' : '10px 0'}; border-bottom: ${strong ? 'none' : '1px solid #e5e7eb'}; text-align: right; color: #111827; font-weight: ${strong ? '600' : '500'};">${amount}</td>
+          </tr>`
+    const blocks = combined
+      .map(
+        (section) => `
+        <div style="margin-bottom: 20px;" data-role="quote-section">
+          <h3 style="font-size: 14px; font-weight: 600; color: #111827; margin: 0 0 6px 0;">${escapeHtml(section.serviceName)}</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tbody>
+              ${template.showLineItems ? section.lines.map((item) => row(escapeHtml(item.label), formatCurrency(item.amount, pricing.currency, locale))).join('') : ''}
+              ${row(`${escapeHtml(section.serviceName)} subtotal`, formatCurrency(section.subtotal, pricing.currency, locale), true)}
+            </tbody>
+          </table>
+          ${section.minimum ? `<p style="margin: 6px 0 0 0; font-size: 13px; color: #374151;">${escapeHtml(minimumChargeNote(formatCurrency(section.minimum.minimumCharge, pricing.currency, locale)))}</p>` : ''}
+        </div>`
+      )
+      .join('')
+    sections.push(`
+      <div style="margin-bottom: 24px;">
+        <h2 style="font-size: 14px; font-weight: 600; color: ${primaryColor}; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px;">
+          Pricing Breakdown
+        </h2>
+        ${blocks}
+      </div>
+    `)
+  } else if (template.showLineItems && (priceLines.length > 0 || minimumApplied)) {
     const lineItemsHtml = priceLines
       .map(
         (item) => `

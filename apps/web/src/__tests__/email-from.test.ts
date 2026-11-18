@@ -199,6 +199,7 @@ describe('every sender says who the email is for', () => {
     'apps/web/src/lib/auth-flow.ts': ['business'], // T-173: confirm your email, reset your password, you already have an account
     'apps/web/src/lib/whatsapp-renewal.ts': ['business'], // T-175: reconnect WhatsApp before it runs out
     'apps/web/src/lib/failed-quote.ts': ['business'], // T-178: a request could not be priced (the worker's copy, apps/worker/src/failed-quote.ts, is also 'business')
+    'apps/web/src/lib/request-updated.ts': ['business'], // T-179: a customer added a service to their quote, or took one off
     // worker: customer quote, business "new quote", review request, customer estimate
     'apps/worker/src/email/index.ts': ['customer', 'business', 'business', 'customer'],
   }

@@ -8,6 +8,7 @@ import LineItemEditor from './LineItemEditor'
 import AddonsEditor from './AddonsEditor'
 import RecommendationsEditor from './RecommendationsEditor'
 import { TextSectionEditor, ListSectionEditor } from './SectionEditor'
+import { ServiceSectionsEditor } from './ServiceSectionsEditor'
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   GBP: '\u00a3', USD: '$', EUR: '\u20ac', AUD: 'A$', CAD: 'C$', NZD: 'NZ$',
@@ -21,6 +22,8 @@ interface QuoteEditorProps {
   version: number
   currency: string
   feedbackId?: string
+  /** T-179: the quote's own service (it cannot be added as a section) */
+  mainServiceId?: string
   onSave: () => Promise<void>
   onCancel: () => void
 }
@@ -33,6 +36,7 @@ export default function QuoteEditor({
   version,
   currency,
   feedbackId,
+  mainServiceId,
   onSave,
   onCancel,
 }: QuoteEditorProps) {
@@ -44,6 +48,12 @@ export default function QuoteEditor({
     removeMinimum,
     restoreMinimum,
     subtotal,
+    mainSubtotal,
+    sections,
+    sectionTotals,
+    addSection,
+    removeSection,
+    updateSectionItems,
     taxAmount,
     taxLabel,
     taxRate,
@@ -264,9 +274,30 @@ export default function QuoteEditor({
               </p>
             )}
           </div>
+          {sections.length > 0 && (
+            <div className="flex justify-between text-sm" data-testid="editor-main-subtotal">
+              <span className="text-text-secondary">This service’s subtotal</span>
+              <span className="text-text-primary">{symbol}{mainSubtotal.toFixed(2)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* T-179: other services on this quote, each priced from its own rules; add or remove one */}
+        <ServiceSectionsEditor
+          quoteId={quoteId}
+          mainServiceId={mainServiceId}
+          currency={currency}
+          sections={sections}
+          totals={sectionTotals}
+          onAdd={addSection}
+          onRemove={removeSection}
+          onItems={updateSectionItems}
+        />
+
+        <div className="mt-4 pt-4 border-t border-border space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-text-secondary">Subtotal</span>
-            <span className="text-text-primary">{symbol}{subtotal.toFixed(2)}</span>
+            <span className="text-text-primary" data-testid="editor-subtotal">{symbol}{subtotal.toFixed(2)}</span>
           </div>
           {taxRate > 0 && (
             <div className="flex justify-between text-sm">
@@ -276,7 +307,7 @@ export default function QuoteEditor({
           )}
           <div className="flex justify-between text-base font-semibold pt-2 border-t border-border">
             <span className="text-text-primary">Total</span>
-            <span className="text-text-primary">{symbol}{total.toFixed(2)}</span>
+            <span className="text-text-primary" data-testid="editor-total">{symbol}{total.toFixed(2)}</span>
           </div>
           <p className="text-xs text-text-muted">Tax is recalculated server-side on save.</p>
         </div>

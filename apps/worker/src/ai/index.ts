@@ -34,11 +34,11 @@ export {
 } from './wording'
 export type { QuoteContent, WordingContext } from './wording'
 
-export { extractCrossServiceDetails } from './cross-service'
+export { prefillSectionAnswers } from './cross-service'
 export type { CrossServiceEstimate } from './cross-service'
 
 export { detectServicesFromDescription } from './service-detection'
-export type { ServiceForMatching, DetectedServiceResult } from './service-detection'
+export type { ServiceForMatching, DetectedServiceResult, MainServiceContext, DetectionResult } from './service-detection'
 
 export { generateServiceDraft, getFallbackDraft } from './service-draft'
 export type { ServiceDraftRequest } from './service-draft'

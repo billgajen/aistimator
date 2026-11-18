@@ -15,6 +15,129 @@
 
 ## Issues & Resolutions
 
+### 2026-11-17: T-179 — One request, several services: other services the customer asked for can be added to the same quote (AD-061)
+
+**Built, not deployed. One commit, not pushed.** No migration.
+
+#### What it does
+
+A customer picks one service and, in the note, asks for another the business also offers. Until now the quote
+page showed a rough figure for it in a box outside the total ("Other services you mentioned"), priced from the
+base fee and the old per-unit model only. Now:
+
+1. **The main service is priced exactly as before.** Nothing is added to it by a mention.
+2. **Each other offered service the customer explicitly asked for is a card** under the price breakdown: "You
+   also asked for: “their words”" and the service's name. If nothing more needs asking it shows that service's
+   price and "Add to my quote". If the service has questions of its own it says "Answer N questions to add it";
+   an answer the note already gave is filled in, marked as such, for the customer to confirm or change.
+3. **Adding it prices a section with the rules engine and that service's full rules** (work steps, add-ons, its
+   own minimum), through the same pipeline a request for that service alone takes, with no AI call and no
+   photos. Totals are worked out again; tax once, on the combined taxed amount.
+4. **A quantity the service would normally measure from photos is asked of the customer** (the existing
+   no-photo path). Nothing is measured for an added service.
+5. **An added section can be removed** until the quote is accepted. Accept covers every section. The hosted
+   page, the PDF and the emails show each service as a section with its subtotal, then one total.
+6. **Review follows the strictest service.** The quote stays sent only if every service on it sends
+   automatically; otherwise it waits for the business again. The business gets one "Request updated" email per
+   change (with a fresh approve link when it now needs approving), never a second quote. Removing the last
+   added section puts the quote back where it stood.
+7. **Something the business does not offer never gets a price.** The customer reads "We’ll confirm “their words”
+   with you separately."; the business sees it at the top of the quote.
+8. **Something the main service already covers** (its scope, options, add-ons) is not another service.
+9. **At most two added services.**
+
+For the business: "Customer also asked for" at the top of the quote, each with its state (added by the customer,
+not added yet, not one of your services), beside T-178's "Check the service" notice. The quote editor adds or
+removes a service section at that service's price; its lines are edited like any other line. The
+approve-by-email page lists the sections and the total.
+
+#### How (the parts worth knowing)
+
+- **Data shape**, no new table or column (`packages/shared/src/quote-sections.ts`, `Docs/03-data-model.md`):
+  `pricing_json.breakdown` stays the main service's lines; `pricing_json.sections[]` are the added services,
+  each with its own lines, its own minimum entry and its subtotal; `subtotal`, `taxAmount` and `total` are the
+  combined figures; `content_json.alsoAsked[]` is what else was asked for and where each stands. A quote with no
+  `sections` is a single-service quote and nothing about it changed, which is how old quotes stay as they were.
+  All the arithmetic is one function, `withSections`, used by the customer's add and remove, the editor's save
+  and nothing else.
+- **Section mode in the worker** (`quote-processor.ts`, `section-pricing.ts`): `processQuote` takes
+  `{ section: { serviceId, answers } }`. It loads that service in place of the quote's own, swaps in the given
+  answers, switches every AI client off, drops the photos, and returns straight after the rules engine. Nothing
+  is written before that point in the pipeline, so it is read-only by construction. `priceSection` turns the
+  result into a section, or into the questions still needed: the service's own required or price-critical
+  questions without an answer, one number question per quantity it would have measured, a placeholder quantity,
+  and "how many" for a per-unit price. Exposed as `POST /section` on the worker; the web app waits for it.
+- **First pass:** the detection (still AI, still with every AD-008, AD-010 and AD-014 check) now also says when
+  the customer asked for something no service covers. A second small call reads the note for answers to the
+  added service's questions; they are kept only as `prefill` on a question. The wording model is told what else
+  was asked for and to leave it out; a check in code then drops any exclusion or sentence of the notes that
+  names a service the customer can add. (Seen before that fix: "Not included: Service B" on a quote the
+  customer had just added Service B to.)
+- **The detection prompt no longer carries trade examples** (carpet, painting, window cleaning, IT). It is
+  built from the business's configuration: the chosen service's description, includes, excludes and add-ons;
+  the other services' names, descriptions and scope. Two plain-language checks were added in code, the same for
+  every business: a phrase the customer declines ("I don't need…", also with a curly apostrophe) or only asks
+  about ("is … included?") is not a request; and a phrase whose key words are all the chosen service's own is
+  covered by it. The keyword fallback gets the same checks (it used to accept "I don't need X" because "need"
+  is a request word).
+- **Review** (`reviewAfterAdding`): a check's hold is never loosened; "hidden until approved" is never loosened
+  to "shown". A sent quote that goes back for review remembers where it stood (`content_json.sectionsBefore`).
+- **Public endpoints** follow AD-055 and AD-060: `POST` and `DELETE /api/public/quotes/{id}/sections` are
+  counted by address before anything is read, token-checked, then counted for the quote and the business, like
+  `/clarify`. Limits fail open and log.
+- **Usage:** nothing in the add or remove path touches a counter. One request is one quote.
+- **Analytics** count the quote under its main service (`quotes.service_id` is unchanged). **Accuracy** counts a
+  combined quote in Overall only (`computeAccuracy`: `combined`), not By service and not By grade: there is one
+  final invoice for all of it.
+
+#### What WhatsApp and the on-site app show (neither was changed)
+
+- **WhatsApp** sends a link to the estimate, never the figures. The link opens the hosted page, which shows the
+  cards, the sections and the one total. A request that arrives on WhatsApp is detected and offered in the same
+  way (the same worker path). The approval notice on WhatsApp is the same link.
+- **On-site app:** it shows a quote's headline price, the service name and the takeoff lines, and that code is
+  untouched. The web API it reads was changed so those three read correctly for a combined quote: the price is
+  the combined total, the service name lists every service ("A + B"), and each added service's lines follow the
+  main service's takeoff, marked "Added by the customer". The app has no way to add or remove a section, and
+  does not show the "also asked for" list. **Not opened on a device in this ticket.**
+
+#### Cut, and why
+
+- **A business with one service gets no "not offered" notice.** The pipeline only reads the note for other
+  services when the business has more than one (unchanged from before); extending it would add an AI call to
+  every single-service request. Later.
+- **The added service's optional questions are not asked.** Only what its price needs. A customer who wants an
+  optional extra on the added service tells the business; the business can edit the section.
+- **No photo measurement for an added service** (the ticket: ask the customer instead).
+- **The scope text, assumptions and exclusions are the main service's.** An added section shows its lines and
+  subtotal; no wording is written for it (no AI at add time).
+- **`calculateCrossServicePricing`** (the old rough estimate) is no longer called. It and its unit test are left
+  in place; nothing reads them.
+
+#### Found on the way (not this ticket's to fix)
+
+- **The plan's usage counter loses counts when requests arrive at the same moment.** `incrementUsageCounter`
+  reads the number and writes it back plus one; six requests submitted together counted as two. It favours the
+  business (it under-counts). It needs an atomic increment. Recorded in OWNER-TODO.
+
+#### Checks
+
+- `pnpm lint`, `pnpm typecheck`: pass. Unit tests: web 991 (29 new), worker 574 (23 new), mobile 11.
+- `verify-t179` 79/79 (new), with the note-reading model and the service matcher stood in for: the twelve cases
+  of the ticket through the real worker and web app, then the customer's page, the dashboard and the editor in
+  a browser at 390 and 1440 px.
+- **The full regression set passes**, so the rebuilt detection prompt stays: `verify-t146` to `verify-t177` (26
+  scripts, 2,288 of 2,288 checks), `verify-t173` 104/104 and `verify-t178` 52/52, each on its own server. In
+  that run the new detection prompt was read by the live model 44 times with no error; it found another
+  service in none of those requests (none asks for one) and flagged one phrase as not offered (below).
+  The first pass of the t146 to t177 batch may have run against a worker left over from the `verify-t179` run
+  (a stopped local worker had kept its port), so that batch and `verify-t173` were run a second time against a
+  worker checked to be the plain one; the figures above are from the second run.
+- Seen in that run, not tuned (the owner's rule on live-model checks): in `verify-t173`'s deliberately
+  mismatched request (wallpaper chosen, a note about repainting three bedrooms "and the trim too"), the live
+  model marked "the trim too" as something the business does not offer. It gets no price either way.
+- Builds: web and worker.
+
 ### 2026-11-17: T-178 — No quote is ever lost: the worker's limiter fails open, a failed quote is never silent, a customer is never stopped at submit (AD-058, AD-059)
 
 **Deployed 2026-11-17 21:02 UTC** (commit `4a08ec9`). No migration.
@@ -7733,6 +7856,50 @@ that it fails open (the owner's call: it protects nothing the website's limits d
 
 ---
 
+### AD-061: One request can carry several services; each is priced from its own rules, as a section of one quote (T-179)
+
+**Decision:** when a customer asks, in one request, for more than one of a business's services, there is still
+one quote: the chosen service as it always was, and each other service the customer adds as a SECTION. One
+total, tax once, one accept, one plan quote. A section's price comes only from the rules engine and that
+service's own configuration, through the same pipeline a request for it alone would take, with no AI at the
+moment it is added.
+
+**Why:** customers ask for two things in one breath. The old box showed a rough number outside the total, from
+a simplified price model, that nobody could accept. The honest options were to price the second service
+properly or not at all. Pricing it properly means its own rules and its own questions, not a guess from the
+note; and it means the customer chooses to add it, because a mention is not an order.
+
+**Rules that follow:**
+- **Nothing is added by a mention.** The main service's price and the total do not change until the customer
+  (or the business, in the editor) adds a section.
+- **The AI points, it never prices and never answers for the customer.** It finds the customer's words and may
+  suggest an answer to a question; a suggestion is shown for the customer to confirm and prices nothing until
+  they send it. Adding a section makes no AI call.
+- **The detection prompt is built from the business's configuration.** No trade, service name or keyword is
+  written in it or in the checks around it. Anything new the model should know goes in the business's
+  configuration, which it is given.
+- **A section is that service priced alone:** its full rules, its own minimum as a floor on its own section
+  (AD-048), its own tax-exempt flag. Never a simplified model, never the main service's rules.
+- **All combined arithmetic goes through `withSections`.** Nothing else adds sections up, and nothing stores a
+  combined figure it did not get from there. `pricing_json.breakdown` is the main service's lines and stays so.
+- **A quote with no `sections` is untouched by any of this.** A renderer that has not been taught about
+  sections still shows a correct total.
+- **Review is the strictest setting among the services on the quote**, and a customer's change never loosens a
+  hold. The business is told once per change, as an update to the same quote.
+- **What the business does not offer never gets a price**, from anyone.
+- **The customer changes sections only while they can see a price and have not decided.** The public endpoints
+  are protected like every other quote action (AD-055, AD-060).
+- **Usage, analytics, accuracy:** one quote on the plan; counted under its main service; in Overall accuracy
+  only.
+
+**Rejected:** adding the other service to the total automatically (a mention is not an order, and its price
+needs its own answers); a second quote for the second service (two links, two accepts, two plan quotes for one
+request); pricing it from the note with AI-filled answers (the AI would be answering for the customer); keeping
+the rough estimate as a "from" price beside the card (two prices for one thing); a new table for sections (the
+quote's own JSON already holds its price, and old quotes need no migration).
+
+---
+
 ## Known Constraints
 
 ### KC-001: No Automatic Access-Based Pricing
@@ -7749,6 +7916,9 @@ that it fails open (the owner's call: it protects nothing the website's limits d
 ---
 
 ### KC-002: Cross-Service Requires Valid Pricing
+
+> **T-179:** still holds, in the new form: another service is offered as a section only if it has pricing
+> configured, and one whose price comes to nothing is not offered (`priceSection`: `no_price`).
 
 **Constraint:** Cross-service recommendations are only shown if they have pricing > £0.
 

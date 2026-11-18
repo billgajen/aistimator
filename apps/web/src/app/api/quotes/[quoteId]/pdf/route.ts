@@ -61,7 +61,8 @@ export async function POST(
           region,
           branding_json,
           template_json
-        )
+        ),
+        services!service_id ( name )
       `)
       .eq('id', quoteId)
       .eq('tenant_id', profile.tenant_id)
@@ -173,6 +174,8 @@ export async function POST(
       createdAt: quote.created_at,
       validUntil,
       locale: getRegion(tenant.region).locale, // T-133
+      // T-179: the first section's heading on a combined quote
+      serviceName: (quote.services as { name?: string } | null)?.name,
     }
 
     // Generate HTML

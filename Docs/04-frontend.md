@@ -455,6 +455,17 @@ Must be:
   business's own questions) when there is no estimate to read, and "Check the service" on a quote held because
   the description read like another of the business's services (`components/quotes/CustomerSent.tsx`).
 
+- **T-179: one request, several services.** Under the price breakdown the customer's page shows a card for
+  each other service they asked for in their note ("You also asked for: “their words”"): its price and
+  "Add to my quote", or "Answer N questions to add it" with that service's own questions (an answer the note
+  gave is filled in and marked "Filled in from your note. Change it if it is not right."). Once added, the
+  breakdown shows each service as a section with its subtotal, then one total; an added section has "Remove"
+  until the quote is accepted. Something the business does not offer shows only "We’ll confirm “…” with you
+  separately." (`components/quote/AlsoAskedCards.tsx`). The dashboard quote page shows "Customer also asked
+  for" with each state beside "Check the service", and the pricing in sections
+  (`components/quotes/CustomerAlsoAsked.tsx`); the quote editor adds or removes a service section
+  (`components/quote-editor/ServiceSectionsEditor.tsx`).
+
 ### Setup (T-150, /app/onboarding)
 Signup (`/signup?plan=<id>` from the pricing page keeps the plan) → email verification → `/app`, which sends a
 business with no services to setup until it has one or presses "Skip". Steps:

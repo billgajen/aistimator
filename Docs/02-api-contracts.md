@@ -62,6 +62,48 @@
 - `GET /quote/{slug}` (the quote link page) over its limit answers **429** with `Retry-After` and a plain HTML
   line. It used to answer 200 with the same words.
 
+## One request, several services (T-179, AD-061)
+A quote can carry up to two added services ("sections"), each priced from its own service's rules. One total,
+tax once, one accept. No migration: the shape is in `Docs/03-data-model.md`.
+
+- `GET /api/public/quotes/{id}` adds, once the customer can see a price:
+  - `alsoAsked[]`: what else the customer asked for in their note. Each
+    `{ id, words, serviceId | null, serviceName?, state: "offered" | "added" | "not_offered", price?, questions? }`.
+    `price` (before tax) is present only when nothing more needs asking; `questions[]` are
+    `{ key, label, type: "number" | "text" | "select" | "boolean", options?, unit?, prefill? }`. `prefill` is what
+    the note said: a suggestion for the customer to confirm, never used unconfirmed. `not_offered` has no price.
+  - `sections[]` on a combined quote: `{ serviceId, serviceName, main, lines[], minimum, subtotal, addedBy? }`,
+    the main service first. Absent on a single-service quote.
+  - `canChangeSections` (the customer can add or remove right now) and `serviceName` (the main service).
+  - `pricing.subtotal`, `taxAmount` and `total` are the combined figures; `pricing.breakdown` stays the main
+    service's lines.
+- `POST /api/public/quotes/{id}/sections` `{ token, serviceId, answers?: [{ fieldId, value }] }`. Adds a service
+  the customer asked for. The price comes from the worker's rules engine (no AI). Answers `{ pricing, alsoAsked,
+  status }`. **422** `ANSWERS_NEEDED` with `questions[]` when the service's own questions are not all answered
+  (a pre-filled value does not count until it is sent). **404** `NOT_OFFERED` for a service the customer did not
+  ask for or the business does not price; **409** `ALREADY_ADDED`, `TOO_MANY` (two is the limit) or
+  `NOT_CHANGEABLE` (accepted, declined, or not visible to the customer); **503** `TRY_AGAIN` if the price could
+  not be worked out.
+- `DELETE /api/public/quotes/{id}/sections` `{ token, serviceId }`. Removes it again, before accepting.
+- Both are protected like `/clarify` (AD-055, AD-060): counted by address before anything is read, then the
+  link token is checked (**401**), then counted for the quote and for the business (**429**). Limits fail open.
+- Adding a section moves the quote to the strictest review setting among its services: it stays sent only if
+  every service sends automatically; otherwise it is `pending_review` again (visible to the customer unless a
+  service is set to hold until approved). Removing the last added section puts it back where it stood. The
+  business gets one "Request updated" email per change, never a second quote.
+- `POST /api/quotes/{id}/sections/price` (dashboard) `{ serviceId, answers? }`: what one of the business's other
+  services costs as a section. Saves nothing. **200** `{ section }`, **422** `ANSWERS_NEEDED { questions }`,
+  **404** `NOT_A_SERVICE` or `NO_PRICE`.
+- `PATCH /api/quotes/{id}`: `pricing_json.sections[]` may be sent (each `{ serviceId, breakdown[] }`; at most
+  two; each one of the business's own services, not the quote's own). Every subtotal, the tax and the total are
+  worked out again on the server. Omitting a section removes it. `content_json.alsoAsked` is kept from the
+  stored quote.
+- `GET /api/app/quotes/{id}` (on-site app): `serviceName` lists every service on the quote ("A + B"), the total
+  is the combined one, and each added service's lines follow the takeoff.
+- Worker `POST /section` (token required, like `/reprice`) `{ quoteId, serviceId, answers? }` →
+  `{ success, ready, section | questions }`. Reads only.
+- Usage: adding or removing a section counts nothing. One request is one quote.
+
 ## Account routes (T-173)
 The browser does not call Supabase's auth directly. All answer `{ "ok": true }` or the standard error envelope.
 - `POST /api/auth/signup` `{ "email", "password", "businessName", "plan"?, "turnstileToken"?, "website"? }`.

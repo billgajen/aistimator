@@ -27,7 +27,10 @@ import type {
   QuoteDetailResponse,
   AmendmentSummary,
 } from '@qolumns/shared'
-import { CHECKER_SETTINGS_VERSION, serviceSuggestionOf } from '@qolumns/shared'
+import { CHECKER_SETTINGS_VERSION, serviceSuggestionOf, MAX_ADDED_SECTIONS, addedSections, alsoAskedOf, alsoAskedWithStates, editedSectionBreakdown, withSections } from '@qolumns/shared'
+import type { CombinedPricing, QuoteSection } from '@qolumns/shared'
+import { sectionTaxFor } from '@/lib/quote-sections-service'
+import { sectionsEmailHtml } from '@/lib/sections-email'
 import { fieldLabels, requestDetails } from '@/lib/request-details'
 import type { FieldRow } from '@/lib/request-details'
 import type {
@@ -454,6 +457,62 @@ export async function PATCH(
     }
     pricing.total = Math.round((pricing.subtotal + pricing.taxAmount) * 100) / 100
 
+    // T-179: service sections on a combined quote. The editor can add, edit
+    // or remove them; every figure is worked out again here. A quote that
+    // neither had nor gets a section takes none of this path.
+    const beforeSections = addedSections(beforePricing)
+    const sentRaw = (body.pricing_json as unknown as { sections?: unknown }).sections
+    const sentSections = Array.isArray(sentRaw) ? (sentRaw as Array<Partial<QuoteSection>>) : []
+    let combined: CombinedPricing = pricing
+    const storedSections: QuoteSection[] = []
+    delete (pricing as CombinedPricing).sections
+    if (beforeSections.length > 0 || sentSections.length > 0) {
+      if (sentSections.length > MAX_ADDED_SECTIONS) {
+        return NextResponse.json({ error: { code: 'INVALID_REQUEST', message: `A quote can carry up to ${MAX_ADDED_SECTIONS} added services` } }, { status: 400 })
+      }
+      const ids = sentSections.map((sec) => sec.serviceId).filter((id): id is string => typeof id === 'string')
+      if (ids.length !== sentSections.length || new Set(ids).size !== ids.length || ids.includes(service.id) || sentSections.some((sec) => !Array.isArray(sec.breakdown))) {
+        return NextResponse.json({ error: { code: 'INVALID_REQUEST', message: 'Each added service must be a different one of your services, with its lines' } }, { status: 400 })
+      }
+      // Only this business's own active services (or one already on the quote) can be a section
+      const { data: serviceRows } = ids.length
+        ? await supabase.from('services').select('id, name, tax_exempt, active').eq('tenant_id', auth.tenantId).in('id', ids)
+        : { data: [] }
+      const known = new Map(((serviceRows ?? []) as Array<{ id: string; name: string; tax_exempt?: boolean | null; active?: boolean | null }>).map((row) => [row.id, row]))
+      const nowIso = new Date().toISOString()
+      for (const sent of sentSections) {
+        const row = known.get(sent.serviceId as string)
+        const before = beforeSections.find((sec) => sec.serviceId === sent.serviceId)
+        if (!row || (!before && row.active === false)) {
+          return NextResponse.json({ error: { code: 'INVALID_REQUEST', message: 'An added service is not one of your active services' } }, { status: 400 })
+        }
+        const lines = (sent.breakdown ?? [])
+          .filter((line) => line && typeof line.label === 'string')
+          .map((line) => ({ ...line, amount: roundMoney(Number(line.amount)) }))
+        const breakdown = editedSectionBreakdown(before?.breakdown, lines)
+        storedSections.push({
+          serviceId: row.id,
+          serviceName: row.name,
+          breakdown,
+          subtotal: roundMoney(breakdown.reduce((sum, line) => sum + line.amount, 0)),
+          ...(row.tax_exempt === true && { taxExempt: true }),
+          addedBy: before?.addedBy ?? 'business',
+          addedAt: before?.addedAt ?? nowIso,
+          ...((before?.answers ?? sent.answers) && { answers: (before?.answers ?? sent.answers ?? []).slice(0, 40) }),
+        })
+      }
+      // read with the signed-in business's own access: its tenant row and its service
+      const { tax } = await sectionTaxFor(supabase as unknown as Parameters<typeof sectionTaxFor>[0], auth.tenantId, service.id)
+      combined = withSections(pricing, storedSections, tax)
+      Object.assign(pricing, combined)
+      if (storedSections.length === 0) delete (pricing as CombinedPricing).sections
+    }
+
+    // T-179: what the customer also asked for is not the editor's to drop. It
+    // is kept from the stored quote, each service's state following the sections.
+    const keptAlsoAsked = alsoAskedWithStates(alsoAskedOf(beforeContent), storedSections)
+    if (keptAlsoAsked.length > 0) (body.content_json as QuoteContent).alsoAsked = keptAlsoAsked
+
     // Compute changes
     const changes = computeChanges(beforePricing, pricing, beforeContent, body.content_json)
 
@@ -582,6 +641,7 @@ export async function PATCH(
           serviceName: service.name,
           quoteViewUrl,
           total: formatTotal(pricing, locale),
+          sectionsHtml: sectionsEmailHtml(pricing, service.name, locale),
           primaryColor: tenant.branding_json?.primaryColor,
         }),
         tag: 'quote-approved',
@@ -598,6 +658,7 @@ export async function PATCH(
         serviceName: service.name,
         quoteViewUrl,
         total: formatTotal(pricing, resolveRegionContext(tenant).locale),
+        sectionsHtml: sectionsEmailHtml(pricing, service.name, resolveRegionContext(tenant).locale),
         primaryColor: branding.primaryColor,
       })
 

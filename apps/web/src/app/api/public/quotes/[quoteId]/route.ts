@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { quoteTokenFilter } from '@/lib/tokens'
-import { isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange, canCustomerDecide } from '@qolumns/shared'
+import { isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange, canCustomerDecide, displaySections, alsoAskedOf, alsoAskedWithStates, addedSections } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
@@ -286,6 +286,11 @@ export async function GET(
           locale: regionCtx.locale,
         })
 
+    // T-179: a combined quote's sections, and what else the customer asked for
+    const mainServiceName = (quote.services as { name?: string } | null)?.name ?? ''
+    const combinedSections = displaySections(pricing, { serviceId: quote.service_id as string, serviceName: mainServiceName })
+    const alsoAsked = alsoAskedWithStates(alsoAskedOf(content), addedSections(pricing))
+
     const response: QuoteViewResponse = {
       quoteId: quote.id,
       status: quote.status,
@@ -347,9 +352,17 @@ export async function GET(
       validUntil,
       assets,
       actions,
-      // Include cross-service pricing if available
+      // Include cross-service pricing if available (quotes made before T-179)
       ...(content.crossServicePricing && content.crossServicePricing.length > 0 && {
         crossServicePricing: content.crossServicePricing,
+      }),
+      // T-179: one request, several services. Only once the customer can see
+      // a price: the sections of a combined quote, and what else they asked for.
+      serviceName: mainServiceName,
+      ...(!isProvisional && combinedSections && { sections: combinedSections }),
+      ...(!isProvisional && alsoAsked.length > 0 && { alsoAsked }),
+      ...(!isProvisional && alsoAsked.some((a) => a.state !== 'not_offered') && {
+        canChangeSections: canCustomerDecide(quote.status) || shownEarly,
       }),
       // Include AI-recommended additional work if available
       ...(content.signalRecommendations && content.signalRecommendations.length > 0 && {

@@ -4,6 +4,7 @@
 
 import type { QuoteListCounts, QuoteListGroup } from './quote-turn'
 import type { ServiceSuggestion } from './service-suggestion'
+import type { AlsoAsked, DisplaySection } from './quote-sections'
 import type {
   QuoteStatus,
   DocumentType,
@@ -222,6 +223,18 @@ export interface QuoteViewResponse {
   actions: QuoteViewActions
   /** Pricing for additional services mentioned by the customer */
   crossServicePricing?: CrossServicePricing[]
+  /**
+   * T-179: a combined quote as sections (the main service first, then each
+   * added one), each with its lines and subtotal. Absent on a single-service
+   * quote, which renders as it always did.
+   */
+  sections?: DisplaySection[]
+  /** T-179: what else the customer asked for in their note, and where each stands */
+  alsoAsked?: AlsoAsked[]
+  /** T-179: the customer can add or remove a service right now */
+  canChangeSections?: boolean
+  /** T-179: the main service's name (the first section's heading) */
+  serviceName?: string
   /** AI-recommended additional work based on unused signals */
   signalRecommendations?: SignalRecommendation[]
   /** Whether the Accept Quote button is shown to customers */

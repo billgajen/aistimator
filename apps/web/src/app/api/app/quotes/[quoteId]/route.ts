@@ -1,3 +1,4 @@
+import { addedSections, splitMinimum } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
 import type { AppQuoteView, ClarificationQuestion, QuoteStatus } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
@@ -43,15 +44,28 @@ export async function GET(_request: Request, { params }: { params: { quoteId: st
         }))
       : []
 
+  // T-179: the app is not changed for combined quotes, so its view is made to
+  // read correctly here: the name lists every service on the quote, and each
+  // added service's lines follow the main service's takeoff, marked as added.
+  // The total is already the combined one.
+  const added = addedSections(quote.pricing_json)
+  const addedLines: AppQuoteView['takeoff'] = added.flatMap((section) =>
+    splitMinimum(section.breakdown).lines.map((line) => ({
+      item: `${section.serviceName}: ${line.label}`,
+      amount: line.amount,
+      method: section.addedBy === 'customer' ? 'Added by the customer' : 'Added by you',
+    }))
+  )
+
   const body: AppQuoteView = {
     id: quote.id as string,
     status,
     businessName: (tenant?.name as string) || '',
-    serviceName: (service?.name as string) || '',
+    serviceName: [(service?.name as string) || '', ...added.map((section) => section.serviceName)].filter(Boolean).join(' + '),
     customerName: ((quote.customer_json as { name?: string } | null)?.name) || '',
     createdAt: quote.created_at as string,
     pricing: { total: pricing.total ?? 0, currency: pricing.currency || 'USD', ...(pricing.estimate && { estimate: pricing.estimate }) },
-    takeoff: content.takeoff || [],
+    takeoff: [...(content.takeoff || []), ...addedLines],
     questions,
   }
   return NextResponse.json(body)

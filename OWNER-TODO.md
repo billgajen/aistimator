@@ -1832,3 +1832,64 @@ fixed in this deploy.
   be accepted. That script was not run in this ticket.
 - wrangler is at 3.114 and prints an "update to 4" notice on every command.
 
+## T-179 — One request, several services
+
+**Built and checked on this machine. Not deployed, not pushed.** One commit on `main`. No migration. Both the
+worker and the web app changed, so a deploy is the worker first, then the web app.
+
+### 1. What to check by hand (after you deploy, with a test business that has two or three services)
+
+- [ ] **A real note, a real model.** Send a request on the quote link for one service and write, in "Anything
+  else about the job?", that you also want another of the business's services. Open the estimate. You should
+  see a card "You also asked for: “your words”" with that service's name, and either its price with
+  "Add to my quote" or "Answer N questions to add it". Everything in my checks used a stand-in for the model
+  that reads the note, so **the live model's reading of a real note is the one thing not proven**. If the card
+  does not appear for a clear request, or appears for something you did not ask for, tell me the words you used.
+- [ ] **Add it, look at the total, remove it.** The total at the top should be the two services plus tax once.
+- [ ] **Your email.** You should get one "Request updated" email, not a second "new quote" email. No email
+  leaves this machine, so I have read its wording but never received it.
+- [ ] **The review rule.** With one service set to send automatically and the other to be reviewed, adding the
+  reviewed one should put the quote back to "Needs your approval". Check that is what you want when a service
+  is set to **hold until approved**: the customer then stops seeing any price (also the main service's, which
+  they had already seen) until you approve. That is "the strictest setting", followed literally.
+- [ ] **The PDF.** Download one for a combined quote. The PDF service is not called on this machine; I read the
+  page it prints, not a file.
+- [ ] **The on-site app**, if you use it: open a combined quote. It should show the combined total, both
+  service names, and the added service's lines under the takeoff. Not opened on a device here.
+- [ ] **The quote editor:** "Add another service to this quote", then Save.
+
+### 2. Decisions I made that you may want to change
+
+- The customer can add or remove a service only while they can see a price and have not accepted or declined.
+- An added service is asked only what its price needs: its required or price-critical questions, and any
+  quantity it would have measured from photos. Its optional questions are not asked.
+- Tax is worked out once on the combined amount, leaving out any service you have marked as not taxed.
+- A combined quote counts in Overall accuracy only (not By service, and not By grade either).
+- The business gets a "Request updated" email on a removal as well as on an addition.
+- A business with only one service is not told about things it does not offer (see Later).
+
+### 3. Found on the way
+
+- [ ] **The plan's usage counter loses counts when requests arrive at the same moment.** Six requests sent
+  together counted as two. It under-counts, so it favours the business, but it is wrong, and it is what the
+  plan limit reads. It needs a counter that adds one inside the database. Not touched in this ticket (it is
+  billing). A small ticket.
+
+### Later (seen, not changed)
+
+- A business with one service gets no "not one of your services" notice: the note is only read for other
+  services when there is more than one.
+- The live model can mark a short phrase as "not one of your services" when the customer picked the wrong
+  service to begin with (seen once: "the trim too" on a wallpaper request that was really about painting).
+  It never gets a price. Not tuned.
+- "Measure the added service from the same photos" (the ticket's own Later).
+- The scope text, assumptions and "not included" list describe the main service only; an added section has
+  lines and a subtotal but no wording of its own.
+- Re-running pricing on a quote that carries added services (the retry script, a platform admin's retry)
+  prices the main service again and drops the added sections. Rare; the customer or the business adds them back.
+- The old rough-estimate code (`calculateCrossServicePricing`) is unused and still in the worker.
+- On the customer's page the added section's "Remove" is a text link; the card uses the pale blue-grey panel
+  the old "Other services you mentioned" box used.
+- The dashboard list and Home still name a combined quote by its main service only.
+- The on-site app cannot add or remove a section and does not show the "also asked for" list.
+

@@ -52,6 +52,11 @@ Ship a compact SaaS that a business can:
 - Email customer and business with quote link
 - Customer can accept quote
 - Optional payment link (Stripe) and record paid status
+- **One request, several services** (T-179, the owner's decision, 2026-11-17; AD-061): a customer who asks for
+  another of the business's services in their note can add it to the same quote. One combined quote, one total,
+  one accept. Each service is priced from its own rules. At most two added services. A request with several
+  services counts as ONE quote on the plan. On the website form and the quote link; WhatsApp and the on-site app
+  show a combined quote but do not add to one.
 
 ### Basic analytics
 - Quotes created

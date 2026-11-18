@@ -14,6 +14,13 @@ export interface InvoicedQuote {
   /** What the business finally invoiced */
   invoiced: number
   grade?: 'A' | 'B' | 'C' | null
+  /**
+   * T-179: the quote carried more than one service. It has one final invoice
+   * for all of them, so it counts in Overall only: it cannot say how accurate
+   * any one service's price was, and the main service's grade is not the grade
+   * of the whole.
+   */
+  combined?: boolean
 }
 
 export interface AccuracyGroup {
@@ -73,8 +80,8 @@ export function computeAccuracy(quotes: InvoicedQuote[]): AccuracyReport {
   }
   return {
     overall: usable.length > 0 ? group('All quotes', usable) : null,
-    byService: by((q) => q.serviceName || 'Unknown service'),
-    byGrade: by((q) => (q.grade ? `Grade ${q.grade}` : null)).sort((a, b) => a.key.localeCompare(b.key)),
+    byService: by((q) => (q.combined ? null : q.serviceName || 'Unknown service')),
+    byGrade: by((q) => (q.combined ? null : q.grade ? `Grade ${q.grade}` : null)).sort((a, b) => a.key.localeCompare(b.key)),
     targets: ACCURACY_TARGETS,
   }
 }

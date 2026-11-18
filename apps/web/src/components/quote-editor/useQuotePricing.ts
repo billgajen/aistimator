@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react'
-import { roundMoney, splitMinimum, minimumTopUp, minimumEntry, withoutMinimumNote } from '@qolumns/shared'
-import type { QuotePricing } from '@qolumns/shared'
+import { roundMoney, splitMinimum, minimumTopUp, minimumEntry, withoutMinimumNote, addedSections, MAX_ADDED_SECTIONS } from '@qolumns/shared'
+import type { QuotePricing, QuoteSection, SectionAnswer } from '@qolumns/shared'
 
 export interface LineItem {
   id: string
@@ -8,6 +8,19 @@ export interface LineItem {
   amount: number
   autoRecommended?: boolean
   recommendationReason?: string
+}
+
+/** T-179: an added service as the editor holds it: its own lines and its own floor */
+export interface EditorSection {
+  serviceId: string
+  serviceName: string
+  addedBy: 'customer' | 'business'
+  addedAt: string
+  taxExempt: boolean
+  answers?: SectionAnswer[]
+  /** That service's minimum charge on this quote; null when it carries none */
+  floor: number | null
+  items: LineItem[]
 }
 
 interface UseQuotePricingOptions {
@@ -67,15 +80,77 @@ export function useQuotePricing({ initialPricing, currency }: UseQuotePricingOpt
   const removeMinimum = useCallback(() => setFloor(null), [])
   const restoreMinimum = useCallback(() => setFloor(loaded.minimum?.minimumCharge ?? null), [loaded])
 
-  const taxAmount = useMemo(
-    () => (taxRate > 0 ? Math.round(subtotal * (taxRate / 100) * 100) / 100 : 0),
-    [subtotal, taxRate]
+  // T-179: service sections on a combined quote. Each keeps its own lines and
+  // its own floor (AD-048); the totals below add them to the main service's.
+  const [sections, setSections] = useState<EditorSection[]>(() =>
+    addedSections(initialPricing).map((section, index) => {
+      const split = splitMinimum(section.breakdown)
+      return {
+        serviceId: section.serviceId,
+        serviceName: section.serviceName,
+        addedBy: section.addedBy,
+        addedAt: section.addedAt,
+        taxExempt: section.taxExempt === true,
+        answers: section.answers,
+        floor: split.minimum?.minimumCharge ?? null,
+        items: split.lines.map((line, i) => ({ id: `section-${index}-${i}`, label: line.label, amount: roundMoney(line.amount) })),
+      }
+    })
   )
+  const sectionTotals = useMemo(
+    () =>
+      sections.map((section) => {
+        const lines = roundMoney(section.items.reduce((sum, item) => sum + item.amount, 0))
+        const sectionTopUp = section.floor === null ? 0 : minimumTopUp(lines, section.floor)
+        return { serviceId: section.serviceId, lines, topUp: sectionTopUp, subtotal: roundMoney(lines + sectionTopUp) }
+      }),
+    [sections]
+  )
+  const mainSubtotalValue = subtotal
+  const combinedSubtotal = roundMoney(mainSubtotalValue + sectionTotals.reduce((sum, t) => sum + t.subtotal, 0))
+  // Was the main service taxed when the quote was priced? (A preview only: the server works tax out again on save.)
+  const [mainTaxable] = useState(() => {
+    if (!(taxRate > 0)) return false
+    const before = addedSections(initialPricing)
+    if (before.length === 0) return true
+    const sectionsTaxable = before.filter((sec) => !sec.taxExempt).reduce((sum, sec) => sum + sec.subtotal, 0)
+    return roundMoney((initialPricing.taxAmount || 0) / (taxRate / 100)) - sectionsTaxable > 0.005
+  })
+
+  const taxAmount = useMemo(() => {
+    if (!(taxRate > 0)) return 0
+    const taxable = (mainTaxable ? mainSubtotalValue : 0) + sections.reduce((sum, section, i) => sum + (section.taxExempt ? 0 : sectionTotals[i]?.subtotal ?? 0), 0)
+    return Math.round(taxable * (taxRate / 100) * 100) / 100
+  }, [mainSubtotalValue, taxRate, mainTaxable, sections, sectionTotals])
 
   const total = useMemo(
-    () => Math.round((subtotal + taxAmount) * 100) / 100,
-    [subtotal, taxAmount]
+    () => Math.round((combinedSubtotal + taxAmount) * 100) / 100,
+    [combinedSubtotal, taxAmount]
   )
+
+  const addSection = useCallback((section: Omit<QuoteSection, 'addedBy' | 'addedAt'>) => {
+    setSections((prev) => {
+      if (prev.length >= MAX_ADDED_SECTIONS || prev.some((existing) => existing.serviceId === section.serviceId)) return prev
+      const split = splitMinimum(section.breakdown)
+      return [
+        ...prev,
+        {
+          serviceId: section.serviceId,
+          serviceName: section.serviceName,
+          addedBy: 'business' as const,
+          addedAt: new Date().toISOString(),
+          taxExempt: section.taxExempt === true,
+          answers: section.answers,
+          floor: split.minimum?.minimumCharge ?? null,
+          items: split.lines.map((line, i) => ({ id: `section-${Date.now()}-${i}`, label: line.label, amount: roundMoney(line.amount) })),
+        },
+      ]
+    })
+  }, [])
+  const removeSection = useCallback((serviceId: string) => setSections((prev) => prev.filter((section) => section.serviceId !== serviceId)), [])
+  const updateSectionItems = useCallback((serviceId: string, change: (items: LineItem[]) => LineItem[]) => {
+    setSections((prev) => prev.map((section) => (section.serviceId === serviceId ? { ...section, items: change(section.items) } : section)))
+  }, [])
 
   const addItem = useCallback(() => {
     setItems((prev) => [
@@ -112,7 +187,7 @@ export function useQuotePricing({ initialPricing, currency }: UseQuotePricingOpt
   const buildPricing = useCallback((): QuotePricing => {
     return {
       currency,
-      subtotal,
+      subtotal: combinedSubtotal,
       taxLabel: taxRate > 0 ? taxLabel : undefined,
       taxRate: taxRate > 0 ? taxRate : undefined,
       taxAmount,
@@ -129,8 +204,28 @@ export function useQuotePricing({ initialPricing, currency }: UseQuotePricingOpt
       ],
       notes: pricingNotes.length > 0 ? pricingNotes : undefined,
       availableAddons: availableAddons.length > 0 ? availableAddons : undefined,
-    }
-  }, [currency, subtotal, taxLabel, taxRate, taxAmount, total, items, pricingNotes, availableAddons, floor, topUp])
+      // T-179: the added services, each with its lines and (while it applies) its own minimum entry
+      ...(sections.length > 0 && {
+        sections: sections.map((section, i) => {
+          const totals = sectionTotals[i]
+          const breakdown = [
+            ...section.items.map((item) => ({ label: item.label, amount: item.amount })),
+            ...(section.floor !== null && totals && totals.topUp > 0 ? [minimumEntry(totals.topUp, section.floor)] : []),
+          ]
+          return {
+            serviceId: section.serviceId,
+            serviceName: section.serviceName,
+            breakdown,
+            subtotal: totals?.subtotal ?? 0,
+            ...(section.taxExempt && { taxExempt: true }),
+            addedBy: section.addedBy,
+            addedAt: section.addedAt,
+            ...(section.answers && { answers: section.answers }),
+          }
+        }),
+      }),
+    } as QuotePricing
+  }, [currency, combinedSubtotal, taxLabel, taxRate, taxAmount, total, items, pricingNotes, availableAddons, floor, topUp, sections, sectionTotals])
 
   return {
     items,
@@ -139,7 +234,14 @@ export function useQuotePricing({ initialPricing, currency }: UseQuotePricingOpt
     minimumRemoved,
     removeMinimum,
     restoreMinimum,
-    subtotal,
+    subtotal: combinedSubtotal,
+    /** T-179: the main service's own subtotal (the same as `subtotal` on a single-service quote) */
+    mainSubtotal: mainSubtotalValue,
+    sections,
+    sectionTotals,
+    addSection,
+    removeSection,
+    updateSectionItems,
     taxAmount,
     taxLabel,
     taxRate,

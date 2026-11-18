@@ -47,6 +47,10 @@ max_retries = 3
 # - APP_URL (production: https://qolumns.com, T-174)
 # - CLOUDFLARE_WORKER_TOKEN (same value as the web app's; required outside local dev)
 #
+# Local checks only (ignored unless ENVIRONMENT = "development"; never set in production):
+# - SECTION_AI_BASE_URL  a stand-in for the model that reads a customer's note for other
+#   services (T-179). `npx wrangler dev --var SECTION_AI_BASE_URL:http://127.0.0.1:8796/note`
+#
 # Optional rate limit overrides:
 # - RATE_LIMIT_GLOBAL (default: 100)
 # - RATE_LIMIT_TENANT (default: 10)

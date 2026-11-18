@@ -1,3 +1,4 @@
+import { sectionsEmailHtml } from '@/lib/sections-email'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getRegion, statusAfterResend, QUOTE_SEND_AGAIN_STATUSES } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
@@ -179,6 +180,7 @@ export async function POST(
       serviceName: service.name,
       quoteViewUrl,
       total: totalFormatted,
+      sectionsHtml: sectionsEmailHtml(pricing, service.name, locale),
       validUntil,
       primaryColor: branding.primaryColor,
     })

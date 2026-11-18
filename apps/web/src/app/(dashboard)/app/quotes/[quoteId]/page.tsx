@@ -3,9 +3,10 @@
 import { AcceptanceCard } from '@/components/quotes/AcceptanceCard'
 import type { AcceptanceDetails } from '@/lib/acceptance'
 import { useEffect, useState, useCallback } from 'react'
-import { formatMoney, quoteActions, quoteTurn, quoteTracker, customerFirstName, splitMinimum } from '@qolumns/shared'
+import { formatMoney, quoteActions, quoteTurn, quoteTracker, customerFirstName, splitMinimum, addedSections, alsoAskedOf, alsoAskedWithStates, displaySections } from '@qolumns/shared'
 import { NextStepBox } from '@/components/quotes/NextStepBox'
 import { CustomerSent, ServiceSuggestionNote } from '@/components/quotes/CustomerSent'
+import { CustomerAlsoAsked } from '@/components/quotes/CustomerAlsoAsked'
 import { MinimumNote } from '@/components/quote/MinimumNote'
 import { QuoteTracker } from '@/components/quotes/QuoteTracker'
 import { TurnBadge } from '@/components/quotes/TurnBadge'
@@ -226,6 +227,8 @@ export default function QuoteDetailPage({
   const content = quote.content_json as QuoteContent
   // T-165: the minimum charge is a floor, not an item: the job's lines, then a note
   const { lines: priceLines, minimum: minimumApplied } = splitMinimum(pricing.breakdown)
+  // T-179: a combined quote's sections (null for a single-service quote, which renders as before)
+  const combined = displaySections(pricing, { serviceId: quote.service_id, serviceName: data.service?.name ?? 'Service' })
   const customer = quote.customer_json as { name: string; email: string; phone?: string }
   // T-169: the big total is set like the customer's page sets it; the browser's locale, as the rest of the dashboard (T-133)
   const moneyLocale = typeof navigator !== 'undefined' ? navigator.language : 'en-US'
@@ -438,6 +441,12 @@ export default function QuoteDetailPage({
       {/* T-178: the request form's suggestion of another service, on a quote held for that reason */}
       {quote.status === 'pending_review' && <ServiceSuggestionNote suggestion={data.serviceSuggestion} chosenServiceName={data.service?.name ?? null} />}
 
+      {/* T-179: what else the customer asked for, and where each stands. Beside "Check the service", not instead of it. */}
+      <CustomerAlsoAsked
+        items={alsoAskedWithStates(alsoAskedOf(content), addedSections(pricing))}
+        addedBy={Object.fromEntries(addedSections(pricing).map((sec) => [sec.serviceId, sec.addedBy]))}
+      />
+
       {/* T-178: no estimate to read (it failed, or has no price yet): the customer's own answers, to quote it by hand */}
       {(quote.status === 'failed' || (pricing?.total ?? 0) <= 0) && <CustomerSent request={data.request} serviceName={data.service?.name ?? null} />}
 
@@ -463,6 +472,39 @@ export default function QuoteDetailPage({
           </p>
         </div>
         <div className="tape-rule mt-4 opacity-60" aria-hidden="true" />
+        {/* T-179: a combined quote shows each service as a section with its subtotal */}
+        {combined ? (
+          <div className="mt-4 space-y-5" data-testid="quote-sections">
+            {combined.map((section, sectionIndex) => (
+              <div key={section.serviceId ?? sectionIndex} data-testid="quote-section">
+                <h3 className="text-sm font-semibold text-text-primary">
+                  {section.serviceName}
+                  {!section.main && (
+                    <span className="ml-2 text-xs font-normal text-text-muted">{section.addedBy === 'business' ? 'added by you' : 'added by the customer'}</span>
+                  )}
+                </h3>
+                <div className="mt-2 space-y-2">
+                  {section.lines.map((item, index) => (
+                    <div key={index} className="flex justify-between gap-4 text-sm" data-testid="price-line">
+                      <span className="min-w-0 text-text-secondary">
+                        {item.label}
+                        {item.autoRecommended && <span className="ml-2 text-xs text-secondary">(auto-recommended)</span>}
+                      </span>
+                      <span className="figure shrink-0 font-medium text-text-primary">{formatCurrency(item.amount, pricing.currency)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 space-y-1">
+                  <MinimumNote minimumCharge={section.minimum?.minimumCharge} currency={pricing.currency} />
+                  <div className="flex justify-between gap-4 border-t border-border pt-2 text-sm">
+                    <span className="text-text-secondary">{section.serviceName} subtotal</span>
+                    <span className="figure text-text-primary" data-testid="quote-section-subtotal">{formatCurrency(section.subtotal, pricing.currency)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="mt-4 space-y-2">
           {priceLines.map((item, index) => (
             <div key={index} className="flex justify-between gap-4 text-sm" data-testid="price-line">
@@ -478,8 +520,9 @@ export default function QuoteDetailPage({
             </div>
           ))}
         </div>
+        )}
         <div className="border-t border-border mt-4 pt-4 space-y-2">
-          <MinimumNote minimumCharge={minimumApplied?.minimumCharge} currency={pricing.currency} />
+          {!combined && <MinimumNote minimumCharge={minimumApplied?.minimumCharge} currency={pricing.currency} />}
           <div className="flex justify-between gap-4 text-sm">
             <span className="text-text-secondary">Subtotal</span>
             <span className="figure text-text-primary">{formatCurrency(pricing.subtotal, pricing.currency)}</span>
@@ -679,6 +722,7 @@ function QuoteEditorWrapper({
     version: number
     currency: string
     feedbackId?: string
+    mainServiceId?: string
     onSave: () => Promise<void>
     onCancel: () => void
   }> | null>(null)
@@ -721,6 +765,7 @@ function QuoteEditorWrapper({
       version={quote.version}
       currency={pricing.currency}
       feedbackId={feedbackId}
+      mainServiceId={quote.service_id}
       onSave={onSave}
       onCancel={onCancel}
     />

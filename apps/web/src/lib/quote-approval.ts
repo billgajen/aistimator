@@ -25,6 +25,7 @@
  *   fail or undo an approval.
  */
 
+import { sectionsEmailHtml } from '@/lib/sections-email'
 import { formatMoney, getRegion, repairCustomerWording, businessPhrasesFrom } from '@qolumns/shared'
 import type { QuotePricing, TenantBranding, CustomerWording, WordingRepairRecord, PricingRules, WorkStepConfig } from '@qolumns/shared'
 import type { createClient, createAdminClient } from '@/lib/supabase/server'
@@ -200,6 +201,7 @@ export async function approveQuote(opts: {
     serviceName: service.name,
     quoteViewUrl,
     total: formatMoney(pricing.total, pricing.currency, locale),
+    sectionsHtml: sectionsEmailHtml(pricing, service.name, locale),
     validUntil: expiry.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' }),
     primaryColor: tenant.branding_json?.primaryColor,
   })

@@ -1,3 +1,4 @@
+import { sectionsEmailHtml } from '@/lib/sections-email'
 import { createAdminClient } from '@/lib/supabase/server'
 import { limitQuoteAction, limitQuoteAndBusinessActions } from '@/lib/quote-action-limit'
 import { quoteTokenFilter } from '@/lib/tokens'
@@ -157,6 +158,7 @@ export async function POST(
           customerName: customer?.name || 'A customer',
           serviceName: service?.name || 'your service',
           totalFormatted,
+          sectionsHtml: sectionsEmailHtml(pricing, service?.name || 'Service', resolveRegionContext(tenant ?? {}).locale),
           dashboardUrl: `${appUrl}/app/quotes/${quoteId}`,
           primaryColor: tenant.branding_json?.primaryColor,
           ...(acceptance && {

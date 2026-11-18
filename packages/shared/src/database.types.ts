@@ -1,3 +1,4 @@
+import type { AlsoAsked } from './quote-sections'
 import type { RegionCode, UnitSystem, ReferenceObject } from './regions/types'
 import type { AiUsageSummary } from './ai-models'
 import type { IdentificationSpec } from './identification'
@@ -665,6 +666,8 @@ export interface QuoteContent {
   exclusions?: string[]
   notes?: string
   validityDays?: number
+  /** T-179: what else the customer asked for (shape in quote-sections.ts) */
+  alsoAsked?: AlsoAsked[]
 }
 
 // ============================================================================

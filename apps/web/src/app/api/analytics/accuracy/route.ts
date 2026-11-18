@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { computeAccuracy, type InvoicedQuote } from '@qolumns/shared'
+import { computeAccuracy, hasSections, type InvoicedQuote } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
 
 /**
@@ -33,6 +33,8 @@ export async function GET() {
       quoted: Number(pricing.total ?? 0),
       invoiced: Number(row.final_invoice_amount),
       grade: pricing.estimate?.grade ?? null,
+      // T-179: one invoice for several services says nothing about any one of them
+      ...(hasSections(pricing) && { combined: true }),
     }
   })
   return NextResponse.json(computeAccuracy(rows))

@@ -216,6 +216,21 @@ Indexes: `(tenant_id, created_at desc)` where not completed; the same where also
   - `quotes.content_json.retryCode` (`hash`, `expiresAt`): the hash of the one-time code
     `scripts/retry-failed-quote.sh` writes; the retry route removes it as it uses it.
   - There is no `quotes.error_message` column. Code that wrote one had its whole update refused.
+- T-179 (no migration, no new column): a combined quote (AD-061; `packages/shared/src/quote-sections.ts`).
+  - `quotes.pricing_json.breakdown` is the MAIN service's lines, exactly as on any quote.
+  - `quotes.pricing_json.sections[]` are the added services (at most two): `serviceId`, `serviceName`,
+    `breakdown[]` (that service's lines, with its own marked minimum entry while its floor applies), `subtotal`,
+    `taxExempt?`, `addedBy` (`customer` | `business`), `addedAt`, `answers[]` (`key`, `label`, `value`). The key
+    is absent on a single-service quote, which is how every older quote stays as it was.
+  - `quotes.pricing_json.subtotal`, `taxAmount` and `total` are the combined figures: main + every section, tax
+    worked out once on the taxed amount (a tax-exempt service's section is left out of it).
+  - `quotes.content_json.alsoAsked[]`: what else the customer asked for (`id`, `words`, `serviceId` | null,
+    `serviceName`, `state`, `price?`, `questions?`). Written by the worker on the first pass; replaces
+    `crossServicePricing`, which only quotes made before T-179 carry.
+  - `quotes.content_json.sectionsBefore` (`status`, `approvedAt`, `reviewHold`): where a sent quote stood before
+    a customer's added service sent it back for review; used to put it back if they remove it.
+  - `quotes.service_id` stays the main service: analytics count the quote under it. Accuracy counts a combined
+    quote in Overall only.
 
 ### SMS channel (T-136, migration 27)
 - sms_configs: tenant_id (unique), phone_number (E.164, unique), messaging_service_sid, is_active, a2p_brand_registered, a2p_campaign_registered

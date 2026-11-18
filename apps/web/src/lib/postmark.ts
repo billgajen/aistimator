@@ -136,6 +136,8 @@ export function generateCustomerEmailHtml(data: {
   total: string
   validUntil?: string
   primaryColor?: string
+  /** T-179: the services of a combined quote, as rows (lib/sections-email.ts); nothing for a single-service quote */
+  sectionsHtml?: string
 }): string {
   const primaryColor = data.primaryColor || '#2563eb'
 
@@ -178,6 +180,8 @@ export function generateCustomerEmailHtml(data: {
                   ${escapeHtml(data.total)}
                 </p>
               </div>
+
+              ${data.sectionsHtml ?? ''}
 
               ${validitySection}
 

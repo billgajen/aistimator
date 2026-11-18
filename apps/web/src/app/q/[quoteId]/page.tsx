@@ -3,6 +3,8 @@
 import { AcceptDetailsForm } from '@/components/quote/AcceptDetailsForm'
 import { Money, SectionLabel } from '@/components/quote/document-parts'
 import { MinimumNote } from '@/components/quote/MinimumNote'
+import { AlsoAskedCards } from '@/components/quote/AlsoAskedCards'
+import type { AddResult, AnswerValue } from '@/components/quote/AlsoAskedCards'
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { brandStyleVars } from '@/lib/color'
@@ -254,6 +256,61 @@ export default function QuotePage({ params }: QuotePageProps) {
     }
   }, [token, quoteId, feedbackText, submittingFeedback, quote])
 
+  // T-179: the customer adds a service they asked for to this quote, or takes
+  // one off again. The server prices it (the business's price list, no AI)
+  // and works the totals out; the page then reads the quote afresh.
+  const [changingSection, setChangingSection] = useState<string | null>(null)
+  const [sectionNote, setSectionNote] = useState<string | null>(null)
+  const reloadQuote = useCallback(async () => {
+    const fresh = await fetch(`/api/public/quotes/${quoteId}?token=${token}&poll=1`)
+    if (fresh.ok) setQuote((await fresh.json()) as QuoteViewResponse)
+  }, [quoteId, token])
+  const addSection = useCallback(
+    async (serviceId: string, answers: Array<{ fieldId: string; value: AnswerValue }>): Promise<AddResult> => {
+      setSectionNote(null)
+      try {
+        const response = await fetch(`/api/public/quotes/${quoteId}/sections`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, serviceId, answers }),
+        })
+        const data = await response.json().catch(() => null)
+        if (!response.ok) {
+          return { ok: false, message: data?.error?.message || 'We couldn’t add that just now. Please try again.', questions: data?.error?.questions }
+        }
+        await reloadQuote()
+        return { ok: true }
+      } catch {
+        return { ok: false, message: 'We couldn’t reach the server. Check your connection and try again.' }
+      }
+    },
+    [quoteId, token, reloadQuote]
+  )
+  const removeSection = useCallback(
+    async (serviceId: string) => {
+      setChangingSection(serviceId)
+      setSectionNote(null)
+      try {
+        const response = await fetch(`/api/public/quotes/${quoteId}/sections`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, serviceId }),
+        })
+        if (!response.ok) {
+          const data = await response.json().catch(() => null)
+          setSectionNote(data?.error?.message || 'We couldn’t remove that just now. Please try again.')
+        } else {
+          await reloadQuote()
+        }
+      } catch {
+        setSectionNote('We couldn’t reach the server. Check your connection and try again.')
+      } finally {
+        setChangingSection(null)
+      }
+    },
+    [quoteId, token, reloadQuote]
+  )
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -482,36 +539,51 @@ export default function QuotePage({ params }: QuotePageProps) {
             <section className="mb-8">
               <SectionLabel>Price breakdown</SectionLabel>
 
-              {priceLines.length > 0 && (
-                <div className="space-y-2.5 mb-5">
-                  {priceLines.map((item, index) => {
-                    const [labelMain, labelMath] = splitLabelMath(item.label)
-                    return (
-                    <div key={index}>
-                      <div className="flex items-baseline gap-2 text-sm">
-                        <span className="text-text-primary">{labelMain}</span>
-                        <span className="flex-1 border-b border-dotted border-border-strong translate-y-[-3px]" />
-                        <span className="figure text-text-primary whitespace-nowrap">
-                          {formatCurrency(item.amount, pricing.currency, locale)}
-                        </span>
+              {/* T-179: a combined quote shows each service as a section with its subtotal; a single-service quote is unchanged */}
+              {quote.sections && quote.sections.length > 0 ? (
+                <div className="mb-5 space-y-6" data-testid="price-sections">
+                  {quote.sections.map((section, sectionIndex) => (
+                    <div key={section.serviceId ?? sectionIndex} data-testid="price-section" data-main={section.main ? 'true' : 'false'}>
+                      <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                        <h3 className="text-sm font-semibold text-text-primary" data-testid="price-section-name">
+                          {section.serviceName}
+                        </h3>
+                        {!section.main && section.addedBy === 'customer' && quote.canChangeSections && !settled && section.serviceId && (
+                          <button
+                            type="button"
+                            onClick={() => removeSection(section.serviceId as string)}
+                            disabled={changingSection !== null}
+                            className="inline-flex min-h-[44px] items-center text-sm text-text-secondary underline underline-offset-4 hover:text-text-primary disabled:opacity-50"
+                            data-testid="price-section-remove"
+                          >
+                            {changingSection === section.serviceId ? 'Removing…' : 'Remove'}
+                          </button>
+                        )}
                       </div>
-                      {labelMath && (
-                        <p className="figure text-xs text-text-muted mt-0.5">{labelMath}</p>
-                      )}
-                      {item.autoRecommended && (
-                        <p className="text-xs text-primary mt-0.5">
-                          Added for you{item.recommendationReason ? ` — ${item.recommendationReason.toLowerCase()}` : ''}
-                        </p>
-                      )}
+                      <PriceLines lines={section.lines} currency={pricing.currency} locale={locale} />
+                      <div className="mt-2.5 space-y-1.5">
+                        <MinimumNote minimumCharge={section.minimum?.minimumCharge} currency={pricing.currency} locale={locale} />
+                        <div className="flex justify-between border-t border-border pt-2 text-sm">
+                          <span className="text-text-secondary">{section.serviceName} subtotal</span>
+                          <span className="figure text-text-primary" data-testid="price-section-subtotal">
+                            {formatCurrency(section.subtotal, pricing.currency, locale)}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  )})}
-                  {priceLines.some((item) => item.autoRecommended) && (
-                    <p className="text-xs text-text-muted pt-1">
-                      Items marked &quot;added for you&quot; came from your description or photos —
-                      ask us to remove any you don&apos;t need.
+                  ))}
+                  {sectionNote && (
+                    <p className="text-sm text-danger" role="alert">
+                      {sectionNote}
                     </p>
                   )}
                 </div>
+              ) : (
+                priceLines.length > 0 && (
+                  <div className="mb-5">
+                    <PriceLines lines={priceLines} currency={pricing.currency} locale={locale} />
+                  </div>
+                )
               )}
 
               {pricingNotes.length > 0 && (
@@ -526,7 +598,10 @@ export default function QuotePage({ params }: QuotePageProps) {
               )}
 
               <div className="border-t border-border pt-4 space-y-2">
-                <MinimumNote minimumCharge={minimumApplied?.minimumCharge} currency={pricing.currency} locale={locale} />
+                {/* a combined quote states each service's minimum in its own section, above */}
+                {!(quote.sections && quote.sections.length > 0) && (
+                  <MinimumNote minimumCharge={minimumApplied?.minimumCharge} currency={pricing.currency} locale={locale} />
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Subtotal</span>
                   <span className="figure text-text-primary">
@@ -600,8 +675,19 @@ export default function QuotePage({ params }: QuotePageProps) {
               </section>
             )}
 
-            {/* Cross-service pricing */}
-            {crossServicePricing && crossServicePricing.length > 0 && (
+            {/* T-179: other services the customer asked for (they can add them to this quote), and anything not offered */}
+            {quote.alsoAsked && quote.alsoAsked.length > 0 && (
+              <AlsoAskedCards
+                items={quote.alsoAsked}
+                currency={pricing.currency}
+                locale={locale}
+                canChange={quote.canChangeSections === true && !settled}
+                onAdd={addSection}
+              />
+            )}
+
+            {/* Cross-service pricing (quotes made before T-179) */}
+            {crossServicePricing && crossServicePricing.length > 0 && !(quote.alsoAsked && quote.alsoAsked.length > 0) && (
               <section className="mb-8">
                 <div className="bg-mist/70 border border-border rounded-2xl px-5 py-4">
                   <SectionLabel>
@@ -1109,6 +1195,47 @@ function DocumentFooter({
 }
 
 /** T-133: Intl formatting with the tenant's locale (any ISO currency) */
+/** One service's price lines, as the ledger has always shown them (T-179: used once per section on a combined quote) */
+function PriceLines({
+  lines,
+  currency,
+  locale,
+}: {
+  lines: Array<{ label: string; amount: number; autoRecommended?: boolean; recommendationReason?: string }>
+  currency: string
+  locale: string
+}) {
+  if (lines.length === 0) return null
+  return (
+    <div className="space-y-2.5">
+      {lines.map((item, index) => {
+        const [labelMain, labelMath] = splitLabelMath(item.label)
+        return (
+          <div key={index}>
+            <div className="flex items-baseline gap-2 text-sm">
+              <span className="text-text-primary">{labelMain}</span>
+              <span className="flex-1 border-b border-dotted border-border-strong translate-y-[-3px]" />
+              <span className="figure text-text-primary whitespace-nowrap">{formatCurrency(item.amount, currency, locale)}</span>
+            </div>
+            {labelMath && <p className="figure text-xs text-text-muted mt-0.5">{labelMath}</p>}
+            {item.autoRecommended && (
+              <p className="text-xs text-primary mt-0.5">
+                Added for you{item.recommendationReason ? ` — ${item.recommendationReason.toLowerCase()}` : ''}
+              </p>
+            )}
+          </div>
+        )
+      })}
+      {lines.some((item) => item.autoRecommended) && (
+        <p className="text-xs text-text-muted pt-1">
+          Items marked &quot;added for you&quot; came from your description or photos —
+          ask us to remove any you don&apos;t need.
+        </p>
+      )}
+    </div>
+  )
+}
+
 function formatCurrency(amount: number, currency: string, locale: string): string {
   return formatMoney(amount, currency, locale)
 }

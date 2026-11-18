@@ -9,6 +9,8 @@
 import { createRateLimiter } from './rate-limiter'
 import { handleQuoteJob } from './queue-consumer'
 import { markQuoteFailed } from './failed-quote'
+import { priceSection } from './section-pricing'
+import type { PriceSectionInput } from './section-pricing'
 import type { RateLimiter } from './rate-limiter'
 import { getSupabaseClient, updateQuoteStatus } from './supabase'
 import { processQuote } from './quote-processor'
@@ -64,6 +66,10 @@ export interface Env {
   POSTMARK_API_TOKEN?: string
   POSTMARK_FROM_EMAIL?: string
   APP_URL?: string
+
+  // T-179, local checks only (ignored unless ENVIRONMENT=development): a stand-in
+  // for the model that reads a customer's note for other services
+  SECTION_AI_BASE_URL?: string
 
   // Rate limit configuration (optional overrides)
   RATE_LIMIT_GLOBAL?: string
@@ -203,6 +209,30 @@ export default {
     // Reprice after a clarification answer: deterministic (no AI, no photos),
     // so the web app waits for it instead of queueing. 409 = this quote has no
     // reprice snapshot (saved before snapshots existed) — queue it instead.
+    // T-179: price another of the business's services as a section of a quote.
+    // Deterministic (the rules engine, no AI, no photos) and read-only, so the
+    // web app waits for it, as it does for /reprice. It answers with the
+    // section, or with the questions that still need an answer.
+    if (url.pathname === '/section' && request.method === 'POST') {
+      const supabase = getSupabaseClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY)
+      if (!supabase) return jsonResponse({ error: 'Supabase not configured' }, 503)
+      let body: PriceSectionInput
+      try {
+        body = (await request.json()) as PriceSectionInput
+      } catch {
+        return jsonResponse({ error: 'Invalid request body' }, 400)
+      }
+      if (!body.quoteId || !body.serviceId) return jsonResponse({ error: 'Missing required fields: quoteId, serviceId' }, 400)
+      const result = await priceSection(supabase, env, {
+        quoteId: body.quoteId,
+        serviceId: body.serviceId,
+        answers: Array.isArray(body.answers) ? body.answers : [],
+        knownQuestions: Array.isArray(body.knownQuestions) ? body.knownQuestions : [],
+      })
+      if (!result.ok) return jsonResponse({ success: false, reason: result.reason }, result.reason === 'failed' ? 500 : 409)
+      return jsonResponse({ success: true, ...result }, 200)
+    }
+
     if (url.pathname === '/reprice' && request.method === 'POST') {
       const supabase = getSupabaseClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY)
       if (!supabase) return jsonResponse({ error: 'Supabase not configured' }, 503)

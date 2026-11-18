@@ -47,6 +47,17 @@ export function ApproveCard({ token, initialOutcome, summary }: { token: string;
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-tertiary">{summary.businessName}</p>
               <p className="mt-2 font-display text-xl font-bold text-text-primary">{summary.customerName}</p>
               <p className="text-sm text-text-secondary">{summary.serviceName}</p>
+              {/* T-179: a combined quote lists each service with its subtotal, then the one total */}
+              {summary.sections && summary.sections.length > 0 && (
+                <ul className="mt-3 divide-y divide-border border-y border-border text-sm" data-testid="approve-sections">
+                  {summary.sections.map((section, i) => (
+                    <li key={i} className="flex justify-between gap-4 py-2">
+                      <span className="min-w-0 text-text-secondary">{section.serviceName}</span>
+                      <span className="figure shrink-0 text-text-primary">{section.subtotal}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
               {summary.price && <p className="figure mt-3 text-3xl text-text-primary" data-testid="approve-price">{summary.price}</p>}
               {summary.scopeSummary && <p className="mt-3 text-sm leading-relaxed text-text-secondary">{summary.scopeSummary}</p>}
             </div>

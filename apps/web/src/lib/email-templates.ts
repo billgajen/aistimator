@@ -25,6 +25,8 @@ export function generateRevisedQuoteEmailHtml(data: {
   quoteViewUrl: string
   total: string
   primaryColor?: string
+  /** T-179: the services of a combined quote, as rows (lib/sections-email.ts); nothing for a single-service quote */
+  sectionsHtml?: string
 }): string {
   const primaryColor = data.primaryColor || '#2563eb'
 
@@ -63,6 +65,8 @@ export function generateRevisedQuoteEmailHtml(data: {
                   ${escapeHtml(data.total)}
                 </p>
               </div>
+
+              ${data.sectionsHtml ?? ''}
 
               <table role="presentation" style="width: 100%; margin: 32px 0;">
                 <tr>
@@ -308,6 +312,8 @@ export function generateQuoteAcceptedEmailHtml(data: {
   customerName: string
   serviceName: string
   totalFormatted: string
+  /** T-179: the services of a combined quote, as rows (lib/sections-email.ts); nothing for a single-service quote */
+  sectionsHtml?: string
   dashboardUrl: string
   primaryColor?: string
   /** T-151: what the customer told you when accepting */
@@ -351,6 +357,7 @@ export function generateQuoteAcceptedEmailHtml(data: {
                 ${escapeHtml(data.serviceName)} &middot; ${escapeHtml(data.totalFormatted)}
               </p>
 
+              ${data.sectionsHtml ?? ''}
               ${nextStepSection}
               <p style="margin: 0 0 24px; color: #374151; font-size: 14px; line-height: 1.6;">
                 The customer is expecting to hear from you — reaching out quickly keeps the momentum going.

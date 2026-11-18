@@ -10,6 +10,7 @@
  * Uses structured output (JSON schema) for reliable parsing.
  */
 
+import type { AlsoAsked } from '@qolumns/shared'
 import { GeminiClient } from './gemini'
 import type { AiClient } from './client'
 import { QUOTE_CONTENT_SCHEMA } from './schemas'
@@ -21,6 +22,8 @@ import type { PricingResult } from '../pricing/rules-engine'
  * Generated quote content
  */
 export interface QuoteContent {
+  /** T-179: what else the customer asked for (other services they can add; things the business does not offer) */
+  alsoAsked?: AlsoAsked[]
   scopeSummary: string
   assumptions: string[]
   exclusions: string[]
@@ -88,6 +91,14 @@ export interface WordingContext {
   learningContext?: string
   /** T-133: region block (language variant, currency, units, tax/postal wording) */
   regionGuidance?: string
+  /**
+   * T-179: other work the customer asked for in the same note. It is shown to
+   * them separately on the quote page (where another of the business's
+   * services can be added to this quote), so the wording must not mention
+   * it: an "excluded" or "can be quoted separately" line would contradict
+   * the quote the moment the customer adds it.
+   */
+  alsoAsked?: Array<{ words: string; serviceName?: string }>
 }
 
 /**
@@ -390,6 +401,11 @@ export async function generateWording(
   }
 
   // T-133: write in the tenant's language variant and units
+  if (context.alsoAsked && context.alsoAsked.length > 0) {
+    const list = context.alsoAsked.map((a) => `- "${a.words}"${a.serviceName ? ` (the business's service: ${a.serviceName})` : ''}`).join('\n')
+    prompt += `\n\n===== OTHER WORK THE CUSTOMER ASKED FOR (handled elsewhere) =====\nIn the same note the customer also asked for the following. It is NOT part of this service and it is dealt with separately, on the same page as this quote.\n${list}\nDo NOT mention it anywhere in your answer: not in scopeSummary, not in assumptions, not in exclusions, not in notes. Do not say it is excluded, not included, extra, or that it can be quoted separately. Write as if the note had not mentioned it.`
+  }
+
   if (context.regionGuidance) {
     prompt += `\n\n===== ${context.regionGuidance}\nUse these conventions in every customer-facing sentence. Never convert or restate prices.`
   }

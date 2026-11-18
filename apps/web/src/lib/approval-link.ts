@@ -14,8 +14,10 @@ import {
   approvalLinkState,
   formatMoney,
   getRegion,
+  displaySections,
   type ApprovalOutcome,
   type ApprovalLinkRow,
+  type QuotePricing,
 } from '@qolumns/shared'
 import type { createAdminClient } from '@/lib/supabase/server'
 import { approveQuote } from '@/lib/quote-approval'
@@ -47,6 +49,8 @@ export interface ApprovalSummary {
   serviceName: string
   price: string
   scopeSummary?: string
+  /** T-179: a combined quote's services, each with its subtotal (absent on a single-service quote) */
+  sections?: Array<{ serviceName: string; subtotal: string }>
 }
 
 export interface LoadedLink {
@@ -54,6 +58,16 @@ export interface LoadedLink {
   link: LinkRow | null
   summary: ApprovalSummary | null
   quote: QuoteRow | null
+}
+
+/** T-179: the services on a combined quote, for the confirmation page */
+function sectionsSummary(q: QuoteRow): { sections?: Array<{ serviceName: string; subtotal: string }> } {
+  const pricing = q.pricing_json as (QuotePricing & { sections?: unknown }) | null
+  const sections = pricing ? displaySections(pricing, { serviceName: q.services?.name ?? 'Service' }) : null
+  if (!pricing || !sections) return {}
+  const region = getRegion(q.tenants?.region)
+  const currency = pricing.currency || region.currency
+  return { sections: sections.map((s) => ({ serviceName: s.serviceName, subtotal: formatMoney(s.subtotal, currency, region.locale) })) }
 }
 
 function priceLabel(pricing: QuoteRow['pricing_json'], region?: string | null): string {
@@ -95,6 +109,7 @@ export async function loadApprovalLink(admin: Admin, token: string, now: Date = 
       serviceName: q.services?.name ?? '',
       price: priceLabel(q.pricing_json, q.tenants?.region),
       ...(q.content_json?.scopeSummary && { scopeSummary: q.content_json.scopeSummary }),
+      ...sectionsSummary(q),
     },
   }
 }

@@ -23,7 +23,7 @@ import {
   detectAddonsFromDescription,
   extractInventoryItems,
   matchItemsToCatalog,
-  extractCrossServiceDetails,
+  prefillSectionAnswers,
   detectServicesFromDescription,
   autoGeneratePromptContext,
   generateSignalRecommendations,
@@ -37,7 +37,6 @@ import type {
   QuoteContent,
   AddonForMatching,
   InventoryDetectionContext,
-  CrossServiceEstimate,
   ServiceForMatching,
   SignalExtractionContext,
   CustomerRequestContext,
@@ -50,7 +49,12 @@ import { initializeFusionFromStructuredSignals } from './agents/signal-fusion'
 import { evaluateQualityGate } from './agents/quality-gate'
 import type { TriageDecision, TriageInput, FusedSignals } from './agents/types'
 import type { QualityGateResult, ClarificationQuestion } from '@qolumns/shared'
-import { AiUsageMeter, CHECKER_SETTINGS_VERSION, serviceSuggestionOf, suggestedServiceReason } from '@qolumns/shared'
+import { AiUsageMeter, CHECKER_SETTINGS_VERSION, serviceSuggestionOf, suggestedServiceReason, alsoAskedOf, MAX_ADDED_SECTIONS } from '@qolumns/shared'
+import type { AlsoAsked } from '@qolumns/shared'
+import { priceSection, withoutMentionsOf } from './section-pricing'
+import { declinedOrOnlyAsked, coveredByMainService, sentenceAround } from './ai/service-detection'
+import type { MainServiceContext } from './ai/service-detection'
+import type { WordingContext } from './ai/wording'
 import { withAiTimeout, aiCallTimeoutMs } from './ai/timeouts'
 import { createAiClient } from './ai/factory'
 import type { AiClient } from './ai/client'
@@ -60,7 +64,7 @@ import { formatScopeAnswers } from './ai/scope-answers'
 import { fieldOptions, snapToOption, answersOutsideOptions, type OptionField } from './answer-options'
 import { identificationTargets, identifyFromLabels, applyIdentifications, weakenUnreadGuesses, pricingReferencedKeys, checkIdentifications, identificationProvenance, identificationQuestion, DEFAULT_IDENTIFICATION_TIMEOUT_MS, type IdentificationOutcome } from './ai/identification'
 import { buildTakeoff, buildReference } from './takeoff'
-import { calculatePricingWithTrace, getDefaultPricingRules, calculateCrossServicePricing, findLookalikeUnconditionedSteps } from './pricing'
+import { calculatePricingWithTrace, getDefaultPricingRules, findLookalikeUnconditionedSteps } from './pricing'
 import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@qolumns/shared'
 import { createSentenceRewriter } from './ai/wording-repair'
@@ -84,6 +88,14 @@ interface CrossServiceRecommendation {
   serviceName: string
   reason: string
   matchedKeyword: string
+  /** T-179: the customer's own words asking for it */
+  words: string
+}
+
+/** T-179: what the first pass found the customer also asked for */
+interface AlsoAskedDetection {
+  services: CrossServiceRecommendation[]
+  notOffered: Array<{ words: string }>
 }
 
 /**
@@ -200,6 +212,8 @@ interface QuoteData {
     name: string
     description?: string
     detection_keywords?: string[]
+    scope_includes?: string[] | null
+    scope_excludes?: string[] | null
   }>
   businessOwnerEmail?: string
   pricingRules?: PricingRules
@@ -215,9 +229,27 @@ interface QuoteData {
 /**
  * Quote processing result
  */
+/**
+ * T-179: what the pipeline returns in section mode — another of the business's
+ * services priced for this quote from answers alone (no AI, no photos, nothing
+ * written). `section-pricing.ts` turns it into a section or a list of questions.
+ */
+export interface SectionRun {
+  service: QuoteData['service']
+  widgetFields: WidgetField[]
+  rules: PricingRules
+  answers: Array<{ fieldId: string; value: string | number | boolean | string[] }>
+  pricing: PricingResult
+  pricingTrace: PricingTrace
+  /** Quantities the service prices by that have no usable value (it would have measured them from photos) */
+  missingQuantitySignals: Array<{ signalKey: string; stepName: string }>
+}
+
 export interface ProcessingResult {
   success: boolean
   error?: string
+  /** T-179: set in section mode instead of everything below */
+  sectionRun?: SectionRun
   /** `repriceOnly` was requested but the quote has no reprice snapshot */
   notRepriceable?: boolean
   signals?: ExtractedSignals
@@ -406,6 +438,14 @@ export async function processQuote(
     queueWaitMs?: number
     /** Only run the deterministic reprice; return `notRepriceable` instead of the full pipeline */
     repriceOnly?: boolean
+    /**
+     * T-179 section mode: price ANOTHER of the business's services for this
+     * quote, from these answers only. The same code path as a request for
+     * that service alone, with every AI client off and no photos, and it
+     * returns straight after the rules engine: nothing is written, sent or
+     * counted. (Like the reprice path, it is deterministic.)
+     */
+    section?: { serviceId: string; answers: Array<{ fieldId: string; value: string | number | boolean | string[] }> }
   } = {}
 ): Promise<ProcessingResult> {
   console.log(`[Processor] Starting quote processing: ${quoteId}`)
@@ -413,9 +453,25 @@ export async function processQuote(
   timer.queueWaitMs = options.queueWaitMs
 
   // 1. Load all quote data
-  const quoteData = await timer.time('load', () => loadQuoteData(supabase, quoteId))
+  const quoteData = await timer.time('load', () => loadQuoteData(supabase, quoteId, options.section?.serviceId))
   if (!quoteData) {
     return { success: false, error: 'Failed to load quote data' }
+  }
+  if (options.section) {
+    // T-179: the added service is priced from its own answers alone. The main
+    // request's answers, note, quantity, photos and clarification round are
+    // not its inputs.
+    const sectionAnswers = options.section.answers.filter((a) => a.fieldId !== SECTION_QUANTITY_KEY)
+    const quantity = Number(options.section.answers.find((a) => a.fieldId === SECTION_QUANTITY_KEY)?.value)
+    quoteData.quoteRequest = {
+      ...quoteData.quoteRequest,
+      job_answers: sectionAnswers as typeof quoteData.quoteRequest.job_answers,
+      job_quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : undefined,
+    } as typeof quoteData.quoteRequest
+    quoteData.assets = []
+    quoteData.quote.clarification_questions_json = undefined as never
+    quoteData.quote.clarification_answers_json = undefined as never
+    quoteData.quote.signals_json = null as never
   }
 
   const { quoteRequest, tenant, service, pricingRules, assets } = quoteData
@@ -580,8 +636,9 @@ export async function processQuote(
   // T-135: model per task from the registry (env-overridable); every call's
   // tokens are metered for the per-quote AI cost estimate in the trace
   const aiUsage = new AiUsageMeter()
-  const gemini = createAiClient('extraction_pass', env, aiUsage) // vision: signals, measurement, inventory
-  const textAi = createAiClient('wording', env, aiUsage) // text: wording, addons, gate, validator, cross-service
+  // T-179: section mode makes no AI call at all (both clients off; every AI step below is gated on them)
+  const gemini = options.section ? null : createAiClient('extraction_pass', env, aiUsage) // vision: signals, measurement, inventory
+  const textAi = options.section ? null : createAiClient('wording', env, aiUsage) // text: wording, addons, gate, validator, cross-service
 
   // Extract customer notes for context
   const notesAnswer = quoteRequest.job_answers?.find(
@@ -1408,6 +1465,23 @@ export async function processQuote(
     )
   const { result: pricing, trace: pricingTrace } = priceWithSignals(structuredSignals)
 
+  if (options.section) {
+    // T-179: priced by the rules engine from the service's full rules. Stop
+    // here: no wording, no checks, no writes, no emails, no usage.
+    return {
+      success: true,
+      sectionRun: {
+        service,
+        widgetFields: quoteData.widgetFields || [],
+        rules: rulesWithWorkSteps,
+        answers: formAnswers,
+        pricing,
+        pricingTrace,
+        missingQuantitySignals: [...missingQuantitySignals],
+      },
+    }
+  }
+
   console.log(`[Processor] Pricing calculated: ${pricing.currency} ${pricing.total}`)
   if (pricingTrace.trace.length > 0) {
     console.log(`[Processor] Pricing trace has ${pricingTrace.trace.length} steps`)
@@ -1712,7 +1786,7 @@ export async function processQuote(
   }
 
   // Build wording context with service profile data
-  const wordingContext = {
+  const wordingContext: WordingContext = {
     businessName: tenant.name,
     serviceName: service.name,
     serviceDescription: service.description,
@@ -1735,12 +1809,31 @@ export async function processQuote(
   const crossServiceDetectionPromise =
     !reprice && triageDecision.crossServiceCheck
       ? timer.time('cross_service', () => detectCrossServiceMentionsWithAI(
-          textAi,
+          // T-179: outside production a check can stand in for the model that reads the note (never in production)
+          sectionStandInAi(env) ?? textAi,
           projectDescription || '',
-          service.name,
+          {
+            name: service.name,
+            description: service.description,
+            scopeIncludes: service.scope_includes,
+            scopeExcludes: service.scope_excludes,
+            addons: (pricingRules?.addons ?? []).map((a) => a.label),
+          },
           quoteData.otherServices || []
         ))
-      : Promise.resolve([])
+      : Promise.resolve<AlsoAskedDetection>({ services: [], notOffered: [] })
+
+  // T-179: what else the customer asked for is known before the wording is
+  // written (the detection started earlier and reads only the note), so the
+  // wording can leave it out: it is offered on the page, not excluded.
+  if (!reprice) {
+    const early = await crossServiceDetectionPromise
+    const mentioned = [
+      ...early.services.map((rec) => ({ words: rec.words, serviceName: rec.serviceName })),
+      ...early.notOffered.map((item) => ({ words: item.words })),
+    ]
+    if (mentioned.length > 0) wordingContext.alsoAsked = mentioned
+  }
 
   if (reprice) {
     // The provisional wording shown with the range stands; prices in it come
@@ -1779,89 +1872,57 @@ export async function processQuote(
     console.log('[Processor] Cross-service detection skipped by triage')
   }
 
+  // Quotes made before T-179 carried a rough estimate for each other service
+  // ("Other services you mentioned"). A reprice of one keeps what it had;
+  // new quotes carry `alsoAsked` instead and this stays empty.
   const crossServicePricing: CrossServicePricing[] = reprice ? [...reprice.crossServicePricing] : []
 
-  if (crossServiceRecommendations.length > 0) {
-    console.log(`[Processor] Detected ${crossServiceRecommendations.length} cross-service recommendations`)
-
-    // Calculate pricing for each cross-service
-    for (const rec of crossServiceRecommendations) {
+  // T-179 (AD-061): what else the customer asked for. Each other service
+  // they asked for is priced as a section the customer can add: by the rules
+  // engine, from that service's own rules, with no AI. Here we only work out
+  // where each stands: a price when nothing more needs asking, or the
+  // service's own questions (pre-filled from the note for the customer to
+  // confirm). Nothing is added to this quote's price.
+  const alsoAsked: AlsoAsked[] = reprice ? alsoAskedOf(reprice.content) : []
+  if (!reprice && (crossServiceRecommendations.services.length > 0 || crossServiceRecommendations.notOffered.length > 0)) {
+    console.log(`[Processor] The customer also asked for ${crossServiceRecommendations.services.length} other services and ${crossServiceRecommendations.notOffered.length} things the business does not offer`)
+    const noteAi = sectionStandInAi(env) ?? textAi
+    for (const rec of crossServiceRecommendations.services.slice(0, MAX_ADDED_SECTIONS)) {
       try {
-        // Load pricing rules for this service
-        const { data: servicePricingRule } = await supabase
-          .from('service_pricing_rules')
-          .select('rules_json')
-          .eq('service_id', rec.serviceId)
-          .single()
-
-        // Skip if no pricing rules configured
-        if (!servicePricingRule?.rules_json) {
-          console.log(`[Processor] No pricing rules for cross-service ${rec.serviceName}, skipping`)
+        const priced = await priceSection(supabase, env, { quoteId, serviceId: rec.serviceId })
+        // KC-002: a service with no price configured (or a price of nothing) is never offered
+        if (!priced.ok) {
+          console.log(`[Processor] Not offering ${rec.serviceName} as a section: ${priced.reason}`)
           continue
         }
-
-        const serviceRules = servicePricingRule.rules_json as PricingRules
-
-        // Extract details using AI if Gemini is available
-        let crossServiceEstimate: CrossServiceEstimate
-        if (textAi && projectDescription) {
-          crossServiceEstimate = await extractCrossServiceDetails(
-            textAi,
-            service.name,
-            rec.serviceName,
-            projectDescription
-          )
-          console.log(`[Processor] Extracted cross-service details for ${rec.serviceName}: confidence=${crossServiceEstimate.confidence}`)
-        } else {
-          // Fallback without AI
-          crossServiceEstimate = {
-            serviceName: rec.serviceName,
-            estimatedQuantity: null,
-            quantityUnit: null,
-            extractedDetails: [],
-            confidence: 0.3,
-          }
+        let questions = priced.ready ? [] : priced.questions
+        if (questions.length > 0 && noteAi && projectDescription) {
+          const prefill = await prefillSectionAnswers(noteAi, priced.serviceName, questions, projectDescription)
+          questions = questions.map((q) => (prefill[q.key] !== undefined ? { ...q, prefill: prefill[q.key] } : q))
         }
-
-        // Calculate pricing
-        const pricingResult = calculateCrossServicePricing(
-          serviceRules,
-          crossServiceEstimate,
-          {
-            enabled: tenant.tax_enabled,
-            label: regionCtx.taxLabel,
-            // DB stores rate as decimal (0.20 = 20%), pricing engine expects whole number (20 = 20%)
-            rate: (tenant.tax_rate || 0) * 100,
-          },
-          tenant.currency
-        )
-
-        // Bug fix: Only include cross-service recommendations with valid pricing (> £0)
-        // Showing £0.00 looks broken and unprofessional
-        if (pricingResult.estimatedTotal <= 0) {
-          console.log(`[Processor] Skipping cross-service ${rec.serviceName} - invalid pricing: ${tenant.currency} ${pricingResult.estimatedTotal}`)
-          continue
-        }
-
-        // Add to cross-service pricing list
-        crossServicePricing.push({
+        alsoAsked.push({
+          id: `also_${rec.serviceId}`,
+          words: rec.words,
           serviceId: rec.serviceId,
-          serviceName: rec.serviceName,
-          reason: rec.reason,
-          baseFee: pricingResult.baseFee,
-          estimatedTotal: pricingResult.estimatedTotal,
-          breakdown: pricingResult.breakdown,
-          extractedDetails: crossServiceEstimate.extractedDetails,
-          isEstimate: pricingResult.isEstimate,
-          note: pricingResult.note,
+          serviceName: priced.serviceName,
+          state: 'offered',
+          ...(priced.ready ? { price: priced.section.subtotal } : { questions }),
         })
-
-        console.log(`[Processor] Calculated cross-service pricing for ${rec.serviceName}: ${tenant.currency} ${pricingResult.estimatedTotal}`)
       } catch (error) {
-        console.error(`[Processor] Failed to process cross-service ${rec.serviceName}:`, error)
-        // Continue with other cross-services
+        console.error(`[Processor] Could not prepare ${rec.serviceName} as a section:`, error instanceof Error ? error.name : 'unknown error')
       }
     }
+    // Something the business does not offer: never a price, only the customer's words
+    crossServiceRecommendations.notOffered.forEach((item, i) => {
+      alsoAsked.push({ id: `also_other_${i + 1}`, words: item.words, serviceId: null, state: 'not_offered' })
+    })
+  }
+  // On the content, so the clarification round and the final store both carry it
+  if (alsoAsked.length > 0) content.alsoAsked = alsoAsked
+  // … and the main service's wording never says a service the customer can add here is "not included"
+  if (!reprice) {
+    const offeredNames = alsoAsked.filter((a) => a.state === 'offered' && a.serviceName).map((a) => a.serviceName as string)
+    if (offeredNames.length > 0) content = withoutMentionsOf(content, offeredNames)
   }
 
   // 4.6 Evaluate confidence-based fallbacks
@@ -2393,6 +2454,8 @@ export async function processQuote(
         // new content fields MUST be added here or they silently vanish)
         takeoff: content.takeoff,
         reference: content.reference,
+        // T-179: what else the customer asked for (other services they can add; things not offered)
+        ...(content.alsoAsked && content.alsoAsked.length > 0 && { alsoAsked: content.alsoAsked }),
         // Store signals for reference (not displayed to customer)
         _signals: {
           confidence: signals.confidence,
@@ -2627,9 +2690,34 @@ export async function processQuote(
 /**
  * Load all data needed for quote processing
  */
+/** T-179: the key a section's answers use for "how many" when the service asks the customer for a quantity */
+export const SECTION_QUANTITY_KEY = '_quantity'
+
+/** The service columns the pipeline reads (one list, so a section's service is loaded exactly as the main one is) */
+const SERVICE_COLUMNS = `
+        id,
+        name,
+        description,
+        scope_includes,
+        scope_excludes,
+        default_assumptions,
+        media_config,
+        prompt_context,
+        expected_signals,
+        work_steps,
+        low_confidence_mode,
+        confidence_threshold,
+        high_value_threshold,
+        draft_config,
+        tax_exempt,
+        auto_send,
+        hold_until_approved`
+
 async function loadQuoteData(
   supabase: SupabaseClient,
-  quoteId: string
+  quoteId: string,
+  /** T-179 section mode: load THIS service (one of the same business's active services) in place of the quote's own */
+  sectionServiceId?: string
 ): Promise<QuoteData | null> {
   // Load quote with joins
   const { data: quote, error: quoteError } = await supabase
@@ -2650,24 +2738,7 @@ async function loadQuoteData(
         notification_email,
         is_demo
       ),
-      services!service_id (
-        id,
-        name,
-        description,
-        scope_includes,
-        scope_excludes,
-        default_assumptions,
-        media_config,
-        prompt_context,
-        expected_signals,
-        work_steps,
-        low_confidence_mode,
-        confidence_threshold,
-        high_value_threshold,
-        draft_config,
-        tax_exempt,
-        auto_send,
-        hold_until_approved
+      services!service_id (${SERVICE_COLUMNS}
       )
     `)
     .eq('id', quoteId)
@@ -2678,11 +2749,29 @@ async function loadQuoteData(
     return null
   }
 
+  // T-179: in section mode everything below is read for the added service
+  let serviceRow: unknown = quote.services
+  const serviceId: string = sectionServiceId ?? quote.service_id
+  if (sectionServiceId) {
+    const { data: other } = await supabase
+      .from('services')
+      .select(SERVICE_COLUMNS)
+      .eq('id', sectionServiceId)
+      .eq('tenant_id', quote.tenant_id)
+      .eq('active', true)
+      .single()
+    if (!other) {
+      console.error(`[Processor] Section service ${sectionServiceId} is not an active service of this business`)
+      return null
+    }
+    serviceRow = other
+  }
+
   // Load pricing rules for service
   const { data: pricingRule } = await supabase
     .from('service_pricing_rules')
     .select('rules_json')
-    .eq('service_id', quote.service_id)
+    .eq('service_id', serviceId)
     .single()
 
   // Load assets for quote request (primary: by quote_request_id foreign key)
@@ -2731,7 +2820,7 @@ async function loadQuoteData(
     .from('widget_configs')
     .select('config_json')
     .eq('tenant_id', quote.tenant_id)
-    .eq('service_id', quote.service_id)
+    .eq('service_id', serviceId)
     .single()
 
   if (serviceWidgetConfig?.config_json) {
@@ -2757,10 +2846,10 @@ async function loadQuoteData(
   // Load other services for cross-service detection (include description for AI matching)
   const { data: otherServices } = await supabase
     .from('services')
-    .select('id, name, description, detection_keywords')
+    .select('id, name, description, detection_keywords, scope_includes, scope_excludes')
     .eq('tenant_id', quote.tenant_id)
     .eq('active', true)
-    .neq('id', quote.service_id)
+    .neq('id', serviceId)
 
   return {
     quote: {
@@ -2786,7 +2875,7 @@ async function loadQuoteData(
     },
     quoteRequest: quote.quote_requests as unknown as QuoteData['quoteRequest'],
     tenant: quote.tenants as unknown as QuoteData['tenant'],
-    service: quote.services as unknown as QuoteData['service'],
+    service: serviceRow as QuoteData['service'],
     otherServices: (otherServices || []) as QuoteData['otherServices'],
     businessOwnerEmail,
     pricingRules: pricingRule?.rules_json as PricingRules | undefined,
@@ -3361,35 +3450,33 @@ function detectFormDescriptionConflicts(
 }
 
 /**
- * Detect mentions of other services using hybrid AI + keyword approach
- *
- * This first tries AI detection (more intelligent), then falls back to
- * keyword matching for any services not detected by AI.
+ * Find what else the customer asked for: AI first (more intelligent), then
+ * keywords for any of the business's services the AI did not find.
  */
 async function detectCrossServiceMentionsWithAI(
   gemini: AiClient | null,
   projectDescription: string,
-  primaryServiceName: string,
-  otherServices: Array<{ id: string; name: string; description?: string; detection_keywords?: string[] }>
-): Promise<CrossServiceRecommendation[]> {
-  // Comprehensive logging for debugging
+  main: MainServiceContext,
+  otherServices: Array<{ id: string; name: string; description?: string; detection_keywords?: string[]; scope_includes?: string[] | null; scope_excludes?: string[] | null }>
+): Promise<AlsoAskedDetection> {
   console.log(`[CrossService] Description length: ${projectDescription?.length || 0}`)
   console.log(`[CrossService] Available services: ${otherServices.map((s) => s.name).join(', ') || 'none'}`)
 
   if (!projectDescription || projectDescription.trim().length < 10) {
     console.log('[CrossService] SKIP: Description too short or empty')
-    return []
+    return { services: [], notOffered: [] }
   }
 
   if (otherServices.length === 0) {
     console.log('[CrossService] SKIP: No other services configured for this tenant')
-    return []
+    return { services: [], notOffered: [] }
   }
 
   const recommendations: CrossServiceRecommendation[] = []
+  const notOffered: Array<{ words: string }> = []
   const detectedServiceIds = new Set<string>()
 
-  // Try AI detection first (if Gemini is available)
+  // Try AI detection first (if available)
   if (gemini) {
     console.log('[CrossService] Attempting AI-powered service detection')
     try {
@@ -3398,25 +3485,24 @@ async function detectCrossServiceMentionsWithAI(
         name: s.name,
         description: s.description,
         detection_keywords: s.detection_keywords,
+        scopeIncludes: s.scope_includes,
+        scopeExcludes: s.scope_excludes,
       }))
 
-      const aiDetected = await detectServicesFromDescription(
-        gemini,
-        primaryServiceName,
-        projectDescription,
-        servicesForMatching
-      )
+      const aiDetected = await detectServicesFromDescription(gemini, main, projectDescription, servicesForMatching)
 
-      for (const detected of aiDetected) {
+      for (const detected of aiDetected.services) {
         recommendations.push({
           serviceId: detected.serviceId,
           serviceName: detected.serviceName,
           reason: detected.reason,
           matchedKeyword: detected.matchedPhrase,
+          words: detected.matchedPhrase,
         })
         detectedServiceIds.add(detected.serviceId)
         console.log(`[CrossService] AI detected: ${detected.serviceName} (conf: ${detected.confidence})`)
       }
+      notOffered.push(...aiDetected.notOffered)
     } catch (error) {
       console.error('[CrossService] AI detection failed, falling back to keywords:', error)
     }
@@ -3431,12 +3517,33 @@ async function detectCrossServiceMentionsWithAI(
   )
 
   for (const match of keywordMatches) {
+    // T-179: the same plain-language checks the AI's answers get
+    if (declinedOrOnlyAsked(projectDescription, match.matchedKeyword) || coveredByMainService(match.words, main)) {
+      console.log(`[CrossService] Skipping keyword match for "${match.serviceName}": declined, only asked about, or covered by the chosen service`)
+      continue
+    }
     recommendations.push(match)
     console.log(`[CrossService] Keyword detected: ${match.serviceName} (keyword: "${match.matchedKeyword}")`)
   }
 
   console.log(`[CrossService] Total detected: ${recommendations.length} services`)
-  return recommendations
+  return { services: recommendations, notOffered }
+}
+
+/**
+ * T-179, checks only: a stand-in for the model that reads the customer's
+ * note for other services (detection and the pre-fill). A live model's
+ * answers vary from run to run, so the checks script one. Honoured in local
+ * development only (ENVIRONMENT=development); in production it is ignored.
+ */
+function sectionStandInAi(env: Env): AiClient | null {
+  const base = env.ENVIRONMENT === 'development' ? env.SECTION_AI_BASE_URL : undefined
+  if (!base) return null
+  const generateText = async (prompt: string) => {
+    const response = await fetch(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) })
+    return response.text()
+  }
+  return { generateText } as unknown as AiClient
 }
 
 /**
@@ -3467,6 +3574,7 @@ function detectCrossServiceMentionsKeywords(
           serviceName: service.name,
           reason: `You mentioned "${service.name}" in your description`,
           matchedKeyword: service.name,
+          words: sentenceAround(projectDescription, service.name).slice(0, 160),
         })
       } else {
         console.log(`[CrossService] Skipping "${service.name}" - not a genuine request (${phraseContext.length} chars of context)`)
@@ -3499,6 +3607,7 @@ function detectCrossServiceMentionsKeywords(
             serviceName: service.name,
             reason: `Based on: "${phraseContext}"`,
             matchedKeyword: keyword,
+            words: sentenceAround(projectDescription, keyword).slice(0, 160),
           })
           matched = true
           break // Only one match per service
