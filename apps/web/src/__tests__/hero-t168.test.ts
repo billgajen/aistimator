@@ -126,8 +126,16 @@ describe('T-168: the hero demo is three frames of one height', () => {
     expect(demo).toContain('data-testid="demo-accept">Accept<')
     expect(demo).toMatch(/data-testid="demo-approve">\s*Approve &amp; send/)
     expect(demo).toContain('QUOTE_TURN_COPY.home.title')
-    // no photo field, no label-reading step, no long breakdown, no "Sent"
-    expect(demo).not.toMatch(/photo|QuestionScreen|EstimateSheet|demo-sent|demo-confirmed/)
+    // no photo field, no label-reading step, no long breakdown
+    expect(demo).not.toMatch(/photo|QuestionScreen|EstimateSheet|demo-confirmed/)
+    // T-187 (the owner's review): "Approve & send" is pressed and the lead changes to its sent state: the
+    // chip, the line and the button's place, each in the dashboard's own words, never typed here
+    expect(demo).toContain('data-testid="demo-sent"')
+    expect(demo).toContain('data-testid="demo-chip-after"')
+    expect(demo).toContain("quoteTurn({ status: 'sent'")
+    expect(demo).toContain('{sent.detail}')
+    expect(demo).toContain('{content.sentNote}')
+    expect(demo).not.toMatch(/Waiting for customer|not opened yet|Sent to the customer/)
     expect(Object.keys(DEMO_TIMELINE)).not.toContain('read')
     // a short estimate: the example the hero uses has one or two lines
     const example = marketingExample()

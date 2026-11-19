@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { FREE_ALLOWANCE, SUPPORT_EMAIL, offeredPlans } from '@qolumns/shared'
 import { HERO, NOTICES, PAGE_META } from '@/lib/marketing/home-copy'
 import { marketingExample } from '@/lib/marketing/examples'
-import { BILLED_IN_ADVANCE, PLAN_CHANNEL_LINES, PLUS_TAX, PRICING_DESCRIPTION, PRICING_TAGLINES, planLines, sitePlans } from '@/lib/marketing/plan-claims'
+import { BILLED_IN_ADVANCE, PLAN_CHANNEL_LINES, PLUS_TAX, PRICING_DESCRIPTION, planCards, planLines, sitePlans } from '@/lib/marketing/plan-claims'
 import { DATA_DELETION, FOOTER } from '@/lib/marketing/site-copy'
 
 const ROOT = join(__dirname, '..', '..', '..', '..')
@@ -72,24 +72,28 @@ describe('T-181: plan cards say what the business gets', () => {
     expect(FREE_ALLOWANCE.US).toEqual({ quotes: 10, per: 'total' })
   })
 
-  it('Home’s cards list the live lines from the same list as Pricing; both keep "plus tax"; Pricing says how plans are billed', () => {
-    const home = read('apps/web/src/app/page.tsx')
-    expect(home).toContain('{planLines(def)')
-    expect(home).toContain('.filter((line) => line.live)')
-    expect(home).toContain('per month, {PLUS_TAX}')
-    const pricing = read('apps/web/src/app/pricing/page.tsx')
-    expect(pricing).toContain('{PLUS_TAX}')
-    expect(pricing).toContain('{BILLED_IN_ADVANCE}')
+  it('Home’s cards and Pricing’s are one list and one component; both keep "plus tax"; Pricing says how plans are billed', () => {
+    // T-187: the same cards on both pages, from `planCards`. A card lists what a business can use today
+    // first, then what is still to come, marked (T-181's Home cards listed the live lines only).
+    const cards = read('apps/web/src/components/marketing/PlanCards.tsx')
+    for (const page of ['apps/web/src/app/page.tsx', 'apps/web/src/app/pricing/page.tsx']) expect(read(page), page).toContain('<PlanCards')
+    expect(cards).toContain('const cards = planCards()')
+    expect(cards).toContain('a month, {PLUS_TAX}')
+    for (const card of planCards()) {
+      const firstLater = card.lines.findIndex((l) => !l.live)
+      if (firstLater >= 0) expect(card.lines.slice(firstLater).every((l) => !l.live), card.id).toBe(true)
+    }
+    expect(read('apps/web/src/lib/marketing/pricing-copy.ts')).toContain('`${BILLED_IN_ADVANCE} Pay yearly and two months are free.`')
     expect(PLUS_TAX).toBe('plus tax')
     expect(BILLED_IN_ADVANCE).toBe('Billed in advance, monthly or yearly.')
-    expect(PRICING_TAGLINES.plan_us_starter).not.toMatch(/on your website/)
   })
 })
 
 describe('T-181: the site is for any business', () => {
   it('nothing limits it to contractors or home-service businesses', () => {
     expect(HERO.smallLine).toBe('For any business that quotes for its work, small to corporate. No website? Use your quote link.')
-    expect(FOOTER.tagline).toContain('for any business, small or large')
+    // T-187: the footer's line names no kind of business at all
+    expect(FOOTER.line).toBe('Instant quotes for your customers, in your own prices.')
     expect(PRICING_DESCRIPTION).toContain('for businesses of any size')
     for (const file of ['lib/marketing/home-copy.ts', 'lib/marketing/site-copy.ts', 'lib/marketing/plan-claims.ts', 'lib/marketing/features-copy.ts', 'app/pricing/page.tsx', 'app/layout.tsx']) {
       expect(read(`apps/web/src/${file}`), file).not.toMatch(/contractors and home-service|home-service businesses|for service businesses/i)

@@ -140,13 +140,21 @@ describe('T-180: plans and prices', () => {
 describe('T-180: prices are shown before tax, and say so', () => {
   it('"plus tax" sits beside every plan price: the Pricing page, Home\'s plan cards and the billing page\'s', () => {
     expect(PLUS_TAX).toBe('plus tax')
-    for (const file of ['apps/web/src/app/pricing/page.tsx', 'apps/web/src/app/page.tsx', 'apps/web/src/app/(dashboard)/app/settings/billing/page.tsx']) {
+    // T-187: the Pricing page and Home draw the same plan cards (components/marketing/PlanCards), so the
+    // words sit there once; the billing page has its own cards
+    for (const file of ['apps/web/src/components/marketing/PlanCards.tsx', 'apps/web/src/app/(dashboard)/app/settings/billing/page.tsx']) {
       const src = read(file)
       expect(src, file).toContain('{PLUS_TAX}')
       expect(src, file).not.toMatch(/['"`>]\s*plus tax/) // from the constant, never typed
     }
-    // the yearly price on the Pricing page says it too
-    expect(read('apps/web/src/app/pricing/page.tsx')).toContain('a year {PLUS_TAX} (two months free)')
+    for (const file of ['apps/web/src/app/pricing/page.tsx', 'apps/web/src/app/page.tsx']) {
+      expect(read(file), file).toContain('<PlanCards')
+      expect(read(file), file).not.toMatch(/['"`>]\s*plus tax/)
+    }
+    // the monthly and the yearly price both say it
+    const cards = read('apps/web/src/components/marketing/PlanCards.tsx')
+    expect(cards).toContain('a month, {PLUS_TAX}')
+    expect(cards).toContain('a year, {PLUS_TAX} (two months free)')
   })
 
   it('the Terms no longer speak of metered overage (no plan has it), and say plans are billed in advance, monthly or yearly', () => {

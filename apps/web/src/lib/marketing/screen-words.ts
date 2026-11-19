@@ -41,6 +41,25 @@ export const SCREEN_WORDS = {
     rangeLead: 'Confirm a couple of details so we can price it for your job. It takes less than a minute.',
     rangeButton: 'Confirm details',
   },
+  /** A quote that carries several services (app/q/[quoteId]): each service's part, and the one total (T-179, T-187) */
+  sections: {
+    subtotal: (serviceName: string) => `${serviceName} subtotal`,
+    total: 'Total',
+  },
+  /**
+   * T-187: the on-site app's own words (apps/mobile), for the app screens shown on the site. The status
+   * words and the step names are not here: they come from the shared wording the app itself uses
+   * (packages/shared/src/quote-turn.ts).
+   */
+  app: {
+    listTitle: 'Quotes',
+    search: 'Search by customer name',
+    tabs: { quotes: 'Quotes', newQuote: 'New quote', account: 'Account' },
+    priceTitle: 'Price',
+    scanTitle: 'Room scan',
+    scanLead: 'Walk each room with the camera. A scanned room is measured, not estimated.',
+    scanButton: 'Scan a room',
+  },
   /** Setup's price check (components/onboarding/CheckPricesStep) */
   prices: {
     title: 'Check your prices',

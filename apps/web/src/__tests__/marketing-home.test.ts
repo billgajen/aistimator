@@ -101,21 +101,23 @@ describe('T-154: the approved copy', () => {
   it('the FAQ answers as approved', () => {
     const a = (q: string) => FAQ.find((f) => f.q === q)!.a
     expect(a('Can it quote the wrong price?')).toBe(
-      'Every price comes from the prices you set. A photo or an answer can still be misread, so your customer sees an estimate, or a range and one quick question, and by default cannot accept until you have confirmed it.'
+      // T-187: "can only accept after you approve it", the words the page now uses for it everywhere
+      'Every price comes from the prices you set. A photo or an answer can still be misread, so your customer sees an estimate, or a range and one quick question, and can only accept after you approve it.'
     )
     expect(a('Is my data private?')).toBe(
       'Your customers’ details and photos are visible to you and never to other businesses. Photos are stored privately and used only to prepare the estimate. Our privacy policy has the details.'
     )
     expect(a('Does it work with WordPress, Wix or Squarespace?')).toContain('a short piece of code')
-    expect(ADD_IT.ways.find((w) => w.title === 'Your website')!.text).toContain('a short piece of code')
     expect(JSON.stringify({ FAQ, ADD_IT })).not.toMatch(/one line of code/i)
+    // T-187: reviewed against the new page. The two questions about what is not live yet (WhatsApp, the
+    // app) are not in this list: they come from plan-claims, beside their flags (site-t187.test.ts)
     expect(FAQ.map((f) => f.q)).toEqual([
-      'What if I have no website?',
+      'Do I need a website?',
       'Can it quote the wrong price?',
       'Can I approve before the customer accepts?',
       'Does it work with WordPress, Wix or Squarespace?',
       'What does the customer see?',
-      'What happens after 10 free quotes?',
+      'What happens after the 10 free quotes?',
       'Is my data private?',
     ])
   })
@@ -125,8 +127,10 @@ describe('T-154: the approved copy', () => {
     for (const t of texts) {
       if (/\b(check|confirm|approve)s?\b[^.]*\bevery\b|\bevery (estimate|quote)\b[^.]*\b(check|confirm|approve)/i.test(t)) expect(t).toMatch(/by default/)
     }
-    // the three sending choices are stated wherever confirming is promised
-    expect(CONTROL.points.map((p) => p.text).join(' ')).toMatch(/send automatically/i)
+    // T-187 (the owner's review): "Three ways to send, per service" left the "Your prices" section. That a
+    // service can hold its price, or send without waiting, is still said on the page: in the questions.
+    expect(CONTROL.points.map((p) => p.title)).toEqual(['Only your prices', 'You approve before they can accept'])
+    expect(FAQ.find((f) => f.q === 'Can I approve before the customer accepts?')!.a).toMatch(/hold its price until you approve, or send without waiting for you/)
   })
 
   it('the privacy policy says the same as the FAQ', () => {
@@ -192,7 +196,11 @@ describe('T-154: visuals priced from the packs', () => {
       expect(ex.total).toBeGreaterThan(0)
       expect(ex.total).toBe(Math.max(ex.lines.reduce((s, l) => s + l.amount, 0), 0))
     }
-    expect(marketingExample().total).toBe(375) // the home page: the demo's spring pair
+    // T-187: the home page's demo is interior painting (it was the garage door spring pair, $375):
+    // three rooms at the template's $375 a room, and its visit fee
+    expect(marketingExample().serviceName).toBe('Interior Painting')
+    expect(marketingExample().total).toBe(1200)
+    expect(marketingExample('garage-doors').total).toBe(375)
     expect(marketingExample('water-heaters').total).toBe(2150)
     // T-181: three rooms, as in the customer's message on Home ($75 + 3 × $375); it was two rooms, $825
     expect(marketingExample('painting').total).toBe(1200)
@@ -332,18 +340,20 @@ describe('T-155: features promises match what is live (item 7 decision)', () => 
   // in place of its four text boxes, so the boxes' lines ("Estimate page in your branding", …) are gone
   const features = code('app/features/page.tsx') + code('lib/marketing/features-copy.ts')
 
-  it('T-167: the five steps as the owner approved them; no claim that is not live', () => {
-    for (const step of ['Ask', 'Read the job', 'Price', 'Confirm', 'Track']) expect(features).toContain(`name: '${step}'`)
-    // step 05 was "Learn: your corrections improve the next estimate", true only of confirmed photo measurements
+  it('T-187: one section per thing a business cares about (it was T-167’s five steps); no claim that is not live', () => {
+    for (const id of ['photos', 'prices', 'services', 'approve', 'page', 'share', 'flags']) expect(features).toContain(`id: '${id}'`)
+    // "Learn: your corrections improve the next estimate" was true only of confirmed photo measurements
     expect(features).not.toMatch(/Learns? from|corrections improve|which services win work and where requests stall/)
-    expect(features).toContain('See what’s winning work.')
-    // the chat form is not offered to businesses
-    expect(features).not.toMatch(/\bchat\b/i)
+    // the chat form of the request is not offered to businesses (a WhatsApp chat is another thing, and is marked)
+    expect(features).not.toMatch(/chat form|form or a chat|step-by-step form/i)
     expect(code('app/pricing/page.tsx')).not.toMatch(/AI chat/)
     // the price sentence matches Home's: two prices, no minimum
     expect(features).not.toMatch(/minimum job/i)
-    // five steps, five screens, no row of text boxes
-    expect((code('app/features/page.tsx').match(/testId="feature-screen"/g) ?? []).length).toBe(5)
+    // every section has its picture: one component draws a section, and it always draws the screen
+    const page = code('app/features/page.tsx')
+    expect((page.match(/testId="feature-screen"/g) ?? []).length).toBe(1)
+    expect(page).toContain('{pictures[section.id]}')
+    expect(page).toContain('{item.picture}')
   })
 
   it('no PDF, reminder, price-comparison or every-quantity claim on the marketing pages', () => {

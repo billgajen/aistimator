@@ -1,7 +1,10 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { DEMO_BUSINESS_NAME, DEMO_LOGO_PATH, DEMO_PRIMARY_COLOR, DEMO_SLUG, formatMoney, freeOfferLabel, FREE_ALLOWANCE } from '@qolumns/shared'
-import { PLUS_TAX, planLines, sitePlans } from '@/lib/marketing/plan-claims'
+import { DEMO_BUSINESS_NAME, DEMO_LOGO_PATH, DEMO_PRIMARY_COLOR, DEMO_SLUG, freeOfferLabel, FREE_ALLOWANCE, shortDate } from '@qolumns/shared'
+import { upcomingFaq } from '@/lib/marketing/plan-claims'
+import { PlanCards } from '@/components/marketing/PlanCards'
+import { Faq } from '@/components/marketing/Faq'
+import { AppSection } from '@/components/marketing/home/AppSection'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { FounderNote } from '@/components/marketing/FounderNote'
@@ -15,9 +18,9 @@ import { PriceSentence } from '@/components/marketing/home/PriceSentence'
 import { AddItAnywhere } from '@/components/marketing/home/AddItAnywhere'
 import { listPacks } from '@/lib/vertical-packs'
 import { templateTrades, tradeHref } from '@/lib/marketing/trades'
-import { marketingExample } from '@/lib/marketing/examples'
+import { appQuoteLines, marketingExample } from '@/lib/marketing/examples'
 import { MAIN_CTA, QUIET_BUTTON, QUIET_LINK } from '@/lib/marketing/cta'
-import { HERO, HERO_DEMO, HERO_DEMO_FRAMES, MESSAGE_LINE, NOTICES, OTHER_TRADES, SETUP, CONTROL, STATISTICS, ADD_IT, PRICING_HEADING, FAQ, FINAL_CTA, FINAL_QUIET_LINK, PAGE_META } from '@/lib/marketing/home-copy'
+import { HERO, HERO_DEMO, HERO_DEMO_FRAMES, MESSAGE_LINE, NOTICES, OTHER_TRADES, SETUP, CONTROL, STATISTICS, ADD_IT, PRICING_HEADING, PLANS_SECTION, FAQ, HOME_FAQ_UPCOMING_AFTER, FINAL_CTA, FINAL_QUIET_LINK, PAGE_META } from '@/lib/marketing/home-copy'
 
 export const metadata: Metadata = {
   title: PAGE_META.title,
@@ -40,21 +43,24 @@ const WRAP = 'mx-auto max-w-container px-4 sm:px-6'
  *   3 what it notices (paper): the message line and four examples, each with its real screen
  *   4 your prices (mint): a sentence that turns into price lines (the one moment)
  *   5 set up in minutes (paper): three steps beside their screens; the trade links sit in step 1
- *   6 add it anywhere (grey): a QR code, the quote page on a phone, the form on a website
- *   7 plans: a card for each plan the site shows (sitePlans: two today), each with its own button
- *   8 questions: a narrow column
- *   9 who is behind this (when filled in)
- *  10 the closing band: one button and one quiet link, over an evening photograph (T-170)
+ *   6 add it anywhere (grey): five ways, each with its picture; two are still to come (T-187)
+ *   7 the on-site app (mint): words beside two of its screens; "Coming soon to iPhone" (T-187)
+ *   8 plans (paper): two cards, centred, the same component as Pricing (T-187)
+ *   9 questions (grey): a centred column
+ *  10 who is behind this (when filled in)
+ *  11 the closing band: one button and one quiet link, over an evening photograph (T-170)
+ * Whatever is not live yet (quotes inside WhatsApp, the on-site app, the room scan) is drawn from
+ * lib/marketing/plan-claims.ts with its "Coming soon" mark; nothing on this page says it is live.
  * Copy: lib/marketing/home-copy.ts. Screens: the product's own parts, at true size.
  */
 export default function HomePage() {
   // the water-heater example the sections below are built on, and the hero demo's own short example
-  // (the default one: one question, one price line)
+  // (the default one, interior painting since T-187: one question, the price from the template's rates)
   const example = marketingExample(HERO_DEMO.trade)
   const demo = marketingExample()
+  const hvac = marketingExample('hvac')
   const trades = templateTrades(listPacks('US').filter((p) => p.region === 'US').map((p) => p.id))
   const free = FREE_ALLOWANCE.US!.quotes
-  const plans = sitePlans()
   const appOrigin = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
   const quoteLink = `${appOrigin}/quote/${DEMO_SLUG}`
   const form = {
@@ -65,6 +71,14 @@ export default function HomePage() {
     question: HERO_DEMO.question,
     answer: HERO_DEMO.answer,
   }
+  // T-187: the on-site app's screens show the same example jobs, at the templates' own prices
+  const appRows = [
+    { customer: demo.customerName, service: demo.serviceName, total: demo.total, status: 'pending_review' as const, when: 'just now' },
+    { customer: example.customerName, service: example.serviceName, total: example.total, status: 'sent' as const, when: '2 hours ago' },
+    { customer: hvac.customerName, service: hvac.serviceName, total: hvac.total, status: 'viewed' as const, when: 'yesterday' },
+  ]
+  const appQuote = { customer: demo.customerName, service: demo.serviceName, total: demo.total, lines: appQuoteLines(), receivedOn: shortDate(new Date().toISOString(), { locale: 'en-US' }) ?? '' }
+  const faq = [...FAQ.slice(0, HOME_FAQ_UPCOMING_AFTER), ...upcomingFaq(), ...FAQ.slice(HOME_FAQ_UPCOMING_AFTER)]
 
   // the hero's words and its demo: the same in production and on a hero-test preview
   const heroBody = (
@@ -99,6 +113,7 @@ export default function HomePage() {
             frames: HERO.frames,
             playAgain: HERO_DEMO_FRAMES.playAgain,
             acceptNote: HERO_DEMO_FRAMES.acceptNote(DEMO_BUSINESS_NAME),
+            sentNote: HERO_DEMO_FRAMES.sentNote,
             screens: HERO_DEMO_FRAMES.screens,
           }}
         />
@@ -189,94 +204,56 @@ export default function HomePage() {
           prices={example.lines}
           quoteLink={quoteLink}
           tradeLinks={[...trades.map((t) => ({ label: t.label, href: tradeHref(t) })), { label: OTHER_TRADES, href: '/signup', other: true }]}
+          elsewhere={SETUP.elsewhere}
         />
       </section>
 
-      {/* 6. Add it anywhere */}
-      <section className="border-y border-border bg-surface py-16 sm:py-20">
+      {/* 6. Add it anywhere: five ways, two of them still to come (T-187) */}
+      <section id={ADD_IT.id} className="scroll-mt-20 border-y border-border bg-surface py-16 sm:py-20" data-testid="add-it-section">
         <div className={WRAP}>
           <h2 className={H2}>{ADD_IT.heading}</h2>
           <p className="mt-3 max-w-2xl text-text-secondary">{ADD_IT.lead}</p>
-          <AddItAnywhere shown={ADD_IT.shown} screenLabels={ADD_IT.screens} quoteLink={quoteLink} form={form} />
+          <AddItAnywhere
+            shown={ADD_IT.shown}
+            screenLabels={ADD_IT.screens}
+            quoteLink={quoteLink}
+            form={form}
+            chat={{ serviceName: demo.serviceName, customerName: demo.customerName, link: `${appOrigin.replace(/^https?:\/\//, '')}/q/…` }}
+            appRows={appRows.slice(0, 2)}
+          />
         </div>
       </section>
 
-      {/* 7. Plans */}
-      <section className={`${WRAP} py-16 sm:py-20`} data-testid="plans">
-        <h2 className={H2}>{PRICING_HEADING}</h2>
-        <p className="mt-3 text-text-secondary">
-          <span className="figure">{free}</span> priced quotes free in total, no card.
-        </p>
-        {/* T-170 (owner's decision): only the plans with a line of their own live today (sitePlans) */}
-        <div className={`mt-8 grid gap-5 ${plans.length === 2 ? 'max-w-3xl sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
-          {plans.map((def) => (
-            <div key={def.id} className={`flex flex-col rounded-2xl p-6 ${def.recommended ? 'bg-primary text-white shadow-warm-lg' : 'border border-border bg-white'}`} data-testid="plan-card">
-              <p className={`text-sm font-semibold ${def.recommended ? 'text-on-primary/80' : 'text-text-secondary'}`}>{def.name}</p>
-              <p className="figure mt-2 text-3xl font-medium">{formatMoney((def.monthlyPrice.USD ?? 0) / 100, 'USD', 'en-US', { decimals: 0 })}</p>
-              <p className={`mt-1 text-xs ${def.recommended ? 'text-on-primary/70' : 'text-text-muted'}`}>
-                per month, {PLUS_TAX} · {def.quoteLimit.toLocaleString('en-US')} quotes a month
-              </p>
-              {/* T-181: what the plan gives, in the same words as Pricing (lib/marketing/plan-claims.ts).
-                  Only what a business can use today; Pricing also lists what is still to come. */}
-              <ul className="mt-4 flex-1 space-y-2 text-sm" data-testid="plan-lines">
-                {planLines(def)
-                  .filter((line) => line.live)
-                  .map((line) => (
-                    <li key={line.label} className="flex gap-2" data-testid="plan-line">
-                      <span aria-hidden="true" className={def.recommended ? 'text-on-primary' : 'text-secondary'}>✓</span>
-                      <span className={def.recommended ? 'text-on-primary' : 'text-text-secondary'}>{line.label}</span>
-                    </li>
-                  ))}
-              </ul>
-              <Link
-                href={`/signup?plan=${def.id}`}
-                className={`motion-press mt-6 inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 text-sm font-semibold ${def.recommended ? 'bg-white text-primary hover:bg-mint' : 'border border-field bg-background text-text-primary hover:bg-surface'}`}
-                data-testid="plan-button"
-              >
-                Choose {def.name}
-              </Link>
-            </div>
-          ))}
+      {/* 7. The on-site app (T-187): not live; every word about it comes from plan-claims with its mark */}
+      <section className="bg-mint py-16 sm:py-20" data-testid="app">
+        <div className={WRAP}>
+          <AppSection listRows={appRows} quote={appQuote} />
         </div>
+      </section>
+
+      {/* 8. Plans: two cards, centred, the same component as Pricing (T-187) */}
+      <section className={`${WRAP} py-16 text-center sm:py-20`} data-testid="plans">
+        <h2 className={H2}>{PRICING_HEADING}</h2>
+        <p className="mt-3 text-text-secondary" data-testid="plans-free">
+          <span className="figure">{free}</span> {PLANS_SECTION.free}
+        </p>
+        <PlanCards className="mt-10" />
         <p className="mt-6">
-          <Link href="/pricing" className="inline-flex min-h-[44px] items-center text-sm font-semibold text-primary hover:text-primary-hover">
-            Compare plans →
+          <Link href="/pricing" className="inline-flex min-h-[44px] items-center text-sm font-semibold text-primary underline underline-offset-4 hover:text-primary-hover">
+            {PLANS_SECTION.compare}
           </Link>
         </p>
       </section>
 
-      {/* 8. Questions */}
-      <section className="border-t border-border bg-surface py-16">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6">
-          <h2 className={H2}>Questions</h2>
-          <div className="mt-6 divide-y divide-border rounded-2xl border border-border bg-white" data-testid="faq">
-            {FAQ.map((f) => (
-              <details key={f.q} className="group px-5">
-                <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between gap-3 py-3 font-semibold text-text-primary">
-                  {f.q}
-                  <span className="text-text-muted transition-transform group-open:rotate-45" aria-hidden="true">+</span>
-                </summary>
-                <p className="pb-4 text-sm text-text-secondary">
-                  {f.a}
-                  {'link' in f && f.link ? (
-                    <>
-                      {' '}
-                      <Link href={f.link.href} className="font-semibold text-primary underline underline-offset-2">
-                        {f.link.label}
-                      </Link>
-                    </>
-                  ) : null}
-                </p>
-              </details>
-            ))}
-          </div>
-        </div>
+      {/* 9. Questions: a centred column (T-187) */}
+      <section className="border-t border-border bg-surface py-16 sm:py-20" data-testid="questions">
+        <Faq heading="Questions" items={faq} />
       </section>
 
-      {/* 9. Who is behind this (renders nothing until lib/marketing/founder.ts is filled in) */}
+      {/* 10. Who is behind this (renders nothing until lib/marketing/founder.ts is filled in) */}
       <FounderNote />
 
-      {/* 10. The closing band: one button style and one quiet link. T-170: an evening photograph behind it, with
+      {/* 11. The closing band: one button style and one quiet link. T-170: an evening photograph behind it, with
           the same treatment as the hero on juniper: the words are light, on the side that is solid juniper */}
       <section className="hero-band closing-band text-white" data-testid="closing">
         <ScenePhoto photo={CLOSING_PHOTO} testId="closing-photo" />

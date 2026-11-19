@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { formatMoney, getPlan } from '@qolumns/shared'
-import { COMING_LATER, PLUS_TAX, planLines } from '@/lib/marketing/plan-claims'
+import { COMING_SOON, PLUS_TAX, planLines } from '@/lib/marketing/plan-claims'
 import type { BillingResponse, PlanInfo } from '@qolumns/shared'
 import { pendingChangeLine, type PendingPlanChange } from '@/lib/billing-pending'
 
@@ -536,7 +536,7 @@ function PlanLineItem({ label, live }: { label: string; live: boolean }) {
         {!live && ' '}
         {!live && (
           <span className="ml-1 inline-block whitespace-nowrap rounded-full border border-field px-2 text-xs font-semibold text-text-secondary" data-testid="coming-later">
-            {COMING_LATER}
+            {COMING_SOON}
           </span>
         )}
       </span>

@@ -1,12 +1,15 @@
 import { QrSvg } from '@/components/marketing/QrSvg'
 import { ShortLink, shortLink } from '@/components/marketing/ShortLink'
+import { Soon } from '@/components/marketing/Soon'
+import { AppListScreen, AppPhone, ChatScreen, type AppListRow } from '@/components/marketing/screens/AppScreens'
+import { UPCOMING, type NotLiveYet } from '@/lib/marketing/plan-claims'
 import { VAN_PHOTO } from '@/lib/marketing/photos'
 import { RequestFormScreen } from './RequestFormScreen'
 
 /**
- * "Add it anywhere", shown instead of told (T-165; redrawn in T-170): three
- * columns of one height, aligned at the top, each with a picture of the same
- * size, stacked on a phone (globals.css, "Add it anywhere").
+ * "Add it anywhere", shown instead of told (T-165; redrawn in T-170; five
+ * ways since T-187). Each way has its title above a picture of one size
+ * (5:8), all in one style:
  *
  *   1 the QR code on the side of a van. The van is a scene photograph
  *     (Docs/design/photos.md); the code is our real one for the example
@@ -16,19 +19,35 @@ import { RequestFormScreen } from './RequestFormScreen'
  *   2 that quote page on a phone: a phone-shaped frame wide enough for the
  *     business's name on one line, with the link, short, in its address bar.
  *   3 the same form sitting on the business's own web page.
+ *   4 a price asked for in the business's own WhatsApp chat      (not live)
+ *   5 the on-site app                                             (not live)
  *
- * Each has its title above it; there is no caption under a picture.
+ * The last two are not live. Their titles and their "Coming soon" mark come
+ * from lib/marketing/plan-claims.ts; the mark goes when the flag is set.
+ *
+ * Layout (globals.css, "Add it anywhere"): from 1024 px three in a row, then
+ * the other two in a second row of the same columns, so every picture is one
+ * size and each row's pictures start on one line. From 640 px each is a row
+ * of words and picture; on a phone they stack. Never five across.
+ *
+ * There is no caption under a picture.
  */
 export function AddItAnywhere({
   shown,
   screenLabels,
   quoteLink,
   form,
+  chat,
+  appRows,
 }: {
   shown: { qr: { title: string; text: string }; page: { title: string; text: string }; site: { title: string; text: string } }
   screenLabels: { van: string; sign: string; page: string; site: string }
   quoteLink: string
   form: { businessName: string; logoUrl: string; primaryColor: string; serviceName: string; question: string; answer: string }
+  /** The WhatsApp picture: who asks, and for which of the example business's services */
+  chat: { serviceName: string; customerName: string; link: string }
+  /** The app picture: the rows of its quotes list */
+  appRows: AppListRow[]
 }) {
   return (
     <div className="add-it mt-10" data-testid="add-it">
@@ -95,14 +114,37 @@ export function AddItAnywhere({
           </div>
         </div>
       </div>
+
+      {/* 4. A price asked for in the business's own WhatsApp chat (not live: plan-claims) */}
+      <div className="add-it-item add-it-next" data-testid="add-it-item" data-upcoming="whatsapp">
+        <Title title={UPCOMING.whatsapp.name} text={UPCOMING.whatsapp.lines[0]} soon="whatsapp" />
+        <div className="add-it-picture" role="img" aria-label={UPCOMING.whatsapp.screen} {...({ inert: '' } as object)} data-testid="add-it-chat">
+          <AppPhone className="h-full">
+            <ChatScreen businessName={form.businessName} serviceName={chat.serviceName} customerName={chat.customerName} message={UPCOMING.whatsapp.customerMessage} link={chat.link} />
+          </AppPhone>
+        </div>
+      </div>
+
+      {/* 5. The on-site app (not live: plan-claims) */}
+      <div className="add-it-item add-it-next" data-testid="add-it-item" data-upcoming="app">
+        <Title title={UPCOMING.app.name} text={UPCOMING.app.lines[1]} soon="app" />
+        <div className="add-it-picture" role="img" aria-label={UPCOMING.app.screens.list} {...({ inert: '' } as object)} data-testid="add-it-app">
+          <AppPhone className="h-full">
+            <AppListScreen rows={appRows} />
+          </AppPhone>
+        </div>
+      </div>
     </div>
   )
 }
 
-function Title({ title, text }: { title: string; text: string }) {
+function Title({ title, text, soon }: { title: string; text: string; soon?: NotLiveYet }) {
   return (
     <div>
-      <h3 className="font-display text-lg font-bold text-text-primary">{title}</h3>
+      <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 font-display text-lg font-bold text-text-primary">
+        {title}
+        {soon ? <Soon of={soon} className="font-sans" /> : null}
+      </h3>
       <p className="mt-1 text-sm text-text-secondary">{text}</p>
     </div>
   )

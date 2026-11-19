@@ -57,7 +57,9 @@ describe('T-165: one free offer (the owner’s pricing decision)', () => {
 
   it('the pricing page: Pro is "Choose Pro", the closing button is the free offer', () => {
     const pricing = code('app/pricing/page.tsx')
-    expect(pricing).toContain('cta: `Choose ${def.name}`,')
+    // T-187: the cards are the component Home uses too
+    expect(pricing).toContain('<PlanCards />')
+    expect(code('components/marketing/PlanCards.tsx')).toContain('Choose {card.name}')
     expect(pricing).not.toMatch(/TRIAL_PLAN|trialDays/)
     expect([...pricing.matchAll(/className=\{(?:`\$\{)?MAIN_CTA/g)]).toHaveLength(2)
   })
@@ -75,7 +77,8 @@ describe('T-165: the home page', () => {
   it('has its sections in this order, one idea each', () => {
     // T-167: the figures are second, "What it notices" is third, and the trade
     // links moved from a row of their own into step 1 of "Set up in minutes"
-    const order = ['data-testid="hero"', 'data-testid="statistics"', 'data-testid="notices"', 'data-testid="control"', 'data-testid="setup"', '<AddItAnywhere', 'data-testid="plans"', 'data-testid="faq"', '<FounderNote', 'data-testid="closing"', '<SiteFooter']
+    // T-187: the on-site app has a section of its own after "Add it anywhere"; the questions are the shared <Faq>
+    const order = ['data-testid="hero"', 'data-testid="statistics"', 'data-testid="notices"', 'data-testid="control"', 'data-testid="setup"', '<AddItAnywhere', '<AppSection', 'data-testid="plans"', '<Faq', '<FounderNote', 'data-testid="closing"', '<SiteFooter']
     const at = order.map((mark) => home.indexOf(mark))
     expect(at.every((i) => i > 0)).toBe(true)
     expect([...at].sort((a, b) => a - b)).toEqual(at)
@@ -86,10 +89,11 @@ describe('T-165: the home page', () => {
   })
 
   // T-168: the demo is three frames of one height again (the look before T-165): the answer arrives and the
-  // button is pressed, the price lands, the lead arrives for the business. It ends on "Approve & send", not "Sent".
-  it('the hero demo: the customer answers, the price lands, the lead reaches the business, in that order', () => {
+  // button is pressed, the price lands, the lead arrives for the business. T-187: then "Approve & send" is
+  // pressed and the lead reads as sent.
+  it('the hero demo: the customer answers, the price lands, the lead reaches the business and is approved, in that order', () => {
     const T = DEMO_TIMELINE
-    const order = [T.answer, T.ask, T.tape, T.lines, T.total, T.lead]
+    const order = [T.answer, T.ask, T.tape, T.lines, T.total, T.lead, T.approve, T.sent]
     expect([...order].sort((a, b) => a - b)).toEqual(order)
     // it plays once and is over within six seconds
     expect(DEMO_LENGTH_MS).toBeLessThanOrEqual(6000)
@@ -140,7 +144,10 @@ describe('T-165: the home page', () => {
     expect(SETUP.heading).toBe('Set up in minutes')
     expect(SETUP.steps.map((s) => s.title)).toEqual(['Choose your trade', 'Check your prices', 'Share your link'])
     const steps = code('components/marketing/home/SetupSteps.tsx')
-    for (const id of ['setup-screen-trade', 'setup-screen-prices', 'setup-screen-link']) expect(steps).toContain(`data-testid="${id}"`)
+    for (const id of ['setup-screen-trade', 'setup-screen-prices']) expect(steps).toContain(`data-testid="${id}"`)
+    // T-187: the link screen is shared with the Features page (ProductScreens); step 3 still shows it
+    expect(steps).toContain('<LinkScreen key="link" quoteLink={quoteLink} />')
+    expect(code('components/marketing/screens/ProductScreens.tsx')).toContain('data-testid="setup-screen-link"')
   })
 
   it('your prices: a sentence of two prices and the two price lines it becomes; the minimum is not an item', () => {
@@ -163,11 +170,18 @@ describe('T-165: the home page', () => {
     for (const id of ['qr-svg', 'add-it-phone', 'add-it-site']) expect(add + code('components/marketing/QrSvg.tsx')).toContain(`data-testid="${id}"`)
     expect(code('components/marketing/QrSvg.tsx')).toContain("import { qrMatrix } from '@/lib/qr'")
     expect(Object.keys(ADD_IT.shown)).toEqual(['qr', 'page', 'site'])
+    // T-187: two more ways, not live yet: their words and their mark come from plan-claims, not from here
+    for (const id of ['add-it-chat', 'add-it-app']) expect(add).toContain(`data-testid="${id}"`)
+    expect(add).toContain('soon="whatsapp"')
+    expect(add).toContain('soon="app"')
   })
 
   it('each plan card on Home has its own button, and the closing band has one button and one quiet link', () => {
-    expect(home).toContain('href={`/signup?plan=${def.id}`}')
-    expect(home).toContain('data-testid="plan-button"')
+    // T-187: the cards are one component, shared with Pricing
+    expect(home).toContain('<PlanCards')
+    const cards = code('components/marketing/PlanCards.tsx')
+    expect(cards).toContain('href={`/signup?plan=${card.id}`}')
+    expect(cards.match(/data-testid="plan-button"/g)).toHaveLength(1)
     const closing = home.slice(home.indexOf('data-testid="closing"'), home.indexOf('<SiteFooter'))
     expect(closing.match(/<Link /g)).toHaveLength(2)
     expect(closing).toMatch(/className=\{MAIN_CTA\}/)
@@ -208,8 +222,12 @@ describe('T-165: login and small fixes', () => {
   it('footer links are 44 px tall on a phone', () => {
     const footer = code('components/marketing/SiteFooter.tsx')
     expect(footer).toContain("const FOOT_LINK = 'inline-flex min-h-[44px] items-center")
-    // T-181: fourteen, with "Delete your data"
-    expect(footer.match(/className=\{FOOT_LINK\}/g)).toHaveLength(14)
+    // T-187: four columns. Written once each: four product links, one per trade (a loop) and "All trades",
+    // two company links, three legal ones. The support address is a link of the same height.
+    expect(footer.match(/className=\{FOOT_LINK\}/g)).toHaveLength(11)
+    expect(footer).toContain('{TRADES.map((trade) => (')
+    expect(footer).toMatch(/data-testid="footer-support"/)
+    expect(footer).toMatch(/inline-flex min-h-\[44px\] items-center font-semibold text-primary/)
   })
 
   it('one wordmark component draws the name everywhere', () => {

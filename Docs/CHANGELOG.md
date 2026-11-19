@@ -15,6 +15,144 @@
 
 ## Issues & Resolutions
 
+### 2026-11-19: T-187 — Home, Pricing, Features and the footer after the owner's review
+
+Built and pushed, **not deployed**. The web app only (and one small function in the shared package for the
+footer's company line). No worker change, no migration, no price, no quote flow. To put it live: the web.
+
+#### What changed, item by item
+
+| # | What | Where |
+|---|---|---|
+| 1 | **The hero demo is interior painting** (it was the garage door spring): "How many rooms?", 3, "Walls & ceilings, 3 rooms" $1,125 and the visit fee, $1,200. The figures are the painting template's own, through `examples.ts`, and the per-room rate is the "$375 per room" of the price sentence further down | `HOME_EXAMPLE_TRADE` in `lib/marketing/examples.ts` |
+| 2 | **The third card is approved.** After the lead arrives, "Approve & send" is pressed; the card changes to its sent state (the chip reads "Waiting for customer", the line "Sent today, not opened yet", and the button's place "Sent to the customer"), then it stands still with "Play again". The words are the dashboard's own (`quoteTurn`). Two layers in one cell, one fading out as the other arrives: opacity and transform only, and the three frames stay one height. The run is about 4.4 seconds (the rule is under six) | `components/marketing/home/HeroDemo.tsx` (`DEMO_TIMELINE.approve`, `.sent`) |
+| 3 | **Balanced wrapping on every marketing page.** A heading and the line under it use `text-wrap: balance`; other text `text-wrap: pretty`. One rule, for every `<main>` that begins with the site's navigation | `globals.css`; recorded in `system.md` |
+| 4 | **"Your prices. You stay in control."** has two points. "Three ways to send, per service" is gone. "You confirm first" is now "You approve before they can accept: your customer sees the price straight away. They can only accept after you approve it, and you can change anything first." That a service can hold its price, or send without waiting, is still said, in the questions | `CONTROL` in `home-copy.ts` |
+| 5 | **"Set up in minutes", step 3** keeps the link and QR box, and lists where else the form works: on your website; in your WhatsApp chat and on site with the app, both marked. A link goes down to "Add it anywhere" | `SetupSteps.tsx`, `SETUP.elsewhere` |
+| 6 | **"Add it anywhere" has five ways**, each with a picture of one size: the QR code on the van, the quote page on a phone, the form on a website, a price asked for in the business's own WhatsApp chat, the on-site app. The last two are marked. Three to a row, then two, in the same columns; a row of words and picture from 640 px; stacked on a phone. Never five across | `AddItAnywhere.tsx`, `globals.css` |
+| 7 | **New section, the app:** "Price a job while you are standing in it." Three short lines, "Coming soon to iPhone", the room scan card (marked), and two of the app's screens in phones: the quotes list and one quote. Badge slots for the App Store and Google Play are behind `APP_STORE_URL` and `PLAY_STORE_URL`; a slot shows only when its address is set, so none shows today. Nothing says Android | `home/AppSection.tsx`, `screens/AppScreens.tsx`, `lib/marketing/app-stores.ts` |
+| 8 | **Plans on Home: two cards, centred**, the same component as Pricing. Each: the price a month "plus tax", the price a year, the quotes a month, what you get (what works today first, what is still to come marked), one button. Pro says "Everything in Starter, plus" and lists only what it adds. "10 quotes free, no card." is above them | `components/marketing/PlanCards.tsx`, `planCards()` in `plan-claims.ts` |
+| 9 | **Questions, centred**, on Home and Pricing (one component). Every answer was read against the new page. New or reworded: "Do I need a website?", "Can my customers get a quote in WhatsApp?", "Is there an app?", "What happens after the 10 free quotes?" | `Faq.tsx`, `FAQ` in `home-copy.ts`, `upcomingFaq()` in `plan-claims.ts` |
+| 10 | **Footer:** the wordmark, one short line ("Instant quotes for your customers, in your own prices."), four link columns (Product, Trades, Company, Legal), the support address, and "Run by Billiom Limited, a company registered in England and Wales (company number …)" with the number from `NEXT_PUBLIC_COMPANY_NUMBER`. The message line is no longer repeated there | `SiteFooter.tsx`, `FOOTER` in `site-copy.ts`, `operatorLine()` in `packages/shared/src/brand.ts` |
+| 11 | **Pricing:** the two plan cards, then a compare table in plain rows grouped Quotes, Where customers reach you, What the AI does, Your brand, Coming soon; then five billing notes (billed in advance, plus tax, cancel any time, a smaller plan from the end of the period, over the limit); then the pricing questions. The table is built from the plan definitions and `plan-claims`, not typed | `app/pricing/page.tsx`, `lib/marketing/pricing-copy.ts` |
+| 12 | **Features:** one section per thing, each with a picture and two or three lines. Live: it reads the photos and notes; your price list sets every price; several services in one quote; you approve before it counts; a quote page in your brand; share it anywhere; it flags what doesn't add up. Then, under "On the way" and marked: quotes inside WhatsApp, the on-site app, the room scan | `app/features/page.tsx`, `features-copy.ts` |
+
+#### One flag for each thing that is not live
+
+Quotes inside WhatsApp, the on-site app and the room scan are shown before they are live. Each has **one
+flag**: the `live` of its plan line in `lib/marketing/plan-claims.ts`. Every place that shows one (Home's setup
+step, "Add it anywhere", the app section, the plan cards, two questions, Pricing's cards and table, Features)
+asks `soonMark` (the `<Soon>` mark), so setting the flag removes "Coming soon" everywhere, moves the line up
+its card and out of the table's last group, and changes the question's answer. A unit test sets a flag and
+checks each of those. The words about the three are in `plan-claims.ts` beside the flag (`UPCOMING`); they
+describe what is built, not what a business can use, and are never written through `says`.
+
+The mark reads "Coming soon" (it read "Coming later"). **The dashboard's billing page uses the same mark**, so
+it reads "Coming soon" there too.
+
+#### Claims
+
+- **Added to the inventory, then claimed: `also-asked`** ("several services in one quote"). It had no row.
+  Evidence: on the local database 122 quotes carry a "Customer also asked for" entry and 64 carry more than one
+  service (34 added by the customer, 30 by the business); it has been in production since 18 November (T-179,
+  T-180). It is claimed as noticing and offering; the customer adds it, and that service is priced from its own
+  prices. The old `cross-service-suggestions` row stays "do not claim" and now says what replaced it.
+- **Dropped: "PDF"** from "a quote page and PDF in your brand". Production makes a PDF only when the business
+  asks for one in the dashboard, and as a test document (OWNER-TODO, T-155, still open). An existing unit test
+  already forbids the word on these pages.
+- **Narrowed: "it flags what looks wrong".** The AI quote checker is on the inventory's do-not-claim list ("it
+  is an AI's note, it can be wrong"). The section is kept, as "It flags what doesn't add up", on three rows the
+  inventory does list: a blurry or dark photo caught before it is sent, a message that fits another service,
+  and words that differ from an answer.
+- **Not on a plan card or in the table: the room scan.** It is a Business-plan line and Business is off the
+  site (`sitePlans`). It is on Home's app section and on Features, marked.
+- **"A text" left the copy** ("Share your quote link … a text, a WhatsApp chat" now says "an email, a WhatsApp
+  chat"): the owner's "no SMS anywhere".
+- **Removed with the old pages:** Features' fifth step ("See what's winning work", Home's numbers), which is
+  not among the ten things the owner listed; and the line under each plan's name on Pricing.
+
+#### How the pictures are made
+
+- **The app's screens are drawn again in HTML** (`AppScreens.tsx`): the app is React Native and cannot be
+  mounted on a web page. They keep the app's order and its own words (`SCREEN_WORDS.app`, held against the
+  app's source by a unit test) and take every status, step name, sentence and note from the shared functions
+  the app itself calls (`quoteStory`, `lineDetail`, `sourceForBusiness`, `certaintySentence`).
+- **The WhatsApp picture** is our own bubbles, no look-alike of WhatsApp's design. The reply is the
+  assistant's own first sentence (`say.openingWithLink` in `lib/whatsapp-assistant-rules.ts`), word for word.
+- **A store badge slot is a plain link**, not a drawing of Apple's or Google's badge. Their artwork is theirs
+  and is added with the address.
+- The two-service breakdown on Features is the painting template's two services at their own rates
+  (`twoServiceExample`): $1,200 and $2,300, $3,500 in all.
+
+#### Verified
+
+- **Unit tests:** web 1,195 (31 new in `site-t187.test.ts`: the flags and what follows from setting one, the
+  store badges, the plan cards, the compare table, the claims, Home's sections, the footer, the wrapping rule;
+  eleven older files updated for the new pages, none loosened), worker 679, mobile 100. Lint and typecheck pass.
+- **`pnpm check:quick`, once: 24 of 28** (20 scripts, 1,566 checks, 7 min 32 s). Four scripts failed:
+  - `verify-t154`: **a real fault of this ticket.** On a phone, two links on the new plan cards were 38 px
+    tall (the rule is 44). Fixed in `PlanCards.tsx` and in the compare table.
+  - `verify-t165`: a mistake in the check I had added for the hero's sent state (a named helper inside the
+    page, which the script runner cannot run). Rewritten.
+  - `verify-t167`: it looked for a Pricing answer in the page's visible text; the questions are now rows that
+    open, so a closed answer is on the page but not visible. It reads the page's text.
+  - `verify-t170`: Home on a phone is now about 18,000 px tall, and a browser's picture of a page stops at
+    16,384 px, so the closing band at the bottom measured as blank. The script now takes the page in pieces
+    and joins them. The band itself did not change and measures as before.
+- **`pnpm check:failed`: 4 of 4** (776 checks, 2 min 48 s), on a fresh build of the final source.
+- **`pnpm check:quick --static` on the final source: 7 of 7** (lint, typecheck, the three unit suites, both
+  builds; 1 min 25 s).
+- Scripts updated before the run, for what this ticket changes on purpose: `verify-t155` (ten Features
+  sections), `verify-t165` (the sent state, the section order, seventeen footer links), `verify-t167` (the
+  order, the Features sections and their screens, the mark's words, four demo links), `verify-t170` (five ways
+  in two rows and their marks, the shared plan cards, the table's last group).
+- **In a browser (Chromium), at 1440 and 390:** the three pages have no sideways scroll, no page error, and no
+  heading or subtitle that ends on a single word (measured from where each word is painted). The hero's third
+  card was sampled through its run: the lead arrives, the button is pressed, the before state goes and the
+  sent state comes at about 4.1 s, and the three frames stay 399 px tall.
+- **Screenshots** for the owner's review are in `.checks/t187/` on this machine (that folder is not in git):
+  Home, Pricing and Features at 1440 and 390. Home at 390 is in two parts, because of that same 16,384 px
+  limit.
+- `rename-qolumns.test.ts` ("the old embed names…") again timed out in runs made by hand straight after a
+  build, and passes alone and inside the runner (which uses two workers). The same load-sensitive test as in
+  T-186; not from this ticket and not changed.
+
+#### Not verified
+
+- **Safari and Firefox.** The pages were looked at in Chromium only. `text-wrap: balance` is in Safari 17.5 and
+  Firefox 121; `text-wrap: pretty` is newer there (an older browser wraps as before: nothing breaks). The rule
+  uses `:has()`, which every current browser has.
+- **How the "Coming soon" wording reads to a real visitor**, and the look as a whole: the screenshots are for
+  the owner's eye.
+- **Home on a phone is long:** about 18,000 px at 390 wide, some twenty screens. The five ways, the app's two
+  phones and the plan cards each stack. Nothing was cut to shorten it; it is a decision for the owner.
+- `pnpm check:full` was not run (a marketing ticket: no pricing, quote flow, worker, prompt or email change).
+
+#### Constraints introduced
+
+- "Coming soon" is never typed on a page or in a copy file. A thing that is not live is shown through
+  `soonMark` or `<Soon>`, from its one flag, and its words live in `plan-claims.ts` beside that flag.
+- Home and Pricing draw their plan cards from `PlanCards`; a card's content comes from `planCards()`.
+- Pricing's table is built by `compareGroups()`. A row for a plan line is added by adding the line.
+- A marketing page is a `<main>` that begins with `<SiteNav />`; that is what gives it the wrapping rule.
+- A new capability is claimed only after its row, with evidence, is in `ai-capabilities.md` (as `also-asked`).
+
+**Files:** `apps/web/src/lib/marketing/{plan-claims,pricing-copy,features-copy,home-copy,site-copy,examples,screen-words,ai-claims,app-stores}.ts`;
+`apps/web/src/components/marketing/{Soon,PlanCards,Faq,SiteFooter}.tsx`,
+`components/marketing/home/{HeroDemo,SetupSteps,AddItAnywhere,AppSection}.tsx`,
+`components/marketing/screens/{ProductScreens,AppScreens}.tsx`; `apps/web/src/app/{page,pricing/page,features/page}.tsx`,
+`app/globals.css`, `app/(dashboard)/app/settings/billing/page.tsx` (the mark's words); `packages/shared/src/brand.ts`;
+`apps/web/.env.example`; `Docs/design/{system,ai-capabilities}.md`; unit tests (`site-t187.test.ts` new; eleven
+updated); `scripts/hardcore-test/verify-{t155,t165,t167,t170}.mts`; `OWNER-TODO.md`.
+
+**Relation:** T-167's rule holds and was used as written: one new row, two things asked for left unclaimed.
+T-170's rule for plan lines holds (nothing is shown as live that is not; `sitePlans` still decides which plans
+show), with its mark reworded. T-181's "no SMS anywhere" is extended to the words "a text". T-168's hero demo
+keeps its three frames of one height; its ending is changed by the owner's instruction (it ended on "Approve &
+send"). T-165's "one yellow button per screen" holds: the plan cards' buttons are juniper and white.
+
+---
+
 ### 2026-11-19: T-186 — A quote the business made speaks to the business, not the customer; two leftovers from T-185 (AD-068)
 
 Built and pushed, **not deployed**. Shared display rules, the web app, the on-site app, and one worker change

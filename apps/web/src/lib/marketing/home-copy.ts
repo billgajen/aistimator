@@ -47,8 +47,10 @@ export const HERO_DEMO_FRAMES = {
   screens: [
     'The request form on a business’s quote page: one question, answered, and the button “Get my estimate”.',
     'The customer’s estimate: the price of the job from the business’s prices and its total, with the Accept button locked until the business confirms it.',
-    'The business’s dashboard, “Waiting for you”: the new request with its price and the button “Approve & send”.',
+    'The business’s dashboard, “Waiting for you”: the new request with its price. “Approve & send” is pressed, and the request then reads as sent to the customer.',
   ],
+  /** T-187: the third frame after "Approve & send" is pressed (the dashboard's own line for it) */
+  sentNote: 'Sent to the customer',
 } as const
 
 /**
@@ -94,9 +96,14 @@ export const SETUP = {
     },
     {
       title: 'Share your link',
-      text: 'You get your own quote page and a QR code. Put the link anywhere your customers already find you.',
+      text: 'You get your own quote page and a QR code, ready to share. The same form works in more places:',
     },
   ],
+  /**
+   * T-187: under step 3, where else it works. The first is live; the others are named from the page
+   * (they are not live, and their words and their "Coming soon" mark come from lib/marketing/plan-claims.ts).
+   */
+  elsewhere: { website: 'On your website', link: { label: 'See every way to add it', href: '#add-it-anywhere' } },
 } as const
 
 export const CONTROL = {
@@ -119,12 +126,9 @@ export const CONTROL = {
       text: says(['photo-notes', 'pricing-engine'], 'Every price comes from what you set. The AI reads the job details; it never picks a price.'),
     },
     {
-      title: 'You confirm first',
-      text: 'By default your customer sees the estimate at once, and can accept it once you’ve confirmed it.',
-    },
-    {
-      title: 'Three ways to send, per service',
-      text: 'Show the estimate, then confirm (the default). Hold it until you approve. Or send automatically.',
+      // T-187 (the owner's wording): what "you confirm first" means, so anyone understands it
+      title: 'You approve before they can accept',
+      text: 'Your customer sees the price straight away. They can only accept after you approve it, and you can change anything first.',
     },
   ],
 } as const
@@ -242,10 +246,18 @@ export const STATISTICS: Statistic[] = [
   },
 ]
 
+/**
+ * T-187: five ways, each with its own picture. Three are live. The other two
+ * (quotes inside WhatsApp, the on-site app) are not: their words and their
+ * "Coming soon" mark come from lib/marketing/plan-claims.ts, so nothing here
+ * says they exist.
+ */
 export const ADD_IT = {
+  /** The section's id, linked from "Set up in minutes", step 3 */
+  id: 'add-it-anywhere',
   heading: 'Add it anywhere',
-  lead: 'No website needed. Share your quote link anywhere your customers already find you: a text, a WhatsApp chat, your Google profile.',
-  /** T-165: the three things shown, each as its real screen */
+  lead: 'No website needed. Share your quote link anywhere your customers already find you: an email, a WhatsApp chat, your Google profile.',
+  /** T-165: each thing shown as its real screen */
   screens: {
     /** T-170: the words on the van's side, beside the QR code (ours, drawn in code) */
     van: 'Scan for an estimate',
@@ -259,28 +271,37 @@ export const ADD_IT = {
     page: { title: 'Your own quote page', text: 'A link you can send anywhere.' },
     site: { title: 'On your website', text: 'The same form, on your own page.' },
   },
-  ways: [
-    { title: 'Quote link', text: 'Your own page, for example /quote/your-business.' },
-    { title: 'QR code', text: 'Print it on your van, cards or invoices.' },
-    { title: 'WhatsApp', text: 'Send the link in a chat, or set it as your WhatsApp Business greeting.' },
-    { title: 'Your website', text: 'Paste a short piece of code, or ask your web person with one tap.' },
-  ],
 } as const
 
 export const PRICING_HEADING = 'Simple plans. Try it free.'
 
+/** T-187: Home's plan cards (the cards themselves come from lib/marketing/plan-claims.ts, `planCards`) */
+export const PLANS_SECTION = {
+  /** After the number of free quotes */
+  free: 'quotes free, no card.',
+  compare: 'Compare the plans',
+} as const
+
+/**
+ * Home's questions. T-187: reviewed against the page as it now reads (the
+ * customer sees the price at once and can only accept after the business
+ * approves). The two questions about things that are not live yet (WhatsApp,
+ * the app) are not here: they come from lib/marketing/plan-claims.ts
+ * (`upcomingFaq`), beside the flags they depend on, and Home places them after
+ * the first question (`HOME_FAQ_UPCOMING_AFTER`).
+ */
 export const FAQ = [
   {
-    q: 'What if I have no website?',
-    a: 'You don’t need one. Share your quote link or QR code; it’s your own page.',
+    q: 'Do I need a website?',
+    a: 'No. You get your own quote page, with a link and a QR code to share. If you have a website, the same form goes on it too.',
   },
   {
     q: 'Can it quote the wrong price?',
-    a: 'Every price comes from the prices you set. A photo or an answer can still be misread, so your customer sees an estimate, or a range and one quick question, and by default cannot accept until you have confirmed it.',
+    a: 'Every price comes from the prices you set. A photo or an answer can still be misread, so your customer sees an estimate, or a range and one quick question, and can only accept after you approve it.',
   },
   {
     q: 'Can I approve before the customer accepts?',
-    a: 'Yes. That’s the default: they see the estimate at once, and can accept once you confirm. You can also hold it until you approve, or send automatically.',
+    a: 'Yes. That is how every service starts out: they see the price straight away, and can only accept after you approve. You can change anything first. If you prefer, a service can hold its price until you approve, or send without waiting for you.',
   },
   {
     q: 'Does it work with WordPress, Wix or Squarespace?',
@@ -291,8 +312,8 @@ export const FAQ = [
     a: 'A page with your name and logo, the price for their job (or a range and a question), and buttons to accept or ask you something.',
   },
   {
-    q: `What happens after ${FREE} free quotes?`,
-    a: 'New requests are still saved as leads, so you never lose a customer. Pick a plan to price them.',
+    q: `What happens after the ${FREE} free quotes?`,
+    a: 'New requests are still saved as leads, so you never lose a customer. Pick a plan, monthly or yearly, and you can price them.',
   },
   {
     q: 'Is my data private?',
@@ -300,6 +321,9 @@ export const FAQ = [
     link: { href: '/privacy', label: 'Read the privacy policy' },
   },
 ] as const
+
+/** The questions from plan-claims (WhatsApp, the app) go after this many of the questions above */
+export const HOME_FAQ_UPCOMING_AFTER = 1
 
 export const FINAL_CTA = 'Your next customer could have your price tonight.'
 /** T-165: the closing band has one button and one quiet link */

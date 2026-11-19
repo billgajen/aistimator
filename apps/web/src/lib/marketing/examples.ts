@@ -190,11 +190,60 @@ const PICKS: Record<string, Pick> = {
   },
 }
 
-/** The home page uses the demo's no-photo service */
-export const HOME_EXAMPLE_TRADE = 'garage-doors'
+/**
+ * The home page's hero demo: interior painting (T-187, the owner's choice). A
+ * job anyone understands in the US, the UK and the EU, with no photo to read,
+ * and the same service as the "$375 per room" price sentence further down the
+ * page. (It was the garage door spring until then.)
+ */
+export const HOME_EXAMPLE_TRADE = 'painting'
 
 export function marketingExample(trade: string = HOME_EXAMPLE_TRADE): MarketingExample {
   return build(PICKS[trade] ?? PICKS[HOME_EXAMPLE_TRADE]!)
 }
 
 export const EXAMPLE_TRADES = Object.keys(PICKS)
+
+/**
+ * T-187: a quote that carries two of a business's services (AD-061), for the
+ * Features page: the painting template's interior job, and its exterior
+ * service added by the customer. Each part is that service's own lines at
+ * the template's own rates; the total is the two subtotals added, as
+ * `withSections` adds them.
+ */
+export interface TwoServiceExample {
+  main: { serviceName: string; lines: Array<{ label: string; amount: number }>; subtotal: number }
+  added: { serviceName: string; lines: Array<{ label: string; amount: number }>; subtotal: number }
+  total: number
+}
+
+export function twoServiceExample(): TwoServiceExample {
+  const painting = marketingExample('painting')
+  const measured = painting.measured
+  if (!measured) throw new Error('The painting example has no second service to add')
+  const second = PICKS.painting!.measured!.service
+  const addedLines = [{ label: `${measured.item}, ${measured.quantity.toLocaleString('en-US')} sq ft`, amount: measured.amount }]
+  return {
+    main: { serviceName: painting.serviceName, lines: painting.lines, subtotal: painting.total },
+    added: { serviceName: second, lines: addedLines, subtotal: measured.amount },
+    total: painting.total + measured.amount,
+  }
+}
+
+/**
+ * T-187: the painting example's lines as the on-site app shows them: a line
+ * priced by quantity with its rate, its quantity and the template's own unit
+ * (the app writes "$375 × 3 rooms" from these), and a fixed line with its
+ * amount alone. The same figures as `marketingExample('painting')`.
+ */
+export function appQuoteLines(): Array<{ name: string; amount: number; rate?: number; quantity?: number; unit?: string }> {
+  const pick = PICKS.painting!
+  const svc = pick.pack.services.find((s) => s.name === pick.service)!
+  const lines: Array<{ name: string; amount: number; rate?: number; quantity?: number; unit?: string }> = pick.steps.map((want) => {
+    const step = svc.draft.pricing.workSteps.find((s) => s.name === want.name)!
+    const quantity = want.qty ?? 1
+    return { name: step.name, amount: step.defaultCost * quantity, rate: step.defaultCost, quantity, unit: step.unitLabel ?? undefined }
+  })
+  if (pick.baseFee && svc.draft.pricing.baseFee > 0) lines.push({ name: 'Visit and setup', amount: svc.draft.pricing.baseFee })
+  return lines
+}

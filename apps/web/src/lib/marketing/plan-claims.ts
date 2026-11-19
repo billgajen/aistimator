@@ -32,7 +32,12 @@ export interface PlanLine {
   shown?: boolean
 }
 
-export const COMING_LATER = 'Coming later'
+/**
+ * T-187: the words on the mark beside anything that is not live yet (they were "Coming later").
+ * Nothing on the site types them: a page asks `soonMark` below, so the mark goes away by itself
+ * when the thing's line is marked live.
+ */
+export const COMING_SOON = 'Coming soon'
 
 /** T-181: under the plan cards on Pricing, with the tax note. The Terms say the same. */
 export const BILLED_IN_ADVANCE = 'Billed in advance, monthly or yearly.'
@@ -58,7 +63,7 @@ export const PLAN_CHANNEL_LINES: Record<PlanChannel, PlanLine> = {
     found: 'Built, not switched on: production runs text messages in test mode and no business has a number, so nobody can use it.',
   },
   whatsapp: {
-    label: 'Quotes inside WhatsApp, on your own number',
+    label: 'Quotes inside WhatsApp, on your own business number',
     live: false,
     found: 'Built, and running for our own test business since 17 November 2026. Not open to other businesses: Meta has not reviewed the app, so nobody else can connect a number (OWNER-TODO, T-181). (Sharing your quote link in a WhatsApp chat works on every plan and is not this.)',
   },
@@ -95,6 +100,164 @@ export const PLAN_FEATURE_LINES: Partial<Record<keyof PlanFeatureSet, PlanLine>>
     live: false,
     found: 'Not offered yet. Since T-174 there is a support address (SUPPORT_EMAIL), but no promise of a faster answer for one plan; the owner decides when this is live.',
   },
+}
+
+// ---------------------------------------------------------------------------
+// T-187: the three things the site shows before they are live
+// ---------------------------------------------------------------------------
+
+/**
+ * Quotes inside a WhatsApp chat, the on-site app, and measuring a room by
+ * scanning it. Each has ONE flag: the `live` of its plan line above. Every
+ * page that shows one of them (Home's setup step, "Add it anywhere", the app
+ * section, the plan cards, the questions, Pricing's table, Features) asks
+ * `soonMark`, so marking the line live removes "Coming soon" everywhere at
+ * once. The words about each live here too, beside the flag: they describe
+ * something a business cannot use yet, so they are not claims about the live
+ * product and are never written through `says`.
+ */
+export type NotLiveYet = 'whatsapp' | 'app' | 'roomScan'
+
+const FLAG_LINE: Record<NotLiveYet, PlanLine> = {
+  whatsapp: PLAN_CHANNEL_LINES.whatsapp,
+  app: PLAN_CHANNEL_LINES.mobile_app,
+  roomScan: PLAN_FEATURE_LINES.lidar_scanning!,
+}
+
+/** Can a business use it today? */
+export function isLive(key: NotLiveYet): boolean {
+  return FLAG_LINE[key].live
+}
+
+/** "Coming soon" while it is not live; null once it is */
+export function soonMark(key: NotLiveYet): string | null {
+  return isLive(key) ? null : COMING_SOON
+}
+
+/** The mark for any plan line: "Coming soon" unless a business can use it today */
+export function lineMark(line: PlanLine): string | null {
+  return line.live ? null : COMING_SOON
+}
+
+export const UPCOMING = {
+  whatsapp: {
+    /** Its name wherever it is one of a list */
+    name: 'WhatsApp, on your own business number',
+    /** Home, "Set up in minutes", step 3 */
+    where: 'In your WhatsApp chat',
+    heading: 'Quotes inside WhatsApp, on the number you already use.',
+    lines: [
+      'A customer asks for a price in your WhatsApp chat.',
+      'It asks only what the job needs, then sends them your estimate, priced from your price list.',
+      'It stays quiet for every other message, and whenever you reply yourself.',
+    ],
+    /** What a screen reader hears for the picture */
+    screen: 'A WhatsApp chat on a phone: a customer asks for a price, and the reply gives them the link to their estimate.',
+    /** The customer's message in the picture */
+    customerMessage: 'Hi, how much to repaint three bedrooms?',
+  },
+  app: {
+    name: 'The on-site app',
+    where: 'On site, with the app',
+    heading: 'Price a job while you are standing in it.',
+    lines: [
+      'Take the photos and answer the job’s questions on your phone.',
+      'The price comes from your own price list, while you are still there.',
+      'Approve it and hand your customer the link before you leave.',
+    ],
+    screens: {
+      list: 'The app’s list of quotes on a phone: the ones that need you first, then the ones waiting for a customer.',
+      quote: 'One quote in the app: the customer, the price, where it stands, and the button “Approve & send”.',
+    },
+    /** The only platform named. Android is not built: nothing on the site says it is coming. */
+    platform: 'iPhone',
+  },
+  roomScan: {
+    name: 'Room scan',
+    where: 'A room scan, in the app',
+    heading: 'Scan a room, and its sizes fill themselves in.',
+    lines: [
+      'Walk the room with your phone’s camera, in the app.',
+      'The room’s sizes go into the quote for you, and you can still type over any of them.',
+      'It needs an iPhone that has a LiDAR scanner.',
+    ],
+    screen: 'The app’s room scan card: “Walk each room with the camera”, and the button “Scan a room”.',
+  },
+} as const
+
+/** "Coming soon to iPhone", or "On iPhone" once the app is live */
+export function appAvailability(): string {
+  return isLive('app') ? `On ${UPCOMING.app.platform}` : `${COMING_SOON} to ${UPCOMING.app.platform}`
+}
+
+/**
+ * The questions about things that are not live yet (Home's questions). Each answer says what works
+ * today first; the second sentence depends on the flag.
+ */
+export function upcomingFaq(): Array<{ q: string; a: string }> {
+  return [
+    {
+      q: 'Can my customers get a quote in WhatsApp?',
+      a: `Yes, today, by link: send your quote link in any WhatsApp chat and it opens your quote page. ${
+        isLive('whatsapp')
+          ? 'They can also ask for a price in the chat itself, on your own business number.'
+          : 'Asking for a price in the chat itself, on your own business number, is coming soon.'
+      }`,
+    },
+    {
+      q: 'Is there an app?',
+      a: isLive('app')
+        ? `Yes. The ${UPCOMING.app.platform} app prices a job while you are on site, and your dashboard works in any phone’s browser.`
+        : `An ${UPCOMING.app.platform} app for pricing a job while you are on site is coming soon. Today your dashboard works in your phone’s browser.`,
+    },
+  ]
+}
+
+// ---------------------------------------------------------------------------
+// T-187: what a plan card says
+// ---------------------------------------------------------------------------
+
+export interface PlanCard {
+  id: string
+  name: string
+  recommended: boolean
+  /** Monthly and yearly price, in minor units (cents) */
+  monthly: number
+  yearly: number | null
+  /** "50 quotes a month" */
+  quotes: string
+  /** "Everything in Starter, plus": set when the plan below it is shown too */
+  buildsOn: string | null
+  /** What you get, live lines first. With `buildsOn`, only what the plan below does not have. */
+  lines: PlanLine[]
+}
+
+/** "50 quotes a month" */
+export function quotesLine(plan: PlanDefinition): string {
+  return plan.quoteLimit > 0 ? `${plan.quoteLimit.toLocaleString('en-US')} quotes a month` : 'No limit on quotes'
+}
+
+/**
+ * The plan cards of the public site (Home and Pricing draw the same ones).
+ * Everything on a card comes from the plan definitions and the lines above:
+ * a plan's own lines, live ones first, with the plan below it summed up as
+ * "Everything in <that plan>, plus".
+ */
+export function planCards(currency = 'USD', plans: PlanDefinition[] = sitePlans()): PlanCard[] {
+  return plans.map((plan, i) => {
+    const below = plans[i - 1]
+    const had = new Set(below ? planLines(below).map((l) => l.label) : [])
+    return {
+      id: plan.id,
+      name: plan.name,
+      recommended: Boolean(plan.recommended),
+      monthly: plan.monthlyPrice[currency] ?? 0,
+      yearly: plan.annualPrice?.[currency] ?? null,
+      quotes: quotesLine(plan),
+      buildsOn: below ? `Everything in ${below.name}, plus` : null,
+      lines: planLines(plan).filter((l) => !had.has(l.label)),
+    }
+  })
 }
 
 /** The line every plan has */
@@ -136,20 +299,6 @@ export function sitePlans(plans: PlanDefinition[] = offeredPlans()): PlanDefinit
     const has = new Set(planLines(below).map((l) => l.label))
     return planLines(plan).some((l) => l.live && !has.has(l.label))
   })
-}
-
-/**
- * The line under a plan's name on the Pricing page. The plan definitions'
- * own taglines name channels and features that are not live ("text and
- * WhatsApp", "the on-site app", "LiDAR scanning"), so the Pricing page says
- * only what a business gets today. A plan that is not listed keeps its own
- * tagline.
- */
-export const PRICING_TAGLINES: Record<string, string> = {
-  // T-181: the plan's own tagline said "on your website"; a business needs no website to use it (T-173)
-  plan_us_starter: 'Instant quotes for your customers, with or without a website',
-  plan_us_pro: 'Everything in Starter, with more quotes and no badge of ours on your estimates',
-  plan_us_business: 'Everything in Pro, with the most quotes a month',
 }
 
 /** The words under the Pricing headline, and the page's description: only what is live */

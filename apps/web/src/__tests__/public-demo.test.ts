@@ -269,11 +269,16 @@ describe('T-153: the /demo page and links', () => {
   })
 
   it('every marketing demo link goes to /demo and says "Try it as a customer"', () => {
-    for (const f of ['apps/web/src/app/page.tsx', 'apps/web/src/components/marketing/TradeLanding.tsx', 'apps/web/src/components/marketing/SiteFooter.tsx']) {
+    for (const f of ['apps/web/src/app/page.tsx', 'apps/web/src/components/marketing/TradeLanding.tsx']) {
       const s = read(f)
       expect(s).not.toMatch(/live demo|Widget demo/i)
       expect(s).toMatch(/href="\/demo"[\s\S]{0,400}Try it as a customer/)
     }
+    // T-187: the footer's link words live in the copy file
+    const footer = read('apps/web/src/components/marketing/SiteFooter.tsx')
+    expect(footer).not.toMatch(/live demo|Widget demo/i)
+    expect(footer).toContain('<Link href="/demo" className={FOOT_LINK}>{L.demo}</Link>')
+    expect(read('apps/web/src/lib/marketing/site-copy.ts')).toContain("demo: 'Try it as a customer',")
   })
 
   it('the logo and sample photo are our own drawings, shipped in the repo', () => {

@@ -5,14 +5,28 @@
  * files, where each claim names its row of Docs/design/ai-capabilities.md.
  */
 import { says } from './ai-claims'
-import { MESSAGE_LINE } from './home-copy'
 
+/**
+ * T-187: the footer. One short line that says what the product is, with no
+ * claim in it: the message line ("The AI works out the job…") is said once on
+ * each page already and is no longer repeated here.
+ */
 export const FOOTER = {
   /** Under the wordmark */
-  // T-181: any business, small to corporate (it used to name one kind of business)
-  tagline: says(['photo-notes', 'pricing-engine'], 'Instant, professional quotes for any business, small or large. The AI works out the job. Your prices work out the cost.'),
-  /** After the copyright line */
-  closing: MESSAGE_LINE,
+  line: 'Instant quotes for your customers, in your own prices.',
+  columns: { product: 'Product', trades: 'Trades', company: 'Company', legal: 'Legal' },
+  links: {
+    features: 'Features',
+    pricing: 'Pricing',
+    demo: 'Try it as a customer',
+    allTrades: 'All trades',
+    logIn: 'Log in',
+    contact: 'Contact us',
+    terms: 'Terms of service',
+    privacy: 'Privacy policy',
+  },
+  /** Before the support address */
+  support: 'Questions? Email',
 } as const
 
 /** Under the buttons of a trade page's hero */

@@ -255,9 +255,10 @@ describe('T-171: the request form', () => {
 describe('T-171: the billing page, and the small leftovers', () => {
   it('the billing page lists a plan’s lines from the list the public Pricing page reads', () => {
     const billing = code('apps/web/src/app/(dashboard)/app/settings/billing/page.tsx')
-    expect(billing).toContain("import { COMING_LATER, PLUS_TAX, planLines } from '@/lib/marketing/plan-claims'")
+    // T-187: the mark reads "Coming soon" (it read "Coming later"); still one constant for every page
+    expect(billing).toContain("import { COMING_SOON, PLUS_TAX, planLines } from '@/lib/marketing/plan-claims'")
     expect(billing).toContain('const lines = definition ? planLines(definition) : []')
-    expect(billing).toContain('{COMING_LATER}')
+    expect(billing).toContain('{COMING_SOON}')
     // its own list of feature names is gone, so the two pages cannot disagree
     expect(billing).not.toMatch(/FeatureItem|label="LiDAR scanning"|label="Quoting by text/)
     // Business stays on offer there, with its lines marked

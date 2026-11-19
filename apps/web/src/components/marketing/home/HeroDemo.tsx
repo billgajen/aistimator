@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type CSSProperties } from 'react'
-import { QUOTE_TURN_COPY, formatMoney } from '@qolumns/shared'
+import { QUOTE_TURN_COPY, formatMoney, quoteTurn } from '@qolumns/shared'
 import { brandStyleVars } from '@/lib/color'
 import { TurnBadge } from '@/components/quotes/TurnBadge'
 import { Button } from '@/components/ui/Button'
@@ -15,14 +15,18 @@ import { Button } from '@/components/ui/Button'
  *   1 "Your customer asks"   one question with its answer, and "Get my estimate"
  *   2 "They see your price"  a short estimate: a line or two, the total, the locked Accept
  *   3 "You confirm it"       "Waiting for you": one lead, its price, "Approve & send"
+ *                            pressed, and the lead then reads as sent (T-187)
  * (T-165 had three full-size screens of different heights, and T-167 added a
  * label-reading step to the first. The AI's reading is shown in "What it
  * notices" instead.)
  *
  * It plays once on load: the answer arrives and the button is pressed; the
  * tape rule is drawn out and the price lands; the lead arrives for the
- * business. Then it stands still on that last state, which is the three
- * frames as described above. "Play again" mounts the frames afresh, which
+ * business; "Approve & send" is pressed and the lead changes to its sent
+ * state (T-187: its status chip, its line and the button's place, each in the
+ * dashboard's own words). Then it stands still on that last state. The change
+ * is two layers in one place, one fading out as the other arrives (opacity
+ * and transform only), so nothing changes size. "Play again" mounts the frames afresh, which
  * starts the CSS again. Under reduced motion the global rule ends every
  * animation at once, so the finished frames show with no movement.
  *
@@ -30,7 +34,7 @@ import { Button } from '@/components/ui/Button'
  * one under another on a phone (never a sideways strip).
  */
 
-/** When each thing happens, in ms from the start. The whole run is about 3.4 s (system.md: under six). */
+/** When each thing happens, in ms from the start. The whole run is about 4.6 s (system.md: under six). */
 export const DEMO_TIMELINE = {
   answer: 400,
   ask: 1100,
@@ -38,9 +42,16 @@ export const DEMO_TIMELINE = {
   lines: 1700,
   total: 2200,
   lead: 2900,
+  /** T-187: "Approve & send" is pressed */
+  approve: 3800,
+  /** the lead changes to its sent state */
+  sent: 4050,
 } as const
-/** The last thing to finish: the lead, plus its entrance */
-export const DEMO_LENGTH_MS = DEMO_TIMELINE.lead + 300
+/** The last thing to finish: the sent state, plus its entrance */
+export const DEMO_LENGTH_MS = DEMO_TIMELINE.sent + 300
+
+/** A fixed moment, so "Sent today" reads the same on the server and in the browser */
+const SENT_AT = new Date('2026-01-01T12:00:00Z')
 
 const at = (ms: number): CSSProperties => ({ '--at': `${ms}ms` } as CSSProperties)
 
@@ -62,6 +73,8 @@ export interface HeroDemoContent {
   playAgain: string
   /** Under the estimate: why Accept is locked */
   acceptNote: string
+  /** T-187: where "Approve & send" was, once it is pressed (the dashboard's own line) */
+  sentNote: string
   /** what a screen reader hears for each of the three frames */
   screens: readonly [string, string, string]
 }
@@ -71,6 +84,8 @@ export function HeroDemo({ content }: { content: HeroDemoContent }) {
   const T = DEMO_TIMELINE
   const money = (n: number) => formatMoney(n, content.currency, content.locale)
   const brand = brandStyleVars(content.primaryColor)
+  // T-187: the lead once it is sent, in the dashboard's own words (the shared status wording)
+  const sent = quoteTurn({ status: 'sent', customerName: content.customerName, hasEmail: true, total: content.total, sentAt: SENT_AT.toISOString() }, { now: SENT_AT, timeZone: 'UTC' })
 
   return (
     <div data-testid="hero-demo-stage" data-run={run}>
@@ -130,16 +145,38 @@ export function HeroDemo({ content }: { content: HeroDemoContent }) {
             <p className="font-display text-base font-bold leading-tight text-text-primary" data-testid="demo-frame-header">{QUOTE_TURN_COPY.home.title}</p>
             <div className="demo-in mt-4 rounded-xl border border-border bg-white p-4" style={at(T.lead)} data-testid="demo-lead">
               <p className="truncate text-sm font-semibold text-text-primary">{content.customerName}</p>
-              <p className="truncate text-xs text-text-secondary">{content.serviceName} · just now</p>
-              <div className="mt-2">
-                <TurnBadge turn={{ label: QUOTE_TURN_COPY.labels.needsApproval, detail: '', tone: 'attention' }} showDetail={false} />
+              {/* T-187: the line and the chip, before and after approving: two layers in one cell */}
+              <div className="grid">
+                <p className="demo-out col-start-1 row-start-1 truncate text-xs text-text-secondary" style={at(T.sent)} data-testid="demo-lead-before">
+                  {content.serviceName} · just now
+                </p>
+                <p className="demo-in col-start-1 row-start-1 truncate text-xs text-text-secondary" style={at(T.sent)} data-testid="demo-lead-after">
+                  {sent.detail}
+                </p>
+              </div>
+              <div className="mt-2 grid">
+                <div className="demo-out col-start-1 row-start-1" style={at(T.sent)} data-testid="demo-chip-before">
+                  <TurnBadge turn={{ label: QUOTE_TURN_COPY.labels.needsApproval, detail: '', tone: 'attention' }} showDetail={false} />
+                </div>
+                <div className="demo-in col-start-1 row-start-1" style={at(T.sent)} data-testid="demo-chip-after">
+                  <TurnBadge turn={{ label: sent.label, detail: '', tone: sent.tone }} showDetail={false} />
+                </div>
               </div>
               <p className="figure mt-2 text-2xl font-medium text-text-primary">{money(content.total)}</p>
             </div>
-            <div className="mt-auto pt-4">
-              <Button tabIndex={-1} className="w-full" data-testid="demo-approve">
-                Approve &amp; send
-              </Button>
+            <div className="mt-auto grid pt-4">
+              {/* pressed, then gone: the place then says it was sent */}
+              <div className="demo-out col-start-1 row-start-1" style={at(T.sent)} data-testid="demo-approve-wrap">
+                <div className="demo-press" style={at(T.approve)}>
+                  <Button tabIndex={-1} className="w-full" data-testid="demo-approve">
+                    Approve &amp; send
+                  </Button>
+                </div>
+              </div>
+              <p className="demo-in col-start-1 row-start-1 flex min-h-[40px] items-center justify-center gap-2 text-sm font-semibold text-secondary" style={at(T.sent)} data-testid="demo-sent">
+                <span aria-hidden="true">✓</span>
+                {content.sentNote}
+              </p>
             </div>
           </div>
         </Frame>

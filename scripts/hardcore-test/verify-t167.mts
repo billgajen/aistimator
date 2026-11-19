@@ -25,9 +25,9 @@ import { findConfidenceLanguage } from '../../packages/shared/src/customer-langu
 import { TRADES, tradeHref } from '../../apps/web/src/lib/marketing/trades'
 import { marketingExample } from '../../apps/web/src/lib/marketing/examples'
 import { HERO, MESSAGE_LINE, NOTICES } from '../../apps/web/src/lib/marketing/home-copy'
-import { FEATURE_STEPS } from '../../apps/web/src/lib/marketing/features-copy'
+import { FEATURE_SECTIONS } from '../../apps/web/src/lib/marketing/features-copy'
 import { SCREEN_WORDS } from '../../apps/web/src/lib/marketing/screen-words'
-import { planLines, sitePlans } from '../../apps/web/src/lib/marketing/plan-claims'
+import { COMING_SOON, UPCOMING, planCards } from '../../apps/web/src/lib/marketing/plan-claims'
 import { PRICING_DEMO_LINKS } from '../../apps/web/src/lib/marketing/site-copy'
 
 const cfg = loadEnv()
@@ -160,7 +160,8 @@ if (!process.env.PLAYWRIGHT_DIR) {
     await shot(p, `home-${width}-demo-end`, false)
 
     const sections = await sectionsOf(p)
-    check(`${width}: the sections are in the T-167 order`, JSON.stringify(sections.map((s) => s.id)) === JSON.stringify(['hero', 'homeowners', 'notices', 'control', 'setup', 'Add it anywhere', 'plans', 'Questions', 'closing']), sections.map((s) => s.id))
+    // T-187: the on-site app has a section of its own after "Add it anywhere"
+    check(`${width}: the sections are in order (T-167, with T-187's app section)`, JSON.stringify(sections.map((s) => s.id)) === JSON.stringify(['hero', 'homeowners', 'notices', 'control', 'setup', 'add-it-section', 'app', 'plans', 'questions', 'closing']), sections.map((s) => s.id))
     const sameBackground = sections.filter((s, i) => i > 0 && s.bg === sections[i - 1]!.bg).map((s) => s.id)
     check(`${width}: no two neighbouring sections share a background`, sameBackground.length === 0, sections.map((s) => s.bg))
     // the figures are the second thing a visitor sees. T-168: back to three columns side by side (the large
@@ -211,23 +212,31 @@ if (!process.env.PLAYWRIGHT_DIR) {
     f.on('pageerror', (e) => fErrors.push(String(e)))
     await f.goto(`${cfg.appUrl}/features`, { waitUntil: 'networkidle' })
     check(`${width}: Features leads with the message line`, (await f.locator('h1').innerText()).replace(/\s+/g, ' ').trim() === MESSAGE_LINE)
-    const steps = await f.locator('[data-testid=feature-step]').evaluateAll((els) =>
+    // T-187: one section per thing a business cares about (it was five numbered steps): seven that are live,
+    // then three that are on the way, each marked
+    const steps = await f.locator('[data-testid=feature-section]').evaluateAll((els) =>
       els.map((el) => {
         const words = el.querySelector('h2')!.getBoundingClientRect()
         const screen = el.querySelector('[data-testid=feature-screen]')!.getBoundingClientRect()
         const side = screen.top >= words.bottom - 4 ? (Math.abs(screen.left + screen.width / 2 - (words.left + words.width / 2)) < 60 ? 'under, centred' : 'under') : screen.left > words.left ? 'right' : 'left'
         let bg = getComputedStyle(el).backgroundColor
         if (/rgba\(0, 0, 0, 0\)/.test(bg)) bg = 'paper'
-        return { id: el.getAttribute('data-step'), headline: el.querySelector('h2')!.textContent ?? '', side: `${side} on ${bg}`, described: (el.querySelector('[data-testid=feature-screen]')!.getAttribute('aria-label') ?? '').length > 30, screenWidth: Math.round(screen.width), boxes: el.querySelectorAll('ul > li.rounded-xl').length }
+        return { id: el.getAttribute('data-feature'), upcoming: el.getAttribute('data-upcoming'), soon: (el.querySelector('[data-testid=coming-soon]') as HTMLElement | null)?.innerText.trim() ?? null, lines: el.querySelectorAll('[data-testid=feature-lines] > li').length, headline: el.querySelector('h2')!.textContent ?? '', side: `${side} on ${bg}`, described: (el.querySelector('[data-testid=feature-screen]')!.getAttribute('aria-label') ?? '').length > 30, screenWidth: Math.round(screen.width), boxes: el.querySelectorAll('ul > li.rounded-xl').length }
       })
     )
-    check(`${width}: five steps, each with its real screen and no row of text boxes`, JSON.stringify(steps.map((s) => s.id)) === JSON.stringify(FEATURE_STEPS.map((s) => s.id)) && steps.every((s) => s.described && s.screenWidth >= 280 && s.boxes === 0) && JSON.stringify(steps.map((s) => s.headline)) === JSON.stringify(FEATURE_STEPS.map((s) => s.headline)), steps.map((s) => [s.id, s.screenWidth]))
+    const UPCOMING_KEYS = ['whatsapp', 'app', 'roomScan'] as const
+    check(`${width}: seven sections that are live and three on the way, each with its real screen, two or three lines, and no row of text boxes`,
+      JSON.stringify(steps.map((s) => s.id)) === JSON.stringify([...FEATURE_SECTIONS.map((s) => s.id), ...UPCOMING_KEYS]) && steps.every((s) => s.described && s.screenWidth >= 240 && s.boxes === 0 && s.lines >= 2 && s.lines <= 3) &&
+        JSON.stringify(steps.map((s) => s.headline)) === JSON.stringify([...FEATURE_SECTIONS.map((s) => s.title), ...UPCOMING_KEYS.map((k) => UPCOMING[k].heading)]), steps.map((s) => [s.id, s.screenWidth, s.lines]))
+    check(`${width}: what is not live is marked "${COMING_SOON}", and nothing that is live carries the mark`, steps.filter((s) => s.upcoming).length === 3 && steps.every((s) => (s.upcoming ? s.soon === COMING_SOON : s.soon === null)), steps.map((s) => [s.id, s.soon]))
     const alike = steps.filter((s, i) => i > 0 && s.side === steps[i - 1]!.side).map((s) => s.id)
     check(`${width}: no two neighbouring steps share a layout`, alike.length === 0, steps.map((s) => s.side))
     const featureScreens = await f.locator('[data-testid=feature-screen]').evaluateAll((els) => els.map((el) => [...el.querySelectorAll('[data-testid]')].map((x) => x.getAttribute('data-testid')).filter((id) => /screen|sheet/.test(id ?? '')).join('+')))
-    check(`${width}: the screens are the form on a phone, a photo with what was read, the price setup, the quote page and Home's numbers`, JSON.stringify(featureScreens) === JSON.stringify(['request-form-screen', 'question-screen', 'price-check-screen', 'estimate-sheet', 'numbers-screen']) && (await f.locator('[data-step=read] img').count()) === 1, featureScreens)
+    check(`${width}: the screens are a photo with what was read, the price setup, two services in one breakdown, the request to approve, the quote page, the link and QR code, the message with what was made of it; then a chat, the app and the room scan card`,
+      JSON.stringify(featureScreens) === JSON.stringify(['question-screen', 'price-check-screen', 'sections-screen', 'approve-screen', 'estimate-sheet', 'setup-screen-link', 'understood-screen', '', '', '']) && (await f.locator('[data-feature=photos] img').count()) === 1 &&
+        (await f.locator('[data-feature=whatsapp] [data-testid=chat-reply]').count()) === 1 && (await f.locator('[data-feature=app] [data-testid=app-phone]').count()) === 1 && (await f.locator('[data-feature=roomScan] [data-testid=room-scan-card]').count()) === 1, featureScreens)
     const fText = (await f.locator('main').innerText()).replace(/\s+/g, ' ')
-    check(`${width}: step 05 is "Track"; no "chat", no "minimum job", no "Learn" claim`, fText.includes('See what’s winning work.') && !/\bchat\b/i.test(fText) && !/minimum job/i.test(fText) && !/corrections improve|Learns from/i.test(fText) && fText.includes('“$375 per room, heavy prep adds $250.”'))
+    check(`${width}: no chat form, no "minimum job", no "Learn" claim, no PDF; the price sentence is Home's`, !/chat form|form or a chat/i.test(fText) && !/minimum job/i.test(fText) && !/corrections improve|Learns from/i.test(fText) && !/\bPDFs?\b/.test(fText) && fText.includes('“$375 per room, heavy prep adds $250.”'))
     const fYellow = await yellowButtons(f)
     const fPer = await yellowPerScreen(f)
     check(`${width}: the main button is yellow, one per screen: the hero's and the closing band's`, fYellow.length === 2 && fYellow.every((y) => y.href === '/signup' && y.text === 'Try it free: 10 quotes, no card') && Math.max(...fPer) === 1 && fPer[0] === 1, { ids: fYellow.map((y) => y.id), max: Math.max(...fPer) })
@@ -299,15 +308,19 @@ if (!process.env.PLAYWRIGHT_DIR) {
   // T-170: how many there are follows the plans the page shows (it was "four or more", when three plans were shown)
   // T-181: the two lines are worded as what the business gets; their words come from the copy file
   const DEMO_LINES: string[] = [PRICING_DEMO_LINKS.hostedPages, PRICING_DEMO_LINKS.branding]
-  const demoLinksWanted = sitePlans().flatMap((plan) => planLines(plan)).filter((l) => DEMO_LINES.includes(l.label)).length
-  check('the estimate-page line and the own-brand line link to /demo on every plan that lists them', links.length === demoLinksWanted && links.length >= 3 && links.every((l) => l.href === '/demo') && DEMO_LINES.every((label) => links.some((l) => l.text === label)), links)
+  // T-187: a plan card lists only what the plan adds, so each of the two lines is on one card; the compare
+  // table has a row for each, linked too
+  const demoLinksWanted = planCards().flatMap((card) => card.lines).filter((l) => DEMO_LINES.includes(l.label)).length + DEMO_LINES.length
+  check('the estimate-page line and the own-brand line link to /demo, on the plan card that lists each and in the compare table', links.length === demoLinksWanted && links.length >= 4 && links.every((l) => l.href === '/demo') && DEMO_LINES.every((label) => links.filter((l) => l.text === label).length === 2), links)
   const pricingText = (await pr.locator('main').innerText()).replace(/\s+/g, ' ')
   // T-170: a plan line that is not live yet says so
   const later = await pr.locator('[data-testid=plan-line][data-live=false]').evaluateAll((els) => els.map((el) => (el as HTMLElement).innerText.replace(/\s+/g, ' ').trim()))
   // (the owner's decision: Business is left off the page until a line of its own is live, so these are Pro's)
-  const laterWanted = sitePlans().flatMap((plan) => planLines(plan).filter((l) => !l.live).map((l) => l.label))
-  check(`Pricing marks every line that is not live yet "Coming later" (T-170): ${[...new Set(laterWanted)].join(', ')}`, later.length === laterWanted.length && later.length >= 2 && later.every((l) => l.endsWith('Coming later')) && laterWanted.every((label) => later.some((l) => l.includes(label))), later)
-  check('Pricing no longer lists "AI chat", and its answer says the AI works out the job', !/AI chat/.test(pricingText) && pricingText.includes('The AI works out the job; the price is calculated from the prices you set.'))
+  const laterWanted = planCards().flatMap((card) => card.lines.filter((l) => !l.live).map((l) => l.label))
+  check(`Pricing marks every line that is not live yet "${COMING_SOON}" (T-170; the words are T-187's): ${[...new Set(laterWanted)].join(', ')}`, later.length === laterWanted.length && later.length >= 2 && later.every((l) => l.endsWith(COMING_SOON)) && laterWanted.every((label) => later.some((l) => l.includes(label))), later)
+  // T-187: the questions are rows that open, so a closed answer is on the page but not in its visible text
+  const pricingAll = ((await pr.locator('main').textContent()) ?? '').replace(/\s+/g, ' ')
+  check('Pricing no longer lists "AI chat", and its answer says the AI works out the job', !/AI chat/.test(pricingAll) && pricingAll.includes('The AI works out the job; the price is calculated from the prices you set.'))
   await pctx.close()
   await browser.close()
 }

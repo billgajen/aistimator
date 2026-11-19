@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { formatMoney } from '@qolumns/shared'
 import { Button } from '@/components/ui/Button'
-import { QrSvg } from '@/components/marketing/QrSvg'
+import { LinkScreen } from '@/components/marketing/screens/ProductScreens'
+import { Soon } from '@/components/marketing/Soon'
+import { UPCOMING, isLive } from '@/lib/marketing/plan-claims'
 
 /**
  * T-165: "Set up in minutes" — three steps, each beside the screen it happens
@@ -12,6 +14,11 @@ import { QrSvg } from '@/components/marketing/QrSvg'
  * T-167: the links to the trade pages live here, under step 1 ("Choose your
  * trade"), as pills on a line that wraps; the last pill is "Other trades".
  * (They were a row of their own under the hero.)
+ *
+ * T-187: step 3 keeps the link and QR box and says where else the same form
+ * works: on a website (live), in a WhatsApp chat and on site with the app.
+ * The last two are not live: their words and their "Coming soon" mark come
+ * from lib/marketing/plan-claims.ts. A link leads down to "Add it anywhere".
  */
 export function SetupSteps({
   steps,
@@ -22,6 +29,7 @@ export function SetupSteps({
   prices,
   quoteLink,
   tradeLinks,
+  elsewhere,
 }: {
   steps: ReadonlyArray<{ title: string; text: string }>
   /** each screen is a picture of the product: what a screen reader hears for it */
@@ -33,6 +41,8 @@ export function SetupSteps({
   quoteLink: string
   /** T-167: the trade pages, linked from step 1; the last one is "Other trades" */
   tradeLinks: ReadonlyArray<{ label: string; href: string; other?: boolean }>
+  /** T-187: under step 3: the live place by name, and the link down to "Add it anywhere" */
+  elsewhere: { website: string; link: { label: string; href: string } }
 }) {
   const screens = [
     <TradeScreen key="trade" trades={trades} chosen={chosenTrade} />,
@@ -60,6 +70,31 @@ export function SetupSteps({
                   </li>
                 ))}
               </ul>
+            ) : null}
+            {i === 2 ? (
+              <>
+                <ul className="mt-4 space-y-2 text-text-primary" data-testid="setup-elsewhere">
+                  <li className="flex items-center gap-2.5">
+                    <Tick />
+                    {elsewhere.website}
+                  </li>
+                  <li className="flex flex-wrap items-center gap-2.5">
+                    <Tick soon={!isLive('whatsapp')} />
+                    {UPCOMING.whatsapp.where}
+                    <Soon of="whatsapp" />
+                  </li>
+                  <li className="flex flex-wrap items-center gap-2.5">
+                    <Tick soon={!isLive('app')} />
+                    {UPCOMING.app.where}
+                    <Soon of="app" />
+                  </li>
+                </ul>
+                <p className="mt-3">
+                  <Link href={elsewhere.link.href} className="inline-flex min-h-[44px] items-center text-sm font-semibold text-primary underline underline-offset-4 hover:text-primary-hover" data-testid="setup-elsewhere-link">
+                    {elsewhere.link.label}
+                  </Link>
+                </p>
+              </>
             ) : null}
           </div>
           <div role="img" aria-label={screenLabels[i]} {...({ inert: '' } as object)} className={i % 2 === 1 ? 'lg:order-1' : ''}>
@@ -116,18 +151,11 @@ function PricesScreen({ serviceName, prices }: { serviceName: string; prices: Ar
   )
 }
 
-function LinkScreen({ quoteLink }: { quoteLink: string }) {
+/** A tick for a place that works today, a ring for one still to come (a shape, with the words beside it) */
+function Tick({ soon = false }: { soon?: boolean }) {
   return (
-    <div className={CARD} data-testid="setup-screen-link">
-      <p className="font-display text-lg font-bold text-text-primary">Your quote link</p>
-      <div className="mt-4 flex items-center gap-2">
-        <span className="figure flex min-h-[44px] min-w-0 flex-1 items-center truncate rounded-lg border border-field bg-background px-3 text-sm text-text-primary">{quoteLink.replace(/^https?:\/\//, '')}</span>
-        <Button size="sm" tabIndex={-1}>Copy</Button>
-      </div>
-      <div className="mt-5 flex items-center gap-4">
-        <QrSvg value={quoteLink} className="h-24 w-24 shrink-0 rounded-lg border border-border text-ink" />
-        <p className="text-sm text-text-secondary">Put it on your van, flyers, business cards or invoices.</p>
-      </div>
-    </div>
+    <span aria-hidden="true" className={soon ? 'text-text-muted' : 'text-secondary'}>
+      {soon ? '○' : '✓'}
+    </span>
   )
 }

@@ -82,5 +82,14 @@ export function operatorStatement(companyNumber?: string | null): string {
   return `${PRODUCT_NAME} is run by ${OPERATOR.name}, a company registered in ${OPERATOR.registeredIn}${number ? ` (company number ${number})` : ''}.`
 }
 
+/**
+ * T-187: the same facts as one short line for the site's footer, after the copyright mark and the
+ * product's name: "Run by Billiom Limited, a company registered in England and Wales (company number …)."
+ */
+export function operatorLine(companyNumber?: string | null): string {
+  const number = (companyNumber ?? '').replace(/\s+/g, ' ').trim()
+  return `Run by ${OPERATOR.name}, a company registered in ${OPERATOR.registeredIn}${number ? ` (company number ${number})` : ''}.`
+}
+
 /** The law the terms are under */
 export const GOVERNING_LAW = `the law of ${OPERATOR.registeredIn}`

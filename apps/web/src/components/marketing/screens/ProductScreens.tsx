@@ -1,5 +1,7 @@
-import { formatMoney } from '@qolumns/shared'
+import { QUOTE_TURN_COPY, formatMoney } from '@qolumns/shared'
 import { brandStyleVars } from '@/lib/color'
+import { QrSvg } from '@/components/marketing/QrSvg'
+import { TurnBadge } from '@/components/quotes/TurnBadge'
 import { Money, SectionLabel } from '@/components/quote/document-parts'
 import { Button } from '@/components/ui/Button'
 import { SCREEN_WORDS } from '@/lib/marketing/screen-words'
@@ -16,6 +18,9 @@ import { SCREEN_WORDS } from '@/lib/marketing/screen-words'
  *   RangeScreen      the estimate while a detail is unconfirmed: a range
  *   PriceCheckScreen setup's "Check your prices"
  *   NumbersScreen    Home's numbers for the last 30 days
+ *   SectionsScreen   the price breakdown of a quote that carries two services (T-187)
+ *   ApproveScreen    the dashboard's "Waiting for you": a request to approve (T-187)
+ *   LinkScreen       the Quote link screen: the link, Copy, the QR code
  *   UnderstoodScreen a customer's message beside what the product made of it (T-173).
  *                    Not one screen of the product: a summary of three results that
  *                    each appear on a real one (the form's service suggestion, the
@@ -341,6 +346,110 @@ export function UnderstoodScreen({
             </div>
           ))}
         </dl>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * T-187: the price breakdown of a quote that carries two of a business's
+ * services (AD-061): each service's own lines and subtotal, and one total.
+ */
+export function SectionsScreen({
+  parts,
+  total,
+  currency = 'USD',
+  locale = 'en-US',
+  primaryColor,
+  className = '',
+}: {
+  parts: Array<{ serviceName: string; lines: Array<{ label: string; amount: number }>; subtotal: number }>
+  total: number
+  currency?: string
+  locale?: string
+  primaryColor: string
+  className?: string
+}) {
+  const money = (n: number) => formatMoney(n, currency, locale)
+  return (
+    <div className={`rounded-3xl bg-background px-6 py-6 text-left shadow-document ${className}`} style={brandStyleVars(primaryColor)} data-testid="sections-screen">
+      <SectionLabel as="p">{W.estimate.breakdown}</SectionLabel>
+      <div className="mb-5 space-y-6">
+        {parts.map((part) => (
+          <div key={part.serviceName} data-testid="sections-part">
+            <p className="mb-2.5 text-sm font-semibold text-text-primary">{part.serviceName}</p>
+            <div className="space-y-2.5">
+              {part.lines.map((line) => (
+                <div key={line.label} className="flex items-baseline gap-2 text-sm">
+                  <span className="text-text-primary">{line.label}</span>
+                  <span className="flex-1 translate-y-[-3px] border-b border-dotted border-border-strong" />
+                  <span className="figure whitespace-nowrap text-text-primary">{money(line.amount)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2.5 flex justify-between gap-4 border-t border-border pt-2 text-sm">
+              <span className="text-text-secondary">{W.sections.subtotal(part.serviceName)}</span>
+              <span className="figure text-text-primary">{money(part.subtotal)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-baseline justify-between border-t border-border-strong pt-3">
+        <span className="font-display font-bold text-text-primary">{W.sections.total}</span>
+        <span className="figure text-lg font-medium text-text-primary">{money(total)}</span>
+      </div>
+    </div>
+  )
+}
+
+/** T-187: the dashboard's "Waiting for you" with one request to approve (the hero demo's third frame, still) */
+export function ApproveScreen({
+  customerName,
+  serviceName,
+  total,
+  currency = 'USD',
+  locale = 'en-US',
+  className = '',
+}: {
+  customerName: string
+  serviceName: string
+  total: number
+  currency?: string
+  locale?: string
+  className?: string
+}) {
+  return (
+    <div className={`rounded-3xl bg-white p-6 text-left shadow-warm-lg ${className}`} data-testid="approve-screen">
+      <p className="font-display text-lg font-bold text-text-primary">{QUOTE_TURN_COPY.home.title}</p>
+      <div className="mt-4 rounded-xl border border-border bg-background p-4">
+        <p className="text-sm font-semibold text-text-primary">{customerName}</p>
+        <p className="text-xs text-text-secondary">{serviceName} · just now</p>
+        <div className="mt-2">
+          <TurnBadge turn={{ label: QUOTE_TURN_COPY.labels.needsApproval, detail: '', tone: 'attention' }} showDetail={false} />
+        </div>
+        <p className="figure mt-2 text-2xl font-medium text-text-primary">{formatMoney(total, currency, locale)}</p>
+      </div>
+      <Button className="mt-4 w-full" tabIndex={-1}>
+        {QUOTE_TURN_COPY.pageButtons.approve}
+      </Button>
+    </div>
+  )
+}
+
+/** The Quote link screen: the business's own link with Copy, and its QR code (a real code: it opens the link) */
+export function LinkScreen({ quoteLink, className = '' }: { quoteLink: string; className?: string }) {
+  return (
+    <div className={`rounded-3xl bg-white p-6 text-left shadow-warm-lg ${className}`} data-testid="setup-screen-link">
+      <p className="font-display text-lg font-bold text-text-primary">Your quote link</p>
+      <div className="mt-4 flex items-center gap-2">
+        <span className="figure flex min-h-[44px] min-w-0 flex-1 items-center truncate rounded-lg border border-field bg-background px-3 text-sm text-text-primary">{quoteLink.replace(/^https?:\/\//, '')}</span>
+        <Button size="sm" tabIndex={-1}>
+          Copy
+        </Button>
+      </div>
+      <div className="mt-5 flex items-center gap-4">
+        <QrSvg value={quoteLink} className="h-24 w-24 shrink-0 rounded-lg border border-border text-ink" />
+        <p className="text-sm text-text-secondary">Put it on your van, flyers, business cards or invoices.</p>
       </div>
     </div>
   )

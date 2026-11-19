@@ -2848,3 +2848,87 @@ still unanswered):**
   (`BUSINESS_REQUEST_SOURCES`) and gets all of the above.
 - One unit test fails when the Mac is busy (it searches the whole repository eight times against a 5 second
   limit). It is not from this ticket. A longer limit for that one test would stop it wasting a run.
+
+---
+
+## T-187 — Home, Pricing, Features and the footer, from your review
+
+Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-187" (web only; no worker, no
+migration).
+
+### Look before you deploy
+
+Screenshots of the three pages, at 1440 and 390 wide, are on this Mac in `.checks/t187/` (that folder is not
+in git). In them the quote link reads `localhost:3000`, because they were taken here; on the site it is
+`qolumns.com`.
+
+- [ ] **Hero:** the demo is interior painting ("How many rooms?", 3, $1,200). On the site, watch the third
+  card: "Approve & send" is pressed, then the card reads "Waiting for customer", "Sent today, not opened yet"
+  and "Sent to the customer". "Play again" runs it once more.
+- [ ] **Headings:** no heading or line under one ends on a single word, on your phone and on a wide screen.
+- [ ] **"Your prices. You stay in control."** has two points; the second is "You approve before they can
+  accept".
+- [ ] **"Set up in minutes", step 3:** the link and QR box, then "On your website", "In your WhatsApp chat"
+  (Coming soon), "On site, with the app" (Coming soon), and a link down the page.
+- [ ] **"Add it anywhere":** five pictures, three then two on a wide screen, one under another on a phone.
+- [ ] **The app section:** "Price a job while you are standing in it", "Coming soon to iPhone", two phones.
+- [ ] **Plans:** two cards in the middle; Pro says "Everything in Starter, plus".
+- [ ] **Questions:** centred; read the answers about a website, WhatsApp, the app and the 10 free quotes.
+- [ ] **Footer:** four columns, hello@qolumns.com, and the company line with your company number.
+- [ ] **Pricing:** cards, the compare table, the five billing notes, the questions.
+- [ ] **Features:** seven sections, then "On the way" with three marked "Coming soon".
+
+### What I did not claim, and why
+
+1. **"PDF"** (you asked for "a quote page and PDF in your brand"). The site says "A quote page in your brand".
+   Production makes a PDF only when you ask for one in the dashboard, and as a test document, because
+   `DOCRAPTOR_API_KEY` is not set (the open item under T-155). When that is done, tell me and I add it.
+2. **"It flags what looks wrong"** is on the page as "It flags what doesn't add up", and rests on three things
+   the product does and our claims list allows: a blurry or dark photo is caught before it is sent; a message
+   that fits another of your services gets a suggestion; words that give a different size from the answer get a
+   question. It does **not** mention the AI's "Worth checking" notes on your dashboard: the claims list forbids
+   that on a public page, because such a note can be wrong.
+3. **The room scan is on no plan card and not in Pricing's table.** It belongs to the Business plan, which is
+   off the site until it has something of its own that is live. It is shown on Home (in the app section) and
+   on Features, marked "Coming soon".
+
+### One thing I added to the claims list
+
+"Several services in one quote" had no entry in the list of what the site may claim, so I added one first
+(`also-asked`), with its evidence: on this machine 64 quotes carry more than one service, and it has been live
+since 18 November. It is worded as what it does: it notices and offers; your customer adds it; the price comes
+from that service's own prices.
+
+### When something goes live: one edit each
+
+In `apps/web/src/lib/marketing/plan-claims.ts`, set `live: true` on the line, and every page follows:
+
+| When | The line |
+|---|---|
+| Meta has reviewed the app and other businesses can connect WhatsApp | `PLAN_CHANNEL_LINES.whatsapp` |
+| The app is in the App Store | `PLAN_CHANNEL_LINES.mobile_app`, and set `APP_STORE_URL` in Vercel to its store page |
+| The room scan ships in the app | `PLAN_FEATURE_LINES.lidar_scanning` |
+
+- [ ] **Before the App Store badge shows:** download Apple's own badge artwork (Apple's marketing resources
+  page) and send it to me. Until then the badge slot is a plain dark button with the words "Download on the
+  App Store"; Apple asks for its own artwork. Leave `PLAY_STORE_URL` empty: there is no Android app.
+
+### Decisions for you (my recommendation first)
+
+1. **The mark now reads "Coming soon" on your dashboard's billing page too** (it read "Coming later"). One
+   constant feeds every page. Recommended: keep it the same everywhere.
+2. **Features lost its fifth step, "See what's winning work"** (your dashboard's numbers), because your list
+   of ten did not have it. Recommended: leave it off; say if you want it back as an eighth section.
+3. **Under "You approve before they can accept" the page no longer says a service can send without waiting.**
+   It is said in the questions instead ("Can I approve before the customer accepts?"). Recommended: keep.
+4. **"A text" is gone from "Share your quote link anywhere"** (it now says "an email, a WhatsApp chat, your
+   Google profile"), to keep to "no SMS anywhere". Recommended: keep.
+
+5. **Home is long on a phone:** about twenty screens at 390 wide (the five ways, the app's two phones and the
+   plan cards each stack one under another). Recommended: look at it on your own phone first. If it is too
+   long, the first thing to shorten is the app section on a phone (one phone, not two).
+
+### Not proven
+
+- Safari and Firefox: I looked in Chrome only. In an older browser the wrapping is as it was; nothing breaks.
+- The full regression level was not run (a marketing ticket).

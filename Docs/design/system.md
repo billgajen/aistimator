@@ -180,8 +180,17 @@ prompt, what was kept and what was rejected).
   demo service, following that service's own photo instruction.
 - The image has fixed dimensions, so nothing moves when it arrives. Only a hero's image loads with priority; every
   other photograph loads when it is near the screen.
-- **A phone frame** is the one device frame on the site ("Add it anywhere"): an ink edge and a phone's corners,
-  which are not a step of the radius scale.
+- **A phone frame** is the one device frame on the site ("Add it anywhere", Home's app section, Features): an ink
+  edge and a phone's corners, which are not a step of the radius scale.
+- **The on-site app's screens are drawn again in HTML** (T-187; `components/marketing/screens/AppScreens.tsx`).
+  The app is React Native and cannot be mounted on a web page. The drawing keeps the app's order and its own
+  words (`screen-words.ts`, held against the app's source by a unit test) and takes every status, step name,
+  sentence and note from the shared functions the app itself calls. As in the app, its figures are the text face
+  with tabular figures. **A chat is drawn in our own bubbles:** no look-alike of another product's design, and
+  the reply is the assistant's own sentence.
+- **A store badge is a slot behind a setting** (`APP_STORE_URL`, `PLAY_STORE_URL`): nothing shows until the
+  address is set. A store's own badge artwork is the store's, and is added with the address; until then the slot
+  is a plain link.
 
 ## Layout
 
@@ -196,8 +205,18 @@ prompt, what was kept and what was rejected).
 - Phone first. Nothing scrolls sideways at 390 px; content does not swipe sideways as its only way to be read.
 - **A name or a link is never cut and never broken inside a word.** A link is shown short (no "https://") and may
   wrap only after a slash (`ShortLink`). Where a name does not fit, the layout gives way, not the name.
-- **Pictures in a row are one size, and start on one line** ("Add it anywhere": three columns of one height from
-  1024 px, each a row of words and picture from 640 px, stacked on a phone).
+- **Pictures in a row are one size, and start on one line** ("Add it anywhere": three columns from 1024 px, each a
+  row of words and picture from 640 px, stacked on a phone). **Five things are never five across** (T-187): the
+  five ways sit three to a row and then two, in the same three columns, so every picture stays one size.
+- **Balanced wrapping on every marketing page** (T-187, the owner's review): a heading, and the line under it,
+  are set with `text-wrap: balance`; other text with `text-wrap: pretty`. No single word sits alone on a last
+  line, at any width. One rule in `globals.css` covers every page whose `<main>` begins with the site's
+  navigation; a new marketing page gets it by being one. A line that is not a heading's subtitle and must be
+  balanced takes the class `balance`.
+- **"Coming soon" is drawn from a flag, never typed** (T-187). Three things are shown before they are live:
+  quotes inside WhatsApp, the on-site app and the room scan. Each has one flag (`lib/marketing/plan-claims.ts`)
+  and one mark (`<Soon>`: an outlined pill, words in a shape, never colour alone). Whatever is not live sits
+  after what is: last in a list, last on a card, the last group of a table, the last sections of a page.
 - Tap targets are 44 px on a phone. Controls are never closer than 8 px. Nothing a person can press is under
   24 px at any width. A destructive action sits apart from the others (a rule and a wider gap), never beside them.
 - **Customer pages (T-171):**
@@ -253,7 +272,9 @@ Rules:
    - **The hero demo** (Home) is the hero entrance: the product shown working, in **three frames of the same
      height, side by side, one idea each** (T-168, the owner's choice): the customer's question with its answer and
      "Get my estimate"; a short estimate (a line or two, the total, the locked Accept); "Waiting for you" with one
-     lead, its price and "Approve & send". The frames are built from the product's own parts and words at readable
+     lead, its price and "Approve & send", which is then pressed: the lead changes to its sent state (its status
+     chip, its line and the button's place, in the dashboard's own words; T-187). A change of state is two layers
+     in one place, one fading out as the other arrives, so nothing changes size. The frames are built from the product's own parts and words at readable
      sizes (nothing under 12 px); they are short pictures of a screen, not whole screens, and they keep one height
      at every width (stacked on a phone). It plays once on load, each step a token-length entrance in its turn, the
      whole run under six seconds, then it stands still on its last state with a small "Play again". The demo does

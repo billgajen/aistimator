@@ -89,7 +89,8 @@ for (const [label, ctx] of [['390 px', phone], ['1440 px', desk]] as const) {
   await p.goto(`${app}/features`, { waitUntil: 'networkidle' })
   const feat = await p.locator('main').innerText()
   const goneFeat = ['Estimate page in your branding', 'Estimates expire automatically', 'Your dashboard shows which services win work and where requests stall.', 'Learns from your own corrections']
-  check(`${label} /features: five steps with their screens; the text boxes and the "Learn" claim are gone`, (await p.locator('[data-testid=feature-step]').count()) === 5 && (await p.locator('[data-testid=feature-screen]').count()) === 5 && goneFeat.every((s) => !feat.includes(s)) && feat.includes('See what’s winning work.'), goneFeat.filter((s) => feat.includes(s)))
+  // T-187: one section per thing a business cares about (seven live, three on the way), each with its screen
+  check(`${label} /features: ten sections with their screens; the text boxes and the "Learn" claim are gone`, (await p.locator('[data-testid=feature-section]').count()) === 10 && (await p.locator('[data-testid=feature-screen]').count()) === 10 && (await p.locator('[data-testid=feature-section][data-upcoming]').count()) === 3 && goneFeat.every((s) => !feat.includes(s)), goneFeat.filter((s) => feat.includes(s)))
   const OLD_CLAIMS = /\bPDFs?\b|remind|price comparison|compare with similar|anonymi[sz]ed|every quantity was worked out|working visible/i
   const claimHits: string[] = []
   for (const route of ['/', '/features', '/pricing', '/trades', ...STRIP_PAGES.filter((r) => r !== '/')]) {

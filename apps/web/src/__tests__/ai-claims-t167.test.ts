@@ -21,6 +21,7 @@ import { CAPABILITIES, CLAIM_WORDS, NOT_YET_ON_A_PAGE, recordedClaims, type Capa
 import * as homeCopy from '@/lib/marketing/home-copy'
 import * as featuresCopy from '@/lib/marketing/features-copy'
 import * as siteCopy from '@/lib/marketing/site-copy'
+import * as pricingCopy from '@/lib/marketing/pricing-copy'
 import * as tradesCopy from '@/lib/marketing/trades'
 import { TRADES } from '@/lib/marketing/trades'
 import { SCREEN_WORDS } from '@/lib/marketing/screen-words'
@@ -63,7 +64,8 @@ function strings(value: unknown, into: string[] = []): string[] {
   else if (value && typeof value === 'object') for (const item of Object.values(value)) strings(item, into)
   return into
 }
-const COPY = { 'home-copy.ts': homeCopy, 'features-copy.ts': featuresCopy, 'site-copy.ts': siteCopy, 'trades.ts': tradesCopy }
+// T-187: Pricing's words (the compare table's rows about what the product does) are a copy file too
+const COPY = { 'home-copy.ts': homeCopy, 'features-copy.ts': featuresCopy, 'site-copy.ts': siteCopy, 'pricing-copy.ts': pricingCopy, 'trades.ts': tradesCopy }
 
 /**
  * Sentences that match the claim words and are not claims about the product's
@@ -77,6 +79,7 @@ const NOT_CLAIMS = new Map<string, string>([
   ['Model and size, read from a photo', 'a heading (T-174, the owner’s words); the sentence under it is the claim'],
   ['Walls, measured from photos', 'a heading; the sentence under it is the claim'],
   ['What it notices', 'a section heading'],
+  ['What the AI does', 'a group heading of Pricing’s compare table (T-187); the rows under it are the claims'],
   ['It reads the label', 'a step title; the sentence under it is the claim'],
   ['It reads the rating plate', 'a step title; the sentence under it is the claim'],
   ['It reads the panel label', 'a step title; the sentence under it is the claim'],
@@ -224,7 +227,10 @@ describe('T-167: the message, the demo beat and "What it notices"', () => {
   // shown in "What it notices", which is where the question and the customer's "Yes" now live.
   it('the reading is shown in "What it notices", not in the hero demo', () => {
     const T = DEMO_TIMELINE
-    expect(Object.keys(T)).toEqual(['answer', 'ask', 'tape', 'lines', 'total', 'lead'])
+    // T-187: after the lead arrives, "Approve & send" is pressed and the lead changes to its sent state
+    expect(Object.keys(T)).toEqual(['answer', 'ask', 'tape', 'lines', 'total', 'lead', 'approve', 'sent'])
+    expect(T.lead).toBeLessThan(T.approve)
+    expect(T.approve).toBeLessThan(T.sent)
     expect(T.tape).toBeLessThan(T.total)
     // system.md: the whole run is under six seconds
     expect(DEMO_LENGTH_MS).toBeLessThan(6000)

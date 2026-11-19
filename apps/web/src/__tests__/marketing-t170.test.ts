@@ -13,7 +13,7 @@ import { HERO_PHOTO } from '@/lib/marketing/hero-photo'
 import { shortLink } from '@/components/marketing/ShortLink'
 import { DEMO_SAMPLE_PHOTOS } from '@/lib/demo/sample-photos'
 import { DEMO_SERVICE_PICKS } from '@/lib/demo/demo-services'
-import { COMING_LATER, PLAN_CHANNEL_LINES, PLAN_FEATURE_LINES, PLAN_HOSTED_PAGES, PRICING_DESCRIPTION, PRICING_LEAD, PRICING_TAGLINES, planLines, sitePlans } from '@/lib/marketing/plan-claims'
+import { COMING_SOON, PLAN_CHANNEL_LINES, PLAN_FEATURE_LINES, PLAN_HOSTED_PAGES, PRICING_DESCRIPTION, PRICING_LEAD, planLines, sitePlans } from '@/lib/marketing/plan-claims'
 import { ADD_IT } from '@/lib/marketing/home-copy'
 
 const ROOT = join(__dirname, '..', '..', '..', '..')
@@ -142,11 +142,14 @@ describe('T-170: "Add it anywhere"', () => {
   const add = code('apps/web/src/components/marketing/home/AddItAnywhere.tsx')
   const layout = css.slice(css.indexOf('"Add it anywhere" on Home'), css.indexOf("T-169: the larger view of a customer's photo"))
 
-  it('three columns of one height with pictures of one size; stacked on a phone', () => {
-    expect((add.match(/data-testid="add-it-item"/g) ?? []).length).toBe(3)
-    expect((add.match(/className="add-it-picture/g) ?? []).length).toBe(3)
+  it('three columns with pictures of one size, three to a row, never five across; stacked on a phone', () => {
+    // T-187: five ways (three live, two still to come), on the same grid of three columns in two rows
+    expect((add.match(/data-testid="add-it-item"/g) ?? []).length).toBe(5)
+    expect((add.match(/className="add-it-picture/g) ?? []).length).toBe(5)
+    expect((add.match(/add-it-item add-it-next/g) ?? []).length).toBe(2)
     expect(layout).toContain('.add-it-picture { width: 100%; max-width: 20rem; aspect-ratio: 5 / 8; margin-inline: auto; }')
-    expect(layout).toMatch(/@media \(min-width: 1024px\) \{\s*\.add-it \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); grid-template-rows: auto auto;/)
+    expect(layout).toMatch(/@media \(min-width: 1024px\) \{\s*\.add-it \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); grid-template-rows: auto auto auto auto;/)
+    expect(layout).not.toMatch(/repeat\(5,/)
     expect(layout).toContain('.add-it-item { grid-row: span 2; grid-template-rows: subgrid;')
     // the van's picture is the same shape as its box, so the sign stays on the panel
     expect(VAN_PHOTO.width / VAN_PHOTO.height).toBeCloseTo(5 / 8, 5)
@@ -222,7 +225,7 @@ describe('T-170: Pricing says only what a business can use today', () => {
   const page = code('apps/web/src/app/pricing/page.tsx')
   const NOT_LIVE = /text message|by text|\bSMS\b|WhatsApp|on[- ]site|LiDAR|team member|priority support/i
 
-  it('a line that is not live is listed after the live ones and marked "Coming later"', () => {
+  it('a line that is not live is listed after the live ones and marked "Coming soon" (T-187; it read "Coming later")', () => {
     const [starter, pro, business] = offeredPlans()
     // T-181: each line says what the business gets, and text messages are not on the site at all
     expect(planLines(starter!).map((l) => [l.label, l.live])).toEqual([
@@ -230,8 +233,8 @@ describe('T-170: Pricing says only what a business can use today', () => {
       ['Every customer gets their own estimate page to open, accept and come back to', true],
     ])
     expect(planLines(pro!).filter((l) => l.live).map((l) => l.label).slice(2)).toEqual(['Estimates under your brand alone, with no badge of ours', 'See how your estimates compare with your final invoices'])
-    expect(planLines(pro!).filter((l) => !l.live).map((l) => l.label)).toEqual(['Quotes inside WhatsApp, on your own number', 'An app for pricing a job while you are on site'])
-    expect(planLines(business!).filter((l) => !l.live).map((l) => l.label)).toEqual(['Quotes inside WhatsApp, on your own number', 'An app for pricing a job while you are on site', 'Measure a room by scanning it with your phone', 'Logins for your whole team', 'Faster answers from us when you need help'])
+    expect(planLines(pro!).filter((l) => !l.live).map((l) => l.label)).toEqual(['Quotes inside WhatsApp, on your own business number', 'An app for pricing a job while you are on site'])
+    expect(planLines(business!).filter((l) => !l.live).map((l) => l.label)).toEqual(['Quotes inside WhatsApp, on your own business number', 'An app for pricing a job while you are on site', 'Measure a room by scanning it with your phone', 'Logins for your whole team', 'Faster answers from us when you need help'])
     for (const plan of offeredPlans()) expect(planLines(plan).map((l) => l.label).join(' '), plan.id).not.toMatch(/\bSMS\b|text message|by text/i)
     expect(PLAN_CHANNEL_LINES.sms.shown).toBe(false)
     for (const plan of offeredPlans()) {
@@ -239,9 +242,15 @@ describe('T-170: Pricing says only what a business can use today', () => {
       const firstLater = lines.findIndex((l) => !l.live)
       if (firstLater >= 0) expect(lines.slice(firstLater).every((l) => !l.live), plan.id).toBe(true)
     }
-    expect(COMING_LATER).toBe('Coming later')
-    expect(page).toContain('{COMING_LATER}')
-    expect(page).toContain('data-live="false"')
+    expect(COMING_SOON).toBe('Coming soon')
+    // T-187: the words are typed nowhere. The plan cards and every page draw the mark from the line's flag.
+    const cards = code('apps/web/src/components/marketing/PlanCards.tsx')
+    expect(cards).toContain('<Soon line={line}')
+    expect(cards).toContain("data-live={live ? 'true' : 'false'}")
+    expect(code('apps/web/src/components/marketing/Soon.tsx')).toContain('const mark = of ? soonMark(of) : line ? lineMark(line) : null')
+    for (const file of ['apps/web/src/app/page.tsx', 'apps/web/src/app/pricing/page.tsx', 'apps/web/src/app/features/page.tsx', 'apps/web/src/components/marketing/PlanCards.tsx', 'apps/web/src/components/marketing/home/AddItAnywhere.tsx', 'apps/web/src/components/marketing/home/AppSection.tsx', 'apps/web/src/components/marketing/home/SetupSteps.tsx', 'apps/web/src/lib/marketing/home-copy.ts', 'apps/web/src/lib/marketing/features-copy.ts']) {
+      expect(code(file), file).not.toMatch(/Coming (soon|later)/i)
+    }
   })
 
   it('the owner’s decision: a plan is left off the public pages until a line of its own is live, so Business is off and Starter and Pro stay', () => {
@@ -258,8 +267,11 @@ describe('T-170: Pricing says only what a business can use today', () => {
     const proWithoutItsOwn = { ...pro!, features: { ...pro!.features, custom_branding: false, calibration_insights: false } }
     expect(sitePlans([starter!, proWithoutItsOwn]).map((p) => p.id)).toEqual(['plan_us_starter'])
     // both public pages read it; the billing page and sign-up do not
-    expect(page).toContain('const OFFERED = sitePlans()')
-    expect(code('apps/web/src/app/page.tsx')).toContain('const plans = sitePlans()')
+    // (T-187: through the shared plan cards, and Pricing's compare table)
+    expect(page).toContain('const plans = sitePlans()')
+    expect(code('apps/web/src/lib/marketing/plan-claims.ts')).toContain('export function planCards(currency = \'USD\', plans: PlanDefinition[] = sitePlans()): PlanCard[] {')
+    expect(code('apps/web/src/components/marketing/PlanCards.tsx')).toContain('const cards = planCards()')
+    expect(code('apps/web/src/app/page.tsx')).toContain('<PlanCards')
     expect(code('apps/web/src/app/page.tsx')).not.toContain('offeredPlans')
     expect(page).not.toContain('offeredPlans')
     expect(read('apps/web/src/app/api/billing/route.ts')).toContain('offeredPlans')
@@ -285,12 +297,13 @@ describe('T-170: Pricing says only what a business can use today', () => {
     }
   })
 
-  it('nothing else on the page promises what is not live: the taglines, the lead and the description', () => {
-    for (const plan of offeredPlans()) expect(PRICING_TAGLINES[plan.id] ?? plan.tagline, plan.id).not.toMatch(NOT_LIVE)
+  it('nothing else on the page promises what is not live: the lead and the description', () => {
+    // T-187: a card no longer carries a line under the plan's name (the plans' own taglines name things that
+    // are not live, and the page's replacements for them went with the old cards)
     expect(PRICING_LEAD).not.toMatch(NOT_LIVE)
     expect(PRICING_DESCRIPTION).not.toMatch(NOT_LIVE)
     expect(page).not.toMatch(/Most popular|by text, and on site/)
-    expect(page).toContain('tagline: PRICING_TAGLINES[def.id] ?? def.tagline,')
+    expect(page + code('apps/web/src/components/marketing/PlanCards.tsx')).not.toMatch(/\.tagline\b/)
   })
 
   it('the list of what a plan line is today is written down beside the AI list', () => {

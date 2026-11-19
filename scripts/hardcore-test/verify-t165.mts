@@ -271,7 +271,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
     await p.waitForTimeout(1300)
     const middle = await demoState(p)
     check(`${width}: part-way, the customer has answered; the lead has not arrived yet`, middle.answer === 1 && middle.lead < 1, middle)
-    await p.waitForTimeout(3200)
+    await p.waitForTimeout(3700) // T-187: the run is longer (the approval and the sent state): about 4.4 s in all
     const end = await demoState(p)
     check(`${width}: it ends on its last state: the answer is in, the tape is drawn, the price has landed, the lead is waiting`, done(end), end)
     await p.waitForTimeout(2500)
@@ -282,7 +282,23 @@ if (!process.env.PLAYWRIGHT_DIR) {
     check(`${width}: frame 1 is one question with its answer and "Get my estimate"`, frameText.length === 3 && frameText[0]!.includes('Get my estimate') && (await p.locator('[data-testid=demo-card]').first().locator('[data-testid=demo-answer]').count()) === 1 && (frameText[0]!.match(/\?/g) ?? []).length === 1, frameText[0])
     const priceLines = await p.locator('[data-testid=demo-card]').nth(1).locator('li').count()
     check(`${width}: frame 2 is a short estimate (one or two lines and the total), then the locked "Accept"`, priceLines >= 1 && priceLines <= 2 && /\$[\d,]+\.\d\d/.test(await p.locator('[data-testid=estimate-total]').innerText()) && (await p.locator('[data-testid=demo-accept]').innerText()).trim() === 'Accept' && (await p.locator('button[data-testid=demo-accept]').count()) === 0, { priceLines, text: frameText[1] })
-    check(`${width}: frame 3 is "Waiting for you" with one lead, its price and "Approve & send"`, frameText[2]!.startsWith('Waiting for you') && (await p.locator('[data-testid=demo-owner] [data-testid=demo-lead]').count()) === 1 && /\$[\d,]+\.\d\d/.test(await p.locator('[data-testid=demo-lead]').innerText()) && (await p.locator('[data-testid=demo-approve]').innerText()).trim() === 'Approve & send', frameText[2])
+    // T-187: "Approve & send" is pressed and the lead changes to its sent state: the button has gone, and the
+    // chip, the line and the button's place read as sent, in the dashboard's own words
+    // (no named helper inside the page: it cannot run the wrapper tsx puts around one)
+    const sentParts = await p.evaluate(() =>
+      ['demo-approve-wrap', 'demo-chip-before', 'demo-lead-before', 'demo-chip-after', 'demo-lead-after', 'demo-sent', 'demo-approve'].map((id) => {
+        const el = document.querySelector(`[data-testid=${id}]`) as HTMLElement
+        return { opacity: Number(getComputedStyle(el).opacity), words: el.innerText.replace(/\s+/g, ' ').trim() }
+      })
+    )
+    const sentState = {
+      approve: sentParts[0]!.opacity, chipBefore: sentParts[1]!.opacity, lineBefore: sentParts[2]!.opacity, chipAfter: sentParts[3]!.opacity, lineAfter: sentParts[4]!.opacity, sent: sentParts[5]!.opacity,
+      chip: sentParts[3]!.words, line: sentParts[4]!.words, note: sentParts[5]!.words, button: sentParts[6]!.words,
+    }
+    check(`${width}: frame 3 is "Waiting for you" with one lead and its price; "Approve & send" was pressed and the lead now reads as sent`,
+      frameText[2]!.startsWith('Waiting for you') && (await p.locator('[data-testid=demo-owner] [data-testid=demo-lead]').count()) === 1 && /\$[\d,]+\.\d\d/.test(await p.locator('[data-testid=demo-lead]').innerText()) &&
+        sentState.button === 'Approve & send' && sentState.approve === 0 && sentState.chipBefore === 0 && sentState.lineBefore === 0 && sentState.chipAfter === 1 && sentState.lineAfter === 1 && sentState.sent === 1 &&
+        sentState.chip === 'Waiting for customer' && sentState.line === 'Sent today, not opened yet' && sentState.note.endsWith('Sent to the customer'), sentState)
     const heroText = (await p.locator('[data-testid=hero]').innerText()).replace(/\s+/g, ' ')
     check(`${width}: the hero has no label-reading step and no photo field ("We read…" lives in "What it notices")`, !/We read|Is that right|rating label/i.test(heroText) && (await p.locator('[data-testid=hero] [data-testid=question-screen]').count()) === 0 && (await p.locator('[data-testid=hero] [data-testid=demo-photo]').count()) === 0 && (await p.locator('[data-testid=notices] [data-testid=question-screen]').count()) === 1)
     await shot(p, `home-${width}-demo-end`, false)
@@ -418,7 +434,8 @@ if (!process.env.PLAYWRIGHT_DIR) {
     check(`${width}: three big figures ${width >= 768 ? 'in three columns side by side' : 'in one column'}, each with its source still linked`, stats.length === 3 && stats.every((x) => x.size >= 52 && x.source.startsWith('https://')) && (width >= 768 ? inColumns : inOneColumn), stats.map((x) => [x.size, x.left]))
     // T-167: the order of Home changed, and the trades row moved into step 1 of "Set up in minutes"
     const order = await p.locator('main > section').evaluateAll((els) => els.map((el) => el.getAttribute('data-testid') ?? el.querySelector('h2')?.textContent ?? '').filter(Boolean))
-    check(`${width}: the sections are in the T-167 order: hero, the figures, "What it notices", your prices, setup, add it anywhere, plans, questions, the closing band`, JSON.stringify(order) === JSON.stringify(['hero', 'homeowners', 'notices', 'control', 'setup', 'Add it anywhere', 'plans', 'Questions', 'closing']), order)
+    // T-187: the on-site app has a section of its own after "Add it anywhere"
+    check(`${width}: the sections are in order: hero, the figures, "What it notices", your prices, setup, add it anywhere, the app, plans, questions, the closing band`, JSON.stringify(order) === JSON.stringify(['hero', 'homeowners', 'notices', 'control', 'setup', 'add-it-section', 'app', 'plans', 'questions', 'closing']), order)
     const pills = await p.locator('[data-testid=setup-step]').first().locator('[data-testid=trades-row] a').allInnerTexts()
     check(`${width}: the trade links sit inside "Choose your trade", ending with "Other trades"; there is no trades row of its own`, (await p.locator('[data-testid=trades-row]').count()) === 1 && pills.length === 7 && pills[6]!.trim() === 'Other trades: describe your prices in plain English', pills.length)
 
@@ -433,8 +450,9 @@ if (!process.env.PLAYWRIGHT_DIR) {
 
     // the footer and the skip link
     const footLinks = await p.locator('footer a').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)))
-    // T-181: fourteen links, with "Delete your data" (it was thirteen)
-    if (width < 500) check(`${width}: every footer link is 44 px tall`, footLinks.length === 14 && Math.min(...footLinks) >= 44, Math.min(...footLinks))
+    // T-187: four columns (four product links, six trades and "All trades", two company links, three legal
+    // ones) and the support address: seventeen links
+    if (width < 500) check(`${width}: every footer link is 44 px tall`, footLinks.length === 17 && Math.min(...footLinks) >= 44, { count: footLinks.length, min: Math.min(...footLinks) })
     // a fresh load, so Tab starts from the top of the page
     await p.goto(HOME, { waitUntil: 'domcontentloaded' })
     await p.locator('[data-testid=skip-link]').waitFor({ state: 'attached' })

@@ -32,7 +32,7 @@ import { TRADE_PHOTOS, CLOSING_PHOTO, VAN_PHOTO } from '../../apps/web/src/lib/m
 import { HERO_PHOTO } from '../../apps/web/src/lib/marketing/hero-photo'
 import { DEMO_SAMPLE_PHOTOS } from '../../apps/web/src/lib/demo/sample-photos'
 import { DEMO_SERVICE_PICKS } from '../../apps/web/src/lib/demo/demo-services'
-import { COMING_LATER, planLines, sitePlans } from '../../apps/web/src/lib/marketing/plan-claims'
+import { COMING_SOON, planCards, planLines, sitePlans } from '../../apps/web/src/lib/marketing/plan-claims'
 import { offeredPlans } from '../../packages/shared/src/plans'
 import { qrMatrix } from '../../apps/web/src/lib/qr'
 import { DEMO_BUSINESS_NAME, DEMO_SLUG } from '../../packages/shared/src/demo'
@@ -121,9 +121,18 @@ if (!process.env.PLAYWRIGHT_DIR) {
    */
   const paintedWithoutWords = async (p: Page) => {
     const tag = await p.addStyleTag({ content: '* { color: transparent !important; text-shadow: none !important; caret-color: transparent !important } nav[aria-label="Site"] { visibility: hidden !important }' })
-    const png = PNG.sync.read(await p.screenshot({ fullPage: true }))
+    // T-187: Home on a phone is taller than one picture can hold (the browser stops at 16,384 px, and what
+    // lay below came back blank, so the closing band measured 1:1). The page is taken in pieces and joined.
+    const { width, height } = await p.evaluate(() => ({ width: document.documentElement.clientWidth, height: document.documentElement.scrollHeight }))
+    const PIECE = 8000
+    const data = Buffer.alloc(width * height * 4)
+    for (let y = 0; y < height; y += PIECE) {
+      const piece = PNG.sync.read(await p.screenshot({ fullPage: true, clip: { x: 0, y, width, height: Math.min(PIECE, height - y) } }))
+      if (piece.width !== width) throw new Error(`a piece of the page came back ${piece.width} px wide, not ${width}`)
+      piece.data.copy(data, y * width * 4, 0, piece.width * piece.height * 4)
+    }
     await tag.evaluate((el) => el.remove())
-    return png as { width: number; height: number; data: Buffer }
+    return { width, height, data }
   }
   /** Where an element's lines of text are on the page, and its text colour */
   const linesOf = (p: Page, selector: string) =>
@@ -274,13 +283,21 @@ if (!process.env.PLAYWRIGHT_DIR) {
       }
     })
     const same = (values: number[], tolerance = 1) => Math.max(...values) - Math.min(...values) <= tolerance
+    // T-187: five ways. Three live in a first row, then the two still to come in a second row of the same
+    // columns: never five across, every picture one size, each row's pictures starting on one line.
+    const rowOne = add.items.slice(0, 3)
+    const rowTwo = add.items.slice(3)
     if (width >= 1024) {
-      check(`${width}: three columns of equal height, aligned at the top`, add.items.length === 3 && same(add.items.map((i) => i.top)) && same(add.items.map((i) => i.height)) && add.items[0]!.left < add.items[1]!.left && add.items[1]!.left < add.items[2]!.left && same(add.items.map((i) => i.width)), add.items)
-      check(`${width}: each picture is the same size, and the three start on one line`, add.pictures.length === 3 && same(add.pictures.map((x) => x.width)) && same(add.pictures.map((x) => x.height)) && same(add.pictures.map((x) => x.top)), add.pictures)
+      check(`${width}: three columns: the first three of equal height, aligned at the top; the other two under them, in the same columns`,
+        add.items.length === 5 && same(rowOne.map((i) => i.top)) && same(rowOne.map((i) => i.height)) && rowOne[0]!.left < rowOne[1]!.left && rowOne[1]!.left < rowOne[2]!.left && same(add.items.map((i) => i.width)) &&
+          same(rowTwo.map((i) => i.top)) && rowTwo[0]!.top >= rowOne[0]!.bottom && rowTwo[0]!.left === rowOne[0]!.left && rowTwo[1]!.left === rowOne[1]!.left, add.items)
+      check(`${width}: each picture is the same size, and each row's pictures start on one line`, add.pictures.length === 5 && same(add.pictures.map((x) => x.width)) && same(add.pictures.map((x) => x.height)) && same(add.pictures.slice(0, 3).map((x) => x.top)) && same(add.pictures.slice(3).map((x) => x.top)), add.pictures)
     } else {
-      check(`${width}: the three are stacked, one under another`, add.items.length === 3 && add.items[0]!.bottom <= add.items[1]!.top && add.items[1]!.bottom <= add.items[2]!.top, add.items.map((i) => [i.top, i.bottom]))
-      check(`${width}: each picture is the same size`, add.pictures.length === 3 && same(add.pictures.map((x) => x.width)) && same(add.pictures.map((x) => x.height)), add.pictures)
+      check(`${width}: the five are stacked, one under another`, add.items.length === 5 && add.items.every((item, i) => i === 0 || add.items[i - 1]!.bottom <= item.top), add.items.map((i) => [i.top, i.bottom]))
+      check(`${width}: each picture is the same size`, add.pictures.length === 5 && same(add.pictures.map((x) => x.width)) && same(add.pictures.map((x) => x.height)), add.pictures)
     }
+    const upcomingMarks = await p.locator('[data-testid=add-it-item]').evaluateAll((els) => els.map((el) => [el.getAttribute('data-upcoming'), (el.querySelector('[data-testid=coming-soon]') as HTMLElement | null)?.innerText.trim() ?? null]))
+    check(`${width}: the two ways that are not live yet are marked "${COMING_SOON}"; the three that are live are not`, JSON.stringify(upcomingMarks) === JSON.stringify([[null, null], [null, null], [null, null], ['whatsapp', COMING_SOON], ['app', COMING_SOON]]), upcomingMarks)
     const link = `${cfg.appUrl.replace(/\/$/, '')}/quote/${DEMO_SLUG}`
     const m = qrMatrix(link)
     const expectedPath = m.flatMap((row, y) => row.map((dark, x) => (dark ? `M${x + 2} ${y + 2}h1v1h-1z` : ''))).join('')
@@ -400,16 +417,19 @@ if (!process.env.PLAYWRIGHT_DIR) {
     // the owner's decision: the page shows the plans with a line of their own live today
     const shown = sitePlans()
     const hidden = offeredPlans().filter((plan) => !shown.some((s) => s.id === plan.id))
-    const wanted = shown.flatMap((plan) => planLines(plan))
+    // T-187: the cards are the shared plan cards: a plan's quotes a month, then what it adds to the plan below
+    const wanted = planCards().flatMap((card) => [{ label: card.quotes, live: true }, ...card.lines])
     const notLive = wanted.filter((l) => !l.live).map((l) => l.label)
     const live = wanted.filter((l) => l.live).map((l) => l.label)
-    const cards = await p.locator('[data-testid=plans] > div').evaluateAll((els) => els.map((el) => (el as HTMLElement).innerText.replace(/\s+/g, ' ')))
+    const cards = await p.locator('[data-testid=plan-card]').evaluateAll((els) => els.map((el) => (el as HTMLElement).innerText.replace(/\s+/g, ' ')))
     check(`${width} Pricing: it shows ${shown.length} plans (${shown.map((s) => s.name).join(' and ')}), each with its price and its button; ${hidden.map((h) => h.name).join(', ') || 'none'} is left off until a line of its own is live`, shown.length === 2 && cards.length === shown.length && shown.every((s, i) => cards[i]!.includes(s.name) && cards[i]!.includes(`$${(s.monthlyPrice.USD ?? 0) / 100}`) && cards[i]!.includes(`Choose ${s.name}`)) && hidden.every((h) => !cards.some((card) => card.includes(`Choose ${h.name}`))), cards.map((card) => card.slice(0, 40)))
-    check(`${width} Pricing: every line that is not live yet says "${COMING_LATER}" and has no tick; no live line is marked`, lines.length === wanted.length && notLive.length >= 2 /* T-181: text messages left the site, so two, not three */ && lines.every((l) => (notLive.some((label) => l.text.startsWith(label)) ? !l.live && l.text.endsWith(COMING_LATER) && l.tick !== '✓' : l.live && !l.text.includes(COMING_LATER) && l.tick === '✓')) && notLive.every((label) => lines.some((l) => l.text.startsWith(label))) && live.every((label) => lines.some((l) => l.text === label)), lines.filter((l) => !l.live).map((l) => l.text))
+    check(`${width} Pricing: every line that is not live yet says "${COMING_SOON}" and has no tick; no live line is marked`, lines.length === wanted.length && notLive.length >= 2 /* T-181: text messages left the site, so two, not three */ && lines.every((l) => (notLive.some((label) => l.text.startsWith(label)) ? !l.live && l.text.endsWith(COMING_SOON) && l.tick !== '✓' : l.live && !l.text.includes(COMING_SOON) && l.tick === '✓')) && notLive.every((label) => lines.some((l) => l.text.startsWith(label))) && live.every((label) => lines.some((l) => l.text === label)), lines.filter((l) => !l.live).map((l) => l.text))
     // the page's words with the marked lines taken out: what is left must promise none of them
     const pricingText = await p.evaluate(() => {
       const main = document.querySelector('main')!.cloneNode(true) as HTMLElement
       main.querySelectorAll('[data-testid=plan-line][data-live=false]').forEach((el) => el.remove())
+      // T-187: the compare table's last group holds the same lines, under the same mark
+      main.querySelectorAll('[data-testid=compare-group][data-group=soon]').forEach((el) => el.remove())
       return (main.textContent ?? '').replace(/\s+/g, ' ')
     })
     const promised = pricingText.match(/by text|\bSMS\b|WhatsApp|on[- ]site|LiDAR|team members|priority support|Most popular/gi)

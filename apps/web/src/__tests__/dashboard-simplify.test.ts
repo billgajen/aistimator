@@ -130,8 +130,11 @@ describe('T-152: the free allowance is 10 quotes in total', () => {
   it('pricing page, FAQ and billing page say it the same way', () => {
     const pricing = read('apps/web/src/app/pricing/page.tsx')
     expect(pricing).toContain('freeOfferLabel()')
-    expect(pricing).toMatch(/Can I try it for free\?/)
-    expect(pricing).toMatch(/don’t reset each month/)
+    // T-187: the Pricing page's questions live in its copy file, and the page draws them
+    expect(pricing).toContain('items={PRICING_FAQ}')
+    const pricingCopy = read('apps/web/src/lib/marketing/pricing-copy.ts')
+    expect(pricingCopy).toMatch(/Can I try it for free\?/)
+    expect(pricingCopy).toMatch(/don’t reset each month/)
     const billing = read('apps/web/src/app/(dashboard)/app/settings/billing/page.tsx')
     expect(billing).toMatch(/Free quotes used/)
     expect(billing).toMatch(/don’t reset each month/)

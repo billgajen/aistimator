@@ -515,10 +515,27 @@
 }
 
 /* ------------------------------------------------------------
-   "Add it anywhere" on Home (T-170): three columns of one height,
-   aligned at the top, each with a picture of the same size (5:8).
-   From 1024 px the three sit side by side, and a row of the grid
-   holds the three titles so the pictures start on one line. From
+   Balanced wrapping on the marketing site (T-187, the owner's
+   review): no single word sits alone on the last line of a
+   heading or of the line under one, at any width. Every marketing
+   page is a <main> whose first child is the site's navigation, so
+   one rule covers them all, and a new page gets it by being one.
+   A heading and its subtitle are balanced (their lines come out
+   about the same length); other text is set "pretty", which only
+   keeps the last line from being a lone word.
+   ------------------------------------------------------------ */
+main:has(> nav[aria-label="Site"]) :is(p, li, blockquote, figcaption, summary, dd) { text-wrap: pretty; }
+main:has(> nav[aria-label="Site"]) :is(h1, h2, h3, h4),
+main:has(> nav[aria-label="Site"]) :is(h1, h2, h3, h4) + p,
+main:has(> nav[aria-label="Site"]) .balance { text-wrap: balance; }
+
+/* ------------------------------------------------------------
+   "Add it anywhere" on Home (T-170; five ways since T-187): every
+   way has a picture of the same size (5:8), with its title above.
+   From 1024 px they sit three to a row on one grid of three
+   columns: the three live ways, then the two still to come in a
+   second row, in the same columns, so each row's pictures start
+   on one line and all five are one size. Never five across. From
    640 px each is a row: its words, then its picture. On a phone
    they stack.
    ------------------------------------------------------------ */
@@ -529,8 +546,10 @@
   .add-it-item { grid-template-columns: minmax(0, 1fr) 20rem; align-items: center; gap: 2rem; }
 }
 @media (min-width: 1024px) {
-  .add-it { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto auto; gap: 1.25rem 2rem; }
+  .add-it { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto auto auto auto; gap: 1.25rem 2rem; }
   .add-it-item { grid-row: span 2; grid-template-rows: subgrid; gap: 1.25rem; }
+  /* the second row stands a little further off the first */
+  .add-it-next { margin-top: 2rem; }
   .add-it-picture { max-width: none; }
 }
 /* The sign on the van: the name and its line are sized from the picture's own width, so the sign keeps its

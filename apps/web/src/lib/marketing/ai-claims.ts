@@ -24,6 +24,7 @@ export const CAPABILITIES = [
   'range-and-question',
   'extras-from-description',
   'words-against-answers',
+  'also-asked',
   'photo-notes',
   'worth-considering',
   'scope-wording',
