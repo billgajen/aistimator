@@ -22,7 +22,7 @@
  * No customer contact detail is read here, and nothing here is logged.
  */
 
-import { answerNote, checkerFindings } from '@qolumns/shared'
+import { answerNote, checkerFindings, isLineSource } from '@qolumns/shared'
 import type { QuoteUnderstanding, UnderstoodItem, UnderstoodQuestion } from '@qolumns/shared'
 
 export type { QuoteUnderstanding, UnderstoodItem, UnderstoodQuestion }
@@ -226,7 +226,11 @@ export function quoteUnderstanding(
     if (line.autoRecommended !== true) continue
     const label = text(line.label)
     if (!label) continue
-    const fromPhotos = /photo/i.test(text(line.recommendationReason)) && !/description/i.test(text(line.recommendationReason))
+    // T-189: the line's own source says where it came from (T-188 stores it). The engine's reason
+    // reads "from your description" for every added extra, so it is only used when no source was stored.
+    const fromPhotos = isLineSource(line.source)
+      ? line.source === 'seen'
+      : /photo/i.test(text(line.recommendationReason)) && !/description/i.test(text(line.recommendationReason))
     if (fromPhotos) addPhoto(`extra:${label}`, { text: UNDERSTOOD_COPY.extraFromPhotos(label) })
     else words.push({ text: understoodCopyFor(input.madeByBusiness).extra(label) })
   }

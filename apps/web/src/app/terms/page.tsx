@@ -1,14 +1,30 @@
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
-import { GOVERNING_LAW, PRODUCT_NAME, SUPPORT_EMAIL, operatorStatement } from '@qolumns/shared'
+import { GOVERNING_LAW, OPERATOR, PRODUCT_NAME, SUPPORT_EMAIL, operatorStatement } from '@qolumns/shared'
+import { SUB_PROCESSORS, subProcessorLine } from '@/lib/legal/sub-processors'
 
 export const metadata: Metadata = {
   title: `Terms of Service — ${PRODUCT_NAME}`,
   description: `The terms that govern your use of ${PRODUCT_NAME}.`,
 }
 
-const SECTIONS = [
+interface Point {
+  label: string
+  text: string
+  /** A list under the text (the providers) */
+  list?: string[]
+}
+
+interface Section {
+  title: string
+  body: string
+  more?: string
+  /** T-189: labelled points under the body (the data-processing section) */
+  points?: Point[]
+}
+
+const SECTIONS: Section[] = [
   {
     title: '1. The service',
     body: `${PRODUCT_NAME} provides software that lets your business collect enquiries (including photos and documents), generate estimates and quotes calculated from pricing rules you configure, and deliver them to your customers via hosted pages, PDF and email. AI is used to extract information from enquiries and draft wording; prices are always calculated from your configuration.`,
@@ -37,29 +53,71 @@ const SECTIONS = [
     body: 'Enquiry data (contact details, photos, documents, messages) belongs to you and your customers. We process it to provide the service, as described in the Privacy Policy, and do not sell it. You are responsible for having a lawful basis to collect it from your customers.',
   },
   {
-    title: '7. Availability and changes',
+    // T-189: what a business needs to know as the one responsible for its customers' data. It promises
+    // nothing the Privacy Policy does not, except the notice of a breach and how to ask for an agreement.
+    // The providers are read from lib/legal/sub-processors, the same list the Privacy Policy prints.
+    title: '7. Data processing',
+    body: `When your customers ask you for a quote through ${PRODUCT_NAME}, you decide what is collected from them and why, and you are responsible for it: in data-protection law you are the controller. ${OPERATOR.name} is your processor. We handle your customers’ data only to provide the service to you, as your settings and your written requests tell us to, and for nothing of our own.`,
+    points: [
+      {
+        label: 'What is collected',
+        text: 'Your customer’s name and contact details (email and phone), the address of the job, the photos and documents they send, their answers to your questions, and any message they write.',
+      },
+      {
+        label: 'Where it is stored and who else handles it',
+        text: 'These providers handle it for us, each only for the job named:',
+        list: SUB_PROCESSORS.map(subProcessorLine),
+      },
+      {
+        label: 'How long it is kept',
+        text: 'For as long as your account is open, so that you and your customer can both come back to a quote. When an account is closed, its quote history stays available for export for 30 days and is then deleted.',
+      },
+      {
+        label: 'How it is deleted',
+        text: `You can ask us to delete a single customer’s request at any time, or to close your account: email ${SUPPORT_EMAIL} from your account’s address. The “Delete your data” page sets out the steps.`,
+      },
+      {
+        label: 'Security',
+        text: 'Photos and documents are stored privately and can be reached only through a time-limited link or the quote’s own page. Each business can read only its own customers’ data. Data is encrypted on its way to and from us. We keep our logs to the minimum and do not write photos, files or the full text of messages to them.',
+      },
+      {
+        label: 'If there is a breach',
+        text: 'If we learn of a breach of security that affects your customers’ data, we will tell you without undue delay, by email to your account’s address, with what we know, so that you can meet your own duties.',
+      },
+      {
+        label: 'A written agreement',
+        text: `If your business needs a data-processing agreement, ask for one at ${SUPPORT_EMAIL}.`,
+      },
+      {
+        label: 'Who we are',
+        text: `${OPERATOR.name} is a company registered in ${OPERATOR.registeredIn}. This section, like the rest of these terms, is governed by ${GOVERNING_LAW}.`,
+      },
+    ],
+  },
+  {
+    title: '8. Availability and changes',
     body: 'We aim for high availability but do not guarantee uninterrupted service. Features may evolve; we will not materially reduce the core service you pay for during a billing period without notice.',
   },
   {
-    title: '8. Liability',
+    title: '9. Liability',
     body: 'To the maximum extent permitted by law, our liability arising from the service in any 12-month period is limited to the fees you paid in that period. We are not liable for indirect or consequential losses, including lost profits or lost business.',
   },
   {
-    title: '9. Termination',
+    title: '10. Termination',
     body: 'You may close your account at any time. We may suspend or terminate accounts that breach these terms, with notice where practicable. On termination we will make your quote history available for export for 30 days.',
   },
   {
     // T-177
-    title: '10. WhatsApp',
+    title: '11. WhatsApp',
     body: `If you connect a WhatsApp number to ${PRODUCT_NAME}, it must be a number your business owns and has the right to use. You must follow the WhatsApp Business Messaging Policy and the WhatsApp Commerce Policy, and you are responsible for the messages sent from your number, including those the assistant sends on your behalf. Meta charges you directly for WhatsApp. ${PRODUCT_NAME} may pause the assistant on your number if Meta restricts or suspends it, if your plan no longer includes WhatsApp, or if your subscription is not active; your connection is kept, and you can remove it at any time with Disconnect.`,
   },
   {
     // T-177
-    title: '11. Governing law',
+    title: '12. Governing law',
     body: `These terms are governed by ${GOVERNING_LAW}.`,
   },
   {
-    title: '12. Contact',
+    title: '13. Contact',
     body: `Questions about these terms: email ${SUPPORT_EMAIL}, or contact us through your dashboard.`,
   },
 ]
@@ -72,7 +130,7 @@ export default function TermsPage() {
         <h1 className="font-display text-4xl font-extrabold tracking-tight text-text-primary">
           Terms of Service
         </h1>
-        <p className="mt-3 text-sm text-text-muted">Last updated: 18 November 2026</p>
+        <p className="mt-3 text-sm text-text-muted">Last updated: 19 November 2026</p>
         {/* T-177: who runs the product. The company number comes from NEXT_PUBLIC_COMPANY_NUMBER. */}
         <p className="mt-3 leading-relaxed text-text-secondary" data-testid="operator">
           {operatorStatement(process.env.NEXT_PUBLIC_COMPANY_NUMBER)}
@@ -83,10 +141,29 @@ export default function TermsPage() {
             <section key={section.title}>
               <h2 className="font-display text-lg font-bold text-text-primary">{section.title}</h2>
               <p className="mt-2 leading-relaxed text-text-secondary">{section.body}</p>
-              {'more' in section && section.more ? (
+              {section.more ? (
                 <p className="mt-3 leading-relaxed text-text-secondary" data-testid="payments-and-tax">
                   {section.more}
                 </p>
+              ) : null}
+              {section.points ? (
+                <dl className="mt-4 space-y-4" data-testid="data-processing">
+                  {section.points.map((point) => (
+                    <div key={point.label}>
+                      <dt className="font-semibold text-text-primary">{point.label}</dt>
+                      <dd className="mt-1 leading-relaxed text-text-secondary">
+                        {point.text}
+                        {point.list ? (
+                          <ul className="mt-2 list-disc space-y-1 pl-5" data-testid="sub-processors">
+                            {point.list.map((item) => (
+                              <li key={item}>{item}</li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
               ) : null}
             </section>
           ))}

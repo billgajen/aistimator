@@ -16,11 +16,15 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { failedRequestEmail } from '@qolumns/shared'
 import { loadBusinessEmail } from './business-email'
 import { sendEmail } from './email/postmark'
+import { sendOpsAlert } from './ops-alert'
 
 export interface FailedQuoteEnv {
   POSTMARK_API_TOKEN?: string
   POSTMARK_FROM_EMAIL?: string
   APP_URL?: string
+  /** T-189: the owner's alert address (ops-alert.ts) */
+  ALERT_EMAIL?: string
+  ENVIRONMENT?: string
 }
 
 type Send = typeof sendEmail
@@ -93,6 +97,15 @@ export async function markQuoteFailed(
         },
       })
       .eq('id', quoteId)
+    // T-189: the owner is told too (ids only; at most one email an hour for this kind), whether or
+    // not the quote could be marked. The public demo's own quotes are left out, as they are from
+    // the business's email above.
+    if (!demo) {
+      await sendOpsAlert(supabase, env, {
+        kind: 'quote_failed',
+        details: { Quote: quoteId, ...(quote?.tenant_id && { Business: quote.tenant_id }), ...(quote?.is_test === true && { Test: 'yes' }) },
+      }, send)
+    }
     if (updateError) {
       console.error(`[Worker] Could not mark quote ${quoteId} failed: ${updateError.message}`)
       return { marked: false, emailed }

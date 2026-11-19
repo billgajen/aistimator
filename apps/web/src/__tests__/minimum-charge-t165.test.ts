@@ -199,7 +199,8 @@ describe('T-165: the note every page shows', () => {
     const page = code('app/(dashboard)/app/services/page.tsx')
     expect(page).not.toContain('Minimum Charge Adjustment')
     expect(page).not.toMatch(/subtotal < formData\.minimumCharge/)
-    expect(page).toContain('minimumTopUp(subtotal, formData.minimumCharge) > 0')
+    // T-189: the preview's maths moved to lib/sample-price; the floor is the same shared rule
+    expect(code('lib/sample-price.ts')).toContain('minimumTopUp(subtotal, service.minimumCharge) > 0')
     expect(page).toContain('minimumChargeNote(currencySymbol + simulatorResult.minimumCharge.toFixed(2))')
   })
 

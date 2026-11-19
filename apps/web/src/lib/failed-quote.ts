@@ -15,6 +15,7 @@ import { failedRequestEmail } from '@qolumns/shared'
 import type { createAdminClient } from '@/lib/supabase/server'
 import { isPostmarkConfigured, sendEmail } from '@/lib/postmark'
 import { resolveBusinessEmail } from '@/lib/business-email'
+import { sendOpsAlert } from '@/lib/ops-alert'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -64,6 +65,11 @@ export async function markQuoteFailed(supabase: Admin, quoteId: string, reason: 
       .from('quotes')
       .update({ status: 'failed', content_json: { ...content, error: reason, failedAt: now, ...(emailed && { failedNotifiedAt: now }) } })
       .eq('id', quoteId)
+    // T-189: the owner is told the worker could not be reached (ids only; one email an hour for this kind)
+    await sendOpsAlert(supabase, {
+      kind: 'worker_error',
+      details: { Where: 'the web app could not hand a request to the worker', Quote: quoteId, ...(quote?.tenant_id && { Business: quote.tenant_id }) },
+    })
     if (error) {
       console.error(`[FailedQuote] could not mark ${quoteId} failed: ${error.message}`)
       return { marked: false, emailed }

@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { MetaPixel, trackMeta } from '@/components/marketing/MetaPixel'
 import { useTurnstile } from '@/components/embed/useTurnstile'
 import { AUTH_INPUT, AUTH_LABEL, AUTH_LINK, AuthError, Honeypot, postAuth } from '@/components/auth/auth-form'
+import { readFirstVisit, rememberFirstVisit } from '@/lib/signup-source'
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
 
@@ -19,6 +20,11 @@ export default function SignupPage() {
   const [success, setSuccess] = useState(false)
   // T-173: the human check, invisible unless Cloudflare asks for a tap
   const { containerRef: turnstileRef, getToken: getTurnstileToken } = useTurnstile(TURNSTILE_SITE_KEY)
+
+  // T-189: someone who opens this page first (an advert's link) has their first visit noted here
+  useEffect(() => {
+    rememberFirstVisit()
+  }, [])
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -40,6 +46,8 @@ export default function SignupPage() {
         password,
         businessName,
         ...(plan && { plan }),
+        // T-189: how they found us, from this tab's first visit (no cookie)
+        source: readFirstVisit() ?? undefined,
         turnstileToken: turnstileToken || undefined,
         website: honeypot || undefined,
       })

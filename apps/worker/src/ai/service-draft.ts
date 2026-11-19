@@ -19,7 +19,6 @@ import type {
   ServiceDraftConfig,
   WorkStepConfig,
   ExpectedSignalConfig,
-  DocumentType,
 } from '@qolumns/shared'
 
 /**
@@ -28,7 +27,6 @@ import type {
 export interface ServiceDraftRequest {
   serviceName: string
   description: string
-  documentType?: DocumentType
 }
 
 /**
@@ -75,7 +73,6 @@ function buildDraftPrompt(request: ServiceDraftRequest): string {
 
 SERVICE NAME: ${request.serviceName}
 DESCRIPTION: ${request.description}
-DOCUMENT TYPE: ${request.documentType || 'instant_estimate'}
 
 Return a JSON object with this exact structure:
 

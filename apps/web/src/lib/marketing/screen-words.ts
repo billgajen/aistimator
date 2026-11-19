@@ -7,6 +7,7 @@
  * These are screen text, not marketing claims: they are not written through
  * `says` (lib/marketing/ai-claims.ts).
  */
+import { addedForCustomer } from '@qolumns/shared'
 import { customerReadLines, readingQuestion } from '../customer-read'
 
 export const SCREEN_WORDS = {
@@ -25,7 +26,8 @@ export const SCREEN_WORDS = {
   estimate: {
     breakdown: 'Price breakdown',
     total: 'Total',
-    added: 'Added for you — detected from your description',
+    // T-189: the product's own words for an extra added from what the customer wrote
+    added: addedForCustomer('words'),
     takeoffTitle: 'Measurement & takeoff',
     takeoffLead: 'What was measured or read for this estimate.',
     fromPhotos: 'From your photos',

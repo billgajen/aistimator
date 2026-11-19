@@ -439,19 +439,16 @@ describe('T-183: the review email', () => {
 // ---------------------------------------------------------------------------
 
 describe('T-183: the scope summary opens with the work', () => {
-  const tones = ['instant_estimate', 'formal_quote', 'proposal', 'sow'] as const
-
-  it('no prompt asks for an informal opener', () => {
-    for (const tone of tones) {
-      const prompt = getSystemPrompt(tone)
-      expect(prompt).not.toMatch(/here'?s a quick estimate|based on what you'?ve shared|we are pleased to provide|please find our quotation/i)
-      expect(prompt).not.toMatch(/conversational|casual/i)
-    }
+  // T-189: there is one document style, so one system prompt (it took a tone until then)
+  it('the prompt asks for no informal opener', () => {
+    const prompt = getSystemPrompt()
+    expect(prompt).not.toMatch(/here'?s a quick estimate|based on what you'?ve shared|we are pleased to provide|please find our quotation/i)
+    expect(prompt).not.toMatch(/conversational|casual/i)
   })
 
-  it('every prompt says the first sentence states the work, and the user prompt repeats it for the scope summary', () => {
-    for (const tone of tones) expect(getSystemPrompt(tone)).toMatch(/first sentence states the work to be done/)
-    expect(getSystemPrompt(undefined)).toMatch(/Never open it with a greeting/)
+  it('the prompt says the first sentence states the work, and the user prompt repeats it for the scope summary', () => {
+    expect(getSystemPrompt()).toMatch(/first sentence states the work to be done/)
+    expect(getSystemPrompt()).toMatch(/Never open it with a greeting/)
     expect(WORDING_PROMPT).toContain(SCOPE_SUMMARY_OPENING_RULE)
   })
 

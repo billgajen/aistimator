@@ -1821,7 +1821,6 @@ export async function processQuote(
     pricing,
     formAnswers: formAnswersForWording,
     projectDescription, // Customer's detailed project description
-    documentType: quoteData.quote.document_type as 'instant_estimate' | 'formal_quote' | 'proposal' | 'sow',
     errorCode, // FIX-6: Pass error code to wording for contextual notes
     learningContext, // Learning context from amendment patterns
     regionGuidance: regionPromptBlock(regionCtx), // T-133

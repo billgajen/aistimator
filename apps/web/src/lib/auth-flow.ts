@@ -14,6 +14,7 @@
  * (so the product can be used on a laptop); in production the caller is told
  * the email could not be sent.
  */
+import type { SignupSource } from '@/lib/signup-source'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendEmail, isPostmarkConfigured } from '@/lib/postmark'
 import { alreadyRegisteredEmail, confirmEmail, resetPasswordEmail } from '@/lib/auth-emails'
@@ -87,6 +88,8 @@ export async function startSignup(input: {
   password: string
   businessName: string
   selectedPlan: string | null
+  /** T-189: the first-visit source, already cleaned by the route */
+  signupSource?: SignupSource | null
   origin: string
 }): Promise<AuthMailResult> {
   const email = input.email.trim().toLowerCase()
@@ -99,6 +102,7 @@ export async function startSignup(input: {
       data: {
         business_name: input.businessName,
         ...(input.selectedPlan && { selected_plan: input.selectedPlan }),
+        ...(input.signupSource && { signup_source: input.signupSource }),
       },
     },
   })

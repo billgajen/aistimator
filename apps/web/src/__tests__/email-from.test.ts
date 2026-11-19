@@ -201,6 +201,7 @@ describe('every sender says who the email is for', () => {
     'apps/web/src/lib/whatsapp-renewal.ts': ['business'], // T-175: reconnect WhatsApp before it runs out
     'apps/web/src/lib/failed-quote.ts': ['business'], // T-178: a request could not be priced (the worker's copy, apps/worker/src/failed-quote.ts, is also 'business')
     'apps/web/src/lib/request-updated.ts': ['business'], // T-179: a customer added a service to their quote, or took one off
+    'apps/web/src/lib/ops-alert.ts': ['business'], // T-189: the owner's alert (the product's own name as sender; the worker's copy is apps/worker/src/ops-alert.ts)
     // worker: customer quote, business "new quote", review request, customer estimate
     'apps/worker/src/email/index.ts': ['customer', 'business', 'business', 'customer'],
   }

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { MetaPixel } from './MetaPixel'
+import { FirstVisit } from './FirstVisit'
 import { MobileMenu } from './MobileMenu'
 import { NAV_LINKS, HEADER_SHORT_CTA } from '@/lib/marketing/nav'
 import { Wordmark } from '@/components/brand/Wordmark'
@@ -24,6 +25,8 @@ export function SiteNav() {
     <nav className="sticky top-0 z-40 border-b border-border bg-background" aria-label="Site">
       {/* T-144: marketing pages only (SiteNav is never rendered in the app or on quote pages) */}
       <MetaPixel />
+      {/* T-189: notes this tab's first visit, for the sign-up form to send. No cookie. */}
+      <FirstVisit />
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4">
         <Link href="/" className="inline-flex min-h-[44px] items-center">
           <Wordmark className="text-xl" />

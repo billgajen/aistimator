@@ -43,10 +43,9 @@ Ship a compact SaaS that a business can:
 ### Quote outputs
 - Hosted quote page (mandatory)
 - PDF generation via DocRaptor API (one template, with toggles)
-- Document type options (limited in v1 UI):
-  - Instant estimate
-  - Formal quote
-  - Proposal and SOW are stored as types but templates can be minimal initially
+- One document style (T-189, AD-070): every quote is plain, brief and professional. The four document types
+  (instant estimate, formal quote, proposal, SOW) changed only the wording's tone and are no longer offered;
+  the stored type is ignored.
 
 ### Workflow
 - Email customer and business with quote link

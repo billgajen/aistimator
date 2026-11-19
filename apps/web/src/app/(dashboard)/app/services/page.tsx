@@ -1,19 +1,20 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, type KeyboardEvent } from 'react'
-import { currencySymbol as sharedCurrencySymbol, getRegion, reviewModeOf, minimumTopUp, minimumChargeNote } from '@qolumns/shared'
+import { currencySymbol as sharedCurrencySymbol, getRegion, reviewModeOf, minimumChargeNote } from '@qolumns/shared'
 import type { ReviewMode } from '@qolumns/shared'
 import { PageHeader } from '@/components/dashboard/EmptyState'
 import { AIDraftBadge } from '@/components/AIDraftBadge'
 import { WorkStepEditor } from '@/components/WorkStepEditor'
 import { SuggestedFieldEditor } from '@/components/SuggestedFieldEditor'
 import { BulkServiceUpload } from '@/components/services/BulkServiceUpload'
+import { TemplatePicker } from '@/components/services/TemplatePicker'
 import { AIDraftRefinementPanel } from '@/components/services/AIDraftRefinementPanel'
 import { PricingComposer } from '@/components/services/PricingComposer'
 import { draftAddonsToConfig } from '@/lib/draft-addons'
+import { measuredLines, sampleNote, samplePrice, type SampleResult } from '@/lib/sample-price'
 import type {
   Service,
-  DocumentType,
   ServiceMediaConfig,
   ServiceDraftConfig,
   WorkStepConfig,
@@ -22,16 +23,10 @@ import type {
   AddonConfig,
   MultiplierConfig,
   PricingRules,
+  RegionCode,
 } from '@qolumns/shared'
 
 export const dynamic = 'force-dynamic'
-
-const DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
-  { value: 'instant_estimate', label: 'Instant Estimate' },
-  { value: 'formal_quote', label: 'Formal Quote' },
-  { value: 'proposal', label: 'Proposal' },
-  { value: 'sow', label: 'Statement of Work' },
-]
 
 /** T-147: the three ways an estimate reaches the customer */
 const REVIEW_MODE_OPTIONS: { value: ReviewMode; label: string; help: string }[] = [
@@ -59,7 +54,6 @@ const WIZARD_STEPS: WizardStep[] = ['basic', 'scope', 'fields', 'pricing', 'test
 interface ServiceFormData {
   name: string
   description: string
-  documentTypeDefault: DocumentType
   /** T-146: send quotes without business review (default off) */
   /** T-147: show, then confirm (default) / hold until approved / send automatically */
   reviewMode: ReviewMode
@@ -80,7 +74,6 @@ interface ServiceFormData {
 const defaultFormData: ServiceFormData = {
   name: '',
   description: '',
-  documentTypeDefault: 'instant_estimate',
   reviewMode: 'show_then_confirm',
   scopeIncludes: [],
   scopeExcludes: [],
@@ -369,6 +362,9 @@ export default function ServicesPage() {
 
   // Tenant currency for the pricing composer (verification finding: £ tenants saw $)
   const [currencySymbol, setCurrencySymbol] = useState('$')
+  // T-189: the business's region decides which trade templates "Add from a template" lists (as in setup)
+  const [region, setRegion] = useState<RegionCode>(getRegion(undefined).code)
+  const [showTemplates, setShowTemplates] = useState(false)
   useEffect(() => {
     fetch('/api/tenant')
       .then((res) => (res.ok ? res.json() : null))
@@ -376,6 +372,7 @@ export default function ServicesPage() {
         const currency = data?.tenant?.currency
         // T-133: Intl symbol for any ISO currency
         if (currency) setCurrencySymbol(sharedCurrencySymbol(currency, getRegion(data?.tenant?.region).locale))
+        if (data?.tenant) setRegion(getRegion(data.tenant.region).code)
       })
       .catch(() => {})
   }, [])
@@ -385,13 +382,7 @@ export default function ServicesPage() {
 
   // Quote Simulator state
   const [simulatorValues, setSimulatorValues] = useState<Record<string, string | number | boolean>>({})
-  const [simulatorResult, setSimulatorResult] = useState<{
-    lineItems: Array<{ name: string; amount: number; calculation: string; quantitySource?: string }>
-    subtotal: number
-    warnings: string[]
-    /** T-165: the minimum charge, when the lines came to less and it applied (shown as a note, not a line) */
-    minimumCharge: number | null
-  } | null>(null)
+  const [simulatorResult, setSimulatorResult] = useState<SampleResult | null>(null)
 
   const fetchServices = useCallback(async () => {
     try {
@@ -433,7 +424,6 @@ export default function ServicesPage() {
     setFormData({
       name: service.name,
       description: service.description || '',
-      documentTypeDefault: service.document_type_default,
       reviewMode: reviewModeOf(service),
       scopeIncludes: service.scope_includes || [],
       scopeExcludes: service.scope_excludes || [],
@@ -488,7 +478,6 @@ export default function ServicesPage() {
         body: JSON.stringify({
           serviceName: formData.name,
           description: formData.description,
-          documentType: formData.documentTypeDefault,
         }),
       })
 
@@ -584,148 +573,19 @@ export default function ServicesPage() {
   }
 
   /**
-   * Run Quote Simulator to preview pricing calculations
+   * The sample price on "Test & Publish" (T-189: the maths lives in lib/sample-price,
+   * where a line measured from photos is never priced at a quantity of 1)
    */
-  const runSimulator = () => {
-    const lineItems: Array<{ name: string; amount: number; calculation: string; quantitySource?: string }> = []
-    const warnings: string[] = []
-    let subtotal = 0
-
-    // Add base fee if configured
-    if (formData.baseFee > 0) {
-      lineItems.push({
-        name: 'Base Fee',
-        amount: formData.baseFee,
-        calculation: `Fixed: $${formData.baseFee.toFixed(2)}`,
-        quantitySource: 'constant',
-      })
-      subtotal += formData.baseFee
-    }
-
-    for (const step of formData.workSteps) {
-      // Check trigger condition for optional steps
-      if (step.optional && step.triggerSignal) {
-        const triggerValue = simulatorValues[step.triggerSignal]
-        if (step.triggerCondition) {
-          const { operator, value: conditionValue } = step.triggerCondition
-          let shouldTrigger = false
-
-          switch (operator) {
-            case 'exists':
-              shouldTrigger = triggerValue !== undefined && triggerValue !== ''
-              break
-            case 'not_exists':
-              shouldTrigger = triggerValue === undefined || triggerValue === ''
-              break
-            case 'equals':
-              shouldTrigger = String(triggerValue) === String(conditionValue)
-              break
-            case 'gt':
-              shouldTrigger = Number(triggerValue) > Number(conditionValue)
-              break
-            case 'gte':
-              shouldTrigger = Number(triggerValue) >= Number(conditionValue)
-              break
-            case 'lt':
-              shouldTrigger = Number(triggerValue) < Number(conditionValue)
-              break
-            case 'lte':
-              shouldTrigger = Number(triggerValue) <= Number(conditionValue)
-              break
-          }
-
-          if (!shouldTrigger) {
-            continue // Skip this optional step
-          }
-        } else {
-          // If no condition, trigger if signal has any truthy value
-          if (!triggerValue) {
-            continue
-          }
-        }
-      }
-
-      // Calculate amount based on cost type
-      let amount = step.defaultCost
-      let calculation = `Fixed: $${step.defaultCost.toFixed(2)}`
-      let quantitySource: string | undefined
-
-      if (step.costType === 'per_unit' || step.costType === 'per_hour') {
-        let quantity = 1
-        const unitLabel = step.unitLabel || (step.costType === 'per_hour' ? 'hours' : 'units')
-
-        if (step.quantitySource) {
-          switch (step.quantitySource.type) {
-            case 'form_field': {
-              const fieldValue = simulatorValues[step.quantitySource.fieldId || '']
-              if (typeof fieldValue === 'number') {
-                quantity = fieldValue
-              } else if (typeof fieldValue === 'string') {
-                const parsed = parseFloat(fieldValue)
-                if (!isNaN(parsed)) {
-                  quantity = parsed
-                }
-              }
-              quantitySource = 'form_field'
-              break
-            }
-            case 'constant':
-              quantity = step.quantitySource.value || 1
-              quantitySource = 'constant'
-              break
-            case 'ai_signal':
-              quantity = 1 // In simulator, AI signals default to 1
-              quantitySource = 'ai_signal'
-              warnings.push(`"${step.name}" uses AI signal - actual quantity will be extracted from photos`)
-              break
-          }
-        } else {
-          warnings.push(`"${step.name}" has no quantity source configured - using quantity 1`)
-          quantitySource = 'missing'
-        }
-
-        amount = quantity * step.defaultCost
-        calculation = `${quantity} ${unitLabel} × $${step.defaultCost.toFixed(2)} = $${amount.toFixed(2)}`
-      }
-
-      lineItems.push({
-        name: step.name || 'Unnamed',
-        amount,
-        calculation,
-        quantitySource,
-      })
-      subtotal += amount
-    }
-
-    // Apply multipliers
-    let multiplierAdjustment = 0
-    for (const mult of formData.multipliers) {
-      if (mult.when.fieldId && mult.when.equals) {
-        const fieldValue = simulatorValues[mult.when.fieldId]
-        if (String(fieldValue) === String(mult.when.equals)) {
-          const adjustment = subtotal * (mult.multiplier - 1)
-          multiplierAdjustment += adjustment
-          const pct = Math.round((mult.multiplier - 1) * 100)
-          const field = formData.suggestedFields.find(f => f.fieldId === mult.when.fieldId)
-          lineItems.push({
-            name: `${field?.label || mult.when.fieldId} = ${mult.when.equals}`,
-            amount: adjustment,
-            calculation: pct >= 0 ? `+${pct}% adjustment` : `${pct}% adjustment`,
-            quantitySource: 'multiplier',
-          })
-        }
-      }
-    }
-    subtotal += multiplierAdjustment
-
-    // T-165: the minimum charge is a floor, not an item. Below it the lines
-    // stay as they are, the total is the minimum, and a note says so.
-    const minimumApplies = minimumTopUp(subtotal, formData.minimumCharge) > 0
-    if (minimumApplies) subtotal = formData.minimumCharge
-
-    setSimulatorResult({ lineItems, subtotal, warnings, minimumCharge: minimumApplies ? formData.minimumCharge : null })
+  const sampleService = {
+    baseFee: formData.baseFee,
+    minimumCharge: formData.minimumCharge,
+    workSteps: formData.workSteps,
+    multipliers: formData.multipliers,
+    suggestedFields: formData.suggestedFields,
+    expectedSignals: formData.expectedSignals,
   }
-
+  const runSimulator = () => setSimulatorResult(samplePrice(sampleService, simulatorValues, currencySymbol))
+  const measured = measuredLines(sampleService, simulatorValues)
 
   const goToNextStep = async () => {
     // Validate before moving forward
@@ -829,7 +689,6 @@ export default function ServicesPage() {
           body: JSON.stringify({
             name: formData.name,
             description: formData.description || null,
-            documentTypeDefault: formData.documentTypeDefault,
             autoSend: formData.reviewMode === 'auto_send',
             holdUntilApproved: formData.reviewMode === 'hold_until_approved',
             scopeIncludes: formData.scopeIncludes,
@@ -858,7 +717,6 @@ export default function ServicesPage() {
           body: JSON.stringify({
             name: formData.name,
             description: formData.description || null,
-            documentTypeDefault: formData.documentTypeDefault,
             autoSend: formData.reviewMode === 'auto_send',
             holdUntilApproved: formData.reviewMode === 'hold_until_approved',
             scopeIncludes: formData.scopeIncludes,
@@ -950,6 +808,13 @@ export default function ServicesPage() {
               Upload Services
             </button>
             <button
+              onClick={() => setShowTemplates(true)}
+              data-testid="add-from-template"
+              className="inline-flex min-h-[44px] items-center rounded-lg border border-field bg-background px-4 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary"
+            >
+              Add from a template
+            </button>
+            <button
               onClick={openCreateModal}
               className="inline-flex min-h-[44px] items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
             >
@@ -1027,15 +892,20 @@ export default function ServicesPage() {
           >
             Add your first service
           </button>
+          <button
+            onClick={() => setShowTemplates(true)}
+            className="mt-3 inline-flex min-h-[44px] items-center text-sm font-semibold text-text-secondary underline underline-offset-2 hover:text-text-primary"
+          >
+            Or add one from a template
+          </button>
         </div>
       ) : (
         /* Services list. T-169: one row per service that stacks on a phone, so
            Edit, Disable and Delete are always on screen. Delete sits apart
            from the other two, behind a rule, and is the only red one. */
         <div className="rounded-xl border border-border bg-background">
-          <div className="hidden border-b border-border px-6 py-4 text-xs font-bold uppercase tracking-widest text-text-muted md:grid md:grid-cols-[minmax(0,1fr)_9rem_6rem_auto] md:gap-x-6" aria-hidden="true">
+          <div className="hidden border-b border-border px-6 py-4 text-xs font-bold uppercase tracking-widest text-text-muted md:grid md:grid-cols-[minmax(0,1fr)_6rem_auto] md:gap-x-6" aria-hidden="true">
             <span>Service</span>
-            <span>Document type</span>
             <span>Status</span>
             <span className="w-[17rem] text-right">Actions</span>
           </div>
@@ -1043,7 +913,7 @@ export default function ServicesPage() {
           {services.map((service) => (
             <li
               key={service.id}
-              className="flex flex-col gap-3 px-4 py-4 md:grid md:grid-cols-[minmax(0,1fr)_9rem_6rem_auto] md:items-center md:gap-x-6 md:px-6"
+              className="flex flex-col gap-3 px-4 py-4 md:grid md:grid-cols-[minmax(0,1fr)_6rem_auto] md:items-center md:gap-x-6 md:px-6"
               data-testid="service-row"
               data-active={service.active ? 'true' : 'false'}
             >
@@ -1055,9 +925,6 @@ export default function ServicesPage() {
                 {service.description && <p className="mt-0.5 truncate text-sm text-text-muted">{service.description}</p>}
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-secondary md:contents">
-                <span>
-                  {DOCUMENT_TYPES.find((d) => d.value === service.document_type_default)?.label || service.document_type_default}
-                </span>
                 <span>
                   <span
                     className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
@@ -1233,28 +1100,6 @@ export default function ServicesPage() {
                       <p className="mt-1 text-xs text-text-muted">
                         A good description helps AI generate better defaults for the next steps
                       </p>
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-secondary">
-                        Default Document Type
-                      </label>
-                      <select
-                        value={formData.documentTypeDefault}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            documentTypeDefault: e.target.value as DocumentType,
-                          })
-                        }
-                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
-                      >
-                        {DOCUMENT_TYPES.map((type) => (
-                          <option key={type.value} value={type.value}>
-                            {type.label}
-                          </option>
-                        ))}
-                      </select>
                     </div>
 
                     {/* T-147: how new estimates reach the customer */}
@@ -1875,8 +1720,34 @@ export default function ServicesPage() {
                             </label>
                           </div>
                         ))}
+                        {/* T-189: a line measured from the customer's photos has no size here. Its own box
+                            offers a sample size from the service's own range, or takes one to try. */}
+                        {measured.map((line) => (
+                          <div key={line.key} data-testid="sample-size">
+                            <label htmlFor={line.key} className="mb-1 block text-sm text-text-secondary">
+                              {line.name} ({line.unit})
+                            </label>
+                            <input
+                              id={line.key}
+                              type="number"
+                              min={0}
+                              value={(simulatorValues[line.key] as number) || ''}
+                              onChange={(e) => {
+                                setSimulatorValues(prev => ({ ...prev, [line.key]: parseFloat(e.target.value) || 0 }))
+                                setSimulatorResult(null)
+                              }}
+                              placeholder={line.suggested !== null ? String(line.suggested) : 'Size to try'}
+                              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
+                            />
+                            <p className="mt-1 text-xs text-text-muted">
+                              {line.suggested !== null
+                                ? `Measured from the customer's photos. The sample uses ${line.suggested.toLocaleString('en-US')} ${line.unit} unless you type another size.`
+                                : "Measured from the customer's photos. Type a size to see a sample price."}
+                            </p>
+                          </div>
+                        ))}
                       </div>
-                      {formData.suggestedFields.length === 0 && (
+                      {formData.suggestedFields.length === 0 && measured.length === 0 && (
                         <p className="text-sm text-text-muted">
                           No customer questions defined. Go back to add questions that affect pricing.
                         </p>
@@ -1905,16 +1776,22 @@ export default function ServicesPage() {
                                 {item.quantitySource === 'constant' && (
                                   <span className="rounded-sm bg-secondary-light px-1.5 py-0.5 text-xs text-secondary">fixed</span>
                                 )}
-                                {item.quantitySource === 'ai_signal' && (
-                                  <span className="rounded-sm bg-tertiary-light px-1.5 py-0.5 text-xs font-semibold text-tertiary">AI</span>
+                                {item.quantitySource === 'photos' && (
+                                  <span className="rounded-sm border border-border px-1.5 py-0.5 text-xs text-text-secondary">{item.sample ? 'sample size' : 'from photos'}</span>
                                 )}
                                 {item.quantitySource === 'missing' && (
                                   <span className="rounded-sm bg-danger-light px-1.5 py-0.5 text-xs text-danger">no source</span>
                                 )}
                               </div>
                               <div className="text-right">
-                                <span className="font-medium text-text-primary">${item.amount.toFixed(2)}</span>
-                                <span className="ml-2 text-text-muted">({item.calculation})</span>
+                                {item.amount !== null ? (
+                                  <>
+                                    <span className="font-medium text-text-primary">{currencySymbol}{item.amount.toFixed(2)}</span>
+                                    <span className="ml-2 text-text-muted">({item.calculation})</span>
+                                  </>
+                                ) : (
+                                  <span className="text-text-secondary" data-testid="sample-rate">{item.calculation}, priced from the customer&apos;s photos</span>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -1927,10 +1804,22 @@ export default function ServicesPage() {
                                 {minimumChargeNote(currencySymbol + simulatorResult.minimumCharge.toFixed(2))}
                               </p>
                             )}
-                            <div className="flex items-center justify-between font-medium">
-                              <span className="text-text-primary">Total</span>
-                              <span className="text-lg text-text-primary">${simulatorResult.subtotal.toFixed(2)}</span>
-                            </div>
+                            {simulatorResult.unmeasured.length > 0 ? (
+                              <div className="flex items-center justify-between font-medium" data-testid="sample-total">
+                                <span className="text-text-primary">Total</span>
+                                <span className="text-text-primary">
+                                  {simulatorResult.subtotal > 0 ? `${currencySymbol}${simulatorResult.subtotal.toFixed(2)} + the lines priced from photos` : 'Priced from the photos'}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between font-medium" data-testid="sample-total">
+                                <span className="text-text-primary">{simulatorResult.sampled.length > 0 ? 'Sample total' : 'Total'}</span>
+                                <span className="text-lg text-text-primary">{currencySymbol}{simulatorResult.subtotal.toFixed(2)}</span>
+                              </div>
+                            )}
+                            {sampleNote(simulatorResult) && (
+                              <p className="mt-2 text-sm text-text-secondary" data-testid="sample-note">{sampleNote(simulatorResult)}</p>
+                            )}
                           </div>
                         </div>
 
@@ -2098,6 +1987,21 @@ export default function ServicesPage() {
         open={showBulkUpload}
         onClose={() => setShowBulkUpload(false)}
         onServicesCreated={fetchServices}
+      />
+
+      {/* T-189: a trade template's service, added after setup. It opens at its prices, which are a starting point. */}
+      <TemplatePicker
+        open={showTemplates}
+        region={region}
+        ownedNames={services.map((s) => s.name)}
+        money={(n) => `${currencySymbol}${n % 1 === 0 ? n.toFixed(0) : n.toFixed(2)}`}
+        onClose={() => setShowTemplates(false)}
+        onAdded={(service) => {
+          setShowTemplates(false)
+          fetchServices()
+          openEditModal(service)
+          setActiveStep('pricing')
+        }}
       />
     </div>
   )

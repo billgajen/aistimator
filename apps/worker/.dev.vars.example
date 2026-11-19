@@ -27,3 +27,6 @@ ENVIRONMENT=development
 # AI_TIMEOUT_WORDING_MS=30000
 # AI_TIMEOUT_ADDONS_MS=20000
 # AI_TIMEOUT_CHECKER_MS=30000
+
+# T-189: the owner's alert address (see apps/web/.env.example). Empty = alerts off.
+# ALERT_EMAIL=

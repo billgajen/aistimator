@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { normalizeFieldOption } from '@/lib/field-options'
 import { type NextRequest, NextResponse } from 'next/server'
 import type {
-  DocumentType,
   ServiceMediaConfig,
   WorkStepConfig,
   ExpectedSignalConfig,
@@ -128,7 +127,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       name,
       description,
       active,
-      documentTypeDefault,
       autoSend,
       holdUntilApproved,
       scopeIncludes,
@@ -143,7 +141,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       name?: string
       description?: string | null
       active?: boolean
-      documentTypeDefault?: DocumentType
       /** T-146: send quotes without business review */
       autoSend?: boolean
       /** T-147: hide the estimate until approved */
@@ -201,9 +198,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       updates.hold_until_approved = holdUntilApproved
       if (holdUntilApproved && autoSend === undefined) updates.auto_send = false
     }
-    if (documentTypeDefault !== undefined) {
-      updates.document_type_default = documentTypeDefault
-    }
+    // T-189: a `documentTypeDefault` from an older caller is ignored: there is one document style
     if (scopeIncludes !== undefined) {
       updates.scope_includes = scopeIncludes
     }

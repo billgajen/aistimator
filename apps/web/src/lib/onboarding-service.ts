@@ -23,7 +23,6 @@ export function servicePayload(svc: Omit<DraftService, 'selected'>) {
   return {
     name: svc.name,
     description: svc.description,
-    documentTypeDefault: 'instant_estimate' as const,
     scopeIncludes: svc.draft.scope.included,
     scopeExcludes: svc.draft.scope.excluded,
     defaultAssumptions: svc.draft.scope.assumptions,

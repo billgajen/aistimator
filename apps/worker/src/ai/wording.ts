@@ -64,11 +64,6 @@ export interface FormAnswerWithMeta {
 }
 
 /**
- * Document type for tone/style selection
- */
-export type DocumentTone = 'instant_estimate' | 'formal_quote' | 'proposal' | 'sow'
-
-/**
  * Context for wording generation
  */
 export interface WordingContext {
@@ -85,8 +80,6 @@ export interface WordingContext {
   formAnswers?: FormAnswerWithMeta[]
   /** Customer's project description from the widget form */
   projectDescription?: string
-  /** Document type for tone selection */
-  documentType?: DocumentTone
   /** Error code reported by customer (e.g., boiler error code "EA", "F1") */
   errorCode?: string
   /** Learning context from business editing patterns (affects wording, not pricing) */
@@ -120,54 +113,36 @@ IMPORTANT RULES:
 7. The scopeSummary is part of a commercial document. Its first sentence states the work to be done. Never open it with a greeting, an introduction, or a remark about the estimate or quote itself.`
 
 /**
- * T-183: how the scope summary opens, said once, for every document type.
+ * T-183: how the scope summary opens.
  * It names no service and no business: only the shape of the first sentence.
  */
 export const SCOPE_SUMMARY_OPENING_RULE =
   'scopeSummary: plain and professional. The first sentence states the work to be done. Do not open with a greeting, an introduction, or a remark about the estimate or quote itself.'
 
 /**
- * Document type specific tone instructions
+ * T-189: one style for every quote.
+ *
+ * A service used to carry a "document type" (instant estimate, formal quote,
+ * proposal, statement of work). It changed these few lines of the prompt and
+ * nothing else: the price, the page, the PDF and the title were the same. The
+ * choice is gone. Every quote is written plain, brief and professional (what
+ * the instant estimate was). The words never call the quote binding: it is an
+ * estimate from the details given, and the business confirms it.
+ *
+ * The column a service and a quote still carry (`document_type_default`,
+ * `document_type`) is not read here or anywhere else.
  */
-const DOCUMENT_TYPE_TONES: Record<DocumentTone, string> = {
-  instant_estimate: `
+export const DOCUMENT_STYLE = `
 TONE: Plain and Brief
 - Use plain, professional language; short sentences
 - Keep it brief and to the point
 - This is an estimate from the details provided, so the assumptions should say what it rests on
-- Do not use chatty openers or filler phrases`,
+- Do not use chatty openers or filler phrases`
 
-  formal_quote: `
-TONE: Professional and Clear
-- Use standard business language
-- Be thorough but not verbose
-- This is a binding quote, so be precise
-- Maintain professional courtesy throughout`,
-
-  proposal: `
-TONE: Persuasive and Value-Focused
-- Emphasize the value and benefits of choosing this service
-- Use confident, solution-oriented language
-- Use phrases like "We propose", "Our solution includes", "The benefits of working with us"
-- Include reasons why the customer should choose this business
-- Be professional but slightly more sales-oriented`,
-
-  sow: `
-TONE: Technical and Detailed
-- Use precise, technical language appropriate for the industry
-- Be very specific about scope, deliverables, and responsibilities
-- Use phrases like "The scope of work includes", "Deliverables", "Project specifications"
-- Include clear boundaries of what is and isn't included
-- This is a formal document, maintain a technical/legal tone`,
-}
-
-/**
- * Get system prompt based on document type
- */
-export function getSystemPrompt(documentType?: DocumentTone): string {
-  const toneInstructions = documentType ? DOCUMENT_TYPE_TONES[documentType] : DOCUMENT_TYPE_TONES.formal_quote
+/** The system prompt for a quote's wording: the same for every quote */
+export function getSystemPrompt(): string {
   return `${WORDING_SYSTEM_PROMPT_BASE}
-${toneInstructions}`
+${DOCUMENT_STYLE}`
 }
 
 /**
@@ -437,7 +412,7 @@ export async function generateWording(
     const content = await client.generateWithSchema<QuoteContent>(
       prompt,
       QUOTE_CONTENT_SCHEMA,
-      getSystemPrompt(context.documentType)
+      getSystemPrompt()
     )
     return validateContent(content, context)
   } catch (error) {
@@ -445,7 +420,7 @@ export async function generateWording(
 
     // Fallback: use text-based generation + parseJSON
     try {
-      const response = await client.generateText(prompt, getSystemPrompt(context.documentType))
+      const response = await client.generateText(prompt, getSystemPrompt())
       const content = GeminiClient.parseJSON<QuoteContent>(response)
       return validateContent(content, context)
     } catch (fallbackError) {

@@ -229,7 +229,6 @@ export function BulkServiceUpload({ open, onClose, onServicesCreated }: BulkServ
           body: JSON.stringify({
             name: svc.name,
             description: svc.description,
-            documentTypeDefault: 'instant_estimate',
             scopeIncludes: svc.draft.scope.included,
             scopeExcludes: svc.draft.scope.excluded,
             defaultAssumptions: svc.draft.scope.assumptions,

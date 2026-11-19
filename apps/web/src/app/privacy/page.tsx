@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { PRODUCT_NAME, SUPPORT_EMAIL, operatorStatement } from '@qolumns/shared'
+import { subProcessorSentence } from '@/lib/legal/sub-processors'
 
 export const metadata: Metadata = {
   title: `Privacy Policy — ${PRODUCT_NAME}`,
@@ -15,7 +16,7 @@ const SECTIONS = [
   },
   {
     title: '2. What we collect',
-    body: 'For enquiries: contact details you provide (name, email, phone), job details, photos and documents you upload, and messages you send. For account holders: your login email, business configuration and billing details (payment cards are handled by Stripe and never touch our servers). We also collect basic technical logs (IP address, timestamps) for security and rate limiting.',
+    body: 'For enquiries: contact details you provide (name, email, phone), job details, photos and documents you upload, and messages you send. For account holders: your login email, business configuration and billing details (payment cards are handled by Stripe and never touch our servers). When a business signs up we also keep how it found us: the site it came from, any campaign tags on the link it followed, and the first page of ours it opened. We also collect basic technical logs (IP address, timestamps) for security and rate limiting.',
   },
   {
     title: '3. How photos and AI are used',
@@ -23,7 +24,8 @@ const SECTIONS = [
   },
   {
     title: '4. Where data lives',
-    body: 'Data is stored with our infrastructure providers: Supabase (database, EU region), Cloudflare (file storage and processing), Vercel (hosting), Stripe (payments), Postmark (email), Google (AI processing) and, for a business that connects its WhatsApp number, Meta (WhatsApp messages to and from that number). Uploads are stored privately and served only via time-limited signed links or the controlled quote page. Each business sees only its own customers’ details and photos; no other business can.',
+    // T-189: the providers are read from the one list the Terms' data-processing section prints
+    body: `Data is handled for us by these providers, each only for the job named: ${subProcessorSentence()} Uploads are stored privately and served only via time-limited signed links or the controlled quote page. Each business sees only its own customers’ details and photos; no other business can.`,
   },
   {
     title: '5. How long we keep it',
@@ -35,7 +37,7 @@ const SECTIONS = [
   },
   {
     title: '7. Cookies',
-    body: 'On our own marketing pages (not the dashboard, and never on the quote pages and widgets our customers send to their customers) we may use the Meta Pixel and Meta Conversions API to measure our advertising; this sets Meta cookies, and the email you sign up with is sent to Meta only as a one-way hash. If your browser sends a Global Privacy Control signal, the Pixel is not loaded. The dashboard uses strictly necessary cookies for login sessions. Anti-bot verification on quote submission may set a cookie from Cloudflare Turnstile solely to distinguish humans from bots.',
+    body: 'On our own marketing pages (not the dashboard, and never on the quote pages and widgets our customers send to their customers) we may use the Meta Pixel and Meta Conversions API to measure our advertising; this sets Meta cookies, and the email you sign up with is sent to Meta only as a one-way hash. If your browser sends a Global Privacy Control signal, the Pixel is not loaded. To know how a new business found us, your browser tab remembers the site you came from, any campaign tags on the link and the first page you opened, until you close the tab. This is not a cookie, holds nothing that identifies you, and reaches us only if you sign up. The dashboard uses strictly necessary cookies for login sessions. Anti-bot verification on quote submission may set a cookie from Cloudflare Turnstile solely to distinguish humans from bots.',
   },
   {
     title: '8. Contact',
@@ -52,7 +54,7 @@ export default function PrivacyPage() {
         <h1 className="font-display text-4xl font-extrabold tracking-tight text-text-primary">
           Privacy Policy
         </h1>
-        <p className="mt-3 text-sm text-text-muted">Last updated: 17 November 2026</p>
+        <p className="mt-3 text-sm text-text-muted">Last updated: 19 November 2026</p>
         {/* T-177: who runs the product. The company number comes from NEXT_PUBLIC_COMPANY_NUMBER. */}
         <p className="mt-3 leading-relaxed text-text-secondary" data-testid="operator">
           {operatorStatement(process.env.NEXT_PUBLIC_COMPANY_NUMBER)}

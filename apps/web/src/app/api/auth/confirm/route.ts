@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import type { AuthLinkType } from '@/lib/auth-flow'
+import { saveSignupSource } from '@/lib/signup-choices'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +34,10 @@ export async function POST(request: Request) {
   if (!rate.allowed) return to('/login?notice=too-many')
 
   const supabase = await createClient()
-  const { error } = await supabase.auth.verifyOtp({ type: kind, token_hash: tokenHash })
+  const { data, error } = await supabase.auth.verifyOtp({ type: kind, token_hash: tokenHash })
   if (error) return to(AFTER[kind].failed)
+  // T-189: the business now exists (the database made it as the address was confirmed):
+  // keep where it came from. Never stops the sign-in.
+  if (kind === 'signup' && data.user) await saveSignupSource(data.user.id, data.user.user_metadata)
   return to(AFTER[kind].ok)
 }

@@ -166,6 +166,25 @@ routes, one webhook and one admin route. Plan numbers come from `packages/shared
   room, **403** `ACCOUNT_PAUSED` when the business is suspended. A lead priced here is now counted.
 - `GET /api/whatsapp/config` `access.why` can also be `suspended`.
 
+## T-189: templates, sign-up source, alerts
+
+- **A service from a template** uses `POST /api/services` with the body setup sends (`servicePayload`); there
+  is no new route. The list and its starting prices are built in the browser from the packs
+  (`lib/service-templates.ts`).
+- **`POST /api/auth/signup`** takes an optional `source`: `{ utm?: { source, medium, campaign, term, content },
+  referrer?, landing?, at? }`. The server keeps only those keys, as short plain strings, the referrer as a host
+  and the landing page as a path; anything else is dropped. It is never required and never a reason to refuse.
+- **`POST /api/auth/confirm`**, for a sign-up, writes that source to `tenants.signup_source` once (migration
+  45; server-only, a trigger refuses any other writer). A failure to write it never stops the sign-in.
+- **`GET /api/admin/tenants`** items gain `cameFrom`: one line ("newsletter / email / launch · from
+  example.org · first page /pricing", "came directly · first page /", or "Not recorded").
+- **Alerts** have no route. The worker and the web app email `ALERT_EMAIL` (unset = off) through
+  `claim_ops_alert(p_kind, p_every_seconds)` (migration 45, service role only), which returns `send` and
+  `held_back`. Kinds: `quote_failed`, `worker_error`, `queue_backed_up`. The worker gains a `scheduled`
+  handler (production: every 5 minutes) that reads waiting quotes and changes none.
+- **The public quote's price lines**: the customer's page words an added line from the line's `source`
+  (`seen` / `words`), not from `recommendationReason`, which is still sent and no longer shown.
+
 ## Account routes (T-173)
 The browser does not call Supabase's auth directly. All answer `{ "ok": true }` or the standard error envelope.
 - `POST /api/auth/signup` `{ "email", "password", "businessName", "plan"?, "turnstileToken"?, "website"? }`.
@@ -491,8 +510,12 @@ Service object:
   "serviceId": "svc_1",
   "name": "Patio Cleaning",
   "active": true,
-  "documentTypeDefault": "formal_quote"
+  "documentTypeDefault": "instant_estimate"
 }
+
+T-189 (AD-070): `documentTypeDefault` is stored and returned but read by nothing: every quote has one style. A
+create or update that sends it is accepted and the value ignored. `POST /api/services/ai-draft` no longer reads
+`documentType`.
 
 PUT /api/services/:serviceId/pricing
 

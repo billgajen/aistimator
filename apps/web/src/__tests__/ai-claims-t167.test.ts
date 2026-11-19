@@ -16,7 +16,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'fs'
 import { join } from 'path'
-import { findConfidenceLanguage } from '@qolumns/shared'
+import { addedForCustomer, findConfidenceLanguage } from '@qolumns/shared'
 import { CAPABILITIES, CLAIM_WORDS, NOT_YET_ON_A_PAGE, recordedClaims, type Capability } from '@/lib/marketing/ai-claims'
 import * as homeCopy from '@/lib/marketing/home-copy'
 import * as featuresCopy from '@/lib/marketing/features-copy'
@@ -270,8 +270,10 @@ describe('T-167: the screens on marketing pages say the product’s own words', 
 
   it('the estimate: breakdown, the added line, the measurement block, the range', () => {
     expect(quote).toContain(`<SectionLabel>${SCREEN_WORDS.estimate.breakdown}</SectionLabel>`)
-    expect(quote).toContain('Added for you{item.recommendationReason ? ` — ${item.recommendationReason.toLowerCase()}`')
-    expect(SCREEN_WORDS.estimate.added).toBe('Added for you — detected from your description')
+    // T-189: the added line's words come from its real source (photos or description), by one shared function
+    expect(quote).toContain('{addedForCustomer(item.source)}')
+    expect(SCREEN_WORDS.estimate.added).toBe('Added for you — from your description')
+    expect(SCREEN_WORDS.estimate.added).toBe(addedForCustomer('words'))
     expect(read('apps/worker/src/ai/signals.ts') + read('apps/worker/src/pricing/rules-engine.ts') + read('apps/worker/src/quote-processor.ts')).toContain('Detected from your description')
     expect(quote).toContain('Measurement &amp; takeoff')
     expect(quote).toContain(SCREEN_WORDS.estimate.takeoffLead)

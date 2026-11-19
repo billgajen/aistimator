@@ -338,6 +338,7 @@ export interface ServiceResponse {
   serviceId: string
   name: string
   active: boolean
+  /** T-189: stored, never read: every quote has the one document style */
   documentTypeDefault: DocumentType
 }
 

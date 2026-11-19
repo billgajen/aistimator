@@ -3,7 +3,7 @@
  * the route (T-153) so the demo seed script creates its services exactly the
  * way the dashboard does. Relative imports only: scripts load this with tsx.
  */
-import type { DocumentType, ServiceMediaConfig, WorkStepConfig, ExpectedSignalConfig, ServiceDraftConfig, AddonConfig, MultiplierConfig } from '@qolumns/shared'
+import type { ServiceMediaConfig, WorkStepConfig, ExpectedSignalConfig, ServiceDraftConfig, AddonConfig, MultiplierConfig } from '@qolumns/shared'
 import { normalizeFieldOption } from './field-options'
 
 export interface ServiceCreateBody {
@@ -13,7 +13,8 @@ export interface ServiceCreateBody {
   holdUntilApproved?: boolean
   name: string
   description?: string | null
-  documentTypeDefault?: DocumentType
+  /** T-189: accepted from older callers and ignored: every quote has the one style */
+  documentTypeDefault?: unknown
   scopeIncludes?: string[]
   scopeExcludes?: string[]
   defaultAssumptions?: string[]
@@ -49,7 +50,7 @@ export function serviceInsertRow(tenantId: string, body: ServiceCreateBody, now 
     name: body.name.trim(),
     description: body.description || null,
     active: true,
-    document_type_default: body.documentTypeDefault || 'instant_estimate',
+    // T-189: there is one document style. The column keeps the database's own default and is not read.
     auto_send: body.autoSend === true,
     hold_until_approved: body.holdUntilApproved === true && body.autoSend !== true,
     scope_includes: body.scopeIncludes || [],

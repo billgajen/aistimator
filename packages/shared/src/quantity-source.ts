@@ -249,3 +249,16 @@ export function anyMeasuredFromPhotos(codes: ReadonlyArray<LineSource | null>): 
   if (!codes.some((code) => code !== null)) return undefined
   return codes.some((code) => code === 'photos' || code === 'label')
 }
+
+/**
+ * T-189: what the customer reads under a line the product added for them, from
+ * the line's real source. An extra the photos called for used to read "detected
+ * from your description" (the pricing engine's one reason for every added
+ * extra). A line whose source was never stored (a quote from before T-188)
+ * says only that it was added: nothing is claimed that is not known.
+ */
+export function addedForCustomer(source: unknown): string {
+  if (source === 'seen') return 'Added for you — from your photos'
+  if (source === 'words') return 'Added for you — from your description'
+  return 'Added for you'
+}

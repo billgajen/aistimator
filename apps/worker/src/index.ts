@@ -9,13 +9,14 @@
 import { createRateLimiter } from './rate-limiter'
 import { handleQuoteJob } from './queue-consumer'
 import { markQuoteFailed } from './failed-quote'
+import { checkQueue, sendOpsAlert } from './ops-alert'
 import { priceSection } from './section-pricing'
 import type { PriceSectionInput } from './section-pricing'
 import type { RateLimiter } from './rate-limiter'
 import { getSupabaseClient, updateQuoteStatus } from './supabase'
 import { processQuote } from './quote-processor'
 import { authorizeJobRequest } from './auth'
-import { PRODUCT_NAME } from '@qolumns/shared'
+import { PRODUCT_NAME, errorNameOf } from '@qolumns/shared'
 import { aiStandInOn } from './ai/client'
 
 export interface Env {
@@ -67,6 +68,8 @@ export interface Env {
   POSTMARK_API_TOKEN?: string
   POSTMARK_FROM_EMAIL?: string
   APP_URL?: string
+  /** T-189: the owner's alert address (ops-alert.ts). Not set: alerts are off. */
+  ALERT_EMAIL?: string
 
   // T-179, local checks only (ignored unless ENVIRONMENT=development): a stand-in
   // for the model that reads a customer's note for other services
@@ -108,6 +111,17 @@ const BASE_DELAY_SECONDS = 30
 function getBackoffDelay(retryCount: number): number {
   // Exponential backoff: 30s, 60s, 120s
   return BASE_DELAY_SECONDS * Math.pow(2, retryCount)
+}
+
+/**
+ * T-189: tell the owner the worker itself went wrong (not a quote that could not be priced:
+ * failed-quote.ts reports that). Only where it happened and the error's name are sent.
+ */
+async function workerError(env: Env, where: string, error: unknown): Promise<void> {
+  await sendOpsAlert(getSupabaseClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY), env, {
+    kind: 'worker_error',
+    details: { Where: where, Error: typeof error === 'string' ? error : errorNameOf(error) },
+  })
 }
 
 function jsonResponse(body: unknown, status: number): Response {
@@ -199,6 +213,7 @@ export default {
 
       if (!env.QUOTE_JOBS) {
         console.error('[Worker] /trigger called but the QUOTE_JOBS queue is not bound')
+        await workerError(env, 'the queue is not bound to the worker', 'configuration')
         return jsonResponse({ error: 'Queue not configured' }, 503)
       }
 
@@ -206,6 +221,7 @@ export default {
         await env.QUOTE_JOBS.send(body)
       } catch (error) {
         console.error('[Worker] Queue send failed:', error instanceof Error ? error.message : error)
+        await workerError(env, 'a request could not be put on the queue', error)
         return jsonResponse({ error: 'Queue send failed' }, 502)
       }
       return jsonResponse({ success: true, message: 'Job enqueued' }, 200)
@@ -259,6 +275,7 @@ export default {
         return jsonResponse({ success: true, total: result.pricing?.total }, 200)
       } catch (error) {
         console.error('[Worker] Reprice error:', error instanceof Error ? error.message : error)
+        await workerError(env, 'pricing a quote again after an answer', error)
         return jsonResponse({ success: false, error: 'Reprice failed' }, 500)
       }
     }
@@ -346,21 +363,43 @@ export default {
 
     if (!supabase) {
       console.error('[Worker] Supabase not configured, retrying all messages')
+      await workerError(env, 'the worker has no database settings', 'configuration')
       batch.retryAll()
       return
     }
 
     for (const message of batch.messages) {
-      // T-178: the rules for one job (limiter fails open, retries, failure) are in queue-consumer.ts
-      await handleQuoteJob<QuoteJobMessage>(message, {
-        limiter: rateLimiter,
-        process: (job, queueWaitMs) => processQuoteJob(job, supabase, env, queueWaitMs),
-        markFailed: async (job, error) => {
-          await markQuoteFailed(supabase, env, job.quoteId, error)
-        },
-        maxRetries: MAX_RETRIES,
-        backoffSeconds: getBackoffDelay,
-      })
+      try {
+        // T-178: the rules for one job (limiter fails open, retries, failure) are in queue-consumer.ts
+        await handleQuoteJob<QuoteJobMessage>(message, {
+          limiter: rateLimiter,
+          process: (job, queueWaitMs) => processQuoteJob(job, supabase, env, queueWaitMs),
+          markFailed: async (job, error) => {
+            await markQuoteFailed(supabase, env, job.quoteId, error)
+          },
+          maxRetries: MAX_RETRIES,
+          backoffSeconds: getBackoffDelay,
+        })
+      } catch (error) {
+        // handleQuoteJob deals with a job's own failure; this is the consumer itself going wrong
+        console.error(`[Worker] Queue consumer error: ${errorNameOf(error)}`)
+        await workerError(env, 'taking a request off the queue', error)
+        message.retry()
+      }
+    }
+  },
+
+  // T-189: the queue check, on a timer (wrangler.toml, [triggers]). It emails the owner when
+  // requests have been waiting too long. It prices nothing and changes no quote.
+  async scheduled(_event: ScheduledEvent, env: Env): Promise<void> {
+    const supabase = getSupabaseClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY)
+    if (!supabase) return
+    try {
+      const result = await checkQueue(supabase, env)
+      if (result.waiting > 0) console.log(`[Alert] Queue check: ${result.waiting} waiting, ${result.stuck} since the last check (${result.alert})`)
+    } catch (error) {
+      console.error(`[Worker] Queue check error: ${errorNameOf(error)}`)
+      await workerError(env, 'the check of waiting requests', error)
     }
   },
 }

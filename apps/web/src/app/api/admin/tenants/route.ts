@@ -1,3 +1,4 @@
+import { signupSourceLine } from '@/lib/signup-source'
 import { createAdminClient } from '@/lib/supabase/server'
 import { isFreeTestAccount } from '@qolumns/shared'
 import { verifyAdmin } from '@/lib/admin'
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
         created_at,
         updated_at,
         suspended_at,
+        signup_source,
         subscriptions!tenant_id (
           status,
           stripe_customer_id,
@@ -117,6 +119,8 @@ export async function GET(request: Request) {
         quoteCount: quoteCounts[tenant.id] || 0,
         // T-180: the suspend switch, and a plan nobody pays for (never revenue)
         suspendedAt: (tenant as { suspended_at?: string | null }).suspended_at ?? null,
+        // T-189: where the business came from, in one line
+        cameFrom: signupSourceLine((tenant as { signup_source?: unknown }).signup_source),
         testAccount: isFreeTestAccount(subscription as { status?: string; stripe_customer_id?: string | null; stripe_subscription_id?: string | null } | null),
       }
     })

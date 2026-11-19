@@ -55,6 +55,7 @@ export * from './business-email'
 export * from './email-from'
 export * from './minimum-charge'
 export * from './failed-request'
+export * from './ops-alerts'
 export * from './service-suggestion'
 // T-179: one request, several services
 export * from './quote-sections'

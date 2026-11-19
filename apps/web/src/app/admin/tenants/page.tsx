@@ -14,6 +14,8 @@ interface TenantItem {
   quoteCount: number
   suspendedAt: string | null
   testAccount: boolean
+  /** T-189: where the business came from at sign-up, in one line */
+  cameFrom?: string
 }
 
 export default function AdminTenantsPage() {
@@ -172,8 +174,11 @@ export default function AdminTenantsPage() {
                 <td className="whitespace-nowrap px-4 py-3 text-sm text-text-primary">
                   {tenant.quoteCount}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-sm text-text-muted">
-                  {new Date(tenant.createdAt).toLocaleDateString()}
+                <td className="px-4 py-3 text-sm text-text-muted">
+                  <div className="whitespace-nowrap">{new Date(tenant.createdAt).toLocaleDateString()}</div>
+                  {tenant.cameFrom && (
+                    <div className="mt-0.5 max-w-[16rem] text-xs text-text-muted" data-testid="came-from">{tenant.cameFrom}</div>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-sm">
                   <Link

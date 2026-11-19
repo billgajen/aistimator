@@ -74,20 +74,24 @@ Code for every item is already built; these are the steps that unlock it.
   2026-11-08): internal notes shown to customers, raw unit labels,
   "worth considering" duplicating scope items, clarification page + email styling, "Powered by Estimator" name.
 - **Product backlog, added 2026-11-09 (not built; owner-requested, park until scheduled):**
-  1. **Document types are cosmetic.** Instant Estimate / Formal Quote / Proposal / Statement of Work change only the
+  1. ~~Document types are cosmetic.~~ **Done another way in T-189 (your decision): the choice is removed and
+     every quote has one style.** The note as written: Instant Estimate / Formal Quote / Proposal / Statement of Work change only the
      AI wording tone; price, layout, PDF and title are identical. Give each a real format: Proposal (phases, timeline,
      options), SOW (deliverables, milestones, terms), Formal Quote (full terms and an acceptance block). Until then,
      consider hiding Proposal and SOW from the selector.
   2. **Model comparison for service setup.** Compare `gemini-3.8-flash` vs `gemini-3.1-pro-preview` on the compile and
      service-setup scenarios (AI draft, refine, website extract). Switch only if Pro is clearly better (owner rule: current
      vs one candidate).
-  3. **"Test & Publish" preview prices photo-measured quantities at 1** (e.g. 1 m² walls → $18 + minimum top-up), which
+  3. ~~"Test & Publish" preview prices photo-measured quantities at 1.~~ **Fixed in T-189: a sample size from
+     the service's own range, or a plain statement.** Not built: low / typical / high, the source switch and
+     "Test with a photo". The note as written: **"Test & Publish" preview prices photo-measured quantities at 1** (e.g. 1 m² walls → $18 + minimum top-up), which
      looks broken. Pre-fill a typical value from the pack's plausibility envelope (editable, labelled "from photos —
      sample"), show low / typical / high prices, add a per-quantity source switch (Photos only / Ask customer / Both),
      and an optional "Test with a photo" upload.
   4. **Painting accuracy: fix the photo scale.** Ask the customer for one known measurement (e.g. house width) and use it
      as the measurement anchor, so the wall area doesn't hinge on the door-size assumption.
-  5. **"Add service" has no template picker.** Pack templates (`lib/vertical-packs/`) only appear in onboarding
+  5. ~~"Add service" has no template picker.~~ **Done in T-189: "Add from a template" on the services page.**
+     The note as written: **"Add service" has no template picker.** Pack templates (`lib/vertical-packs/`) only appear in onboarding
      (`OnboardingFlow.tsx`), so an existing business can't add one later (e.g. an HVAC company adding water heaters).
      Let "Add service" start from any pack template, with the pack's signal specs, questions and `TODO-OWNER` rates
      to review, the same as onboarding. (Owner confirmed 2026-11-09 after the production AC test: "Add service from template".)
@@ -2933,9 +2937,8 @@ In `apps/web/src/lib/marketing/plan-claims.ts`, set `live: true` on the line, an
 
 ## T-188 — Questions with choices and a note, honest line sources, small leftovers
 
-Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-188" (worker, then web; no
-migration). **Deploy before you test the app:** the choices are built by the worker, so a quote priced before
-the deploy still has the old kind of question.
+**Deployed by you on 19 November 2026:** the worker, then the web. No migration. Everything below is live. A
+quote priced before the deploy keeps the old kind of question.
 
 I have still not seen the app run: there is no iPhone, simulator or Xcode on this machine.
 
@@ -2995,3 +2998,67 @@ I have still not seen the app run: there is no iPhone, simulator or Xcode on thi
 
 - The customer still reads "Added for you — detected from your description" on an extra the photos called
   for. This ticket fixed what the business reads; the customer's line is a separate, small change.
+
+## T-189 — Backlog fixes before launch
+
+Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-189", in this order: migration
+45, the worker, the web.
+
+### One setting to add (both places, same value)
+
+- `ALERT_EMAIL`: the address the alerts go to. On the worker: `wrangler secret put ALERT_EMAIL --env
+  production`. On Vercel: an environment variable of the same name.
+- **To turn alerts off:** remove it from both. With no address nothing is sent. To stop only the check of
+  waiting requests, take the `[env.production.triggers]` block out of `apps/worker/wrangler.toml` and deploy
+  the worker.
+
+### Legal check before launch
+
+- [ ] **Have the Terms' new section "7. Data processing" read by someone qualified.** I wrote it from what the
+  code does. The two things it promises that no page promised before: we tell you "without undue delay" if a
+  breach affects your customers' data, and a business can ask for a data-processing agreement at the support
+  address. **You will need an agreement ready to send when someone asks.**
+- [ ] The same read should cover the list of providers. It now names DocRaptor (PDFs) and Upstash (counting
+  requests to stop abuse), which the Privacy Policy had left out. It says the database is held in the EU, as
+  the Privacy Policy already did: please confirm that in Supabase.
+- [ ] Things the section does not cover, for the same person to decide: transfers of data outside the UK, how
+  much notice you give before adding a provider, and audits.
+- Text messages are not on the list because they are not offered. If they ever are, a business connects its own
+  Twilio account.
+
+### What to look at (after the deploy)
+
+- [ ] **Services → edit a service priced from photos → Test & Publish.** The sample shows a size from the
+  service's own range ("Sample total"), or says the price comes from the customer's photos. Never 1 × the rate.
+- [ ] **Services:** no "Document type" column and no selector in the editor. Setup, bulk upload and the AI
+  draft no longer ask either.
+- [ ] **Services → "Add from a template":** the same trade templates as setup, each with a starting price. One
+  you already have says "You have this". Adding one opens it at its prices: they are a starting point.
+- [ ] **A quote with an extra added from the photos:** the customer's page says "Added for you — from your
+  photos" (only on quotes priced since T-188; older ones say "Added for you").
+- [ ] **Sign up through a link with tags** (for example `/pricing?utm_source=test&utm_medium=email`), confirm
+  the address, then open the admin's list of businesses: the line under the date reads where it came from.
+  A business from before this reads "Not recorded".
+- [ ] **The first alert.** Nothing has been sent yet: no address is set here. The first real one is the proof.
+
+### How to read where businesses came from
+
+- In the admin area, the list of businesses: one line under each date.
+- The stored value is `tenants.signup_source` (campaign tags, the referring site's host, the first page's
+  path, the time).
+
+### Not proven
+
+- **The billing check (`verify-t180`) did not pass, in three tries.** Each time it stopped on Stripe's own
+  sandbox pages not loading within 30 seconds (Checkout twice, the customer portal once). Every check of our
+  own code in it passed, and this ticket changes nothing in billing. Please have it run again before the
+  deploy: `pnpm check:full --only t180`.
+- The alerts have not been sent for real, and the timer has not fired (it exists in production only).
+- The admin's list was not opened in a browser.
+- The legal wording has not been read by a lawyer.
+
+### Not done
+
+- From your backlog note on the sample price: low / typical / high prices, a switch per quantity, and "Test
+  with a photo". You asked for a realistic sample or a plain statement; that is what is built.
+- A deploy script for migration 45: for the deploy ticket.

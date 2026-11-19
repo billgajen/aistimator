@@ -10,7 +10,7 @@ import { useSearchParams } from 'next/navigation'
 import { brandStyleVars } from '@/lib/color'
 import { timingLabel } from '@/lib/acceptance'
 import type { QuoteViewResponse, QuoteStatus } from '@qolumns/shared'
-import { formatMoney, formatDate, isQuoteProcessing, canCustomerDecide, customerDecisionWords, splitLabelMath, PRODUCT_NAME, splitMinimum, withoutMinimumNote, crossServiceLine, SLOW_PREPARING_MS, slowPreparingLine, failedRequestTitle, failedRequestLine, willConfirmLine } from '@qolumns/shared'
+import { formatMoney, formatDate, isQuoteProcessing, canCustomerDecide, customerDecisionWords, splitLabelMath, PRODUCT_NAME, splitMinimum, withoutMinimumNote, crossServiceLine, SLOW_PREPARING_MS, slowPreparingLine, failedRequestTitle, failedRequestLine, willConfirmLine, addedForCustomer } from '@qolumns/shared'
 
 interface QuotePageProps {
   params: { quoteId: string }
@@ -1214,7 +1214,7 @@ function PriceLines({
   currency,
   locale,
 }: {
-  lines: Array<{ label: string; amount: number; autoRecommended?: boolean; recommendationReason?: string }>
+  lines: Array<{ label: string; amount: number; autoRecommended?: boolean; source?: unknown }>
   currency: string
   locale: string
 }) {
@@ -1232,8 +1232,9 @@ function PriceLines({
             </div>
             {labelMath && <p className="figure text-xs text-text-muted mt-0.5">{labelMath}</p>}
             {item.autoRecommended && (
-              <p className="text-xs text-primary mt-0.5">
-                Added for you{item.recommendationReason ? ` — ${item.recommendationReason.toLowerCase()}` : ''}
+              <p className="text-xs text-primary mt-0.5" data-testid="added-for-you">
+                {/* T-189: the line's real source (photos or description), not the engine's one reason for every extra */}
+                {addedForCustomer(item.source)}
               </p>
             )}
           </div>

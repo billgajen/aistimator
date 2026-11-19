@@ -15,11 +15,204 @@
 
 ## Issues & Resolutions
 
+### 2026-11-19: T-189 — Backlog fixes before launch: sample price, one document style, services from templates, data-processing terms, alerts, sign-up source (AD-070, AD-071, AD-072)
+
+Built and pushed, **not deployed**. The web app, the worker, the shared package and **migration 45**. No amount,
+no pricing rule and no question the worker asks changed. To put it live, in this order: migration 45, the
+worker, the web. One new setting, on both the worker and the web: `ALERT_EMAIL` (the address alerts go to;
+without it alerts are off).
+
+**Deploy recorded here, from the owner's note:** T-188 (worker, then web) was deployed by the owner on
+2026-11-19. Its entry below now says so.
+
+#### 1. The sample price on "Test & Publish"
+
+- **What was wrong:** the sample on a service's last step priced a line measured from the customer's photos at
+  a quantity of 1 ("1 sqft × $2.50"), because there are no photos on a settings page. With the minimum charge
+  applied on top it read as a broken price. A note under it said the line "uses AI signal".
+- **Now:** the sample's maths is one pure module, `apps/web/src/lib/sample-price.ts` (moved out of the
+  2,100-line page, unchanged for every other kind of line). A measured line is priced, in this order: at the
+  size the business types to try; at a sample size from **the service's own plausible range** for that
+  measurement (its expected signal's `envelope`: the middle of the range per driver, times the driver the
+  business typed or the range's own default, kept inside the outer bounds); or not at all. With no size the
+  line shows its rate and "priced from the customer's photos", the total reads "$150.00 + the lines priced from
+  photos" (or "Priced from the photos"), the minimum is not applied to a sum that is not the job's price, and a
+  sentence says the real price comes from the customer's photos.
+- A sample is called one: the line is tagged "sample size", the total is "Sample total", and a sentence gives
+  the size used. Each measured line has its own box in "Sample values", pre-set to that size.
+- Outer bounds alone give no sample: they are the edges of what is possible, not a size anyone has.
+- Seen in a browser (local): US Exterior Painting, added from its template, shows 1,100 sqft → $2,900.00
+  ("Sample total"), and $5,150.00 with 2,000 typed. Before, the same service showed $152.50.
+- The preview also printed "$" for every business; it now prints the business's own currency symbol.
+- **Not built** from the backlog note: low / typical / high prices, a per-quantity source switch, and "Test
+  with a photo". The ticket asked for a sample at a realistic size or a plain statement.
+
+#### 2. One document style (AD-070)
+
+- Instant Estimate, Formal Quote, Proposal and Statement of Work changed four lines of the wording prompt and
+  nothing else. The choice is removed from the services page (the selector in the editor and the "Document
+  type" column of the list), setup, bulk upload and the AI draft (both copies of the draft prompt carried a
+  `DOCUMENT TYPE:` line).
+- The worker has one tone, `DOCUMENT_STYLE` in `apps/worker/src/ai/wording.ts`: the Instant Estimate's "plain
+  and brief". `getSystemPrompt()` takes no argument. The Formal Quote tone's "This is a binding quote" is gone
+  with the rest; no prompt says "binding".
+- **Nothing is migrated.** `services.document_type_default` and `quotes.document_type` keep what they hold. A
+  new service takes the column's own default. A request that still sends `documentTypeDefault` (the check
+  scripts do, and any older client) is accepted and the value ignored. The public quote response still carries
+  `documentType`; nothing reads it.
+
+#### 3. A service from a template, after setup
+
+- The services page has "Add from a template" (and "Or add one from a template" on the empty page). It lists
+  the trade templates setup lists for the business's region (`listPacks(region)` filtered to the region: the
+  same call), each service with its description and a starting price.
+- The starting price is the template's own number: its first price every job pays ("$375 per room"), else its
+  base fee, its minimum charge, or the lowest of its prices that depend on an answer ("From $275").
+- Picking one sends exactly the body setup sends (`servicePayload`), so the service is the one setup would have
+  made, then opens it at its prices: a template's rates are a starting point to check.
+- A service the business already has is marked "You have this" and has no button; the request builder refuses
+  it too. "Already has" is by name, ignoring case and spacing. A business that renamed a template's service can
+  add the template again.
+- Pure module: `apps/web/src/lib/service-templates.ts`; the dialog: `components/services/TemplatePicker.tsx`.
+- Seen in a browser (local) at 1280 and 390 px: 12 templates for a US business, the owned one marked, the added
+  one opened at "Describe your pricing" and was marked on the next look. Nothing scrolls sideways.
+
+#### 4. Data processing in the Terms
+
+- New section "7. Data processing" (the later sections move down one; there are now 13). It says, with a
+  heading for each: you decide what is collected and are the controller, and Billiom Limited is your processor
+  and handles the data only to provide the service; what is collected; where it is stored and who else handles
+  it; how long it is kept; how it is deleted; security; notice of a breach "without undue delay"; that a
+  data-processing agreement can be asked for at the support address; and who we are and the governing law.
+- **The providers are one list**, `apps/web/src/lib/legal/sub-processors.ts`, read from the code: Supabase,
+  Cloudflare, Vercel, Google, Postmark, DocRaptor, Upstash, Stripe, and Meta for a business that connects
+  WhatsApp. Each entry names a setting in `apps/web/.env.example`; a unit test checks it both ways (every
+  listed provider has its setting; every outside service with a setting is listed, or is in
+  `NOT_SUB_PROCESSORS` with the reason: Twilio, the Meta Pixel).
+- **The Privacy Policy's "Where data lives" is now written from the same list.** It gains DocRaptor and
+  Upstash, which it had left out although the product uses both. That is a correction of fact on a published
+  page.
+- It makes no promise about keeping or deleting that the Privacy Policy did not already make. Two things are
+  new promises: the notice of a breach, and that an agreement can be asked for. Both were asked for in the
+  ticket. **OWNER-TODO marks the whole section for a legal check before launch.**
+- Both pages' dates are 19 November 2026.
+
+#### 5. Alerts (AD-071)
+
+- **What existed:** when a quote could not be priced, the business was emailed (T-178). Nothing told the owner
+  of the product. Nothing watched the queue. The only timer was Vercel's daily job for reminders.
+- **Now:** one email to `ALERT_EMAIL` when (a) a quote could not be priced, (b) the worker hit an error of its
+  own or the web app could not hand a request to it, (c) requests have been waiting more than 10 minutes.
+- **At most one email per kind per hour.** `claim_ops_alert()` in the database decides and records in one step,
+  so the hour holds across every copy of the worker and the web app. What was held back is counted and said in
+  the next email. If the database cannot answer (which may be the fault being reported), the process's own
+  memory keeps the hour: the fault is still reported and a burst cannot flood the inbox.
+- **What an alert carries:** ids and counts, where it happened, and an error's name. Never a customer's name,
+  contact details, words or photos, and never an error's message (a message can carry an address or a key).
+- **The queue check** is the worker's new `scheduled` handler, on a 5-minute timer in production only
+  (`[env.production.triggers]` in `wrangler.toml`). A request counts when it has been queued or in progress for
+  more than 10 minutes, arrived in the last 24 hours, **and was already waiting at the previous check**. The
+  last rule is there because a quote priced again after an answer is "queued" for a few seconds, and the table
+  has no "queued since" time: without it, an answer given just as a check ran would have raised a false alarm.
+  So a stuck request is reported 10 to 15 minutes after it arrived.
+- **To turn alerts off:** remove `ALERT_EMAIL` from the worker (`wrangler secret delete ALERT_EMAIL --env
+  production`) and from Vercel. With no address nothing is claimed and nothing is sent. To stop only the queue
+  check, remove the `[env.production.triggers]` block and deploy the worker.
+- Files: `packages/shared/src/ops-alerts.ts` (the rules, pure), `apps/worker/src/ops-alert.ts`,
+  `apps/web/src/lib/ops-alert.ts`, hooks in `apps/worker/src/index.ts` and both `failed-quote.ts`.
+
+#### 6. Where a new business came from (AD-072)
+
+- **What was recorded:** nothing. A sign-up carried its email, its business name and the plan picked on the
+  Pricing page.
+- **Now:** the first visit's campaign tags (`utm_source`, `utm_medium`, `utm_campaign`, `utm_term`,
+  `utm_content`), the site the person came from as a host name only, and the first page of ours they opened as
+  a path only, with the time.
+- **No cookie.** The first visit is kept in the browser tab (`sessionStorage`), written once by a component in
+  the marketing header and by the sign-up page, gone when the tab closes, and sent only with the sign-up form.
+  The Privacy Policy now says so, in "What we collect" and in "Cookies".
+- The server cleans it at sign-up (known keys only, short plain strings, a host, a path) and keeps it in the
+  new account's metadata, as it does the chosen plan. When the address is confirmed and the database has made
+  the business, the confirm route writes it to `tenants.signup_source` (migration 45), once.
+- The column is server-only: a trigger refuses a business's own write (as for the suspend switch).
+- The admin's business list shows it under the date: "newsletter / email / launch · from example.org · first
+  page /pricing", "came directly · first page /", or "Not recorded" for a business from before this.
+- Tried on the local stack through the real confirm route: a sign-up with a source stored it, cleaned (an
+  unknown key and an email address put in by hand were dropped, the referrer became a host, the page a path); a
+  sign-up with none stored nothing; the owner's own attempt to overwrite it was refused (42501) while an
+  ordinary change to the same row went through.
+
+#### 7. The customer's words for an added line
+
+- **What was wrong:** under an extra the product added, the customer read "Added for you — detected from your
+  description" even when the photos were the reason. The pricing engine gives every added extra that one
+  reason; T-188 made the line's stored source honest but the customer's page still printed the engine's words.
+- **Now:** `addedForCustomer(source)` in `packages/shared/src/quantity-source.ts` (beside T-188's functions)
+  words it from the line's own source: "from your photos", "from your description", or just "Added for you"
+  when no source was stored (a quote from before T-188). The customer's page uses it; the marketing page's
+  drawn screen uses it; the dashboard's "what was understood" panel files such an extra under the photos from
+  the same source.
+- The engine's own reason string is untouched (no pricing change); nothing shows it to a customer any more.
+
+#### Checks
+
+- **Unit tests:** worker 729 (22 new in `backlog-t189.test.ts`), web 1,243 (34 new in `backlog-t189.test.ts`),
+  app 105. Six older web tests and one worker test pinned what this ticket changed on purpose (the legal pages'
+  dates and section numbers, the list of email senders, the preview's maths now in its own module, the added
+  line's words, the four tones) and were updated, none loosened.
+- **`pnpm check:quick`, once: 4 of 27, in 40 s. My own fault, not the product's.** Lint and typecheck were
+  failing (a regex the linter refuses in `signup-source.ts`; a type in my new worker test), so the web app did
+  not build and no script ran. I had called both clean several times on the strength of empty output from
+  `pnpm -s … | tail`: the silent flag hides the errors and the pipe hides the exit code. Both fixed.
+- **`pnpm check:failed`: 24 of 24** (20 scripts, 1,717 checks, 3 min 39 s).
+- **`pnpm check:full`, once: 39 of 40** (32 scripts, 2,735 checks, 22 min 51 s, the real model). Unit tests and
+  both builds are part of it and passed.
+- **`verify-t180` (billing, against Stripe's sandbox) did not pass, in three tries** (the full run, then
+  `pnpm check:failed` twice): 80 of 81, 64 of 65, 78 of 79. Each time the one failed check was "the browser
+  journey ran to the end", stopped by a 30-second wait on **Stripe's own hosted pages**: Checkout did not load
+  (twice, in the third journey), and the customer portal sat on its loading spinner (once, in the first
+  journey; the script's own screenshot shows it). The step differed each time, and every check of our own code
+  in the script passed each time. This ticket changes nothing in billing, and the same script passed in
+  T-188's full run earlier the same day. I did not try a fourth time. **It should be run again before a
+  deploy** (`pnpm check:full --only t180`).
+- **Tried by hand on the local stack:** the sign-up source through the real confirm route (stored, cleaned,
+  refused to the business itself); the alert claim through the API (service role: yes, no, yes with one held
+  back; anyone else: refused, for the function and the table); migration 45 applied twice; and the services
+  page in a browser at 1280 and 390 px (the template list, adding one, its sample price). Screenshots are in
+  `.checks/t189/` (not in git).
+- **Not run again after the full run:** nothing in the source changed after it; only these documents.
+
+#### Not proven
+
+- **The alerts have never been sent for real.** No `ALERT_EMAIL` is set on this machine. The rule, the claim in
+  the database (run by hand: yes, no, no, then yes with 2 held back) and the worker's and web's senders are
+  covered by unit tests with a stand-in for the email call. The timer has not fired: it exists in production
+  only. After the deploy, the first real alert is the proof.
+- **The admin's list was not opened in a browser** (it needs a platform admin's sign-in). The line it shows is
+  unit-tested; the stored value was read from the database.
+- **The first-visit note in a real browser tab.** The pure function, the server's cleaning and the save were
+  tried; the component that writes `sessionStorage` was not watched doing it.
+- **The legal wording** is mine, from what the code does. It has not been read by a lawyer.
+- **The one document style on a real quote:** the full run prices quotes with the one prompt; nobody compared a
+  quote's wording before and after for a service that had been a Formal Quote.
+
+#### Later
+
+- A deploy script for migration 45 (`scripts/deploy-migration-45.sh`) is for the deploy ticket; the migration
+  was applied to the local database by hand, twice (it is re-runnable).
+- Backlog note 3's extras for the sample price (low / typical / high, a source switch, "Test with a photo").
+- The backlog's real formats for a proposal or a statement of work, if they are ever wanted, are a new feature;
+  the columns are still there.
+- The sub-processor list says the database is held in the EU, as the Privacy Policy already did. Nothing in the
+  code can prove a region.
+
 ### 2026-11-19: T-188 — Questions with choices and a note, honest line sources, small leftovers (AD-069)
 
-Built and pushed, **not deployed**. The worker (how a question is built, and where a line says it came from),
-the shared rules, the web app and the on-site app. No amount, no pricing rule and no migration changed. To put
-it live: the worker, then the web.
+**Deployed by the owner on 2026-11-19:** the worker, then the web. No migration. (Recorded in T-189 from the
+owner's note; the worker version and the deployment id were not given.)
+
+**As built:** the worker (how a question is built, and where a line says it came from),
+the shared rules, the web app and the on-site app. No amount, no pricing rule and no migration changed.
 
 **Deploys recorded here, from the owner's note:** T-186 (worker, then web) and T-187 (web only) were both
 deployed by the owner on 2026-11-19. Their entries below now say so.
@@ -9832,6 +10025,63 @@ a price, and nothing would tie the choice to a value the rules understand.
 
 ---
 
+### AD-070: One document style; the stored type is ignored, not migrated (T-189)
+
+**Decision (the owner's):** every quote is written in one plain, brief, professional style. The four "document
+types" are no longer offered anywhere.
+
+**Why:** the type changed four lines of the wording prompt and nothing a customer could point to: the price, the
+page, the PDF and the title were the same. A choice that changes nothing is a question the business should not
+be asked, and one of the four told the model the quote was "binding", which it is not.
+
+**Rules:**
+- The worker has one tone (`DOCUMENT_STYLE`) and `getSystemPrompt()` takes no argument. No prompt receives a
+  document type, and no prompt says "binding".
+- `services.document_type_default` and `quotes.document_type` stay, keep what they hold, and are read by
+  nothing. A request that sends `documentTypeDefault` is accepted and the value dropped.
+- If a real second format is ever built (a proposal with phases, a statement of work with milestones), it is a
+  new feature with its own page and PDF, not a tone.
+
+---
+
+### AD-071: The owner's alerts: three kinds, one email per kind per hour, ids only, off without an address (T-189)
+
+**Decision:** the product emails the person who runs it when a quote cannot be priced, when the worker errors
+or cannot be reached, and when requests wait too long. It is the simplest thing that works: an email through
+the sender we already have, no new service.
+
+**Rules:**
+- **Off without `ALERT_EMAIL`.** No address: nothing is claimed, nothing is sent. That is the off switch.
+- **One per kind per hour, decided in the database** (`claim_ops_alert`), so the limit holds across every copy
+  of the worker and the web app. What was held back is counted and said in the next email.
+- **A database fault does not silence an alert.** When the claim cannot be made, the process's own memory keeps
+  the hour. The fault is reported once; a burst cannot flood the inbox.
+- **An alert carries ids, counts, where it happened and an error's name.** Never a customer's name, contact
+  details, words or photos, and never an error's message.
+- **An alert never changes a quote's outcome.** It is sent after the quote has been dealt with and never throws.
+- **The queue check counts only a request seen waiting at two checks in a row.** A quote priced again after an
+  answer is "queued" for seconds and the table has no "queued since" time. If that time is ever stored, the
+  check can use it and drop the note it keeps between runs.
+- The demo business's quotes raise no alert, as they send no email.
+
+---
+
+### AD-072: Where a business came from is noted without a cookie and kept server-only (T-189)
+
+**Decision:** the first visit's campaign tags, the referring site's host and the first page's path are kept in
+the browser tab's own storage and sent with the sign-up form. Nothing is stored on the visitor's device beyond
+the tab, nothing identifies a person, and nothing is sent unless they sign up.
+
+**Rules:**
+- No cookie, no `localStorage`, no call to any server before sign-up. The Privacy Policy says what is kept.
+- A host and a path only: never a referring page's address or any query string beyond the five campaign tags.
+- The server cleans what the browser sends, twice: at sign-up, and again before it is written to the business.
+- `tenants.signup_source` is written once, by the server, when the address is confirmed. A trigger refuses a
+  business's own write. It is for the owner's own reading; no product behaviour may depend on it.
+- It rides in the new account's metadata until the business exists (the database makes the business when the
+  address is confirmed). The sign-up trigger itself was not changed.
+
+---
 ## Known Constraints
 
 ### KC-001: No Automatic Access-Based Pricing

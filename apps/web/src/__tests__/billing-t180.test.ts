@@ -166,7 +166,8 @@ describe('T-180: prices are shown before tax, and say so', () => {
   it('the Terms say who takes the payment and that tax is added, and carry the new date', () => {
     const terms = read('apps/web/src/app/terms/page.tsx')
     expect(terms).toContain('Payments are processed by Stripe, which acts as the seller of record through Link. Applicable sales tax or VAT is added at checkout.')
-    expect(terms).toContain('Last updated: 18 November 2026')
+    // T-189 added the data-processing section, so the date moved on a day
+    expect(terms).toContain('Last updated: 19 November 2026')
   })
 
   it('the confirmed plan numbers: Starter 50 quotes, Pro 200, 10 free in total; only Business is still to confirm', () => {

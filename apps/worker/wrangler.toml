@@ -45,6 +45,9 @@ max_retries = 3
 # - POSTMARK_API_TOKEN
 # - POSTMARK_FROM_EMAIL
 # - APP_URL (production: https://qolumns.com, T-174)
+# - ALERT_EMAIL (T-189: the owner's alert address. One email per kind per hour when a quote
+#   cannot be priced, the worker errors, or requests wait too long. Not set = alerts off.
+#   The web app has the same setting.)
 # - CLOUDFLARE_WORKER_TOKEN (same value as the web app's; required outside local dev)
 #
 # Local checks only (ignored unless ENVIRONMENT = "development"; never set in production):
@@ -60,6 +63,12 @@ max_retries = 3
 # Production environment
 [env.production]
 vars = { ENVIRONMENT = "production" }
+
+# T-189: the queue check (the worker's `scheduled` handler): every 5 minutes it counts the
+# requests that have waited too long and emails the owner (ALERT_EMAIL). It prices nothing.
+# Production only: the local worker has no timer. Removing this block switches the check off.
+[env.production.triggers]
+crons = ["*/5 * * * *"]
 
 # Inherited from the top level; repeated so it is plain that production has it
 [env.production.observability]

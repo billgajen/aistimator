@@ -805,8 +805,8 @@ describe('T-177 item 9: the Privacy and Terms pages', () => {
     for (const page of ['apps/web/src/app/privacy/page.tsx', 'apps/web/src/app/terms/page.tsx']) {
       const src = code(page)
       expect(src, page).toContain('{operatorStatement(process.env.NEXT_PUBLIC_COMPANY_NUMBER)}')
-      // T-180 added a paragraph to the Terms (payments and tax), so its date moved on a day
-      expect(src, page).toContain(page.includes('terms') ? 'Last updated: 18 November 2026' : 'Last updated: 17 November 2026')
+      // T-189 added the data-processing section to the Terms and the sign-up source to the Privacy Policy
+      expect(src, page).toContain('Last updated: 19 November 2026')
       expect(src, page).not.toMatch(/Billiom|company number \d/)
     }
     expect(read('apps/web/.env.example')).toMatch(/^NEXT_PUBLIC_COMPANY_NUMBER=$/m)
@@ -816,7 +816,8 @@ describe('T-177 item 9: the Privacy and Terms pages', () => {
     expect(GOVERNING_LAW).toBe('the law of England and Wales')
     const terms = code('apps/web/src/app/terms/page.tsx')
     expect(terms).toContain('These terms are governed by ${GOVERNING_LAW}.')
-    const whatsapp = terms.slice(terms.indexOf("title: '10. WhatsApp'"), terms.indexOf("title: '11. Governing law'"))
+    // T-189: "7. Data processing" went in after "Your customers' data", so these two moved down one
+    const whatsapp = terms.slice(terms.indexOf("title: '11. WhatsApp'"), terms.indexOf("title: '12. Governing law'"))
     expect(whatsapp).toMatch(/a number your business owns and has the right to use/)
     expect(whatsapp).toMatch(/WhatsApp Business Messaging Policy and the WhatsApp Commerce Policy/)
     expect(whatsapp).toMatch(/may pause the assistant on your number if Meta restricts or suspends it/)

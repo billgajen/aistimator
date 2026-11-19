@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
-import type { ServiceDraftConfig, DocumentType } from '@qolumns/shared'
+import type { ServiceDraftConfig } from '@qolumns/shared'
 import { validateAndNormalizeDraft, parseGeminiJson, loadTenantRegionBlock } from './shared'
 import { geminiThinkingConfig, geminiUrlFor } from '@/lib/ai/models'
 
@@ -48,7 +48,6 @@ SIGNAL GUIDELINES:
 interface DraftRequest {
   serviceName: string
   description: string
-  documentType?: DocumentType
 }
 
 export async function POST(request: NextRequest) {
@@ -182,7 +181,6 @@ function buildDraftPrompt(request: DraftRequest): string {
 
 SERVICE NAME: ${request.serviceName}
 DESCRIPTION: ${request.description}
-DOCUMENT TYPE: ${request.documentType || 'instant_estimate'}
 
 Return a JSON object with this exact structure:
 

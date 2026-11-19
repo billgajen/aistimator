@@ -17,6 +17,11 @@ import type { CertaintyReason } from './grading'
 // ============================================================================
 
 export type ServiceAreaMode = 'none' | 'postcode_allowlist' | 'county_state'
+/**
+ * T-189: the choice is gone and every quote is written in one style. The two
+ * columns that carry this (`services.document_type_default`,
+ * `quotes.document_type`) keep whatever they hold and are read by nothing.
+ */
 export type DocumentType = 'instant_estimate' | 'formal_quote' | 'proposal' | 'sow'
 export type QuoteStatus =
   | 'queued'
@@ -88,6 +93,8 @@ export interface Tenant {
   trade_other?: string | null
   /** T-150: plan picked on the pricing page before signup (billing pre-select) */
   selected_plan?: string | null
+  /** T-189: first-visit source at sign-up ({ utm, referrer, landing, at }); server-only, null when none */
+  signup_source?: Record<string, unknown> | null
   /** T-150: the business skipped guided setup */
   onboarding_skipped_at?: string | null
   /** T-152: when the business confirmed its prices (setup or the Prices page) */

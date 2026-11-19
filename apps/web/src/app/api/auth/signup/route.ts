@@ -3,6 +3,7 @@ import { checkRateLimit, emailKey, getClientIp, rateLimitedResponse } from '@/li
 import { verifyTurnstileToken, HUMAN_CHECK_FAILED_MESSAGE } from '@/lib/turnstile'
 import { BUSINESS_NAME_MAX_LENGTH, EMAIL_NOT_SENT_MESSAGE, passwordProblem, siteOrigin, startSignup, validEmail } from '@/lib/auth-flow'
 import { authError, readJson } from '@/lib/auth-route'
+import { cleanSignupSource } from '@/lib/signup-source'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,6 +48,8 @@ export async function POST(request: Request) {
     password: body.password as string,
     businessName,
     selectedPlan,
+    // T-189: how they found us (campaign tags, the site they came from, the first page), cleaned here
+    signupSource: cleanSignupSource(body.source),
     origin: siteOrigin(request),
   })
   if (!result.ok) {
