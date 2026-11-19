@@ -3049,10 +3049,7 @@ Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-1
 
 ### Not proven
 
-- **The billing check (`verify-t180`) did not pass, in three tries.** Each time it stopped on Stripe's own
-  sandbox pages not loading within 30 seconds (Checkout twice, the customer portal once). Every check of our
-  own code in it passed, and this ticket changes nothing in billing. Please have it run again before the
-  deploy: `pnpm check:full --only t180`.
+- ~~The billing check (`verify-t180`) did not pass.~~ Run again while preparing the deploy: 108 of 108.
 - The alerts have not been sent for real, and the timer has not fired (it exists in production only).
 - The admin's list was not opened in a browser.
 - The legal wording has not been read by a lawyer.
@@ -3061,4 +3058,4 @@ Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-1
 
 - From your backlog note on the sample price: low / typical / high prices, a switch per quantity, and "Test
   with a photo". You asked for a realistic sample or a plain statement; that is what is built.
-- A deploy script for migration 45: for the deploy ticket.
+- ~~A deploy script for migration 45.~~ Ready: `bash scripts/deploy-migration-45.sh` (tested on a local copy at 44).

@@ -173,8 +173,9 @@ without it alerts are off).
   (twice, in the third journey), and the customer portal sat on its loading spinner (once, in the first
   journey; the script's own screenshot shows it). The step differed each time, and every check of our own code
   in the script passed each time. This ticket changes nothing in billing, and the same script passed in
-  T-188's full run earlier the same day. I did not try a fourth time. **It should be run again before a
-  deploy** (`pnpm check:full --only t180`).
+  T-188's full run earlier the same day. I did not try a fourth time.
+  **Run again while preparing the deploy (same day): `pnpm check:full --only t180` passed, 108 of 108, in
+  10 min 27 s.** No code was changed in between.
 - **Tried by hand on the local stack:** the sign-up source through the real confirm route (stored, cleaned,
   refused to the business itself); the alert claim through the API (service role: yes, no, yes with one held
   back; anyone else: refused, for the function and the table); migration 45 applied twice; and the services
@@ -198,8 +199,13 @@ without it alerts are off).
 
 #### Later
 
-- A deploy script for migration 45 (`scripts/deploy-migration-45.sh`) is for the deploy ticket; the migration
-  was applied to the local database by hand, twice (it is re-runnable).
+- ~~A deploy script for migration 45.~~ Written while preparing the deploy: `scripts/deploy-migration-45.sh`,
+  the same shape as 44's (refuses unless at 44 or already 45; Before, apply, record, After; the checks name
+  nothing new except through the catalogue). **Tested whole in its test mode** (`MIGRATION_TEST_API`): a copy
+  of the local database (public schema and migration history) was taken back to 44 and a local stand-in for
+  the management API ran each query on it. Before: 44, all new things 0, 3,615 tenants. After: 45, column 1,
+  guard 1, table 1 with row security, function 1, none open to users, 3,615 tenants. A second run changed
+  nothing. The copy was then dropped. Not run against production.
 - Backlog note 3's extras for the sample price (low / typical / high, a source switch, "Test with a photo").
 - The backlog's real formats for a proposal or a statement of work, if they are ever wanted, are a new feature;
   the columns are still there.
