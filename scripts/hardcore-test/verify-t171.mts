@@ -34,7 +34,7 @@ import { garageDoorsPackUS } from '../../apps/web/src/lib/vertical-packs/garage-
 import { servicePayload } from '../../apps/web/src/lib/onboarding-service'
 import { embedSnippet } from '../../apps/web/src/lib/embed-snippet'
 import { findConfidenceLanguage } from '../../packages/shared/src/customer-language'
-import { COMING_LATER, planLines, sitePlans } from '../../apps/web/src/lib/marketing/plan-claims'
+import { COMING_SOON, planCards, planLines, sitePlans } from '../../apps/web/src/lib/marketing/plan-claims'
 import { offeredPlans } from '../../packages/shared/src/plans'
 import { readableTextOn, contrastRatio } from '../../apps/web/src/lib/color'
 
@@ -574,15 +574,22 @@ if (!process.env.PLAYWRIGHT_DIR) {
     await p.goto(`${cfg.appUrl}/app/settings/billing`, { waitUntil: 'networkidle' })
     await p.locator('[data-testid=plan-lines]').first().waitFor({ timeout: 60_000 })
     const cards = await p.locator('[data-testid=plan-lines]').evaluateAll((lists) => lists.map((ul) => ({ name: (ul.parentElement!.querySelector('h3') as HTMLElement).innerText.trim(), lines: [...ul.querySelectorAll('[data-testid=plan-line]')].map((li) => ({ text: (li as HTMLElement).innerText.replace(/\s+/g, ' ').trim(), live: li.getAttribute('data-live') === 'true' })), button: (ul.parentElement!.querySelector('button') as HTMLButtonElement).innerText.trim(), disabled: (ul.parentElement!.querySelector('button') as HTMLButtonElement).disabled })))
-    const wanted = offeredPlans().map((plan) => ({ name: plan.name, lines: planLines(plan).map((l) => ({ text: l.live ? l.label : `${l.label} ${COMING_LATER}`, live: l.live })) }))
+    const wanted = offeredPlans().map((plan) => ({ name: plan.name, lines: planLines(plan).map((l) => ({ text: l.live ? l.label : `${l.label} ${COMING_SOON}`, live: l.live })) }))
     check(`${width} billing: every plan on offer is there, Business included, each one can be chosen`, cards.length === offeredPlans().length && cards.some((c) => c.name === 'Business') && cards.every((c) => !c.disabled && /Select Plan/.test(c.button)), cards.map((c) => [c.name, c.button]))
-    check(`${width} billing: each plan's lines are the public Pricing page's own, with "Coming later" on what is not live (the same list feeds both)`, JSON.stringify(cards.map((c) => ({ name: c.name, lines: c.lines }))) === JSON.stringify(wanted), cards.map((c) => c.lines.filter((l) => !l.live).length))
+    check(`${width} billing: each plan's lines are the public Pricing page's own, with "${COMING_SOON}" on what is not live (the same list feeds both; the words were "Coming later" until T-187)`, JSON.stringify(cards.map((c) => ({ name: c.name, lines: c.lines }))) === JSON.stringify(wanted), cards.map((c) => c.lines.filter((l) => !l.live).length))
     // the public page, for the plans it shows
     const pub = await ctx.newPage()
     await pub.goto(`${cfg.appUrl}/pricing`, { waitUntil: 'networkidle' })
-    const publicCards = await pub.locator('[data-testid=plans] > div').evaluateAll((els) => els.map((el) => [...el.querySelectorAll('[data-testid=plan-line]')].map((li) => ({ text: (li as HTMLElement).innerText.replace(/[✓○]/g, '').replace(/\s+/g, ' ').trim(), live: li.getAttribute('data-live') === 'true' }))))
+    const publicCards = await pub.locator('[data-testid=plan-card]').evaluateAll((els) => els.map((el) => [...el.querySelectorAll('[data-testid=plan-line]')].map((li) => ({ text: (li as HTMLElement).innerText.replace(/[✓○]/g, '').replace(/\s+/g, ' ').trim(), live: li.getAttribute('data-live') === 'true' }))))
     const shownNames = sitePlans().map((s) => s.name)
-    check(`${width} billing: for ${shownNames.join(' and ')}, the two pages list the same lines in the same order`, publicCards.length === shownNames.length && shownNames.every((name, i) => JSON.stringify(publicCards[i]) === JSON.stringify(cards.find((c) => c.name === name)!.lines)), publicCards.map((c) => c.length))
+    // T-187: a public card lists the plan's quotes a month and then only what the plan adds to the one below
+    // it ("Everything in Starter, plus"), so it is no longer the billing page's whole list. Both still come
+    // from one list: every line on a public card is on the billing page's card for that plan, worded and
+    // marked the same, and a plan's public lines are exactly `planCards()`.
+    const wantedPublic = planCards().map((card) => [{ text: card.quotes, live: true }, ...card.lines.map((l) => ({ text: l.live ? l.label : `${l.label} ${COMING_SOON}`, live: l.live }))])
+    check(`${width} billing: for ${shownNames.join(' and ')}, the public cards are the shared plan cards, and every line on one is on the billing page's card for that plan, worded and marked the same`,
+      publicCards.length === shownNames.length && JSON.stringify(publicCards) === JSON.stringify(wantedPublic) &&
+        shownNames.every((name, i) => publicCards[i]!.slice(1).every((line) => cards.find((c) => c.name === name)!.lines.some((l) => l.text === line.text && l.live === line.live))), publicCards.map((c) => c.length))
     check(`${width} billing: nothing scrolls sideways`, (await sideways(p)) <= 0)
     if (width === 1440) await shot(p, 'billing-1440')
     await ctx.close()

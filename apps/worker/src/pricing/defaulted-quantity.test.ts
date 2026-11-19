@@ -112,7 +112,14 @@ describe('T-127: defaulted quantities are visible and clarifiable', () => {
         clarificationCount: 0,
         serviceName: 'Home Cleaning',
         hasPhotos: true,
-        quantityConcern: { reason: 'From your photos, 2 hours may not be enough for a full deep clean — many similar jobs need 3-4 hours.', fieldId: 'hours_required' },
+        quantityConcern: { reason: 'The photos show more than 2 hours of work for a full deep clean.', fieldId: 'hours_required', suggested: '4' },
+        // T-188: the choices come from the doubted answer's own field and the line it sizes
+        choiceContext: {
+          fields: [{ fieldId: 'hours_required', label: 'Hours', type: 'number' }],
+          workSteps: [{ id: 'clean', name: 'Hourly cleaning', description: '', costType: 'per_hour', defaultCost: 28, optional: false, unitLabel: 'hour', quantitySource: { type: 'form_field', fieldId: 'hours_required' } }],
+          addons: [],
+          answers: [{ fieldId: 'hours_required', value: 2 }],
+        },
         workStepsConfigured: 1,
         workStepLinesPriced: 1,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -121,6 +128,8 @@ describe('T-127: defaulted quantities are visible and clarifiable', () => {
     )
     expect(result.action).toBe('ask_clarification')
     expect(result.questions?.[0]?.targetSignalKey).toBe('hours_required')
+    expect(result.questions?.[0]?.choices).toEqual([{ label: 'Keep 2 hours', value: '2' }, { label: '4 hours', value: '4' }])
+    expect(result.questions?.[0]?.question).not.toMatch(/What should we allow for/)
   })
 
   it('R3-1 cosmetics: multiplier lines carry human labels with percentages', () => {

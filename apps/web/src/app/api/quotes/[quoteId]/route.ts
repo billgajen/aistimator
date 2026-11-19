@@ -27,8 +27,8 @@ import type {
   QuoteDetailResponse,
   AmendmentSummary,
 } from '@qolumns/shared'
-import { CHECKER_SETTINGS_VERSION, businessIsAsked, carrySources, isMadeByBusiness, serviceSuggestionOf, MAX_ADDED_SECTIONS, addedSections, alsoAskedOf, alsoAskedWithStates, editedSectionBreakdown, withSections } from '@qolumns/shared'
-import type { ClarificationQuestion, CombinedPricing, QuoteSection } from '@qolumns/shared'
+import { CHECKER_SETTINGS_VERSION, QUESTIONS_OPEN_STATUS, askedQuestions, businessIsAsked, carrySources, isMadeByBusiness, serviceSuggestionOf, MAX_ADDED_SECTIONS, addedSections, alsoAskedOf, alsoAskedWithStates, editedSectionBreakdown, withSections } from '@qolumns/shared'
+import type { CombinedPricing, QuoteSection } from '@qolumns/shared'
 import { sectionTaxFor } from '@/lib/quote-sections-service'
 import { sectionsEmailHtml } from '@/lib/sections-email'
 import { fieldLabels, formFields, requestDetails } from '@/lib/request-details'
@@ -238,15 +238,13 @@ export async function GET(
       // T-186: a quote the business made asks the business, on this page; a customer's asks the customer
       madeByBusiness: isMadeByBusiness(requestRow?.source_json),
       businessQuestions: businessIsAsked(quote.status, isMadeByBusiness(requestRow?.source_json))
-        ? (((quote as { clarification_questions_json?: unknown }).clarification_questions_json as ClarificationQuestion[] | null) ?? []).map((q) => ({
-            id: q.id,
-            question: q.question,
-            ...(q.type && { type: q.type }),
-            ...(q.aiValue !== undefined && { aiValue: q.aiValue }),
-            ...(q.evidence && { evidence: q.evidence }),
-            ...(q.options && { options: q.options }),
-          }))
+        ? askedQuestions((quote as { clarification_questions_json?: unknown }).clarification_questions_json)
         : [],
+      // T-188: the customer's own open questions, so the business can answer for them
+      customerQuestions:
+        quote.status === QUESTIONS_OPEN_STATUS && !isMadeByBusiness(requestRow?.source_json)
+          ? askedQuestions((quote as { clarification_questions_json?: unknown }).clarification_questions_json)
+          : [],
     }
 
     return NextResponse.json(response)

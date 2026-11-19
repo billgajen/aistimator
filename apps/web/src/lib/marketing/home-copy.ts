@@ -26,8 +26,8 @@ export const HERO = {
     ['photo-notes', 'pricing-engine'],
     'The AI reads what your customer tells you and the photos they send, and works out the job. The price comes from your own price list, and you confirm it.'
   ),
-  /** T-181 (the owner's instruction): any business, small to corporate; it used to name two kinds of business only */
-  smallLine: 'For any business that quotes for its work, small to corporate. No website? Use your quote link.',
+  /** T-181: any business (it used to name two kinds only). T-188 (the owner): "small to corporate" is dropped. */
+  smallLine: 'For any business that quotes for its work. No website? Use your quote link.',
   frames: ['Your customer asks', 'They see your price', 'You confirm it'] as const,
 }
 

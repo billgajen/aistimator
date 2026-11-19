@@ -15,10 +15,170 @@
 
 ## Issues & Resolutions
 
+### 2026-11-19: T-188 — Questions with choices and a note, honest line sources, small leftovers (AD-069)
+
+Built and pushed, **not deployed**. The worker (how a question is built, and where a line says it came from),
+the shared rules, the web app and the on-site app. No amount, no pricing rule and no migration changed. To put
+it live: the worker, then the web.
+
+**Deploys recorded here, from the owner's note:** T-186 (worker, then web) and T-187 (web only) were both
+deployed by the owner on 2026-11-19. Their entries below now say so.
+
+#### 1. Every question has choices to press
+
+- **What was wrong:** a doubt about an answer was asked as the doubt followed by "What should we allow for?",
+  with a text box (and a list only when the doubted answer happened to be a question with options). A
+  question about something nobody gave took whatever options the model made up.
+- **Now the choices are built in code**, from the business's own configuration and the line the question is
+  about (`apps/worker/src/agents/question-choices.ts`, pure):
+  | The doubted answer | The choices |
+  |---|---|
+  | a question with options | its own options, as the business wrote them |
+  | a yes or no that switches a line on (a step's condition, or an extra) | "Keep <the line>" / "No <the line>"; "Add <the line>" when it is off |
+  | a number that sizes a line | "Keep <the number given> <the step's own unit>", the number the evidence points to when the wording layer gives one, and "Other" for another figure |
+  | a thing the service lists allowed values for | those values |
+  | a quantity nobody gave | a number box |
+  The words of a choice are the business's own names (a field's option, a step's name, a step's unit) and
+  three plain words of ours (keep, add, no). No trade, service or question text is in the rule; a unit test
+  reads the file for it.
+- **A choice is a label and a value** (`ClarificationQuestion.choices`). The value is what the business's own
+  rule tests: the step's condition, the extra's id, the option's stored value, the number. So pressing a
+  choice reprices exactly as a typed answer did. `closed` says the choices are every possible answer, and
+  then no typed answer is offered.
+- **A doubt tied to no answer the business configured is not asked.** No answer to it could change the price
+  and no choice can be built for it. The quote is held for the business with the doubt as its reason (the
+  gate answers `require_review`). Before, it was asked of the customer as an open question that changed
+  nothing. **This is the one change to what happens to a quote:** such a quote now waits for the business
+  where it used to wait for the customer.
+- **The wording layer** (`ai/wording.ts`, `ai/schemas.ts`) gained one field, `quantityConcernSuggestedValue`:
+  the value the evidence points to for the doubted answer. A number is read out of it for a choice; a person
+  picks it, and the price comes from the engine. Its sentence is now asked for as an observation.
+- **A model's own answer options are no longer used** (the question prompt says not to write any).
+- The customer's question page draws the same choices as rows to tap; the dashboard's card and the app draw
+  them by the shared `questionChoices`.
+
+#### 2. An optional note: "Why (for your records)"
+
+- Under each question's choices, in the app and on the dashboard. It is sent with its answer to the business's
+  answer route, stored with the answer (`clarification_answers_json[].note`, up to 500 characters), and shown
+  on the dashboard quote page beside the answer ("Why: …"), where the answer now reads as the words of the
+  choice that was pressed.
+- **Nothing reads it but that page.** The worker reads an answer's question and value only; a unit test holds
+  ten worker files to never naming an answer's note. The customer's answer route keeps the question and the
+  answer only, so a customer cannot store one, and the customer's quote data never carried the answers.
+
+#### 3. Questions worded for who answers
+
+- The gate is told who answers (`audience`), by T-186's one rule (`isMadeByBusiness`).
+- The doubt is written as an observation that addresses nobody ("The photos show…", never "your photos" or
+  "you selected"), and what follows it is "Keep <the line>?" for the business and "Which is right?" for a
+  customer. The choices are the same for both.
+- "From your photos and details, we estimated…" reads "From the photos and details, … was estimated at …" on a
+  quote the business made. A generated question is asked of "the business that is pricing this job", and may
+  not say "your quote", "your request" or "your photos".
+
+#### 4. A line the product added says where it came from
+
+- **A step switched on by something read from the job** (heavy prep, from a photo of a crack) said "Your fixed
+  price": its amount is fixed, but that is not why it is on the quote. It now carries a source of its own:
+  "From the photos" (new code `seen`) or "From the notes" (`words`), by where the thing was read.
+- **An extra the product added said "The customer's choice".** Found while testing: the takeoff looked for a
+  mark the pricing engine never writes (`auto_detected`), so every such extra read as chosen. It now reads the
+  engine's own record, and says "From the notes" or, when the photos called for it, "From the photos". Which
+  extras the photos called for is kept through a reprice.
+- **One function words it** (`businessSources`): the app, the approval page, the review email, and now the
+  dashboard's quote page, which shows a line's source under its name (it showed none).
+- No amount changed. A quote priced before keeps the source stored on its lines.
+
+#### 5. "Answer for the customer"
+
+On a request that waits for its customer's answers, a quiet link in the app and on the dashboard opens the
+same answer card for the business (after a phone call, say). The page still says the customer was asked. It
+uses the route the app already had; the questions travel as `customerQuestions`.
+
+#### 6. Site
+
+- "Add it anywhere": the second row's two pictures are centred under the first three, and all five ways have
+  one title layout: the title, its mark on a line of its own, then the words.
+- The hero's small line reads "For any business that quotes for its work. No website? Use your quote link."
+
+#### 7. The unit test that failed on a busy machine
+
+`rename-qolumns.test.ts` looked for eight old names with eight searches of the repository, one process each,
+against a five-second limit. It failed at 5.2, 5.4 and 11.7 seconds under load and passed alone in 1.5. It now
+makes **one** search for all eight, and looks name by name only to say which one was found. The limit is
+unchanged. Proved to still catch a name by planting one (the test failed, naming the file; the file was removed).
+
+#### Verified
+
+- **Unit tests:** worker 707 (28 new in `checker-choices-t188.test.ts`: every kind of choice, the gate with no
+  model for both audiences, the note, the sources), web 1,209 (14 new in `checker-t188.test.ts`), app 105 (5
+  new in `answers-t188.test.ts`). Lint and typecheck pass; the iOS bundle builds.
+- **`pnpm check:quick`, once: 27 of 28** (20 scripts, 1,716 checks, 6 min 28 s). `verify-t170` failed one
+  check: at 768 px the closing band's heading measured 1.58:1. **The band was right; the script was wrong, and
+  it was my T-187 change to it.** T-187 made it picture a tall page in clipped pieces. Under reduced motion a
+  clipped piece of a full-page picture comes back about 37 px off from the page's own layout (reproduced
+  alone: a whole-page picture and the layout agree, the clipped piece does not), so the heading was measured
+  over the button below it. The script now takes one whole picture when the page fits, and scrolls and joins
+  screen-sized pictures when it does not. `pnpm check:failed`: 3 of 3 (417 checks).
+- **`pnpm check:full`, once: 38 of 40** (32 scripts, 2,562 checks, 35 min 32 s, the real model). Two failed:
+  - `verify-t171` stopped at its first line: it still imported `COMING_LATER`, which T-187 renamed. T-187 ran
+    the quick level only, and this script is full-level. It also compared Pricing's cards with the billing
+    page's line for line, which T-187's cards ("Everything in Starter, plus") no longer are. The script was
+    brought up to T-187, and found one real thing: a plan line and its "Coming soon" mark had no space between
+    them in the page's text (for a screen reader, "…numberComing soon"). A space was added.
+  - `verify-t173` ran out of time. **A real fault, of this ticket's prompt change.** On a test request for two
+    rooms with one photo, the model raised a doubt: "the photos only show a single bedroom, while the request
+    specifies 2 rooms". The customer was asked a question, and the script waited five minutes for an estimate.
+    How many photos were sent is not evidence about a count; asking the model for "the value the evidence
+    points to" had plausibly invited it. One sentence was added to the wording prompt saying so.
+  Then `pnpm check:failed`: `verify-t173` 104 of 104 (its live section included: answered 1 room, wrote "three
+  bedrooms", and the customer is asked which is right), `verify-t171` 97 of 97.
+- **After those runs, on the final source:** `pnpm check:quick --static` 7 of 7 (53 s), and the three scripts
+  that read the plan cards, `--only t154,t167,t170`, 628 checks (2 min 38 s).
+- The one sentence added to the prompt was exercised by the two reruns above only, not by a second full run.
+
+#### Not verified
+
+- **Anything on a phone**, as before.
+- **What the real model now writes** for a doubt (an observation, with a suggested value) beyond what the full
+  run exercised: the sentence is the model's, and no check can hold its wording.
+- **Whether the model still raises a doubt it should not.** One wrong doubt was seen and the prompt was
+  tightened for that kind (a photo count against a stated count). Other kinds are possible; when one happens
+  the question now has buttons, and on a quote with no answer behind the doubt the business sees it as a note.
+- **The dashboard's answer card and its note in a browser:** unit-tested by source and typechecked; no
+  regression script opens it (the ticket asked for none to be added).
+
+#### Constraints introduced (AD-069)
+
+- A question's choices are built by `question-choices.ts` from the business's configuration. A model never
+  writes a choice, and a prompt never asks for one.
+- A doubt that names no configured answer is a note for the business, never a question.
+- An answer's `note` is the business's record. No prompt and no pricing code may read it.
+- A line the product switched on carries `seen` or `words`, never `fixed`.
+
+**Files:** `apps/worker/src/agents/{question-choices,quality-gate}.ts`, `apps/worker/src/{quote-processor,takeoff,reprice-snapshot}.ts`,
+`apps/worker/src/ai/{wording,schemas}.ts`; `packages/shared/src/{question-choices,quantity-source,quote-turn,database.types,api.types}.ts`;
+`apps/web/src/app/api/app/quotes/[quoteId]/answers/route.ts`, `api/public/quotes/[quoteId]/clarify/route.ts`, `api/quotes/[quoteId]/route.ts`,
+`apps/web/src/lib/{app-quote-view,quote-understanding}.ts`, `components/quotes/{BusinessQuestions,UnderstoodPanel}.tsx`,
+`app/(dashboard)/app/quotes/[quoteId]/page.tsx`, `app/q/[quoteId]/clarify/page.tsx`, `components/marketing/home/AddItAnywhere.tsx`,
+`app/globals.css`, `lib/marketing/home-copy.ts`; `apps/mobile/app/quote/[id].tsx`, `apps/mobile/src/lib/api.ts`; tests;
+`scripts/hardcore-test/verify-{t155,t170}.mts`; `Docs/02-api-contracts.md`, `OWNER-TODO.md`.
+
+**Relation:** AD-001 holds: the model suggests a quantity as a choice, a person presses it, and the engine
+prices from the business's rules. AD-068 (T-186) is what tells the gate who answers. AD-066 (T-183) holds: a
+line's source is still one code on the line and one function's words. AD-049 holds: the checker still changes
+nothing. T-182's offline queue is untouched.
+
+---
+
 ### 2026-11-19: T-187 — Home, Pricing, Features and the footer after the owner's review
 
-Built and pushed, **not deployed**. The web app only (and one small function in the shared package for the
-footer's company line). No worker change, no migration, no price, no quote flow. To put it live: the web.
+**Deployed by the owner on 2026-11-19:** web only. No worker, no migration. (Recorded in T-188 from the
+owner's note; the deployment id was not given.)
+
+**As built:** the web app only (and one small function in the shared package for the
+footer's company line). No worker change, no migration, no price, no quote flow.
 
 #### What changed, item by item
 
@@ -155,9 +315,12 @@ send"). T-165's "one yellow button per screen" holds: the plan cards' buttons ar
 
 ### 2026-11-19: T-186 — A quote the business made speaks to the business, not the customer; two leftovers from T-185 (AD-068)
 
-Built and pushed, **not deployed**. Shared display rules, the web app, the on-site app, and one worker change
+**Deployed by the owner on 2026-11-19:** the worker, then the web. No migration. (Recorded in T-188 from the
+owner's note; the worker version and the deployment id were not given.)
+
+**As built:** shared display rules, the web app, the on-site app, and one worker change
 (why a price is not confirmed is now recorded as what it is). No amount, no grade letter, no question the
-worker asks and no migration changed. To put it live: the worker, then the web.
+worker asks and no migration changed.
 
 **The owner's test (quote "Gkn", made in the on-site app):** the screen said "Waiting for customer… Gkn was
 asked for more details. The price comes once they answer", showed a price, asked the business a "Confirm on
@@ -9636,6 +9799,36 @@ request already says. The price paid is that a list which filters by status must
 - A quote priced before T-186 has no reasons stored. Its old sentence is replaced only where the quote's own
   lines prove it wrong.
 - `QuoteNextAction` has a new member, `give_answers`. Anything that lists the actions must handle it.
+
+---
+
+### AD-069: A question's choices are built from the business's rules; a doubt with no answer behind it is a note (T-188)
+
+**Context:** the worker asked a doubt as an open question ("What should we allow for?") with a text box, and
+took a model's made-up options for other questions. An answer typed into a box may not be one the business's
+rules can price, and an open question is slow to answer on site.
+
+**Decision:**
+1. **Choices are built in code** (`apps/worker/src/agents/question-choices.ts`) from the doubted answer's own
+   field and the line it prices: a field's options, "keep or drop" for a line an answer switches on, the
+   number given and the number the evidence points to for a line an answer sizes. A choice is a label and the
+   value the business's rule tests.
+2. **A model writes no choice.** It may say which answer it doubts and what value the evidence points to; a
+   person presses the choice, and the engine prices.
+3. **A doubt that names no configured answer is not asked.** The quote is held for the business with the doubt
+   as the reason.
+4. **Who answers changes the words of a question, never its choices.**
+5. **An answer may carry the business's note.** It is a record for the business and is read by nothing else.
+
+**Why not let the model word the choices:** it would put text the business never wrote on a button that sets
+a price, and nothing would tie the choice to a value the rules understand.
+
+**Consequences:**
+- A quote whose doubt cannot be tied to an answer now waits for the business where it used to wait for the
+  customer.
+- A question about a quantity nobody gave is still typed: it is a number, and no list of numbers is the
+  business's.
+- A new kind of rule that an answer can switch needs its case in `question-choices.ts`, or its doubt is a note.
 
 ---
 

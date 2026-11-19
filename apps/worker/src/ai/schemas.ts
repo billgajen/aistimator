@@ -188,11 +188,15 @@ export const QUOTE_CONTENT_SCHEMA: Record<string, unknown> = {
     quantityConcern: {
       type: 'string',
       description:
-        'Empty string normally. Set to ONE customer-facing sentence when the photos/description suggest a customer-stated price-driving quantity (hours, area, counts) is likely too low or too high for the described job. Never invent concerns the photos cannot support.',
+        'Empty string normally. Set to ONE plain sentence, an observation that addresses nobody (no "you" or "your") and asks nothing, when the photos/description suggest a stated price-driving quantity (hours, area, counts) is likely too low or too high for the described job. Never invent concerns the photos cannot support.',
     },
     quantityConcernFieldId: {
       type: 'string',
       description: 'When quantityConcern is set: the exact fieldId (shown in square brackets in the form answers) of the doubted answer, else empty string',
+    },
+    quantityConcernSuggestedValue: {
+      type: 'string',
+      description: 'When quantityConcern is set: the value the evidence points to for that answer, written the way the answer is written (a number alone, or the option\'s own words). Empty string when the evidence does not say.',
     },
   },
   required: ['scopeSummary', 'assumptions', 'exclusions', 'notes', 'validityDays', 'serviceMismatch', 'quantityConcern'],

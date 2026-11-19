@@ -162,7 +162,8 @@ describe('T-186: an answer the business typed reads "Your answer"', () => {
     expect(sourceForBusiness({ source: 'answer' }, own)).toBe('Your answer')
     expect(sourceForBusiness({ source: 'calculated' }, own)).toBe('Worked out from your answers')
     expect(sourceForBusiness({ source: 'details' }, own)).toBe('Estimated from the details you gave')
-    expect(sourceForBusiness({ source: 'words' }, own)).toBe('From your notes')
+    // T-188: a line the product added from what was written says "From the notes", whoever wrote it
+    expect(sourceForBusiness({ source: 'words' }, own)).toBe('From the notes')
     expect(sourceForBusiness({ source: 'choice' }, own)).toBe('Your choice')
   })
 

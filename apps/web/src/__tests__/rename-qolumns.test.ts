@@ -33,6 +33,20 @@ function filesWith(flags: string, text: string): string[] {
     return [] // git grep exits 1 when nothing matches
   }
 }
+/**
+ * T-188: files with a hit for ANY of several fixed strings, in one search of the repository. The embed-names
+ * test ran one search per name, eight in a row, and each is a process that walks the whole working tree: on a
+ * busy machine the eight together passed the five-second limit (it failed at 5.2, 5.4 and 11.7 seconds, and
+ * passed alone in 1.5). One search does the same work once, so the test no longer depends on how busy the
+ * machine is. A longer limit would only have moved the line.
+ */
+function filesWithAny(texts: readonly string[]): string[] {
+  try {
+    return execSync(`git grep --untracked -l -F ${texts.map((text) => `-e "${text}"`).join(' ')}`, { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean)
+  } catch {
+    return [] // git grep exits 1 when nothing matches
+  }
+}
 function linesWith(flags: string, text: string, file: string): string[] {
   try {
     return execSync(`git grep --untracked -h ${flags} -F -e "${text}" -- "${file}"`, { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean)
@@ -139,9 +153,11 @@ describe('T-162: the embed code', () => {
 
   it('the old embed names do not work any more: they are nowhere in the app', () => {
     const lower = FIRST_NAME.toLowerCase()
-    for (const old of [`${lower}-widget`, `${FIRST_NAME}Widget`, `${FIRST_NAME}Iframe`, `${lower}-resize`, `${lower}-submitted`, `${lower}:submitted`, `${lower}-floating`, `[${FIRST_NAME}]`]) {
-      expect(filesWith('', old).filter((f) => !isHistory(f)), old).toEqual([])
-    }
+    const oldNames = [`${lower}-widget`, `${FIRST_NAME}Widget`, `${FIRST_NAME}Iframe`, `${lower}-resize`, `${lower}-submitted`, `${lower}:submitted`, `${lower}-floating`, `[${FIRST_NAME}]`]
+    // one search for all eight (T-188). Only if it finds something is each name looked up, to say which.
+    const hits = filesWithAny(oldNames).filter((f) => !isHistory(f))
+    if (hits.length > 0) for (const old of oldNames) expect(filesWith('', old).filter((f) => !isHistory(f)), old).toEqual([])
+    expect(hits).toEqual([])
   })
 
   it('the file names of the two loaders are unchanged', () => {

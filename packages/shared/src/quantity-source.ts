@@ -26,8 +26,10 @@ export type LineSource =
   | 'calculated'
   /** the business's fixed price or fixed quantity */
   | 'fixed'
-  /** an extra picked up from the customer's own words */
+  /** a line added because of what was written with the request: an extra, or a step its notes call for */
   | 'words'
+  /** T-188: a line added because of what the photos show (a step or an extra the photos call for) */
+  | 'seen'
   /** an extra the customer chose */
   | 'choice'
 
@@ -56,7 +58,9 @@ const BUSINESS_WORDS: Record<LineSource, string> = {
   details: "Estimated from the customer's details",
   calculated: "Worked out from the customer's answers",
   fixed: 'Your fixed price',
-  words: "From the customer's words",
+  // T-188: a line the product added says where it came from, never "Your fixed price"
+  words: 'From the notes',
+  seen: 'From the photos',
   choice: "The customer's choice",
 }
 
@@ -70,7 +74,6 @@ const OWN_WORDS: Record<LineSource, string> = {
   answer: 'Your answer',
   details: 'Estimated from the details you gave',
   calculated: 'Worked out from your answers',
-  words: 'From your notes',
   choice: 'Your choice',
 }
 
@@ -135,7 +138,15 @@ export function sourceForBusiness(
 
 /** True when the source means the AI worked the quantity out, so the business should look at it */
 export function isMeasuredSource(source: unknown): boolean {
-  return source === 'photos' || source === 'label' || source === 'details'
+  return source === 'photos' || source === 'label' || source === 'details' || source === 'seen' || source === 'words'
+}
+
+/**
+ * T-188: a line the product added by itself, from the photos or from what was written, as against one
+ * the business's price list always charges or an answer chose. Its price is still the business's own.
+ */
+export function isAddedByProduct(source: unknown): boolean {
+  return source === 'seen' || source === 'words'
 }
 
 /**

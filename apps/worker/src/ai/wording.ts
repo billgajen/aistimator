@@ -49,6 +49,8 @@ export interface QuoteContent {
    */
   quantityConcern?: string
   quantityConcernFieldId?: string
+  /** T-188: what the evidence points to for the doubted answer (a figure, or one of its options); empty when it cannot say */
+  quantityConcernSuggestedValue?: string
 }
 
 /**
@@ -226,7 +228,8 @@ Write the quote content as a JSON object with this exact structure:
   "serviceMismatch": false,
   "mismatchReason": "",
   "quantityConcern": "",
-  "quantityConcernFieldId": ""
+  "quantityConcernFieldId": "",
+  "quantityConcernSuggestedValue": ""
 }
 
 ===== STATED QUANTITY SANITY CHECK (quantityConcern) =====
@@ -234,11 +237,23 @@ Compare the customer's stated price-driving quantities (hours, areas, counts
 in their form answers above) against the photos and description. If the
 evidence suggests a stated quantity is likely TOO LOW or TOO HIGH for the job
 described (e.g. photos show heavy clutter but only 2 hours booked), set
-"quantityConcern" to ONE friendly customer-facing sentence naming the doubt
-and what would be realistic, and set "quantityConcernFieldId" to that answer's
-fieldId (the value in square brackets). Do NOT bury the doubt only in notes —
-this field is what lets the system act on it. Leave both as empty strings when
-the stated quantities look plausible or the photos cannot inform them.
+"quantityConcern" to ONE plain sentence that states the doubt as an
+observation. Do not address anyone in it: no "you" and no "your" (write "The
+photos show…", "The notes mention…", never "your photos" or "you selected").
+Do not ask a question in it and do not say what to do: it is followed by a
+question with answers to choose from. Set "quantityConcernFieldId" to that
+answer's fieldId (the value in square brackets), and
+"quantityConcernSuggestedValue" to the value the evidence points to for that
+answer, written the way the answer is written (a number alone for a number;
+the option's own words for a choice; empty when the evidence does not say).
+Do NOT bury the doubt only in notes — these fields are what let the system
+act on it. Leave all three as empty strings when the stated quantities look
+plausible or the photos cannot inform them.
+A photo shows part of a job, never all of it. How many photos were sent, or
+how many of something happen to be visible in them, is NOT evidence that a
+stated count is wrong: never raise a doubt because the photos show fewer (or
+more) than the count that was stated. Raise one only when what the photos or
+the description show contradicts the answer itself.
 
 ===== WRONG-SERVICE DETECTION (serviceMismatch) =====
 Set "serviceMismatch": true ONLY when the customer's request is fundamentally
@@ -494,6 +509,7 @@ function validateContent(content: Partial<QuoteContent>, context: WordingContext
     // R3-1: stated-quantity doubt, same AD-016 rule
     quantityConcern: typeof content.quantityConcern === 'string' && content.quantityConcern.trim() ? content.quantityConcern.trim() : undefined,
     quantityConcernFieldId: typeof content.quantityConcernFieldId === 'string' && content.quantityConcernFieldId.trim() ? content.quantityConcernFieldId.trim() : undefined,
+    quantityConcernSuggestedValue: typeof content.quantityConcernSuggestedValue === 'string' && content.quantityConcernSuggestedValue.trim() ? content.quantityConcernSuggestedValue.trim() : undefined,
   }
 }
 

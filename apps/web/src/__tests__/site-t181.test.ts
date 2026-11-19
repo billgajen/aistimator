@@ -91,7 +91,7 @@ describe('T-181: plan cards say what the business gets', () => {
 
 describe('T-181: the site is for any business', () => {
   it('nothing limits it to contractors or home-service businesses', () => {
-    expect(HERO.smallLine).toBe('For any business that quotes for its work, small to corporate. No website? Use your quote link.')
+    expect(HERO.smallLine).toBe('For any business that quotes for its work. No website? Use your quote link.')
     // T-187: the footer's line names no kind of business at all
     expect(FOOTER.line).toBe('Instant quotes for your customers, in your own prices.')
     expect(PRICING_DESCRIPTION).toContain('for businesses of any size')

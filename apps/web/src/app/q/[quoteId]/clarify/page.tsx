@@ -168,7 +168,53 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
                   {reading ? readingQuestion(String(q.aiValue), reading.where) : q.question}
                 </p>
 
-                {q.type === 'confirm_value' && q.aiValue !== undefined ? (
+                {q.choices && q.choices.length > 0 ? (
+                  /* T-188: the answers to press, built from the business's own rules (the worker's
+                     question-choices): rows to tap (system.md, customer pages). "Another answer" opens a
+                     box only where the choices are not every possible answer. */
+                  <div className="space-y-2" data-testid="question-choices">
+                    {q.choices.map((choice) => (
+                      <button
+                        key={choice.value}
+                        type="button"
+                        aria-pressed={answers[q.id] === choice.value}
+                        onClick={() => setAnswers(prev => ({ ...prev, [q.id]: choice.value }))}
+                        data-testid="question-choice"
+                        className={`flex min-h-[48px] w-full items-center rounded-md border px-4 py-3 text-left text-sm font-semibold transition-colors ${
+                          answers[q.id] === choice.value ? 'border-secondary bg-secondary-light text-secondary' : 'border-field text-text-primary hover:border-ink'
+                        }`}
+                      >
+                        {choice.label}
+                      </button>
+                    ))}
+                    {!q.closed && (
+                      <>
+                        <button
+                          type="button"
+                          aria-pressed={answers[q.id] !== undefined && !q.choices.some((c) => c.value === answers[q.id])}
+                          onClick={() => setAnswers(prev => ({ ...prev, [q.id]: '' }))}
+                          data-testid="question-other"
+                          className={`flex min-h-[48px] w-full items-center rounded-md border px-4 py-3 text-left text-sm font-semibold transition-colors ${
+                            answers[q.id] !== undefined && !q.choices.some((c) => c.value === answers[q.id]) ? 'border-ink bg-surface text-text-primary' : 'border-field text-text-primary hover:border-ink'
+                          }`}
+                        >
+                          Another answer
+                        </button>
+                        {answers[q.id] !== undefined && !q.choices.some((c) => c.value === answers[q.id]) && (
+                          <input
+                            type="text"
+                            inputMode={q.answerKind === 'number' ? 'decimal' : 'text'}
+                            aria-label="Your answer"
+                            value={answers[q.id] || ''}
+                            onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                            autoFocus
+                            className="w-full px-3 py-2 border border-field rounded-md text-base focus:outline-none focus:ring-2"
+                          />
+                        )}
+                      </>
+                    )}
+                  </div>
+                ) : q.type === 'confirm_value' && q.aiValue !== undefined ? (
                   /* T-108: one-tap confirmation of the AI's extracted value */
                   <div className="space-y-2">
                     <div className="flex flex-col gap-2 sm:flex-row">
@@ -266,6 +312,7 @@ export default function ClarifyPage({ params }: { params: { quoteId: string } })
                 ) : (
                   <input
                     type="text"
+                    inputMode={q.answerKind === 'number' ? 'decimal' : 'text'}
                     placeholder="Your answer..."
                     value={answers[q.id] || ''}
                     onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}

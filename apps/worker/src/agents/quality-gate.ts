@@ -3,7 +3,9 @@
  *
  * Evaluates quote quality after pricing + wording and decides:
  * - send: Quote is good, proceed to customer
- * - ask_clarification: Low-confidence signals need customer input (max 2 questions)
+ * - ask_clarification: Low-confidence signals need an answer (max 2 questions). T-188: every question
+ *   carries the answers to press, built in code from the business's own rules (question-choices.ts),
+ *   and is worded for whoever answers it: the customer, or the business on a quote it made (T-186).
  * - require_review: Critical issue, flag for business owner
  *
  * Uses signal provenance from Phase 3 to decide what to ask.
@@ -14,6 +16,7 @@ import type { AiClient } from '../ai/client'
 import type { ExtractedSignalsV2, ClarificationQuestion, QualityGateResult } from '@qolumns/shared'
 import type { PricingResult } from '../pricing/rules-engine'
 import type { FusedSignals, SignalConflict } from './types'
+import { doubtChoices, missingChoices, type Audience, type BuiltAnswer, type ChoiceContext } from './question-choices'
 
 /** Input context for quality gate evaluation */
 export interface QualityGateInput {
@@ -54,7 +57,22 @@ export interface QualityGateInput {
    * contradicted by the photos/description. Ask the customer to confirm the
    * quantity (answer merges back as a form answer via the fieldId).
    */
-  quantityConcern?: { reason: string; fieldId?: string; options?: string[] }
+  quantityConcern?: {
+    reason: string
+    fieldId?: string
+    /** T-188: what the evidence points to, in the wording layer's words; a number is read out of it for a choice */
+    suggested?: string
+  }
+  /**
+   * T-188: who answers the questions. A quote the business made itself asks the business (T-186); every
+   * other asks the customer. It changes a question's words, never its choices. Default: the customer.
+   */
+  audience?: Audience
+  /**
+   * T-188: what the choices are built from: the request's fields, the service's lines and extras, and the
+   * answers given. Without it a doubt cannot be turned into choices, and is not asked.
+   */
+  choiceContext?: Omit<ChoiceContext, 'audience'>
   /** T-126 send-guard: how many work steps the config defines */
   workStepsConfigured?: number
   /** T-126 send-guard: how many work-step lines actually priced */
@@ -150,15 +168,21 @@ export async function evaluateQualityGate(
       key: d.askKey,
       reason: `The quantity for "${d.stepName}" was not provided — the line is currently priced at a single-unit placeholder; ask the customer for the actual value`,
     }))
-  // R3-1: stated-but-doubted quantities — the concern is already a
-  // customer-facing sentence, so ask it directly (the confirm-template would
-  // absurdly ask the customer to confirm the number they themselves typed)
-  const concern = input.quantityConcern
+  // R3-1: stated-but-doubted quantities — the concern is a plain sentence of its own, so it is asked
+  // directly (the confirm-template would absurdly ask someone to confirm the number they themselves typed).
+  // T-188: it is asked with choices built from the business's own rules, never as an open question. A
+  // doubt tied to no answer the business configured has no choices and no answer that could change the
+  // price: it is not asked, and goes to the business as a note (below).
+  const audience: Audience = input.audience ?? 'customer'
+  const choiceContext: ChoiceContext = { fields: [], workSteps: [], addons: [], answers: [], ...input.choiceContext, audience }
+  const concernAnswer = input.quantityConcern ? doubtChoices(input.quantityConcern.fieldId, input.quantityConcern.suggested, choiceContext) : null
+  const unaskedConcern = input.quantityConcern && !concernAnswer ? input.quantityConcern.reason : null
+  const concern = input.quantityConcern && concernAnswer
     ? [{
-        key: input.quantityConcern.fieldId || 'stated_quantity',
+        key: input.quantityConcern.fieldId!,
         reason: input.quantityConcern.reason,
         direct: true,
-        options: input.quantityConcern.options,
+        built: concernAnswer,
       }]
     : []
   // T-139: identification questions arrive ready-made (deterministic)
@@ -178,7 +202,11 @@ export async function evaluateQualityGate(
     ...identified.filter((s) => !structural.some((m) => m.key === s.key)),
   ]
 
+  // T-188: a doubt that could not be asked is the business's to look at before the quote goes anywhere
+  const heldForDoubt = (): QualityGateResult => ({ action: 'require_review', reason: unaskedConcern!, evaluatedAt: new Date().toISOString() })
+
   if (signalsNeedingClarification.length === 0) {
+    if (unaskedConcern) return heldForDoubt()
     return {
       action: 'send',
       evaluatedAt: new Date().toISOString(),
@@ -186,14 +214,17 @@ export async function evaluateQualityGate(
   }
 
   // Generate targeted questions (max 2)
+  const quantityKeys = new Set([...missing.map((m) => m.key), ...defaulted.map((d) => d.key)])
   const questions = await generateClarificationQuestions(
     signalsNeedingClarification.slice(0, 2),
     input.serviceName,
     structuredSignals,
-    gemini
+    gemini,
+    { audience, context: choiceContext, quantityKeys }
   )
 
   if (questions.length === 0) {
+    if (unaskedConcern) return heldForDoubt()
     // Couldn't generate questions — proceed with send
     return {
       action: 'send',
@@ -305,7 +336,8 @@ async function generateClarificationQuestions(
   signalsToAsk: Array<{ key: string; reason: string }>,
   serviceName: string,
   structuredSignals: ExtractedSignalsV2,
-  gemini: AiClient | null
+  gemini: AiClient | null,
+  who: { audience: Audience; context: ChoiceContext; quantityKeys: Set<string> }
 ): Promise<ClarificationQuestion[]> {
   if (signalsToAsk.length === 0) return []
 
@@ -318,14 +350,17 @@ async function generateClarificationQuestions(
       confirmQuestions.push(prebuilt)
       continue
     }
-    // R3-1: direct entries already carry the exact customer-facing question
+    // R3-1: a direct entry states the doubt in its own sentence. T-188: what follows it is the question
+    // the choices answer ("Keep <the line>?", "Which is right?"), never an open "What should we allow for?"
     if ((s as { direct?: boolean }).direct) {
-      const options = (s as { options?: string[] }).options
+      const built = (s as unknown as { built: BuiltAnswer }).built
       confirmQuestions.push({
         id: `cq_${Date.now()}_d${confirmQuestions.length}`,
         targetSignalKey: s.key,
-        question: `${s.reason} What should we allow for?`,
-        ...(options && options.length > 0 && { options }),
+        question: `${s.reason.replace(/\s+$/, '')} ${built.ask}`,
+        ...(built.choices.length > 0 && { choices: built.choices }),
+        ...(built.closed && { closed: true }),
+        ...(built.answerKind && { answerKind: built.answerKind }),
       })
       continue
     }
@@ -336,7 +371,11 @@ async function generateClarificationQuestions(
       confirmQuestions.push({
         id: `cq_${Date.now()}_c${confirmQuestions.length}`,
         targetSignalKey: s.key,
-        question: `From your photos and details, we estimated ${label}: ${value}. Is that right?`,
+        // T-188: worded for who answers. On a quote the business made, the photos and details are its own.
+        question:
+          who.audience === 'business'
+            ? `From the photos and details, ${label} was estimated at ${value}. Is that right?`
+            : `From your photos and details, we estimated ${label}: ${value}. Is that right?`,
         type: 'confirm_value',
         aiValue: typeof value === 'number' ? value : String(value),
         evidence: signal?.evidence,
@@ -346,7 +385,17 @@ async function generateClarificationQuestions(
     }
   }
 
-  const textQuestions = await generateTextQuestions(needsAiQuestion, serviceName, gemini)
+  // T-188: a question about something nobody gave is answered with the options of the field it fills, or
+  // with a number. A model's own suggested options are not used: they are not the business's.
+  const textQuestions = (await generateTextQuestions(needsAiQuestion, serviceName, gemini, who.audience)).map((asked) => {
+    const answer = missingChoices(asked.targetSignalKey, who.context, who.quantityKeys.has(asked.targetSignalKey))
+    return {
+      ...asked,
+      ...(answer && answer.choices.length > 0 && { choices: answer.choices }),
+      ...(answer?.closed && { closed: true }),
+      ...(answer?.answerKind && { answerKind: answer.answerKind }),
+    }
+  })
   return [...confirmQuestions, ...textQuestions]
 }
 
@@ -357,7 +406,8 @@ async function generateClarificationQuestions(
 async function generateTextQuestions(
   signalsToAsk: Array<{ key: string; reason: string }>,
   serviceName: string,
-  gemini: AiClient | null
+  gemini: AiClient | null,
+  audience: Audience = 'customer'
 ): Promise<ClarificationQuestion[]> {
   if (signalsToAsk.length === 0) return []
 
@@ -368,14 +418,24 @@ async function generateTextQuestions(
         .map(s => `- "${s.key}": ${s.reason}`)
         .join('\n')
 
-      const prompt = `Generate ${signalsToAsk.length} clear, friendly question(s) to ask a customer about their ${serviceName} quote request.
+      // T-188: who is asked. On a quote the business made itself, the question goes to the person who
+      // entered the job; it must not speak to them as a customer ("your quote request", "your photos").
+      const asked =
+        audience === 'business'
+          ? `to ask the business that is pricing this ${serviceName} job. The business entered the job itself and is looking at it now`
+          : `to ask a customer about their ${serviceName} quote request`
+      const reader =
+        audience === 'business'
+          ? 'Speak to the business about the job ("How many…", "What is the…"). Never say "your quote", "your request" or "your photos", and never thank them'
+          : 'Questions should be simple and easy for a non-technical customer to answer'
+      const prompt = `Generate ${signalsToAsk.length} clear, friendly question(s) ${asked}.
 
 These signals need clarification:
 ${signalDescriptions}
 
 Rules:
-1. Questions should be simple and easy for a non-technical customer to answer
-2. If possible, provide 2-4 answer options to choose from
+1. ${reader}
+2. Do not offer answer options: the answers to choose from are added separately
 3. Each question should target exactly one signal
 4. Keep questions concise (1-2 sentences max)
 
@@ -384,14 +444,15 @@ Return a JSON object with a "questions" array.`
       const result = await gemini.generateWithSchema<{ questions: Array<{ targetSignalKey: string; question: string; options?: string[] }> }>(
         prompt,
         CLARIFICATION_QUESTIONS_SCHEMA,
-        'You are a friendly customer service assistant helping gather information for a quote.'
+        audience === 'business'
+          ? 'You help a business gather the last details it needs to price a job.'
+          : 'You are a friendly customer service assistant helping gather information for a quote.'
       )
 
       return result.questions.map((q, i) => ({
         id: `cq_${Date.now()}_${i}`,
         targetSignalKey: q.targetSignalKey,
         question: q.question,
-        options: q.options,
       }))
     } catch (error) {
       console.error('[QualityGate] AI question generation failed:', error)
@@ -402,6 +463,9 @@ Return a JSON object with a "questions" array.`
   return signalsToAsk.map((s, i) => ({
     id: `cq_${Date.now()}_${i}`,
     targetSignalKey: s.key,
-    question: `Could you provide more details about "${s.key.replace(/_/g, ' ')}" for your ${serviceName} quote?`,
+    question:
+      audience === 'business'
+        ? `What is "${s.key.replace(/_/g, ' ')}" for this ${serviceName} job?`
+        : `Could you provide more details about "${s.key.replace(/_/g, ' ')}" for your ${serviceName} quote?`,
   }))
 }

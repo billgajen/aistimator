@@ -57,6 +57,16 @@ export function signalSource(signal: Signal | undefined): LineSource {
 }
 
 /**
+ * T-188: why a line the product switched on is on the quote: because of the photos, because of what was
+ * written with the request, or (a guess from neither) from the details as a whole.
+ */
+export function addedBecause(signal: Signal): LineSource {
+  if (signal.source === 'vision') return 'seen'
+  if (signal.source === 'nlp') return 'words'
+  return 'details'
+}
+
+/**
  * Build the takeoff table from the trace, resolving each quantity's method
  * from its provenance (measurement evidence > customer-provided > fixed).
  */
@@ -66,6 +76,8 @@ export function buildTakeoff(opts: {
   workSteps: WorkStepConfig[]
   /** T-138: form fields filled by an on-site LiDAR scan, with the audit line */
   scanned?: { fieldIds: Set<string>; evidence: string }
+  /** T-188: the extras that were added because of what the photos show (the others the product added came from what was written) */
+  photoAddonIds?: ReadonlySet<string>
 }): TakeoffEntry[] {
   const { trace, structuredSignals, workSteps } = opts
   const entries: TakeoffEntry[] = []
@@ -146,6 +158,11 @@ export function buildTakeoff(opts: {
             method = `${trigger.value} — ${plainSource(trigger).replace(/^From/, 'from')}`
             source = 'label'
             evidence = trigger.evidence
+          } else if (trigger && !config.when) {
+            // T-188: the line is here because of something the product read: in the photos, or in what
+            // was written. It said "Your fixed price", which is where its amount comes from, not why it
+            // is on the quote. (The customer's words for it, `method`, are unchanged.)
+            source = addedBecause(trigger)
           }
         }
 
@@ -166,12 +183,19 @@ export function buildTakeoff(opts: {
       }
 
       case 'addon': {
-        const detected = step.signalsUsed.some((s) => s.key === 'auto_detected')
+        // The engine's own record of why the extra is on the quote: a word of the request matched it
+        // ('matched_keyword'), or something the photos show did ('detected_condition'). An extra the
+        // customer chose carries neither.
+        // T-188: this looked for a key the engine never writes ('auto_detected'), so every extra the
+        // product added read as "The customer's choice". It now says whether the photos or the notes
+        // called for it. Its amount is the business's own price either way.
+        const fromPhotos = step.signalsUsed.some((s) => s.key === 'detected_condition') || (step.id !== undefined && opts.photoAddonIds?.has(step.id) === true)
+        const detected = fromPhotos || step.signalsUsed.some((s) => s.key === 'matched_keyword')
         entries.push({
           item: step.description,
           amount: step.amount,
-          method: detected ? PLAIN.fromDescription : PLAIN.selectedExtra,
-          source: detected ? 'words' : 'choice',
+          method: detected ? (fromPhotos ? PLAIN.photos : PLAIN.fromDescription) : PLAIN.selectedExtra,
+          source: detected ? (fromPhotos ? 'seen' : 'words') : 'choice',
         })
         break
       }

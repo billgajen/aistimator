@@ -26,7 +26,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as Clipboard from 'expo-clipboard'
-import { allAnswered, certaintySentence, chosenChoice, customerFirstName, formatMoney, isTypedAnswer, lineLabelParts, parseMoneyInput, questionChoices, QUOTE_TURN_COPY, type AppQuoteLine, type AppQuoteSection, type AppQuoteView } from '@qolumns/shared'
+import { ANSWER_NOTE_MAX, allAnswered, certaintySentence, chosenChoice, customerFirstName, formatMoney, isTypedAnswer, lineLabelParts, parseMoneyInput, questionChoices, QUOTE_TURN_COPY, type AppQuoteLine, type AppQuoteSection, type AppQuoteView } from '@qolumns/shared'
 import { useApi } from '../../src/lib/api-context'
 import { toApiError } from '../../src/lib/api'
 import { config } from '../../src/lib/config'
@@ -54,6 +54,9 @@ export default function QuoteDetail() {
   const router = useRouter()
   const [quote, setQuote] = useState<AppQuoteView | null>(null)
   const [answers, setAnswers] = useState<Record<string, string | undefined>>({})
+  // T-188: the optional note with each answer, and whether the business is answering for the customer
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const [forCustomer, setForCustomer] = useState(false)
   const [invoice, setInvoice] = useState('')
   const [invoiceSaved, setInvoiceSaved] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
@@ -112,18 +115,28 @@ export default function QuoteDetail() {
 
   const setAnswer = (id: string, value: string) => setAnswers((a) => ({ ...a, [id]: value }))
 
-  const confirm = () =>
+  /**
+   * Send the answers, and the price is worked out again. `asked` is the business's own questions, or
+   * (T-188) the customer's, when the business answers for them. A note goes with its answer.
+   */
+  const sendAnswers = (asked: AppQuoteView['questions']) =>
     run(async () => {
       if (!quote) return
       const stored = await loadQuoteToken(quote.id)
       await api.answerQuestions(
         quote.id,
-        quote.questions.map((q) => ({ questionId: q.id, answer: (answers[q.id] ?? '').trim() })),
+        asked.map((q) => {
+          const note = (notes[q.id] ?? '').trim()
+          return { questionId: q.id, answer: (answers[q.id] ?? '').trim(), ...(note && { note }) }
+        }),
         stored?.token
       )
       setAnswers({})
+      setNotes({})
+      setForCustomer(false)
       await load()
     })
+  const confirm = () => (quote ? sendAnswers(quote.questions) : undefined)
 
   /** The customer's link: the one this phone kept, or a new one (every earlier link keeps working) */
   async function linkFor(q: AppQuoteView): Promise<string> {
@@ -228,6 +241,8 @@ export default function QuoteDetail() {
   const customer = quote.customer ?? { name: quote.customerName, email: null, phone: null }
   const first = customerFirstName(customer.name)
   const answered = allAnswered(quote.questions, answers)
+  // T-188: the customer's own open questions (a server from before T-188 sends none)
+  const customerQuestions = quote.customerQuestions ?? []
   const request = quote.request
   const photos = quote.photos ?? []
   const photoCount = Math.max(quote.photoCount ?? 0, photos.length)
@@ -311,41 +326,26 @@ export default function QuoteDetail() {
           <Card>
             <Label>{QUOTE_TURN_COPY.questions.title(quote.questions.length)}</Label>
             <Muted>{QUOTE_TURN_COPY.questions.note}</Muted>
-            {quote.questions.map((q) => {
-              const words = evidenceWords(q.evidence)
-              const { choices, otherLabel, numeric } = questionChoices(q)
-              const answer = answers[q.id]
-              const chosen = chosenChoice(choices, answer)
-              const typed = isTypedAnswer(choices, answer)
-              return (
-                <View key={q.id} style={{ marginTop: space.lg }}>
-                  <Text style={styles.question} maxFontSizeMultiplier={scale.text}>
-                    {q.question}
-                  </Text>
-                  {words ? <Muted>{words.line}</Muted> : null}
-                  {words?.labelText ? <Muted>The label says: {words.labelText}</Muted> : null}
-                  <View style={{ height: space.sm }} />
-                  {choices.length > 0 ? (
-                    <Rows
-                      options={[...choices.map((c) => ({ value: c.value, label: c.label })), ...(otherLabel ? [{ value: OTHER, label: otherLabel }] : [])]}
-                      value={chosen ? chosen.value : typed ? OTHER : undefined}
-                      onChange={(v) => setAnswer(q.id, v === OTHER ? '' : v)}
-                    />
-                  ) : null}
-                  {typed ? (
-                    <View style={{ marginTop: choices.length > 0 ? space.sm : 0 }}>
-                      <Field
-                        label={QUOTE_TURN_COPY.questions.otherLabel}
-                        value={answer ?? ''}
-                        onChangeText={(v) => setAnswer(q.id, v)}
-                        keyboardType={numeric ? 'decimal-pad' : 'default'}
-                      />
-                    </View>
-                  ) : null}
-                </View>
-              )
-            })}
+            <Questions asked={quote.questions} answers={answers} notes={notes} onAnswer={setAnswer} onNote={(id, v) => setNotes((n) => ({ ...n, [id]: v }))} />
           </Card>
+        ) : null}
+
+        {/* 3b. T-188: a request that waits for the customer's answers. The screen says the customer was asked;
+            a quiet link lets the business answer for them (after a phone call, say). Same card, same route. */}
+        {!story.asksBusiness && customerQuestions.length > 0 ? (
+          forCustomer ? (
+            <Card>
+              <Label>{QUOTE_TURN_COPY.questions.forCustomerTitle(customerQuestions.length)}</Label>
+              <Muted>{QUOTE_TURN_COPY.questions.forCustomerNote}</Muted>
+              <Questions asked={customerQuestions} answers={answers} notes={notes} onAnswer={setAnswer} onNote={(id, v) => setNotes((n) => ({ ...n, [id]: v }))} />
+              <View style={{ height: space.lg }} />
+              <Button title={QUOTE_TURN_COPY.pageButtons.giveAnswers} onPress={() => sendAnswers(customerQuestions)} busy={busy} disabled={!allAnswered(customerQuestions, answers)} />
+            </Card>
+          ) : (
+            <Card>
+              <LinkRow title={QUOTE_TURN_COPY.questions.answerForCustomer} icon="chatbubble-ellipses-outline" onPress={() => setForCustomer(true)} last />
+            </Card>
+          )
         ) : null}
 
         {/* 4. The price: lines, the minimum as a note, added services as sections, one total */}
@@ -551,6 +551,63 @@ function PhotoTile({ uri, label, onPress, onRetry }: { uri: string; label: strin
     <Pressable accessibilityRole="imagebutton" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.photo, pressed && { opacity: 0.8 }]}>
       <Image source={{ uri }} style={styles.photoImage} onLoad={() => setState('shown')} onError={() => setState('failed')} accessibilityIgnoresInvertColors />
     </Pressable>
+  )
+}
+
+/**
+ * The questions of a quote, each with its choices as rows to press (typing is behind "Other") and, under
+ * them, the optional note "Why (for your records)" (T-188). Which choices a question has is the shared
+ * rule's; the note is the business's own record and changes nothing on the quote.
+ */
+function Questions({
+  asked,
+  answers,
+  notes,
+  onAnswer,
+  onNote,
+}: {
+  asked: AppQuoteView['questions']
+  answers: Record<string, string | undefined>
+  notes: Record<string, string>
+  onAnswer: (id: string, value: string) => void
+  onNote: (id: string, value: string) => void
+}) {
+  return (
+    <>
+      {asked.map((q) => {
+        const words = evidenceWords(q.evidence)
+        const { choices, otherLabel, numeric } = questionChoices(q)
+        const answer = answers[q.id]
+        const chosen = chosenChoice(choices, answer)
+        const typed = isTypedAnswer(choices, answer)
+        return (
+          <View key={q.id} style={{ marginTop: space.lg }}>
+            <Text style={styles.question} maxFontSizeMultiplier={scale.text}>
+              {q.question}
+            </Text>
+            {words ? <Muted>{words.line}</Muted> : null}
+            {words?.labelText ? <Muted>The label says: {words.labelText}</Muted> : null}
+            <View style={{ height: space.sm }} />
+            {choices.length > 0 ? (
+              <Rows
+                options={[...choices.map((c) => ({ value: c.value, label: c.label })), ...(otherLabel ? [{ value: OTHER, label: otherLabel }] : [])]}
+                value={chosen ? chosen.value : typed ? OTHER : undefined}
+                onChange={(v) => onAnswer(q.id, v === OTHER ? '' : v)}
+              />
+            ) : null}
+            {typed ? (
+              <View style={{ marginTop: choices.length > 0 ? space.sm : 0 }}>
+                <Field label={QUOTE_TURN_COPY.questions.otherLabel} value={answer ?? ''} onChangeText={(v) => onAnswer(q.id, v)} keyboardType={numeric ? 'decimal-pad' : 'default'} />
+              </View>
+            ) : null}
+            <View style={{ marginTop: space.sm }}>
+              <Field label={QUOTE_TURN_COPY.questions.noteLabel} value={notes[q.id] ?? ''} onChangeText={(v) => onNote(q.id, v.slice(0, ANSWER_NOTE_MAX))} />
+              <Muted style={{ marginTop: 0 }}>{QUOTE_TURN_COPY.questions.noteHint}</Muted>
+            </View>
+          </View>
+        )
+      })}
+    </>
   )
 }
 

@@ -22,7 +22,7 @@
  * No customer contact detail is read here, and nothing here is logged.
  */
 
-import { checkerFindings } from '@qolumns/shared'
+import { answerNote, checkerFindings } from '@qolumns/shared'
 import type { QuoteUnderstanding, UnderstoodItem, UnderstoodQuestion } from '@qolumns/shared'
 
 export type { QuoteUnderstanding, UnderstoodItem, UnderstoodQuestion }
@@ -246,8 +246,12 @@ export function quoteUnderstanding(
     const question = text(q.question)
     if (!question) continue
     const answer = answers.find((a) => a.questionId === q.id)
-    const said = answer ? valueWords(answer.answer) : ''
-    asked.push({ question, answer: said || null })
+    // T-188: an answer is shown by the words of the choice that was pressed, when it was a choice
+    const pressed = answer ? list(q.choices).find((c) => text(c.value) !== '' && text(c.value) === text(answer.answer)) : undefined
+    const said = answer ? text(pressed?.label) || valueWords(answer.answer) : ''
+    // "Why (for your records)": the business's own note, shown to the business alone
+    const note = answer ? answerNote(answer.note) : null
+    asked.push({ question, answer: said || null, ...(note && { note }) })
   }
 
   // ---- The quote checker's findings (AD-049: notes only) ----------------------

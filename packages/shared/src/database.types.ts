@@ -787,12 +787,29 @@ export interface ClarificationQuestion {
   aiValue?: string | number
   /** What the AI saw that produced this value — shown to build customer trust */
   evidence?: string
+  /**
+   * T-188: the answers to press, built in code from the business's own rules (the doubted answer's field
+   * and the line it prices), never written by a model. `value` is what is saved as the answer; `label`
+   * is what the button says. When present, they are the question's choices (`options` is the older,
+   * words-only form and is still read).
+   */
+  choices?: Array<{ label: string; value: string }>
+  /** T-188: the choices are every possible answer (a field's own options, or yes and no): no typed answer is offered */
+  closed?: boolean
+  /** T-188: a typed answer to this question is a number (a quantity nobody gave) */
+  answerKind?: 'number'
 }
 
 /** Customer's answer to a clarification question */
 export interface ClarificationAnswer {
   questionId: string
   answer: string
+  /**
+   * T-188: "Why (for your records)": a note the business may add when it answers. Kept with the answer
+   * and shown on the dashboard quote page. It is the business's own record: no prompt is given it and
+   * no pricing rule reads it (a unit test holds the worker to that).
+   */
+  note?: string
 }
 
 /** Quality gate evaluation result */

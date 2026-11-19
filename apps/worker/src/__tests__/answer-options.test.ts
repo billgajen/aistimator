@@ -50,10 +50,18 @@ describe('option answers (US gauntlet S39)', () => {
         clarificationCount: 0,
         serviceName: 'Water heater',
         hasPhotos: false,
-        quantityConcern: { reason: 'You described 40 gallons but picked 50.', fieldId: 'model', options: ['40 gallon gas', '50 gallon electric'] },
+        quantityConcern: { reason: 'The notes say 40 gallons but 50 was picked.', fieldId: 'model' },
+        // T-188: the gate builds the choices itself, from the field's own options (the processor used to
+        // hand it their labels)
+        choiceContext: { fields: [{ fieldId: 'model', label: 'Model', options: [{ value: '40_gallon_gas', label: '40 gallon gas' }, { value: '50_gallon_electric', label: '50 gallon electric' }] }], workSteps: [], addons: [], answers: [{ fieldId: 'model', value: '50_gallon_electric' }] },
       },
       null
     )
-    expect(result.questions?.[0]).toMatchObject({ targetSignalKey: 'model', options: ['40 gallon gas', '50 gallon electric'] })
+    expect(result.questions?.[0]).toMatchObject({
+      targetSignalKey: 'model',
+      question: 'The notes say 40 gallons but 50 was picked. Which is right?',
+      choices: [{ label: '40 gallon gas', value: '40_gallon_gas' }, { label: '50 gallon electric', value: '50_gallon_electric' }],
+      closed: true,
+    })
   })
 })

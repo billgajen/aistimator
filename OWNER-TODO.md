@@ -2780,9 +2780,7 @@ migration. Everything below is live.
 
 ## T-186 — On-site quotes speak to you, not the customer
 
-Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-186" (worker, then web; no
-migration). **Deploy before you test the app:** without the web, the quote screen still gets the old words
-from the server ("The customer's answer", the old sentence under the total).
+**Deployed by you on 19 November 2026:** the worker, then the web. No migration. Everything below is live.
 
 I have still not seen the app run: there is no iPhone, simulator or Xcode on this machine.
 
@@ -2846,15 +2844,13 @@ still unanswered):**
 - Questions worded for the business on its own quotes (decision 2).
 - A quote entered by the business on the dashboard does not exist yet; when it does, it is added in one place
   (`BUSINESS_REQUEST_SOURCES`) and gets all of the above.
-- One unit test fails when the Mac is busy (it searches the whole repository eight times against a 5 second
-  limit). It is not from this ticket. A longer limit for that one test would stop it wasting a run.
+- ~~One unit test fails when the Mac is busy.~~ Done in T-188: it makes one search, not eight.
 
 ---
 
 ## T-187 — Home, Pricing, Features and the footer, from your review
 
-Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-187" (web only; no worker, no
-migration).
+**Deployed by you on 19 November 2026:** web only. No worker, no migration. Everything below is live.
 
 ### Look before you deploy
 
@@ -2932,3 +2928,70 @@ In `apps/web/src/lib/marketing/plan-claims.ts`, set `live: true` on the line, an
 
 - Safari and Firefox: I looked in Chrome only. In an older browser the wrapping is as it was; nothing breaks.
 - The full regression level was not run (a marketing ticket).
+
+---
+
+## T-188 — Questions with choices and a note, honest line sources, small leftovers
+
+Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-188" (worker, then web; no
+migration). **Deploy before you test the app:** the choices are built by the worker, so a quote priced before
+the deploy still has the old kind of question.
+
+I have still not seen the app run: there is no iPhone, simulator or Xcode on this machine.
+
+### What to look at (after the deploy, on a new quote)
+
+- [ ] **A question has buttons.** Make a quote on site where a photo disagrees with an answer you gave (a
+  yes/no that adds a line, or a count). The question states the doubt and asks "Keep <the line>?"; the
+  buttons read "Keep <the line>" and "No <the line>". For a count: "Keep 1 room", the suggested count, and
+  "Other". There is no "What should we allow for?" any more.
+- [ ] **Under the buttons: "Why (for your records)".** Write a line, answer, then open the same quote on the
+  dashboard: under "What Qolumns understood", "Asked you" shows your answer and "Why: …".
+- [ ] **The question speaks to you** on a quote you made ("The photos show…", "From the photos and
+  details…"), not "From your photos…".
+- [ ] **A line the product added** (heavy prep from a photo, an extra from your notes) says "From the photos"
+  or "From the notes" under its name, in the app and now on the dashboard's quote page too. It no longer says
+  "Your fixed price" or "The customer's choice".
+- [ ] **"Answer for the customer":** on a customer's request that says "Waiting for customer… was asked for
+  more details", there is a quiet link in the app and on the dashboard. It opens the same questions; your
+  answer prices the quote as theirs would.
+- [ ] **Site (after the web deploy):** in "Add it anywhere" the two lower pictures sit in the middle, and
+  WhatsApp and the app have the same title, badge and words layout. The line under the hero buttons no longer
+  says "small to corporate".
+
+### One thing that now happens differently
+
+- **A doubt that is tied to no answer is no longer asked of anyone.** If the product doubts a quote but cannot
+  say which of your answers it doubts, there is no choice to offer and no answer that could change the price.
+  The quote now waits for you ("Needs your approval"), with the doubt shown as the reason it was held. Before,
+  the customer was asked an open question whose answer changed nothing. Recommended: keep. Say if you would
+  rather such a quote went straight through.
+
+### Decisions for you (my recommendation first)
+
+1. **A question about a quantity nobody gave is still typed** (a number box): there is no honest list of
+   numbers to offer. Recommended: keep.
+2. **A choice's words are your own names** with one of three plain words in front: "Keep Wallpaper removal",
+   "No Wallpaper removal", "Add Heavy prep". If a step's name reads badly after "Keep" or "No", renaming the
+   step in your price list fixes it everywhere. Recommended: look at two or three on real quotes first.
+3. **The note is one line of up to 500 characters, per question.** Recommended: keep.
+4. **Older quotes keep the source that was stored on their lines** ("Your fixed price" on a heavy prep line
+   priced before this deploy). Recommended: leave them.
+
+### Not proven
+
+- Anything on a phone.
+- What the real model writes for a doubt on your own quotes. The full check run exercises the path, but the
+  sentence is the model's; the buttons under it are ours and are fixed.
+- **Whether the model raises a doubt it should not.** In the full check run it did once: a request for two
+  rooms with one photo was doubted because "the photos only show a single bedroom". I added one sentence to
+  its instructions (how many photos there are is not evidence about a count) and the same check then passed.
+  Other wrong doubts are possible. If you see one, send me the quote: the question will at least have buttons,
+  and "Keep …" is always one of them.
+- The dashboard's answer card and its note in a browser (unit tests and the typecheck only: you asked for no
+  new regression scripts).
+
+### Later
+
+- The customer still reads "Added for you — detected from your description" on an extra the photos called
+  for. This ticket fixed what the business reads; the customer's line is a separate, small change.

@@ -26,8 +26,8 @@ import { RequestFormScreen } from './RequestFormScreen'
  * from lib/marketing/plan-claims.ts; the mark goes when the flag is set.
  *
  * Layout (globals.css, "Add it anywhere"): from 1024 px three in a row, then
- * the other two in a second row of the same columns, so every picture is one
- * size and each row's pictures start on one line. From 640 px each is a row
+ * the other two in a second row, centred under the first (T-188), so every
+ * picture is one size and each row's pictures start on one line. From 640 px each is a row
  * of words and picture; on a phone they stack. Never five across.
  *
  * There is no caption under a picture.
@@ -116,7 +116,7 @@ export function AddItAnywhere({
       </div>
 
       {/* 4. A price asked for in the business's own WhatsApp chat (not live: plan-claims) */}
-      <div className="add-it-item add-it-next" data-testid="add-it-item" data-upcoming="whatsapp">
+      <div className="add-it-item add-it-next add-it-next-first" data-testid="add-it-item" data-upcoming="whatsapp">
         <Title title={UPCOMING.whatsapp.name} text={UPCOMING.whatsapp.lines[0]} soon="whatsapp" />
         <div className="add-it-picture" role="img" aria-label={UPCOMING.whatsapp.screen} {...({ inert: '' } as object)} data-testid="add-it-chat">
           <AppPhone className="h-full">
@@ -141,11 +141,15 @@ export function AddItAnywhere({
 function Title({ title, text, soon }: { title: string; text: string; soon?: NotLiveYet }) {
   return (
     <div>
-      <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 font-display text-lg font-bold text-text-primary">
-        {title}
-        {soon ? <Soon of={soon} className="font-sans" /> : null}
-      </h3>
-      <p className="mt-1 text-sm text-text-secondary">{text}</p>
+      {/* T-188: one layout for every way: the title on its own line, then its mark (when it has one) on a
+          line of its own, then the words. A short title and a long one read the same way. */}
+      <h3 className="font-display text-lg font-bold text-text-primary">{title}</h3>
+      {soon ? (
+        <p className="mt-1.5 leading-none">
+          <Soon of={soon} />
+        </p>
+      ) : null}
+      <p className="mt-1.5 text-sm text-text-secondary">{text}</p>
     </div>
   )
 }

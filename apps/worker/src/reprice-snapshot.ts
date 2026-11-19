@@ -25,6 +25,8 @@ export interface RepriceSnapshot {
   matchedItems: MatchedItem[]
   /** Add-ons the AI applied from the description/photos (auto-recommended) */
   aiDetectedAddonIds: string[]
+  /** T-188: those among them that the photos called for (absent on a snapshot saved before) */
+  photoAddonIds?: string[]
   aiAddonDetectionRan: boolean
   signalRecommendations: SignalRecommendation[]
   crossServicePricing: CrossServicePricing[]
@@ -74,6 +76,6 @@ export function readRepriceInputs(quote: {
     structuredSignals: structuredClone(structuredSignals) as ExtractedSignalsV2,
     legacySignals: structuredClone(snapshot.legacySignals),
     // The customer has answered: a doubt about a stated quantity is resolved
-    content: { ...structuredClone(content), quantityConcern: undefined, quantityConcernFieldId: undefined },
+    content: { ...structuredClone(content), quantityConcern: undefined, quantityConcernFieldId: undefined, quantityConcernSuggestedValue: undefined },
   }
 }

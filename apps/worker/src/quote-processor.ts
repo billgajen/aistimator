@@ -59,6 +59,7 @@ import { withAiTimeout, aiCallTimeoutMs } from './ai/timeouts'
 import { createAiClient } from './ai/factory'
 import type { AiClient } from './ai/client'
 import type { QuantityProvenance } from '@qolumns/shared'
+import type { QuestionField } from './agents/question-choices'
 import { computeEnvelope, enforceEnvelope, computeEstimateGrade, capFlatRateGrade, priceDependsOnJobFacts, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue, parseRoomScan, scanAnswers, scanEvidence, summarizeRoomScan, ROOM_SCAN_FIELD, decideReviewHold, reviewModeOf, customerEstimateRange, isMadeByBusiness, repairCustomerWording, businessPhrasesFrom } from '@qolumns/shared'
 import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor, DEFAULT_ADJUDICATION_VALUE_THRESHOLD, DEFAULT_ADJUDICATION_TIMEOUT_MS } from './ai/measurement'
 import { formatScopeAnswers } from './ai/scope-answers'
@@ -1227,6 +1228,8 @@ export async function processQuote(
 
   // Track AI-detected addon IDs so we can mark them as autoRecommended in pricing
   const aiDetectedAddonIds = new Set<string>()
+  /** T-188: the extras among them that the photos called for (the rest came from what was written) */
+  const photoAddonIds = new Set<string>()
   let aiAddonDetectionRan = false
 
   // 3.5 AI-powered addon detection from customer description (started above,
@@ -1241,6 +1244,7 @@ export async function processQuote(
       }
       aiDetectedAddonIds.add(addonId)
     }
+    for (const addonId of reprice.photoAddonIds ?? []) photoAddonIds.add(addonId)
   } else if (detectedDescriptionAddons && projectDescription && rules.addons && rules.addons.length > 0) {
     console.log('[Processor] Running AI addon detection on customer description')
     try {
@@ -1338,6 +1342,8 @@ export async function processQuote(
           })
           // Track as AI-detected so pricing engine marks it as autoRecommended
           aiDetectedAddonIds.add(detected.addonId)
+          // T-188: and that it was the photos that called for it, for the line's source
+          photoAddonIds.add(detected.addonId)
           console.log(`[Processor] Auto-applying addon from image: ${detected.addonId} - ${detected.reason}`)
         }
       }
@@ -1479,6 +1485,8 @@ export async function processQuote(
     structuredSignals,
     workSteps: rulesWithWorkSteps.workSteps || [],
     ...(scanEvidenceText && { scanned: { fieldIds: scannedFieldIds, evidence: scanEvidenceText } }),
+    // the engine's own photo-condition extras, and the ones the photo pass added
+    photoAddonIds: new Set([...photoAddonIds, ...(pricing.recommendedAddons ?? []).filter((a) => a.source === 'image_signal').map((a) => a.id)]),
   })
   pricing.breakdown = withLineSources(pricing.breakdown, takeoffEntries)
 
@@ -2243,21 +2251,27 @@ export async function processQuote(
           defaultedQuantitySteps,
           // T-139: equipment identification to confirm or ask (built by code)
           identificationQuestions,
-          // R3-1: stated-quantity doubt from the wording layer
+          // R3-1: stated-quantity doubt from the wording layer. T-188: asked with choices the gate builds
+          // from the doubted answer's own field and the line it prices (agents/question-choices.ts)
           quantityConcern: quantityConcern
             ? {
                 reason: quantityConcern,
                 fieldId: quantityConcernFieldId,
-                // An option field is answered by picking an option, not prose
-                ...(quantityConcernFieldId && {
-                  options: fieldOptions(
-                    quantityConcernFieldId,
-                    quoteData.widgetFields as OptionField[] | undefined,
-                    service.draft_config?.suggestedFields as OptionField[] | undefined
-                  ).map((o) => o.label),
-                }),
+                suggested: (content.quantityConcernSuggestedValue || '').trim() || undefined,
               }
             : undefined,
+          // T-188: who answers (a quote the business made asks the business), and what choices are built from
+          audience: isMadeByBusiness(quoteRequest.source_json) ? 'business' : 'customer',
+          choiceContext: {
+            fields: [
+              ...((quoteData.widgetFields as QuestionField[] | undefined) || []),
+              ...((service.draft_config?.suggestedFields as QuestionField[] | undefined) || []),
+            ],
+            workSteps: rulesWithWorkSteps.workSteps || [],
+            addons: (rules.addons || []).map((a) => ({ id: a.id, label: a.label })),
+            answers: formAnswers,
+            allowedValues: Object.fromEntries((service.expected_signals || []).filter((es) => es.possibleValues?.length).map((es) => [es.signalKey, es.possibleValues!])),
+          },
           // T-126 send-guard inputs
           workStepsConfigured: rulesWithWorkSteps.workSteps?.length ?? 0,
           workStepLinesPriced: pricingTrace.trace.filter((t) => t.type === 'work_step').length,
@@ -2286,6 +2300,7 @@ export async function processQuote(
               legacySignals: signals,
               matchedItems,
               aiDetectedAddonIds: [...aiDetectedAddonIds],
+              photoAddonIds: [...photoAddonIds],
               aiAddonDetectionRan,
               signalRecommendations,
               crossServicePricing,

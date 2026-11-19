@@ -98,7 +98,10 @@ export async function POST(
     const { error: updateError } = await supabase
       .from('quotes')
       .update({
-        clarification_answers_json: body.answers,
+        // only what a customer's answer is: the question and the answer (T-188: a note is the business's alone)
+        clarification_answers_json: body.answers
+          .filter((a) => a && typeof a.questionId === 'string' && typeof a.answer === 'string')
+          .map((a) => ({ questionId: a.questionId, answer: a.answer })),
         clarification_count: 1,
         status: 'queued', // Re-enqueue for processing
       })

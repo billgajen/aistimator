@@ -141,7 +141,8 @@ describe('T-186: what the quote screen’s source must hold', () => {
   it('a question’s choices are buttons from the shared rule; typing is behind "Other"', () => {
     expect(screen).toContain('const { choices, otherLabel, numeric } = questionChoices(q)')
     expect(screen).toContain('const typed = isTypedAnswer(choices, answer)')
-    expect(screen).toContain("onChange={(v) => setAnswer(q.id, v === OTHER ? '' : v)}")
+    // (T-188: the questions are drawn by one component, for the business's own and for the customer's)
+    expect(screen).toContain("onChange={(v) => onAnswer(q.id, v === OTHER ? '' : v)}")
     expect(screen).toContain('{typed ? (')
     // nothing is filled in before the business presses or types, and "Other" itself is never sent
     expect(code).not.toContain('String(q.aiValue)')

@@ -1,20 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { QUOTE_TURN_COPY, allAnswered, chosenChoice, isTypedAnswer, questionChoices } from '@qolumns/shared'
+import { ANSWER_NOTE_MAX, QUOTE_TURN_COPY, allAnswered, chosenChoice, isTypedAnswer, questionChoices, type AskedQuestion } from '@qolumns/shared'
 
-export interface BusinessQuestion {
-  id: string
-  question: string
-  type?: string
-  aiValue?: string | number
-  evidence?: string
-  options?: string[]
-}
+export type BusinessQuestion = AskedQuestion
 
 const CHOICE = 'inline-flex min-h-[44px] items-center justify-center rounded-lg border px-4 py-2 text-sm font-semibold transition-colors'
 const CHOSEN = 'border-primary bg-mint text-text-primary'
 const NOT_CHOSEN = 'border-field bg-background text-text-primary hover:bg-surface'
+const FIELD = 'min-h-[44px] w-full rounded-lg border border-field bg-background px-3 py-2 text-base text-text-primary focus:outline-none focus:ring-2 sm:max-w-sm'
 
 /**
  * T-186: the questions on a quote the business made itself. No customer was
@@ -23,11 +17,32 @@ const NOT_CHOSEN = 'border-field bg-background text-text-primary hover:bg-surfac
  *
  * A question with clear choices is answered by pressing one; typing is behind
  * "Other". Which choices a question has is decided by the shared
- * `questionChoices`, so this card and the app offer the same answers.
+ * `questionChoices` (T-188: from the choices the worker built out of the
+ * business's own rules), so this card and the app offer the same answers.
+ *
+ * T-188:
+ *   - under each question's choices, an optional note, "Why (for your
+ *     records)". It is saved with the answer and shown on this page. Nothing
+ *     prices from it and no prompt is given it.
+ *   - `forCustomer`: the same card for a request that waits for the
+ *     customer's answers, when the business answers for them (after a phone
+ *     call, say). It sits behind a quiet link; the page still says the
+ *     customer was asked.
  */
-export function BusinessQuestions({ quoteId, questions, onAnswered }: { quoteId: string; questions: BusinessQuestion[]; onAnswered: () => Promise<void> | void }) {
+export function BusinessQuestions({
+  quoteId,
+  questions,
+  onAnswered,
+  forCustomer = false,
+}: {
+  quoteId: string
+  questions: BusinessQuestion[]
+  onAnswered: () => Promise<void> | void
+  forCustomer?: boolean
+}) {
   const C = QUOTE_TURN_COPY.questions
   const [answers, setAnswers] = useState<Record<string, string | undefined>>({})
+  const [notes, setNotes] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [failed, setFailed] = useState(false)
   if (questions.length === 0) return null
@@ -41,7 +56,12 @@ export function BusinessQuestions({ quoteId, questions, onAnswered }: { quoteId:
       const response = await fetch(`/api/app/quotes/${encodeURIComponent(quoteId)}/answers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers: questions.map((q) => ({ questionId: q.id, answer: (answers[q.id] ?? '').trim() })) }),
+        body: JSON.stringify({
+          answers: questions.map((q) => {
+            const note = (notes[q.id] ?? '').trim()
+            return { questionId: q.id, answer: (answers[q.id] ?? '').trim(), ...(note && { note }) }
+          }),
+        }),
       })
       if (!response.ok) {
         setFailed(true)
@@ -56,13 +76,18 @@ export function BusinessQuestions({ quoteId, questions, onAnswered }: { quoteId:
   }
 
   return (
-    <section className="mb-6 rounded-2xl border border-primary bg-white p-5 shadow-warm-md" aria-labelledby="business-questions-title" data-testid="business-questions">
+    <section
+      className={`mb-6 rounded-2xl border bg-white p-5 shadow-warm-md ${forCustomer ? 'border-border' : 'border-primary'}`}
+      aria-labelledby="business-questions-title"
+      data-testid="business-questions"
+      data-for={forCustomer ? 'customer' : 'business'}
+    >
       <h2 id="business-questions-title" className="text-sm font-semibold text-text-primary">
-        {C.title(questions.length)}
+        {forCustomer ? C.forCustomerTitle(questions.length) : C.title(questions.length)}
       </h2>
-      <p className="mt-1 text-sm text-text-secondary">{C.note}</p>
+      <p className="mt-1 text-sm text-text-secondary">{forCustomer ? C.forCustomerNote : C.note}</p>
 
-      <div className="mt-4 space-y-5">
+      <div className="mt-4 space-y-6">
         {questions.map((q) => {
           const { choices, otherLabel, numeric } = questionChoices(q)
           const answer = answers[q.id]
@@ -95,16 +120,25 @@ export function BusinessQuestions({ quoteId, questions, onAnswered }: { quoteId:
               {typed && (
                 <label className="mt-3 block">
                   <span className="mb-1 block text-sm text-text-secondary">{C.otherLabel}</span>
-                  <input
-                    type="text"
-                    inputMode={numeric ? 'decimal' : 'text'}
-                    value={answer ?? ''}
-                    onChange={(event) => set(q.id, event.target.value)}
-                    className="min-h-[44px] w-full rounded-lg border border-field bg-background px-3 py-2 text-base text-text-primary focus:outline-none focus:ring-2 sm:max-w-sm"
-                    data-testid="question-typed"
-                  />
+                  <input type="text" inputMode={numeric ? 'decimal' : 'text'} value={answer ?? ''} onChange={(event) => set(q.id, event.target.value)} className={FIELD} data-testid="question-typed" />
                 </label>
               )}
+              {/* T-188: the business's own note. Optional; it changes nothing on the quote. */}
+              <label className="mt-3 block">
+                <span className="mb-1 block text-sm text-text-secondary">{C.noteLabel}</span>
+                <input
+                  type="text"
+                  maxLength={ANSWER_NOTE_MAX}
+                  value={notes[q.id] ?? ''}
+                  onChange={(event) => setNotes((current) => ({ ...current, [q.id]: event.target.value }))}
+                  aria-describedby={`note-hint-${q.id}`}
+                  className={FIELD}
+                  data-testid="question-note"
+                />
+                <span id={`note-hint-${q.id}`} className="mt-1 block text-xs text-text-muted">
+                  {C.noteHint}
+                </span>
+              </label>
             </fieldset>
           )
         })}

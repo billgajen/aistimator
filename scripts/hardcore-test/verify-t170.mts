@@ -121,16 +121,27 @@ if (!process.env.PLAYWRIGHT_DIR) {
    */
   const paintedWithoutWords = async (p: Page) => {
     const tag = await p.addStyleTag({ content: '* { color: transparent !important; text-shadow: none !important; caret-color: transparent !important } nav[aria-label="Site"] { visibility: hidden !important }' })
-    // T-187: Home on a phone is taller than one picture can hold (the browser stops at 16,384 px, and what
-    // lay below came back blank, so the closing band measured 1:1). The page is taken in pieces and joined.
-    const { width, height } = await p.evaluate(() => ({ width: document.documentElement.clientWidth, height: document.documentElement.scrollHeight }))
-    const PIECE = 8000
-    const data = Buffer.alloc(width * height * 4)
-    for (let y = 0; y < height; y += PIECE) {
-      const piece = PNG.sync.read(await p.screenshot({ fullPage: true, clip: { x: 0, y, width, height: Math.min(PIECE, height - y) } }))
-      if (piece.width !== width) throw new Error(`a piece of the page came back ${piece.width} px wide, not ${width}`)
-      piece.data.copy(data, y * width * 4, 0, piece.width * piece.height * 4)
+    // One picture of the whole page, when a picture can hold it (the browser stops at 16,384 px).
+    // T-187: Home on a phone is taller than that, and what lay below came back blank. T-188: a taller page
+    // is taken a screen at a time, by scrolling, and joined at the scroll positions the browser reports.
+    // (T-187 first took clipped pieces of a full-page picture. Under reduced motion a clipped piece comes
+    // back about 37 px off from the page's own layout, so the closing band at 768 measured the button
+    // under its heading. A whole picture, and a picture of the screen, are both true to the layout.)
+    const { width, height, screen } = await p.evaluate(() => ({ width: document.documentElement.clientWidth, height: document.documentElement.scrollHeight, screen: innerHeight }))
+    if (height <= 16000) {
+      const png = PNG.sync.read(await p.screenshot({ fullPage: true }))
+      await tag.evaluate((el) => el.remove())
+      return png as { width: number; height: number; data: Buffer }
     }
+    const data = Buffer.alloc(width * height * 4)
+    for (let want = 0; want < height; want += screen) {
+      const at = await p.evaluate((y) => { window.scrollTo(0, y); return Math.round(scrollY) }, want)
+      const shot = PNG.sync.read(await p.screenshot())
+      if (shot.width !== width) throw new Error(`a picture of the screen came back ${shot.width} px wide, not ${width}`)
+      const rows = Math.min(shot.height, height - at)
+      shot.data.copy(data, at * width * 4, 0, rows * width * 4)
+    }
+    await p.evaluate(() => window.scrollTo(0, 0))
     await tag.evaluate((el) => el.remove())
     return { width, height, data }
   }
@@ -288,9 +299,11 @@ if (!process.env.PLAYWRIGHT_DIR) {
     const rowOne = add.items.slice(0, 3)
     const rowTwo = add.items.slice(3)
     if (width >= 1024) {
-      check(`${width}: three columns: the first three of equal height, aligned at the top; the other two under them, in the same columns`,
+      check(`${width}: three in a row, of equal height, aligned at the top; the other two under them, the same width, centred`,
         add.items.length === 5 && same(rowOne.map((i) => i.top)) && same(rowOne.map((i) => i.height)) && rowOne[0]!.left < rowOne[1]!.left && rowOne[1]!.left < rowOne[2]!.left && same(add.items.map((i) => i.width)) &&
-          same(rowTwo.map((i) => i.top)) && rowTwo[0]!.top >= rowOne[0]!.bottom && rowTwo[0]!.left === rowOne[0]!.left && rowTwo[1]!.left === rowOne[1]!.left, add.items)
+          // T-188: the second row's two sit in the middle of the row above, not under its first two
+          same(rowTwo.map((i) => i.top)) && rowTwo[0]!.top >= rowOne[0]!.bottom && rowTwo[0]!.left < rowTwo[1]!.left &&
+          Math.abs((rowTwo[0]!.left + rowTwo[1]!.left + rowTwo[1]!.width) / 2 - (rowOne[0]!.left + rowOne[2]!.left + rowOne[2]!.width) / 2) <= 2, add.items)
       check(`${width}: each picture is the same size, and each row's pictures start on one line`, add.pictures.length === 5 && same(add.pictures.map((x) => x.width)) && same(add.pictures.map((x) => x.height)) && same(add.pictures.slice(0, 3).map((x) => x.top)) && same(add.pictures.slice(3).map((x) => x.top)), add.pictures)
     } else {
       check(`${width}: the five are stacked, one under another`, add.items.length === 5 && add.items.every((item, i) => i === 0 || add.items[i - 1]!.bottom <= item.top), add.items.map((i) => [i.top, i.bottom]))

@@ -3,7 +3,7 @@
 import { AcceptanceCard } from '@/components/quotes/AcceptanceCard'
 import type { AcceptanceDetails } from '@/lib/acceptance'
 import { useEffect, useState, useCallback } from 'react'
-import { anyMeasuredFromPhotos, certaintyLabel, certaintySentence, formatMoney, isQuoteProcessing, lineLabelNow, lineSourceCodes, quoteActions, quoteStory, customerFirstName, splitMinimum, addedSections, alsoAskedOf, alsoAskedWithStates, displaySections, sectionsAwaitingApproval } from '@qolumns/shared'
+import { QUOTE_TURN_COPY, anyMeasuredFromPhotos, businessSources, certaintyLabel, certaintySentence, formatMoney, isQuoteProcessing, lineLabelNow, lineSourceCodes, quoteActions, quoteStory, customerFirstName, splitMinimum, addedSections, alsoAskedOf, alsoAskedWithStates, displaySections, sectionsAwaitingApproval } from '@qolumns/shared'
 import { BusinessQuestions } from '@/components/quotes/BusinessQuestions'
 import { NextStepBox } from '@/components/quotes/NextStepBox'
 import { CustomerSent, ServiceSuggestionNote } from '@/components/quotes/CustomerSent'
@@ -49,6 +49,8 @@ export default function QuoteDetailPage({
   const [actionNote, setActionNote] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null)
   const [copying, setCopying] = useState(false)
   const [answering, setAnswering] = useState<string | null>(null)
+  // T-188: the card for answering a customer's open questions for them is behind a quiet link
+  const [answeringForCustomer, setAnsweringForCustomer] = useState(false)
 
   /** Loads the quote; answers its status, or null when it could not be loaded */
   const fetchQuote = useCallback(async (): Promise<string | null> => {
@@ -276,6 +278,13 @@ export default function QuoteDetailPage({
   })
   const turn = story.turn
   const trackerSteps = story.steps
+  // T-188: where each line came from, in the words the app, the approval page and the review email use
+  // (one shared function): a line the product added from the photos or the notes says so
+  const madeByBusiness = data.madeByBusiness === true
+  const takeoff = (content as { takeoff?: unknown } | null)?.takeoff
+  const lineNotes = businessSources(priceLines, takeoff, { madeByBusiness })
+  // T-188: a request that waits for its customer's answers: the business can answer for them
+  const customerQuestions = data.customerQuestions ?? []
   // T-186: was anything on this quote measured from the photos? An older quote's stored sentence may
   // say so when nothing was; the shared rule then shows one the quote does not contradict.
   const measuredOnQuote = anyMeasuredFromPhotos([
@@ -428,6 +437,37 @@ export default function QuoteDetailPage({
         />
       )}
 
+      {/* T-188: a request that waits for the customer's answers. The page says the customer was asked; a quiet
+          link lets the business answer for them (after a phone call, say), with the same card and route. */}
+      {customerQuestions.length > 0 && !story.asksBusiness && (
+        answeringForCustomer ? (
+          <BusinessQuestions
+            forCustomer
+            quoteId={quote.id}
+            questions={customerQuestions}
+            onAnswered={async () => {
+              setAnsweringForCustomer(false)
+              for (let tries = 0; tries < REPRICE_LOOKS; tries++) {
+                const fresh = await fetchQuote()
+                if (fresh && !isQuoteProcessing(fresh)) return
+                await new Promise((resolve) => setTimeout(resolve, REPRICE_LOOK_MS))
+              }
+            }}
+          />
+        ) : (
+          <p className="-mt-3 mb-6">
+            <button
+              type="button"
+              onClick={() => setAnsweringForCustomer(true)}
+              className="inline-flex min-h-[44px] items-center text-sm font-semibold text-primary underline underline-offset-4 hover:text-primary-hover"
+              data-testid="answer-for-customer"
+            >
+              {QUOTE_TURN_COPY.questions.answerForCustomer}
+            </button>
+          </p>
+        )
+      )}
+
       {/* Open customer questions (and old review requests, which customers can no longer send): part of the next step */}
       {pendingFeedback.length > 0 && (
         <div className="mb-6 space-y-3">
@@ -514,6 +554,7 @@ export default function QuoteDetailPage({
                       <span className="min-w-0 text-text-secondary">
                         {lineLabelNow(item.label)}
                         {item.autoRecommended && <span className="ml-2 text-xs text-secondary">(auto-recommended)</span>}
+                        <LineSourceNote note={businessSources(section.lines, section.main ? takeoff : undefined, { madeByBusiness })[index]} />
                       </span>
                       <span className="figure shrink-0 font-medium text-text-primary">{formatCurrency(item.amount, pricing.currency)}</span>
                     </div>
@@ -538,6 +579,7 @@ export default function QuoteDetailPage({
                 {item.autoRecommended && (
                   <span className="ml-2 text-xs text-secondary">(auto-recommended)</span>
                 )}
+                <LineSourceNote note={lineNotes[index]} />
               </span>
               <span className="figure shrink-0 font-medium text-text-primary">
                 {formatCurrency(item.amount, pricing.currency)}
@@ -647,6 +689,16 @@ export default function QuoteDetailPage({
         />
       )}
     </div>
+  )
+}
+
+/** T-188: where a price line came from, in the business's words, on a line of its own under the line's name */
+function LineSourceNote({ note }: { note: string | null | undefined }) {
+  if (!note) return null
+  return (
+    <span className="block text-xs text-text-muted" data-testid="price-line-source">
+      {note}
+    </span>
   )
 }
 

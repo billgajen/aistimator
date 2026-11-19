@@ -13,12 +13,58 @@
  */
 
 import { QUOTE_TURN_COPY } from './quote-turn'
+import type { ClarificationQuestion } from './database.types'
 
 export interface ChoiceQuestion {
   /** 'confirm_value' asks to confirm `aiValue` */
   type?: string | null
   aiValue?: string | number | null
   options?: readonly string[] | null
+  /** T-188: the choices the worker built from the business's own rules; they win over `options` */
+  choices?: ReadonlyArray<{ label: string; value: string }> | null
+  /** T-188: the choices are every possible answer, so no typed answer is offered */
+  closed?: boolean | null
+  /** T-188: a typed answer is a number */
+  answerKind?: string | null
+}
+
+/**
+ * T-188: a question as it is sent to whoever answers it (the on-site app, the
+ * dashboard, the customer's page): its words, and what it can be answered
+ * with. Nothing else of the stored question travels (the key it fills is the
+ * worker's business).
+ */
+export interface AskedQuestion {
+  id: string
+  question: string
+  type?: 'confirm_value' | 'text'
+  aiValue?: string | number
+  evidence?: string
+  options?: string[]
+  choices?: Array<{ label: string; value: string }>
+  closed?: boolean
+  answerKind?: 'number'
+}
+
+export function askedQuestion(q: ClarificationQuestion): AskedQuestion {
+  return {
+    id: q.id,
+    question: q.question,
+    ...(q.type && { type: q.type }),
+    ...(q.aiValue !== undefined && { aiValue: q.aiValue }),
+    ...(q.evidence && { evidence: q.evidence }),
+    ...(q.options && { options: q.options }),
+    ...(q.choices && q.choices.length > 0 && { choices: q.choices }),
+    ...(q.closed === true && { closed: true }),
+    ...(q.answerKind && { answerKind: q.answerKind }),
+  }
+}
+
+/** The stored questions of a quote, as they are sent to whoever answers them */
+export function askedQuestions(stored: unknown): AskedQuestion[] {
+  return (Array.isArray(stored) ? stored : [])
+    .filter((q): q is ClarificationQuestion => typeof q === 'object' && q !== null && typeof (q as ClarificationQuestion).id === 'string' && typeof (q as ClarificationQuestion).question === 'string')
+    .map(askedQuestion)
 }
 
 export interface QuestionChoice {
@@ -46,15 +92,22 @@ export function questionChoices(question: ChoiceQuestion): QuestionChoices {
     seen.add(key)
     choices.push({ label, value })
   }
-  const confirm = question.aiValue !== undefined && question.aiValue !== null && String(question.aiValue).trim() !== ''
-  if (confirm) add(QUOTE_TURN_COPY.questions.yes(String(question.aiValue)), String(question.aiValue))
-  for (const option of question.options ?? []) {
-    if (typeof option === 'string') add(option.trim(), option.trim())
+  const built = (question.choices ?? []).filter((c) => c && typeof c.label === 'string' && typeof c.value === 'string')
+  if (built.length > 0) {
+    // T-188: the worker's own choices, worded from the business's rules
+    for (const choice of built) add(choice.label.trim(), choice.value)
+  } else {
+    const confirm = question.aiValue !== undefined && question.aiValue !== null && String(question.aiValue).trim() !== ''
+    if (confirm) add(QUOTE_TURN_COPY.questions.yes(String(question.aiValue)), String(question.aiValue))
+    for (const option of question.options ?? []) {
+      if (typeof option === 'string') add(option.trim(), option.trim())
+    }
   }
   return {
     choices,
-    otherLabel: choices.length > 0 ? QUOTE_TURN_COPY.questions.other : null,
-    numeric: typeof question.aiValue === 'number',
+    // "Other" opens a typed answer. Not offered when the choices are every possible answer.
+    otherLabel: choices.length > 0 && question.closed !== true ? QUOTE_TURN_COPY.questions.other : null,
+    numeric: question.answerKind === 'number' || typeof question.aiValue === 'number',
   }
 }
 
@@ -72,6 +125,16 @@ export function chosenChoice(choices: readonly QuestionChoice[], answer: string 
 export function isTypedAnswer(choices: readonly QuestionChoice[], answer: string | null | undefined): boolean {
   if (choices.length === 0) return true
   return answer !== null && answer !== undefined && chosenChoice(choices, answer) === null
+}
+
+/** T-188: the longest note kept with an answer ("Why (for your records)") */
+export const ANSWER_NOTE_MAX = 500
+
+/** A note as it is stored: trimmed, one run of spaces, cut to the limit; null when there is nothing */
+export function answerNote(note: unknown): string | null {
+  if (typeof note !== 'string') return null
+  const clean = note.replace(/\s+/g, ' ').trim().slice(0, ANSWER_NOTE_MAX)
+  return clean === '' ? null : clean
 }
 
 /** Every question has an answer that is not blank */

@@ -1,3 +1,4 @@
+import { QUOTE_TURN_COPY } from '@qolumns/shared'
 import type { QuotePhoto, QuoteUnderstanding, UnderstoodItem } from '@qolumns/shared'
 import { UNDERSTOOD_COPY, understoodCopyFor, understoodNothing } from '@/lib/quote-understanding'
 import { CustomerPhotos } from './CustomerPhotos'
@@ -79,6 +80,12 @@ export function UnderstoodPanel({
                       </>
                     )}
                   </p>
+                  {/* T-188: the business's own note with its answer: its record, shown to it alone */}
+                  {q.note ? (
+                    <p className="mt-1 text-text-secondary" data-testid="understood-note">
+                      {QUOTE_TURN_COPY.questions.noteShown}: {q.note}
+                    </p>
+                  ) : null}
                 </li>
               ))}
             </ul>

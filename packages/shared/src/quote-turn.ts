@@ -194,6 +194,15 @@ export const QUOTE_TURN_COPY = {
     otherLabel: 'Your answer',
     yes: (value: string) => `Yes, ${value}`,
     failed: 'Your answers could not be saved. Please try again.',
+    /** T-188: the optional note under a question's choices */
+    noteLabel: 'Why (for your records)',
+    noteHint: 'Optional. Only you see it. It does not change the price.',
+    /** T-188: beside a saved answer on the dashboard quote page */
+    noteShown: 'Why',
+    /** T-188: the quiet link on a request that waits for the customer's answers, and the card it opens */
+    answerForCustomer: 'Answer for the customer',
+    forCustomerTitle: (n: number) => (n === 1 ? 'Answer the question for the customer' : 'Answer the questions for the customer'),
+    forCustomerNote: 'Use this when they have told you the answer, for example on the phone. It sets the price as their own answer would.',
   },
   home: {
     title: 'Waiting for you',

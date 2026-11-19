@@ -148,9 +148,11 @@ describe('T-170: "Add it anywhere"', () => {
     expect((add.match(/className="add-it-picture/g) ?? []).length).toBe(5)
     expect((add.match(/add-it-item add-it-next/g) ?? []).length).toBe(2)
     expect(layout).toContain('.add-it-picture { width: 100%; max-width: 20rem; aspect-ratio: 5 / 8; margin-inline: auto; }')
-    expect(layout).toMatch(/@media \(min-width: 1024px\) \{\s*\.add-it \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); grid-template-rows: auto auto auto auto;/)
+    // T-188: six half-columns, two to a picture: three in the first row, and the second row's two centred
+    expect(layout).toMatch(/\.add-it \{ grid-template-columns: repeat\(6, minmax\(0, 1fr\)\); grid-template-rows: auto auto auto auto;/)
+    expect(layout).toContain('.add-it-item { grid-column: span 2; grid-row: span 2; grid-template-rows: subgrid;')
+    expect(layout).toContain('.add-it-next-first { grid-column: 2 / span 2; }')
     expect(layout).not.toMatch(/repeat\(5,/)
-    expect(layout).toContain('.add-it-item { grid-row: span 2; grid-template-rows: subgrid;')
     // the van's picture is the same shape as its box, so the sign stays on the panel
     expect(VAN_PHOTO.width / VAN_PHOTO.height).toBeCloseTo(5 / 8, 5)
   })

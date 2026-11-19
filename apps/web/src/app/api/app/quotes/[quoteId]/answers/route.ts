@@ -4,12 +4,19 @@ import { requireTenant } from '@/lib/auth-tenant'
 import { enqueueQuoteJob, repriceQuoteNow } from '@/lib/queue'
 import { createAdminClient } from '@/lib/supabase/server'
 import { recordMeasurementExamples } from '@/lib/measurement-memory'
+import { answerNote } from '@qolumns/shared'
 
 /**
  * POST /api/app/quotes/:quoteId/answers (T-137) — the business confirms the
  * open questions on site. Same effect as the customer's clarification
  * (answers merge as confirmed form answers, deterministic reprice), but
  * authorised by the signed-in business instead of the quote token.
+ *
+ * T-188: each answer may carry a `note` ("Why (for your records)"). It is kept
+ * with the answer and shown on the dashboard quote page. It is the business's
+ * own record: nothing prices from it and no prompt is given it. The same route
+ * serves a request that waits for the customer's answers, when the business
+ * answers for them (after a phone call, say).
  *
  * `quoteToken` is optional: the device that created the quote keeps it, and
  * the worker needs the raw token to email the customer their link. It is
@@ -20,7 +27,7 @@ export async function POST(request: Request, { params }: { params: { quoteId: st
   if (!auth.ok) return auth.response
   const { supabase, tenantId } = auth
 
-  let body: { answers?: Array<{ questionId: string; answer: string }>; quoteToken?: string }
+  let body: { answers?: Array<{ questionId: string; answer: string; note?: unknown }>; quoteToken?: string }
   try {
     body = await request.json()
   } catch {
@@ -49,7 +56,13 @@ export async function POST(request: Request, { params }: { params: { quoteId: st
     )
   }
   const known = new Set(((quote.clarification_questions_json || []) as Array<{ id: string }>).map((q) => q.id))
-  const valid = answers.filter((a) => known.has(a.questionId))
+  // only what an answer is: the question, the answer, and the business's own note when it wrote one
+  const valid = answers
+    .filter((a) => known.has(a.questionId))
+    .map((a) => {
+      const note = answerNote(a.note)
+      return { questionId: a.questionId, answer: a.answer.trim(), ...(note && { note }) }
+    })
   if (valid.length === 0) {
     return NextResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'No answer matches an open question' } }, { status: 400 })
   }

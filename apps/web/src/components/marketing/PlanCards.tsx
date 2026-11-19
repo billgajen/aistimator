@@ -74,7 +74,8 @@ export function PlanCards({ className = '' }: { className?: string }) {
                   ) : (
                     line.label
                   )}
-                  <Soon line={line} onDark={dark} className="ml-2" />
+                  {/* a real space before the mark, so the line reads "… number Coming soon" to a screen reader and when copied */}{' '}
+                  <Soon line={line} onDark={dark} className="ml-1" />
                 </Line>
               ))}
             </ul>

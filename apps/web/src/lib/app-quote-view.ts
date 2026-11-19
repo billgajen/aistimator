@@ -18,6 +18,8 @@ import {
   alsoAskedStateWords,
   alsoAskedWithStates,
   anyMeasuredFromPhotos,
+  askedQuestions,
+  QUESTIONS_OPEN_STATUS,
   businessIsAsked,
   businessSources,
   certaintySentence,
@@ -31,7 +33,6 @@ import {
   type AppQuoteLine,
   type AppQuoteSection,
   type AppQuoteView,
-  type ClarificationQuestion,
   type QuoteStatus,
   type RequestDetails,
 } from '@qolumns/shared'
@@ -99,17 +100,11 @@ export function appQuoteView(input: {
 
   // T-186: the business answers the questions of a quote it made. A customer's quote that waits
   // for the customer's answers shows none here: the customer was asked, and the screen says so.
-  const questions =
-    businessIsAsked(status, madeByBusiness)
-      ? ((quote.clarification_questions_json || []) as ClarificationQuestion[]).map((q) => ({
-          id: q.id,
-          question: q.question,
-          ...(q.type && { type: q.type }),
-          ...(q.aiValue !== undefined && { aiValue: q.aiValue }),
-          ...(q.evidence && { evidence: q.evidence }),
-          ...(q.options && { options: q.options }),
-        }))
-      : []
+  const open = status === QUESTIONS_OPEN_STATUS ? askedQuestions(quote.clarification_questions_json) : []
+  const questions = businessIsAsked(status, madeByBusiness) ? open : []
+  // T-188: the customer's own open questions, so the business can answer for them (a quiet link; the
+  // screen still says the customer was asked)
+  const customerQuestions = businessIsAsked(status, madeByBusiness) ? [] : open
 
   const main = splitMinimum(pricing.breakdown)
   const added = addedSections(quote.pricing_json as object | null)
@@ -174,6 +169,7 @@ export function appQuoteView(input: {
       approvedAt: quote.approved_at ?? null,
     },
     questions,
+    ...(customerQuestions.length > 0 && { customerQuestions }),
     request: input.request,
     photos: input.photos,
     ...(input.photoCount !== undefined && { photoCount: input.photoCount }),

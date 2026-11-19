@@ -4,6 +4,7 @@
 
 import type { QuoteListCounts, QuoteListGroup } from './quote-turn'
 import type { ServiceSuggestion } from './service-suggestion'
+import type { AskedQuestion } from './question-choices'
 import type { AlsoAsked, DisplaySection } from './quote-sections'
 import type {
   QuoteStatus,
@@ -628,7 +629,9 @@ export interface QuoteDetailResponse {
   /** T-186: the business made this quote itself (the on-site app), so no customer was asked anything about it */
   madeByBusiness?: boolean
   /** T-186: the questions the business answers on this page (only on a quote it made; empty otherwise) */
-  businessQuestions?: Array<{ id: string; question: string; type?: 'confirm_value' | 'text'; aiValue?: string | number; evidence?: string; options?: string[] }>
+  businessQuestions?: AskedQuestion[]
+  /** T-188: the customer's own open questions, so the business can answer for them (empty otherwise) */
+  customerQuestions?: AskedQuestion[]
 }
 
 /**
@@ -654,6 +657,8 @@ export interface UnderstoodQuestion {
   question: string
   /** null while the customer has not answered */
   answer: string | null
+  /** T-188: "Why (for your records)": the business's own note with its answer, when it wrote one */
+  note?: string
 }
 
 /** T-169: what the AI produced for one quote. Every list can be empty; nothing is ever padded. */
@@ -810,14 +815,13 @@ export interface AppQuoteView {
    * The questions the business answers on this screen. Since T-186 only those of a quote the business
    * made: a customer's quote that waits for the customer's answers carries none here.
    */
-  questions: Array<{
-    id: string
-    question: string
-    type?: 'confirm_value' | 'text'
-    aiValue?: string | number
-    evidence?: string
-    options?: string[]
-  }>
+  questions: AskedQuestion[]
+  /**
+   * T-188: the questions the customer was asked and has not answered (a customer's quote that waits for
+   * its customer). The screen still says the customer was asked; a quiet link lets the business answer
+   * for them, with the same route.
+   */
+  customerQuestions?: AskedQuestion[]
   // ---- T-182: what the app needs to match the dashboard -----------------------
   /** The quote's main service alone (`serviceName` lists every service on a combined quote) */
   mainServiceName?: string

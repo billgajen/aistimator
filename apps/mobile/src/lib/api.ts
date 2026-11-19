@@ -177,7 +177,8 @@ export function createApi(opts: {
     createQuote: (body: AppCreateQuoteRequest) =>
       request<AppCreateQuoteResponse>('/api/app/quotes', { method: 'POST', body: JSON.stringify(body) }),
 
-    answerQuestions: (quoteId: string, answers: Array<{ questionId: string; answer: string }>, quoteToken?: string) =>
+    /** T-188: an answer may carry the business's own note ("Why (for your records)"); it is kept with the answer */
+    answerQuestions: (quoteId: string, answers: Array<{ questionId: string; answer: string; note?: string }>, quoteToken?: string) =>
       request<{ success: boolean }>(`/api/app/quotes/${encodeURIComponent(quoteId)}/answers`, {
         method: 'POST',
         body: JSON.stringify({ answers, ...(quoteToken && { quoteToken }) }),

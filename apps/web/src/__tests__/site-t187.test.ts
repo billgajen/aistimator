@@ -94,7 +94,7 @@ describe('T-187: what is not live yet is marked from one flag', () => {
   it('every place that shows one of them draws the mark from the flag, and types neither the mark nor "soon"', () => {
     const marked: Array<[string, string[]]> = [
       ['components/marketing/home/SetupSteps.tsx', ['<Soon of="whatsapp" />', '<Soon of="app" />']],
-      ['components/marketing/home/AddItAnywhere.tsx', ['soon="whatsapp"', 'soon="app"', '{soon ? <Soon of={soon}']],
+      ['components/marketing/home/AddItAnywhere.tsx', ['soon="whatsapp"', 'soon="app"', '<Soon of={soon} />']],
       ['components/marketing/home/AppSection.tsx', ['{appAvailability()}', '<Soon of="roomScan" />']],
       ['components/marketing/PlanCards.tsx', ['<Soon line={line}']],
       ['app/features/page.tsx', ['<Soon of={soon} />', 'soon={item.key}']],
@@ -419,7 +419,8 @@ describe('T-187: Home', () => {
     expect(add).toContain('title={UPCOMING.app.name}')
     expect([UPCOMING.whatsapp.name, UPCOMING.app.name]).toEqual(['WhatsApp, on your own business number', 'The on-site app'])
     const css = read(`${WEB}/app/globals.css`)
-    expect(css).toContain('.add-it { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto auto auto auto; gap: 1.25rem 2rem; }')
+    // T-188: six half-columns, two to a picture, so the second row's two sit in the middle
+    expect(css).toContain('.add-it { grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: auto auto auto auto; gap: 1.25rem 2rem; }')
   })
 
   it('the app section: its heading, three short lines, two phones and the room scan card; every word from plan-claims', () => {

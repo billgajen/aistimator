@@ -85,8 +85,8 @@ describe('T-154: the approved copy', () => {
   })
 
   it('T-155: the small line under the hero buttons doesn’t contradict "on your website"', () => {
-    // T-181: any business, small to corporate (it named contractors and home-service businesses only)
-    expect(HERO.smallLine).toBe('For any business that quotes for its work, small to corporate. No website? Use your quote link.')
+    // T-181: any business (it named contractors and home-service businesses only); T-188: the words are dropped
+    expect(HERO.smallLine).toBe('For any business that quotes for its work. No website? Use your quote link.')
     expect(code('app/page.tsx')).toContain('{HERO.smallLine}')
     // trade pages keep their own line (T-167: it carries the message; its words live in site-copy.ts)
     expect(code('components/marketing/TradeLanding.tsx')).toContain('{TRADE_SMALL_LINE}')
