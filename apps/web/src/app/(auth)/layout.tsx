@@ -21,7 +21,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         {/* Brand mark */}
         <div className="mb-8 text-center">
           <p>
-            <Wordmark className="text-3xl" />
+            <Wordmark height={44} className="mx-auto" />
           </p>
           {/* T-160: the home page's own headline, so signing in always matches it */}
           <p className="mt-2 text-sm font-medium text-text-secondary" data-testid="auth-line">{HERO.headline}</p>

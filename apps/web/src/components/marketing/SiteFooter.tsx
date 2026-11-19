@@ -28,7 +28,7 @@ export function SiteFooter() {
         <div className="grid gap-10 py-12 lg:grid-cols-[minmax(0,18rem)_1fr] lg:gap-16">
           <div>
             <p>
-              <Wordmark className="text-xl" />
+              <Wordmark height={28} />
             </p>
             <p className="mt-2 max-w-xs text-sm text-text-secondary" data-testid="footer-line">
               {FOOTER.line}

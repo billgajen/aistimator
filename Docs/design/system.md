@@ -73,7 +73,7 @@ are gone).
 
 ## Type
 
-- **Bricolage Grotesque** for display (headings, the wordmark), **Instrument Sans** for text, **Spline Sans Mono**
+- **Bricolage Grotesque** for display (headings), **Instrument Sans** for text, **Spline Sans Mono**
   for every figure (class `figure`: money, counts, dates in a ledger). These three stay.
 - **One scale.** Text uses Tailwind's steps: `text-xs` 12, `text-sm` 14, `text-base` 16, `text-lg` 18,
   `text-2xl` 24, `text-4xl` 36. Marketing headlines add four display sizes:
@@ -324,8 +324,16 @@ only what the AI does for that trade.
 
 ## The name
 
-The name is `PRODUCT_NAME` (`packages/shared/src/brand.ts`). The wordmark is that name as text in the display
-font, extra-bold (the owner's choice, T-165). One component draws it everywhere: `components/brand/Wordmark.tsx`.
+The name is `PRODUCT_NAME` (`packages/shared/src/brand.ts`). Since T-190 the wordmark is the owner's drawing
+(`brand/qolumns-wordmark.svg`; the white one for dark grounds), not typed text. One component draws it everywhere:
+`components/brand/Wordmark.tsx`, inline, with a fixed height and width and the name as its spoken label
+(`tone="light"` on a dark ground). The files' colours are their own and are not tokens: the dark wordmark is ink;
+the app icon and the social image are cream `#F7EBC7` on dark green `#192822`.
+
+- **Favicon and Apple touch icon:** the "Qo" letter file. **Social image:** the square file, 1200 × 630.
+- **Emails to a business** start with the PNG wordmark (`productLogoRow`, shared). Emails to a customer carry the
+  business's brand, never ours.
+- **The app:** the icon is the letter file on its own green; the splash is the wordmark on paper.
 
 ## Which skill leads where
 

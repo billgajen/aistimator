@@ -18,7 +18,7 @@
       "package": "com.qolumns.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#205E56"
+        "backgroundColor": "#192822"
       }
     },
     "plugins": [
@@ -36,9 +36,9 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash.png",
-          "imageWidth": 220,
+          "imageWidth": 240,
           "resizeMode": "contain",
-          "backgroundColor": "#205E56"
+          "backgroundColor": "#FAF9F6"
         }
       ]
     ],

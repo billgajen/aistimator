@@ -40,6 +40,7 @@ export * from './ai-models'
 // Re-export plan definitions (T-134)
 export * from './plans'
 export * from './brand'
+export * from './product-logo'
 export * from './demo'
 // T-156: approve from the review email
 export * from './approval-link'

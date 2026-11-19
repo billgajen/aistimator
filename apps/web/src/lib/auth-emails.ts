@@ -7,7 +7,7 @@
  * Plain wording, the product's name, one button. The link in each is made by
  * the server (lib/auth-flow.ts) and works once.
  */
-import { PRODUCT_NAME } from '@qolumns/shared'
+import { PRODUCT_NAME, productLogoRow } from '@qolumns/shared'
 
 /**
  * How long a link in these emails works, in minutes. It is Supabase's
@@ -48,6 +48,7 @@ function layout(parts: { title: string; paragraphs: string[]; button: { label: s
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 40px 20px;">
+        ${productLogoRow()}
         <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px;">

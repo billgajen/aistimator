@@ -6,6 +6,7 @@
  * web app and the worker both use it, so the two never drift.
  */
 import { PRODUCT_NAME } from './brand'
+import { productLogoRow } from './product-logo'
 
 /** After this long on "Preparing your estimate" the customer is told it is slow */
 export const SLOW_PREPARING_MS = 60_000
@@ -49,6 +50,7 @@ export function failedRequestEmail(input: FailedRequestEmailInput): { subject: s
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>A request needs you</title></head>
 <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f3f4f6;">
   <table role="presentation" style="width:100%;border-collapse:collapse;"><tr><td style="padding:40px 20px;">
+    ${productLogoRow()}
     <table role="presentation" style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;"><tr><td style="padding:40px;">
       <p style="margin:0;font-size:14px;color:#6b7280;">A request needs you</p>
       <h1 style="margin:8px 0 0;font-size:24px;font-weight:700;color:#111827;">${escape(name)}</h1>

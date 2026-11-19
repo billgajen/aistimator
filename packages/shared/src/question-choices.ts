@@ -127,6 +127,23 @@ export function isTypedAnswer(choices: readonly QuestionChoice[], answer: string
   return answer !== null && answer !== undefined && chosenChoice(choices, answer) === null
 }
 
+/**
+ * T-190: a question card has at most one text box.
+ * - With choices: the buttons, and the optional note ("Why (for your records)").
+ * - "Other" pressed: the typed answer is the one box, and the note is not asked.
+ * - No choices (older quotes, or a quantity with no list): the answer box only, no note.
+ */
+export function questionTextBox(choices: readonly QuestionChoice[], answer: string | null | undefined): 'answer' | 'note' {
+  return isTypedAnswer(choices, answer) ? 'answer' : 'note'
+}
+
+/** The note sent with an answer: only when its box is the one shown, so a hidden box never sends old words */
+export function noteToSend(choices: readonly QuestionChoice[], answer: string | null | undefined, note: string | undefined): string | undefined {
+  if (questionTextBox(choices, answer) !== 'note') return undefined
+  const clean = (note ?? '').trim()
+  return clean === '' ? undefined : clean
+}
+
 /** T-188: the longest note kept with an answer ("Why (for your records)") */
 export const ANSWER_NOTE_MAX = 500
 

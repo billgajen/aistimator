@@ -106,11 +106,13 @@ check('privacy: "businesses with a Qolumns account" (the article changed with th
 check('terms: "Qolumns provides software…" and "your use of Qolumns"', terms.includes('Qolumns provides software that lets your business') && (await get('/terms')).html.includes('The terms that govern your use of Qolumns.'))
 const home = await get('/')
 check('home: the footer says "© <year> Qolumns."', new RegExp(`© ${new Date().getFullYear()} Qolumns\\.`).test(visible(home.html)))
-check('home: the social image text names Qolumns', /property="og:image:alt" content="Qolumns: /.test(home.html), /property="og:image:alt" content="([^"]*)"/.exec(home.html)?.[1])
-const og = await fetch(`${cfg.appUrl}/opengraph-image`)
+check('home: the social image text names Qolumns', /property="og:image:alt" content="Qolumns"/.test(home.html), /property="og:image:alt" content="([^"]*)"/.exec(home.html)?.[1])
+// T-190: the social image is a static file now; its address is the one the home page names
+const ogUrl = async (base: string) => /property="og:image" content="([^"]+)"/.exec(await (await fetch(`${base}/`)).text())?.[1] ?? `${base}/opengraph-image.png`
+const og = await fetch(await ogUrl(cfg.appUrl))
 const ogBytes = og.ok ? Buffer.from(await og.arrayBuffer()) : Buffer.alloc(0)
 writeFileSync(path.join(outDir, 'opengraph-image.png'), ogBytes)
-check('the social image is drawn again from code (PNG, saved to the results folder)', og.ok && og.headers.get('content-type') === 'image/png' && ogBytes.length > 5000, ogBytes.length)
+check('the social image is served (PNG, saved to the results folder)', og.ok && og.headers.get('content-type') === 'image/png' && ogBytes.length > 5000, ogBytes.length)
 
 const workerUrl = process.env.WORKER_URL || 'http://localhost:8787'
 const workerRoot = await fetch(`${workerUrl}/`).then(async (r) => ({ status: r.status, text: await r.text() })).catch((e: unknown) => ({ status: 0, text: String(e) }))
@@ -148,7 +150,8 @@ const mustSay = (name: string) => (name.startsWith('business-review-and-approve'
 for (const [name, html] of Object.entries(EMAILS)) {
   writeFileSync(path.join(outDir, `email-${name.replace(/[^a-z]+/g, '-').replace(/-$/, '')}.html`), html)
   const text = visible(html)
-  check(`email, ${name}: says "${mustSay(name)}" and neither earlier name`, text.includes(mustSay(name)) && (!toBusiness(name) || !text.includes('Powered by')) && oldNamesInText(text).length === 0 && oldNamesInSource(html).length === 0, { text: oldNamesInText(text), source: oldNamesInSource(html) })
+  // T-190: an email to the business names the product in its logo's alt text
+  check(`email, ${name}: says "${mustSay(name)}" and neither earlier name`, (text.includes(mustSay(name)) || html.includes(`alt="${mustSay(name)}"`)) && (!toBusiness(name) || !text.includes('Powered by')) && oldNamesInText(text).length === 0 && oldNamesInSource(html).length === 0, { text: oldNamesInText(text), source: oldNamesInSource(html) })
 }
 
 // ====================================================================
@@ -293,7 +296,8 @@ if (!process.env.PLAYWRIGHT_DIR) {
     const p = await anon.newPage()
     await p.goto(`${cfg.appUrl}/`)
     await pageCheck(p, 'home', 'home')
-    check('home: the header and the footer both say Qolumns', (await p.locator('nav').first().innerText()).includes(NAME) && (await p.locator('footer').innerText()).includes(`© ${new Date().getFullYear()} Qolumns.`))
+    // T-190: the header's wordmark is the drawing, read as the name
+    check('home: the header and the footer both say Qolumns', (await p.locator('nav svg[data-testid=wordmark]').first().getAttribute('aria-label')) === NAME && (await p.locator('footer').innerText()).includes(`© ${new Date().getFullYear()} Qolumns.`))
     await p.goto(`${cfg.appUrl}/login`)
     await pageCheck(p, 'login', 'login')
     await p.goto(`${cfg.appUrl}/quote/${a.slug}`)

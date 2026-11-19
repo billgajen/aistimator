@@ -15,12 +15,116 @@
 
 ## Issues & Resolutions
 
+### 2026-11-19: T-190 — The owner's logo everywhere; one text box on a question card (AD-073)
+
+Built and pushed, **not deployed**. The web app, the worker (its emails only), the shared package and the mobile
+app's pictures. No pricing, quote flow, worker logic or Stripe change. No migration, no new setting.
+
+**0. Deploy recorded:** T-189 was deployed by the owner on 2026-11-19 (migration 45, then the worker, version
+`628da7f6`, then the web; `ALERT_EMAIL` on the worker as a secret and on Vercel, Production). Its entry says so.
+
+**The files** are the owner's, in `/brand` (the `.ai` files stay there and are not shipped): the dark and white
+wordmark (SVG and PNG), "Qo" on dark green (2670 square) and the full wordmark on dark green (2670 square). The
+square PNGs' outer pixels are part-transparent (alpha 16 to 64); every picture made from them is cut 3 px in and
+laid on the files' own green, so no edge shows and nothing is transparent.
+
+#### 1. The website's wordmark
+
+- `components/brand/Wordmark.tsx` draws the owner's SVG inline (the six paths and the view box of
+  `brand/qolumns-wordmark.svg`). `tone="dark"` uses the dark file's fill (ink), `tone="light"` the white file's.
+  Width and height are set from one `height` prop (28 px is 104 × 28), so nothing moves when it paints, and it is
+  sharp at every size. `role="img"`, `aria-label` and `<title>` are the product name.
+- Used in the nav (28), the phone menu (28; it was typed text), the footer (28), the sign-in pages (44, centred)
+  and the dashboard panel (30). `/design` shows it on paper and the white one on juniper. No page in the product
+  puts the wordmark on a dark ground today; the white one is ready for it.
+- The two SVGs are also served at `/brand/qolumns-wordmark.svg` and `/brand/qolumns-wordmark-white.svg`.
+
+#### 2. Favicon and the social image
+
+- `app/favicon.ico` (16, 32, 48), `app/icon.png` (512) and `app/apple-icon.png` (180), from the letter file. Next
+  writes the `<link>` tags.
+- `app/opengraph-image.png` and `app/twitter-image.png` (1200 × 630): the square file's wordmark, centred on its
+  own green. Their alt text (`.alt.txt`) is the product name, which a test compares with `PRODUCT_NAME`. The drawn
+  `opengraph-image.tsx` (the headline on paper, T-154) is removed; the page's title and description still carry
+  the headline.
+
+#### 3. The logo in every email to the business
+
+- `productLogoRow()` (`packages/shared/src/product-logo.ts`): the PNG at
+  `https://<APP_DOMAIN>/brand/qolumns-wordmark-email.png`, always the main domain, so an old email still finds it.
+  The file is 420 × 113 and is shown at 140 × 38 (set as attributes and in the style). With pictures blocked the
+  alt text is the name in ink, bold, 22 px. Centred above the white card (the card's width follows its content,
+  so a left-aligned row did not line up with it).
+- In: the new-request and review emails (worker), the failed-request email (shared), feedback, plan limit
+  reached, request held, quote accepted, quote declined, WhatsApp renewal, request updated, the three account
+  emails (confirm, reset, already registered) and the two billing emails. T-183's marked row now holds it; the
+  emails that had "Powered by" removed for the business (T-185) all have it.
+- Not in: any email to a customer (the quote, the revised quote, the reminder, the clarification). The ops alert
+  to the owner is unchanged.
+- **Until the web is deployed** the address does not answer, and an email sent before then shows the alt text.
+
+#### 4. The app
+
+- Icon (`assets/icon.png`): the letter file flattened onto its green, 840 px inside 1024 (92 px each side) so the
+  Q's tail clears the rounded corners. RGB, no alpha. The Android adaptive icon's background is the file's green.
+- Splash (`assets/splash.png`): the dark wordmark, 720 px wide, centred on paper (`#FAF9F6`, the app's
+  background colour), shown at 240.
+- Sign-in: the wordmark picture where the typed name was (`assets/wordmark.png`, 480 × 129, shown 160 × 43, read
+  as the product name). A `*.png` module declaration was added (`src/assets.d.ts`).
+
+#### 5. Colours
+
+The files' dark green is `#192822` and their cream `#F7EBC7`. The tokens are ink `#1B2823` and butter `#F7E9C6`:
+close, not equal. The dark wordmark's fill is ink exactly. **Tokens not changed**, as asked. The logo's green is
+not juniper (`#205E56`), the brand token.
+
+#### 6. One text box on a question card (dashboard and app)
+
+- `questionTextBox(choices, answer)` (shared): with choices, the buttons and the optional note; with "Other"
+  typed, the typed answer is the one box and the note is not asked; with no choices (older quotes, or a quantity
+  with no list), the answer box only. `noteToSend` sends a note only when its box was shown.
+- `BusinessQuestions.tsx` and the app's `Questions` both use it.
+
+#### Older checks updated (no new regression script)
+
+- `verify-t164`, `verify-t165`: the wordmark is the drawing, read as the name (was: typed text in Bricolage).
+- `verify-t154`, `verify-t155`, `verify-t162`: the social image is fetched from the address the home page names
+  (it was `/opengraph-image`, the drawn route); its alt is the name alone.
+- Unit tests: `marketing-home`, `site-t181` (the drawn image is gone), `approval-t183` (the review email's one
+  picture is our logo).
+
+#### Checks
+
+- New unit tests: `logo-t190.test.ts` in web (27), worker (2) and mobile (4).
+- `pnpm lint` 0, `pnpm typecheck` 0, unit tests web 1,269, worker 731, mobile 109; the iOS bundle builds.
+- `pnpm check:quick` once: 26 of 28 in 4 min 56 s. `t162` (the review email's name is now the logo's alt text;
+  the header's name is the drawing) and `t183` (the email's one picture is our logo) expected the typed name; both
+  updated, and `pnpm check:failed`: 4 of 4 in 54 s.
+- Screenshots in `.checks/t190/` (not in git): the nav and footer at 1440 and 390, an email to the business with
+  the logo and with pictures blocked, the favicon set.
+- The owner's SVG and PNG files in `/brand` are in git (the tests compare against them); the `.ai` files are not.
+
+**Files:** `apps/web/src/components/brand/Wordmark.tsx`, `components/marketing/{SiteNav,MobileMenu,SiteFooter}.tsx`,
+`app/(auth)/layout.tsx`, `app/(dashboard)/layout.tsx`, `components/design/DesignPreview.tsx`,
+`app/{favicon.ico,icon.png,apple-icon.png,opengraph-image.png,twitter-image.png,*.alt.txt}`,
+`public/brand/*`, `lib/{email-templates,auth-emails,billing-emails,request-updated-email}.ts`,
+`components/quotes/BusinessQuestions.tsx`; `apps/worker/src/email/templates.ts`;
+`packages/shared/src/{product-logo,failed-request,question-choices,index}.ts`; `apps/mobile/{app.json,
+app/login.tsx, app/quote/[id].tsx, assets/*, src/lib/wordmark.ts, src/assets.d.ts}`; `Docs/design/system.md`.
+
+**To deploy:** the web (the pictures, the wordmark, the emails it sends, the question card) and the worker (its
+emails). Order does not matter; web first means the logo's address answers before the worker's emails use it.
+No migration, no setting. The app's icon and splash reach a phone only in a new build (Expo Go shows neither).
+
 ### 2026-11-19: T-189 — Backlog fixes before launch: sample price, one document style, services from templates, data-processing terms, alerts, sign-up source (AD-070, AD-071, AD-072)
 
-Built and pushed, **not deployed**. The web app, the worker, the shared package and **migration 45**. No amount,
-no pricing rule and no question the worker asks changed. To put it live, in this order: migration 45, the
-worker, the web. One new setting, on both the worker and the web: `ALERT_EMAIL` (the address alerts go to;
-without it alerts are off).
+**Deployed by the owner on 2026-11-19:** migration 45 (`scripts/deploy-migration-45.sh`), then the worker
+(version `628da7f6`), then the web. `ALERT_EMAIL` is set on the worker (a secret) and on Vercel (Production).
+(Recorded in T-190 from the owner's note.)
+
+**As built:** the web app, the worker, the shared package and **migration 45**. No amount, no pricing rule and no
+question the worker asks changed. One new setting, on both the worker and the web: `ALERT_EMAIL` (the address
+alerts go to; without it alerts are off).
 
 **Deploy recorded here, from the owner's note:** T-188 (worker, then web) was deployed by the owner on
 2026-11-19. Its entry below now says so.
@@ -10088,6 +10192,32 @@ the tab, nothing identifies a person, and nothing is sent unless they sign up.
   address is confirmed). The sign-up trigger itself was not changed.
 
 ---
+### AD-073: The wordmark is the owner's drawing; our logo goes only on our own emails (T-190)
+
+**Decision:** the wordmark, the favicon set, the social image and the app's icon and splash are made from the
+owner's files in `/brand`. The website draws the SVG inline from one component. Every email the product sends to
+a business starts with the PNG wordmark from a fixed address on the main domain; no email to a customer carries
+it. A question card has at most one text box.
+
+**Why:** a typed name in a web font was the stand-in until the logo existed (T-165). An inline SVG is sharp at any
+size, needs no request and cannot shift the layout. An email's picture must load for years from any mail server,
+so its address is the main domain, not the environment's app address and not a signed link. A customer's email is
+the business's document, so our mark stays off it (T-183, T-185).
+
+**Rules that follow:**
+- The component's paths are the file's paths (a unit test compares them). A new logo is a new file and a new copy
+  of the paths, never a hand edit.
+- The files' colours are their own; the design tokens did not change (the green and cream are close to ink and
+  butter, not equal).
+- The email logo's shown size is fixed in `PRODUCT_LOGO_EMAIL`; the file is three times that.
+- One text box: the shared `questionTextBox` decides, on the dashboard and in the app.
+
+**Rejected:** making the files' green a token (asked not to change tokens); a CSS background or a web font for the
+email logo (blocked or ignored by mail clients); keeping the drawn social image beside the owner's (two images
+for one page).
+
+---
+
 ## Known Constraints
 
 ### KC-001: No Automatic Access-Based Pricing

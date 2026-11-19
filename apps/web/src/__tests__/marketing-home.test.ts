@@ -39,7 +39,6 @@ const MARKETING_FILES = [
   'app/terms/page.tsx',
   'app/privacy/page.tsx',
   'app/data-deletion/page.tsx', // T-181
-  'app/opengraph-image.tsx',
   'components/marketing/TradeLanding.tsx',
   'components/marketing/ProductStrip.tsx',
   'components/marketing/SiteNav.tsx',
@@ -250,8 +249,9 @@ describe('T-154: phone menu, buttons, metadata', () => {
 
   it('the page title, description and social image carry the new message', () => {
     expect(code('app/page.tsx')).toMatch(/title: PAGE_META\.title/)
-    expect(existsSync(join(ROOT, WEB, 'app/opengraph-image.tsx'))).toBe(true)
-    expect(code('app/opengraph-image.tsx')).toContain('HERO.headline')
+    // T-190: the social image is the owner's square file (the wordmark on green), not a drawn page
+    expect(existsSync(join(ROOT, WEB, 'app/opengraph-image.png'))).toBe(true)
+    expect(existsSync(join(ROOT, WEB, 'app/opengraph-image.tsx'))).toBe(false)
     expect(PRODUCT_NAME).toBe('Qolumns')
   })
 })
@@ -330,8 +330,8 @@ describe('T-155: the product frames and the social image', () => {
     expect(strip).toMatch(/<figure className="flex [^"]*flex-col/)
   })
 
-  it('the social image has no yellow rule beside the button', () => {
-    expect(code('app/opengraph-image.tsx')).not.toMatch(/#DCAF3E/i)
+  it('the social image is a picture, so it draws no rule or button (T-190)', () => {
+    expect(existsSync(join(ROOT, WEB, 'app/opengraph-image.tsx'))).toBe(false)
   })
 })
 

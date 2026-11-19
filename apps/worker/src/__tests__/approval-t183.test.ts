@@ -20,6 +20,8 @@ import {
   CUSTOMER_METHOD,
   MINIMUM_ENTRY_LABEL,
   PRODUCT_NAME,
+  productLogoRow,
+  productLogoUrl,
   type ExtractedSignalsV2,
   type PricingTrace,
   type WorkStepConfig,
@@ -395,7 +397,9 @@ describe('T-183: the review email', () => {
 
   it('photos are one line pointing at the approval page; no customer photo is put in the email', () => {
     at('3 photos: view them on the approval page')
-    expect(html).not.toMatch(/<img/i)
+    // T-190: the one picture is the product's logo, from the main domain; no customer photo
+    expect(html.match(/<img/gi)).toHaveLength(1)
+    expect(html).toContain(`<img src="${productLogoUrl()}"`)
   })
 
   it('Approve & send is one link; "Open in dashboard to edit" stays', () => {
@@ -408,8 +412,9 @@ describe('T-183: the review email', () => {
     expect(html).not.toContain('Powered by')
     const logo = at('data-role="product-logo"')
     expect(logo).toBeLessThan(at('Estimate ready for your approval'))
-    expect(html).toContain(`>${PRODUCT_NAME}</td>`)
-    expect(html).toContain('<!-- PRODUCT LOGO:')
+    // T-190: the row holds the logo, with the name as its alt text
+    expect(html).toContain(productLogoRow())
+    expect(html).toContain(`alt="${PRODUCT_NAME}"`)
   })
 
   it('a reason that is already the "Check the service" warning is not said twice', () => {

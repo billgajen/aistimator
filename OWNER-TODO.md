@@ -3001,13 +3001,13 @@ I have still not seen the app run: there is no iPhone, simulator or Xcode on thi
 
 ## T-189 — Backlog fixes before launch
 
-Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-189", in this order: migration
-45, the worker, the web.
+Built and pushed 19 November 2026. **Deployed by you on 19 November 2026:** migration 45, then the worker
+(version `628da7f6`), then the web. `ALERT_EMAIL` is set on the worker (a secret) and on Vercel (Production).
 
 ### One setting to add (both places, same value)
 
-- `ALERT_EMAIL`: the address the alerts go to. On the worker: `wrangler secret put ALERT_EMAIL --env
-  production`. On Vercel: an environment variable of the same name.
+- ~~`ALERT_EMAIL`: the address the alerts go to.~~ Done on both (19 November). On the worker: `wrangler secret
+  put ALERT_EMAIL --env production`. On Vercel: an environment variable of the same name.
 - **To turn alerts off:** remove it from both. With no address nothing is sent. To stop only the check of
   waiting requests, take the `[env.production.triggers]` block out of `apps/worker/wrangler.toml` and deploy
   the worker.
@@ -3059,3 +3059,27 @@ Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-1
 - From your backlog note on the sample price: low / typical / high prices, a switch per quantity, and "Test
   with a photo". You asked for a realistic sample or a plain statement; that is what is built.
 - ~~A deploy script for migration 45.~~ Ready: `bash scripts/deploy-migration-45.sh` (tested on a local copy at 44).
+
+## T-190 — The Qolumns logo everywhere, one text box
+
+Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-190", the web and the worker (web
+first, so the email logo's address answers before the worker's emails use it). No migration, no new setting.
+
+### What to look at (after the deploy)
+
+- [ ] **The site:** the drawn wordmark in the header, the phone menu, the footer, sign-in and the dashboard.
+- [ ] **The browser tab** shows "Qo"; a link to the site pasted in a chat shows the wordmark on green.
+- [ ] **An email to you** (for example a test request): the wordmark above the card. With pictures off, the word
+  "Qolumns" in dark bold. Emails to your customers do not have it.
+- [ ] **A question on a quote you made:** with choices, the buttons and "Why (for your records)"; "Other" opens
+  the answer box instead of the note; a question with no list has the answer box only.
+
+### The app
+
+- The icon and splash reach a phone only in a new build (Expo Go shows neither). The sign-in screen shows the
+  wordmark in Expo Go after the next app update.
+
+### Colours (not changed)
+
+- The files' dark green is `#192822` and cream `#F7EBC7`; the design tokens are ink `#1B2823` and butter
+  `#F7E9C6`. Close, not equal. Tell me if the tokens should follow the files.

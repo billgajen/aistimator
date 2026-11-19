@@ -2,14 +2,50 @@ import { PRODUCT_NAME } from '@qolumns/shared'
 import { cn } from '@/lib/cn'
 
 /**
- * The wordmark: the name as text, in the display font (the owner's choice,
- * T-165). One component, so the header, the footer, the sign-in pages and the
- * dashboard draw it the same way. Size and colour come from the caller.
+ * T-190: the wordmark is the owner's drawing (brand/qolumns-wordmark.svg, also served at
+ * /brand/qolumns-wordmark.svg), drawn inline so it is sharp at every size and needs no request. One component, so
+ * the header, the footer, the sign-in pages and the dashboard draw it the same way. A unit test checks that these
+ * paths are the file's paths.
+ *
+ * - `tone`: "dark" (ink, the dark file) on light grounds; "light" (white, the white file) on dark ones.
+ * - `height` in px. The width follows from the drawing, and both are set, so nothing moves when it paints.
  */
-export function Wordmark({ className }: { className?: string }) {
+export const WORDMARK_VIEWBOX = '0 0 566.35 152.34'
+const [, , VIEW_W = 1, VIEW_H = 1] = WORDMARK_VIEWBOX.split(' ').map(Number)
+
+export const WORDMARK_PATHS: readonly string[] = [
+  'M68.9,125.4c1.07,5.36,2.91,9.65,5.66,12.71l-20.82,14.24c-4.75-6.13-7.81-14.7-9.19-26.64C17.45,120.96,0,99.06,0,70.73,0,38.73,22.35,15,55.89,15s55.73,23.73,55.73,55.73c0,27.71-16.69,49.3-42.72,54.66ZM86.97,70.73c0-19.45-12.4-33.84-31.08-33.84s-31.24,14.39-31.24,33.84,12.56,33.99,31.24,33.99,31.08-14.39,31.08-33.99Z',
+  'M194.29,71.46c0,22.35-15.59,38.9-38.9,38.9s-38.9-16.55-38.9-38.9,15.59-38.9,38.9-38.9,38.9,16.55,38.9,38.9ZM173.04,71.46c0-11.31-6.35-19.73-17.66-19.73s-17.66,8.42-17.66,19.73,6.35,19.73,17.66,19.73,17.66-8.42,17.66-19.73Z',
+  'M199.15,108.29V0h21.52v108.29h-21.52Z',
+  'M225.4,73.25v-38.49h21.52v36.56c0,11.45,2.76,18.9,15.04,18.9,15.73,0,20.69-10.76,36.83-32.14,5.52-7.31,11.73-15.04,19.87-19.87l.14-.14c4.83-3.04,10.76-4.83,16.55-4.83h.28c.69-.14,1.24-.14,1.93-.14h.55c11.04.14,19.04,4.41,23.87,12.55,4.97-8.42,13.24-12.55,24.69-12.55,18.62,0,32.97,11.45,32.97,36.7v38.49h-21.52v-36.42c0-11.59-3.59-19.04-12.69-19.04s-12.69,7.45-12.69,19.04h.14v36.42h-21.52v-36.42c0-11.45-3.59-18.76-12.42-19.04h-.55c-13.24.83-22.21,15.59-33.38,30.07-4.42,5.93-9.24,12.97-14.76,17.8-7.73,6.62-16.83,9.24-28.28,9.24-23.04,0-36.56-13.38-36.56-36.7ZM298.52,50.22c-1.24,1.66-2.62,3.17-3.72,4.83-6.48,8.42-11.04,15.31-15.31,20.42-.83.97-1.66,1.93-2.48,2.76v-43.46h21.52v15.45ZM326.8,63.46c-.55,2.35-.83,5.24-.83,8.42v36.42h-21.52v-17.24c3.04-3.73,5.79-7.45,8.42-11.04,4.83-6.48,9.24-12.55,13.93-16.55Z',
+  'M497.62,69.81v38.49h-21.52v-36.42c0-11.59-2.76-19.04-15.04-19.04s-15.04,7.45-15.04,19.04v36.42h-21.52v-38.49c0-23.31,13.52-36.7,36.56-36.7s36.56,13.38,36.56,36.7Z',
+  'M566.35,87.19c0,14.35-11.59,22.76-32.14,22.76-12.97,0-32-2.9-31.73-26.07h17.8c0,8.42,9.11,9.38,13.38,9.38,6.9,0,12.28-.55,12.28-5.93,0-10.21-42.08-4-42.08-31.32,0-13.8,9.79-22.9,30.49-22.9,11.04,0,25.52,2.07,30.35,12.69l-6.35,14.07c-4.14-8-13.93-10.62-23.59-10.62-7.17,0-10.62,2.07-10.62,5.79,0,12.14,42.21,1.52,42.21,32.14Z',
+]
+
+/** The two fills of the owner's files: ink (the design system's text colour) and white */
+export const WORDMARK_FILL = { dark: '#1b2823', light: '#fff' } as const
+
+export function wordmarkWidth(height: number): number {
+  return Math.round((height * VIEW_W) / VIEW_H)
+}
+
+export function Wordmark({ height = 28, tone = 'dark', className }: { height?: number; tone?: keyof typeof WORDMARK_FILL; className?: string }) {
   return (
-    <span className={cn('font-display font-extrabold tracking-tight text-text-primary', className)} data-testid="wordmark">
-      {PRODUCT_NAME}
-    </span>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox={WORDMARK_VIEWBOX}
+      width={wordmarkWidth(height)}
+      height={height}
+      role="img"
+      aria-label={PRODUCT_NAME}
+      className={cn('block shrink-0', className)}
+      data-testid="wordmark"
+      data-tone={tone}
+    >
+      <title>{PRODUCT_NAME}</title>
+      {WORDMARK_PATHS.map((d) => (
+        <path key={d.slice(0, 12)} d={d} fill={WORDMARK_FILL[tone]} />
+      ))}
+    </svg>
   )
 }

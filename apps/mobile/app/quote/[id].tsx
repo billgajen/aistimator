@@ -26,7 +26,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as Clipboard from 'expo-clipboard'
-import { ANSWER_NOTE_MAX, allAnswered, certaintySentence, chosenChoice, customerFirstName, formatMoney, isTypedAnswer, lineLabelParts, parseMoneyInput, questionChoices, QUOTE_TURN_COPY, type AppQuoteLine, type AppQuoteSection, type AppQuoteView } from '@qolumns/shared'
+import { ANSWER_NOTE_MAX, allAnswered, certaintySentence, chosenChoice, customerFirstName, formatMoney, isTypedAnswer, lineLabelParts, noteToSend, parseMoneyInput, questionChoices, questionTextBox, QUOTE_TURN_COPY, type AppQuoteLine, type AppQuoteSection, type AppQuoteView } from '@qolumns/shared'
 import { useApi } from '../../src/lib/api-context'
 import { toApiError } from '../../src/lib/api'
 import { config } from '../../src/lib/config'
@@ -126,7 +126,7 @@ export default function QuoteDetail() {
       await api.answerQuestions(
         quote.id,
         asked.map((q) => {
-          const note = (notes[q.id] ?? '').trim()
+          const note = noteToSend(questionChoices(q).choices, answers[q.id], notes[q.id])
           return { questionId: q.id, answer: (answers[q.id] ?? '').trim(), ...(note && { note }) }
         }),
         stored?.token
@@ -556,7 +556,8 @@ function PhotoTile({ uri, label, onPress, onRetry }: { uri: string; label: strin
 
 /**
  * The questions of a quote, each with its choices as rows to press (typing is behind "Other") and, under
- * them, the optional note "Why (for your records)" (T-188). Which choices a question has is the shared
+ * them, the optional note "Why (for your records)" (T-188). One text box at most (T-190): a question with no
+ * choices has its answer box only, and "Other" typed replaces the note. Which choices a question has is the shared
  * rule's; the note is the business's own record and changes nothing on the quote.
  */
 function Questions({
@@ -600,10 +601,13 @@ function Questions({
                 <Field label={QUOTE_TURN_COPY.questions.otherLabel} value={answer ?? ''} onChangeText={(v) => onAnswer(q.id, v)} keyboardType={numeric ? 'decimal-pad' : 'default'} />
               </View>
             ) : null}
-            <View style={{ marginTop: space.sm }}>
-              <Field label={QUOTE_TURN_COPY.questions.noteLabel} value={notes[q.id] ?? ''} onChangeText={(v) => onNote(q.id, v.slice(0, ANSWER_NOTE_MAX))} />
-              <Muted style={{ marginTop: 0 }}>{QUOTE_TURN_COPY.questions.noteHint}</Muted>
-            </View>
+            {/* T-190: one text box at most: the note only beside choices, and not while "Other" is typed */}
+            {questionTextBox(choices, answer) === 'note' ? (
+              <View style={{ marginTop: space.sm }}>
+                <Field label={QUOTE_TURN_COPY.questions.noteLabel} value={notes[q.id] ?? ''} onChangeText={(v) => onNote(q.id, v.slice(0, ANSWER_NOTE_MAX))} />
+                <Muted style={{ marginTop: 0 }}>{QUOTE_TURN_COPY.questions.noteHint}</Muted>
+              </View>
+            ) : null}
           </View>
         )
       })}

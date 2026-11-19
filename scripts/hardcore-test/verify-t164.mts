@@ -204,9 +204,10 @@ if (!process.env.PLAYWRIGHT_DIR) {
     check(`${width}: the accent is decided: there is no switch on the page`, (await p.locator('[data-testid=accent-switch]').count()) === 0 && (await p.getAttribute('[data-testid=design-preview]', 'data-accent')) === null)
     const present = await p.evaluate(() => ['wordmark', 'palette', 'type', 'shape', 'components', 'marketing-band', 'dashboard-row', 'motion'].filter((id) => !document.querySelector(`[data-testid=section-${id}]`)))
     check(`${width}: every section is there (wordmark, palette, type, shape, components, marketing band, dashboard row, motion)`, present.length === 0, present)
-    check(`${width}: the wordmark is the name, in the display font`,
-      (await p.locator('[data-testid=section-wordmark] [data-testid=wordmark]').first().innerText()) === 'Qolumns' && /Bricolage/i.test(await style(p, '[data-testid=section-wordmark] [data-testid=wordmark]', 'font-family')),
-      await style(p, '[data-testid=section-wordmark] [data-testid=wordmark]', 'font-family'))
+    // T-190: the wordmark is the owner's drawing (an SVG read as the product's name), not typed text
+    check(`${width}: the wordmark is the owner's drawing, read as the name`,
+      (await p.locator('[data-testid=section-wordmark] svg[data-testid=wordmark]').first().getAttribute('aria-label')) === 'Qolumns',
+      await p.locator('[data-testid=section-wordmark] [data-testid=wordmark]').first().evaluate((e) => e.tagName))
     check(`${width}: the marketing band shows a real product screen (the three frames of the home page)`, (await p.locator('[data-testid=marketing-band] [data-testid=product-frame]').count()) === 3)
     check(`${width}: five status colours`, (await p.locator('[data-testid=status-pills] [data-testid=turn-label]').count()) === 5)
 

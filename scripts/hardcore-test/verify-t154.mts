@@ -86,7 +86,9 @@ await d.screenshot({ path: `${out}/home-1440-fold.png` })
 await d.goto(`${app}/trades/hvac`, { waitUntil: 'networkidle' })
 await d.screenshot({ path: `${out}/trades-hvac-1440.png` })
 
-const og = await fetch(`${app}/opengraph-image`)
+// T-190: the social image is a static file now; its address is the one the home page names
+const ogUrl = async (base: string) => /property="og:image" content="([^"]+)"/.exec(await (await fetch(`${base}/`)).text())?.[1] ?? `${base}/opengraph-image.png`
+const og = await fetch(await ogUrl(app))
 const ogBytes = og.ok ? (await og.arrayBuffer()).byteLength : 0
 check('the social preview image renders', og.ok && og.headers.get('content-type') === 'image/png' && ogBytes > 5000, ogBytes)
 const head = await (await fetch(`${app}/`)).text()

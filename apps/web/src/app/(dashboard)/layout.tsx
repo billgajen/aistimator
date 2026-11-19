@@ -43,7 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Wordmark */}
       <div className="px-5 pt-5 pb-4">
         <Link href="/app" className="group inline-block">
-          <Wordmark className="text-[22px]" />
+          <Wordmark height={30} />
           <div className="tape-rule mt-1.5 w-24 opacity-50 group-hover:opacity-90 transition-opacity" />
         </Link>
       </div>

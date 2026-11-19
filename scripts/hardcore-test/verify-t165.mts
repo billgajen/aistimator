@@ -532,7 +532,8 @@ if (!process.env.PLAYWRIGHT_DIR) {
   check('Home: the "Waiting for you" row’s pill is the strong yellow too', hexOf(homePill) === YELLOW, hexOf(homePill))
   const dashButtons = await d.locator('main button, main a').evaluateAll((els, yellow) => els.filter((el) => { const m = getComputedStyle(el).backgroundColor.match(/\d+/g) ?? []; return '#' + m.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, '0')).join('').toUpperCase() === yellow }).length, YELLOW)
   check('dashboard buttons did not change: none is yellow ("Approve & send" is juniper)', dashButtons === 0 && hexOf(await d.getByRole('button', { name: 'Approve & send' }).first().evaluate((el) => getComputedStyle(el).backgroundColor)) === '#205E56', dashButtons)
-  check('the dashboard’s wordmark is the name in the display font', (await d.locator('[data-testid=wordmark]').first().innerText()) === 'Qolumns' && /Bricolage/i.test(await style(d, '[data-testid=wordmark]', 'font-family')))
+  // T-190: the owner's drawing, read as the name
+  check('the dashboard’s wordmark is the owner’s drawing, read as the name', (await d.locator('svg[data-testid=wordmark]').first().getAttribute('aria-label')) === 'Qolumns')
   await shot(d, 'dashboard-home')
   await d.goto(`${cfg.appUrl}/app/settings/billing`)
   await d.waitForLoadState('networkidle').catch(() => {})

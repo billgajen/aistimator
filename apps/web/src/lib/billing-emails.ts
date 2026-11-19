@@ -6,7 +6,7 @@
  * Each says one thing and has one button. No card detail, no amount: the
  * amounts and the receipts come from Stripe, who is the seller of record.
  */
-import { PAYMENT_FAILED_LINE, PRODUCT_NAME, freeQuotesLeftLine } from '@qolumns/shared'
+import { PAYMENT_FAILED_LINE, PRODUCT_NAME, freeQuotesLeftLine, productLogoRow } from '@qolumns/shared'
 
 const escape = (text: string) =>
   text.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch] ?? ch)
@@ -17,6 +17,7 @@ function page(input: { title: string; label: string; heading: string; paragraphs
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${escape(input.title)}</title></head>
 <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f3f4f6;">
   <table role="presentation" style="width:100%;border-collapse:collapse;"><tr><td style="padding:40px 20px;">
+    ${productLogoRow()}
     <table role="presentation" style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;"><tr><td style="padding:40px;">
       <p style="margin:0;font-size:14px;color:#6b7280;">${escape(input.label)}</p>
       <h1 style="margin:8px 0 0;font-size:24px;font-weight:700;color:#111827;" data-role="heading">${escape(input.heading)}</h1>

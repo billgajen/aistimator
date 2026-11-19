@@ -4,7 +4,7 @@
  * HTML email templates for quote notifications.
  * Uses inline styles for maximum email client compatibility.
  */
-import { APPROVAL_COPY, PRODUCT_NAME } from '@qolumns/shared'
+import { APPROVAL_COPY, PRODUCT_NAME, productLogoRow } from '@qolumns/shared'
 import type { ApprovalDetail } from '@qolumns/shared'
 
 export interface CustomerEmailData {
@@ -44,20 +44,11 @@ export interface BusinessEmailData {
  * Base email wrapper with consistent styling
  */
 function emailWrapper(content: string, _primaryColor: string = '#2563eb', options: { fromProduct?: boolean; toBusiness?: boolean } = {}): string {
-  // T-183: an email that the product itself sends to the business says so at
-  // the top, and has no "Powered by" line (that line is for the business's
-  // own emails to its customers). The logo file does not exist yet: this row
-  // is where it goes. Until then it shows the product's name as text.
-  const productHeader = options.fromProduct
-    ? `<table role="presentation" style="max-width: 600px; margin: 0 auto 16px;">
-          <tr>
-            <!-- PRODUCT LOGO: replace the text in this cell with the logo image when the file exists -->
-            <td data-role="product-logo" style="padding: 0 4px; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: #205E56;">${PRODUCT_NAME}</td>
-          </tr>
-        </table>`
-    : ''
-  // T-185: no email to the business carries "Powered by" (it is from the product). Only the review
-  // email also has the logo row; the line itself is for the business's emails to its customers.
+  // T-183 marked this row; T-190 fills it: every email the product sends to the business has the product's logo
+  // at the top (productLogoRow, @qolumns/shared). Emails to a customer carry the business's brand, not ours.
+  const productHeader = options.fromProduct || options.toBusiness ? productLogoRow() : ''
+  // T-185: no email to the business carries "Powered by" (it is from the product); the line is for the
+  // business's emails to its customers.
   const footer = options.fromProduct || options.toBusiness
     ? ''
     : `<table role="presentation" style="max-width: 600px; margin: 20px auto 0;">

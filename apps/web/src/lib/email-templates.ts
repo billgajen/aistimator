@@ -8,7 +8,7 @@
  * they are from the product itself. The two that go to a customer (updated quote, reminder)
  * keep theirs. A unit test holds both (app-t184.test.ts).
  */
-import { PRODUCT_NAME } from '@qolumns/shared'
+import { PRODUCT_NAME, productLogoRow } from '@qolumns/shared'
 
 function escapeHtml(text: string): string {
   const htmlEntities: Record<string, string> = {
@@ -148,6 +148,7 @@ export function generateFeedbackNotificationEmailHtml(data: {
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 40px 20px;">
+        ${productLogoRow()}
         <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px;">
@@ -250,6 +251,7 @@ function generateLimitReachedEmailBody(
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 40px 20px;">
+        ${productLogoRow()}
         <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px;">
@@ -335,6 +337,7 @@ export function generateQuoteAcceptedEmailHtml(data: {
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 40px 20px;">
+        ${productLogoRow()}
         <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px;">
@@ -410,6 +413,7 @@ export function generateQuoteDeclinedEmailHtml(data: {
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 40px 20px;">
+        ${productLogoRow()}
         <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px;">
@@ -549,6 +553,7 @@ export function generateWhatsAppRenewalEmailHtml(data: {
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 40px 20px;">
+        ${productLogoRow()}
         <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px;">

@@ -14,11 +14,11 @@ const ROOT = join(__dirname, '..', '..', '..', '..')
 const read = (file: string) => readFileSync(join(ROOT, file), 'utf8')
 
 describe('T-181: the headline (already the owner’s words since T-173)', () => {
-  it('reads "Instant quotes for your customers, in your prices." on the page, in the title and in the social image', () => {
+  // T-190: the social image is now the owner's wordmark picture, so the headline is in the page's title and description
+  it('reads "Instant quotes for your customers, in your prices." on the page and in the title', () => {
     expect(HERO.headline).toBe('Instant quotes for your customers, in your prices.')
     expect(PAGE_META.title).toContain('Instant quotes for your customers, in your prices')
     expect(read('apps/web/src/app/layout.tsx')).toContain("description: 'Instant quotes for your customers, in your prices.',")
-    expect(read('apps/web/src/app/opengraph-image.tsx')).toContain('{HERO.headline}')
     expect(read('apps/web/src/app/page.tsx')).toContain('openGraph: { title: PAGE_META.title, description: PAGE_META.description')
   })
 })

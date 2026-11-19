@@ -1,9 +1,10 @@
 'use client'
 
+import { Wordmark } from '@/components/brand/Wordmark'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { PRODUCT_NAME, freeOfferLabel } from '@qolumns/shared'
+import { freeOfferLabel } from '@qolumns/shared'
 import { NAV_LINKS } from '@/lib/marketing/nav'
 import { lockPageScroll } from '@/lib/marketing/scroll-lock'
 
@@ -111,7 +112,7 @@ export function MobileMenu({ defaultOpen = false }: { defaultOpen?: boolean }) {
           data-testid="site-menu"
         >
           <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
-            <span className="inline-flex min-h-[44px] items-center font-display text-lg font-extrabold tracking-tight text-text-primary">{PRODUCT_NAME}</span>
+            <span className="inline-flex min-h-[44px] items-center"><Wordmark height={28} /></span>
             <button
               ref={closeRef}
               type="button"

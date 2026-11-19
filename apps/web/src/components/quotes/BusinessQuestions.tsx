@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ANSWER_NOTE_MAX, QUOTE_TURN_COPY, allAnswered, chosenChoice, isTypedAnswer, questionChoices, type AskedQuestion } from '@qolumns/shared'
+import { ANSWER_NOTE_MAX, QUOTE_TURN_COPY, allAnswered, chosenChoice, isTypedAnswer, noteToSend, questionChoices, questionTextBox, type AskedQuestion } from '@qolumns/shared'
 
 export type BusinessQuestion = AskedQuestion
 
@@ -58,7 +58,7 @@ export function BusinessQuestions({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           answers: questions.map((q) => {
-            const note = (notes[q.id] ?? '').trim()
+            const note = noteToSend(questionChoices(q).choices, answers[q.id], notes[q.id])
             return { questionId: q.id, answer: (answers[q.id] ?? '').trim(), ...(note && { note }) }
           }),
         }),
@@ -123,22 +123,25 @@ export function BusinessQuestions({
                   <input type="text" inputMode={numeric ? 'decimal' : 'text'} value={answer ?? ''} onChange={(event) => set(q.id, event.target.value)} className={FIELD} data-testid="question-typed" />
                 </label>
               )}
-              {/* T-188: the business's own note. Optional; it changes nothing on the quote. */}
-              <label className="mt-3 block">
-                <span className="mb-1 block text-sm text-text-secondary">{C.noteLabel}</span>
-                <input
-                  type="text"
-                  maxLength={ANSWER_NOTE_MAX}
-                  value={notes[q.id] ?? ''}
-                  onChange={(event) => setNotes((current) => ({ ...current, [q.id]: event.target.value }))}
-                  aria-describedby={`note-hint-${q.id}`}
-                  className={FIELD}
-                  data-testid="question-note"
-                />
-                <span id={`note-hint-${q.id}`} className="mt-1 block text-xs text-text-muted">
-                  {C.noteHint}
-                </span>
-              </label>
+              {/* T-188: the business's own note. Optional; it changes nothing on the quote.
+                  T-190: one text box at most, so only beside choices, and not while "Other" is typed. */}
+              {questionTextBox(choices, answer) === 'note' && (
+                <label className="mt-3 block">
+                  <span className="mb-1 block text-sm text-text-secondary">{C.noteLabel}</span>
+                  <input
+                    type="text"
+                    maxLength={ANSWER_NOTE_MAX}
+                    value={notes[q.id] ?? ''}
+                    onChange={(event) => setNotes((current) => ({ ...current, [q.id]: event.target.value }))}
+                    aria-describedby={`note-hint-${q.id}`}
+                    className={FIELD}
+                    data-testid="question-note"
+                  />
+                  <span id={`note-hint-${q.id}`} className="mt-1 block text-xs text-text-muted">
+                    {C.noteHint}
+                  </span>
+                </label>
+              )}
             </fieldset>
           )
         })}

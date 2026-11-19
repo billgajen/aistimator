@@ -106,18 +106,18 @@ export function DesignPreview({ productScreen }: { productScreen: React.ReactNod
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">Design system preview</p>
           <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight text-text-primary">Tokens and components, as they render</h1>
           <p className="mt-3 max-w-2xl text-text-secondary">
-            Everything on this page is a real token or a real component. The accent is yellow and the wordmark is the name in the display font.
+            Everything on this page is a real token or a real component. The accent is yellow and the wordmark is the owner’s drawing.
           </p>
         </header>
 
-        <Section id="wordmark" title="Wordmark" lead="The name as text, in the display font. The header, the footer, the sign-in pages and the dashboard all draw it with this one component.">
+        <Section id="wordmark" title="Wordmark" lead="The owner’s drawing, inline: dark on light grounds, white on dark ones. The header, the footer, the sign-in pages and the dashboard all draw it with this one component.">
           <div className="grid gap-4 sm:grid-cols-2">
             <Card className="bg-white p-8">
-              <Wordmark className="text-display-sm sm:text-display-md" />
+              <Wordmark height={72} className="h-auto max-w-full" />
               <p className="mt-4 text-sm text-text-secondary">On paper</p>
             </Card>
             <div className="flex flex-col justify-between rounded-xl bg-primary p-8">
-              <Wordmark className="text-display-sm text-white sm:text-display-md" />
+              <Wordmark height={72} tone="light" className="h-auto max-w-full" />
               <p className="mt-4 text-sm text-on-primary/80">On juniper</p>
             </div>
           </div>

@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native'
+import { Image, KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native'
 import { PRODUCT_NAME } from '@qolumns/shared'
 import { supabase } from '../src/lib/supabase'
 import { Button, ErrorText, Field, Muted, Screen } from '../src/components/ui'
-import { colors, fonts, scale, space } from '../src/theme'
+import { space } from '../src/theme'
+import { WORDMARK_SIZE } from '../src/lib/wordmark'
+import WORDMARK from '../assets/wordmark.png'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -39,9 +41,7 @@ export default function Login() {
   return (
     <Screen>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.wrap}>
-        <Text accessibilityRole="header" style={styles.brand} maxFontSizeMultiplier={scale.large}>
-          {PRODUCT_NAME}
-        </Text>
+        <Image source={WORDMARK} style={styles.brand} accessible accessibilityRole="header" accessibilityLabel={PRODUCT_NAME} resizeMode="contain" />
         <Muted>Quote on site. Sign in with the email and password you use on the web.</Muted>
         <View style={{ height: space.xl }} />
         <Field label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" textContentType="username" />
@@ -56,6 +56,6 @@ export default function Login() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, justifyContent: 'center', padding: space.xl },
-  // the wordmark: the product's name in the display face (the logo file comes later)
-  brand: { fontFamily: fonts.display, fontSize: 40, letterSpacing: -1, color: colors.brand, marginBottom: space.xs },
+  // T-190: the owner's wordmark (brand/qolumns-wordmark.png, 3x of its shown size); width and height fixed so nothing moves
+  brand: { width: WORDMARK_SIZE.width, height: WORDMARK_SIZE.height, marginBottom: space.md },
 })

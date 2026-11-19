@@ -187,7 +187,9 @@ check('1440 px: no menu button (desktop links instead)', !(await d.getByTestId('
 await d.close()
 
 // 6. the social image: no tape-yellow (#DCAF3E) rule
-const og = await fetch(`${app}/opengraph-image`)
+// T-190: the social image is a static file now; its address is the one the home page names
+const ogUrl = async (base: string) => /property="og:image" content="([^"]+)"/.exec(await (await fetch(`${base}/`)).text())?.[1] ?? `${base}/opengraph-image.png`
+const og = await fetch(await ogUrl(app))
 const png = PNG.sync.read(Buffer.from(await og.arrayBuffer()))
 let yellow = 0
 for (let i = 0; i < png.data.length; i += 4) {

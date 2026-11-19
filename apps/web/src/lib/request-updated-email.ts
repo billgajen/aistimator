@@ -3,7 +3,7 @@
  * lib/request-updated.ts). It is about the SAME quote, never a second one:
  * each service as a section with its subtotal, then the one total.
  */
-import { displaySections, formatMoney, sectionsAwaitingApproval } from '@qolumns/shared'
+import { displaySections, formatMoney, productLogoRow, sectionsAwaitingApproval } from '@qolumns/shared'
 import type { CombinedPricing } from '@qolumns/shared'
 
 const escape = (text: string) =>
@@ -55,6 +55,7 @@ export function requestUpdatedEmail(input: RequestUpdatedInput): { subject: stri
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Request updated</title></head>
 <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f3f4f6;">
   <table role="presentation" style="width:100%;border-collapse:collapse;"><tr><td style="padding:40px 20px;">
+    ${productLogoRow()}
     <table role="presentation" style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;"><tr><td style="padding:40px;">
       <p style="margin:0;font-size:14px;color:#6b7280;">Request updated</p>
       <h1 style="margin:8px 0 0;font-size:24px;font-weight:700;color:#111827;">${escape(name)}</h1>
