@@ -13,7 +13,12 @@ export const PLAIN = {
   offline: 'No signal. Nothing was lost. Try again when you are back online.',
   unknown: 'Something went wrong. Nothing was lost. Try again.',
   signIn: 'Please sign in again.',
+  /** T-191: the plan's quotes are used. No "upgrade" and no plan to pick: the app may not point at a purchase */
+  planLimit: 'Your plan’s quotes are used, so this request cannot be priced yet.',
 } as const
+
+/** T-191: words that point at buying something; the App Store does not allow them in the app */
+const BUYING = /\b(upgrade|pick a plan|choose a plan|subscribe|billing|checkout|pricing page|buy)\b/i
 
 /** Is this text something a person wrote for a person? */
 function readsPlainly(text: string): boolean {
@@ -31,6 +36,8 @@ export function plainError(thrown: unknown, fallback: string = PLAIN.unknown): s
   if (thrown instanceof ApiError) {
     if (thrown.offline) return PLAIN.offline
     if (thrown.status === 401) return PLAIN.signIn
+    if (thrown.status === 402 || thrown.code === 'PLAN_LIMIT_REACHED') return PLAIN.planLimit
+    if (BUYING.test(thrown.message)) return fallback
     return readsPlainly(thrown.message) ? thrown.message : fallback
   }
   return fallback

@@ -150,7 +150,9 @@ routes, one webhook and one admin route. Plan numbers come from `packages/shared
   your quotes running.", `action: "portal"`) or `suspended` (`action: "email"`). Suspended wins.
 - `POST /api/webhooks/stripe` (Stripe only; signed with `STRIPE_WEBHOOK_SECRET`). Handles exactly
   `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`,
-  `invoice.payment_failed`, `invoice.paid`; each re-reads the subscription from Stripe and stores it. Answers
+  `invoice.payment_failed`, `invoice.paid`, and (T-191) `charge.refunded`, `charge.dispute.closed`; each re-reads
+  from Stripe and stores the subscription (a full refund of the current period or a lost dispute cancels it
+  first: AD-074). Answers
   `{ received: true }`; `{ received: true, duplicate: true }` for an event already handled (nothing is touched);
   `{ received: true, handled: false }` for any other event type; **400** for a missing or wrong signature;
   **500** when storing failed (Stripe sends it again).

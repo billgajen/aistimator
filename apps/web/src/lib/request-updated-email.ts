@@ -3,7 +3,7 @@
  * lib/request-updated.ts). It is about the SAME quote, never a second one:
  * each service as a section with its subtotal, then the one total.
  */
-import { displaySections, formatMoney, productLogoRow, sectionsAwaitingApproval } from '@qolumns/shared'
+import { EMAIL_FONT, displaySections, emailHeadStyle, formatMoney, productLogoRow, sectionsAwaitingApproval } from '@qolumns/shared'
 import type { CombinedPricing } from '@qolumns/shared'
 
 const escape = (text: string) =>
@@ -41,33 +41,34 @@ export function requestUpdatedEmail(input: RequestUpdatedInput): { subject: stri
   const rows = (sections ?? [{ serviceName: input.mainServiceName, subtotal: input.pricing.subtotal, main: true }])
     .map(
       (s) =>
-        `<tr><td style="padding:8px 0;border-bottom:1px solid #e5e7eb;font-size:14px;color:#111827;">${escape(s.serviceName)}${'addedBy' in s && s.addedBy === 'customer' ? ' <span style="color:#6b7280;">(added by the customer)</span>' : ''}</td><td style="padding:8px 0;border-bottom:1px solid #e5e7eb;font-size:14px;color:#111827;text-align:right;white-space:nowrap;" data-role="section-subtotal">${escape(money(s.subtotal))}</td></tr>`
+        `<tr><td style="padding:8px 0;border-bottom:1px solid #E5E2D8;font-size:14px;color:#1B2823;">${escape(s.serviceName)}${'addedBy' in s && s.addedBy === 'customer' ? ' <span style="color:#626C66;">(added by the customer)</span>' : ''}</td><td style="padding:8px 0;border-bottom:1px solid #E5E2D8;font-size:14px;color:#1B2823;text-align:right;white-space:nowrap;" data-role="section-subtotal">${escape(money(s.subtotal))}</td></tr>`
     )
     .join('')
   const tax =
     input.pricing.taxAmount > 0
-      ? `<tr><td style="padding:8px 0;font-size:14px;color:#6b7280;">${escape(input.pricing.taxLabel || 'Tax')}</td><td style="padding:8px 0;font-size:14px;color:#6b7280;text-align:right;">${escape(money(input.pricing.taxAmount))}</td></tr>`
+      ? `<tr><td style="padding:8px 0;font-size:14px;color:#626C66;">${escape(input.pricing.taxLabel || 'Tax')}</td><td style="padding:8px 0;font-size:14px;color:#626C66;text-align:right;">${escape(money(input.pricing.taxAmount))}</td></tr>`
       : ''
   const button = (href: string, label: string, role: string) =>
-    `<table role="presentation" style="width:100%;margin:20px 0 4px;"><tr><td style="text-align:center;"><a href="${escape(href)}" data-role="${role}" style="display:inline-block;padding:14px 28px;background-color:#205E56;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;border-radius:8px;">${label}</a></td></tr></table>`
+    `<table role="presentation" style="width:100%;margin:20px 0 4px;"><tr><td style="text-align:center;"><a href="${escape(href)}" data-role="${role}" style="display:inline-block;padding:14px 28px;background-color:#205E56;color:#FFFFFF;text-decoration:none;font-weight:600;font-size:15px;border-radius:8px;">${label}</a></td></tr></table>`
   const html = `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Request updated</title></head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f3f4f6;">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Request updated</title>${emailHeadStyle()}
+</head>
+<body style="margin:0;padding:0;font-family:${EMAIL_FONT.body};background-color:#FAF9F6;">
   <table role="presentation" style="width:100%;border-collapse:collapse;"><tr><td style="padding:40px 20px;">
     ${productLogoRow()}
-    <table role="presentation" style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;"><tr><td style="padding:40px;">
-      <p style="margin:0;font-size:14px;color:#6b7280;">Request updated</p>
-      <h1 style="margin:8px 0 0;font-size:24px;font-weight:700;color:#111827;">${escape(name)}</h1>
-      <p style="margin:12px 0 0;font-size:15px;color:#111827;" data-role="what-changed">
+    <table role="presentation" style="max-width:600px;margin:0 auto;background-color:#FFFFFF;border-radius:8px;"><tr><td style="padding:40px;">
+      <p style="margin:0;font-size:14px;color:#626C66;">Request updated</p>
+      <h1 style="margin:8px 0 0;font-size:24px;font-weight:700;color:#1B2823;">${escape(name)}</h1>
+      <p style="margin:12px 0 0;font-size:15px;color:#1B2823;" data-role="what-changed">
         ${escape(name)} ${escape(what)} the quote you already have for them. It is still one quote, with one total.
       </p>
       <table role="presentation" style="width:100%;border-collapse:collapse;margin:20px 0 0;">
         ${rows}
         ${tax}
-        <tr><td style="padding:12px 0 0;font-size:16px;font-weight:700;color:#111827;">Total</td><td style="padding:12px 0 0;font-size:16px;font-weight:700;color:#111827;text-align:right;" data-role="total">${escape(money(input.pricing.total))}</td></tr>
+        <tr><td style="padding:12px 0 0;font-size:16px;font-weight:700;color:#1B2823;">Total</td><td style="padding:12px 0 0;font-size:16px;font-weight:700;color:#1B2823;text-align:right;" data-role="total">${escape(money(input.pricing.total))}</td></tr>
       </table>
-      <p style="margin:16px 0 0;font-size:14px;color:#374151;" data-role="next">
+      <p style="margin:16px 0 0;font-size:14px;color:#4F5D57;" data-role="next">
         ${next}
       </p>
       ${input.awaitingApproval && input.approveUrl ? button(input.approveUrl, 'Approve &amp; send', 'approve') : ''}

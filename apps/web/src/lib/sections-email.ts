@@ -18,12 +18,12 @@ export function sectionsEmailHtml(pricing: QuotePricing | null | undefined, main
   const rows = sections
     .map(
       (s) =>
-        `<tr><td style="padding:8px 0;border-bottom:1px solid #e5e7eb;font-size:14px;color:#374151;">${escape(s.serviceName)}</td><td style="padding:8px 0;border-bottom:1px solid #e5e7eb;font-size:14px;color:#111827;text-align:right;white-space:nowrap;">${escape(money(s.subtotal))}</td></tr>`
+        `<tr><td style="padding:8px 0;border-bottom:1px solid #E5E2D8;font-size:14px;color:#4F5D57;">${escape(s.serviceName)}</td><td style="padding:8px 0;border-bottom:1px solid #E5E2D8;font-size:14px;color:#1B2823;text-align:right;white-space:nowrap;">${escape(money(s.subtotal))}</td></tr>`
     )
     .join('')
   const tax =
     pricing.taxAmount > 0
-      ? `<tr><td style="padding:8px 0;font-size:14px;color:#6b7280;">${escape(pricing.taxLabel || 'Tax')}</td><td style="padding:8px 0;font-size:14px;color:#6b7280;text-align:right;white-space:nowrap;">${escape(money(pricing.taxAmount))}</td></tr>`
+      ? `<tr><td style="padding:8px 0;font-size:14px;color:#626C66;">${escape(pricing.taxLabel || 'Tax')}</td><td style="padding:8px 0;font-size:14px;color:#626C66;text-align:right;white-space:nowrap;">${escape(money(pricing.taxAmount))}</td></tr>`
       : ''
-  return `<table role="presentation" data-role="quote-sections" style="width:100%;border-collapse:collapse;margin:0 0 24px;">${rows}${tax}<tr><td style="padding:10px 0 0;font-size:15px;font-weight:700;color:#111827;">Total</td><td style="padding:10px 0 0;font-size:15px;font-weight:700;color:#111827;text-align:right;white-space:nowrap;">${escape(money(pricing.total))}</td></tr></table>`
+  return `<table role="presentation" data-role="quote-sections" style="width:100%;border-collapse:collapse;margin:0 0 24px;">${rows}${tax}<tr><td style="padding:10px 0 0;font-size:15px;font-weight:700;color:#1B2823;">Total</td><td style="padding:10px 0 0;font-size:15px;font-weight:700;color:#1B2823;text-align:right;white-space:nowrap;">${escape(money(pricing.total))}</td></tr></table>`
 }

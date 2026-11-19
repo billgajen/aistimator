@@ -21,6 +21,7 @@
  * no address nothing is claimed and nothing is sent.
  */
 import { PRODUCT_NAME } from './brand'
+import { EMAIL_FONT, emailHeadStyle } from './email-style'
 
 export type OpsAlertKind = 'quote_failed' | 'worker_error' | 'queue_backed_up'
 
@@ -82,15 +83,16 @@ export function opsAlertEmail(alert: OpsAlert, opts: OpsAlertEmailOptions = {}):
   const lines = [words.what, ...facts, held, words.look, admin, off].filter(Boolean)
   const html = `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${escape(words.subject)}</title></head>
-<body style="margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#111827;background-color:#ffffff;">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${escape(words.subject)}</title>${emailHeadStyle()}
+</head>
+<body style="margin:0;padding:24px;font-family:${EMAIL_FONT.body};color:#1B2823;background-color:#FFFFFF;">
   <h1 style="margin:0;font-size:20px;font-weight:700;">${escape(words.subject)}</h1>
   <p style="margin:12px 0 0;font-size:15px;" data-role="what">${escape(words.what)}</p>
-  ${facts.length ? `<ul style="margin:12px 0 0;padding-left:20px;font-size:14px;color:#374151;" data-role="facts">${facts.map((f) => `<li>${escape(f)}</li>`).join('')}</ul>` : ''}
-  ${held ? `<p style="margin:12px 0 0;font-size:14px;color:#374151;" data-role="held-back">${escape(held)}</p>` : ''}
+  ${facts.length ? `<ul style="margin:12px 0 0;padding-left:20px;font-size:14px;color:#4F5D57;" data-role="facts">${facts.map((f) => `<li>${escape(f)}</li>`).join('')}</ul>` : ''}
+  ${held ? `<p style="margin:12px 0 0;font-size:14px;color:#4F5D57;" data-role="held-back">${escape(held)}</p>` : ''}
   <p style="margin:12px 0 0;font-size:15px;">${escape(words.look)}</p>
   ${admin ? `<p style="margin:12px 0 0;font-size:15px;"><a href="${escape(admin)}" data-role="admin">Open the admin area</a></p>` : ''}
-  <p style="margin:24px 0 0;font-size:13px;color:#6b7280;" data-role="turn-off">${escape(off)}</p>
+  <p style="margin:24px 0 0;font-size:13px;color:#626C66;" data-role="turn-off">${escape(off)}</p>
 </body>
 </html>`
   return { subject, html, text: lines.join('\n\n') }

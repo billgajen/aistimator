@@ -144,7 +144,7 @@ describe('T-190: the logo at the top of every email to the business', () => {
     it(`"${name}" starts with the logo, once`, () => {
       expect(html.split(productLogoRow())).toHaveLength(2)
       // above the white card
-      expect(html.indexOf(productLogoRow())).toBeLessThan(html.indexOf('#ffffff'))
+      expect(html.indexOf(productLogoRow())).toBeLessThan(html.toLowerCase().indexOf('#ffffff'))
     })
   }
 

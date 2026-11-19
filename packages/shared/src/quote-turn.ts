@@ -277,6 +277,11 @@ export interface QuoteTurnOptions {
   locale?: string
   /** Defaults to the viewer's time zone */
   timeZone?: string
+  /**
+   * T-191: where the words are read. "app" is the phone app, which may not point at a purchase (App Store
+   * rule 3.1.1): no "upgrade", no plan to pick. Defaults to the dashboard.
+   */
+  surface?: 'dashboard' | 'app'
 }
 
 /** The calendar day of a moment in a time zone, as a day count (for differences only) */
@@ -456,7 +461,9 @@ export function quoteTurn(input: QuoteTurnInput, opts: QuoteTurnOptions = {}): Q
           'attention',
           L.held,
           'Your plan limit was reached',
-          `This request arrived after your plan limit was reached, so it has no price. ${Name} was told you will send their estimate shortly. Upgrade your plan, then price it.`,
+          opts.surface === 'app'
+            ? `This request arrived after your plan limit was reached, so it has no price. ${Name} was told you will send their estimate shortly. It can be priced when your plan has room for it.`
+            : `This request arrived after your plan limit was reached, so it has no price. ${Name} was told you will send their estimate shortly. Upgrade your plan, then price it.`,
           'price_request'
         )
       }

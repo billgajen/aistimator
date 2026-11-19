@@ -10,6 +10,9 @@
 import { quoteStory, quoteTurn, type AppQuoteView, type QuoteListItem, type QuoteStory, type QuoteTurn, type QuoteTurnOptions, type QuoteTurnTone } from '@qolumns/shared'
 import { colors } from '../theme'
 
+/** T-191: the app's words never point at a purchase (App Store rule 3.1.1) */
+const APP: QuoteTurnOptions = { surface: 'app' }
+
 export function turnOfListItem(item: QuoteListItem, opts: QuoteTurnOptions = {}): QuoteTurn {
   return quoteTurn(
     {
@@ -28,7 +31,7 @@ export function turnOfListItem(item: QuoteListItem, opts: QuoteTurnOptions = {})
       madeByBusiness: item.madeByBusiness === true,
       openQuestions: item.openQuestions ?? 0,
     },
-    opts
+    { ...APP, ...opts }
   )
 }
 
@@ -58,7 +61,7 @@ export function storyOfQuote(q: AppQuoteView, opts: QuoteTurnOptions = {}): Quot
       madeByBusiness: q.madeByBusiness === true || q.questions.length > 0,
       openQuestions: q.questions.length,
     },
-    opts
+    { ...APP, ...opts }
   )
 }
 

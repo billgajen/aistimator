@@ -54,6 +54,12 @@ export const EMBED_NAMES = {
   consolePrefix: '[qolumns]',
 } as const
 
+/**
+ * T-191: the page that says how to have data deleted or an account closed (T-181). The website's footer and the
+ * app's "Delete your account" row both open it, so the two cannot point at different places.
+ */
+export const DATA_DELETION_PATH = '/data-deletion'
+
 /** The brand colour a new business starts with (migration 3 default). */
 export const DEFAULT_PRIMARY_COLOR = '#2563eb'
 

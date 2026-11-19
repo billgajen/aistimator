@@ -4,7 +4,7 @@
  * HTML email templates for quote notifications.
  * Uses inline styles for maximum email client compatibility.
  */
-import { APPROVAL_COPY, PRODUCT_NAME, productLogoRow } from '@qolumns/shared'
+import { APPROVAL_COPY, EMAIL_COLOR, EMAIL_FONT, PRODUCT_NAME, brandColourForEmail, emailHeadStyle, productLogoRow, textColourOnCardForEmail, textOnColourForEmail } from '@qolumns/shared'
 import type { ApprovalDetail } from '@qolumns/shared'
 
 export interface CustomerEmailData {
@@ -43,7 +43,7 @@ export interface BusinessEmailData {
 /**
  * Base email wrapper with consistent styling
  */
-function emailWrapper(content: string, _primaryColor: string = '#2563eb', options: { fromProduct?: boolean; toBusiness?: boolean } = {}): string {
+function emailWrapper(content: string, _primaryColor?: string, options: { fromProduct?: boolean; toBusiness?: boolean } = {}): string {
   // T-183 marked this row; T-190 fills it: every email the product sends to the business has the product's logo
   // at the top (productLogoRow, @qolumns/shared). Emails to a customer carry the business's brand, not ours.
   const productHeader = options.fromProduct || options.toBusiness ? productLogoRow() : ''
@@ -53,7 +53,7 @@ function emailWrapper(content: string, _primaryColor: string = '#2563eb', option
     ? ''
     : `<table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
           <tr>
-            <td style="text-align: center; color: #9ca3af; font-size: 12px;">
+            <td style="text-align: center; color: #626C66; font-size: 12px;">
               Powered by ${PRODUCT_NAME}
             </td>
           </tr>
@@ -65,13 +65,14 @@ function emailWrapper(content: string, _primaryColor: string = '#2563eb', option
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Quote notification</title>
+${emailHeadStyle()}
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+<body style="margin: 0; padding: 0; font-family: ${EMAIL_FONT.body}; background-color: #FAF9F6;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 40px 20px;">
         ${productHeader}
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px;">
               ${content}
@@ -91,44 +92,44 @@ function emailWrapper(content: string, _primaryColor: string = '#2563eb', option
  * Customer quote notification email
  */
 export function customerQuoteEmail(data: CustomerEmailData): string {
-  const primaryColor = data.primaryColor || '#2563eb'
+  const primaryColor = brandColourForEmail(data.primaryColor)
 
   const estimate = data.awaitingConfirmation === true
   const validitySection = estimate
-    ? `<p style="margin: 0 0 24px; color: #6b7280; font-size: 14px;">${escapeHtml(data.businessName)} will review and confirm this estimate. You can accept it once they have.</p>`
+    ? `<p style="margin: 0 0 24px; color: #626C66; font-size: 14px;">${escapeHtml(data.businessName)} will review and confirm this estimate. You can accept it once they have.</p>`
     : data.validUntil
-    ? `<p style="margin: 0 0 24px; color: #6b7280; font-size: 14px;">This quote is valid until <strong>${data.validUntil}</strong>.</p>`
+    ? `<p style="margin: 0 0 24px; color: #626C66; font-size: 14px;">This quote is valid until <strong>${data.validUntil}</strong>.</p>`
     : ''
 
   const scopeSection = data.scopeSummary
     ? `
-      <div style="margin: 24px 0; padding: 16px; background-color: #f9fafb; border-radius: 8px;">
-        <p style="margin: 0 0 8px; font-weight: 600; color: #374151; font-size: 14px;">Scope of work</p>
-        <p style="margin: 0; color: #6b7280; font-size: 14px; line-height: 1.5;">${escapeHtml(data.scopeSummary)}</p>
+      <div style="margin: 24px 0; padding: 16px; background-color: #F2F0EA; border-radius: 8px;">
+        <p style="margin: 0 0 8px; font-weight: 600; color: #4F5D57; font-size: 14px;">Scope of work</p>
+        <p style="margin: 0; color: #626C66; font-size: 14px; line-height: 1.5;">${escapeHtml(data.scopeSummary)}</p>
       </div>
     `
     : ''
 
   const content = `
-    <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: ${primaryColor};">
+    <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: ${textColourOnCardForEmail(primaryColor)};">
       ${escapeHtml(data.businessName)}
     </h1>
-    <p style="margin: 0 0 32px; color: #6b7280; font-size: 14px;">
+    <p style="margin: 0 0 32px; color: #626C66; font-size: 14px;">
       Your ${estimate ? 'estimate' : 'quote'} for ${escapeHtml(data.serviceName)}
     </p>
 
-    <p style="margin: 0 0 16px; color: #374151; font-size: 16px; line-height: 1.5;">
+    <p style="margin: 0 0 16px; color: #4F5D57; font-size: 16px; line-height: 1.5;">
       Hi ${escapeHtml(data.customerName)},
     </p>
-    <p style="margin: 0 0 24px; color: #374151; font-size: 16px; line-height: 1.5;">
+    <p style="margin: 0 0 24px; color: #4F5D57; font-size: 16px; line-height: 1.5;">
       ${estimate
         ? 'Thank you for your enquiry. Here is your estimate, based on your photos and details:'
         : "Thank you for your enquiry. We've prepared a quote for you:"}
     </p>
 
-    <div style="margin: 24px 0; padding: 24px; background-color: #f0f9ff; border-radius: 8px; text-align: center;">
-      <p style="margin: 0 0 4px; color: #6b7280; font-size: 14px;">${estimate ? 'Estimate' : 'Quoted total'}</p>
-      <p style="margin: 0; font-size: 36px; font-weight: 700; color: ${primaryColor};">
+    <div style="margin: 24px 0; padding: 24px; background-color: #EAEFF5; border-radius: 8px; text-align: center;">
+      <p style="margin: 0 0 4px; color: #626C66; font-size: 14px;">${estimate ? 'Estimate' : 'Quoted total'}</p>
+      <p style="margin: 0; font-size: 36px; font-weight: 700; font-family: ${EMAIL_FONT.figure}; font-variant-numeric: tabular-nums; color: ${textColourOnCardForEmail(primaryColor)};">
         ${escapeHtml(data.total)}
       </p>
     </div>
@@ -139,18 +140,18 @@ export function customerQuoteEmail(data: CustomerEmailData): string {
     <table role="presentation" style="width: 100%; margin: 32px 0;">
       <tr>
         <td style="text-align: center;">
-          <a href="${escapeHtml(data.quoteViewUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
+          <a href="${escapeHtml(data.quoteViewUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: ${textOnColourForEmail(primaryColor)}; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
             ${estimate ? 'View your estimate' : 'View full quote'}
           </a>
         </td>
       </tr>
     </table>
 
-    <p style="margin: 24px 0 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
+    <p style="margin: 24px 0 0; color: #626C66; font-size: 14px; line-height: 1.5;">
       If you have any questions, simply reply to this email and we'll get back to you.
     </p>
 
-    <p style="margin: 24px 0 0; color: #374151; font-size: 14px;">
+    <p style="margin: 24px 0 0; color: #4F5D57; font-size: 14px;">
       Best regards,<br>
       <strong>${escapeHtml(data.businessName)}</strong>
     </p>
@@ -163,26 +164,26 @@ export function customerQuoteEmail(data: CustomerEmailData): string {
  * Business new lead notification email
  */
 export function businessNotificationEmail(data: BusinessEmailData): string {
-  const primaryColor = data.primaryColor || '#2563eb'
+  const primaryColor: string = EMAIL_COLOR.juniper // T-191: an email to the business is the product's
 
   const phoneSection = data.customerPhone
-    ? `<p style="margin: 4px 0 0; color: #6b7280; font-size: 14px;">Phone: ${escapeHtml(data.customerPhone)}</p>`
+    ? `<p style="margin: 4px 0 0; color: #626C66; font-size: 14px;">Phone: ${escapeHtml(data.customerPhone)}</p>`
     : ''
 
   const addressSection = data.jobAddress
     ? `
       <div style="margin-top: 16px;">
-        <p style="margin: 0; font-weight: 600; color: #374151; font-size: 14px;">Job location</p>
-        <p style="margin: 4px 0 0; color: #6b7280; font-size: 14px;">${escapeHtml(data.jobAddress)}</p>
+        <p style="margin: 0; font-weight: 600; color: #4F5D57; font-size: 14px;">Job location</p>
+        <p style="margin: 4px 0 0; color: #626C66; font-size: 14px;">${escapeHtml(data.jobAddress)}</p>
       </div>
     `
     : ''
 
   const content = `
-    <div style="margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid #e5e7eb;">
-      <p style="margin: 0; font-size: 14px; color: #6b7280;">${data.awaitingReview ? 'Estimate ready for your review' : 'New quote generated'}</p>
-      ${data.reviewReason ? `<p style="margin: 8px 0 0; font-size: 13px; color: #92400e;">${escapeHtml(data.reviewReason)}</p>` : ''}
-      <h1 style="margin: 8px 0 0; font-size: 24px; font-weight: 700; color: #111827;">
+    <div style="margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid #E5E2D8;">
+      <p style="margin: 0; font-size: 14px; color: #626C66;">${data.awaitingReview ? 'Estimate ready for your review' : 'New quote generated'}</p>
+      ${data.reviewReason ? `<p style="margin: 8px 0 0; font-size: 13px; color: #7F5710;">${escapeHtml(data.reviewReason)}</p>` : ''}
+      <h1 style="margin: 8px 0 0; font-size: 24px; font-weight: 700; color: #1B2823;">
         ${escapeHtml(data.customerName)}
       </h1>
     </div>
@@ -191,22 +192,22 @@ export function businessNotificationEmail(data: BusinessEmailData): string {
       <table role="presentation" style="width: 100%;">
         <tr>
           <td style="width: 50%; vertical-align: top;">
-            <p style="margin: 0; font-weight: 600; color: #374151; font-size: 14px;">Service</p>
-            <p style="margin: 4px 0 0; color: #6b7280; font-size: 14px;">${escapeHtml(data.serviceName)}</p>
+            <p style="margin: 0; font-weight: 600; color: #4F5D57; font-size: 14px;">Service</p>
+            <p style="margin: 4px 0 0; color: #626C66; font-size: 14px;">${escapeHtml(data.serviceName)}</p>
           </td>
           <td style="width: 50%; vertical-align: top; text-align: right;">
-            <p style="margin: 0; font-weight: 600; color: #374151; font-size: 14px;">Quote total</p>
-            <p style="margin: 4px 0 0; font-size: 20px; font-weight: 700; color: ${primaryColor};">${escapeHtml(data.total)}</p>
+            <p style="margin: 0; font-weight: 600; color: #4F5D57; font-size: 14px;">Quote total</p>
+            <p style="margin: 4px 0 0; font-size: 20px; font-weight: 700; color: ${textColourOnCardForEmail(primaryColor)};">${escapeHtml(data.total)}</p>
           </td>
         </tr>
       </table>
     </div>
 
-    <div style="margin-bottom: 24px; padding: 16px; background-color: #f9fafb; border-radius: 8px;">
-      <p style="margin: 0; font-weight: 600; color: #374151; font-size: 14px;">Customer details</p>
-      <p style="margin: 8px 0 0; color: #6b7280; font-size: 14px;">${escapeHtml(data.customerName)}</p>
-      ${data.customerEmail ? `<p style="margin: 4px 0 0; color: #6b7280; font-size: 14px;">
-        <a href="mailto:${escapeHtml(data.customerEmail)}" style="color: ${primaryColor}; text-decoration: none;">
+    <div style="margin-bottom: 24px; padding: 16px; background-color: #F2F0EA; border-radius: 8px;">
+      <p style="margin: 0; font-weight: 600; color: #4F5D57; font-size: 14px;">Customer details</p>
+      <p style="margin: 8px 0 0; color: #626C66; font-size: 14px;">${escapeHtml(data.customerName)}</p>
+      ${data.customerEmail ? `<p style="margin: 4px 0 0; color: #626C66; font-size: 14px;">
+        <a href="mailto:${escapeHtml(data.customerEmail)}" style="color: ${textColourOnCardForEmail(primaryColor)}; text-decoration: none;">
           ${escapeHtml(data.customerEmail)}
         </a>
       </p>` : ''}
@@ -214,21 +215,21 @@ export function businessNotificationEmail(data: BusinessEmailData): string {
       ${addressSection}
     </div>
 
-    <p style="margin: 0 0 8px; color: #6b7280; font-size: 12px;">
+    <p style="margin: 0 0 8px; color: #626C66; font-size: 12px;">
       Quote ID: ${escapeHtml(data.quoteId)}
     </p>
 
     <table role="presentation" style="width: 100%; margin: 24px 0;">
       <tr>
         <td style="text-align: center;">
-          <a href="${escapeHtml(data.dashboardUrl)}" style="display: inline-block; padding: 14px 28px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;">
+          <a href="${escapeHtml(data.dashboardUrl)}" style="display: inline-block; padding: 14px 28px; background-color: ${primaryColor}; color: ${textOnColourForEmail(primaryColor)}; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;">
             ${data.awaitingReview ? 'Review and approve' : 'View in dashboard'}
           </a>
         </td>
       </tr>
     </table>
 
-    <p style="margin: 24px 0 0; color: #6b7280; font-size: 12px; text-align: center;">
+    <p style="margin: 24px 0 0; color: #626C66; font-size: 12px; text-align: center;">
       ${data.awaitingReview
         ? 'The customer has not been sent anything yet. Review it, edit if needed, and approve to send it.'
         : 'The customer has been sent their quote automatically.'}
@@ -275,52 +276,52 @@ export interface ReviewEmailData {
 export function approvalDetailHtml(detail: ApprovalDetail): { warnings: string; price: string; photos: string } {
   const warnings = detail.warnings
     .map(
-      (warning) => `<div data-role="warning" data-kind="${warning.kind}" style="margin: 0 0 12px; padding: 12px 14px; background-color: #fbf3e4; border-left: 4px solid #7f5710; border-radius: 0 8px 8px 0;">
-        <p style="margin: 0; font-size: 13px; font-weight: 700; color: #7f5710;">${escapeHtml(warning.title)}</p>
-        ${warning.lines.map((line) => `<p style="margin: 6px 0 0; font-size: 14px; line-height: 1.45; color: #1b2823;">${escapeHtml(line)}</p>`).join('')}
-        ${warning.kind === 'check' ? `<p style="margin: 6px 0 0; font-size: 12px; color: #626c66;">${escapeHtml(APPROVAL_COPY.checksNote)}</p>` : ''}
+      (warning) => `<div data-role="warning" data-kind="${warning.kind}" style="margin: 0 0 12px; padding: 12px 14px; background-color: #F2F0EA; border-left: 4px solid #7F5710; border-radius: 0 8px 8px 0;">
+        <p style="margin: 0; font-size: 13px; font-weight: 700; color: #7F5710;">${escapeHtml(warning.title)}</p>
+        ${warning.lines.map((line) => `<p style="margin: 6px 0 0; font-size: 14px; line-height: 1.45; color: #1B2823;">${escapeHtml(line)}</p>`).join('')}
+        ${warning.kind === 'check' ? `<p style="margin: 6px 0 0; font-size: 12px; color: #626C66;">${escapeHtml(APPROVAL_COPY.checksNote)}</p>` : ''}
       </div>`
     )
     .join('')
 
-  const cell = 'padding: 8px 0; border-bottom: 1px solid #e5e7eb; font-size: 14px; vertical-align: top;'
+  const cell = 'padding: 8px 0; border-bottom: 1px solid #E5E2D8; font-size: 14px; vertical-align: top;'
   const rows = detail.parts
     .map((part) => {
       const who = part.addedBy === 'customer' ? APPROVAL_COPY.addedByCustomer : part.addedBy === 'business' ? APPROVAL_COPY.addedByYou : ''
       const heading = detail.combined
-        ? `<tr data-role="part"><td colspan="2" style="padding: 14px 0 4px; font-size: 14px; font-weight: 700; color: #111827;">${escapeHtml(part.serviceName)}${who ? ` <span style="font-weight: 400; color: #6b7280;">(${escapeHtml(who)})</span>` : ''}</td></tr>`
+        ? `<tr data-role="part"><td colspan="2" style="padding: 14px 0 4px; font-size: 14px; font-weight: 700; color: #1B2823;">${escapeHtml(part.serviceName)}${who ? ` <span style="font-weight: 400; color: #626C66;">(${escapeHtml(who)})</span>` : ''}</td></tr>`
         : ''
       const lines = part.lines
         .map(
           (line) => `<tr data-role="line">
-            <td style="${cell} color: #111827;">${escapeHtml(line.label)}${line.source ? `<br><span data-role="source" style="font-size: 12px; color: #6b7280;">${escapeHtml(line.source)}</span>` : ''}</td>
-            <td style="${cell} color: #111827; text-align: right; white-space: nowrap;">${escapeHtml(line.amount)}</td>
+            <td style="${cell} color: #1B2823;">${escapeHtml(line.label)}${line.source ? `<br><span data-role="source" style="font-size: 12px; color: #626C66;">${escapeHtml(line.source)}</span>` : ''}</td>
+            <td style="${cell} color: #1B2823; text-align: right; white-space: nowrap;">${escapeHtml(line.amount)}</td>
           </tr>`
         )
         .join('')
       const minimum = part.minimumNote
-        ? `<tr data-role="minimum"><td colspan="2" style="padding: 8px 0; font-size: 13px; color: #6b7280;">${escapeHtml(part.minimumNote)}</td></tr>`
+        ? `<tr data-role="minimum"><td colspan="2" style="padding: 8px 0; font-size: 13px; color: #626C66;">${escapeHtml(part.minimumNote)}</td></tr>`
         : ''
       const waits = part.priceWaits
-        ? `<tr><td colspan="2" style="padding: 4px 0 8px; font-size: 13px; color: #6b7280;">${escapeHtml(APPROVAL_COPY.priceWaits)}</td></tr>`
+        ? `<tr><td colspan="2" style="padding: 4px 0 8px; font-size: 13px; color: #626C66;">${escapeHtml(APPROVAL_COPY.priceWaits)}</td></tr>`
         : ''
       const subtotal = detail.combined
-        ? `<tr data-role="part-subtotal"><td style="padding: 8px 0; font-size: 14px; color: #374151;">${escapeHtml(APPROVAL_COPY.subtotal)}</td><td style="padding: 8px 0; font-size: 14px; font-weight: 600; color: #111827; text-align: right; white-space: nowrap;">${escapeHtml(part.subtotal)}</td></tr>`
+        ? `<tr data-role="part-subtotal"><td style="padding: 8px 0; font-size: 14px; color: #4F5D57;">${escapeHtml(APPROVAL_COPY.subtotal)}</td><td style="padding: 8px 0; font-size: 14px; font-weight: 600; color: #1B2823; text-align: right; white-space: nowrap;">${escapeHtml(part.subtotal)}</td></tr>`
         : ''
       return heading + lines + minimum + waits + subtotal
     })
     .join('')
   const tax = detail.totals.tax
-    ? `<tr data-role="tax"><td style="padding: 8px 0; font-size: 14px; color: #6b7280;">${escapeHtml(detail.totals.tax.label)}</td><td style="padding: 8px 0; font-size: 14px; color: #6b7280; text-align: right; white-space: nowrap;">${escapeHtml(detail.totals.tax.amount)}</td></tr>`
+    ? `<tr data-role="tax"><td style="padding: 8px 0; font-size: 14px; color: #626C66;">${escapeHtml(detail.totals.tax.label)}</td><td style="padding: 8px 0; font-size: 14px; color: #626C66; text-align: right; white-space: nowrap;">${escapeHtml(detail.totals.tax.amount)}</td></tr>`
     : ''
   const price = `<table role="presentation" data-role="price-lines" style="width: 100%; border-collapse: collapse; margin: 0 0 16px;">
       ${rows}
       ${tax}
-      <tr><td style="padding: 12px 0 0; font-size: 16px; font-weight: 700; color: #111827;">${escapeHtml(APPROVAL_COPY.total)}</td><td data-role="total" style="padding: 12px 0 0; font-size: 20px; font-weight: 700; color: #111827; text-align: right; white-space: nowrap;">${escapeHtml(detail.totals.total)}</td></tr>
+      <tr><td style="padding: 12px 0 0; font-size: 16px; font-weight: 700; color: #1B2823;">${escapeHtml(APPROVAL_COPY.total)}</td><td data-role="total" style="padding: 12px 0 0; font-size: 20px; font-weight: 700; color: #1B2823; text-align: right; white-space: nowrap;">${escapeHtml(detail.totals.total)}</td></tr>
     </table>`
   const photos =
     detail.photoCount > 0
-      ? `<p data-role="photos" style="margin: 0 0 16px; font-size: 14px; color: #374151;">${escapeHtml(APPROVAL_COPY.photosOnPage(detail.photoCount))}</p>`
+      ? `<p data-role="photos" style="margin: 0 0 16px; font-size: 14px; color: #4F5D57;">${escapeHtml(APPROVAL_COPY.photosOnPage(detail.photoCount))}</p>`
       : ''
   return { warnings, price, photos }
 }
@@ -332,33 +333,33 @@ export function approvalDetailHtml(detail: ApprovalDetail): { warnings: string; 
  * can already see the estimate.
  */
 export function reviewRequestEmail(data: ReviewEmailData): string {
-  const primaryColor = data.primaryColor || '#2563eb'
+  const primaryColor: string = EMAIL_COLOR.juniper // T-191: an email to the business is the product's
   const testBanner = data.testBanner
-    ? `<div style="margin: 0 0 20px; padding: 12px 14px; background-color: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px;">
-        <p style="margin: 0; font-size: 13px; font-weight: 700; color: #92400e;">TEST REQUEST</p>
-        <p style="margin: 4px 0 0; font-size: 13px; color: #92400e;">${escapeHtml(data.testBanner)}</p>
+    ? `<div style="margin: 0 0 20px; padding: 12px 14px; background-color: #F2F0EA; border: 1px solid #CFC0A6; border-radius: 8px;">
+        <p style="margin: 0; font-size: 13px; font-weight: 700; color: #7F5710;">TEST REQUEST</p>
+        <p style="margin: 4px 0 0; font-size: 13px; color: #7F5710;">${escapeHtml(data.testBanner)}</p>
       </div>`
     : ''
   const approveButton = data.approveUrl
     ? `<table role="presentation" style="width: 100%; margin: 24px 0 8px;">
         <tr>
           <td style="text-align: center;">
-            <a href="${escapeHtml(data.approveUrl)}" style="display: block; padding: 16px 28px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 17px; border-radius: 10px;" data-role="approve">
+            <a href="${escapeHtml(data.approveUrl)}" style="display: block; padding: 16px 28px; background-color: ${primaryColor}; color: ${textOnColourForEmail(primaryColor)}; text-decoration: none; font-weight: 700; font-size: 17px; border-radius: 10px;" data-role="approve">
               Approve &amp; send
             </a>
           </td>
         </tr>
       </table>
-      <p style="margin: 0 0 8px; text-align: center; font-size: 12px; color: #6b7280;">Opens a page to confirm. Works once, for 72 hours.</p>`
+      <p style="margin: 0 0 8px; text-align: center; font-size: 12px; color: #626C66;">Opens a page to confirm. Works once, for 72 hours.</p>`
     : ''
   const dashboardLink = data.approveUrl
     ? `<p style="margin: 16px 0 0; text-align: center; font-size: 14px;">
-        <a href="${escapeHtml(data.dashboardUrl)}" style="color: ${primaryColor}; text-decoration: underline;" data-role="dashboard">Open in dashboard to edit</a>
+        <a href="${escapeHtml(data.dashboardUrl)}" style="color: ${textColourOnCardForEmail(primaryColor)}; text-decoration: underline;" data-role="dashboard">Open in dashboard to edit</a>
       </p>`
     : `<table role="presentation" style="width: 100%; margin: 24px 0;">
         <tr>
           <td style="text-align: center;">
-            <a href="${escapeHtml(data.dashboardUrl)}" style="display: inline-block; padding: 14px 28px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;" data-role="dashboard">
+            <a href="${escapeHtml(data.dashboardUrl)}" style="display: inline-block; padding: 14px 28px; background-color: ${primaryColor}; color: ${textOnColourForEmail(primaryColor)}; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;" data-role="dashboard">
               Review and approve
             </a>
           </td>
@@ -371,34 +372,34 @@ export function reviewRequestEmail(data: ReviewEmailData): string {
   const reasonShown = data.detail?.warnings.some((warning) => warning.lines.includes(data.reviewReason ?? ''))
   const content = `
     ${testBanner}
-    <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
-      <p style="margin: 0; font-size: 14px; color: #6b7280;">Estimate ready for your approval</p>
-      <h1 style="margin: 8px 0 0; font-size: 24px; font-weight: 700; color: #111827;">${escapeHtml(data.customerName)}</h1>
-      <p style="margin: 4px 0 0; font-size: 15px; color: #374151;">${escapeHtml(data.serviceName)}</p>
-      <p style="margin: 12px 0 0; font-size: 28px; font-weight: 700; color: ${primaryColor};" data-role="price">${escapeHtml(data.total)}</p>
+    <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #E5E2D8;">
+      <p style="margin: 0; font-size: 14px; color: #626C66;">Estimate ready for your approval</p>
+      <h1 style="margin: 8px 0 0; font-size: 24px; font-weight: 700; color: #1B2823;">${escapeHtml(data.customerName)}</h1>
+      <p style="margin: 4px 0 0; font-size: 15px; color: #4F5D57;">${escapeHtml(data.serviceName)}</p>
+      <p style="margin: 12px 0 0; font-size: 28px; font-weight: 700; color: ${textColourOnCardForEmail(primaryColor)};" data-role="price">${escapeHtml(data.total)}</p>
     </div>
 
     ${detail ? detail.warnings : ''}
     ${detail ? detail.price : ''}
     ${detail ? detail.photos : ''}
 
-    <div style="margin-bottom: 20px; padding: 14px 16px; background-color: #f9fafb; border-radius: 8px;">
-      <p style="margin: 0; font-size: 14px; color: #111827;" data-role="hold">${escapeHtml(data.holdLine)}</p>
-      ${data.reviewReason && !reasonShown ? `<p style="margin: 8px 0 0; font-size: 13px; color: #92400e;" data-role="reason">Why: ${escapeHtml(data.reviewReason)}</p>` : ''}
+    <div style="margin-bottom: 20px; padding: 14px 16px; background-color: #F2F0EA; border-radius: 8px;">
+      <p style="margin: 0; font-size: 14px; color: #1B2823;" data-role="hold">${escapeHtml(data.holdLine)}</p>
+      ${data.reviewReason && !reasonShown ? `<p style="margin: 8px 0 0; font-size: 13px; color: #7F5710;" data-role="reason">Why: ${escapeHtml(data.reviewReason)}</p>` : ''}
     </div>
 
     ${approveButton}
     ${dashboardLink}
 
-    <div style="margin-top: 28px; padding: 16px; background-color: #f9fafb; border-radius: 8px;">
-      <p style="margin: 0; font-weight: 600; color: #374151; font-size: 14px;">Customer details</p>
-      <p style="margin: 8px 0 0; color: #6b7280; font-size: 14px;">${escapeHtml(data.customerName)}</p>
-      ${data.customerEmail ? `<p style="margin: 4px 0 0; color: #6b7280; font-size: 14px;">${escapeHtml(data.customerEmail)}</p>` : ''}
-      ${data.customerPhone ? `<p style="margin: 4px 0 0; color: #6b7280; font-size: 14px;">Phone: ${escapeHtml(data.customerPhone)}</p>` : ''}
-      ${data.jobAddress ? `<p style="margin: 4px 0 0; color: #6b7280; font-size: 14px;">${escapeHtml(data.jobAddress)}</p>` : ''}
+    <div style="margin-top: 28px; padding: 16px; background-color: #F2F0EA; border-radius: 8px;">
+      <p style="margin: 0; font-weight: 600; color: #4F5D57; font-size: 14px;">Customer details</p>
+      <p style="margin: 8px 0 0; color: #626C66; font-size: 14px;">${escapeHtml(data.customerName)}</p>
+      ${data.customerEmail ? `<p style="margin: 4px 0 0; color: #626C66; font-size: 14px;">${escapeHtml(data.customerEmail)}</p>` : ''}
+      ${data.customerPhone ? `<p style="margin: 4px 0 0; color: #626C66; font-size: 14px;">Phone: ${escapeHtml(data.customerPhone)}</p>` : ''}
+      ${data.jobAddress ? `<p style="margin: 4px 0 0; color: #626C66; font-size: 14px;">${escapeHtml(data.jobAddress)}</p>` : ''}
     </div>
 
-    <p style="margin: 16px 0 0; color: #9ca3af; font-size: 12px;">Quote ID: ${escapeHtml(data.quoteId)}</p>
+    <p style="margin: 16px 0 0; color: #626C66; font-size: 12px;">Quote ID: ${escapeHtml(data.quoteId)}</p>
   `
 
   return emailWrapper(content, primaryColor, { fromProduct: true })
@@ -452,27 +453,27 @@ export interface FeedbackNotificationEmailData {
  * Email sent to business owner when customer submits feedback on a quote.
  */
 export function feedbackNotificationEmail(data: FeedbackNotificationEmailData): string {
-  const primaryColor = data.primaryColor || '#2563eb'
+  const primaryColor: string = EMAIL_COLOR.juniper // T-191: an email to the business is the product's
   const feedbackLabel = data.feedbackType === 'approval_request' ? 'Review request' : 'Feedback'
 
   const feedbackSection = data.feedbackText
     ? `
-      <div style="margin: 16px 0; padding: 16px; background-color: #fefce8; border-left: 4px solid #eab308; border-radius: 0 8px 8px 0;">
-        <p style="margin: 0 0 8px; font-weight: 600; color: #374151; font-size: 14px;">Customer message:</p>
-        <p style="margin: 0; color: #374151; font-size: 14px; line-height: 1.5; white-space: pre-wrap;">${escapeHtml(data.feedbackText)}</p>
+      <div style="margin: 16px 0; padding: 16px; background-color: #F2F0EA; border-left: 4px solid #CFC0A6; border-radius: 0 8px 8px 0;">
+        <p style="margin: 0 0 8px; font-weight: 600; color: #4F5D57; font-size: 14px;">Customer message:</p>
+        <p style="margin: 0; color: #4F5D57; font-size: 14px; line-height: 1.5; white-space: pre-wrap;">${escapeHtml(data.feedbackText)}</p>
       </div>
     `
     : ''
 
   const content = `
-    <div style="margin-bottom: 16px; display: inline-block; padding: 6px 12px; background-color: #fef3c7; border-radius: 6px;">
-      <span style="font-weight: 600; font-size: 13px; color: #92400e;">${feedbackLabel}</span>
+    <div style="margin-bottom: 16px; display: inline-block; padding: 6px 12px; background-color: #F2F0EA; border-radius: 6px;">
+      <span style="font-weight: 600; font-size: 13px; color: #7F5710;">${feedbackLabel}</span>
     </div>
 
-    <h1 style="margin: 0 0 8px; font-size: 20px; font-weight: 700; color: #111827;">
+    <h1 style="margin: 0 0 8px; font-size: 20px; font-weight: 700; color: #1B2823;">
       Customer ${feedbackLabel.toLowerCase()} on quote
     </h1>
-    <p style="margin: 0 0 16px; color: #6b7280; font-size: 14px;">
+    <p style="margin: 0 0 16px; color: #626C66; font-size: 14px;">
       ${escapeHtml(data.customerName)} &middot; ${escapeHtml(data.serviceName)}
     </p>
 
@@ -481,14 +482,14 @@ export function feedbackNotificationEmail(data: FeedbackNotificationEmailData): 
     <table role="presentation" style="width: 100%; margin: 24px 0;">
       <tr>
         <td style="text-align: center;">
-          <a href="${escapeHtml(data.dashboardUrl)}" style="display: inline-block; padding: 14px 28px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;">
+          <a href="${escapeHtml(data.dashboardUrl)}" style="display: inline-block; padding: 14px 28px; background-color: ${primaryColor}; color: ${textOnColourForEmail(primaryColor)}; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;">
             View in dashboard
           </a>
         </td>
       </tr>
     </table>
 
-    <p style="margin: 16px 0 0; color: #6b7280; font-size: 13px;">
+    <p style="margin: 16px 0 0; color: #626C66; font-size: 13px;">
       You can review and respond to this ${feedbackLabel.toLowerCase()} from your dashboard.
     </p>
   `
@@ -513,26 +514,26 @@ export interface RevisedQuoteEmailData {
  * Email sent to customer when business edits and resends a quote.
  */
 export function revisedQuoteEmail(data: RevisedQuoteEmailData): string {
-  const primaryColor = data.primaryColor || '#2563eb'
+  const primaryColor = brandColourForEmail(data.primaryColor)
 
   const content = `
-    <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: ${primaryColor};">
+    <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: ${textColourOnCardForEmail(primaryColor)};">
       ${escapeHtml(data.businessName)}
     </h1>
-    <p style="margin: 0 0 32px; color: #6b7280; font-size: 14px;">
+    <p style="margin: 0 0 32px; color: #626C66; font-size: 14px;">
       Updated quote for ${escapeHtml(data.serviceName)}
     </p>
 
-    <p style="margin: 0 0 16px; color: #374151; font-size: 16px; line-height: 1.5;">
+    <p style="margin: 0 0 16px; color: #4F5D57; font-size: 16px; line-height: 1.5;">
       Hi ${escapeHtml(data.customerName)},
     </p>
-    <p style="margin: 0 0 24px; color: #374151; font-size: 16px; line-height: 1.5;">
+    <p style="margin: 0 0 24px; color: #4F5D57; font-size: 16px; line-height: 1.5;">
       Your quote has been updated. Please review the latest version:
     </p>
 
-    <div style="margin: 24px 0; padding: 24px; background-color: #f0f9ff; border-radius: 8px; text-align: center;">
-      <p style="margin: 0 0 4px; color: #6b7280; font-size: 14px;">Updated total</p>
-      <p style="margin: 0; font-size: 36px; font-weight: 700; color: ${primaryColor};">
+    <div style="margin: 24px 0; padding: 24px; background-color: #EAEFF5; border-radius: 8px; text-align: center;">
+      <p style="margin: 0 0 4px; color: #626C66; font-size: 14px;">Updated total</p>
+      <p style="margin: 0; font-size: 36px; font-weight: 700; font-family: ${EMAIL_FONT.figure}; font-variant-numeric: tabular-nums; color: ${textColourOnCardForEmail(primaryColor)};">
         ${escapeHtml(data.total)}
       </p>
     </div>
@@ -540,18 +541,18 @@ export function revisedQuoteEmail(data: RevisedQuoteEmailData): string {
     <table role="presentation" style="width: 100%; margin: 32px 0;">
       <tr>
         <td style="text-align: center;">
-          <a href="${escapeHtml(data.quoteViewUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
+          <a href="${escapeHtml(data.quoteViewUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: ${textOnColourForEmail(primaryColor)}; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
             View updated quote
           </a>
         </td>
       </tr>
     </table>
 
-    <p style="margin: 24px 0 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
+    <p style="margin: 24px 0 0; color: #626C66; font-size: 14px; line-height: 1.5;">
       If you have any questions, simply reply to this email and we'll get back to you.
     </p>
 
-    <p style="margin: 24px 0 0; color: #374151; font-size: 14px;">
+    <p style="margin: 24px 0 0; color: #4F5D57; font-size: 14px;">
       Best regards,<br>
       <strong>${escapeHtml(data.businessName)}</strong>
     </p>
@@ -566,19 +567,19 @@ export function revisedQuoteEmail(data: RevisedQuoteEmailData): string {
 
 export function customerClarificationEmail(data: ClarificationEmailData): string {
   const questionsList = data.questions
-    .map((q) => `<li style="margin-bottom: 8px; color: #374151;">${escapeHtml(q.question)}</li>`)
+    .map((q) => `<li style="margin-bottom: 8px; color: #4F5D57;">${escapeHtml(q.question)}</li>`)
     .join('')
 
   const content = `
     <tr>
       <td style="padding: 32px;">
-        <h1 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 800; color: #09090B;">
+        <h1 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 800; color: #1B2823;">
           Quick question about your quote
         </h1>
-        <p style="margin: 0 0 24px 0; color: #52525b; font-size: 15px; line-height: 1.6;">
+        <p style="margin: 0 0 24px 0; color: #4F5D57; font-size: 15px; line-height: 1.6;">
           Hi ${escapeHtml(data.customerName)},
         </p>
-        <p style="margin: 0 0 16px 0; color: #52525b; font-size: 15px; line-height: 1.6;">
+        <p style="margin: 0 0 16px 0; color: #4F5D57; font-size: 15px; line-height: 1.6;">
           ${escapeHtml(data.businessName)} needs a little more information to finalize your ${escapeHtml(data.serviceName)} quote.
           It will only take a moment:
         </p>
@@ -587,14 +588,14 @@ export function customerClarificationEmail(data: ClarificationEmailData): string
         </ul>
         <table role="presentation" style="margin: 0 auto;">
           <tr>
-            <td style="background-color: #09090B; border-radius: 6px;">
-              <a href="${data.clarifyUrl}" style="display: inline-block; padding: 14px 32px; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none;">
+            <td style="background-color: #1B2823; border-radius: 6px;">
+              <a href="${data.clarifyUrl}" style="display: inline-block; padding: 14px 32px; color: #FFFFFF; font-size: 15px; font-weight: 600; text-decoration: none;">
                 Answer questions
               </a>
             </td>
           </tr>
         </table>
-        <p style="margin: 24px 0 0 0; color: #a1a1aa; font-size: 13px;">
+        <p style="margin: 24px 0 0 0; color: #626C66; font-size: 13px;">
           This helps us provide you with the most accurate quote possible.
         </p>
       </td>

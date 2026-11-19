@@ -285,7 +285,6 @@ export default function QuoteDetail() {
                   dashboard (shared grading.ts). No grade letter, and none of the words the customer-language rules ban. */}
               {figure && certainty ? <Muted>{certainty}</Muted> : null}
               <Body style={{ marginTop: space.md }}>{turn.sentence}</Body>
-              {action === 'price_request' ? <Muted>Your plan is managed on the web, in your dashboard.</Muted> : null}
               {action === 'add_price' ? <Muted>The price is added on the web, in your dashboard.</Muted> : null}
               {action === 'send' && customer.email ? <Muted>{first ?? 'The customer'} is also emailed the link when you approve.</Muted> : null}
             </>

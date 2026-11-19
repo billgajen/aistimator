@@ -23,11 +23,18 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       [
         "expo-image-picker",
         {
-          "cameraPermission": "Take photos of the job so it can be priced."
+          "cameraPermission": "Take photos of the job so it can be priced, and scan a room to measure it.",
+          "photosPermission": "Choose photos of the job so it can be priced.",
+          "microphonePermission": false
         }
       ],
       "expo-status-bar",

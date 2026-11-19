@@ -116,7 +116,9 @@ describe('T-184: errors are plain sentences', () => {
   })
 
   it('the server’s own sentence is shown as it is; a program’s text from the server is not', () => {
-    expect(plainError(new ApiError(402, 'PLAN_LIMIT_REACHED', 'Your free quotes are used up.'))).toBe('Your free quotes are used up.')
+    // T-191: the plan limit has the app's own line (the server's words name a plan to buy, which the app may not)
+    expect(plainError(new ApiError(409, 'CONFLICT', 'Your free quotes are used up.'))).toBe('Your free quotes are used up.')
+    expect(plainError(new ApiError(402, 'PLAN_LIMIT_REACHED', 'Your free quotes are used up.'))).toBe(PLAIN.planLimit)
     expect(plainError(new ApiError(500, 'HTTP_ERROR', 'Request failed (500)'))).toBe(PLAIN.unknown)
     expect(plainError(new ApiError(500, 'INTERNAL', 'TypeError: x is not a function'))).toBe(PLAIN.unknown)
     expect(plainError(new ApiError(400, 'BAD', '{"error":"x"}'), 'Try again.')).toBe('Try again.')

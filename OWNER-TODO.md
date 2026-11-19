@@ -3062,8 +3062,7 @@ Built and pushed 19 November 2026. **Deployed by you on 19 November 2026:** migr
 
 ## T-190 — The Qolumns logo everywhere, one text box
 
-Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-190", the web and the worker (web
-first, so the email logo's address answers before the worker's emails use it). No migration, no new setting.
+Built and pushed 19 November 2026. **Deployed by you on 19 November 2026:** the web, then the worker.
 
 ### What to look at (after the deploy)
 
@@ -3083,3 +3082,111 @@ first, so the email logo's address answers before the worker's emails use it). N
 
 - The files' dark green is `#192822` and cream `#F7EBC7`; the design tokens are ink `#1B2823` and butter
   `#F7E9C6`. Close, not equal. Tell me if the tokens should follow the files.
+
+## T-191 — App Store readiness, branded emails, refunds and disputes, Wrangler 4
+
+Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-191", the worker, then the web.
+No migration, no new setting. **One Stripe step** (below). The app changes reach a phone in the next build.
+
+### Stripe: add two events to the webhook (after the web is deployed)
+
+- [ ] Run `cd apps/web && npx tsx scripts/stripe-setup-plans.mts --live --dry-run`, then without `--dry-run`. It
+  adds `charge.refunded` and `charge.dispute.closed` to the one endpoint and changes nothing else (the signing
+  secret stays the same). Or add the two events by hand: Developers, Webhooks, the endpoint, "Add events".
+- What they do: a **full refund of the current month's (or year's) payment**, or a **dispute the bank decides
+  against you**, ends the plan at once (the subscription is cancelled at Stripe, no new invoice). A partial
+  refund, a refund of an older period, an open dispute or a won dispute change nothing.
+
+### App Store: account deletion
+
+- **The app only signs in**; accounts are made on the web. So Apple's rule is met by a clear link: Account →
+  "Delete your account" opens qolumns.com/data-deletion (the steps; section 2 is closing an account). The
+  dashboard's "Delete account" button, which said "not available during beta", now opens the same page.
+- Behind that page a person still does the closing (you, from the email). If Apple asks for deletion inside the
+  app, that is a new piece of work.
+
+### App Store: the reviewer's sign-in
+
+- [ ] When you are ready to submit: `npx tsx scripts/create-review-account.mts --prod`. It prints an email and a
+  password **once** (it saves them nowhere): put them in App Store Connect, App Review Information, "Sign-in
+  required". Run it again with `--new-password` to change the password.
+- It makes "Harbor Lane Painting" (US): two services from the trade packs, a free test plan (Pro, no Stripe
+  customer: never billed, not revenue), and three sample quotes from invented customers (one waiting for you,
+  one sent and opened, one accepted). No model is asked, the worker is not used, nothing is emailed.
+- It was run on the local database only. Not on production.
+
+### App Store: privacy answers ("App Privacy" in App Store Connect)
+
+From the app's code (T-191). **Tracking: No.** No data is used to track people across other companies' apps or
+sites; there is no advertising, analytics or crash-reporting kit in the app.
+
+| Apple's category | Collected? | What, exactly | Linked to the user | Purpose |
+|---|---|---|---|---|
+| Contact Info: Email Address | Yes | the sign-in email; a customer's email the business types in | Yes | App Functionality |
+| Contact Info: Name | Yes | a customer's name the business types in | Yes | App Functionality |
+| Contact Info: Phone Number | Yes | a customer's phone the business types in (optional) | Yes | App Functionality |
+| Contact Info: Physical Address | Yes | the job's address and postcode the business types in | Yes | App Functionality |
+| User Content: Photos or Videos | Yes | job photos taken or chosen (photos only, no video; location data is removed: `exif: false`) | Yes | App Functionality |
+| User Content: Other User Content | Yes | answers, notes, the "Why" note on an answer, a room scan's measurements (room sizes, no images) | Yes | App Functionality |
+| Identifiers: User ID | Yes | the account's id, to sign in | Yes | App Functionality |
+| Location | No | the app never reads the phone's location | | |
+| Financial Info, Purchases | No | the app sells nothing and shows no prices of plans | | |
+| Usage Data, Diagnostics | No | no analytics or crash reports are sent | | |
+| Health, Browsing, Search history, Contacts, Sensitive info | No | | | |
+
+- "Data Used to Track You": none. "Data Not Linked to You": none.
+- Privacy Policy URL: https://qolumns.com/privacy
+
+### App Store: listing text
+
+- **Name:** Qolumns
+- **Subtitle (30 max):** Quotes on site, in your prices
+- **Promotional text:** Price a job while you are still on site: from your own price list, with the customer's
+  photos and answers.
+- **Description:**
+
+  Qolumns is for businesses that use Qolumns to send quotes. Sign in with the account you use on the web.
+
+  On site, start a quote for the customer in front of you: choose the service, add their details, take photos of
+  the job and answer the questions your prices need. On an iPhone with LiDAR you can scan a room to measure it.
+  The price comes from your own price list, worked out the same way every time; it is never invented.
+
+  Then check it and send it. The customer gets a link to their quote. You see every quote and whose turn it is:
+  waiting for you, waiting for the customer, accepted.
+
+  Show your quote link as a QR code so a customer can ask for a quote from their own phone.
+
+  Photos, requests and quotes are kept privately for your business.
+
+- **Keywords (100 max):** quote,estimate,quoting,contractor,trades,painting,HVAC,plumbing,electrician,garage door,on site
+- **Support URL:** https://qolumns.com/data-deletion has the support address today. A plain `/support` page would
+  be better: say if you want one.
+- **Privacy Policy URL:** https://qolumns.com/privacy
+- **Category:** Business. **Age rating:** 4+ (no objectionable content).
+- Checked against the claims the site may make: no grades, no "exact", no promise that AI sets a price.
+
+### App Store: checked in the app
+
+- No plan price, "upgrade", plan to pick or billing link anywhere in the app. Two places did point at a purchase
+  and were changed: the held-request sentence ("Upgrade your plan, then price it" is now "It can be priced when
+  your plan has room for it", in the app only), and the server's plan-limit message on "Price it", which the app
+  now replaces with its own line. "Your plan is managed on the web" was removed.
+- Permission prompts: **Camera** "Take photos of the job so it can be priced, and scan a room to measure it."
+  and **Photos** "Choose photos of the job so it can be priced." Two prompts with Expo's default English that the
+  app never uses were in the build (microphone, Face ID); both are now off.
+
+### Emails (after the deploy)
+
+- [ ] An email to you: paper background, ink text, juniper button. On an iPhone or a Mac the text is in the site's
+  own typeface; Gmail and Outlook show the phone's or computer's own.
+- [ ] An email to a customer: in your business's colour (juniper if you never set one). A light colour is used
+  for the button only, with dark text on it.
+- **Not done:** your business logo in customer emails. They have never had one: logos are private files with
+  links that expire, and an email needs an address that works for years. It needs a public logo address, which
+  is a decision of its own.
+
+### Not proven
+
+- Refunds and disputes were tested with Stripe stood in for (unit tests); no real refund or dispute was made in
+  the sandbox.
+- The review account script has not run on production.

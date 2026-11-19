@@ -3,7 +3,7 @@
  *
  * Used for resending quote emails from the dashboard.
  */
-import { PRODUCT_NAME, emailFromHeader, redactEmails } from '@qolumns/shared'
+import { EMAIL_FONT, PRODUCT_NAME, brandColourForEmail, emailFromHeader, emailHeadStyle, redactEmails, textColourOnCardForEmail, textOnColourForEmail } from '@qolumns/shared'
 import type { EmailSender } from '@qolumns/shared'
 
 const POSTMARK_API_URL = 'https://api.postmarkapp.com/email'
@@ -139,10 +139,10 @@ export function generateCustomerEmailHtml(data: {
   /** T-179: the services of a combined quote, as rows (lib/sections-email.ts); nothing for a single-service quote */
   sectionsHtml?: string
 }): string {
-  const primaryColor = data.primaryColor || '#2563eb'
+  const primaryColor = brandColourForEmail(data.primaryColor)
 
   const validitySection = data.validUntil
-    ? `<p style="margin: 0 0 24px; color: #6b7280; font-size: 14px;">This quote is valid until <strong>${escapeHtml(data.validUntil)}</strong>.</p>`
+    ? `<p style="margin: 0 0 24px; color: #626C66; font-size: 14px;">This quote is valid until <strong>${escapeHtml(data.validUntil)}</strong>.</p>`
     : ''
 
   return `
@@ -152,31 +152,32 @@ export function generateCustomerEmailHtml(data: {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Your quote</title>
+${emailHeadStyle()}
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+<body style="margin: 0; padding: 0; font-family: ${EMAIL_FONT.body}; background-color: #FAF9F6;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 40px 20px;">
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px;">
-              <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: ${primaryColor};">
+              <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: ${textColourOnCardForEmail(primaryColor)};">
                 ${escapeHtml(data.businessName)}
               </h1>
-              <p style="margin: 0 0 32px; color: #6b7280; font-size: 14px;">
+              <p style="margin: 0 0 32px; color: #626C66; font-size: 14px;">
                 Your quote for ${escapeHtml(data.serviceName)}
               </p>
 
-              <p style="margin: 0 0 16px; color: #374151; font-size: 16px; line-height: 1.5;">
+              <p style="margin: 0 0 16px; color: #4F5D57; font-size: 16px; line-height: 1.5;">
                 Hi ${escapeHtml(data.customerName)},
               </p>
-              <p style="margin: 0 0 24px; color: #374151; font-size: 16px; line-height: 1.5;">
+              <p style="margin: 0 0 24px; color: #4F5D57; font-size: 16px; line-height: 1.5;">
                 Here's your quote:
               </p>
 
-              <div style="margin: 24px 0; padding: 24px; background-color: #f0f9ff; border-radius: 8px; text-align: center;">
-                <p style="margin: 0 0 4px; color: #6b7280; font-size: 14px;">Quoted total</p>
-                <p style="margin: 0; font-size: 36px; font-weight: 700; color: ${primaryColor};">
+              <div style="margin: 24px 0; padding: 24px; background-color: #EAEFF5; border-radius: 8px; text-align: center;">
+                <p style="margin: 0 0 4px; color: #626C66; font-size: 14px;">Quoted total</p>
+                <p style="margin: 0; font-size: 36px; font-weight: 700; font-family: ${EMAIL_FONT.figure}; font-variant-numeric: tabular-nums; color: ${textColourOnCardForEmail(primaryColor)};">
                   ${escapeHtml(data.total)}
                 </p>
               </div>
@@ -188,18 +189,18 @@ export function generateCustomerEmailHtml(data: {
               <table role="presentation" style="width: 100%; margin: 32px 0;">
                 <tr>
                   <td style="text-align: center;">
-                    <a href="${escapeHtml(data.quoteViewUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
+                    <a href="${escapeHtml(data.quoteViewUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: ${textOnColourForEmail(primaryColor)}; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
                       View full quote
                     </a>
                   </td>
                 </tr>
               </table>
 
-              <p style="margin: 24px 0 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
+              <p style="margin: 24px 0 0; color: #626C66; font-size: 14px; line-height: 1.5;">
                 If you have any questions, simply reply to this email and we'll get back to you.
               </p>
 
-              <p style="margin: 24px 0 0; color: #374151; font-size: 14px;">
+              <p style="margin: 24px 0 0; color: #4F5D57; font-size: 14px;">
                 Best regards,<br>
                 <strong>${escapeHtml(data.businessName)}</strong>
               </p>
@@ -208,7 +209,7 @@ export function generateCustomerEmailHtml(data: {
         </table>
         <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
           <tr>
-            <td style="text-align: center; color: #9ca3af; font-size: 12px;">
+            <td style="text-align: center; color: #626C66; font-size: 12px;">
               Powered by ${PRODUCT_NAME}
             </td>
           </tr>

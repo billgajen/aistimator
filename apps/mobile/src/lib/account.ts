@@ -5,7 +5,7 @@
  * price, no "upgrade", no link to billing. An app may not point at a
  * purchase outside it.
  */
-import type { AppAccountResponse } from '@qolumns/shared'
+import { DATA_DELETION_PATH, type AppAccountResponse } from '@qolumns/shared'
 
 /** "Pro" or "Free quotes" */
 export function planLine(account: Pick<AppAccountResponse, 'planName'>): string {
@@ -29,6 +29,14 @@ export function usageFraction(account: Pick<AppAccountResponse, 'usage'>): numbe
 }
 
 /** The link without its scheme ("the-site/quote/your-business"), as it is read out or typed */
+/**
+ * T-191: where "Delete your account" goes. The app only signs in (accounts are made on the web), so Apple's rule
+ * 5.1.1(v) is met by a clear link to the web page that closes an account.
+ */
+export function deleteAccountUrl(webUrl: string): string {
+  return `${webUrl.replace(/\/+$/, '')}${DATA_DELETION_PATH}`
+}
+
 export function shortLink(url: string): string {
   return url.replace(/^https?:\/\//, '').replace(/\/+$/, '')
 }

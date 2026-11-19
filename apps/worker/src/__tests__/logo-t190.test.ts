@@ -16,7 +16,7 @@ describe('T-190: the logo in the worker’s emails', () => {
       failedRequestEmail({ customerName: 'Megan Grant', serviceName: 'Service A', quoteUrl: 'u' }).html,
     ]) {
       expect(html.split(productLogoRow())).toHaveLength(2)
-      expect(html.indexOf(productLogoRow())).toBeLessThan(html.indexOf('#ffffff'))
+      expect(html.indexOf(productLogoRow())).toBeLessThan(html.toLowerCase().indexOf('#ffffff'))
     }
   })
 

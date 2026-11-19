@@ -570,7 +570,8 @@ describe('T-180: the notice on every dashboard page', () => {
 
 describe('T-180: the webhook handles five events, each once', () => {
   it('the list the endpoint is registered for is the list the route handles', () => {
-    expect([...STRIPE_WEBHOOK_EVENTS]).toEqual(['checkout.session.completed', 'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.payment_failed', 'invoice.paid'])
+    // T-191 added the refund and the closed dispute
+    expect([...STRIPE_WEBHOOK_EVENTS]).toEqual(['checkout.session.completed', 'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.payment_failed', 'invoice.paid', 'charge.refunded', 'charge.dispute.closed'])
     const route = read('apps/web/src/app/api/webhooks/stripe/route.ts')
     for (const type of STRIPE_WEBHOOK_EVENTS) expect(route, type).toContain(`case '${type}'`)
     expect((route.match(/case '/g) ?? []).length).toBe(STRIPE_WEBHOOK_EVENTS.length)

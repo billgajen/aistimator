@@ -15,10 +15,113 @@
 
 ## Issues & Resolutions
 
+### 2026-11-19: T-191 — App Store readiness, emails in the brand, refunds and disputes, Wrangler 4 (AD-074, AD-075)
+
+Built and pushed, **not deployed**. The web app, the worker (its emails, and Wrangler 4), the shared package and
+the mobile app. No pricing or quote flow change. No migration, no new setting. One Stripe step: the webhook
+endpoint needs the two new events.
+
+**0. Deploy recorded:** T-190 was deployed by the owner on 2026-11-19 (the web, then the worker). Its entry says so.
+
+#### 1. App Store readiness (no store account yet)
+
+- **Account deletion.** The app only signs in (no sign-up screen; accounts are made on the web), so Apple's rule
+  5.1.1(v) is met by a clear link. Account has "Delete your account", which opens the web's `/data-deletion` (its
+  section 2 is closing an account). The path is `DATA_DELETION_PATH` (shared), also used by the footer. The
+  dashboard's disabled "Delete Account" button ("not available during beta") now opens the same page.
+- **The reviewer's sign-in:** `scripts/create-review-account.mts` (local by default, `--prod` for production with
+  the service key read through the management API as `seed-demo-tenant.mts` does). Creating the user makes its
+  business through the sign-up trigger; then the business is set up (US, no emails), gets two services from the
+  US packs as setup builds them, a free test plan (`plan_us_pro`, no Stripe customer), and three sample quotes
+  from invented customers on example.com (waiting, sent and opened, accepted) whose lines are the services' own
+  prices at the sample sizes (`samplePrice`, T-189). No model, no worker, no email. The password is printed once
+  and saved nowhere; `--new-password` replaces it; a second run without it changes nothing. Run on the local
+  database only (3 quotes made, $450, $650, $450); **not run on production**.
+- **No purchase in the app.** Two places pointed at one and were changed: the held-request sentence (shared
+  `quoteTurn` takes `surface: 'app'`; the app's says "It can be priced when your plan has room for it", the
+  dashboard keeps "Upgrade your plan, then price it") and the server's 402 on "Price it" ("Pick a plan…",
+  "Upgrade to…"), which the app replaces with its own line (`PLAIN.planLimit`); any server message with buying
+  words falls back to the plain line. "Your plan is managed on the web" was removed.
+- **Permission prompts.** The build's real prompts (read with `expo config --type introspect`) were camera and
+  photos with plain reasons, **plus microphone and Face ID with Expo's default English**, from the image picker
+  and secure store; the app uses neither. Both are off (`microphonePermission: false`, `faceIDPermission: false`).
+  The camera reason had lost "and scan a room to measure it" (the image picker's own text replaces app.json's);
+  both now carry the full sentence.
+- The App Store privacy answers and the listing text are in OWNER-TODO (T-191), from the code.
+
+#### 2. Every email in the brand
+
+- `packages/shared/src/email-style.ts`: the design system's colours (`EMAIL_COLOR`, compared with `globals.css`
+  by a unit test) and type (`EMAIL_FONT`), and `emailHeadStyle()`: Instrument Sans 400/600 and Bricolage
+  Grotesque 700 served from our domain (`apps/web/public/brand/fonts`, OFL, with their licences), headings in the
+  display face. Apple Mail and iOS Mail show them; Gmail and Outlook show the system face. No third party (no
+  Google Fonts) sees who opens an email. Figures: Spline Sans Mono where installed, else the text face with
+  tabular figures (a system monospace read like a typewriter).
+- All ten email files: the old greys and blue mapped to the tokens (page paper, ink and secondary text, muted
+  notes, the token border; warnings on surface with the amber line, never butter; danger and success tokens).
+  A unit test fails on any colour in an email file that is not a token.
+- **Whose colour:** an email to a business is ours (juniper, whatever the business's colour). An email to a
+  customer is the business's: its colour (`brandColourForEmail`, juniper when none is set, as on the quote page;
+  the old blue was the fallback). Button text reads on it (`readableTextOn`, moved to shared from
+  `lib/color.ts`, which re-exports it); a colour that does not reach 4.5:1 on white is never used as text (the
+  heading and the total turn ink).
+- **Customer emails have no business logo**, today or before: logos are private files behind expiring links (T-183
+  left it out for this reason). Not added here: it needs a public logo address, a decision of its own.
+- Pictures: `.checks/t191/` (not in git): a business email and a customer email (a dark and a light business
+  colour), each with pictures and with them blocked.
+
+#### 3. Refunds and lost disputes end the plan (AD-074)
+
+- Two events join `STRIPE_WEBHOOK_EVENTS`: `charge.refunded` and `charge.dispute.closed`
+  (`lib/billing-reversals.ts`). Each re-reads the charge or dispute, then its invoice (through
+  `invoicePayments.list` by payment intent, since charges no longer name their invoice), then the subscription.
+- A full refund of the current period's payment, or a lost dispute, cancels the subscription at Stripe at once
+  (`invoice_now: false, prorate: false`) and syncs the row through `syncSubscriptionFromStripe` (status canceled,
+  "no plan", by the one rule). A partial refund, a refund of an earlier period, an open or won dispute change
+  nothing. A retry after the cancel went through stores the ended plan without cancelling twice; a failed write
+  throws, so Stripe sends the event again.
+- Normal billing is unchanged. The endpoint must be given the two events (the setup script does it, OWNER-TODO).
+
+#### 4. Wrangler 4
+
+- `wrangler` ^3.60 → ^4.165.0. The dry-run build (`pnpm build:worker`) and `wrangler deploy --dry-run --env
+  production` both pass, with the same bindings as Wrangler 3.114: the queue `QUOTE_JOBS` (quote-jobs), R2
+  `ASSETS` (aistimator-assets), `ENVIRONMENT=production`. Wrangler's own config reader shows production keeps
+  `crons = ["*/5 * * * *"]`, the consumer with its dead-letter queue, and observability; the worker's name is
+  unchanged. No config change was needed. Wrangler 4 warns that its optional peer `@cloudflare/workers-types` is
+  older than it would like; types were not changed.
+
+#### Checks
+
+- New unit tests: web `billing-t191` (13), `emails-t191` (24), `review-account-t191` (4); mobile `store-t191` (5).
+  Updated: `billing-t180` (the event list), mobile `app-t184` (the plan-limit line), the T-190 logo tests (colour
+  case). Totals: web 1,310, worker 731, mobile 114. `pnpm lint` 0, `pnpm typecheck` 0, the iOS bundle builds.
+- `pnpm check:quick` once: 28 of 28 in 4 min 34 s (the worker served by Wrangler 4's `wrangler dev`).
+- `pnpm check:full --only t180` once: 107 of 108 in 9 min 51 s. The one failure was the sandbox webhook endpoint
+  still registered for the five old events (the step the owner does for live). The setup script was run on the
+  **sandbox** (it updated the switched-off sandbox endpoint to the seven events and re-applied the same portal
+  settings), then `pnpm check:failed`: t180 108 of 108 in 9 min 56 s.
+- The review account, local: created; a second run changed nothing; `--new-password` worked; signed in with it,
+  the app's API showed "Harbor Lane Painting", Pro, 0 of 200, and the three quotes (one view read: "Base Fee",
+  "Walls & ceilings  $375.00 × 1 room", $450).
+
+**Files:** `apps/mobile/{app.json, app/(tabs)/account.tsx, app/quote/[id].tsx, src/lib/{account,errors,status}.ts}`;
+`packages/shared/src/{email-style,colour-contrast,review-account,quote-turn,brand,failed-request,ops-alerts,index}.ts`;
+`apps/web/src/lib/{billing-reversals,stripe-events,color,email-templates,postmark,auth-emails,billing-emails,
+request-updated-email,sections-email,marketing/site-copy}.ts`, `app/api/webhooks/stripe/route.ts`,
+`app/(dashboard)/app/settings/page.tsx`, `public/brand/fonts/*`; `apps/worker/{package.json,src/email/templates.ts}`;
+`scripts/create-review-account.mts`; `pnpm-lock.yaml`; tests.
+
+**To deploy:** the worker (its emails; Wrangler 4 deploys it), then the web (the emails it sends, the fonts the
+emails load, the webhook, the dashboard link). Then the Stripe step. The app's changes need a new build.
+
 ### 2026-11-19: T-190 — The owner's logo everywhere; one text box on a question card (AD-073)
 
-Built and pushed, **not deployed**. The web app, the worker (its emails only), the shared package and the mobile
-app's pictures. No pricing, quote flow, worker logic or Stripe change. No migration, no new setting.
+**Deployed by the owner on 2026-11-19:** the web, then the worker. No migration. (Recorded in T-191 from the
+owner's note; the worker version and the deployment id were not given.)
+
+**As built:** the web app, the worker (its emails only), the shared package and the mobile app's pictures. No
+pricing, quote flow, worker logic or Stripe change. No migration, no new setting.
 
 **0. Deploy recorded:** T-189 was deployed by the owner on 2026-11-19 (migration 45, then the worker, version
 `628da7f6`, then the web; `ALERT_EMAIL` on the worker as a secret and on Vercel, Production). Its entry says so.
@@ -10215,6 +10318,41 @@ the business's document, so our mark stays off it (T-183, T-185).
 **Rejected:** making the files' green a token (asked not to change tokens); a CSS background or a web font for the
 email logo (blocked or ignored by mail clients); keeping the drawn social image beside the owner's (two images
 for one page).
+
+---
+
+### AD-074: Money taken back ends the plan; nothing else does (T-191)
+
+**Decision:** a full refund of the payment for the subscription's current period, or a dispute that is lost,
+ends the plan at once: we cancel the subscription at Stripe (no invoice, no proration) and sync the row. A partial
+refund, a refund of an earlier period, and a dispute that is open or won change nothing.
+
+**Why:** under Managed Payments Stripe handles refunds and disputes and may refund on its own (AD-062), so a plan
+could run on money that had been given back. A partial or older refund is a goodwill gesture and must not cut a
+paying business off; an open dispute may be won, and pausing during it would need a status the plan rule does not
+have.
+
+**Rules that follow:** decide from what Stripe says when re-read (charge or dispute, invoice, subscription), never
+from the event. End a plan only by cancelling at Stripe and syncing, so Stripe and the row cannot disagree.
+
+**Rejected:** pausing the plan while a dispute is open; ending on any refund; a status of our own for "refunded".
+
+---
+
+### AD-075: Emails speak the design system; a customer's email is the business's (T-191)
+
+**Decision:** every email takes its colours and type from `email-style.ts` (the tokens; Instrument Sans and
+Bricolage from our domain). An email to a business is ours: juniper and our logo (AD-073). An email to a customer
+is the business's: its colour (juniper when none), with text that reads on it, and no mark of ours but "Powered by".
+
+**Why:** the emails still wore the generic grey-and-blue kit from before the design system. Fonts are served from
+our own domain so no third party learns who opens an email.
+
+**Rules that follow:** no colour in an email file that is not a token (a unit test). A business colour is text only
+where it reads at 4.5:1 on white. A new email uses `emailHeadStyle()` and `EMAIL_FONT.body`.
+
+**Rejected:** Google Fonts in emails (a third party, and the Privacy Policy does not list it); a system monospace
+for figures where Spline Sans Mono is missing.
 
 ---
 

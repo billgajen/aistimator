@@ -11,6 +11,10 @@
  *   customer.subscription.deleted   the subscription ended (cancelled period over, or Stripe gave up on the card)
  *   invoice.payment_failed          a renewal payment failed
  *   invoice.paid                    a payment went through (a retry that worked)
+ *   charge.refunded                 T-191: money given back; a full refund of the current period ends the plan
+ *   charge.dispute.closed           T-191: a dispute was decided; a lost one ends the plan
+ * The two T-191 events re-read the charge or dispute, its invoice and the subscription from Stripe
+ * (lib/billing-reversals.ts), and end the plan through the same sync.
  */
 export const STRIPE_WEBHOOK_EVENTS = [
   'checkout.session.completed',
@@ -18,6 +22,8 @@ export const STRIPE_WEBHOOK_EVENTS = [
   'customer.subscription.deleted',
   'invoice.payment_failed',
   'invoice.paid',
+  'charge.refunded',
+  'charge.dispute.closed',
 ] as const
 
 export type HandledStripeEvent = (typeof STRIPE_WEBHOOK_EVENTS)[number]

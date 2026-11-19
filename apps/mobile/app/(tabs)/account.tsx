@@ -1,6 +1,6 @@
 /**
  * The Account tab (T-184): whose app this is, how much of the plan is used,
- * the quote link to show a customer, help, and sign out.
+ * the quote link to show a customer, help, sign out, and (T-191) delete your account.
  *
  * Nothing here is a price or a way to buy: an app may not point at a
  * purchase outside it. The plan is named and its use is counted, no more.
@@ -11,7 +11,8 @@ import { useFocusEffect, useRouter } from 'expo-router'
 import Constants from 'expo-constants'
 import { PRODUCT_NAME, SUPPORT_EMAIL, type AppAccountResponse } from '@qolumns/shared'
 import { useApi } from '../../src/lib/api-context'
-import { planLine, shortLink, usageFraction, usageLine } from '../../src/lib/account'
+import { deleteAccountUrl, planLine, shortLink, usageFraction, usageLine } from '../../src/lib/account'
+import { config } from '../../src/lib/config'
 import { toApiError } from '../../src/lib/api'
 import { plainError } from '../../src/lib/errors'
 import { useOutbox, useOutboxState } from '../../src/lib/outbox-context'
@@ -151,7 +152,16 @@ export default function Account() {
             icon="help-circle-outline"
             onPress={() => void Linking.openURL(`mailto:${supportEmail}?subject=${encodeURIComponent(`${PRODUCT_NAME} app`)}`).catch(() => setError(`Write to ${supportEmail} from your email.`))}
           />
-          <LinkRow title="Sign out" icon="log-out-outline" danger onPress={signOut} last />
+          <LinkRow title="Sign out" icon="log-out-outline" onPress={signOut} />
+          {/* T-191: Apple asks for a clear way to delete the account; it is closed on the web (data deletion page) */}
+          <LinkRow
+            title="Delete your account"
+            note="Opens the steps on the web"
+            icon="trash-outline"
+            danger
+            onPress={() => void Linking.openURL(deleteAccountUrl(config.apiUrl)).catch(() => setError(`Write to ${supportEmail} to close your account.`))}
+            last
+          />
         </Card>
 
         <Text style={styles.version} maxFontSizeMultiplier={scale.large}>

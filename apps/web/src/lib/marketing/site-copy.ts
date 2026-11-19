@@ -4,6 +4,7 @@
  * components; the words "AI" and what it does now live only in the copy
  * files, where each claim names its row of Docs/design/ai-capabilities.md.
  */
+import { DATA_DELETION_PATH } from '@qolumns/shared'
 import { says } from './ai-claims'
 
 /**
@@ -58,7 +59,7 @@ export const PRICING_AI_FAQ = {
  * T-181: the page that says how to have data deleted. Its address is also what goes in the Meta app's
  * "Data deletion instructions URL" (OWNER-TODO, T-181). The footer links to it.
  */
-export const DATA_DELETION = { href: '/data-deletion', label: 'Delete your data' } as const
+export const DATA_DELETION = { href: DATA_DELETION_PATH, label: 'Delete your data' } as const
 
 /** Pricing page: the two plan lines that are shown, not only told (they link to the live demo) */
 export const PRICING_DEMO_LINKS = {

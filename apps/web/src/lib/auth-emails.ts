@@ -7,7 +7,7 @@
  * Plain wording, the product's name, one button. The link in each is made by
  * the server (lib/auth-flow.ts) and works once.
  */
-import { PRODUCT_NAME, productLogoRow } from '@qolumns/shared'
+import { EMAIL_FONT, PRODUCT_NAME, emailHeadStyle, productLogoRow } from '@qolumns/shared'
 
 /**
  * How long a link in these emails works, in minutes. It is Supabase's
@@ -34,8 +34,8 @@ interface AuthEmail {
 }
 
 function layout(parts: { title: string; paragraphs: string[]; button: { label: string; url: string }; after: string[] }): string {
-  const paragraph = (text: string) => `<p style="margin: 0 0 16px; color: #374151; font-size: 16px; line-height: 1.5;">${text}</p>`
-  const small = (text: string) => `<p style="margin: 16px 0 0; color: #6b7280; font-size: 14px; line-height: 1.5;">${text}</p>`
+  const paragraph = (text: string) => `<p style="margin: 0 0 16px; color: #4F5D57; font-size: 16px; line-height: 1.5;">${text}</p>`
+  const small = (text: string) => `<p style="margin: 16px 0 0; color: #626C66; font-size: 14px; line-height: 1.5;">${text}</p>`
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -43,24 +43,25 @@ function layout(parts: { title: string; paragraphs: string[]; button: { label: s
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(parts.title)}</title>
+${emailHeadStyle()}
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+<body style="margin: 0; padding: 0; font-family: ${EMAIL_FONT.body}; background-color: #FAF9F6;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 40px 20px;">
         ${productLogoRow()}
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px;">
-              <h1 style="margin: 0 0 24px; font-size: 24px; font-weight: 700; color: #1b2823;">
+              <h1 style="margin: 0 0 24px; font-size: 24px; font-weight: 700; color: #1B2823;">
                 ${escapeHtml(parts.title)}
               </h1>
               ${parts.paragraphs.map(paragraph).join('\n              ')}
-              <a href="${escapeHtml(parts.button.url)}" style="display: inline-block; margin: 8px 0; padding: 12px 24px; background-color: #205e56; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600;">
+              <a href="${escapeHtml(parts.button.url)}" style="display: inline-block; margin: 8px 0; padding: 12px 24px; background-color: #205E56; color: #FFFFFF; text-decoration: none; border-radius: 8px; font-weight: 600;">
                 ${escapeHtml(parts.button.label)}
               </a>
               ${parts.after.map(small).join('\n              ')}
-              <p style="margin: 32px 0 0; color: #9ca3af; font-size: 12px;">
+              <p style="margin: 32px 0 0; color: #626C66; font-size: 12px;">
                 ${PRODUCT_NAME}
               </p>
             </td>
@@ -117,7 +118,7 @@ export function resetPasswordEmail(data: { resetUrl: string }): AuthEmail {
 export function alreadyRegisteredEmail(data: { loginUrl: string; forgotUrl: string }): AuthEmail {
   const intro = `Someone tried to sign up for ${PRODUCT_NAME} with this email address. It already has an account, so no new one was made.`
   const ask = 'If it was you, log in with the password you chose before.'
-  const forgot = `Forgotten your password? Reset it here: <a href="${escapeHtml(data.forgotUrl)}" style="color: #205e56;">${escapeHtml(data.forgotUrl)}</a>`
+  const forgot = `Forgotten your password? Reset it here: <a href="${escapeHtml(data.forgotUrl)}" style="color: #205E56;">${escapeHtml(data.forgotUrl)}</a>`
   const ignore = 'If it was not you, ignore this email. Nothing has changed.'
   return {
     subject: `You already have a ${PRODUCT_NAME} account`,

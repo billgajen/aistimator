@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getStripeClient } from '@/lib/stripe'
 import { invoiceSubscriptionId, syncSubscriptionFromStripe } from '@/lib/billing-sync'
 import { isHandledStripeEvent } from '@/lib/stripe-events'
+import { handleReversal } from '@/lib/billing-reversals'
 import { sendMetaEvent } from '@/lib/meta-capi'
 
 export const dynamic = 'force-dynamic'
@@ -117,6 +118,16 @@ async function handle(admin: Admin, stripe: Stripe, event: Stripe.Event): Promis
       if (!subscriptionId) return // not a subscription's invoice
       const result = await syncSubscriptionFromStripe(admin, stripe, subscriptionId)
       if (!result.ok && (result.why === 'write_failed' || result.why === 'not_found')) throw new Error(`invoice not stored: ${result.why}`)
+      return
+    }
+
+    // T-191: money taken back. Read again from Stripe; a full refund of the current period or a lost dispute ends the plan.
+    case 'charge.refunded': {
+      await handleReversal(admin, stripe, { kind: 'refund', chargeId: event.data.object.id })
+      return
+    }
+    case 'charge.dispute.closed': {
+      await handleReversal(admin, stripe, { kind: 'dispute', disputeId: event.data.object.id })
       return
     }
   }

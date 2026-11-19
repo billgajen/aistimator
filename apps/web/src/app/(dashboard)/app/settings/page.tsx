@@ -4,7 +4,7 @@ import { CustomerContactSettings } from '@/components/settings/CustomerContactSe
 import { contactRequirementOf } from '@/lib/contact-rules'
 import { useState, useEffect, useCallback } from 'react'
 import type { ServiceAreaMode, RegionCode, UnitSystem } from '@qolumns/shared'
-import { getRegion, listRegions } from '@qolumns/shared'
+import { DATA_DELETION_PATH, getRegion, listRegions } from '@qolumns/shared'
 
 export const dynamic = 'force-dynamic'
 
@@ -593,15 +593,15 @@ export default function SettingsPage() {
           <p className="mt-1 text-sm text-danger">Irreversible actions that affect your account</p>
 
           <div className="mt-6">
-            <button
-              className="rounded-xl border border-danger-line bg-surface px-4 py-2 text-sm font-medium text-danger hover:bg-danger-light"
-              disabled
+            {/* T-191: the same page the app's "Delete your account" opens (DATA_DELETION_PATH) */}
+            <a
+              href={DATA_DELETION_PATH}
+              className="inline-flex min-h-[44px] items-center rounded-xl border border-danger-line bg-surface px-4 py-2 text-sm font-medium text-danger hover:bg-danger-light"
+              data-testid="delete-account"
             >
-              Delete Account
-            </button>
-            <p className="mt-2 text-xs text-danger">
-              Account deletion is not available during beta. Contact support if needed.
-            </p>
+              Delete your account
+            </a>
+            <p className="mt-2 text-xs text-danger">The steps to close your account and have its data deleted.</p>
           </div>
         </div>
       </div>

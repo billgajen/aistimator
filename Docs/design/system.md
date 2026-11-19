@@ -333,6 +333,9 @@ the app icon and the social image are cream `#F7EBC7` on dark green `#192822`.
 - **Favicon and Apple touch icon:** the "Qo" letter file. **Social image:** the square file, 1200 × 630.
 - **Emails to a business** start with the PNG wordmark (`productLogoRow`, shared). Emails to a customer carry the
   business's brand, never ours.
+- **Every email** takes its colours and type from `packages/shared/src/email-style.ts` (T-191, AD-075): the
+  tokens, Instrument Sans for text and Bricolage for headings from our domain. A customer's email is in the
+  business's colour (juniper when none), a business's email in juniper.
 - **The app:** the icon is the letter file on its own green; the splash is the wordmark on paper.
 
 ## Which skill leads where
