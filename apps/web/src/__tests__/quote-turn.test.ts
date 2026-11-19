@@ -398,8 +398,10 @@ describe('one place for the wording', () => {
   it('both quote pages use the shared map and have no label table of their own', () => {
     const list = src('app/(dashboard)/app/quotes/page.tsx')
     const detail = src('app/(dashboard)/app/quotes/[quoteId]/page.tsx')
+    // T-186: the quote page takes the turn together with the Progress steps, from the one story
+    expect(list).toContain('quoteTurn(')
+    expect(detail).toContain('quoteStory(')
     for (const page of [list, detail]) {
-      expect(page).toContain('quoteTurn(')
       expect(page).not.toMatch(/Record<QuoteStatus,\s*\{\s*label/)
       for (const old of ["label: 'Sent'", "label: 'Viewed'", "label: 'Revised'", "label: 'Feedback'", 'Awaiting your approval']) {
         expect(page, old).not.toContain(old)
@@ -474,7 +476,9 @@ describe('list API', () => {
   })
 
   it('filters by group with the shared statuses and scopes every query to the tenant', () => {
-    expect(route).toContain('QUOTE_GROUP_STATUSES[group]')
+    // T-186: by the shared statuses, with the quotes whose questions are the business's moved to "Needs you"
+    expect(route).toContain('applyGroupFilter(query, groupFilter(group, businessAsked))')
+    expect(src('lib/business-asked.ts')).toContain('QUOTE_GROUP_STATUSES[group]')
     expect(route).toContain('defaultQuoteListGroup(counts)')
     // the list query and the quote counts filter by tenant directly; the
     // unfinished count goes through the shared rule (T-160), which does too

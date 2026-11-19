@@ -192,3 +192,16 @@ export function lineLabelParts(label: string): { name: string; detail: string | 
   if (loose) return { name: loose[1] ?? label, detail: (loose[2] ?? '').replace(/\sx\s/, ' × ').replace(/\(/, ' ').replace(/\)/, '') }
   return { name: label, detail: null }
 }
+
+/**
+ * T-186: a line's label as it is shown, with its detail written the way the
+ * engine writes it now. A quote priced before T-185 stores "Rooms  $375 x
+ * 2(Room)"; every screen and document that prints a stored label (the
+ * dashboard, the approval page, the review email, the PDF) prints it through
+ * here, so an older quote reads "Rooms  $375 × 2 rooms" like a new one. A
+ * label with no detail comes back as it is.
+ */
+export function lineLabelNow(label: string): string {
+  const { name, detail } = lineLabelParts(label)
+  return detail ? `${name}  ${detail}` : label
+}

@@ -59,6 +59,8 @@ export interface UnderstandingInput {
   expectedSignals: unknown
   /** The newest quote checker run for this quote, if it found anything */
   checker: { issues: unknown; checkedTotal: unknown } | null
+  /** T-186: the business made this quote itself, so the words, photos and answers on it are its own */
+  madeByBusiness?: boolean
 }
 
 /** Every word the panel shows that is not the pipeline's own */
@@ -82,6 +84,24 @@ export const UNDERSTOOD_COPY = {
   extra: (label: string) => `Picked up from their words: ${label}. Added at your price.`,
   extraFromPhotos: (label: string) => `Picked up from the photos: ${label}. Added at your price.`,
 } as const
+
+/**
+ * T-186: the same words on a quote the business made itself (the on-site
+ * app). Nobody but the business wrote, photographed or answered anything on
+ * it, so nothing here is called the customer's.
+ */
+const OWN_COPY = {
+  wordsTitle: 'From your notes',
+  askedTitle: 'Asked you',
+  answered: 'You answered',
+  photoStripTitle: 'Photos with this job',
+  extra: (label: string) => `Picked up from your notes: ${label}. Added at your price.`,
+} as const
+
+/** The panel's words that depend on who made the quote */
+export function understoodCopyFor(madeByBusiness: boolean | null | undefined): Pick<typeof UNDERSTOOD_COPY, 'wordsTitle' | 'askedTitle' | 'answered' | 'photoStripTitle' | 'extra'> | typeof OWN_COPY {
+  return madeByBusiness ? OWN_COPY : UNDERSTOOD_COPY
+}
 
 /** The most notes of one kind the panel lists: it is a summary, not the trace */
 const MAX_NOTES = 4
@@ -208,7 +228,7 @@ export function quoteUnderstanding(
     if (!label) continue
     const fromPhotos = /photo/i.test(text(line.recommendationReason)) && !/description/i.test(text(line.recommendationReason))
     if (fromPhotos) addPhoto(`extra:${label}`, { text: UNDERSTOOD_COPY.extraFromPhotos(label) })
-    else words.push({ text: UNDERSTOOD_COPY.extra(label) })
+    else words.push({ text: understoodCopyFor(input.madeByBusiness).extra(label) })
   }
 
   // ---- Work the customer may also need (never a price) ------------------------

@@ -50,7 +50,8 @@ describe('T-185: the base fee’s note is the same on every quote', () => {
 describe('T-185: the dashboard shows the same certainty sentence as the app', () => {
   it('the quote page uses the shared sentence, not the stored words as they are', () => {
     const page = readFileSync(join(__dirname, '../app/(dashboard)/app/quotes/[quoteId]/page.tsx'), 'utf8')
-    expect(page).toContain('{certaintySentence(estimate)}')
+    // T-186: with what the quote's own lines show, so an older sentence cannot claim a measurement nothing made
+    expect(page).toContain('{certaintySentence(estimate, { measuredOnQuote })}')
     expect(page).not.toContain('{estimate.description}')
   })
 

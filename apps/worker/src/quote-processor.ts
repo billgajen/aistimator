@@ -58,7 +58,8 @@ import type { WordingContext } from './ai/wording'
 import { withAiTimeout, aiCallTimeoutMs } from './ai/timeouts'
 import { createAiClient } from './ai/factory'
 import type { AiClient } from './ai/client'
-import { computeEnvelope, enforceEnvelope, computeEstimateGrade, capFlatRateGrade, priceDependsOnJobFacts, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue, parseRoomScan, scanAnswers, scanEvidence, summarizeRoomScan, ROOM_SCAN_FIELD, decideReviewHold, reviewModeOf, customerEstimateRange, repairCustomerWording, businessPhrasesFrom } from '@qolumns/shared'
+import type { QuantityProvenance } from '@qolumns/shared'
+import { computeEnvelope, enforceEnvelope, computeEstimateGrade, capFlatRateGrade, priceDependsOnJobFacts, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue, parseRoomScan, scanAnswers, scanEvidence, summarizeRoomScan, ROOM_SCAN_FIELD, decideReviewHold, reviewModeOf, customerEstimateRange, isMadeByBusiness, repairCustomerWording, businessPhrasesFrom } from '@qolumns/shared'
 import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor, DEFAULT_ADJUDICATION_VALUE_THRESHOLD, DEFAULT_ADJUDICATION_TIMEOUT_MS } from './ai/measurement'
 import { formatScopeAnswers } from './ai/scope-answers'
 import { fieldOptions, snapToOption, answersOutsideOptions, type OptionField } from './answer-options'
@@ -1561,13 +1562,7 @@ export async function processQuote(
         const confirmed = s.source === 'form' || s.confidence >= 1
         return {
           signalKey: s.key,
-          basis: (confirmed ? 'confirmed' : (s.basis ?? 'measured')) as
-            | 'confirmed'
-            | 'measured'
-            | 'adjudicated'
-            | 'envelope'
-            | 'defaulted'
-            | 'identified',
+          basis: (confirmed ? 'confirmed' : (s.basis ?? 'measured')) as QuantityProvenance['basis'],
           confidence: s.confidence,
           band: confirmed ? undefined : s.quantityBand,
           stepName: step.name,
@@ -1611,7 +1606,8 @@ export async function processQuote(
       const rateKey = `${t.id}_rate`
       if (!seenKeys.has(rateKey)) {
         seenKeys.add(rateKey)
-        provenance.push({ signalKey: rateKey, basis: 'measured', confidence: 0.7, band: undefined, stepName: bandStep.name })
+        // T-186: a price range is its own reason, not a measurement (the grade it gives is the same)
+        provenance.push({ signalKey: rateKey, basis: 'rate', confidence: 0.7, band: undefined, stepName: bandStep.name })
       }
     }
 
@@ -1682,6 +1678,8 @@ export async function processQuote(
       grade: gradeResult.grade,
       label: gradeResult.label,
       description: gradeResult.description,
+      // T-186: why it is not confirmed, so the sentence under the price is built from what is true
+      reasons: gradeResult.reasons ?? [],
       ...(rangeLow !== undefined &&
         rangeHigh !== undefined &&
         rangeLow !== rangeHigh && {
@@ -2144,14 +2142,17 @@ export async function processQuote(
   const quantityConcern = clarAnswers.length > 0 ? undefined : (content.quantityConcern || '').trim() || undefined
   const quantityConcernFieldId = quantityConcern ? (content.quantityConcernFieldId || '').trim() || undefined : undefined
   if (quantityConcern && pricing.estimate && pricing.estimate.grade === 'A') {
+    // T-186: entered as what it is, a typed quantity that is doubted. It was entered as a
+    // measurement, so the business read "measured from the photos" about a number it typed.
     const capped = computeEstimateGrade([
-      { signalKey: 'stated_quantity_concern', basis: 'measured', confidence: 0.7 },
+      { signalKey: 'stated_quantity_concern', basis: 'doubted', confidence: 0.7 },
     ])
     pricing.estimate = {
       ...pricing.estimate,
       grade: capped.grade,
       label: capped.label,
       description: capped.description,
+      reasons: capped.reasons ?? [],
     }
     console.log(`[Processor] R3-1: grade capped to ${capped.grade} — ${quantityConcern}`)
   }
@@ -2425,7 +2426,7 @@ export async function processQuote(
   const reviewDecision = decideReviewHold({
     statusAfterChecks: finalStatus,
     mode: reviewModeOf(service),
-    businessCreated: quoteRequest.source_json?.type === 'app',
+    businessCreated: isMadeByBusiness(quoteRequest.source_json),
   })
   const awaitingBusinessReview = reviewDecision.reviewHold === 'shown' || reviewDecision.reviewHold === 'held'
   const shownEarly = reviewDecision.reviewHold === 'shown'
@@ -2594,7 +2595,7 @@ export async function processQuote(
       console.log('[Processor] Quote pending review - customer email will be sent after approval')
     }
     if (
-      quoteRequest.source_json?.type !== 'app' &&
+      !isMadeByBusiness(quoteRequest.source_json) &&
       emailOn
     ) {
       const range = pricing.estimate?.rangeLow !== undefined && pricing.estimate?.rangeHigh !== undefined

@@ -47,7 +47,7 @@ export const CUSTOMER_METHOD = {
   adjustment: 'Adjustment from your answers',
 } as const
 
-/** What the business reads beside a line */
+/** What the business reads beside a line of a quote a customer asked for */
 const BUSINESS_WORDS: Record<LineSource, string> = {
   photos: 'Measured from photos',
   label: 'Read from a label in the photos',
@@ -58,6 +58,26 @@ const BUSINESS_WORDS: Record<LineSource, string> = {
   fixed: 'Your fixed price',
   words: "From the customer's words",
   choice: "The customer's choice",
+}
+
+/**
+ * T-186: the same, on a quote the business made itself. The answers, the
+ * notes and the choices on it are the business's own, so they are not called
+ * the customer's. What was measured, read, scanned or fixed reads the same.
+ */
+const OWN_WORDS: Record<LineSource, string> = {
+  ...BUSINESS_WORDS,
+  answer: 'Your answer',
+  details: 'Estimated from the details you gave',
+  calculated: 'Worked out from your answers',
+  words: 'From your notes',
+  choice: 'Your choice',
+}
+
+/** Who made the request decides whose answers they are */
+export interface SourceWordsOptions {
+  /** The business made this quote itself (`isMadeByBusiness`) */
+  madeByBusiness?: boolean
 }
 
 const SOURCES = new Set<string>(Object.keys(BUSINESS_WORDS))
@@ -99,7 +119,10 @@ function whereRead(method: string | null | undefined): string | null {
  * The words the business reads beside a line, or null when the source is not
  * known (a line the business typed in the editor, a quote with no record).
  */
-export function sourceForBusiness(line: { source?: unknown; method?: string | null } | null | undefined): string | null {
+export function sourceForBusiness(
+  line: { source?: unknown; method?: string | null } | null | undefined,
+  opts: SourceWordsOptions = {}
+): string | null {
   if (!line) return null
   const source = isLineSource(line.source) ? line.source : sourceFromMethod(line.method)
   if (!source) return null
@@ -107,7 +130,7 @@ export function sourceForBusiness(line: { source?: unknown; method?: string | nu
     const where = whereRead(line.method)
     return where ? `Read from ${where}` : BUSINESS_WORDS.label
   }
-  return BUSINESS_WORDS[source]
+  return (opts.madeByBusiness ? OWN_WORDS : BUSINESS_WORDS)[source]
 }
 
 /** True when the source means the AI worked the quantity out, so the business should look at it */
@@ -150,7 +173,8 @@ export function carrySources<T extends { label: string; amount: number; source?:
  */
 export function businessSources(
   lines: ReadonlyArray<{ label: string; amount: number; source?: unknown }>,
-  takeoff?: unknown
+  takeoff?: unknown,
+  opts: SourceWordsOptions = {}
 ): Array<string | null> {
   const rows = (Array.isArray(takeoff) ? takeoff : [])
     .filter((row): row is Record<string, unknown> => typeof row === 'object' && row !== null)
@@ -172,9 +196,45 @@ export function businessSources(
     if (isLineSource(line.source)) {
       // where a label was read is said in the takeoff's words for that line
       const method = line.source === 'label' ? (rowFor(line, false)?.method ?? null) : null
-      return sourceForBusiness({ source: line.source, method })
+      return sourceForBusiness({ source: line.source, method }, opts)
     }
     const row = rowFor(line, true)
-    return row ? sourceForBusiness({ source: row.source, method: row.method }) : null
+    return row ? sourceForBusiness({ source: row.source, method: row.method }, opts) : null
   })
+}
+
+/**
+ * T-186: the sources of a quote's lines as codes (not words), for a rule that
+ * must know whether anything on the quote was measured. Same matching as
+ * `businessSources`: the line's own source, or its takeoff row's.
+ */
+export function lineSourceCodes(
+  lines: ReadonlyArray<{ label: string; amount: number; source?: unknown }>,
+  takeoff?: unknown
+): Array<LineSource | null> {
+  const rows = (Array.isArray(takeoff) ? takeoff : [])
+    .filter((row): row is Record<string, unknown> => typeof row === 'object' && row !== null)
+    .map((row) => ({
+      item: typeof row.item === 'string' ? row.item.trim() : '',
+      amount: typeof row.amount === 'number' && Number.isFinite(row.amount) ? row.amount : 0,
+      method: typeof row.method === 'string' ? row.method : '',
+      source: row.source,
+      used: false,
+    }))
+  return lines.map((line) => {
+    if (isLineSource(line.source)) return line.source
+    const row = rows.find((r) => !r.used && r.item !== '' && Math.abs(r.amount - line.amount) < 0.005 && (line.label === r.item || line.label.startsWith(`${r.item} `)))
+    if (!row) return null
+    row.used = true
+    return isLineSource(row.source) ? row.source : sourceFromMethod(row.method)
+  })
+}
+
+/**
+ * Was anything on the quote measured or read from the photos? Undefined when
+ * no line's source is known, so nothing can be said either way.
+ */
+export function anyMeasuredFromPhotos(codes: ReadonlyArray<LineSource | null>): boolean | undefined {
+  if (!codes.some((code) => code !== null)) return undefined
+  return codes.some((code) => code === 'photos' || code === 'label')
 }

@@ -11,13 +11,14 @@
  */
 
 import {
-  canCopyQuoteLink,
   formatMoney,
   isQuoteProcessing,
   minimumChargeNote,
   type AppQuoteLine,
   type AppQuoteView,
+  type QuoteMainButton,
 } from '@qolumns/shared'
+import { storyOfQuote } from './status'
 
 /** Poll while the worker is still pricing. */
 export function isPricing(status: string): boolean {
@@ -64,25 +65,34 @@ export function priceLines(q: Pick<AppQuoteView, 'lines' | 'takeoff'>): PriceLin
 /**
  * What the quote screen offers, in order of importance. One main action per
  * screen; anything else is quieter.
- *   confirm         answer the open questions on site, then it reprices
+ *   confirm         the business answers its own open questions, then it reprices
  *   send            approve the quote and hand the customer its link (one tap)
  *   share           hand the customer the link of a quote already sent
  *   price_request   price a request that was saved at the plan limit
  *   add_price       held with no price: it is finished in the dashboard
  *   contact         could not be priced: reach the customer
  *   wait            the price is being worked out
+ *
+ * T-186: it is not decided here. The shared `quoteStory` works out the main
+ * button together with the status chip, the sentence and the Progress steps;
+ * this gives the app's own name to that button. A customer's quote that waits
+ * for the customer's answers has no main action: the customer was asked.
  */
 export type QuoteAction = 'confirm' | 'send' | 'share' | 'price_request' | 'add_price' | 'contact' | 'wait'
 
-export function mainAction(q: Pick<AppQuoteView, 'status' | 'held' | 'pricing' | 'questions'>): QuoteAction | null {
-  if (isPricing(q.status)) return 'wait'
-  if (q.status === 'awaiting_clarification') return q.questions.length > 0 ? 'confirm' : null
-  if (q.status === 'failed') return 'contact'
-  if (q.status === 'pending_review') {
-    if (q.held) return 'price_request'
-    return q.pricing.total > 0 ? 'send' : 'add_price'
-  }
-  return canCopyQuoteLink(q.status) ? 'share' : null
+const ACTION_OF: Record<QuoteMainButton, QuoteAction> = {
+  answer: 'confirm',
+  approve: 'send',
+  share: 'share',
+  price_request: 'price_request',
+  add_price: 'add_price',
+  contact: 'contact',
+  wait: 'wait',
+}
+
+export function mainAction(q: AppQuoteView): QuoteAction | null {
+  const button = storyOfQuote(q).button
+  return button ? ACTION_OF[button] : null
 }
 
 /** The final invoice can be recorded once the customer has the quote (T-143) */

@@ -2753,9 +2753,8 @@ check is still open); the commands above on your Mac.
 
 ## T-185 — Mobile polish from your second phone test
 
-Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-185" (worker, then web; no
-migration). The app's own changes show in Expo Go as soon as you run it again; three things need the deploy
-first: the line detail on new quotes, the same note on every base fee, and the "New quote" email.
+**Deployed by you on 19 November 2026, 07:37 UTC:** the worker, then the web (Vercel `estimator-bvhmjqf5o`). No
+migration. Everything below is live.
 
 ### What to look at on the phone
 
@@ -2772,10 +2771,80 @@ first: the line detail on new quotes, the same note on every base fee, and the "
 
 ### Not done, and why
 
-- **An older quote on the web still shows the old detail** ("$375 x 2(Room)") on the dashboard, the approval
-  page, the review email and the PDF, which show a line's stored words. New quotes read the new way everywhere.
-  Recommended: leave it; say if you want those four to re-read old quotes too (a small change).
-- **The dashboard's progress tracker keeps its own words** ("You approved", "Customer opened"). The ticket named
-  the app's card. Recommended: move the dashboard to the same four names in a design ticket, if you like them.
+- ~~An older quote on the web still shows the old detail on the dashboard, the approval page, the review email
+  and the PDF.~~ Done in T-186.
+- ~~The dashboard's progress tracker keeps its own words.~~ Done in T-186.
 - The full regression level was not run (the ticket asked for the quick one).
 
+---
+
+## T-186 — On-site quotes speak to you, not the customer
+
+Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-186" (worker, then web; no
+migration). **Deploy before you test the app:** without the web, the quote screen still gets the old words
+from the server ("The customer's answer", the old sentence under the total).
+
+I have still not seen the app run: there is no iPhone, simulator or Xcode on this machine.
+
+### What to look at (after the deploy)
+
+**On the phone, with a quote you make on site that asks you something (your quote "Gkn" is one, if it is
+still unanswered):**
+- [ ] In the Quotes tab it is under **"Needs you"**, and reads "Needs your answer", "1 question to answer".
+- [ ] On the quote: the yellow chip says "Needs your answer". The sentence under the price says "Answer the
+  question below. The price is worked out again from your answer, then you can approve and send it."
+- [ ] The question card is headed "One question before you send". **Its choices are buttons**, with "Other"
+  last; "Other" opens a text box. Nothing is chosen until you press.
+- [ ] Progress: "Approve and send" is highlighted, with "Answer the questions first" under it.
+- [ ] The bottom button says "Answer and reprice". After it, the quote reads "Needs your approval", Progress
+  says "Now" under "Approve and send", and the button is "Approve & send".
+- [ ] The lines say **"Your answer"**, not "The customer's answer".
+- [ ] The sentence under the total does not say "measured from the photos" when you typed the quantities.
+
+**On the dashboard:**
+- [ ] The same quote is under "Needs you" in Quotes and in "Waiting for you" on Home. Open it: a card "One
+  question before you send" with the same buttons, and "Answer and reprice".
+- [ ] Any quote's Progress row reads **Received, Approve and send, Opened, Accepted**, with the step now
+  marked.
+- [ ] An older quote (made before this morning's deploy) shows "$375 × 2 rooms", not "$375 x 2(Room)": on its
+  dashboard page, and on its PDF.
+
+### What changed for a customer's own request
+
+- If a customer's request is waiting for **the customer's** answers, the app's quote screen no longer shows
+  those questions or a button to answer them. It says "Waiting for customer", as the dashboard does. (Before,
+  the app let you answer for the customer on that screen.) Say if you want that back as a quiet link: "Answer
+  for the customer".
+
+### Decisions for you (my recommendation first)
+
+1. **You cannot approve a quote of yours until you answer its questions.** That is how it worked before; only
+   the wording changed. Recommended: keep. The alternative is a quiet "Approve as it is" beside the questions.
+2. **The questions are worded as they are for a customer** ("From your photos and details, we estimated…").
+   They read correctly to you, since the photos are yours. Rewording them for the business means changing
+   what the worker writes, and a full regression run. Recommended: leave unless one reads wrongly on site;
+   send me the question if so.
+3. **The grade's short label on the dashboard changed with its sentence** ("To check", "Price range", "Read
+   from a label", beside "Measured" and "Confirmed"). Recommended: keep.
+
+### Not proven
+
+- Anything on a phone.
+- **Why your quote said "measured from the photos".** The code has one path that both asks a question about a
+  typed quantity and marks the price that way: a typed quantity that the photos or your notes seem to
+  contradict was recorded as if it had been measured. I fixed that path and one like it (a price set as a
+  range). I did not look at your quote on production, so I cannot say for certain it was that path. Either
+  way, after the deploy an older quote none of whose lines was measured stops saying "measured from the
+  photos".
+- The dashboard's question card in a browser (it is checked by unit tests and the typecheck, not by a
+  regression script: the ticket asked for no new ones).
+- The full regression level (`pnpm check:full`) was not run: what the worker asks did not change.
+
+### Later
+
+- "Answer for the customer" in the app, if you miss it.
+- Questions worded for the business on its own quotes (decision 2).
+- A quote entered by the business on the dashboard does not exist yet; when it does, it is added in one place
+  (`BUSINESS_REQUEST_SOURCES`) and gets all of the above.
+- One unit test fails when the Mac is busy (it searches the whole repository eight times against a 5 second
+  limit). It is not from this ticket. A longer limit for that one test would stop it wasting a run.

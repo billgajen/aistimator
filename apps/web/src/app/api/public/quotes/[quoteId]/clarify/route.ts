@@ -6,6 +6,7 @@ import { quoteTokenMatches } from '@/lib/tokens'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import type { ClarifyQuoteRequest } from '@qolumns/shared'
+import { isMadeByBusiness } from '@qolumns/shared'
 
 // Vercel function budget: this route runs the full AI pipeline synchronously
 // (Cloudflare Queues needs the paid Workers plan - revisit post-launch)
@@ -50,7 +51,7 @@ export async function POST(
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
       .select(
-        'id, tenant_id, service_id, status, quote_token_hash, previous_token_hash, link_token_hashes, token_expires_at, quote_request_id, signals_json, clarification_questions_json, is_demo'
+        'id, tenant_id, service_id, status, quote_token_hash, previous_token_hash, link_token_hashes, token_expires_at, quote_request_id, signals_json, clarification_questions_json, is_demo, request:quote_requests!quote_request_id (source_json)'
       )
       .eq('id', quoteId)
       .single()
@@ -82,8 +83,11 @@ export async function POST(
     const busy = await limitQuoteAndBusinessActions(quoteId, quote.tenant_id)
     if (busy) return busy
 
-    // Validate status is awaiting_clarification
-    if (quote.status !== 'awaiting_clarification') {
+    // Validate status is awaiting_clarification. T-186: and that the customer is the one who was
+    // asked. The questions of a quote the business made are the business's (answered in the app or
+    // the dashboard, signed in); a customer's link cannot answer them.
+    const requestOfQuote = ((r: unknown) => (Array.isArray(r) ? r[0] : r))((quote as { request?: unknown }).request) as { source_json?: unknown } | null | undefined
+    if (quote.status !== 'awaiting_clarification' || isMadeByBusiness(requestOfQuote?.source_json)) {
       return NextResponse.json(
         { error: { code: 'INVALID_STATUS', message: `Quote is not awaiting clarification (status: ${quote.status})` } },
         { status: 400 }

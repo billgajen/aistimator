@@ -11,7 +11,7 @@
  */
 
 import type { QuoteStatus } from './database.types'
-import { canSendQuoteAgain } from './quote-status'
+import { canCopyQuoteLink, canSendQuoteAgain } from './quote-status'
 
 // ---------------------------------------------------------------------------
 // Groups
@@ -30,7 +30,35 @@ export const QUOTE_GROUP_STATUSES: Record<QuoteGroup, readonly QuoteStatus[]> = 
 
 export const QUOTE_GROUPS = Object.keys(QUOTE_GROUP_STATUSES) as QuoteGroup[]
 
-export function quoteGroupOf(status: string | null | undefined): QuoteGroup {
+/**
+ * T-186: who made the request. A quote the business made itself (the on-site
+ * app, or any other way of entering a job as the business) has no customer
+ * waiting on a page: every question about it is the business's to answer, and
+ * it is never "Waiting for customer". The fact is the request's own record
+ * (`quote_requests.source_json`); every screen and route asks here.
+ */
+export const BUSINESS_REQUEST_SOURCES: readonly string[] = ['app']
+
+export function isMadeByBusiness(requestSource: unknown): boolean {
+  const type = typeof requestSource === 'object' && requestSource !== null ? (requestSource as { type?: unknown }).type : null
+  return typeof type === 'string' && BUSINESS_REQUEST_SOURCES.includes(type)
+}
+
+/** The status in which a quote waits for answers to its questions */
+export const QUESTIONS_OPEN_STATUS: QuoteStatus = 'awaiting_clarification'
+
+/** True when the questions on a quote are the business's to answer, not the customer's */
+export function businessIsAsked(status: string | null | undefined, madeByBusiness: boolean | null | undefined): boolean {
+  return status === QUESTIONS_OPEN_STATUS && madeByBusiness === true
+}
+
+/**
+ * The group a quote is in. A status belongs to one group, with one exception
+ * (T-186): a quote the business made that has open questions needs the
+ * business, where a customer's quote in the same status waits for the customer.
+ */
+export function quoteGroupOf(status: string | null | undefined, madeByBusiness: boolean | null | undefined = false): QuoteGroup {
+  if (businessIsAsked(status, madeByBusiness)) return 'needs_you'
   for (const group of QUOTE_GROUPS) {
     if ((QUOTE_GROUP_STATUSES[group] as readonly string[]).includes(status ?? '')) return group
   }
@@ -81,6 +109,7 @@ export const QUOTE_TURN_COPY = {
     needsApproval: 'Needs your approval',
     held: 'Saved, not priced yet',
     question: 'Customer asked a question',
+    needsAnswers: 'Needs your answer',
     failed: 'Could not be priced',
     waiting: 'Waiting for customer',
     accepted: 'Customer accepted',
@@ -95,6 +124,7 @@ export const QUOTE_TURN_COPY = {
     add_price: 'Add the price',
     price_request: 'Price this request',
     answer_question: 'Answer question',
+    give_answers: 'Answer to price',
     send_again: 'Send again',
     contact: 'Contact customer',
   } satisfies Record<QuoteNextAction, string>,
@@ -105,6 +135,8 @@ export const QUOTE_TURN_COPY = {
     editQuote: 'Edit quote',
     priceRequest: 'Price this request',
     pricingRequest: 'Starting…',
+    giveAnswers: 'Answer and reprice',
+    givingAnswers: 'Working out the price…',
     upgradePlan: 'Upgrade plan',
     sendAgain: 'Send again',
     sendingAgain: 'Sending…',
@@ -145,6 +177,23 @@ export const QUOTE_TURN_COPY = {
       declined: 'Declined',
       expired: 'Expired',
     },
+    /** T-186: one short line under a step, so Progress tells the same story as the sentence above it */
+    stepNotes: {
+      now: 'Now',
+      answerFirst: 'Answer the questions first',
+      priceFirst: 'It needs a price first',
+      afterCustomerAnswers: 'After the customer answers',
+      afterPricing: 'When the price is ready',
+    },
+  },
+  /** T-186: the questions on a quote the business made, which the business answers */
+  questions: {
+    title: (n: number) => (n === 1 ? 'One question before you send' : `${n} questions before you send`),
+    note: 'Your answer sets the price.',
+    other: 'Other',
+    otherLabel: 'Your answer',
+    yes: (value: string) => `Yes, ${value}`,
+    failed: 'Your answers could not be saved. Please try again.',
   },
   home: {
     title: 'Waiting for you',
@@ -306,7 +355,7 @@ export function quoteActivityLine(kind: QuoteActivityKind, customerName: string 
 // ---------------------------------------------------------------------------
 
 /** What the one next step does. `null` in a turn means there is nothing to do. */
-export type QuoteNextAction = 'approve' | 'add_price' | 'price_request' | 'answer_question' | 'send_again' | 'contact'
+export type QuoteNextAction = 'approve' | 'add_price' | 'price_request' | 'answer_question' | 'give_answers' | 'send_again' | 'contact'
 
 export type QuoteTurnTone = 'attention' | 'danger' | 'waiting' | 'good' | 'closed' | 'working'
 
@@ -327,6 +376,10 @@ export interface QuoteTurnInput {
   declinedAt?: string | null
   /** When the customer's link runs out (token_expires_at) */
   expiresAt?: string | null
+  /** T-186: the business made this quote itself (`isMadeByBusiness`), so its questions are the business's */
+  madeByBusiness?: boolean
+  /** How many questions are open on it, when known */
+  openQuestions?: number | null
 }
 
 export interface QuoteTurn {
@@ -384,7 +437,7 @@ export function quoteTurn(input: QuoteTurnInput, opts: QuoteTurnOptions = {}): Q
     const words = when(input.createdAt)
     return words ? `Received ${words}` : ''
   }
-  const group = quoteGroupOf(input.status)
+  const group = quoteGroupOf(input.status, input.madeByBusiness)
 
   switch (input.status) {
     case 'pending_review': {
@@ -471,7 +524,22 @@ export function quoteTurn(input: QuoteTurnInput, opts: QuoteTurnOptions = {}): Q
       )
     }
 
-    case 'awaiting_clarification':
+    case 'awaiting_clarification': {
+      // T-186: a quote the business made asks the business. No customer was asked anything.
+      if (input.madeByBusiness) {
+        const n = input.openQuestions ?? 0
+        const one = n === 1
+        return turn(
+          group,
+          'attention',
+          L.needsAnswers,
+          n > 0 ? (one ? '1 question to answer' : `${n} questions to answer`) : 'Questions to answer',
+          one
+            ? 'Answer the question below. The price is worked out again from your answer, then you can approve and send it.'
+            : 'Answer the questions below. The price is worked out again from your answers, then you can approve and send it.',
+          'give_answers'
+        )
+      }
       return turn(
         group,
         'waiting',
@@ -480,6 +548,7 @@ export function quoteTurn(input: QuoteTurnInput, opts: QuoteTurnOptions = {}): Q
         `Nothing for you to do. ${Name} was asked for more details. The price comes once they answer.`,
         null
       )
+    }
 
     case 'accepted': {
       const on = onDate(input.acceptedAt)
@@ -597,7 +666,7 @@ export interface QuoteStep {
   note: string | null
 }
 
-export function quoteSteps(input: QuoteTrackerInput, opts: QuoteTurnOptions = {}): QuoteStep[] {
+export function quoteSteps(input: QuoteStoryInput, opts: QuoteTurnOptions = {}): QuoteStep[] {
   const T = QUOTE_TURN_COPY.tracker
   const tracked = quoteTracker(input, opts)
   const over = input.status === 'declined' || input.status === 'expired'
@@ -608,14 +677,93 @@ export function quoteSteps(input: QuoteTrackerInput, opts: QuoteTurnOptions = {}
     if (step.key === 'opened') return T.steps.opened
     return input.status === 'declined' ? T.steps.declined : input.status === 'expired' ? T.steps.expired : T.steps.accepted
   }
-  return tracked.map((step, index) => ({
-    key: step.key,
-    name: nameOf(step),
-    state: step.ended ? 'ended' : step.done ? 'done' : !over && index === firstOpen ? 'current' : 'later',
-    date: step.date,
+  // T-186: "Approve and send" is the step now only when the quote is with the
+  // business. A quote still being priced, one that could not be priced, and
+  // one whose customer was asked for details are not waiting for an approval,
+  // so the step stays ahead and a line under it says what comes first.
+  const next = quoteTurn({ ...input, hasEmail: input.hasEmail === true }, opts).action
+  const withBusiness = next === 'approve' || next === 'add_price' || next === 'price_request' || next === 'give_answers'
+  const approveNote =
+    next === 'give_answers'
+      ? T.stepNotes.answerFirst
+      : next === 'add_price' || next === 'price_request'
+        ? T.stepNotes.priceFirst
+        : next === 'approve'
+          ? T.stepNotes.now
+          : input.status === QUESTIONS_OPEN_STATUS
+            ? T.stepNotes.afterCustomerAnswers
+            : quoteGroupOf(input.status, input.madeByBusiness) === 'working'
+              ? T.stepNotes.afterPricing
+              : null
+  return tracked.map((step, index) => {
+    const open = !step.done && !over && index === firstOpen
+    const current = open && (step.key !== 'approved' || withBusiness)
     // a quote nobody approved by hand was sent by itself: said under the step, not as its name
-    note: step.key === 'approved' && step.done && !input.approvedAt ? T.sentAutomatically : step.note,
-  }))
+    const sentItself = step.key === 'approved' && step.done && !input.approvedAt
+    return {
+      key: step.key,
+      name: nameOf(step),
+      state: step.ended ? 'ended' : step.done ? 'done' : current ? 'current' : 'later',
+      date: step.date,
+      note: sentItself ? T.sentAutomatically : step.key === 'approved' && open ? approveNote : current ? T.stepNotes.now : step.note,
+    }
+  })
+}
+
+// ---------------------------------------------------------------------------
+// One story per screen (T-186)
+// ---------------------------------------------------------------------------
+
+/** Everything the status wording and the steps need, in one input */
+export type QuoteStoryInput = QuoteTrackerInput & Partial<Pick<QuoteTurnInput, 'customerName' | 'hasEmail' | 'madeByBusiness' | 'openQuestions'>>
+
+/**
+ * The one main button of a quote screen:
+ *   answer          the business answers the open questions, then it reprices
+ *   approve         approve the quote and send it
+ *   share           hand the customer the link of a quote already sent
+ *   price_request   price a request that was saved at the plan limit
+ *   add_price       it has no price yet
+ *   contact         it could not be priced: reach the customer
+ *   wait            the price is being worked out
+ */
+export type QuoteMainButton = 'answer' | 'approve' | 'share' | 'price_request' | 'add_price' | 'contact' | 'wait'
+
+export interface QuoteStory {
+  /** The status chip (`label`, `tone`) and the sentence under it */
+  turn: QuoteTurn
+  /** Progress: Received, Approve and send, Opened, Accepted */
+  steps: QuoteStep[]
+  /** The main button, or null when there is nothing to press */
+  button: QuoteMainButton | null
+  /** The questions are shown to the business, to be answered on this screen */
+  asksBusiness: boolean
+}
+
+/**
+ * T-186: the status chip, the sentence under it, the Progress steps and the
+ * main button of a quote screen, worked out together so they cannot disagree.
+ * The on-site app and the dashboard both draw a quote from this one result.
+ */
+export function quoteStory(input: QuoteStoryInput, opts: QuoteTurnOptions = {}): QuoteStory {
+  const turnOf = quoteTurn({ ...input, hasEmail: input.hasEmail === true }, opts)
+  const working = turnOf.group === 'working'
+  const button: QuoteMainButton | null = working
+    ? 'wait'
+    : turnOf.action === 'give_answers'
+      ? 'answer'
+      : turnOf.action === 'approve'
+        ? 'approve'
+        : turnOf.action === 'price_request'
+          ? 'price_request'
+          : turnOf.action === 'add_price'
+            ? 'add_price'
+            : input.status === 'failed'
+              ? 'contact'
+              : canCopyQuoteLink(input.status)
+                ? 'share'
+                : null
+  return { turn: turnOf, steps: quoteSteps(input, opts), button, asksBusiness: turnOf.action === 'give_answers' }
 }
 
 // ---------------------------------------------------------------------------

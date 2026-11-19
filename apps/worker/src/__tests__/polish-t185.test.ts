@@ -60,9 +60,11 @@ describe('T-185: the progress steps are named, and one of them is current', () =
   })
 
   it('a request with no price yet, or held at the plan limit, still has "Approve and send" as current', () => {
-    for (const input of [{ status: 'pending_review', total: 0 }, { status: 'pending_review', total: 0, held: true }, { status: 'failed', total: 0 }]) {
+    for (const input of [{ status: 'pending_review', total: 0 }, { status: 'pending_review', total: 0, held: true }]) {
       expect(names(quoteSteps({ ...input, createdAt: '2026-11-19T09:00:00Z' }, NOW))[1]).toBe('Approve and send:current')
     }
+    // T-186: a request that could not be priced is not waiting for an approval, so the step stays ahead
+    expect(names(quoteSteps({ status: 'failed', total: 0, createdAt: '2026-11-19T09:00:00Z' }, NOW))[1]).toBe('Approve and send:later')
   })
 
   it('declined or expired: the last step says so and nothing is current', () => {

@@ -147,7 +147,13 @@ describe('requests with no price', () => {
 describe('what else the view carries', () => {
   it('open questions only while the quote waits for them', () => {
     expect(view().questions).toEqual([])
-    expect(view({ status: 'awaiting_clarification' }).questions).toHaveLength(1)
+    // T-186: the app shows the questions the business answers, which are those of a quote it made itself
+    const ownQuote = appQuoteView({ quote: row({ status: 'awaiting_clarification' }), serviceName: 'Main service', businessName: 'A Business', request, photos: [], requestSource: { type: 'app' } })
+    expect(ownQuote.questions).toHaveLength(1)
+    expect(ownQuote.madeByBusiness).toBe(true)
+    // a customer's quote that waits for the customer's answers asks the business nothing
+    expect(view({ status: 'awaiting_clarification' }).questions).toEqual([])
+    expect(view({ status: 'awaiting_clarification' }).madeByBusiness).toBe(false)
   })
 
   it('the dates the status wording needs', () => {

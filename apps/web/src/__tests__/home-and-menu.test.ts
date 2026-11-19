@@ -397,7 +397,8 @@ describe('Home', () => {
     expect(QUOTE_TURN_COPY.home.stand.acceptedNote).toBe('in the last 30 days')
     for (const label of ['T.needs_you', 'T.waiting', 'T.accepted']) expect(stand).toContain(label)
     expect(stand).toContain('href={`/app/quotes?tab=${tile.key}`}')
-    expect(home).toContain('QUOTE_GROUP_STATUSES.waiting')
+    // T-186: the waiting count is the shared group, less the quotes whose questions are the business's own
+    expect(home).toContain("groupFilter('waiting', businessAsked)")
     // the quotes page opens the tab named in the address
     expect(read('apps/web/src/app/(dashboard)/app/quotes/page.tsx')).toContain("searchParams.get('tab')")
   })
@@ -412,7 +413,8 @@ describe('Home', () => {
   })
 
   it('a fixed number of queries: nothing is fetched per quote', () => {
-    expect(home.match(/await /g)?.length).toBeLessThanOrEqual(8)
+    // T-186 added one: which quotes have the business's own questions open (one query, not one per quote)
+    expect(home.match(/await /g)?.length).toBeLessThanOrEqual(9)
     expect(home).not.toMatch(/\.map\(async|for \(const [^)]*\) \{[\s\S]{0,200}await supabase/)
   })
 

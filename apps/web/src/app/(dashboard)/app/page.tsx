@@ -1,7 +1,8 @@
 import { syncSelectedPlan } from '@/lib/signup-choices'
 import { createClient } from '@/lib/supabase/server'
 import { headers } from 'next/headers'
-import { QUOTE_GROUP_STATUSES, QUOTE_TURN_COPY, agoWords, formatMoney, freeQuotesLeftLine, getRegion, quoteActivityLine, quoteTurn } from '@qolumns/shared'
+import { QUOTE_TURN_COPY, agoWords, businessIsAsked, formatMoney, freeQuotesLeftLine, getRegion, isMadeByBusiness, quoteActivityLine, quoteTurn } from '@qolumns/shared'
+import { applyGroupFilter, businessAskedQuoteIds, groupFilter, questionCountOf, requestSourceOf } from '@/lib/business-asked'
 import { buildChecklist } from '@/lib/setup-checklist'
 import {
   buildHomeActivity,
@@ -105,17 +106,24 @@ export default async function DashboardPage() {
   // T-160: the 30 days before, for "up 3 / down 1 / same"
   const sinceBefore = new Date(now.getTime() - 2 * HOME_WINDOW_DAYS * 24 * 60 * 60 * 1000)
 
+  // T-186: quotes the business made that have open questions need the business, not a customer
+  const businessAsked = await businessAskedQuoteIds(supabase, profile.tenant_id)
+  const forYou = groupFilter('needs_you', businessAsked)
+  const forCustomer = groupFilter('waiting', businessAsked)
+
   // Every query below is scoped to this tenant (RLS + explicit filter)
   const [servicesResult, waitingResult, recentResult, realRequestResult, waitingCountResult, anyQuoteResult, questionsResult] = await Promise.all([
     supabase.from('services').select('id').eq('tenant_id', profile.tenant_id).eq('active', true).limit(1),
     // a. waiting for the owner, newest first (T-158: also customer questions
     // and requests that could not be priced)
-    supabase
-      .from('quotes')
-      // T-160: the exact count is the "Needs you" number (the rows are capped at 25)
-      .select('id, status, created_at, customer_json, pricing_json, content_json, is_test, services!service_id (name), request:quote_requests!quote_request_id (asset_ids)', { count: 'exact' })
-      .eq('tenant_id', profile.tenant_id)
-      .in('status', [...WAITING_FOR_YOU_STATUSES])
+    applyGroupFilter(
+      supabase
+        .from('quotes')
+        // T-160: the exact count is the "Needs you" number (the rows are capped at 25)
+        .select('id, status, created_at, customer_json, pricing_json, content_json, clarification_questions_json, is_test, services!service_id (name), request:quote_requests!quote_request_id (asset_ids, source_json)', { count: 'exact' })
+        .eq('tenant_id', profile.tenant_id),
+      { ...forYou, statuses: [...WAITING_FOR_YOU_STATUSES] }
+    )
       .eq('is_test', false)
       .order('created_at', { ascending: false })
       .limit(25),
@@ -141,12 +149,14 @@ export default async function DashboardPage() {
       .or('source_json->>type.is.null,source_json->>type.neq.app', { referencedTable: 'quote_requests' })
       .limit(1),
     // d. how many quotes wait for a customer (T-158 group)
-    supabase
-      .from('quotes')
-      .select('id', { count: 'exact', head: true })
-      .eq('tenant_id', profile.tenant_id)
-      .eq('is_test', false)
-      .in('status', [...QUOTE_GROUP_STATUSES.waiting]),
+    applyGroupFilter(
+      supabase
+        .from('quotes')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', profile.tenant_id)
+        .eq('is_test', false),
+      forCustomer
+    ),
     // d + e. has this business had any quote at all (a new one gets a friendly line, not zeros)
     supabase
       .from('quotes')
@@ -184,7 +194,10 @@ export default async function DashboardPage() {
       is_test: boolean | null
       services: { name?: string } | Array<{ name?: string }> | null
       request?: unknown
-    }>
+      clarification_questions_json?: unknown
+    }>,
+    // T-186: its own questions to answer
+    (q) => !q.is_test && businessIsAsked(q.status, isMadeByBusiness(requestSourceOf(q)))
   )
   // T-169: one small photo per waiting row, when the customer sent any (one query, this tenant only)
   const waitingPhotos = await firstPhotoUrls(
@@ -202,6 +215,8 @@ export default async function DashboardPage() {
       hasEmail: Boolean(q.customer_json?.email),
       total,
       held: q.content_json?.limitHold === true,
+      madeByBusiness: isMadeByBusiness(requestSourceOf(q)),
+      openQuestions: questionCountOf(q),
     })
     return {
       id: q.id,

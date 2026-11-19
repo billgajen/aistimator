@@ -66,7 +66,8 @@ describe('T-185: the quote screen', () => {
   const screen = read('app/quote/[id].tsx')
 
   it('the progress card draws the shared named steps: done, current, later', () => {
-    expect(screen).toContain('quoteSteps({')
+    // T-186: the steps come with the chip, the sentence and the main button, from the one shared story
+    expect(screen).toContain('const steps = story.steps')
     for (const state of ["step.state === 'done'", "step.state === 'current'", "step.state === 'later'", "step.state === 'ended'"]) expect(screen).toContain(state)
     expect(screen).toContain('styles.stepCurrent')
     // the names are the shared code's, not typed here

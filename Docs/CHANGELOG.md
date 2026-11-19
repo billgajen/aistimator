@@ -15,9 +15,177 @@
 
 ## Issues & Resolutions
 
+### 2026-11-19: T-186 — A quote the business made speaks to the business, not the customer; two leftovers from T-185 (AD-068)
+
+Built and pushed, **not deployed**. Shared display rules, the web app, the on-site app, and one worker change
+(why a price is not confirmed is now recorded as what it is). No amount, no grade letter, no question the
+worker asks and no migration changed. To put it live: the worker, then the web.
+
+**The owner's test (quote "Gkn", made in the on-site app):** the screen said "Waiting for customer… Gkn was
+asked for more details. The price comes once they answer", showed a price, asked the business a "Confirm on
+site" question, and Progress said "Approve and send: Now". Its lines said "The customer's answer"; the
+sentence under the total said the quantities were "measured from the photos", though they had been typed.
+
+#### What was wrong, and why
+
+**1. The quote was treated as one a customer was waiting on.**
+- **Cause:** when the worker has a question it stores the quote as `awaiting_clarification`, whoever made the
+  request. Every screen read that status as "the customer was asked": the group ("Waiting for customer"), the
+  label, the sentence. The app, alone, also showed the questions and a "Confirm and reprice" button for any
+  quote in that status (T-137). So one screen told two stories.
+- **Nothing was sent to a customer.** The worker stores the questions and returns; no email or message goes
+  out at that point (a unit test holds that the block sends nothing). The customer's page would have shown
+  the questions to anyone holding the quote's link, which for an on-site quote is only the phone that made it.
+- **Fix (AD-068):** who made a request is a fact of its own record (`quote_requests.source_json`), read by one
+  shared function, `isMadeByBusiness`. A quote the business made, with open questions:
+  - is in the **"Needs you"** group: the quotes list's tabs and counts, Home's "Waiting for you" and its two
+    counts, and the app's Quotes tab (`quoteGroupOf(status, madeByBusiness)`; `lib/business-asked.ts` moves
+    those quotes between the two status filters);
+  - reads **"Needs your answer"**, "1 question to answer", and "Answer the question below. The price is worked
+    out again from your answer, then you can approve and send it." (`quoteTurn`);
+  - is answered by the business: on the app's quote screen, and on the dashboard's quote page (a new card,
+    `BusinessQuestions`, which posts to the route the app already uses);
+  - **is never shown to a customer as a question:** the customer's quote data reads as a quote still being
+    prepared and carries no questions, and the customer's answer route refuses it.
+- **The worker** uses the same function where it decided "made by the business" before (the hidden hold, and
+  no "New quote" email about the business's own quote). What it asks, and when, is unchanged.
+- **A customer's quote in that status** reads as before ("Waiting for customer"), and the app no longer shows
+  its questions or an answer button: the customer was asked. The route that lets a signed-in business answer
+  is unchanged.
+
+**2. Four parts of one screen were worked out in four places.**
+- **Fix:** `quoteStory()` in `packages/shared/src/quote-turn.ts` returns the status chip and its sentence
+  (`turn`), the Progress steps (`steps`), the main button (`button`) and whether the business is asked
+  (`asksBusiness`), from one input. The app's quote screen and the dashboard's quote page both draw from it;
+  the app's `mainAction` only renames its button.
+- **Progress now follows the story.** "Approve and send" is the step now only when the quote is with the
+  business and not yet sent. Under it: "Now", "Answer the questions first", or "It needs a price first". When
+  it is not the business's step, it stays ahead with "After the customer answers" or "When the price is
+  ready". A request that could not be priced no longer shows it as current.
+
+**3. "The customer's answer" on a line the business typed.**
+- **Cause:** T-183's source words were written for a quote a customer asked for.
+- **Fix:** `sourceForBusiness` and `businessSources` take who made the quote. On the business's own quote:
+  "Your answer", "Worked out from your answers", "Estimated from the details you gave", "From your notes",
+  "Your choice". What was measured, read, scanned or fixed reads the same. The approval detail reads it from
+  the same request record, so the approval page and the review email agree; its photos line reads "2 photos
+  with this job" there.
+- **The dashboard's quote page** follows the same fact in its other words: "What Qolumns understood" reads
+  "From your notes", "Asked you", "You answered" and "Photos with this job" (`understoodCopyFor`), an extra
+  picked up from the notes says "your notes", and the card on a quote with no price is headed "What you
+  entered".
+
+**4. "Measured from the photos" about typed quantities.**
+- **Cause:** the sentence was chosen by the grade letter, and several things that are not measurements were
+  **entered as one** to get the letter B: a typed quantity that the photos or the description seem to
+  contradict (R3-1), and a price the business set as a range (T-131). So every Grade B read "measured from the
+  photos, and the measurements agree". The first of these is the likeliest in the owner's test: it is the one
+  that both asks a question about a typed quantity and marks the price B. **Not confirmed against the quote
+  itself: production's data was not read.**
+- **Fix:** each is entered as what it is (`basis: 'doubted'`, `basis: 'rate'`; they rank exactly as `measured`
+  did, so no grade letter changes; a unit test holds it over 11 sets). `computeEstimateGrade` returns the
+  reasons, most important first, and the worker stores them (`pricing_json.estimate.reasons`). The sentence and
+  the label are built from the first reason (`certaintyWords`): a doubted typed quantity, a quantity not given,
+  typical figures, a weak measurement, a measurement, a label reading, a price range, a fixed price with a site
+  visit. Only a real measurement says "measured from the photos".
+- **Quotes priced before** carry no reasons. Their stored sentence is shown unless the quote itself proves it
+  wrong: it says "measured from the photos" and no line of the quote was measured or read from a photo
+  (`anyMeasuredFromPhotos(lineSourceCodes(…))`). Then it reads "Not every quantity behind this price is
+  confirmed yet. Confirm them before work starts." The owner's quote gets this once the web is deployed.
+- The app is sent the sentence (`pricing.certainty`), so the app and the dashboard cannot differ.
+
+**5. A question with clear choices was a text box, or a list with no "Other".**
+- **Fix:** `questionChoices()` (`packages/shared/src/question-choices.ts`). A figure to confirm is one button
+  ("Yes, 4"); a question's own options are buttons; typing is behind "Other". A question with no choices is
+  answered in words. The app's screen and the dashboard's card both use it. Nothing is filled in before the
+  business presses or types (the app used to pre-fill the figure). An answer does what it did: it merges as a
+  confirmed answer and the quote is priced again.
+- No question's text is known to the code: the choices are the ones the question carries.
+
+**6. Leftovers from T-185.**
+- **An older quote's line detail** ("$375 x 2(Room)") reads the new way ("$375 × 2 rooms") on the dashboard's
+  quote page, the approval page, the review email (the two are one result) and the PDF: each prints a stored
+  label through `lineLabelNow()`. A line the business typed is left as typed.
+- **The dashboard's progress tracker** uses the app's step names (Received, Approve and send, Opened,
+  Accepted), marks the step now, and shows the same line under a step. `QuoteTracker` takes the shared steps.
+
+#### API (all additive; `Docs/02-api-contracts.md`)
+
+| Route | Change |
+|---|---|
+| `GET /api/app/quotes/:id` | `madeByBusiness`; `questions` only when the business is asked; `pricing.certainty`; `estimate.reasons` |
+| `GET /api/quotes` | items carry `madeByBusiness`, `openQuestions`; `group=needs_you` includes such a quote, `group=waiting` leaves it out, and so do the counts |
+| `GET /api/quotes/:id` | `madeByBusiness`, `businessQuestions[]` |
+| `GET /api/public/quotes/:id` | such a quote reads `pending_review` and carries no questions |
+| `POST /api/public/quotes/:id/clarify` | refused for such a quote |
+
+#### Verified
+
+- **App:** typecheck, lint, **100 unit tests** (10 new in `story-t186.test.ts`: the owner's quote from the list
+  to the main button, a customer's quote that waits for the customer, a server from before this ticket, and
+  what the screen's source must hold), and the iOS bundle (`npx expo export --platform ios`).
+- **Shared rules and worker:** 27 new unit tests (`apps/worker/src/__tests__/business-quotes-t186.test.ts`): who
+  is asked, the story for every status, the source words, the reasons and their sentences (each held against
+  the banned words), that no grade letter moved, the question choices, the old line detail. Worker 679.
+- **Web:** 22 new unit tests (`business-quotes-t186.test.ts`): the app's view, the group filter and the query
+  it builds, which quotes are moved, Home, the customer's routes, the PDF, the dashboard page. Web 1,163.
+- **`pnpm check:quick`, once: 27 of 28 on the first try** (20 scripts, 1,710 checks, 4 min 43 s).
+  `verify-t158` failed one check: it pins the list of buttons a quote row can carry, and this ticket adds one
+  ("Answer to price"). The script was updated while the run was still going, so the runner's own second try of
+  it passed (116 of 116). That was the fix, not a flaky pass. `verify-t158`'s tracker checks were updated
+  before the run for the new step names; they pass in a real browser.
+- **After the run, three dashboard wordings were added** (the "What Qolumns understood" panel, the photos
+  strip and the "sent" card name the business's own notes, photos and answers on its own quote). So the final
+  source was checked again, without repeating the whole run: `pnpm check:quick --static` (lint, typecheck,
+  the three unit suites, both builds: 7 of 7, 56 s) and `pnpm check:quick --only t157,t158,t182,t183` (the
+  scripts that open the changed pages, on a fresh build: 316 checks, 60 s). All pass.
+- **One unit test is sensitive to a busy machine** (`rename-qolumns.test.ts`, "the old embed names…": eight
+  searches of the repository against a 5 second limit). It failed twice at 5.2 and 5.4 seconds while the
+  machine was busy after the builds, and passes alone (1.5 s) and in the full web suite when quiet. Not
+  caused by this ticket and not changed.
+
+#### Not verified
+
+- **Anything on a phone**, as before: there is no device or simulator here.
+- **The owner's quote itself.** The cause in section 4 is the one the code makes likeliest; production was not
+  read. After the deploy the quote will read "Not every quantity…" if none of its lines was measured.
+- **The dashboard's question card in a browser.** It is unit-tested by its source and typechecked; no
+  regression script opens it (the ticket asked for none to be added).
+- `pnpm check:full` was not run: the worker's question logic did not change (the ticket's rule).
+
+#### Constraints introduced
+
+- Who made a request is asked of `isMadeByBusiness`, never by comparing `source_json.type` in a screen or route.
+- A new screen for a quote draws its status, Progress and main button from `quoteStory`, not from the status.
+- A basis entered for grading is what the quantity is. A new reason for "not confirmed" gets its own basis and
+  its own sentence; it is not entered as `measured`.
+- A stored line label is printed through `lineLabelNow` (or split by `lineLabelParts`).
+
+**Files:** `packages/shared/src/{quote-turn,question-choices,quantity-source,grading,line-labels,approval-detail,api.types,database.types,index}.ts`;
+`apps/worker/src/quote-processor.ts`, `apps/worker/src/pricing/rules-engine.ts` (a type);
+`apps/web/src/lib/{business-asked,app-quote-view,home-numbers,pdf-template}.ts`,
+`apps/web/src/app/api/quotes/route.ts`, `apps/web/src/app/api/quotes/[quoteId]/route.ts`,
+`apps/web/src/app/api/app/quotes/[quoteId]/route.ts`, `apps/web/src/app/api/public/quotes/[quoteId]/{route,clarify/route}.ts`,
+`apps/web/src/app/(dashboard)/app/{page,quotes/page,quotes/[quoteId]/page}.tsx`,
+`apps/web/src/components/quotes/{QuoteTracker,BusinessQuestions,UnderstoodPanel,CustomerPhotos,CustomerSent}.tsx`,
+`apps/web/src/lib/quote-understanding.ts`;
+`apps/mobile/app/quote/[id].tsx`, `apps/mobile/src/lib/{status,price,quote-list}.ts`; tests;
+`scripts/hardcore-test/verify-t158.mts` (the tracker's names); `Docs/02-api-contracts.md`, `OWNER-TODO.md`.
+
+**Relation:** AD-043 (T-158) holds and is extended: the wording still lives in `quote-turn.ts`, now with who
+made the quote as an input. AD-065 holds: the app decides nothing (it lost its own rule for the main button
+and its pre-filled answer). AD-066 holds: the source words are still one function for the approval page, the
+email and the app. T-185's `quoteSteps` is the same function, now told whose step it is. T-182's offline queue
+is untouched; its tests pass.
+
+---
+
 ### 2026-11-19: T-185 — Mobile polish from the owner's second phone test, and two leftovers
 
-Built and pushed, **not deployed**. The app, shared display rules, the worker (two display changes: a line's
+**Deployed by the owner on 2026-11-19, 07:37 UTC:** the worker, then the web (Vercel `estimator-bvhmjqf5o`). No
+migration. (Recorded in T-186 from the owner's note; the worker's version id was not given.)
+
+**As built:** the app, shared display rules, the worker (two display changes: a line's
 label and one email) and two web files. No change to any amount, the quote flow or Stripe. No migration.
 
 | # | What | Where |
@@ -9286,6 +9454,50 @@ with one behaviour. A script that needs one particular answer already brings a s
 - The quick level proves the product's own code, not the model's answers.
 - A new verify script must be listed in the manifest, or it is never run (`pnpm check:list` fails on one that
   is not).
+
+---
+
+### AD-068: Who made a quote decides who is asked; a quote screen is one story (T-186)
+
+**Context:** a quote has one status for "it has questions open", whoever made the request. Every screen read
+it as "the customer was asked", and the on-site app also let the business answer. A quote the business made on
+site read "Waiting for customer" above a question addressed to the business, with Progress saying the approval
+was due now. Each of the four parts of the screen was worked out in a different place.
+
+**Decision:**
+1. **Who made a request is a fact of the request** (`quote_requests.source_json`), read only by
+   `isMadeByBusiness` (`packages/shared/src/quote-turn.ts`). The sources that count are listed there
+   (`BUSINESS_REQUEST_SOURCES`); a new way for a business to enter a job is added to that list and nowhere else.
+2. **A quote the business made never asks a customer.** With questions open it needs the business: its group,
+   its wording, the list filters and counts, and the customer's routes (which show and accept nothing) all ask
+   the same function. The database status is unchanged.
+3. **A quote screen is drawn from `quoteStory`:** the status chip, its sentence, the Progress steps and the
+   main button are one result. A screen does not read the status to decide any of them.
+4. **The words for where a quantity came from take who made the quote** ("Your answer" or "The customer's
+   answer"), in the one function every screen uses.
+5. **Why a price is not confirmed is recorded as what it is** and stored with the estimate; the sentence under
+   a price is built from it, not from the grade letter.
+
+**Why the status was not changed:** a second status ("the business has questions") would need a migration and
+a change to every reader of the status, the worker's reprice path among them, to say what one fact on the
+request already says. The price paid is that a list which filters by status must move those quotes by id
+(`lib/business-asked.ts`): one small read per list, of the few quotes a tenant has in that state.
+
+**Rejected:**
+- giving such a quote the status `pending_review` in the worker (it would be approvable with its questions
+  unanswered, the answer route and the reprice path key on the status, and it is a change to the worker's
+  question logic for a display fault);
+- letting the app go on answering a customer's questions from the quote screen while the screen says "Nothing
+  for you to do" (two stories on one screen);
+- rewording Grade B's sentence to something vague enough to fit every case (the fault was the reason being
+  lost, not the words).
+
+**Consequences:**
+- A customer's quote with questions open shows no questions in the app. The signed-in answer route still
+  accepts them; nothing on a screen offers it.
+- A quote priced before T-186 has no reasons stored. Its old sentence is replaced only where the quote's own
+  lines prove it wrong.
+- `QuoteNextAction` has a new member, `give_answers`. Anything that lists the actions must handle it.
 
 ---
 

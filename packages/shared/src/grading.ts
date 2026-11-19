@@ -31,52 +31,175 @@ export interface QuantityProvenance {
    * 'identified' (T-139, AD-029): what the equipment IS was read from a label
    * or nameplate. Ranks like measured (Grade B) until a human confirms it.
    */
-  basis: 'confirmed' | 'measured' | 'adjudicated' | 'envelope' | 'defaulted' | 'identified' | 'scanned'
+  /**
+   * T-186: two reasons a price is not confirmed that are not a measurement.
+   * 'doubted': a quantity a person typed, which the photos or the description
+   * seem to contradict. 'rate': the step's price is a from-price with a
+   * stated range. Both rank exactly as 'measured' did in their place (the
+   * grade letter is unchanged); they exist so the sentence under the price
+   * says what is true.
+   */
+  basis: 'confirmed' | 'measured' | 'adjudicated' | 'envelope' | 'defaulted' | 'identified' | 'scanned' | 'doubted' | 'rate'
   confidence: number
+}
+
+/**
+ * T-186: why a price is not confirmed, as the business reads it. Stored with
+ * the estimate (`estimate.reasons`), most important first.
+ */
+export type CertaintyReason =
+  /** a typed quantity that the photos or the description seem to contradict */
+  | 'doubted'
+  /** a quantity nobody gave: the line is priced as one unit for now */
+  | 'not_given'
+  /** worked out from typical figures, not from this job */
+  | 'typical'
+  /** measured from the photos, without enough to go on */
+  | 'measured_weak'
+  /** measured from the photos, and the measurements agree */
+  | 'measured'
+  /** read from a label or plate in the photos, not confirmed yet */
+  | 'label'
+  /** a price the business set as a range */
+  | 'rate'
+  /** a fixed price, with a site visit still recommended */
+  | 'site_visit'
+
+const REASON_ORDER: readonly CertaintyReason[] = ['doubted', 'not_given', 'typical', 'measured_weak', 'measured', 'label', 'rate', 'site_visit']
+
+export function isCertaintyReason(value: unknown): value is CertaintyReason {
+  return typeof value === 'string' && (REASON_ORDER as readonly string[]).includes(value)
+}
+
+/** One plain sentence per reason. None uses a word the customer-language rules ban (a unit test holds each). */
+const REASON_SENTENCE: Record<CertaintyReason, string> = {
+  doubted: 'A quantity that was typed in does not seem to match the photos or the description. Check it before you send the price.',
+  not_given: 'A quantity was not given, so one line is priced as a single unit for now. Give the quantity to set the price.',
+  typical: 'This is worked out from typical figures for a property like this one. Confirm the details to narrow the price.',
+  measured_weak: 'The photos did not show enough to measure well. Confirm the quantities to narrow the price.',
+  measured: 'This price uses quantities measured from the photos, and the measurements agree. Confirm them before work starts.',
+  label: 'This price uses what was read from a label in the photos. Confirm it before work starts.',
+  rate: 'One of your prices is set as a range, so the final figure can move within it.',
+  site_visit: 'Standard price from your rates. A site visit confirms the details before work starts, so the final price may change.',
+}
+
+/** The short label beside the grade mark, by the reason that decided it */
+const REASON_LABEL: Record<CertaintyReason, string> = {
+  doubted: 'To check',
+  not_given: 'Quantity missing',
+  typical: 'Concept',
+  measured_weak: 'Concept',
+  measured: 'Measured',
+  label: 'Read from a label',
+  rate: 'Price range',
+  site_visit: 'Provisional',
+}
+
+const SENTENCE_GIVEN = 'Every quantity this price depends on was given or confirmed.'
+const SENTENCE_GIVEN_OR_SCANNED = 'Every quantity this price depends on was given, confirmed or scanned on site.'
+/** For a quote priced before the reasons were stored, when its own lines show nothing was measured */
+const SENTENCE_UNCONFIRMED = 'Not every quantity behind this price is confirmed yet. Confirm them before work starts.'
+
+/** The reason one quantity gives, or null when it is confirmed */
+function reasonOf(q: QuantityProvenance): CertaintyReason | null {
+  if (q.basis === 'confirmed' || q.basis === 'scanned') return null
+  if (q.basis === 'doubted') return 'doubted'
+  if (q.basis === 'rate') return 'rate'
+  if (q.basis === 'defaulted') return 'not_given'
+  if (q.basis === 'envelope') return 'typical'
+  if (q.confidence < GRADE_B_MIN_CONFIDENCE) return 'measured_weak'
+  return q.basis === 'identified' ? 'label' : 'measured'
+}
+
+/** Why a price is not confirmed, most important first, each once. Empty when every quantity is confirmed. */
+export function certaintyReasons(quantities: QuantityProvenance[]): CertaintyReason[] {
+  const found = new Set<CertaintyReason>()
+  for (const q of quantities) {
+    const reason = reasonOf(q)
+    if (reason) found.add(reason)
+  }
+  return REASON_ORDER.filter((reason) => found.has(reason))
 }
 
 export interface EstimateGradeResult {
   grade: EstimateGrade
   label: string
-  /** One-line customer-facing meaning */
+  /** One plain sentence for the business about how sure the price is */
   description: string
+  /** T-186: why it is not confirmed, most important first; empty when it is */
+  reasons?: CertaintyReason[]
 }
 
 /**
- * T-185: how sure the price is, in one plain sentence for the business. None
- * of them uses a word the customer-language rules ban ("exact", "firm",
- * "preliminary", "guaranteed"): the first one used to end "this price is
- * exact". A unit test holds each against `findConfidenceLanguage`.
+ * T-185, T-186: how sure the price is, in one plain sentence for the
+ * business. None uses a word the customer-language rules ban ("exact",
+ * "firm", "preliminary", "guaranteed"); a unit test holds each against
+ * `findConfidenceLanguage`.
+ *
+ * T-186: the sentence is chosen by what is true of the quantities, not by
+ * the grade letter. Before, every Grade B read "measured from the photos",
+ * also when nothing was measured: a typed quantity the photos seemed to
+ * contradict, or a price set as a range, was graded B by being entered as a
+ * measurement. The letter still comes out the same; the reason is now kept.
  */
 const GRADE_META: Record<EstimateGrade, { label: string; description: string }> = {
-  A: {
-    label: 'Confirmed',
-    description: 'Every quantity this price depends on was given or confirmed.',
-  },
-  B: {
-    label: 'Measured',
-    description: 'The quantities were measured from the photos, and the measurements agree. Confirm them before work starts.',
-  },
-  C: {
-    label: 'Concept',
-    description: 'This is worked out from typical figures for a property like this one. Confirm the details to narrow the price.',
-  },
+  A: { label: 'Confirmed', description: SENTENCE_GIVEN },
+  B: { label: REASON_LABEL.measured, description: REASON_SENTENCE.measured },
+  C: { label: REASON_LABEL.typical, description: REASON_SENTENCE.typical },
 }
+
+/** The label and sentence for a grade and the reasons behind it */
+export function certaintyWords(grade: EstimateGrade, reasons: readonly CertaintyReason[], opts: { scanned?: boolean } = {}): { label: string; description: string } {
+  const first = reasons[0]
+  if (first) return { label: REASON_LABEL[first], description: REASON_SENTENCE[first] }
+  if (grade === 'A') return { label: GRADE_META.A.label, description: opts.scanned ? SENTENCE_GIVEN_OR_SCANNED : SENTENCE_GIVEN }
+  return GRADE_META[grade]
+}
+
+/** Do the stored words claim a measurement from photos? */
+const CLAIMS_PHOTOS = /measured from (the|your) photos/i
 
 /**
  * The sentence shown to the business under a price (the dashboard's quote
- * page and the on-site app). It is the one stored with the quote, unless that
- * one was written before T-185 and uses a banned word or a dash: then the
- * sentence for the same level is shown in its place, so an older quote reads
- * the same as a new one. Null when there is nothing to say.
+ * page and the on-site app), from one place:
+ *   1. a quote that carries its reasons (T-186) gets the sentence for them;
+ *   2. otherwise the one stored with the quote, unless it uses a banned word
+ *      or a dash (written before T-185), or the quote itself proves it wrong:
+ *      it says "measured from the photos" and `measuredOnQuote` is false,
+ *      meaning no line of the quote was measured. Then the sentence for the
+ *      level is shown, without a claim about photos.
+ * Null when there is nothing to say.
  */
-export function certaintySentence(estimate: { grade?: string | null; description?: string | null } | null | undefined): string | null {
+export function certaintySentence(
+  estimate: { grade?: string | null; description?: string | null; reasons?: unknown } | null | undefined,
+  opts: { measuredOnQuote?: boolean } = {}
+): string | null {
   if (!estimate) return null
+  const grade = estimate.grade as EstimateGrade
+  if (Array.isArray(estimate.reasons) && GRADE_META[grade]) {
+    return certaintyWords(grade, estimate.reasons.filter(isCertaintyReason)).description
+  }
   const stored = (estimate.description ?? '').trim()
   const plain = stored !== '' && findConfidenceLanguage(stored).length === 0 && !/[—–]/.test(stored)
-  if (plain) return stored
-  const meta = GRADE_META[estimate.grade as EstimateGrade]
-  return meta ? meta.description : null
+  const meta = GRADE_META[grade]
+  const sentence = plain ? stored : meta ? meta.description : null
+  if (sentence && opts.measuredOnQuote === false && CLAIMS_PHOTOS.test(sentence)) return SENTENCE_UNCONFIRMED
+  return sentence
+}
+
+/** The short label beside the grade mark, by the same rule as the sentence */
+export function certaintyLabel(
+  estimate: { grade?: string | null; label?: string | null; reasons?: unknown } | null | undefined,
+  opts: { measuredOnQuote?: boolean } = {}
+): string | null {
+  if (!estimate) return null
+  const grade = estimate.grade as EstimateGrade
+  if (Array.isArray(estimate.reasons) && GRADE_META[grade]) {
+    return certaintyWords(grade, estimate.reasons.filter(isCertaintyReason)).label
+  }
+  const stored = (estimate.label ?? '').trim()
+  if (opts.measuredOnQuote === false && stored === REASON_LABEL.measured) return 'Not confirmed'
+  return stored || null
 }
 
 /** Minimum measured confidence for a quantity to support Grade B */
@@ -97,11 +220,12 @@ export function computeEstimateGrade(quantities: QuantityProvenance[]): Estimate
       grade = 'C'
       break
     }
-    // measured / adjudicated / identified with acceptable confidence
+    // measured / adjudicated / identified / doubted / rate with acceptable confidence
     if (grade === 'A') grade = 'B'
   }
 
-  return { grade, ...GRADE_META[grade] }
+  const reasons = certaintyReasons(quantities)
+  return { grade, ...certaintyWords(grade, reasons, { scanned: quantities.some((q) => q.basis === 'scanned') }), reasons }
 }
 
 /**
@@ -132,9 +256,9 @@ export function priceDependsOnJobFacts(
 /** Grade B shown when a flat-rate price still needs a site visit (not "measured from photos") */
 export const FLAT_RATE_SITE_VISIT_GRADE: EstimateGradeResult = {
   grade: 'B',
-  label: 'Provisional',
-  description:
-    'Standard price from the business’s rates. A site visit confirms the details before work starts, so the final price may change.',
+  label: REASON_LABEL.site_visit,
+  description: REASON_SENTENCE.site_visit,
+  reasons: ['site_visit'],
 }
 
 /**

@@ -26,6 +26,7 @@ import type {
   LineSource,
 } from '@qolumns/shared'
 import { evaluateFormula } from '@qolumns/shared'
+import type { CertaintyReason } from '@qolumns/shared'
 import type { CrossServiceEstimate } from '../ai/cross-service'
 
 /**
@@ -129,6 +130,8 @@ export interface PricingResult {
     grade: 'A' | 'B' | 'C'
     label: string
     description: string
+    /** T-186: why the price is not confirmed, most important first (shared grading.ts) */
+    reasons?: CertaintyReason[]
     rangeLow?: number
     rangeHigh?: number
   }

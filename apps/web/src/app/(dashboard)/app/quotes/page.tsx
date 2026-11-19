@@ -389,6 +389,8 @@ function QuotesList() {
                   paidAt: quote.paidAt,
                   declinedAt: quote.declinedAt,
                   expiresAt: quote.expiresAt,
+                  madeByBusiness: quote.madeByBusiness === true,
+                  openQuestions: quote.openQuestions ?? 0,
                 })
                 const busy = actionLoading === quote.quoteId
                 const href = `/app/quotes/${quote.quoteId}`

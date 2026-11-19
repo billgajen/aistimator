@@ -2,7 +2,7 @@
  * One quote: everything for this job (T-182, T-184).
  *
  * In reading order: where it stands and the price; the customer's photos;
- * anything to confirm on site; the price's lines; what else the customer
+ * the business's own questions, when it made the quote; the price's lines; what else the customer
  * asked for; the progress steps; how to reach the customer; what was sent
  * with the request; the link; and one main action at the bottom, under the
  * thumb. While the price is worked out the same screen shows the stages and
@@ -17,12 +17,16 @@
  *   - a combined quote is one quote with one total; each added service is a section
  *   - line names and where each quantity came from are the server's (T-183)
  *   - nothing is edited here: "Edit in the dashboard" opens the web quote
+ *   - T-186: the status chip, the sentence, Progress and the main button are
+ *     one result of the shared `quoteStory`, so they tell one story. A quote
+ *     the business made asks the business; a customer's asks the customer, and
+ *     then this screen asks nothing.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as Clipboard from 'expo-clipboard'
-import { certaintySentence, customerFirstName, formatMoney, lineLabelParts, parseMoneyInput, quoteSteps, QUOTE_TURN_COPY, type AppQuoteLine, type AppQuoteSection, type AppQuoteView } from '@qolumns/shared'
+import { allAnswered, certaintySentence, chosenChoice, customerFirstName, formatMoney, isTypedAnswer, lineLabelParts, parseMoneyInput, questionChoices, QUOTE_TURN_COPY, type AppQuoteLine, type AppQuoteSection, type AppQuoteView } from '@qolumns/shared'
 import { useApi } from '../../src/lib/api-context'
 import { toApiError } from '../../src/lib/api'
 import { config } from '../../src/lib/config'
@@ -33,7 +37,7 @@ import { canRecordInvoice, headlinePrice, isPricing, mainAction, minimumNote, pr
 import { pricingStages } from '../../src/lib/pricing-stages'
 import { loadQuoteToken, saveQuoteToken } from '../../src/lib/quote-tokens'
 import { evidenceWords, shareMessage } from '../../src/lib/share'
-import { TONE_STYLE, turnOfQuote } from '../../src/lib/status'
+import { storyOfQuote, TONE_STYLE } from '../../src/lib/status'
 import { PricingStages } from '../../src/components/PricingStages'
 import { Body, BottomBar, Button, Card, ErrorText, Field, Icon, Label, LinkRow, MoneyRow, Muted, Notice, Pill, Rows, Screen, Skeleton, Title } from '../../src/components/ui'
 import { colors, fonts, icon, radius, scale, space, tabular, touch, type } from '../../src/theme'
@@ -41,12 +45,15 @@ import { colors, fonts, icon, radius, scale, space, tabular, touch, type } from 
 /** How often the screen asks again while the price is worked out (first price takes 20 to 60 seconds) */
 const POLL_MS = 3000
 
+/** The row that opens a typed answer. Never sent: pressing it sets the answer to empty text. */
+const OTHER = '\u0000other'
+
 export default function QuoteDetail() {
   const { id, fresh } = useLocalSearchParams<{ id: string; fresh?: string }>()
   const api = useApi()
   const router = useRouter()
   const [quote, setQuote] = useState<AppQuoteView | null>(null)
-  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [answers, setAnswers] = useState<Record<string, string | undefined>>({})
   const [invoice, setInvoice] = useState('')
   const [invoiceSaved, setInvoiceSaved] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
@@ -103,7 +110,7 @@ export default function QuoteDetail() {
     }
   }
 
-  const answerOf = (q: AppQuoteView['questions'][number]) => answers[q.id] ?? (q.aiValue !== undefined ? String(q.aiValue) : '')
+  const setAnswer = (id: string, value: string) => setAnswers((a) => ({ ...a, [id]: value }))
 
   const confirm = () =>
     run(async () => {
@@ -111,7 +118,7 @@ export default function QuoteDetail() {
       const stored = await loadQuoteToken(quote.id)
       await api.answerQuestions(
         quote.id,
-        quote.questions.map((q) => ({ questionId: q.id, answer: answerOf(q) })),
+        quote.questions.map((q) => ({ questionId: q.id, answer: (answers[q.id] ?? '').trim() })),
         stored?.token
       )
       setAnswers({})
@@ -206,37 +213,27 @@ export default function QuoteDetail() {
     )
   }
 
-  const { estimate, currency } = quote.pricing
-  const turn = turnOfQuote(quote)
+  const { currency } = quote.pricing
+  // T-186: one story: the chip and sentence (`turn`), Progress (`steps`) and the main button
+  const story = storyOfQuote(quote)
+  const turn = story.turn
+  const steps = story.steps
   const action = mainAction(quote)
+  // how sure the price is: the server's one sentence (the dashboard's); a server from before T-186 sends none
+  const certainty = quote.pricing.certainty !== undefined ? quote.pricing.certainty : certaintySentence(quote.pricing.estimate)
   const figure = headlinePrice(quote)
   const lines = priceLines(quote)
   const sections = quote.sections ?? []
   const combined = sections.length > 0
   const customer = quote.customer ?? { name: quote.customerName, email: null, phone: null }
   const first = customerFirstName(customer.name)
-  const allAnswered = quote.questions.every((q) => answerOf(q).trim() !== '')
+  const answered = allAnswered(quote.questions, answers)
   const request = quote.request
   const photos = quote.photos ?? []
   const photoCount = Math.max(quote.photoCount ?? 0, photos.length)
   const hasRequest = Boolean(request && (request.description || request.answers.length > 0 || request.address || request.postcode))
   const pricing = isPricing(quote.status)
   const sentToCustomer = action === 'share'
-  // T-185: the steps by name (Received, Approve and send, Opened, Accepted), each done, current or later
-  const steps = quoteSteps({
-    status: quote.status,
-    total: quote.pricing.total,
-    held: quote.held === true,
-    createdAt: quote.createdAt,
-    approvedAt: quote.dates?.approvedAt ?? null,
-    sentAt: quote.dates?.sentAt ?? null,
-    viewedAt: quote.dates?.viewedAt ?? null,
-    acceptedAt: quote.dates?.acceptedAt ?? null,
-    paidAt: quote.dates?.paidAt ?? null,
-    declinedAt: quote.dates?.declinedAt ?? null,
-    expiresAt: quote.dates?.expiresAt ?? null,
-  })
-
   function viewPhoto(index: number) {
     setViewerPhotos(photos.map((p) => ({ id: p.id, url: p.fullUrl ?? p.url })))
     router.push(`/photo?index=${index}`)
@@ -269,9 +266,9 @@ export default function QuoteDetail() {
                   {figure}
                 </Text>
               ) : null}
-              {/* How sure the price is: the one plain sentence for this level, the same as on the dashboard (shared
-                  grading.ts). No grade letter, and none of the words the customer-language rules ban. */}
-              {figure && certaintySentence(estimate) ? <Muted>{certaintySentence(estimate)}</Muted> : null}
+              {/* How sure the price is: one plain sentence built from why it is not confirmed, the same as on the
+                  dashboard (shared grading.ts). No grade letter, and none of the words the customer-language rules ban. */}
+              {figure && certainty ? <Muted>{certainty}</Muted> : null}
               <Body style={{ marginTop: space.md }}>{turn.sentence}</Body>
               {action === 'price_request' ? <Muted>Your plan is managed on the web, in your dashboard.</Muted> : null}
               {action === 'add_price' ? <Muted>The price is added on the web, in your dashboard.</Muted> : null}
@@ -308,13 +305,18 @@ export default function QuoteDetail() {
           </Card>
         ) : null}
 
-        {/* 3. Open questions, answered on site */}
-        {action === 'confirm' ? (
+        {/* 3. The business's own questions (T-186): a quote it made asks it, here. A question with clear
+            choices is answered by pressing one; typing is behind "Other" (the shared questionChoices). */}
+        {story.asksBusiness && quote.questions.length > 0 ? (
           <Card>
-            <Label>Confirm on site</Label>
-            <Muted>Your answer is treated as confirmed and fixes the price.</Muted>
+            <Label>{QUOTE_TURN_COPY.questions.title(quote.questions.length)}</Label>
+            <Muted>{QUOTE_TURN_COPY.questions.note}</Muted>
             {quote.questions.map((q) => {
               const words = evidenceWords(q.evidence)
+              const { choices, otherLabel, numeric } = questionChoices(q)
+              const answer = answers[q.id]
+              const chosen = chosenChoice(choices, answer)
+              const typed = isTypedAnswer(choices, answer)
               return (
                 <View key={q.id} style={{ marginTop: space.lg }}>
                   <Text style={styles.question} maxFontSizeMultiplier={scale.text}>
@@ -323,16 +325,23 @@ export default function QuoteDetail() {
                   {words ? <Muted>{words.line}</Muted> : null}
                   {words?.labelText ? <Muted>The label says: {words.labelText}</Muted> : null}
                   <View style={{ height: space.sm }} />
-                  {q.options && q.options.length > 0 ? (
-                    <Rows options={q.options.map((o) => ({ value: o, label: o }))} value={answerOf(q) || undefined} onChange={(v) => setAnswers((a) => ({ ...a, [q.id]: v }))} />
-                  ) : (
-                    <Field
-                      label={q.aiValue !== undefined ? 'Correct it if it is wrong' : 'Your answer'}
-                      value={answerOf(q)}
-                      onChangeText={(v) => setAnswers((a) => ({ ...a, [q.id]: v }))}
-                      keyboardType={typeof q.aiValue === 'number' ? 'decimal-pad' : 'default'}
+                  {choices.length > 0 ? (
+                    <Rows
+                      options={[...choices.map((c) => ({ value: c.value, label: c.label })), ...(otherLabel ? [{ value: OTHER, label: otherLabel }] : [])]}
+                      value={chosen ? chosen.value : typed ? OTHER : undefined}
+                      onChange={(v) => setAnswer(q.id, v === OTHER ? '' : v)}
                     />
-                  )}
+                  ) : null}
+                  {typed ? (
+                    <View style={{ marginTop: choices.length > 0 ? space.sm : 0 }}>
+                      <Field
+                        label={QUOTE_TURN_COPY.questions.otherLabel}
+                        value={answer ?? ''}
+                        onChangeText={(v) => setAnswer(q.id, v)}
+                        keyboardType={numeric ? 'decimal-pad' : 'default'}
+                      />
+                    </View>
+                  ) : null}
                 </View>
               )
             })}
@@ -411,8 +420,8 @@ export default function QuoteDetail() {
                       >
                         {step.name}
                       </Text>
+                      {/* "Now", or what comes first ("Answer the questions first"): the shared story's own line */}
                       {step.note ? <Muted style={{ marginTop: 0 }}>{step.note}</Muted> : null}
-                      {step.state === 'current' ? <Muted style={{ marginTop: 0 }}>Now</Muted> : null}
                     </View>
                     {step.date ? (
                       <Text style={styles.stepDate} maxFontSizeMultiplier={scale.large}>
@@ -501,7 +510,7 @@ export default function QuoteDetail() {
       {/* The one main action, under the thumb */}
       {action === 'confirm' ? (
         <BottomBar>
-          <Button title="Confirm and reprice" onPress={confirm} busy={busy} disabled={!allAnswered} />
+          <Button title={QUOTE_TURN_COPY.pageButtons.giveAnswers} onPress={confirm} busy={busy} disabled={!answered} />
         </BottomBar>
       ) : action === 'send' ? (
         <BottomBar>

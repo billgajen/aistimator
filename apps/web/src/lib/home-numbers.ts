@@ -77,10 +77,11 @@ export const WAITING_FOR_YOU_STATUSES = ['pending_review', 'feedback_received', 
  */
 export function waitingForYou<
   T extends { status: string; created_at: string; pricing_json: { total?: number } | null; content_json: { limitHold?: boolean } | null; is_test?: boolean | null },
->(rows: T[] | null | undefined): T[] {
+>(rows: T[] | null | undefined, alsoWaiting: (row: T) => boolean = () => false): T[] {
   const approvals = new Set(waitingForApproval(rows))
   return (rows ?? [])
-    .filter((q) => approvals.has(q) || (!q.is_test && (q.status === 'feedback_received' || q.status === 'failed')))
+    // T-186: `alsoWaiting` adds the quotes the business made that have its own questions open
+    .filter((q) => approvals.has(q) || (!q.is_test && (q.status === 'feedback_received' || q.status === 'failed')) || alsoWaiting(q))
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
 }
 

@@ -734,6 +734,12 @@ T-184 additions to `GET /api/app/quotes/:id` (all additive):
 - `dates.approvedAt`.
 - `request.answers[].value` is the option's label for a choice ("Standard (8 ft)"), on this route and on `GET /api/quotes/:id` (`answerText`, shared).
 
+T-186: a quote the business made itself (`quote_requests.source_json.type` is `app`; `isMadeByBusiness` in `packages/shared/src/quote-turn.ts`). No customer is asked anything about it. All additive:
+- `GET /api/app/quotes/:id`: `madeByBusiness: boolean`. `questions` is non-empty **only when the business is the one asked** (status `awaiting_clarification` on a quote it made); a customer's quote in that status carries `questions: []`, because the customer was asked. `pricing.certainty`: the one sentence about how sure the price is, or null (`certaintySentence`, shared). `pricing.estimate.reasons?: string[]`: why the price is not confirmed, most important first (absent on a quote priced before T-186). `lines[].source` reads "Your answer" on a quote the business made and "The customer's answer" otherwise.
+- `GET /api/quotes` (the list): each item adds `madeByBusiness` and `openQuestions` (0 unless the business is the one asked). With `group=`, a quote the business made that has open questions is in `needs_you` and not in `waiting`, in the list and in `counts`.
+- `GET /api/quotes/:id` (dashboard): `madeByBusiness`, and `businessQuestions: [{ id, question, type?, aiValue?, evidence?, options? }]` (empty unless the business is the one asked). The dashboard answers them with `POST /api/app/quotes/:id/answers`, the route the app uses.
+- `GET /api/public/quotes/:id` (the customer's page): for such a quote `status` reads `pending_review`, `provisional.reason` is `pending_review` and no `clarificationQuestions` are returned. `POST /api/public/quotes/:id/clarify` answers 400 `INVALID_STATUS` for it.
+
 POST /api/app/quotes
 Request: `{ "serviceId", "customer": { "name", "email?", "phone?" }, "job?": { "address?", "postcodeOrZip?", "answers": [{ "fieldId", "value" }] }, "assetIds?": [], "scan?", "clientRequestId?" }`
 Same intake as `POST /api/public/quotes` (field and photo validation, plan limits, queue), without bot checks or the AI service match. `source_json = { "type": "app", "userId", "clientRequestId?" }`.
@@ -743,7 +749,7 @@ T-182:
 - `clientRequestId` (8 to 64 letters, digits, `-` or `_`; anything else is 400) makes a repeat safe. When this business already has a request with that id, nothing is made or counted and the answer is `{ "quoteId", "status", "alreadyCreated": true }` with no `quoteViewUrl` (raw links are never stored; the app asks `POST /api/quotes/:id/link` for one once the quote is approved). The lookup is by tenant: another business sending the same id gets a quote of its own.
 
 GET /api/app/quotes/:quoteId
-200 `AppQuoteView`: `{ id, status, businessName, serviceName, customerName, createdAt, pricing: { total, currency, estimate? }, takeoff: [], questions: [] }`. `questions` is non-empty only while `awaiting_clarification`. 404 for another tenant's quote.
+200 `AppQuoteView`: `{ id, status, businessName, serviceName, customerName, createdAt, pricing: { total, currency, estimate? }, takeoff: [], questions: [] }`. `questions` is non-empty only while `awaiting_clarification` (T-186: and only on a quote the business made; see above). 404 for another tenant's quote.
 T-182 adds, all shaped in `apps/web/src/lib/app-quote-view.ts` from the shared rules:
 - `mainServiceName`; `customer: { name, email, phone }` (null when not given); `dates: { sentAt, viewedAt, acceptedAt, paidAt, declinedAt, expiresAt }` (for the status wording in `quote-turn.ts`).
 - `lines: [{ label, amount }]`: the main service's price lines, **without** the minimum top-up. `minimum?: { minimumCharge, topUp }` when a minimum applied (AD-048: a note, never a line). `totals: { subtotal, tax?: { label, amount }, total }`.

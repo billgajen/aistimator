@@ -32,7 +32,7 @@ export async function GET(_request: Request, { params }: { params: { quoteId: st
   const { data: quote } = await supabase
     .from('quotes')
     .select(
-      'id, status, created_at, customer_json, pricing_json, content_json, clarification_questions_json, service_id, sent_at, viewed_at, accepted_at, paid_at, declined_at, token_expires_at, approved_at, request:quote_requests!quote_request_id (asset_ids, job_answers, job_postcode, job_address, job_quantity)'
+      'id, status, created_at, customer_json, pricing_json, content_json, clarification_questions_json, service_id, sent_at, viewed_at, accepted_at, paid_at, declined_at, token_expires_at, approved_at, request:quote_requests!quote_request_id (asset_ids, job_answers, job_postcode, job_address, job_quantity, source_json)'
     )
     .eq('id', params.quoteId)
     .eq('tenant_id', tenantId)
@@ -47,7 +47,7 @@ export async function GET(_request: Request, { params }: { params: { quoteId: st
   ])
 
   const requestRow = ((r: unknown) => (Array.isArray(r) ? r[0] : r))((quote as { request?: unknown }).request) as
-    | { asset_ids?: unknown; job_answers?: unknown; job_postcode?: string | null; job_address?: string | null; job_quantity?: number | null }
+    | { asset_ids?: unknown; job_answers?: unknown; job_postcode?: string | null; job_address?: string | null; job_quantity?: number | null; source_json?: unknown }
     | null
     | undefined
 
@@ -66,6 +66,7 @@ export async function GET(_request: Request, { params }: { params: { quoteId: st
     ),
     photos: wantsPhotos ? photos.signed : [],
     photoCount: photos.count,
+    requestSource: requestRow?.source_json,
   })
   return NextResponse.json(body)
 }

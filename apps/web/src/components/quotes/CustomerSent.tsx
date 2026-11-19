@@ -8,7 +8,16 @@ import type { RequestDetails, ServiceSuggestion } from '@qolumns/shared'
  * business needs the answers to quote it by hand. The photos sit just below
  * (UnderstoodPanel). Nothing is rendered when the customer sent nothing.
  */
-export function CustomerSent({ request, serviceName }: { request: RequestDetails | undefined; serviceName: string | null }) {
+export function CustomerSent({
+  request,
+  serviceName,
+  madeByBusiness = false,
+}: {
+  request: RequestDetails | undefined
+  serviceName: string | null
+  /** T-186: the business entered this job itself (the on-site app), so the card does not call it the customer's */
+  madeByBusiness?: boolean
+}) {
   if (!request) return null
   const where = [request.address, request.postcode].filter(Boolean).join(', ')
   const rows = [
@@ -21,7 +30,7 @@ export function CustomerSent({ request, serviceName }: { request: RequestDetails
   return (
     <section className="mb-6 rounded-2xl border border-border bg-white p-5 shadow-warm-md" aria-labelledby="customer-sent-title" data-testid="customer-sent">
       <h2 id="customer-sent-title" className="text-xs font-semibold uppercase tracking-[0.14em] text-text-secondary">
-        What the customer sent
+        {madeByBusiness ? 'What you entered' : 'What the customer sent'}
       </h2>
       {serviceName && <p className="mt-1 text-sm text-text-secondary">For {serviceName}</p>}
       {request.description && (

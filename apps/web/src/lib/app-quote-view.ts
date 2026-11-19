@@ -17,8 +17,13 @@ import {
   alsoAskedOf,
   alsoAskedStateWords,
   alsoAskedWithStates,
+  anyMeasuredFromPhotos,
+  businessIsAsked,
   businessSources,
+  certaintySentence,
+  isMadeByBusiness,
   isQuoteProcessing,
+  lineSourceCodes,
   mainSubtotal,
   sectionSubtotal,
   splitMinimum,
@@ -66,6 +71,8 @@ export function appQuoteView(input: {
   photos: Array<{ id: string; url: string; fullUrl?: string }>
   /** How many photos the request carries (they are not signed while the price is worked out) */
   photoCount?: number
+  /** The request's `source_json`: who made it decides who is asked and whose answers the lines name (T-186) */
+  requestSource?: unknown
 }): AppQuoteView {
   const { quote } = input
   const status = quote.status as QuoteStatus
@@ -81,15 +88,19 @@ export function appQuoteView(input: {
   // T-184, T-185: each line with its note (where its quantity came from, in the business's words). One
   // shared function decides it for the approval page, the email and the app, so the base fee's note is
   // the same on every quote; the takeoff covers quotes priced before the note was stored on the line.
+  // T-186: on a quote the business made, an answer is "Your answer", not the customer's.
+  const madeByBusiness = isMadeByBusiness(input.requestSource)
   const withNotes = (list: Array<{ label: string; amount: number; source?: unknown }>, takeoff?: unknown): AppQuoteLine[] => {
-    const notes = businessSources(list, takeoff)
+    const notes = businessSources(list, takeoff, { madeByBusiness })
     return list.map((l, i) => ({ label: l.label, amount: l.amount, ...(notes[i] && { source: notes[i]! }) }))
   }
   const content = (quote.content_json || {}) as { takeoff?: AppQuoteView['takeoff']; limitHold?: boolean }
   const customer = (quote.customer_json || {}) as { name?: unknown; email?: unknown; phone?: unknown }
 
+  // T-186: the business answers the questions of a quote it made. A customer's quote that waits
+  // for the customer's answers shows none here: the customer was asked, and the screen says so.
   const questions =
-    status === 'awaiting_clarification'
+    businessIsAsked(status, madeByBusiness)
       ? ((quote.clarification_questions_json || []) as ClarificationQuestion[]).map((q) => ({
           id: q.id,
           question: q.question,
@@ -117,6 +128,11 @@ export function appQuoteView(input: {
   const total = money(pricing.total)
   const taxAmount = money(pricing.taxAmount)
 
+  // T-186: how sure the price is, in the one sentence the dashboard shows. A quote priced before the
+  // reasons were stored cannot say "measured from the photos" when none of its lines was.
+  const codes = [...lineSourceCodes(main.lines, content.takeoff), ...added.flatMap((section) => lineSourceCodes(splitMinimum(section.breakdown).lines))]
+  const certainty = certaintySentence(pricing.estimate, { measuredOnQuote: anyMeasuredFromPhotos(codes) })
+
   // T-184: what else the customer asked for (T-179), each with where it stands, as the dashboard lists it
   const addedBy = new Map(added.map((section) => [section.serviceId, section.addedBy]))
   const alsoAsked: AppAlsoAsked[] = alsoAskedWithStates(alsoAskedOf(quote.content_json), added).map((item) => ({
@@ -135,7 +151,8 @@ export function appQuoteView(input: {
     customerName: text(customer.name) ?? '',
     customer: { name: text(customer.name) ?? '', email: text(customer.email), phone: text(customer.phone) },
     createdAt: quote.created_at,
-    pricing: { total, currency: pricing.currency || 'USD', ...(pricing.estimate && { estimate: pricing.estimate }) },
+    pricing: { total, currency: pricing.currency || 'USD', ...(pricing.estimate && { estimate: pricing.estimate }), certainty },
+    madeByBusiness,
     // the measured quantities of the main service; the price lines are `lines`
     takeoff: content.takeoff || [],
     lines: withNotes(main.lines, content.takeoff),

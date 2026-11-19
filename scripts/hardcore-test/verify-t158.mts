@@ -511,8 +511,10 @@ if (!process.env.PLAYWRIGHT_DIR) {
     boxPending.sentence === 'Check the price and approve. The customer can accept only after you approve.' && JSON.stringify(boxPending.buttons) === JSON.stringify(['Approve & send']) && boxPending.label === 'Needs your approval' &&
       (await button(listPage, 'Approve & send').count()) === 1, boxPending)
   const tPending = await trackerOf(listPage)
-  check('page, awaiting approval: tracker reads Request received (dated), Waiting for your approval, Not opened yet, Not accepted yet',
-    JSON.stringify(labelsOf(tPending)) === JSON.stringify(['Request received', 'Waiting for your approval', 'Not opened yet', 'Not accepted yet']) && tPending[0]!.done && dated(tPending[0]!) && tPending.slice(1).every((s) => !s.done && s.lines.length === 0), tPending)
+  // T-186: the dashboard's tracker uses the app's step names; the step now is marked and says "Now"
+  check('page, awaiting approval: tracker reads Received (dated), Approve and send (the step now), Opened, Accepted',
+    JSON.stringify(labelsOf(tPending)) === JSON.stringify(['Received', 'Approve and send', 'Opened', 'Accepted']) && tPending[0]!.done && dated(tPending[0]!) &&
+      !tPending[1]!.done && tPending[1]!.lines[0] === 'Now' && tPending.slice(2).every((s) => !s.done && s.lines.length === 0), tPending)
   check('page: the plain timeline is gone', (await listPage.getByText('Timeline', { exact: true }).count()) === 0)
   await button(listPage, 'Approve & send').click()
   await listPage.waitForFunction(() => /Nothing for you to do/.test(document.querySelector('[data-testid="next-step-sentence"]')?.textContent ?? ''), null, { timeout: 30_000 })
@@ -520,7 +522,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
   const tApproved = await trackerOf(listPage)
   check('page, after approving: "Nothing for you to do. Waiting for Avery. Sent today, not opened yet." and no main button',
     boxApproved.sentence === 'Nothing for you to do. Waiting for Avery. Sent today, not opened yet.' && boxApproved.buttons.length === 0 && boxApproved.label === 'Waiting for customer', boxApproved)
-  check('page, approved: tracker step two reads "You approved" with its date', tApproved[1]!.label === 'You approved' && tApproved[1]!.done && dated(tApproved[1]!) && tApproved[2]!.label === 'Not opened yet', tApproved)
+  check('page, approved: tracker step two "Approve and send" is done with its date, and "Opened" is the step now', tApproved[1]!.label === 'Approve and send' && tApproved[1]!.done && dated(tApproved[1]!) && tApproved[2]!.label === 'Opened' && !tApproved[2]!.done && tApproved[2]!.lines[0] === 'Now', tApproved)
   check('page, approved: the other buttons are as T-157 left them (Edit, Send again, Copy link)', (await button(listPage, 'Edit').count()) === 1 && (await button(listPage, 'Send again').count()) === 1 && (await button(listPage, 'Copy link').count()) === 1)
   check('(approving through the box really approved it)', (await statusOf(qApprove.id)) === 'sent' && Boolean((await fullRow(qApprove.id)).approved_at))
   await listPage.close()
@@ -528,7 +530,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
   // sent automatically
   const pAuto = await quotePage(ctxA, qAuto.id)
   const tAuto = await trackerOf(pAuto)
-  check('page, automatic service: tracker step two reads "Sent automatically" with its date', tAuto[1]!.label === 'Sent automatically' && tAuto[1]!.done && dated(tAuto[1]!) && !labelsOf(tAuto).includes('You approved'), tAuto)
+  check('page, automatic service: tracker step two is done with its date and says "Sent automatically" under it', tAuto[1]!.label === 'Approve and send' && tAuto[1]!.done && dated(tAuto[1]!) && tAuto[1]!.lines.includes('Sent automatically'), tAuto)
   await pAuto.close()
 
   // accepted
@@ -539,7 +541,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
   check('page, accepted: "Blake accepted on <date>. Contact them to book the job." with Email and Call links',
     /^Blake accepted on \S+ \S+\. Contact them to book the job\.$/.test(boxAccepted.sentence) && JSON.stringify(boxAccepted.buttons) === JSON.stringify(['Email Blake', 'Call Blake']) &&
       ((await pAccepted.getByTestId('next-step-email').getAttribute('href')) ?? '').startsWith('mailto:blake.accept@example.com') && ((await pAccepted.getByTestId('next-step-call').getAttribute('href')) ?? '').startsWith('tel:'), boxAccepted)
-  check('page, accepted: all four tracker steps are done and dated', JSON.stringify(labelsOf(tAccepted)) === JSON.stringify(['Request received', 'You approved', 'Customer opened', 'Customer accepted']) && tAccepted.every((s) => s.done && dated(s)), tAccepted)
+  check('page, accepted: all four tracker steps are done and dated', JSON.stringify(labelsOf(tAccepted)) === JSON.stringify(['Received', 'Approve and send', 'Opened', 'Accepted']) && tAccepted.every((s) => s.done && dated(s)), tAccepted)
   check('page, accepted: Copy link only, as T-157 left it', (await button(pAccepted, 'Copy link').count()) === 1 && (await button(pAccepted, 'Send again').count()) === 0 && (await button(pAccepted, 'Edit').count()) === 0)
   await pAccepted.close()
 
@@ -548,7 +550,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
   const boxDeclined = await boxOf(pDeclined)
   const tDeclined = await trackerOf(pDeclined)
   check('page, declined: "Casey declined on <date>. Nothing for you to do." and no button', /^Casey declined on \S+ \S+\. Nothing for you to do\.$/.test(boxDeclined.sentence) && boxDeclined.buttons.length === 0 && boxDeclined.label === 'Customer declined', boxDeclined)
-  check('page, declined: the final tracker step reads "Customer declined" with its date', tDeclined[3]!.label === 'Customer declined' && dated(tDeclined[3]!) && !labelsOf(tDeclined).includes('Customer accepted') && !labelsOf(tDeclined).includes('Not accepted yet'), tDeclined)
+  check('page, declined: the final tracker step reads "Declined" with its date', tDeclined[3]!.label === 'Declined' && dated(tDeclined[3]!) && !labelsOf(tDeclined).includes('Accepted'), tDeclined)
   await pDeclined.close()
 
   // expired, a question, held, no price, failed, paid
@@ -590,7 +592,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
 
   const pPaid = await quotePage(ctxA, paid.id)
   const tPaid = await trackerOf(pPaid)
-  check('page, paid: step four keeps "Customer accepted" and adds "Paid <date>"', tPaid[3]!.label === 'Customer accepted' && /^Paid /.test(tPaid[3]!.lines[1] ?? ''), tPaid[3])
+  check('page, paid: step four keeps "Accepted" and adds "Paid <date>"', tPaid[3]!.label === 'Accepted' && /^Paid /.test(tPaid[3]!.lines[1] ?? ''), tPaid[3])
   await pPaid.close()
 
   // tenant isolation on the page: the rival cannot open this business's quote
@@ -698,7 +700,8 @@ const moved: Record<string, string> = {
 const statusesAfter = Object.fromEntries(await Promise.all(everyId.map(async (id) => [id, await statusOf(id)] as const)))
 const unexpected = everyId.filter((id) => statusesAfter[id] !== (moved[id] ?? statusesBefore[id]))
 check('no status changed except through the actions this script took', unexpected.length === 0, unexpected.map((id) => ({ id, before: statusesBefore[id], after: statusesAfter[id] })))
-check('the list buttons are the six agreed, with words', JSON.stringify(Object.values(QUOTE_TURN_COPY.listButtons)) === JSON.stringify(['Check and approve', 'Add the price', 'Price this request', 'Answer question', 'Send again', 'Contact customer']))
+// T-186 added one: "Answer to price", on a quote the business made that has its own questions open
+check('the list buttons are the six agreed and the one T-186 added, with words', JSON.stringify(Object.values(QUOTE_TURN_COPY.listButtons)) === JSON.stringify(['Check and approve', 'Add the price', 'Price this request', 'Answer question', 'Answer to price', 'Send again', 'Contact customer']))
 
 // ---------------------------------------------------------------------
 if (notChecked.length) {

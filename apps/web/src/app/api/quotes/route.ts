@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { QUOTE_GROUP_STATUSES, QUOTE_LIST_GROUPS, defaultQuoteListGroup } from '@qolumns/shared'
+import { QUOTE_LIST_GROUPS, businessIsAsked, defaultQuoteListGroup, isMadeByBusiness } from '@qolumns/shared'
+import { applyGroupFilter, businessAskedQuoteIds, groupFilter, questionCountOf, requestSourceOf } from '@/lib/business-asked'
 import { unfinishedFilter } from '@/lib/unfinished-leads'
 import { assetIdsOf, firstPhotoUrls } from '@/lib/quote-photos'
-import type { QuoteListCounts, QuoteListGroup, QuoteListItem, QuotesListResponse, QuoteStatus } from '@qolumns/shared'
+import type { QuoteGroup, QuoteListCounts, QuoteListGroup, QuoteListItem, QuotesListResponse, QuoteStatus } from '@qolumns/shared'
 
 const VALID_STATUSES: QuoteStatus[] = [
   'queued',
@@ -35,13 +36,22 @@ function searchFilter(search: string): string {
 }
 
 /**
+ * T-186: one group's quotes. A status belongs to one group, except that a
+ * quote the business made, with open questions, is under "Needs you" and not
+ * under "Waiting for customer" (the shared rule; lib/business-asked.ts).
+ */
+function inGroup<Q>(query: Q, group: QuoteGroup, businessAsked: readonly string[]): Q {
+  return applyGroupFilter(query, groupFilter(group, businessAsked))
+}
+
+/**
  * T-158: how many quotes each tab holds, for this tenant only. The quote
  * counts follow the search text so a tab's number matches what it lists.
  */
-async function countTabs(supabase: Supabase, tenantId: string, search: string): Promise<QuoteListCounts | null> {
-  const countQuotes = async (statuses: readonly QuoteStatus[] | null) => {
+async function countTabs(supabase: Supabase, tenantId: string, search: string, businessAsked: readonly string[]): Promise<QuoteListCounts | null> {
+  const countQuotes = async (group: QuoteGroup | null) => {
     let query = supabase.from('quotes').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId)
-    if (statuses) query = query.in('status', statuses as QuoteStatus[])
+    if (group) query = inGroup(query, group, businessAsked)
     if (search) query = query.or(searchFilter(search))
     const { count, error } = await query
     // A failed count has no body to read, so a missing number is a failure too
@@ -60,10 +70,10 @@ async function countTabs(supabase: Supabase, tenantId: string, search: string): 
 
   try {
     const [needsYou, waiting, accepted, closed, all, unfinished] = await Promise.all([
-      countQuotes(QUOTE_GROUP_STATUSES.needs_you),
-      countQuotes(QUOTE_GROUP_STATUSES.waiting),
-      countQuotes(QUOTE_GROUP_STATUSES.accepted),
-      countQuotes(QUOTE_GROUP_STATUSES.closed),
+      countQuotes('needs_you'),
+      countQuotes('waiting'),
+      countQuotes('accepted'),
+      countQuotes('closed'),
       countQuotes(null),
       countUnfinished(),
     ])
@@ -134,8 +144,10 @@ export async function GET(request: Request) {
     // T-158: the counts come back in the same request as the list
     let counts: QuoteListCounts | null = null
     let group: QuoteListGroup | null = null
+    // T-186: the quotes whose questions are the business's (read once, used by the counts and the list)
+    const businessAsked = groupParam !== null ? await businessAskedQuoteIds(supabase, tenantId) : []
     if (groupParam !== null) {
-      counts = await countTabs(supabase, tenantId, search)
+      counts = await countTabs(supabase, tenantId, search, businessAsked)
       if (!counts) {
         return NextResponse.json(
           { error: { code: 'DB_ERROR', message: 'Failed to fetch quotes' } },
@@ -162,11 +174,12 @@ export async function GET(request: Request) {
         pricing_json,
         is_test,
         held:content_json->limitHold,
+        clarification_questions_json,
         services!service_id (
           id,
           name
         ),
-        request:quote_requests!quote_request_id (asset_ids)
+        request:quote_requests!quote_request_id (asset_ids, source_json)
       `)
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
@@ -174,7 +187,7 @@ export async function GET(request: Request) {
 
     // T-158: filter by whose turn it is
     if (group && group !== 'all') {
-      query = query.in('status', QUOTE_GROUP_STATUSES[group] as QuoteStatus[])
+      query = inGroup(query, group, businessAsked)
     }
 
     // Apply status filter
@@ -237,6 +250,9 @@ export async function GET(request: Request) {
         expiresAt: row.token_expires_at ?? null,
         held: row.held === true,
         photoUrl: photoUrls.get(quote.id) ?? null,
+        // T-186: who made it, and how many questions it has open, for the shared status wording
+        madeByBusiness: isMadeByBusiness(requestSourceOf(quote)),
+        openQuestions: businessIsAsked(quote.status, isMadeByBusiness(requestSourceOf(quote))) ? questionCountOf(quote) : 0,
         total: pricing?.total || 0,
         currency: pricing?.currency || 'GBP',
       }

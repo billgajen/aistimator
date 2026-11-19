@@ -28,8 +28,9 @@ const TITLES: Record<ListGroupKey, string> = {
 }
 
 /** Which group a quote is listed under */
-export function listGroupOf(item: Pick<QuoteListItem, 'status' | 'held'>): ListGroupKey {
-  const group: QuoteGroup = quoteGroupOf(item.status)
+export function listGroupOf(item: Pick<QuoteListItem, 'status' | 'held' | 'madeByBusiness'>): ListGroupKey {
+  // T-186: a quote the business made, with its own questions open, needs the business
+  const group: QuoteGroup = quoteGroupOf(item.status, item.madeByBusiness === true)
   if (group === 'needs_you' || group === 'waiting' || group === 'accepted') return group
   return 'rest'
 }
@@ -62,7 +63,7 @@ export interface RowWords {
 }
 
 /** The next steps whose detail line is a reason, not a time (a held request, no price yet, a question waiting) */
-const REASON_ACTIONS = new Set<string>(['price_request', 'add_price', 'answer_question'])
+const REASON_ACTIONS = new Set<string>(['price_request', 'add_price', 'answer_question', 'give_answers'])
 
 /** When the quote last changed: the latest of when it arrived, was sent, opened, accepted, paid or declined */
 export function lastChanged(item: Pick<QuoteListItem, 'createdAt' | 'sentAt' | 'viewedAt' | 'acceptedAt' | 'paidAt' | 'declinedAt'>): string {
@@ -76,7 +77,7 @@ export function lastChanged(item: Pick<QuoteListItem, 'createdAt' | 'sentAt' | '
 /** Everything one row says */
 export function rowWords(item: QuoteListItem, opts: QuoteTurnOptions = {}): RowWords {
   const turn = turnOfListItem(item, opts)
-  const total = item.total > 0 && !item.held && item.status !== 'failed' && quoteGroupOf(item.status) !== 'working' ? formatMoney(item.total, item.currency) : null
+  const total = item.total > 0 && !item.held && item.status !== 'failed' && quoteGroupOf(item.status, item.madeByBusiness === true) !== 'working' ? formatMoney(item.total, item.currency) : null
   const customer = item.customerName?.trim() || 'Customer'
   // T-185: one time only. The dashboard's detail line often carries a time of its own ("Sent 2 days
   // ago, not opened yet"); a phone row shows the state, a reason when there is one, and one time.

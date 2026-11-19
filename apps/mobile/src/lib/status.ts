@@ -7,7 +7,7 @@
  * status colours of Docs/design/system.md.
  */
 
-import { quoteTurn, type AppQuoteView, type QuoteListItem, type QuoteTurn, type QuoteTurnOptions, type QuoteTurnTone } from '@qolumns/shared'
+import { quoteStory, quoteTurn, type AppQuoteView, type QuoteListItem, type QuoteStory, type QuoteTurn, type QuoteTurnOptions, type QuoteTurnTone } from '@qolumns/shared'
 import { colors } from '../theme'
 
 export function turnOfListItem(item: QuoteListItem, opts: QuoteTurnOptions = {}): QuoteTurn {
@@ -25,13 +25,20 @@ export function turnOfListItem(item: QuoteListItem, opts: QuoteTurnOptions = {})
       paidAt: item.paidAt,
       declinedAt: item.declinedAt ?? null,
       expiresAt: item.expiresAt ?? null,
+      madeByBusiness: item.madeByBusiness === true,
+      openQuestions: item.openQuestions ?? 0,
     },
     opts
   )
 }
 
-export function turnOfQuote(q: AppQuoteView, opts: QuoteTurnOptions = {}): QuoteTurn {
-  return quoteTurn(
+/**
+ * T-186: one quote screen's whole story from the one shared function: the
+ * status chip, the sentence under it, the Progress steps and the main button.
+ * Nothing on the screen is decided anywhere else, so they cannot disagree.
+ */
+export function storyOfQuote(q: AppQuoteView, opts: QuoteTurnOptions = {}): QuoteStory {
+  return quoteStory(
     {
       status: q.status,
       customerName: q.customer?.name ?? q.customerName,
@@ -45,9 +52,18 @@ export function turnOfQuote(q: AppQuoteView, opts: QuoteTurnOptions = {}): Quote
       paidAt: q.dates?.paidAt ?? null,
       declinedAt: q.dates?.declinedAt ?? null,
       expiresAt: q.dates?.expiresAt ?? null,
+      approvedAt: q.dates?.approvedAt ?? null,
+      // The server sends questions only when the business is the one asked. (A server from before
+      // T-186 does not say who made the quote; its questions were always shown to the business.)
+      madeByBusiness: q.madeByBusiness === true || q.questions.length > 0,
+      openQuestions: q.questions.length,
     },
     opts
   )
+}
+
+export function turnOfQuote(q: AppQuoteView, opts: QuoteTurnOptions = {}): QuoteTurn {
+  return storyOfQuote(q, opts).turn
 }
 
 export interface ToneStyle {

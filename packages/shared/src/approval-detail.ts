@@ -30,7 +30,9 @@ import {
   sectionSubtotal,
   type AlsoAsked,
 } from './quote-sections'
+import { lineLabelNow } from './line-labels'
 import { businessSources } from './quantity-source'
+import { isMadeByBusiness } from './quote-turn'
 import { serviceSuggestionOf, suggestedServiceReason } from './service-suggestion'
 
 export interface ApprovalWarning {
@@ -103,6 +105,8 @@ export const APPROVAL_COPY = {
   total: 'Total',
   photos: (count: number) =>
     count === 1 ? '1 photo from the customer' : `${count} photos from the customer`,
+  /** T-186: on a quote the business made itself, the photos are its own */
+  ownPhotos: (count: number) => (count === 1 ? '1 photo with this job' : `${count} photos with this job`),
   photosOnPage: (count: number) =>
     count === 1
       ? '1 photo: view it on the approval page'
@@ -155,6 +159,8 @@ export function approvalDetail(input: ApprovalDetailInput): ApprovalDetail {
   const currency = text(pricing.currency) || input.currency
   const money = (n: number) => formatMoney(n, currency, input.locale)
 
+  const madeByBusiness = isMadeByBusiness(input.requestSource)
+
   // ---- The parts: the main service, then each added one ---------------------
   const sections = addedSections(pricing)
   const combined = sections.length > 0
@@ -167,13 +173,15 @@ export function approvalDetail(input: ApprovalDetailInput): ApprovalDetail {
     /** The main service's takeoff; a section has none */
     takeoff?: unknown
   ): ApprovalPart => {
-    // one place decides every line's note (quantity-source.ts)
-    const sources = businessSources(split.lines, takeoff)
+    // one place decides every line's note (quantity-source.ts). T-186: on a quote the business made
+    // itself, an answer is the business's own ("Your answer"), from the same request record.
+    const sources = businessSources(split.lines, takeoff, { madeByBusiness })
     return {
       serviceName,
       ...extra,
       lines: split.lines.map((line, i) => ({
-        label: line.label,
+        // T-186: a quote priced before T-185 shows its line detail the way a new one does
+        label: lineLabelNow(line.label),
         amount: money(line.amount),
         source: sources[i] ?? null,
       })),
@@ -240,7 +248,7 @@ export function approvalDetail(input: ApprovalDetailInput): ApprovalDetail {
         taxAmount > 0 ? { label: text(pricing.taxLabel) || 'Tax', amount: money(taxAmount) } : null,
       total: money(amountOf(pricing.total)),
     },
-    photosLine: photoCount > 0 ? APPROVAL_COPY.photos(photoCount) : null,
+    photosLine: photoCount > 0 ? (madeByBusiness ? APPROVAL_COPY.ownPhotos(photoCount) : APPROVAL_COPY.photos(photoCount)) : null,
     photoCount,
   }
 }

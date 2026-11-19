@@ -18,7 +18,19 @@ import { UNDERSTOOD_COPY } from '@/lib/quote-understanding'
  * A photo's address is a path on our own site that needs the business's
  * sign-in (lib/quote-photos.ts); a storage address never reaches the page.
  */
-export function CustomerPhotos({ photos, customerName }: { photos: QuotePhoto[]; customerName: string }) {
+export function CustomerPhotos({
+  photos,
+  customerName,
+  title = UNDERSTOOD_COPY.photoStripTitle,
+  ownPhotos = false,
+}: {
+  photos: QuotePhoto[]
+  customerName: string
+  /** The strip's heading (T-186: on a quote the business made, the photos are its own) */
+  title?: string
+  /** The business took these photos itself: they are not described as sent by the customer */
+  ownPhotos?: boolean
+}) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [open, setOpen] = useState<number | null>(null)
   const [failed, setFailed] = useState<Record<string, boolean>>({})
@@ -50,7 +62,7 @@ export function CustomerPhotos({ photos, customerName }: { photos: QuotePhoto[];
   return (
     <div data-testid="customer-photos">
       <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-text-secondary">
-        {UNDERSTOOD_COPY.photoStripTitle} <span className="figure">({count})</span>
+        {title} <span className="figure">({count})</span>
       </h3>
       <ul className="mt-3 flex flex-wrap gap-2">
         {photos.map((photo, i) => (
@@ -82,7 +94,7 @@ export function CustomerPhotos({ photos, customerName }: { photos: QuotePhoto[];
 
       <dialog
         ref={dialog}
-        aria-label={`Photos from ${customerName}`}
+        aria-label={ownPhotos ? title : `Photos from ${customerName}`}
         className="photo-viewer w-[min(64rem,calc(100vw-1.5rem))] rounded-2xl border border-border bg-white p-3 shadow-warm-lg sm:p-4"
         onClose={() => setOpen(null)}
         onClick={(e) => {
@@ -104,7 +116,7 @@ export function CustomerPhotos({ photos, customerName }: { photos: QuotePhoto[];
             {/* eslint-disable-next-line @next/next/no-img-element -- as above */}
             <img
               src={current.url}
-              alt={`Photo ${(open ?? 0) + 1} of ${count} sent by ${customerName}`}
+              alt={`Photo ${(open ?? 0) + 1} of ${count}${ownPhotos ? '' : ` sent by ${customerName}`}`}
               className="mx-auto max-h-[70vh] w-auto max-w-full rounded-lg bg-surface object-contain"
               data-testid="photo-viewer-image"
             />

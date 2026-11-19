@@ -363,13 +363,14 @@ describe('T-184: structure, the room scan card, look and feel', () => {
     const screen = read('app/quote/[id].tsx')
     expect(screen).not.toMatch(/Grade \{|estimate\.grade|estimate\.label/)
     // T-185: the sentence comes from the shared rule, never the stored words as they are
-    expect(screen).toContain('certaintySentence(estimate)')
+    // T-186: the sentence is the server's (the dashboard's own), with the shared one for an older server
+    expect(screen).toContain('quote.pricing.certainty')
     expect(screen).toContain("router.push(`/photo?index=${index}`)")
     expect(screen).toContain('title="Send the link again"')
     expect(screen).toContain('Clipboard.setStringAsync')
     expect(screen).toContain('title="Edit in the dashboard"')
     expect(screen).toContain('Customer also asked for')
-    expect(screen).toContain('quoteSteps(')
+    expect(screen).toContain('story.steps')
     expect(screen).toContain('<PricingStages')
   })
 

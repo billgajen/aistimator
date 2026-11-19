@@ -3,7 +3,8 @@
 import { AcceptanceCard } from '@/components/quotes/AcceptanceCard'
 import type { AcceptanceDetails } from '@/lib/acceptance'
 import { useEffect, useState, useCallback } from 'react'
-import { certaintySentence, formatMoney, quoteActions, quoteTurn, quoteTracker, customerFirstName, splitMinimum, addedSections, alsoAskedOf, alsoAskedWithStates, displaySections, sectionsAwaitingApproval } from '@qolumns/shared'
+import { anyMeasuredFromPhotos, certaintyLabel, certaintySentence, formatMoney, isQuoteProcessing, lineLabelNow, lineSourceCodes, quoteActions, quoteStory, customerFirstName, splitMinimum, addedSections, alsoAskedOf, alsoAskedWithStates, displaySections, sectionsAwaitingApproval } from '@qolumns/shared'
+import { BusinessQuestions } from '@/components/quotes/BusinessQuestions'
 import { NextStepBox } from '@/components/quotes/NextStepBox'
 import { CustomerSent, ServiceSuggestionNote } from '@/components/quotes/CustomerSent'
 import { CustomerAlsoAsked } from '@/components/quotes/CustomerAlsoAsked'
@@ -22,6 +23,10 @@ import type {
   AmendmentSummary,
   QuoteFeedback,
 } from '@qolumns/shared'
+
+/** T-186: after the business answers its questions, how often and how many times the page looks for the new price */
+const REPRICE_LOOK_MS = 2000
+const REPRICE_LOOKS = 15
 
 export default function QuoteDetailPage({
   params,
@@ -45,18 +50,21 @@ export default function QuoteDetailPage({
   const [copying, setCopying] = useState(false)
   const [answering, setAnswering] = useState<string | null>(null)
 
-  const fetchQuote = useCallback(async () => {
+  /** Loads the quote; answers its status, or null when it could not be loaded */
+  const fetchQuote = useCallback(async (): Promise<string | null> => {
     try {
       const response = await fetch(`/api/quotes/${quoteId}`)
       if (!response.ok) {
         const errData = await response.json()
         setError(errData.error?.message || 'Failed to load quote')
-        return
+        return null
       }
-      const result = await response.json()
+      const result = (await response.json()) as QuoteDetailResponse
       setData(result)
+      return result.quote.status
     } catch {
       setError('Failed to load quote')
+      return null
     } finally {
       setLoading(false)
     }
@@ -245,24 +253,14 @@ export default function QuoteDetailPage({
   // T-146: a priced quote waiting for the business; held leads are priced first
   const held = (content as { limitHold?: boolean } | null)?.limitHold === true
   const awaitingApproval = quote.status === 'pending_review' && !held && (pricing?.total ?? 0) > 0
-  // T-158: whose turn it is and the one next step, from the shared map. The
-  // same map words the quotes list and Home.
-  const turn = quoteTurn({
+  // T-158, T-186: whose turn it is, the one next step and the Progress steps, from the one shared
+  // function, so the badge, the sentence and Progress tell the same story. The same function
+  // words the quotes list, Home and the on-site app.
+  const businessQuestions = data.businessQuestions ?? []
+  const story = quoteStory({
     status: quote.status,
     customerName: customer?.name,
     hasEmail: Boolean(customer?.email),
-    total: pricing?.total,
-    held,
-    createdAt: quote.created_at,
-    sentAt: quote.sent_at,
-    viewedAt: quote.viewed_at,
-    acceptedAt: quote.accepted_at,
-    paidAt: quote.paid_at,
-    declinedAt: quote.declined_at,
-    expiresAt: quote.token_expires_at,
-  })
-  const trackerSteps = quoteTracker({
-    status: quote.status,
     total: pricing?.total,
     held,
     createdAt: quote.created_at,
@@ -273,7 +271,17 @@ export default function QuoteDetailPage({
     paidAt: quote.paid_at,
     declinedAt: quote.declined_at,
     expiresAt: quote.token_expires_at,
+    madeByBusiness: data.madeByBusiness === true,
+    openQuestions: businessQuestions.length,
   })
+  const turn = story.turn
+  const trackerSteps = story.steps
+  // T-186: was anything on this quote measured from the photos? An older quote's stored sentence may
+  // say so when nothing was; the shared rule then shows one the quote does not contradict.
+  const measuredOnQuote = anyMeasuredFromPhotos([
+    ...lineSourceCodes(priceLines, (content as { takeoff?: unknown } | null)?.takeoff),
+    ...addedSections(pricing).flatMap((section) => lineSourceCodes(splitMinimum(section.breakdown).lines)),
+  ])
 
   if (editMode) {
     // Dynamic import to keep initial bundle small
@@ -404,6 +412,22 @@ export default function QuoteDetailPage({
         }
       />
 
+      {/* T-186: a quote the business made asks the business, here. Answering prices it again. */}
+      {story.asksBusiness && (
+        <BusinessQuestions
+          quoteId={quote.id}
+          questions={businessQuestions}
+          onAnswered={async () => {
+            // the new price is worked out in a moment: look again until it is there
+            for (let tries = 0; tries < REPRICE_LOOKS; tries++) {
+              const fresh = await fetchQuote()
+              if (fresh && !isQuoteProcessing(fresh)) return
+              await new Promise((resolve) => setTimeout(resolve, REPRICE_LOOK_MS))
+            }
+          }}
+        />
+      )}
+
       {/* Open customer questions (and old review requests, which customers can no longer send): part of the next step */}
       {pendingFeedback.length > 0 && (
         <div className="mb-6 space-y-3">
@@ -449,13 +473,13 @@ export default function QuoteDetailPage({
       />
 
       {/* T-178: no estimate to read (it failed, or has no price yet): the customer's own answers, to quote it by hand */}
-      {(quote.status === 'failed' || (pricing?.total ?? 0) <= 0) && <CustomerSent request={data.request} serviceName={data.service?.name ?? null} />}
+      {(quote.status === 'failed' || (pricing?.total ?? 0) <= 0) && <CustomerSent request={data.request} serviceName={data.service?.name ?? null} madeByBusiness={data.madeByBusiness === true} />}
 
       {/* T-151: what the customer told you when accepting (it is what you act on next) */}
       {acceptance && <AcceptanceCard details={acceptance} />}
 
       {/* 2. T-169: what the AI understood, with the customer's photos. Nothing when it produced nothing. */}
-      <UnderstoodPanel understanding={data.understanding} photos={data.photos ?? []} customerName={customer.name} />
+      <UnderstoodPanel understanding={data.understanding} photos={data.photos ?? []} customerName={customer.name} madeByBusiness={data.madeByBusiness === true} />
 
       {/* 3. The price: the total first, in the figure style the customer's page uses */}
       <section className="mb-6 rounded-2xl border border-border bg-white p-5 shadow-warm-md" aria-labelledby="pricing-title" data-testid="pricing">
@@ -488,7 +512,7 @@ export default function QuoteDetailPage({
                   {section.lines.map((item, index) => (
                     <div key={index} className="flex justify-between gap-4 text-sm" data-testid="price-line">
                       <span className="min-w-0 text-text-secondary">
-                        {item.label}
+                        {lineLabelNow(item.label)}
                         {item.autoRecommended && <span className="ml-2 text-xs text-secondary">(auto-recommended)</span>}
                       </span>
                       <span className="figure shrink-0 font-medium text-text-primary">{formatCurrency(item.amount, pricing.currency)}</span>
@@ -510,7 +534,7 @@ export default function QuoteDetailPage({
           {priceLines.map((item, index) => (
             <div key={index} className="flex justify-between gap-4 text-sm" data-testid="price-line">
               <span className="min-w-0 text-text-secondary">
-                {item.label}
+                {lineLabelNow(item.label)}
                 {item.autoRecommended && (
                   <span className="ml-2 text-xs text-secondary">(auto-recommended)</span>
                 )}
@@ -546,6 +570,7 @@ export default function QuoteDetailPage({
         {pricing.estimate && (
           <EstimateGradePanel
             estimate={pricing.estimate}
+            measuredOnQuote={measuredOnQuote}
             currency={pricing.currency}
             gate={quote.quality_gate_json as { action?: string; reason?: string } | null}
             awaitingApproval={awaitingApproval}
@@ -793,11 +818,14 @@ function formatCurrency(amount: number, currency: string): string {
  */
 function EstimateGradePanel({
   estimate,
+  measuredOnQuote,
   currency,
   gate,
   awaitingApproval,
 }: {
   estimate: NonNullable<QuotePricing['estimate']>
+  /** Whether any line of the quote was measured from the photos; undefined when no line's source is known */
+  measuredOnQuote?: boolean
   currency: string
   gate: { action?: string; reason?: string } | null | undefined
   awaitingApproval: boolean
@@ -813,11 +841,12 @@ function EstimateGradePanel({
         </div>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-text-primary">
-            Grade {estimate.grade} · {estimate.label}
+            Grade {estimate.grade} · {certaintyLabel(estimate, { measuredOnQuote })}
             <span className="ml-2 text-xs font-normal text-text-muted">Only visible to you</span>
           </p>
-          {/* T-185: the one plain sentence for this level (shared grading.ts); an older quote's stored words are replaced */}
-          <p className="mt-0.5 text-sm text-text-secondary">{certaintySentence(estimate)}</p>
+          {/* T-185, T-186: one plain sentence, built from why the price is not confirmed (shared grading.ts).
+              An older quote's stored words are replaced when they use a banned word or the quote proves them wrong. */}
+          <p className="mt-0.5 text-sm text-text-secondary" data-testid="certainty-sentence">{certaintySentence(estimate, { measuredOnQuote })}</p>
           {estimate.rangeLow !== undefined && estimate.rangeHigh !== undefined && estimate.rangeHigh > estimate.rangeLow && (
             <p className="mt-1 text-xs text-text-muted">
               Range {formatCurrency(estimate.rangeLow, currency)} – {formatCurrency(estimate.rangeHigh, currency)}

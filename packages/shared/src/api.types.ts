@@ -363,6 +363,10 @@ export interface QuoteListItem {
   held?: boolean
   /** T-169: the first photo the customer sent, as a path on our own site that needs the business's sign-in (null when there is none) */
   photoUrl?: string | null
+  /** T-186: the business made this quote itself (the on-site app). Its questions are the business's to answer */
+  madeByBusiness?: boolean
+  /** T-186: how many questions are open on it (0 when none) */
+  openQuestions?: number
 }
 
 export interface QuotesListResponse {
@@ -621,6 +625,10 @@ export interface QuoteDetailResponse {
   request?: RequestDetails
   /** T-178: the request form thought another of the business's services fits what the customer wrote */
   serviceSuggestion?: ServiceSuggestion | null
+  /** T-186: the business made this quote itself (the on-site app), so no customer was asked anything about it */
+  madeByBusiness?: boolean
+  /** T-186: the questions the business answers on this page (only on a quote it made; empty otherwise) */
+  businessQuestions?: Array<{ id: string; question: string; type?: 'confirm_value' | 'text'; aiValue?: string | number; evidence?: string; options?: string[] }>
 }
 
 /**
@@ -791,10 +799,17 @@ export interface AppQuoteView {
   pricing: {
     total: number
     currency: string
-    estimate?: { grade: 'A' | 'B' | 'C'; label: string; description: string; rangeLow?: number; rangeHigh?: number }
+    estimate?: { grade: 'A' | 'B' | 'C'; label: string; description: string; reasons?: string[]; rangeLow?: number; rangeHigh?: number }
+    /** T-186: the one sentence about how sure the price is, as the dashboard shows it (grading.ts); null when there is none */
+    certainty?: string | null
   }
   takeoff: Array<{ item: string; amount: number; method: string; quantity?: number; unit?: string }>
-  /** Open confirmation questions (status awaiting_clarification) */
+  /** T-186: the business made this quote itself, so no customer was asked anything about it */
+  madeByBusiness?: boolean
+  /**
+   * The questions the business answers on this screen. Since T-186 only those of a quote the business
+   * made: a customer's quote that waits for the customer's answers carries none here.
+   */
   questions: Array<{
     id: string
     question: string

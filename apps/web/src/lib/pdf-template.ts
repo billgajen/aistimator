@@ -5,7 +5,7 @@
  * Uses inline styles for consistent rendering across PDF generators.
  */
 
-import { formatMoney, splitMinimum, minimumChargeNote, displaySections } from '@qolumns/shared'
+import { formatMoney, lineLabelNow, splitMinimum, minimumChargeNote, displaySections } from '@qolumns/shared'
 import type {
   QuotePricing,
   QuoteContent,
@@ -103,7 +103,7 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
           <h3 style="font-size: 14px; font-weight: 600; color: #111827; margin: 0 0 6px 0;">${escapeHtml(section.serviceName)}</h3>
           <table style="width: 100%; border-collapse: collapse;">
             <tbody>
-              ${template.showLineItems ? section.lines.map((item) => row(escapeHtml(item.label), formatCurrency(item.amount, pricing.currency, locale))).join('') : ''}
+              ${template.showLineItems ? section.lines.map((item) => row(escapeHtml(lineLabelNow(item.label)), formatCurrency(item.amount, pricing.currency, locale))).join('') : ''}
               ${row(`${escapeHtml(section.serviceName)} subtotal`, formatCurrency(section.subtotal, pricing.currency, locale), true)}
             </tbody>
           </table>
@@ -125,7 +125,7 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
         (item) => `
           <tr>
             <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; color: #374151;">
-              ${escapeHtml(item.label)}
+              ${escapeHtml(lineLabelNow(item.label))}
             </td>
             <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; text-align: right; color: #111827; font-weight: 500;">
               ${formatCurrency(item.amount, pricing.currency, locale)}

@@ -5,6 +5,7 @@ import type { IdentificationSpec } from './identification'
 import type { ScanSpec } from './room-scan'
 import type { WordingRepairRecord } from './wording-repair'
 import type { LineSource } from './quantity-source'
+import type { CertaintyReason } from './grading'
 
 /**
  * Database types for the Qolumns platform
@@ -635,6 +636,8 @@ export interface QuotePricing {
     grade: 'A' | 'B' | 'C'
     label: string
     description: string
+    /** T-186: why the price is not confirmed, most important first (grading.ts); absent on a quote priced before */
+    reasons?: CertaintyReason[]
     rangeLow?: number
     rangeHigh?: number
   }

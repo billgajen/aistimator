@@ -1,5 +1,5 @@
 import type { QuotePhoto, QuoteUnderstanding, UnderstoodItem } from '@qolumns/shared'
-import { UNDERSTOOD_COPY, understoodNothing } from '@/lib/quote-understanding'
+import { UNDERSTOOD_COPY, understoodCopyFor, understoodNothing } from '@/lib/quote-understanding'
 import { CustomerPhotos } from './CustomerPhotos'
 
 /**
@@ -23,18 +23,22 @@ export function UnderstoodPanel({
   understanding,
   photos,
   customerName,
+  madeByBusiness = false,
 }: {
   understanding: QuoteUnderstanding | undefined
   photos: QuotePhoto[]
   customerName: string
+  /** T-186: the business made this quote itself: its notes, photos and answers are not called the customer's */
+  madeByBusiness?: boolean
 }) {
+  const own = understoodCopyFor(madeByBusiness)
   const nothing = !understanding || understoodNothing(understanding)
   if (nothing && photos.length === 0) return null
 
   if (nothing) {
     return (
       <section className="mb-6 rounded-2xl bg-mist p-5" data-testid="photos-only">
-        <CustomerPhotos photos={photos} customerName={customerName} />
+        <CustomerPhotos photos={photos} customerName={customerName} title={own.photoStripTitle} ownPhotos={madeByBusiness} />
       </section>
     )
   }
@@ -50,18 +54,18 @@ export function UnderstoodPanel({
 
       {photos.length > 0 && (
         <div className="mt-4">
-          <CustomerPhotos photos={photos} customerName={customerName} />
+          <CustomerPhotos photos={photos} customerName={customerName} title={own.photoStripTitle} ownPhotos={madeByBusiness} />
         </div>
       )}
 
       <div className="mt-4 space-y-4">
         <Group title={C.photosTitle} items={u.photos} testid="understood-photos" />
-        <Group title={C.wordsTitle} items={u.words} testid="understood-words" />
+        <Group title={own.wordsTitle} items={u.words} testid="understood-words" />
         <Group title={C.alsoNotedTitle} items={u.alsoNoted} testid="understood-also" />
 
         {u.asked.length > 0 && (
           <div data-testid="understood-asked">
-            <GroupTitle>{C.askedTitle}</GroupTitle>
+            <GroupTitle>{own.askedTitle}</GroupTitle>
             <ul className="mt-2 space-y-2">
               {u.asked.map((q, i) => (
                 <li key={i} className="rounded-lg bg-white px-4 py-3 text-sm">
@@ -71,7 +75,7 @@ export function UnderstoodPanel({
                       C.noAnswer
                     ) : (
                       <>
-                        {C.answered}: <span className="font-semibold text-text-primary">{q.answer}</span>
+                        {own.answered}: <span className="font-semibold text-text-primary">{q.answer}</span>
                       </>
                     )}
                   </p>

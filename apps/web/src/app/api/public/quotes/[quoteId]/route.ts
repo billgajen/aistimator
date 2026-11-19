@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { quoteTokenFilter } from '@/lib/tokens'
-import { isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange, canCustomerDecide, displaySectionsForCustomer, alsoAskedOf, alsoAskedWithStates, addedSections } from '@qolumns/shared'
+import { businessIsAsked, isMadeByBusiness, isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange, canCustomerDecide, displaySectionsForCustomer, alsoAskedOf, alsoAskedWithStates, addedSections } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
@@ -64,7 +64,8 @@ export async function GET(
         ),
         quote_requests!quote_request_id (
           id,
-          asset_ids
+          asset_ids,
+          source_json
         )
       `)
       .eq('id', quoteId)
@@ -226,8 +227,12 @@ export async function GET(
       total: (quote.pricing_json as { total?: number } | null)?.total,
       limitHold: (quote.content_json as { limitHold?: boolean } | null)?.limitHold,
     })
+    // T-186: a quote the business made never asks the customer anything. While the business has its
+    // own questions to answer, the customer's page reads as a quote the business is still preparing.
+    const requestOfQuote = ((r: unknown) => (Array.isArray(r) ? r[0] : r))((quote as { quote_requests?: unknown }).quote_requests) as { source_json?: unknown } | null | undefined
+    const customerStatus: typeof quote.status = businessIsAsked(quote.status, isMadeByBusiness(requestOfQuote?.source_json)) ? 'pending_review' : quote.status
     const isProvisional =
-      (quote.status === 'awaiting_clarification' || quote.status === 'pending_review') && !shownEarly
+      (customerStatus === 'awaiting_clarification' || customerStatus === 'pending_review') && !shownEarly
     let provisional: QuoteViewResponse['provisional']
     const storedRange = (pricing as { range?: { low?: number; high?: number } }).range
     const measuredLow = storedRange?.low ?? pricing.estimate?.rangeLow
@@ -235,7 +240,7 @@ export async function GET(
     const hasMeasuredRange = measuredLow !== undefined && measuredHigh !== undefined && measuredHigh > measuredLow
     // T-146: while the business reviews, show the instant range only if the
     // engine measured one — never a made-up ±12% around a flat price.
-    const showRange = quote.status === 'awaiting_clarification' || hasMeasuredRange
+    const showRange = customerStatus === 'awaiting_clarification' || hasMeasuredRange
     if (isProvisional && (pricing.total || 0) > 0 && showRange) {
       const total = pricing.total || 0
       // Prefer the engine's measured range; fall back to ±12%, rounded to 10s
@@ -244,7 +249,7 @@ export async function GET(
       provisional = {
         rangeLow: low,
         rangeHigh: high,
-        reason: quote.status as 'awaiting_clarification' | 'pending_review',
+        reason: customerStatus as 'awaiting_clarification' | 'pending_review',
       }
     }
 
@@ -304,7 +309,7 @@ export async function GET(
 
     const response: QuoteViewResponse = {
       quoteId: quote.id,
-      status: quote.status,
+      status: customerStatus,
       documentType: quote.document_type,
       locale: regionCtx.locale,
       version: quote.version ?? 1,
@@ -320,7 +325,7 @@ export async function GET(
       ...(provisional && { provisional }),
       // T-108: surface stored questions so the clarify page can render them
       // (previously never returned — the clarify page could not load questions)
-      ...(quote.status === 'awaiting_clarification' &&
+      ...(customerStatus === 'awaiting_clarification' &&
         quote.clarification_questions_json && {
           clarificationQuestions: quote.clarification_questions_json,
         }),

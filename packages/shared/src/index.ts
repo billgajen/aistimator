@@ -60,6 +60,8 @@ export * from './service-suggestion'
 export * from './quote-sections'
 export * from './line-labels'
 export * from './quantity-source'
+// T-186: how a question on a quote is answered (buttons, then "Other")
+export * from './question-choices'
 export * from './approval-detail'
 
 // ID prefixes for stable, readable IDs

@@ -301,8 +301,9 @@ describe('T-183: the approval detail', () => {
   it('every line has its amount and, where it is known, its source', () => {
     const [main] = detail().parts
     expect(main!.lines).toEqual([
-      { label: 'Walls  $2 x 90(sq ft)', amount: '$180.00', source: 'Measured from photos' },
-      { label: 'Doors  $40 x 3(doors)', amount: '$120.00', source: "The customer's answer" },
+      // T-186: a label stored the old way ("$2 x 90(sq ft)") is shown the way a new one is written
+      { label: 'Walls  $2 × 90 sq ft', amount: '$180.00', source: 'Measured from photos' },
+      { label: 'Doors  $40 × 3 doors', amount: '$120.00', source: "The customer's answer" },
       { label: 'Typed by the business', amount: '$20.00', source: null },
     ])
   })
@@ -379,7 +380,7 @@ describe('T-183: the review email', () => {
 
   it('shows every warning, each line with its amount and source, each service’s subtotal and the one total', () => {
     for (const text of ['Check the service', 'Customer also asked for', 'Worth checking']) at(text)
-    for (const text of ['Walls  $2 x 90(sq ft)', '$180.00', 'Measured from photos', 'The customer&#39;s answer', 'Your fixed price']) at(text)
+    for (const text of ['Walls  $2 × 90 sq ft', '$180.00', 'Measured from photos', 'The customer&#39;s answer', 'Your fixed price']) at(text)
     expect(html.match(/data-role="part"/g)).toHaveLength(2)
     expect(html.match(/data-role="part-subtotal"/g)).toHaveLength(2)
     at('$320.00')

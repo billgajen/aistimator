@@ -129,7 +129,7 @@ describe('T-156: issuing the link', () => {
   it('the worker issues it only inside the review-email branch, which demo requests never reach; test requests are marked', () => {
     const src = readFileSync(join(__dirname, '..', 'quote-processor.ts'), 'utf8')
     expect(src).toMatch(/const emailOn = quoteData\.quote\.is_demo !== true && isEmailConfigured/)
-    const branch = src.slice(src.indexOf("quoteRequest.source_json?.type !== 'app' &&"), src.indexOf('Review request email error'))
+    const branch = src.slice(src.indexOf('!isMadeByBusiness(quoteRequest.source_json) &&'), src.indexOf('Review request email error'))
     expect(branch).toContain('emailOn')
     expect(branch).toContain('issueApprovalLink(supabase')
     expect(branch).toContain('isTest: quoteData.quote.is_test === true')

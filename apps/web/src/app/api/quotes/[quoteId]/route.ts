@@ -27,8 +27,8 @@ import type {
   QuoteDetailResponse,
   AmendmentSummary,
 } from '@qolumns/shared'
-import { CHECKER_SETTINGS_VERSION, carrySources, serviceSuggestionOf, MAX_ADDED_SECTIONS, addedSections, alsoAskedOf, alsoAskedWithStates, editedSectionBreakdown, withSections } from '@qolumns/shared'
-import type { CombinedPricing, QuoteSection } from '@qolumns/shared'
+import { CHECKER_SETTINGS_VERSION, businessIsAsked, carrySources, isMadeByBusiness, serviceSuggestionOf, MAX_ADDED_SECTIONS, addedSections, alsoAskedOf, alsoAskedWithStates, editedSectionBreakdown, withSections } from '@qolumns/shared'
+import type { ClarificationQuestion, CombinedPricing, QuoteSection } from '@qolumns/shared'
 import { sectionTaxFor } from '@/lib/quote-sections-service'
 import { sectionsEmailHtml } from '@/lib/sections-email'
 import { fieldLabels, formFields, requestDetails } from '@/lib/request-details'
@@ -176,6 +176,7 @@ export async function GET(
       answers: (quote as { clarification_answers_json?: unknown }).clarification_answers_json,
       expectedSignals: (quote.service as { expected_signals?: unknown } | null)?.expected_signals,
       checker: checkerRow ? { issues: checkerRow.issues, checkedTotal: checkerRow.checked_total } : null,
+      madeByBusiness: isMadeByBusiness(requestRow?.source_json),
     })
 
     const amendments: AmendmentSummary[] = (amendmentsResult.data || []).map(
@@ -234,6 +235,18 @@ export async function GET(
       understanding,
       request: requestDetails(requestRow, fieldLabels(fieldRows.data as FieldRow[] | null, quote.service_id), formFields(fieldRows.data as FieldRow[] | null, quote.service_id)),
       serviceSuggestion: serviceSuggestionOf(requestRow?.source_json),
+      // T-186: a quote the business made asks the business, on this page; a customer's asks the customer
+      madeByBusiness: isMadeByBusiness(requestRow?.source_json),
+      businessQuestions: businessIsAsked(quote.status, isMadeByBusiness(requestRow?.source_json))
+        ? (((quote as { clarification_questions_json?: unknown }).clarification_questions_json as ClarificationQuestion[] | null) ?? []).map((q) => ({
+            id: q.id,
+            question: q.question,
+            ...(q.type && { type: q.type }),
+            ...(q.aiValue !== undefined && { aiValue: q.aiValue }),
+            ...(q.evidence && { evidence: q.evidence }),
+            ...(q.options && { options: q.options }),
+          }))
+        : [],
     }
 
     return NextResponse.json(response)
