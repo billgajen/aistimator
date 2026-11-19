@@ -734,6 +734,39 @@ export interface AppCreateQuoteResponse {
 export interface AppQuoteLine {
   label: string
   amount: number
+  /** T-184: where the line's quantity came from, in the business's words ("Measured from photos"); absent when not known */
+  source?: string
+}
+
+/** T-184: something else the customer asked for in their note (T-179), with where it stands in a sentence */
+export interface AppAlsoAsked {
+  words: string
+  serviceName?: string
+  state: 'offered' | 'added' | 'not_offered'
+  stateWords: string
+}
+
+/**
+ * T-184: what the app's Account tab shows. No price and no purchase link is
+ * ever in here: the app must not point at a purchase outside it.
+ */
+export interface AppAccountResponse {
+  businessName: string
+  /** A short-lived signed address of the business's logo, or null */
+  logoUrl: string | null
+  /** "Pro", or null for a business on the free allowance */
+  planName: string | null
+  usage: {
+    used: number
+    /** 0 when there is no limit */
+    limit: number
+    unlimited: boolean
+    /** this calendar month, or all time (the free allowance never resets) */
+    per: 'month' | 'total'
+  }
+  /** The business's own request page, to show a customer on site (T-149); null when it has none */
+  quoteLink: string | null
+  supportEmail: string
 }
 
 /** T-182: a service added to a quote (T-179), with its own lines and subtotal */
@@ -785,6 +818,8 @@ export interface AppQuoteView {
     paidAt: string | null
     declinedAt: string | null
     expiresAt: string | null
+    /** T-184: when the business approved it (empty on a quote sent automatically), for the progress steps */
+    approvedAt?: string | null
   }
   /** The money rows under the lines. `tax` is absent when the quote has none. */
   totals?: { subtotal: number; tax?: { label: string; amount: number }; total: number }
@@ -798,6 +833,10 @@ export interface AppQuoteView {
   sections?: AppQuoteSection[]
   /** T-178: what was sent with the request, so a request that could not be priced can be quoted by hand */
   request?: RequestDetails
-  /** The request's photos, each a short-lived signed address (never a storage path) */
-  photos?: Array<{ id: string; url: string }>
+  /** The request's photos, each a short-lived signed address (never a storage path). `url` is the small copy; `fullUrl` the photo itself (T-184). */
+  photos?: Array<{ id: string; url: string; fullUrl?: string }>
+  /** T-184: how many photos the request carries, so the app can say when one could not be shown */
+  photoCount?: number
+  /** T-184: what else the customer asked for (T-179), as the dashboard lists it */
+  alsoAsked?: AppAlsoAsked[]
 }

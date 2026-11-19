@@ -31,7 +31,7 @@ import { CHECKER_SETTINGS_VERSION, carrySources, serviceSuggestionOf, MAX_ADDED_
 import type { CombinedPricing, QuoteSection } from '@qolumns/shared'
 import { sectionTaxFor } from '@/lib/quote-sections-service'
 import { sectionsEmailHtml } from '@/lib/sections-email'
-import { fieldLabels, requestDetails } from '@/lib/request-details'
+import { fieldLabels, formFields, requestDetails } from '@/lib/request-details'
 import type { FieldRow } from '@/lib/request-details'
 import type {
   QuotePricing,
@@ -232,7 +232,7 @@ export async function GET(
       smsActive: (smsResult.data as { is_active?: boolean } | null)?.is_active === true,
       photos,
       understanding,
-      request: requestDetails(requestRow, fieldLabels(fieldRows.data as FieldRow[] | null, quote.service_id)),
+      request: requestDetails(requestRow, fieldLabels(fieldRows.data as FieldRow[] | null, quote.service_id), formFields(fieldRows.data as FieldRow[] | null, quote.service_id)),
       serviceSuggestion: serviceSuggestionOf(requestRow?.source_json),
     }
 

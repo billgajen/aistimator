@@ -54,3 +54,31 @@ export const type = {
   title: 24,
   figure: 36,
 }
+
+/**
+ * The three brand faces (Docs/design/system.md, Type): Bricolage Grotesque
+ * for headings and the wordmark, Instrument Sans for text, Spline Sans Mono
+ * for every figure. Each weight is its own font file, so a style names the
+ * family and never sets `fontWeight` beside it (a weight on a custom face
+ * falls back to the phone's own font). They are loaded once in app/_layout;
+ * until then, and if they cannot be loaded, the phone's own font is used.
+ */
+export const fonts = {
+  display: 'BricolageGrotesque_800ExtraBold',
+  displayBold: 'BricolageGrotesque_700Bold',
+  body: 'InstrumentSans_400Regular',
+  semi: 'InstrumentSans_600SemiBold',
+  bold: 'InstrumentSans_700Bold',
+  figure: 'SplineSansMono_500Medium',
+  figureBold: 'SplineSansMono_600SemiBold',
+}
+
+/**
+ * Dynamic Type: text grows with the phone's text-size setting. The largest
+ * figures and titles stop at 1.4 times so a price never runs off the screen;
+ * ordinary text follows the setting all the way to 2 times.
+ */
+export const scale = { text: 2, large: 1.4 }
+
+/** One icon set for the whole app: Ionicons, outline style, these sizes */
+export const icon = { small: 18, row: 22, tab: 26, large: 32 }

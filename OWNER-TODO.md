@@ -2584,3 +2584,169 @@ quote page was asked for with a made-up link, so please open one real customer l
 - Every earlier deploy was checked against the development server only. The full level now uses the built
   app, so this gap is closed for the scripts in the standard set (25 of 32).
 - The emails still use their old colours (blue buttons, grey text), not the design system's. A design ticket.
+
+---
+
+## T-184 — The app as a professional on-site tool
+
+Built and pushed 19 November 2026. **Not deployed.** The web side changed in three small ways (below), so say
+"deploy T-184" (web only: no worker, no migration) **before** you test the app against production. Without it
+the Account tab does not load, and the quote screen has no "Customer also asked for", no sources and shows
+answers as before.
+
+I have still not seen the app run: there is no iPhone, simulator or Xcode on this machine.
+
+### What to try on your phone (Expo Go, as before)
+
+On the Mac: `cd ~/Documents/Estimator && pnpm install && cd apps/mobile && npx expo start`. Scan the code.
+
+- [ ] **The red BigInt message is gone.** Take two photos on the Photos step and carry on to About the job
+  while they upload. Each photo should count up ("Uploading 40%") and no red message should appear. If one
+  does, send me a screenshot of the whole red box.
+- [ ] **Three tabs at the bottom:** Quotes, a round New quote button in the middle, Account. Reach each with
+  one thumb.
+- [ ] **Quotes:** "Needs you" first with its count in yellow, then "Waiting for customer", "Accepted",
+  "Everything else". Type a customer's name in the search box. Pull the list down to refresh.
+- [ ] **A quote:** the photos are near the top; tap one, it fills the screen, pinch to zoom, swipe to the next,
+  close. If a tile says "Try again", tell me (see "The missing photos" below).
+- [ ] **The request** shows "Standard (8 ft)", not "standard_(8_ft)".
+- [ ] **No "Grade A · Confirmed".** Under the price there is one plain sentence about how sure it is.
+- [ ] **While pricing:** after "Price this job" the screen lists four stages and ticks them off, then shows the
+  price in the same place.
+- [ ] **After Approve & send:** a card "The customer's link" with "Send the link again" and "Copy link".
+  Further down: "Edit in the dashboard" opens the quote in Safari.
+- [ ] **Account:** your business name (and logo), "Pro" and how many quotes are used, "Show the QR code". Point
+  another phone's camera at the code: it should open Bluum's request page. Help opens an email. Sign out is
+  here, and no longer in the quotes list.
+- [ ] **Room scan card:** make a quote for a service that prices by a room's size (the painting pack's
+  services do; Bluum needs one of them for this). On "About the job" there is a "Room scan" card, greyed,
+  saying "Room scan needs the full app".
+- [ ] **How it looks:** the headings are in the brand's heavy face, figures in the mono face. Buttons give a
+  light tap. Turn on Settings, Accessibility, Display & Text Size, Larger Text and look at one screen. Turn on
+  VoiceOver for a minute and swipe through the Quotes tab: every control should say what it is.
+- [ ] The icon and splash do not show in Expo Go (it uses its own). They appear in the full app.
+
+### The missing photos: I could not find the cause
+
+You saw no photos on the quote screen. The server's side works here (it is checked with a real photo), and I
+was not able to look at your test quotes on production. So I made the screen tell us which it is:
+
+- The photos now have their own card near the top, headed "2 photos".
+- If the request has photos but they cannot be signed, the card says "The photos could not be shown just now".
+- If a photo is listed but will not load on the phone, its tile says "Try again".
+- If there is no photos card at all, the request reached the server with no photos attached.
+
+- [ ] **Please also open the same quote in the dashboard on your Mac** and tell me whether the photos are
+  there. That one answer tells me whether to look at the upload or at the phone's display.
+
+### Getting the full app on your iPhone 15 Pro (for the room scan)
+
+The room scan is native code. Expo Go cannot run it. There are two ways to get a build that can. **I have
+tried neither: there is no Xcode here, and the scanner's own code (written in T-138) has never been compiled.**
+The first build may fail on something small in that code; send me the error and I fix it.
+
+**(a) Free: Xcode and your own Apple ID.** No Apple Developer account. The app stops opening after 7 days and
+must be installed again; no TestFlight; nobody else can install it.
+
+1. Install **Xcode** from the Mac App Store (free, about 12 GB, takes a while). Open it once, agree to the
+   licence, and let it install the iOS platform when it asks.
+2. In Terminal, once: `sudo xcode-select -s /Applications/Xcode.app` then `brew install cocoapods`
+   (if you have no Homebrew: `sudo gem install cocoapods`).
+3. Xcode, Settings, Accounts, the plus button, **Apple Account**: sign in with your own Apple ID. It appears
+   as a "Personal Team".
+4. Plug the iPhone into the Mac with a cable. On the phone tap **Trust**. Then on the phone: Settings, Privacy
+   & Security, **Developer Mode**, on. It restarts; confirm when it comes back.
+5. In Terminal:
+   ```bash
+   cd ~/Documents/Estimator/apps/mobile
+   npx expo install expo-dev-client
+   APP_VARIANT=dev npx expo run:ios --device --configuration Release
+   ```
+   Choose your iPhone when asked, and your Personal Team if asked. The first build takes 10 to 20 minutes.
+   `APP_VARIANT=dev` makes it "Qolumns Dev" with its own identifier, so the real name stays free for the App
+   Store later. `Release` puts everything in the app, so it works on site with the Mac at home.
+6. The first time, the phone refuses to open it: Settings, General, **VPN & Device Management**, your Apple
+   ID under Developer App, **Trust**.
+7. Open **Qolumns Dev**, sign in, start a quote for a painting service. On "About the job" the Room scan card
+   is now live: **Scan a room**, walk the room slowly, finish.
+8. After step 5, Expo Go is started with `npx expo start --go` (plain `npx expo start` now expects the full
+   app).
+
+**(b) The Apple Developer account and an EAS build.** $99 a year. The build is made on Expo's servers, lasts a
+year, can go to other people's phones, and is the road to TestFlight and the App Store.
+
+1. Enrol in the **Apple Developer Program** as the company (Billiom Limited). Apple checks the company's
+   D-U-N-S number; allow a few days.
+2. Make a free **Expo account** at expo.dev.
+3. In Terminal:
+   ```bash
+   cd ~/Documents/Estimator/apps/mobile
+   npm install -g eas-cli
+   eas login
+   eas init
+   npx expo install expo-dev-client
+   eas device:create
+   ```
+   `eas device:create` gives a link or QR code: open it on the iPhone and install the profile it offers. That
+   registers the phone.
+4. `eas build --profile development --platform ios`. Say yes when it offers to make the certificates. It takes
+   about 15 to 25 minutes and ends with a QR code: scan it with the iPhone to install.
+5. On the phone: Settings, Privacy & Security, **Developer Mode**, on.
+6. On the Mac: `npx expo start --dev-client`, same Wi-Fi, and open **Qolumns Dev** on the phone. (This build
+   loads the app's code from the Mac. For one that works away from the Mac, ask me for a "preview" build: one
+   more command.)
+7. For TestFlight later: `eas build --profile production --platform ios`, then `eas submit`. The list of what
+   App Store Connect needs is in the T-182 section.
+
+**Which:** (a) today if you want to see the scan this week; (b) when the account exists, and for anyone else to
+try the app.
+
+**What I could not test, for both:** that the scanner's Swift code compiles; that the scan opens and returns a
+room; that its sizes fill the service's questions on a real phone; how accurate it is (the T-138 accuracy
+check is still open); the commands above on your Mac.
+
+### What changed on the server (web only)
+
+- `GET /api/app/quotes/:id` (the app's own): each line carries where its quantity came from; photos carry the
+  small copy and the photo itself; how many photos the request has; "Customer also asked for"; when it was
+  approved.
+- `GET /api/app/account` (new, the app's own): the business's name and logo, the plan's name, quotes used, the
+  quote link. No price, no way to buy.
+- Answers are shown by their option's label ("Standard (8 ft)") on the dashboard quote page too, not only in
+  the app. It is the same request, read by one function.
+- The six emails to the business from the web app (customer feedback, plan limit, request held, quote
+  accepted, quote declined, WhatsApp renewal) no longer end "Powered by Qolumns". Customer emails are
+  unchanged.
+- **Left as it was:** the "New quote" email to the business is sent by the worker, and this ticket says no
+  worker changes. It still says "Powered by Qolumns". One line, in the next ticket that touches the worker.
+
+### Decisions for you (my recommendation first)
+
+1. **The stages while pricing are four real ones** (photos uploaded, job sent, working out the price, price
+   ready). Finer ones (reading the photos, measuring, writing the wording) would need the worker to record its
+   progress and a small change to the quote API. Recommended: a later ticket, with the same stages shown to the
+   customer on the website.
+2. **"Message" opens the phone's Messages** with the customer's number. Recommended: keep. (WhatsApp is still
+   offered by the share sheet when you send the link.)
+3. **The icon is the temporary wordmark on juniper** (the one made for the Meta app). Recommended: replace it
+   and the splash when the logo exists.
+4. **The Quotes tab shows the newest 50.** Search asks the server, so older ones are found by name.
+   Recommended: add "load more" only if you find yourself scrolling for one.
+
+### Not proven
+
+- Anything on a phone: the BigInt fix on a real upload, the tabs, the fonts, haptics, Larger Text, VoiceOver,
+  the photo viewer, the QR code being read by a camera, copying a link.
+- The cause of the BigInt message is what the library's code and the message itself say (iOS reports upload
+  progress in 64-bit integers; the app divided two of them and gave the result to a function that takes
+  ordinary numbers; a unit test shows that exact step throws that kind of error). I did not see it happen on
+  a phone, so the first tick above is the proof.
+- Why the quote screen showed no photos (above).
+- Both ways of getting the full app, and the room scan itself.
+
+### Later
+
+- The worker's "New quote" email: drop "Powered by".
+- Finer pricing stages (decision 1).
+- Phone notifications when a customer accepts; Android; "load more" on Quotes.
+- The App Store list from T-182 still stands (the reviewer's sign-in, the privacy answers, screenshots).

@@ -2,6 +2,12 @@
  * Additional email templates for the quote editing and feedback flow.
  * Supplements the existing templates in postmark.ts.
  */
+/**
+ * T-184: the emails in this file that go to the BUSINESS (customer feedback, the plan limit, a
+ * request held, quote accepted, quote declined, WhatsApp renewal) carry no "Powered by" line:
+ * they are from the product itself. The two that go to a customer (updated quote, reminder)
+ * keep theirs. A unit test holds both (app-t184.test.ts).
+ */
 import { PRODUCT_NAME } from '@qolumns/shared'
 
 function escapeHtml(text: string): string {
@@ -174,13 +180,6 @@ export function generateFeedbackNotificationEmailHtml(data: {
             </td>
           </tr>
         </table>
-        <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
-          <tr>
-            <td style="text-align: center; color: #9ca3af; font-size: 12px;">
-              Powered by ${PRODUCT_NAME}
-            </td>
-          </tr>
-        </table>
       </td>
     </tr>
   </table>
@@ -288,13 +287,6 @@ function generateLimitReachedEmailBody(
             </td>
           </tr>
         </table>
-        <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
-          <tr>
-            <td style="text-align: center; color: #9ca3af; font-size: 12px;">
-              Powered by ${PRODUCT_NAME}
-            </td>
-          </tr>
-        </table>
       </td>
     </tr>
   </table>
@@ -375,13 +367,6 @@ export function generateQuoteAcceptedEmailHtml(data: {
             </td>
           </tr>
         </table>
-        <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
-          <tr>
-            <td style="text-align: center; color: #9ca3af; font-size: 12px;">
-              Powered by ${PRODUCT_NAME}
-            </td>
-          </tr>
-        </table>
       </td>
     </tr>
   </table>
@@ -454,13 +439,6 @@ export function generateQuoteDeclinedEmailHtml(data: {
               <p style="margin: 24px 0 0; color: #6b7280; font-size: 13px; line-height: 1.5;">
                 You can follow up with the customer or revise the quote from your dashboard.
               </p>
-            </td>
-          </tr>
-        </table>
-        <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
-          <tr>
-            <td style="text-align: center; color: #9ca3af; font-size: 12px;">
-              Powered by ${PRODUCT_NAME}
             </td>
           </tr>
         </table>
@@ -594,9 +572,6 @@ export function generateWhatsAppRenewalEmailHtml(data: {
               <a href="${data.whatsappUrl}" style="display: inline-block; padding: 12px 24px; background-color: #205e56; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600;">
                 Reconnect WhatsApp
               </a>
-              <p style="margin: 32px 0 0; color: #9ca3af; font-size: 12px;">
-                Powered by ${PRODUCT_NAME}
-              </p>
             </td>
           </tr>
         </table>

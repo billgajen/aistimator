@@ -720,6 +720,20 @@ GET /api/app/bootstrap
 200: `{ "tenantName": "…", "tenantKey": "tkey_…", "currency": "USD", "region": { "code": "US", "locale": "en-US", "postalCodeLabel": "ZIP code" } }`
 409 `NO_SITE` when the tenant has no active widget site (the app uses the widget's form).
 
+GET /api/app/account (T-184)
+The app's Account tab: a small read of what the dashboard already shows.
+200: `{ "businessName": "…", "logoUrl": "<signed address, a few minutes>" | null, "planName": "Pro" | null, "usage": { "used": 37, "limit": 200, "unlimited": false, "per": "month" | "total" }, "quoteLink": "https://…/quote/<slug>" | null, "supportEmail": "…" }`
+- `planName` is null for a business on the free allowance; `usage.limit` is 0 and `unlimited` true when the plan has no limit; `per: "total"` is the free allowance, which never resets.
+- **It never answers a price, an upgrade or a link to billing:** the app may not point at a purchase outside it.
+- Tenant-scoped (RLS and an explicit filter); the limit is read by `checkPlanLimit`, the function that enforces it.
+
+T-184 additions to `GET /api/app/quotes/:id` (all additive):
+- `lines[].source` and `sections[].lines[].source`: where the line's quantity came from, in the business's words ("Measured from photos"); absent when not known.
+- `photos[]` is `{ id, url, fullUrl }`: `url` the small copy (the photo itself when it has none), `fullUrl` the photo. `photoCount` is how many photos the request has, whether or not they were signed this time.
+- `alsoAsked[]`: `{ words, serviceName?, state, stateWords }`, what else the customer asked for (T-179) and where each stands.
+- `dates.approvedAt`.
+- `request.answers[].value` is the option's label for a choice ("Standard (8 ft)"), on this route and on `GET /api/quotes/:id` (`answerText`, shared).
+
 POST /api/app/quotes
 Request: `{ "serviceId", "customer": { "name", "email?", "phone?" }, "job?": { "address?", "postcodeOrZip?", "answers": [{ "fieldId", "value" }] }, "assetIds?": [], "scan?", "clientRequestId?" }`
 Same intake as `POST /api/public/quotes` (field and photo validation, plan limits, queue), without bot checks or the AI service match. `source_json = { "type": "app", "userId", "clientRequestId?" }`.

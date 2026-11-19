@@ -19,6 +19,7 @@
 
 import type { AppCreateQuoteRequest, AppCreateQuoteResponse, RoomScanRoom } from '@qolumns/shared'
 import { toApiError, type ApiError } from './api'
+import { clamp01, toNumber } from './numbers'
 import type { RawAnswers } from './answers'
 
 // ---------------------------------------------------------------------------
@@ -179,7 +180,7 @@ export interface DraftProgress {
 export function draftProgress(draft: Draft): DraftProgress {
   const photosTotal = draft.photos.length
   const photosDone = draft.photos.filter((p) => p.state === 'done').length
-  const partial = draft.photos.reduce((sum, p) => sum + (p.state === 'done' ? 1 : p.state === 'uploading' ? p.progress : 0), 0)
+  const partial = draft.photos.reduce((sum, p) => sum + (p.state === 'done' ? 1 : p.state === 'uploading' ? clamp01(p.progress) : 0), 0)
   const fraction = photosTotal === 0 ? 1 : Math.min(1, partial / photosTotal)
   let line: string
   if (draft.problem) line = draft.problem.message
@@ -325,7 +326,7 @@ export function createOutbox(deps: OutboxDeps) {
     try {
       await deps.files.put(uploadUrl, photo, (fraction) => {
         // a photo that was removed or retaken meanwhile is no longer in the draft
-        setPhoto(draftId, photo.id, { progress: Math.max(0, Math.min(1, fraction)) }, false)
+        setPhoto(draftId, photo.id, { progress: clamp01(fraction) }, false)
       })
     } catch (raw) {
       const error = toApiError(raw)
@@ -488,7 +489,8 @@ export function createOutbox(deps: OutboxDeps) {
         problem: d.problem?.kind === 'refused' ? null : d.problem,
         photos: [
           ...d.photos.filter((p) => !replaced.includes(p)),
-          { ...photo, id: deps.newId(), state: 'waiting', progress: 0 },
+          // the size is the phone's own figure: made an ordinary number before it is stored or sent (numbers.ts)
+          { ...photo, sizeBytes: toNumber(photo.sizeBytes), id: deps.newId(), state: 'waiting', progress: 0 },
         ],
       }))
       for (const old of replaced) void deps.files.remove(old.uri)

@@ -15,6 +15,179 @@
 
 ## Issues & Resolutions
 
+### 2026-11-19: T-184 — The app as a professional on-site tool: tabs, the quote screen, Account, the room scan card, the look
+
+Built and pushed, **not deployed**. The app, and three small things on the web (two routes only the app uses,
+one display rule shared with the dashboard, and six emails). No worker change, no migration, no pricing, no
+Stripe. The owner tests the app in Expo Go; the web side must be deployed before that test.
+
+Nobody has seen the app run: there is no iPhone, simulator or Xcode on the build machine.
+
+#### 1. Bugs from the owner's phone test (iPhone 15 Pro, Expo Go, 18 November)
+
+**"Cannot convert BigInt to number", a red message on the Photos and About the job steps**
+- **Cause:** iOS reports an upload's progress as two 64-bit integers (`bytesSent`, `totalBytes`:
+  `expo-file-system/ios/FileSystemUploadTask.swift`), and they reach JavaScript as BigInt, whatever the
+  library's types say (`number`). The app divided one by the other and passed the result on, and the queue did
+  `Math.min(1, fraction)`: a BigInt given to `Math.min` throws exactly this. It happened on every progress tick,
+  which is why it showed on both steps (photos upload in the background while the questions are answered).
+  The upload itself carried on, so the quote still went.
+- **Not reproduced on a phone** (there is none here). A unit test does the same step with BigInts and gets the
+  same kind of error; the owner's next test is the proof.
+- **Fix:** `apps/mobile/src/lib/numbers.ts` (`toNumber`, `fractionOf`, `clamp01`). Every number that comes
+  from the phone goes through it: upload progress, a kept photo's size, a picked photo's width and height. The
+  progress callback is wrapped so that showing progress can never throw. A photo's size is made an ordinary
+  number before it is stored (a BigInt cannot be written as JSON either).
+- **No raw error text reaches the screen:** `src/lib/errors.ts` (`plainError`). The server's own sentence is
+  shown as it is; anything a program wrote (a type error, "Request failed (500)", code) is replaced by a plain
+  line. Every screen uses it, the sign-in screen no longer shows the sign-in service's wording, and
+  `ErrorBoundary` catches a fault while a screen is drawn.
+
+**A choice answer shown as its stored value ("standard_(8_ft)")**
+- **Cause:** `requestDetails` (T-178) printed `job_answers` values as stored. A select stores the option's
+  value; the label was never looked up.
+- **Fix:** `answerText(field, value)` in `packages/shared/src/line-labels.ts`, beside T-183's line naming (the
+  same "an option is shown by its label" rule). `requestDetails` uses it with the form's own options
+  (`formFields`), so the **dashboard's quote page and the app** both show "Standard (8 ft)". A stored id with
+  no label on file is tidied; text a person typed is left alone.
+
+**"Grade A · Confirmed"**
+- The app shows the sentence the pricing engine writes for the business about how sure the price is
+  (`estimate.description`), which the dashboard shows under its grade mark, and no grade letter or label.
+
+**"Sign out" in the middle of the quotes list:** it is on the Account tab.
+
+**The step progress bar partly hidden under the header:** the new-quote screen draws its own top (`TopBar`)
+with the step count and bar inside it, above the part that scrolls. The tabs have no navigation header at all,
+so nothing can sit over a screen's content.
+
+**The quote screen shows no photos: cause not found.**
+- The server's side is right here (`verify-t182` opens a real photo by its signed address; a unit test covers
+  the view). Production's data for the owner's test could not be looked at.
+- One thing was made safer: a photo is no longer left out if its small copy cannot be found or signed (the
+  photo itself is used).
+- The screen now says which case it is: a photos card near the top with the count; "could not be shown just
+  now" when the request has photos but none could be signed; a tile that says "Try again" when a photo will
+  not load on the phone; no card at all when the request has none. The view carries `photoCount` for this.
+
+#### 2. Structure: three tabs
+
+`app/(tabs)/`: **Quotes**, **New quote** in the centre (a juniper disc that stands proud of the bar; it reads
+"Carry on" while a quote is unfinished), **Account**. The bar clears the home indicator. An unfinished quote is
+reachable from the Quotes tab ("On this phone") and from the centre tab. A quote that sends itself while the
+trade is on another tab does not pull them to its page.
+
+#### 3. Quotes tab
+
+Groups, order and names from `quote-turn.ts` (`quoteGroupOf`, the dashboard's tab names): "Needs you" first
+with its count on the strong yellow with the dark marker, then "Waiting for customer", "Accepted", "Everything
+else". A request that could not be priced and one held at the plan limit are in "Needs you" with the
+dashboard's reason, and no figure. Search by customer name (the list narrows at once; the server is asked
+after a pause). Pull to refresh. Skeleton rows on the first load. An empty state with "Start a quote". Each row:
+customer, service, total, state, the detail line, when.
+
+#### 4. Quote screen
+
+- Photos near the top, small copies, each opening full screen (`app/photo.tsx`: swipe, pinch, close).
+- Call, Message and Email buttons when the customer has a phone or an email.
+- Progress steps from the shared `quoteTracker` (T-158): received, approved, opened, accepted.
+- After approval: "Send the link again" and "Copy link".
+- "Customer also asked for" (T-179) with where each stands, in the words the approval page uses
+  (`alsoAskedStateWords`, now exported). Sections as before. Each line shows where its quantity came from in
+  the business's words (T-183's `sourceForBusiness`, sent by the server).
+- "Edit in the dashboard" opens the web quote. Nothing is edited in the app.
+- **While pricing:** `PricingStages`, on the sending view and then on the quote screen in the same place the
+  price appears: photos uploaded, job sent, working out the price, price ready. **Only stages the app knows for
+  certain.** The steps inside pricing (reading photos, measuring, wording) are not recorded by the worker;
+  showing them needs a worker change and a field on the quote API. Reported, not built.
+
+#### 5. Account tab
+
+Business name and logo, the plan's name and quotes used with a bar, the quote link and a full-screen QR code
+(`app/link.tsx`; drawn from plain views with the dashboard's encoder), Help (an email to the support address),
+the version, sign out. **No price, no "upgrade", no link to billing, anywhere in the app** (a unit test holds
+it). The quote screen's line about plans no longer names Billing.
+
+#### 6. Room scan
+
+The scan card is shown wherever a service has a quantity a scan can measure. Where the scan cannot run because
+the app has no scanner in it (Expo Go), the card is there, disabled, with "Room scan needs the full app", and
+the sizes can be typed in (`roomScanAvailability()`). Both ways to get the full app on the owner's iPhone are
+in OWNER-TODO. `app.config.js` gives a trial build its own identifier (`com.qolumns.app.dev`, with
+`APP_VARIANT=dev`) so the real one stays free for the App Store; `eas.json` holds the build profiles.
+**Neither way was tried, and the scanner's Swift code has never been compiled.**
+
+#### 7. Look and feel
+
+- The three brand faces (`@expo-google-fonts`), named by family and never with a weight beside them. The
+  splash stays until they are loaded; if they cannot be, the phone's own font is used.
+- One icon set (Ionicons), always through the `Icon` component.
+- A light tap on a screen's main button; a "done" pattern on approve and copy (`src/lib/feel.ts`).
+- Text follows the phone's text size (the largest figures stop at 1.4 times). With Reduce Motion on, the
+  loading blocks are still.
+- A spoken label on every control, and on each price row, progress step and photo.
+- The icon and splash are the temporary wordmark on juniper already made for the Meta app. Expo Go shows
+  neither.
+
+#### 8. Web
+
+- The six emails the web app sends to the business (customer feedback, plan limit reached, request held,
+  quote accepted, quote declined, WhatsApp renewal) have no "Powered by" line. The two it sends to a customer
+  keep theirs.
+- **Left alone:** the worker's "New quote" email to the business still has the line. This ticket forbids
+  worker changes.
+
+#### API changes (all additive; reported as the ticket asks)
+
+| Route | Change |
+|---|---|
+| `GET /api/app/quotes/:id` (the app's own) | lines carry `source` (the business's words); `photos[].fullUrl`; `photoCount`; `alsoAsked[]`; `dates.approvedAt` |
+| `GET /api/app/account` (new, the app's own) | name, logo address, plan name, usage, quote link, support address. A read of what the dashboard already shows |
+| `GET /api/quotes/:id` (dashboard) | `request.answers[].value` is the option's label. The same field; a display value only |
+
+Nothing else was needed. The app also calls two existing dashboard routes it did not call before
+(`GET /api/quotes?search=`, already there; `POST /api/quotes/:id/link`, already used).
+
+**Would need more than a small read:** the finer pricing stages (section 4).
+
+#### Verified
+
+- **App:** typecheck, lint, **82 unit tests** (34 new in `app-t184.test.ts`: the BigInt step and its fix
+  through the real queue, plain errors, the groups, the stages, the Account words, the QR matrix, and what the
+  screens' source must hold: tabs, where sign out is, the scan card, no grade, no weight beside a custom face,
+  a label on every pressable), and the full iOS bundle (`npx expo export --platform ios`, 3.9 MB Hermes).
+- **Web:** 22 new unit tests (`app-t184.test.ts`): answers by label, the view's additions, the Account read,
+  the six emails. Web unit tests 1,137, worker 631.
+- **`pnpm check:quick`, once: 26 of 28.** Both failures were this ticket's own and are fixed:
+  - `unit-web`: T-174's test found the product's address typed in a comment of a new app file. Removed.
+  - `verify-t162` expected "Powered by" on the quote-accepted email. The script now expects none on an email
+    to the business.
+  Then `pnpm check:failed`: 4 of 4 (which also built the web app again from the final source).
+- `pnpm check:full` was not run: no shared pricing or quote-flow API and no worker code changed.
+
+#### Not verified
+
+- **Everything on a phone.** The BigInt fix on a real upload; the tabs; the faces; haptics; Larger Text;
+  VoiceOver; the photo viewer; a camera reading the QR code; copying a link.
+- Why the owner's quote screen showed no photos.
+- Both ways of getting the full app, and the room scan.
+- The new Account route and the view's additions against a running server: they are unit-tested as pure
+  functions and typechecked; no regression script calls them (the ticket asked for none to be added).
+
+**Files:** `apps/mobile/**` (`app/_layout.tsx`, `app/(tabs)/{_layout,index,new,account}.tsx`, `app/quote/[id].tsx`,
+`app/{photo,link,login}.tsx`, `src/lib/{numbers,errors,quote-list,pricing-stages,account,feel,photo-viewer,qr,device-files,outbox,api}.ts`,
+`src/components/{ui,PricingStages,Qr,ErrorBoundary}.tsx`, `src/theme.ts`, `modules/room-scan/index.ts`,
+`app.json`, `app.config.js`, `eas.json`, `assets/`, README), `packages/shared/src/{line-labels,approval-detail,api.types}.ts`,
+`apps/web/src/lib/{request-details,app-quote-view,app-account,email-templates}.ts`,
+`apps/web/src/app/api/app/{account/route.ts,quotes/[quoteId]/route.ts}`, `apps/web/src/app/api/quotes/[quoteId]/route.ts`,
+tests, `scripts/hardcore-test/verify-t162.mts`, `Docs/02-api-contracts.md`, `OWNER-TODO.md`.
+
+**Relation:** AD-065 holds: the app still decides nothing, and gained no wording or rule of its own (groups,
+tracker, sources, "also asked" and answer labels are all the shared code's). T-182's offline queue is
+untouched apart from the number conversion; its 32 tests pass.
+
+---
+
 ### 2026-11-18: T-183 — Approval the business can trust, line names, quote wording, faster test runs; a guard that was dead in production builds (AD-066, AD-067)
 
 **Deployed 2026-11-18** (commit `27f5d89`), worker first, then web. No migration. No checks were run for the

@@ -151,7 +151,7 @@ describe('what else the view carries', () => {
 
   it('the dates the status wording needs', () => {
     const v = view({ status: 'viewed', sent_at: '2026-11-18T10:05:00Z', viewed_at: '2026-11-18T10:09:00Z' })
-    expect(v.dates).toEqual({ sentAt: '2026-11-18T10:05:00Z', viewedAt: '2026-11-18T10:09:00Z', acceptedAt: null, paidAt: null, declinedAt: null, expiresAt: '2026-12-18T10:00:00Z' })
+    expect(v.dates).toEqual({ sentAt: '2026-11-18T10:05:00Z', viewedAt: '2026-11-18T10:09:00Z', acceptedAt: null, paidAt: null, declinedAt: null, expiresAt: '2026-12-18T10:00:00Z', approvedAt: null }) // approvedAt: T-184, for the progress steps
   })
 
   it('photos are not signed while the price is being worked out (the app asks again every few seconds then)', () => {

@@ -3,7 +3,7 @@ import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-na
 import { PRODUCT_NAME } from '@qolumns/shared'
 import { supabase } from '../src/lib/supabase'
 import { Button, ErrorText, Field, Muted, Screen } from '../src/components/ui'
-import { colors, space } from '../src/theme'
+import { colors, fonts, scale, space } from '../src/theme'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -17,8 +17,17 @@ export default function Login() {
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
       if (authError) {
-        // no status means no answer came back: that is the signal, not the password
-        setError(authError.status ? authError.message : 'No signal. Check your connection and try again.')
+        // no status means no answer came back: that is the signal, not the password. The sign-in service's
+        // own wording is never shown: a plain sentence is.
+        setError(
+          !authError.status
+            ? 'No signal. Check your connection and try again.'
+            : authError.status === 429
+              ? 'Too many tries. Wait a minute, then try again.'
+              : authError.status >= 500
+                ? 'Sign-in is not answering just now. Try again in a minute.'
+                : 'That email or password is not right.'
+        )
       }
     } catch {
       setError('No signal. Check your connection and try again.')
@@ -30,7 +39,7 @@ export default function Login() {
   return (
     <Screen>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.wrap}>
-        <Text accessibilityRole="header" style={styles.brand}>
+        <Text accessibilityRole="header" style={styles.brand} maxFontSizeMultiplier={scale.large}>
           {PRODUCT_NAME}
         </Text>
         <Muted>Quote on site. Sign in with the email and password you use on the web.</Muted>
@@ -47,5 +56,6 @@ export default function Login() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, justifyContent: 'center', padding: space.xl },
-  brand: { fontSize: 36, fontWeight: '800', color: colors.brand, marginBottom: space.xs },
+  // the wordmark: the product's name in the display face (the logo file comes later)
+  brand: { fontFamily: fonts.display, fontSize: 40, letterSpacing: -1, color: colors.brand, marginBottom: space.xs },
 })

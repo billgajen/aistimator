@@ -14,6 +14,7 @@
  */
 
 import type {
+  AppAccountResponse,
   AppBootstrapResponse,
   AppCreateQuoteRequest,
   AppCreateQuoteResponse,
@@ -165,7 +166,11 @@ export function createApi(opts: {
       request<WidgetConfigResponse>(`/api/public/widget/config?tenantKey=${encodeURIComponent(tenantKey)}`, { auth: false }),
 
     /** `default` opens on what needs the business, when anything does (the dashboard's rule) */
-    listQuotes: (group: QuoteListGroup | 'default' = 'all') => request<QuotesListResponse>(`/api/quotes?limit=30&group=${group}`),
+    listQuotes: (group: QuoteListGroup | 'default' = 'all', search = '') =>
+      request<QuotesListResponse>(`/api/quotes?limit=50&group=${group}${search.trim() ? `&search=${encodeURIComponent(search.trim())}` : ''}`),
+
+    /** T-184: the Account tab (the business's name and logo, its plan's name and usage, its quote link) */
+    account: () => request<AppAccountResponse>('/api/app/account'),
 
     getQuote: (quoteId: string) => request<AppQuoteView>(`/api/app/quotes/${encodeURIComponent(quoteId)}`),
 

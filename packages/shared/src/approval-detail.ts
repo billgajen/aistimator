@@ -104,6 +104,11 @@ const ALSO_ASKED_STATE: Record<AlsoAsked['state'], string> = {
   not_offered: 'Not one of your services. No price was given; the customer was told you will confirm it separately.',
 }
 
+/** Where one thing the customer also asked for stands, in a sentence (the approval page, the email, the on-site app) */
+export function alsoAskedStateWords(item: Pick<AlsoAsked, 'state' | 'serviceId'>, addedBy?: 'customer' | 'business' | null): string {
+  return item.state === 'added' && addedBy === 'business' ? 'Added by you.' : ALSO_ASKED_STATE[item.state]
+}
+
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
 const amountOf = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
@@ -215,7 +220,7 @@ export function approvalDetail(input: ApprovalDetailInput): ApprovalDetail {
       kind: 'also_asked',
       title: APPROVAL_COPY.alsoAskedTitle,
       lines: asked.map((item) => {
-        const state = item.state === 'added' && item.serviceId && addedBy.get(item.serviceId) === 'business' ? 'Added by you.' : ALSO_ASKED_STATE[item.state]
+        const state = alsoAskedStateWords(item, item.serviceId ? addedBy.get(item.serviceId) : null)
         return `${item.serviceName ? `${item.serviceName}: ` : ''}“${item.words.trim()}”. ${state}`
       }),
     })

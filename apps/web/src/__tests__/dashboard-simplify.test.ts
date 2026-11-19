@@ -116,7 +116,9 @@ describe('T-152: the free allowance is 10 quotes in total', () => {
     expect(held).toContain('your free quotes are used up')
     // a monthly plan keeps its old words
     expect(generateLimitReachedEmailHtml({ businessName: 'Ace', used: 50, limit: 50, billingUrl: 'b' })).toContain('next month')
-    expect(limit).toContain(`Powered by ${PRODUCT_NAME}`)
+    // T-184: an email to the business is from the product itself, so it has no "Powered by" line
+    expect(limit).not.toContain('Powered by')
+    expect(held).not.toContain('Powered by')
   })
 
   it('analytics reads the same limit and count as enforcement', () => {

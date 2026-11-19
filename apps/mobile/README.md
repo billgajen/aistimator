@@ -4,22 +4,44 @@ A trade on a site visit: open the app, new quote, pick the service, take the pho
 questions, add a note and the customer's name, see the price, approve it and send the customer their link from
 the phone's share sheet (a text, WhatsApp, an email).
 
-Built in T-137 (the app), T-138 (LiDAR room scan) and T-182 (the on-site path, and matching the web).
+Built in T-137 (the app), T-138 (LiDAR room scan), T-182 (the on-site path, and matching the web) and T-184
+(three tabs, the quote screen, Account, the look).
 
 ## What it is built with
 
 - Expo SDK 58, React Native 0.88, React 19, expo-router. TypeScript, strict.
 - Expo modules: secure-store (the sign-in, in the keychain), image-picker (camera and library),
   image-manipulator (photos are made smaller before upload), file-system (drafts and photos kept on the
-  phone, uploads with progress), constants, linking, status-bar.
+  phone, uploads with progress), constants, linking, status-bar, font, haptics, clipboard, splash-screen.
 - One native module of our own: `modules/room-scan` (Swift, Apple RoomPlan, LiDAR).
-- No UI kit. Colours and sizes are in `src/theme.ts`; `Docs/design/system.md` decides them.
+- No UI kit. Colours, sizes and faces are in `src/theme.ts`; `Docs/design/system.md` decides them. The three
+  brand faces come from `@expo-google-fonts/*`; the one icon set is Ionicons (`@expo/vector-icons`), always
+  through the `Icon` component in `src/components/ui.tsx`. The QR code is drawn from plain views
+  (`qrcode-generator`, the dashboard's encoder).
+
+## The screens (T-184)
+
+| Where | What |
+|---|---|
+| **Quotes** tab (`app/(tabs)/index.tsx`) | what needs me now: "Needs you" first with its count, then "Waiting for customer", "Accepted", the rest; quotes still on this phone above them; search by customer name; pull to refresh |
+| **New quote** tab, in the centre (`app/(tabs)/new.tsx`) | the on-site path; the tab reads "Carry on" while a quote is unfinished |
+| **Account** tab (`app/(tabs)/account.tsx`) | the business's name and logo, the plan's name and quotes used (no prices, no way to buy), the quote link and its QR code, help, the version, sign out |
+| Quote (`app/quote/[id].tsx`) | everything for one job: the price, the photos (tap for full screen), anything to confirm, the lines and where each quantity came from, "Customer also asked for", the progress steps, call and message, the request, the link, "Edit in the dashboard" |
+| `app/photo.tsx`, `app/link.tsx` | a photo full screen; the quote link's QR code full screen |
+
+The tabs draw their own tops (`TopBar`), so nothing a screen shows can sit under a navigation header.
 
 ## Expo Go or a development build
 
 **Everything except the LiDAR room scan runs in Expo Go.** No Apple Developer account and no Xcode are needed.
-The room scan is native code, so it needs a development build; in Expo Go the app hides the scan card
-(`isRoomScanSupported()` is false) and the rest works unchanged.
+The room scan is native code, so it needs the full app (a development build or the store build). In Expo Go the
+scan card is still shown, where a service has a quantity a scan can measure, but disabled, with "Room scan needs
+the full app" (`roomScanAvailability()` in `modules/room-scan`); the sizes can be typed in instead.
+
+The two ways to get the full app onto an iPhone (a free Apple ID with Xcode, or an Apple Developer account with
+EAS) are written out step by step in `OWNER-TODO.md` under T-184. A trial build is made with `APP_VARIANT=dev`
+(`app.config.js`): it gets its own identifier, `com.qolumns.app.dev`, so the real one stays free for the App
+Store. `eas.json` holds the build settings. Neither way has been tried: there is no Xcode on the build machine.
 
 ## Run it
 
@@ -31,7 +53,8 @@ npx expo start              # scan the QR code with the iPhone's camera; it open
 
 A missing value does not crash the app: it opens on one screen naming what is missing.
 
-Step-by-step instructions for the owner's iPhone, against production, are in `OWNER-TODO.md` under T-182.
+Step-by-step instructions for the owner's iPhone, against production, are in `OWNER-TODO.md` under T-182; what
+to try since T-184 is under T-184.
 
 ## How it signs in and talks to the API
 
@@ -87,5 +110,16 @@ cd apps/mobile && npx expo export --platform ios   # the full JavaScript bundle
 npx tsx scripts/hardcore-test/verify-t182.mts      # the app's own client and queue against the local stack
 ```
 
-Not covered by any of these: the app running on a phone (camera, keychain, files, the share sheet). That is the
-owner's test in OWNER-TODO.
+Not covered by any of these: the app running on a phone (camera, keychain, files, the share sheet, fonts,
+haptics, VoiceOver, the room scan). That is the owner's test in OWNER-TODO.
+
+## Rules learned the hard way
+
+- **A number from the phone goes through `toNumber` first** (`src/lib/numbers.ts`). iOS hands some values to
+  JavaScript as BigInt whatever their declared type says (an upload's byte counts are 64-bit integers there),
+  and a BigInt mixed with an ordinary number throws. That was the red "Cannot convert BigInt to number" of the
+  first phone test.
+- **Nothing a program wrote is shown to a person.** Every message on a screen goes through `plainError`
+  (`src/lib/errors.ts`); a fault while a screen is drawn is caught by `ErrorBoundary`.
+- **A custom face is named by its family, never with `fontWeight` beside it** (each weight is its own file).
+- **An app may not point at a purchase outside it.** No price, no "upgrade", no link to billing, anywhere.

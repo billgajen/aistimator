@@ -14,10 +14,16 @@
  */
 import {
   addedSections,
+  alsoAskedOf,
+  alsoAskedStateWords,
+  alsoAskedWithStates,
+  sourceForBusiness,
   isQuoteProcessing,
   mainSubtotal,
   sectionSubtotal,
   splitMinimum,
+  type AppAlsoAsked,
+  type AppQuoteLine,
   type AppQuoteSection,
   type AppQuoteView,
   type ClarificationQuestion,
@@ -41,6 +47,7 @@ export interface AppQuoteRow {
   paid_at?: string | null
   declined_at?: string | null
   token_expires_at?: string | null
+  approved_at?: string | null
 }
 
 const text = (value: unknown): string | null => (typeof value === 'string' && value.trim() !== '' ? value.trim() : null)
@@ -56,7 +63,9 @@ export function appQuoteView(input: {
   serviceName: string
   businessName: string
   request: RequestDetails
-  photos: Array<{ id: string; url: string }>
+  photos: Array<{ id: string; url: string; fullUrl?: string }>
+  /** How many photos the request carries (they are not signed while the price is worked out) */
+  photoCount?: number
 }): AppQuoteView {
   const { quote } = input
   const status = quote.status as QuoteStatus
@@ -67,7 +76,12 @@ export function appQuoteView(input: {
     taxLabel?: string
     taxAmount?: number
     estimate?: Estimate
-    breakdown?: Array<{ label: string; amount: number; kind?: 'minimum'; minimumCharge?: number }>
+    breakdown?: Array<{ label: string; amount: number; kind?: 'minimum'; minimumCharge?: number; source?: unknown }>
+  }
+  // T-184: a line with where its quantity came from, in the business's words (T-183's shared wording)
+  const line = (l: { label: string; amount: number; source?: unknown }): AppQuoteLine => {
+    const source = sourceForBusiness({ source: l.source })
+    return { label: l.label, amount: l.amount, ...(source && { source }) }
   }
   const content = (quote.content_json || {}) as { takeoff?: AppQuoteView['takeoff']; limitHold?: boolean }
   const customer = (quote.customer_json || {}) as { name?: unknown; email?: unknown; phone?: unknown }
@@ -92,7 +106,7 @@ export function appQuoteView(input: {
       serviceName: section.serviceName,
       addedBy: section.addedBy,
       subtotal: sectionSubtotal(section),
-      lines: split.lines.map((line) => ({ label: line.label, amount: line.amount })),
+      lines: split.lines.map(line),
       ...(split.minimum && { minimum: split.minimum }),
       ...(section.awaitingApproval === true && { awaitingApproval: true }),
     }
@@ -100,6 +114,15 @@ export function appQuoteView(input: {
 
   const total = money(pricing.total)
   const taxAmount = money(pricing.taxAmount)
+
+  // T-184: what else the customer asked for (T-179), each with where it stands, as the dashboard lists it
+  const addedBy = new Map(added.map((section) => [section.serviceId, section.addedBy]))
+  const alsoAsked: AppAlsoAsked[] = alsoAskedWithStates(alsoAskedOf(quote.content_json), added).map((item) => ({
+    words: item.words,
+    ...(item.serviceName && { serviceName: item.serviceName }),
+    state: item.state,
+    stateWords: alsoAskedStateWords(item, item.serviceId ? addedBy.get(item.serviceId) : null),
+  }))
 
   return {
     id: quote.id,
@@ -113,7 +136,7 @@ export function appQuoteView(input: {
     pricing: { total, currency: pricing.currency || 'USD', ...(pricing.estimate && { estimate: pricing.estimate }) },
     // the measured quantities of the main service; the price lines are `lines`
     takeoff: content.takeoff || [],
-    lines: main.lines.map((line) => ({ label: line.label, amount: line.amount })),
+    lines: main.lines.map(line),
     ...(main.minimum && { minimum: main.minimum }),
     ...(sections.length > 0 && { sections, mainSubtotal: mainSubtotal(quote.pricing_json as Parameters<typeof mainSubtotal>[0]) }),
     totals: {
@@ -129,9 +152,12 @@ export function appQuoteView(input: {
       paidAt: quote.paid_at ?? null,
       declinedAt: quote.declined_at ?? null,
       expiresAt: quote.token_expires_at ?? null,
+      approvedAt: quote.approved_at ?? null,
     },
     questions,
     request: input.request,
     photos: input.photos,
+    ...(input.photoCount !== undefined && { photoCount: input.photoCount }),
+    ...(alsoAsked.length > 0 && { alsoAsked }),
   }
 }

@@ -104,3 +104,28 @@ export function adjustmentLineLabel(rule: AdjustmentRuleLike, fields: readonly L
   if (relation) return `${question} ${relation} ${tested}${suffix}`
   return `${question}: ${optionName(field, tested)}${suffix}`
 }
+
+/**
+ * T-184: an answer as a person reads it. A choice is stored as the option's
+ * value ("standard_(8_ft)"); what is shown is the option's label ("Standard
+ * (8 ft)"), from the same form the customer filled in. Used wherever an
+ * answer is shown: the dashboard, the on-site app, emails.
+ *
+ * Yes and no are said in words; several choices are joined with commas. A
+ * stored value with no known option is tidied (underscores to spaces) only
+ * when it is plainly an id and not something a person typed.
+ */
+export function answerText(field: LabelField | null | undefined, value: unknown): string {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (Array.isArray(value)) return value.map((item) => answerText(field, item)).filter(Boolean).join(', ')
+  if (typeof value === 'object') return ''
+  const text = String(value).replace(/\s+/g, ' ').trim()
+  if (!text) return ''
+  const option = field?.options?.find((o) => String(o.value) === text)
+  const label = option?.label?.trim()
+  if (label) return label
+  // an id with no label on file: "standard_(8_ft)" reads as "Standard (8 ft)"
+  if (text.includes('_') && !text.includes(' ')) return readableId(text)
+  return text
+}

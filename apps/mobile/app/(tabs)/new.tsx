@@ -9,21 +9,24 @@
  * saved on the phone as it is typed, and "Price this job" works with no
  * signal: the quote waits and sends by itself (src/lib/outbox.ts).
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { formatNumber, scanAnswers, summarizeRoomScan, type AppBootstrapResponse, type RoomScanPayload } from '@qolumns/shared'
-import { isRoomScanSupported, scanRoom } from '../modules/room-scan'
-import { useApi } from '../src/lib/api-context'
-import { fieldsForService, toApiError, type WidgetConfigResponse } from '../src/lib/api'
-import { fieldKind, isAnswered, missingRequired, optionLabel, optionValue, toSubmissionAnswers, toggleOption, visibleFields, type AppField, type RawAnswers } from '../src/lib/answers'
-import { keepPhoto, readFormCache, writeFormCache, type PickedPhoto } from '../src/lib/device-files'
-import { draftProgress, type Draft, type DraftPhoto } from '../src/lib/outbox'
-import { useOutbox, useOutboxReady, useOutboxState } from '../src/lib/outbox-context'
-import { currentUserId } from '../src/lib/supabase'
-import { BottomBar, Button, ErrorText, Field, fieldLabel, Label, Muted, Notice, ProgressBar, Rows, Screen, Title } from '../src/components/ui'
-import { colors, radius, space, touch, type } from '../src/theme'
+import { roomScanAvailability, roomScanBlockedLine, scanRoom } from '../../modules/room-scan'
+import { useApi } from '../../src/lib/api-context'
+import { fieldsForService, toApiError, type WidgetConfigResponse } from '../../src/lib/api'
+import { fieldKind, isAnswered, missingRequired, optionLabel, optionValue, toSubmissionAnswers, toggleOption, visibleFields, type AppField, type RawAnswers } from '../../src/lib/answers'
+import { keepPhoto, readFormCache, writeFormCache, type PickedPhoto } from '../../src/lib/device-files'
+import { plainError } from '../../src/lib/errors'
+import { draftProgress, type Draft, type DraftPhoto } from '../../src/lib/outbox'
+import { useOutbox, useOutboxReady, useOutboxState } from '../../src/lib/outbox-context'
+import { pricingStages } from '../../src/lib/pricing-stages'
+import { currentUserId } from '../../src/lib/supabase'
+import { PricingStages } from '../../src/components/PricingStages'
+import { BottomBar, Button, EmptyState, ErrorText, Field, fieldLabel, Icon, Label, Muted, Notice, ProgressBar, Rows, Screen, Title, TopBar } from '../../src/components/ui'
+import { colors, fonts, radius, scale, space, touch, type } from '../../src/theme'
 
 const STEPS = ['service', 'photos', 'questions', 'details'] as const
 type Step = (typeof STEPS)[number]
@@ -57,10 +60,27 @@ export default function NewQuote() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [stepError, setStepError] = useState<string | null>(null)
   const [moreDetails, setMoreDetails] = useState(false)
-  const scanSupported = useMemo(() => isRoomScanSupported(), [])
+  // T-184: the scan card is always shown where a service can use a scan; where the scan cannot run
+  // (Expo Go has no scanner in it) the card says why instead of disappearing
+  const scanState = useMemo(() => roomScanAvailability(), [])
 
   // The draft: the waiting one that was tapped, or the one being written (a new one if there is none)
   const [attempt, setAttempt] = useState(0)
+  const onScreen = useRef(false)
+  useFocusEffect(
+    useCallback(() => {
+      onScreen.current = true
+      return () => {
+        onScreen.current = false
+      }
+    }, [])
+  )
+
+  // A waiting quote tapped on the Quotes tab opens here, whatever this tab was showing
+  useEffect(() => {
+    if (ready && params.draft && params.draft !== draftId && outbox.find(params.draft)) setDraftId(params.draft)
+  }, [ready, params.draft, draftId, outbox])
+
   useEffect(() => {
     if (!ready || draftId) return
     const draft = (params.draft && outbox.find(params.draft)) || outbox.start()
@@ -92,7 +112,7 @@ export default function NewQuote() {
       } catch (e) {
         if (!alive) return
         const failure = toApiError(e)
-        setLoadError(failure.offline ? OFFLINE : failure.message)
+        setLoadError(failure.offline ? OFFLINE : plainError(e, 'Your services could not be loaded. Try again.'))
       }
     })()
     return () => {
@@ -106,7 +126,12 @@ export default function NewQuote() {
   useEffect(() => {
     if (!draftId || draft) return
     const sent = outbox.takeSent(draftId)
-    if (sent) router.replace(`/quote/${sent.quoteId}`)
+    // this tab is ready for the next quote; the one just sent carries on as its own page
+    setDraftId(null)
+    router.setParams({ draft: undefined })
+    // only when this tab is the one being looked at: a quote that sends itself while the trade is
+    // elsewhere in the app must not pull them away (it is at the top of their quotes)
+    if (sent && onScreen.current) router.push(`/quote/${sent.quoteId}?fresh=1`)
   }, [draftId, draft, outbox, router])
 
   const services = form?.widget.services ?? []
@@ -125,9 +150,9 @@ export default function NewQuote() {
 
   if (!draft) {
     return (
-      <Screen>
-        <View style={styles.centre}>{draftId ? <Muted>Opening the quote…</Muted> : <ActivityIndicator color={colors.brand} />}</View>
-      </Screen>
+      <Shell title="New quote">
+        <View style={styles.centre}>{draftId ? <Muted>Opening the quote…</Muted> : <ActivityIndicator color={colors.brand} accessibilityLabel="Loading" />}</View>
+      </Shell>
     )
   }
 
@@ -136,7 +161,7 @@ export default function NewQuote() {
 
   if (!form) {
     return (
-      <Screen>
+      <Shell title="New quote">
         <View style={styles.centre}>
           {loadError ? (
             <ErrorText>
@@ -144,23 +169,20 @@ export default function NewQuote() {
             </ErrorText>
           ) : (
             <>
-              <ActivityIndicator color={colors.brand} />
+              <ActivityIndicator color={colors.brand} accessibilityLabel="Loading" />
               <Muted>Loading your services…</Muted>
             </>
           )}
         </View>
-      </Screen>
+      </Shell>
     )
   }
 
   if (services.length === 0) {
     return (
-      <Screen>
-        <View style={styles.centre}>
-          <Title>No services yet</Title>
-          <Muted>Add a service in your dashboard on the web. It then shows here.</Muted>
-        </View>
-      </Screen>
+      <Shell title="New quote">
+        <EmptyState icon="construct-outline" title="No services yet" text="Add a service in your dashboard on the web. It then shows here." />
+      </Shell>
     )
   }
 
@@ -168,7 +190,10 @@ export default function NewQuote() {
   const minPhotos = service?.mediaConfig.minPhotos ?? 0
   const maxPhotos = Math.min(service?.mediaConfig.maxPhotos ?? 8, 10)
   const scanSignals = (service?.expectedSignals ?? []).filter((s) => s.scan)
-  const canScan = scanSupported && scanSignals.length > 0
+  // the card shows for a service with a quantity a scan can measure, on an iPhone; it can be used when the phone can scan
+  const showScan = scanSignals.length > 0 && scanState !== 'not_ios' && scanState !== 'no_lidar'
+  const canScan = showScan && scanState === 'ready'
+  const scanBlocked = roomScanBlockedLine(scanState)
   const scan: RoomScanPayload | null =
     draft.rooms.length > 0 ? { version: 1, rooms: draft.rooms, device: Platform.OS === 'ios' ? 'iPhone (LiDAR)' : undefined } : null
   // What the scan fills (the server works it out again; this is what the screen shows)
@@ -177,7 +202,7 @@ export default function NewQuote() {
     : []
   const effective: RawAnswers = { ...Object.fromEntries(scanFilled.map((a) => [a.fieldId, String(a.value)])), ...draft.answers }
 
-  const hasQuestions = fields.length > 0 || canScan
+  const hasQuestions = fields.length > 0 || showScan
   const stepsShown: Step[] = STEPS.filter((s) => (s === 'service' ? services.length > 1 : s === 'questions' ? hasQuestions : true))
   const step: Step = stepsShown.includes(STEPS[draft.step] ?? 'service') ? (STEPS[draft.step] ?? 'service') : (stepsShown[0] ?? 'details')
   const position = stepsShown.indexOf(step)
@@ -234,8 +259,9 @@ export default function NewQuote() {
       const room = await scanRoom()
       outbox.update(draft!.id, { rooms: [...draft!.rooms, { ...room, name: `Room ${draft!.rooms.length + 1}` }] })
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'The scan did not finish'
-      if (!/cancel/i.test(message)) setStepError(message)
+      // closing the scanner is not a fault; anything else is said plainly, never in the scanner's own words
+      const cancelled = e instanceof Error && /cancel/i.test(e.message)
+      if (!cancelled) setStepError('The scan did not finish. Try again, or type the sizes in.')
     }
   }
 
@@ -258,7 +284,7 @@ export default function NewQuote() {
   function back() {
     const previous = stepsShown[position - 1]
     if (previous) goTo(previous)
-    else router.back()
+    else router.navigate('/')
   }
 
   function priceThisJob() {
@@ -311,7 +337,9 @@ export default function NewQuote() {
         style: 'destructive',
         onPress: () => {
           outbox.discard(draft!.id)
-          router.back()
+          setDraftId(null)
+          router.setParams({ draft: undefined })
+          router.navigate('/')
         },
       },
     ])
@@ -321,15 +349,15 @@ export default function NewQuote() {
 
   return (
     <Screen>
-      <Stack.Screen options={{ title: service?.name ?? 'New quote' }} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 96 : 0}>
+      {/* T-184: the steps are part of the screen's own top, above the scrolling part, so nothing can sit over them */}
+      <TopBar title={service?.name ?? 'New quote'}>
+        <Text style={styles.stepCount} maxFontSizeMultiplier={scale.large}>
+          Step {position + 1} of {stepsShown.length}
+        </Text>
+        <ProgressBar fraction={(position + 1) / stepsShown.length} label={`Step ${position + 1} of ${stepsShown.length}`} />
+      </TopBar>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xl }} keyboardShouldPersistTaps="handled">
-          <Text style={styles.stepCount}>
-            Step {position + 1} of {stepsShown.length}
-          </Text>
-          <ProgressBar fraction={(position + 1) / stepsShown.length} />
-          <View style={{ height: space.lg }} />
-
           {draft.problem?.kind === 'refused' ? <Notice tone="danger">{draft.problem.message}</Notice> : null}
           {loadError && position === 0 ? (
             <Notice>{loadError === OFFLINE ? 'No signal. Using your services as this phone last saw them.' : loadError}</Notice>
@@ -372,7 +400,13 @@ export default function NewQuote() {
                     onPress={() => takePhoto(angle.id)}
                     style={({ pressed }) => [styles.angle, pressed && { backgroundColor: colors.mint }]}
                   >
-                    {photo ? <Image source={{ uri: photo.uri }} style={styles.thumb} /> : <View style={[styles.thumb, styles.thumbEmpty]} />}
+                    {photo ? (
+                      <Image source={{ uri: photo.uri }} style={styles.thumb} accessibilityIgnoresInvertColors />
+                    ) : (
+                      <View style={[styles.thumb, styles.thumbEmpty]}>
+                        <Icon name="camera-outline" color={colors.muted} />
+                      </View>
+                    )}
                     <View style={{ flex: 1 }}>
                       <Text style={styles.angleLabel}>{angle.label}</Text>
                       {angle.guidance ? <Muted>{angle.guidance}</Muted> : null}
@@ -385,9 +419,9 @@ export default function NewQuote() {
               })}
               {extras.length > 0 ? (
                 <View style={styles.grid}>
-                  {extras.map((photo) => (
+                  {extras.map((photo, i) => (
                     <View key={photo.id} style={styles.tile}>
-                      <Image source={{ uri: photo.uri }} style={styles.tileImage} />
+                      <Image source={{ uri: photo.uri }} style={styles.tileImage} accessible accessibilityLabel={`Photo ${guided.length + i + 1}. ${photoLine(photo, offline)}`} accessibilityIgnoresInvertColors />
                       <Text style={[styles.tileState, photo.state === 'refused' && { color: colors.danger }]} numberOfLines={2}>
                         {photoLine(photo, offline)}
                       </Text>
@@ -400,7 +434,7 @@ export default function NewQuote() {
               ) : null}
               {ordered.length > 0 ? (
                 <View style={{ marginTop: space.md }}>
-                  <ProgressBar fraction={progress.fraction} />
+                  <ProgressBar fraction={progress.fraction} label="Photos uploaded" />
                   <Muted>{progress.line}</Muted>
                 </View>
               ) : (
@@ -408,7 +442,7 @@ export default function NewQuote() {
               )}
               {!photosFull ? (
                 <View style={{ marginTop: space.lg }}>
-                  <Button title="Choose from your photos" variant="quiet" onPress={() => choosePhotos(null)} />
+                  <Button title="Choose from your photos" icon="images-outline" variant="quiet" onPress={() => choosePhotos(null)} />
                 </View>
               ) : (
                 <Muted>That is the most photos this service takes ({maxPhotos}).</Muted>
@@ -419,10 +453,18 @@ export default function NewQuote() {
           {step === 'questions' ? (
             <>
               <Title>About the job</Title>
-              {canScan ? (
-                <View style={styles.scan}>
-                  <Label>Room scan</Label>
+              {showScan ? (
+                <View style={[styles.scan, !canScan && styles.scanOff]} accessible={!canScan} accessibilityLabel={!canScan ? `Room scan. ${scanBlocked}. You can still type the sizes in.` : undefined}>
+                  <View style={styles.scanHead}>
+                    <Icon name="scan-outline" color={canScan ? colors.brand : colors.muted} />
+                    <Label>Room scan</Label>
+                  </View>
                   <Muted>Walk each room with the camera. A scanned room is measured, not estimated.</Muted>
+                  {!canScan ? (
+                    <Text style={styles.scanBlocked} maxFontSizeMultiplier={scale.text}>
+                      {scanBlocked}. You can still type the sizes in below.
+                    </Text>
+                  ) : null}
                   {scan ? (
                     <Text style={styles.scanSummary}>
                       {(() => {
@@ -432,7 +474,7 @@ export default function NewQuote() {
                     </Text>
                   ) : null}
                   <View style={{ gap: space.sm, marginTop: space.md }}>
-                    <Button title={draft.rooms.length ? 'Scan another room' : 'Scan a room'} variant="secondary" onPress={addScannedRoom} />
+                    <Button title={draft.rooms.length ? 'Scan another room' : 'Scan a room'} icon="scan-outline" variant="secondary" disabled={!canScan} onPress={addScannedRoom} />
                     {draft.rooms.length > 0 ? <Button title="Clear the scans" variant="quiet" onPress={() => outbox.update(draft.id, { rooms: [] })} /> : null}
                   </View>
                 </View>
@@ -506,20 +548,20 @@ export default function NewQuote() {
           </View>
         </ScrollView>
 
-        <BottomBar>
+        <BottomBar inTabs>
           {step === 'photos' ? (
             // While a photo is still needed, taking it is the main action and moving on the quieter one
             photosFull ? (
               <Button title="Next" onPress={next} />
             ) : photosShort || nextAngle ? (
               <>
-                <Button title={nextAngle ? `Take photo: ${nextAngle.label}` : 'Take a photo'} onPress={() => takePhoto(nextAngle?.id ?? null)} />
+                <Button title={nextAngle ? `Take photo: ${nextAngle.label}` : 'Take a photo'} icon="camera" onPress={() => takePhoto(nextAngle?.id ?? null)} />
                 {photosShort ? null : <Button title="Next" variant="secondary" onPress={next} />}
               </>
             ) : (
               <>
                 <Button title="Next" onPress={next} />
-                <Button title="Take another photo" variant="secondary" onPress={() => takePhoto(null)} />
+                <Button title="Take another photo" icon="camera-outline" variant="secondary" onPress={() => takePhoto(null)} />
               </>
             )
           ) : step === 'details' ? (
@@ -574,27 +616,42 @@ function Question({ field, value, onChange }: { field: AppField; value: RawAnswe
   )
 }
 
-/** After "Price this job": uploading, sending, or waiting for a signal. Leaving this screen loses nothing. */
+/** The top of this tab, for the screens that are not a step of the form */
+function Shell({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <Screen>
+      <TopBar title={title} />
+      {children}
+    </Screen>
+  )
+}
+
+/**
+ * After "Price this job": the stages as they happen (T-184). The photos reach
+ * the server, the job is sent, then its own page takes over with the same
+ * list and shows the price. Leaving this screen loses nothing.
+ */
 function Sending({ draft }: { draft: Draft }) {
   const outbox = useOutbox()
   const router = useRouter()
   const progress = draftProgress(draft)
   const stuck = draft.problem !== null
+  const stages = pricingStages({ photosTotal: progress.photosTotal, photosDone: progress.photosDone, sent: false, waitingForSignal: stuck })
   return (
     <Screen>
-      <Stack.Screen options={{ title: draft.serviceName ?? 'New quote' }} />
-      <View style={styles.sending}>
-        <Title>{stuck ? 'Saved on this phone' : 'Sending the job'}</Title>
-        <ProgressBar fraction={draft.send === 'sending' ? 1 : progress.fraction * 0.9} />
-        <Text style={styles.sendingLine}>{progress.line}</Text>
-        {!stuck ? <ActivityIndicator color={colors.brand} style={{ marginTop: space.lg }} /> : null}
-        <Muted style={{ marginTop: space.lg }}>
-          You can leave this screen. The quote stays at the top of your quotes until it has been sent, and the price follows.
+      <TopBar title={draft.customer.name.trim() || draft.serviceName || 'New quote'} note={draft.serviceName} />
+      <ScrollView contentContainerStyle={{ padding: space.lg }}>
+        <Title>{stuck ? 'Saved on this phone' : 'Pricing this job'}</Title>
+        <PricingStages stages={stages} />
+        <Muted style={{ marginTop: space.md }}>
+          {stuck
+            ? 'It sends by itself when the signal is back. You can leave this screen: the quote stays at the top of your quotes.'
+            : 'You can leave this screen. The quote stays at the top of your quotes, and the price follows.'}
         </Muted>
-      </View>
-      <BottomBar>
-        {stuck ? <Button title="Try now" onPress={() => outbox.retryNow()} /> : null}
-        <Button title="Back to quotes" variant={stuck ? 'secondary' : 'primary'} onPress={() => router.replace('/')} />
+      </ScrollView>
+      <BottomBar inTabs>
+        {stuck ? <Button title="Try now" icon="refresh" onPress={() => outbox.retryNow()} /> : null}
+        <Button title="Back to quotes" variant={stuck ? 'secondary' : 'primary'} onPress={() => router.navigate('/')} />
         {draft.send === 'queued' ? <Button title="Change something" variant="quiet" onPress={() => outbox.edit(draft.id)} /> : null}
       </BottomBar>
     </Screen>
@@ -603,7 +660,7 @@ function Sending({ draft }: { draft: Draft }) {
 
 const styles = StyleSheet.create({
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.xl, gap: space.md },
-  stepCount: { color: colors.muted, fontSize: type.small, marginBottom: space.sm },
+  stepCount: { color: colors.textSecondary, fontFamily: fonts.semi, fontSize: type.small, marginTop: space.sm, marginBottom: space.sm },
   angle: {
     minHeight: touch.row,
     flexDirection: 'row',
@@ -617,19 +674,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   thumb: { width: 72, height: 72, borderRadius: radius.md },
-  thumbEmpty: { backgroundColor: colors.mist, borderWidth: 1, borderColor: colors.field, borderStyle: 'dashed' },
-  angleLabel: { color: colors.ink, fontWeight: '700', fontSize: type.large },
-  photoState: { color: colors.brand, fontWeight: '600', fontSize: type.body, marginTop: space.xs },
+  thumbEmpty: { backgroundColor: colors.mist, borderWidth: 1, borderColor: colors.field, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  angleLabel: { color: colors.ink, fontFamily: fonts.bold, fontSize: type.large },
+  photoState: { color: colors.brand, fontFamily: fonts.semi, fontSize: type.body, marginTop: space.xs },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md, marginTop: space.sm },
   tile: { width: 104 },
   tileImage: { width: 104, height: 104, borderRadius: radius.md, backgroundColor: colors.mist },
-  tileState: { color: colors.textSecondary, fontSize: type.note, marginTop: space.xs, minHeight: 32 },
+  tileState: { color: colors.textSecondary, fontFamily: fonts.body, fontSize: type.note, marginTop: space.xs, minHeight: 32 },
   tileRemove: { minHeight: touch.min, justifyContent: 'center' },
-  tileRemoveText: { color: colors.brand, fontWeight: '600', fontSize: type.small },
+  tileRemoveText: { color: colors.brand, fontFamily: fonts.semi, fontSize: type.small },
   scan: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg, padding: space.lg, marginBottom: space.xl },
   // butter is for measurement, and a scan's result is one
-  scanSummary: { color: colors.ink, fontVariant: ['tabular-nums'], marginTop: space.sm, backgroundColor: colors.butter, padding: space.sm, borderRadius: radius.md },
+  scanSummary: { color: colors.ink, fontFamily: fonts.figure, marginTop: space.sm, backgroundColor: colors.butter, padding: space.sm, borderRadius: radius.md, overflow: 'hidden' },
+  scanOff: { backgroundColor: colors.surface, borderStyle: 'dashed', borderColor: colors.lineStrong },
+  scanHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  scanBlocked: { color: colors.ink, fontFamily: fonts.semi, fontSize: type.body, marginTop: space.sm },
   discard: { marginTop: space.xl, paddingTop: space.lg, borderTopWidth: 1, borderTopColor: colors.line },
-  sending: { flex: 1, justifyContent: 'center', padding: space.xl },
-  sendingLine: { color: colors.ink, fontSize: type.large, marginTop: space.md },
 })

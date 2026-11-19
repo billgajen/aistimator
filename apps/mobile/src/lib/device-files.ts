@@ -12,6 +12,7 @@
 import { Directory, File, Paths } from 'expo-file-system'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import { ApiError } from './api'
+import { fractionOf, toNumber } from './numbers'
 import type { DraftPhoto, NewPhoto } from './outbox'
 
 /** The longer side of a kept photo, in pixels: enough to read a rating label */
@@ -53,21 +54,22 @@ export async function keepPhoto(picked: PickedPhoto, angleId: string | null): Pr
   const name = `photo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   try {
     const context = ImageManipulator.manipulate(picked.uri)
-    const width = picked.width ?? 0
-    const height = picked.height ?? 0
+    // numbers from the phone go through toNumber: iOS can hand one over as a BigInt (numbers.ts)
+    const width = toNumber(picked.width)
+    const height = toNumber(picked.height)
     if (Math.max(width, height) > MAX_SIDE) context.resize(width >= height ? { width: MAX_SIDE } : { height: MAX_SIDE })
     const rendered = await context.renderAsync()
     const saved = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: JPEG_QUALITY })
     const kept = new File(folder(), `${name}.jpg`)
     await new File(saved.uri).copy(kept)
-    return { uri: kept.uri, fileName: `${name}.jpg`, contentType: 'image/jpeg', sizeBytes: kept.size, angleId }
+    return { uri: kept.uri, fileName: `${name}.jpg`, contentType: 'image/jpeg', sizeBytes: toNumber(kept.size), angleId }
   } catch {
     // could not be made smaller: keep the photo as the camera gave it
     const source = new File(picked.uri)
     const extension = source.extension || '.jpg'
     const kept = new File(folder(), `${name}${extension}`)
     await source.copy(kept)
-    return { uri: kept.uri, fileName: `${name}${extension}`, contentType: picked.mimeType ?? 'image/jpeg', sizeBytes: kept.size, angleId }
+    return { uri: kept.uri, fileName: `${name}${extension}`, contentType: picked.mimeType ?? 'image/jpeg', sizeBytes: toNumber(kept.size), angleId }
   }
 }
 
@@ -83,7 +85,16 @@ export async function putPhoto(uploadUrl: string, photo: DraftPhoto, onProgress:
       headers: { 'Content-Type': photo.contentType },
       // the app waits for the answer, so the upload belongs to the app while it is open
       sessionType: 'foreground',
-      onProgress: ({ bytesSent, totalBytes }) => onProgress(totalBytes > 0 ? bytesSent / totalBytes : 0),
+      // T-184: iOS reports these two as 64-bit integers, which reach JavaScript as BigInt. Dividing
+      // them and handing the result on threw "Cannot convert BigInt to number" on every tick. They
+      // are made ordinary numbers first, and a fault in showing progress can never stop an upload.
+      onProgress: (event: { bytesSent?: unknown; totalBytes?: unknown }) => {
+        try {
+          onProgress(fractionOf(event?.bytesSent, event?.totalBytes))
+        } catch {
+          // progress is only a display
+        }
+      },
     })
     status = result.status
   } catch {
