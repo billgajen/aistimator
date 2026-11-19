@@ -26,7 +26,7 @@ import { pricingStages } from '../../src/lib/pricing-stages'
 import { currentUserId } from '../../src/lib/supabase'
 import { PricingStages } from '../../src/components/PricingStages'
 import { BottomBar, Button, EmptyState, ErrorText, Field, fieldLabel, Icon, Label, Muted, Notice, ProgressBar, Rows, Screen, Title, TopBar } from '../../src/components/ui'
-import { colors, fonts, radius, scale, space, touch, type } from '../../src/theme'
+import { colors, fonts, radius, scale, space, tabular, touch, type } from '../../src/theme'
 
 const STEPS = ['service', 'photos', 'questions', 'details'] as const
 type Step = (typeof STEPS)[number]
@@ -544,7 +544,7 @@ export default function NewQuote() {
           {stepError ? <ErrorText>{stepError}</ErrorText> : null}
 
           <View style={styles.discard}>
-            <Button title="Delete this quote" variant="quiet" onPress={discard} />
+            <Button title="Delete this quote" variant="dangerText" onPress={discard} />
           </View>
         </ScrollView>
 
@@ -685,7 +685,7 @@ const styles = StyleSheet.create({
   tileRemoveText: { color: colors.brand, fontFamily: fonts.semi, fontSize: type.small },
   scan: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg, padding: space.lg, marginBottom: space.xl },
   // butter is for measurement, and a scan's result is one
-  scanSummary: { color: colors.ink, fontFamily: fonts.figure, marginTop: space.sm, backgroundColor: colors.butter, padding: space.sm, borderRadius: radius.md, overflow: 'hidden' },
+  scanSummary: { color: colors.ink, fontFamily: fonts.figure, fontVariant: tabular, marginTop: space.sm, backgroundColor: colors.butter, padding: space.sm, borderRadius: radius.md, overflow: 'hidden' },
   scanOff: { backgroundColor: colors.surface, borderStyle: 'dashed', borderColor: colors.lineStrong },
   scanHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   scanBlocked: { color: colors.ink, fontFamily: fonts.semi, fontSize: type.body, marginTop: space.sm },

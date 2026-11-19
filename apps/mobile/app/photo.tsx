@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { viewerPhotos } from '../src/lib/photo-viewer'
 import { toNumber } from '../src/lib/numbers'
 import { Icon } from '../src/components/ui'
-import { fonts, icon, scale, space, touch, type } from '../src/theme'
+import { fonts, icon, scale, space, tabular, touch, type } from '../src/theme'
 
 export default function PhotoViewer() {
   const { index } = useLocalSearchParams<{ index?: string }>()
@@ -96,6 +96,6 @@ const styles = StyleSheet.create({
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.xl },
   message: { color: '#FFFFFF', fontFamily: fonts.body, fontSize: type.body, textAlign: 'center', padding: space.xl },
   top: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.lg },
-  count: { color: '#FFFFFF', fontFamily: fonts.figure, fontSize: type.body },
+  count: { color: '#FFFFFF', fontFamily: fonts.figure, fontVariant: tabular, fontSize: type.body },
   close: { width: touch.min, height: touch.min, borderRadius: touch.min / 2, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
 })

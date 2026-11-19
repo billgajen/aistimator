@@ -17,7 +17,7 @@ import {
   alsoAskedOf,
   alsoAskedStateWords,
   alsoAskedWithStates,
-  sourceForBusiness,
+  businessSources,
   isQuoteProcessing,
   mainSubtotal,
   sectionSubtotal,
@@ -78,10 +78,12 @@ export function appQuoteView(input: {
     estimate?: Estimate
     breakdown?: Array<{ label: string; amount: number; kind?: 'minimum'; minimumCharge?: number; source?: unknown }>
   }
-  // T-184: a line with where its quantity came from, in the business's words (T-183's shared wording)
-  const line = (l: { label: string; amount: number; source?: unknown }): AppQuoteLine => {
-    const source = sourceForBusiness({ source: l.source })
-    return { label: l.label, amount: l.amount, ...(source && { source }) }
+  // T-184, T-185: each line with its note (where its quantity came from, in the business's words). One
+  // shared function decides it for the approval page, the email and the app, so the base fee's note is
+  // the same on every quote; the takeoff covers quotes priced before the note was stored on the line.
+  const withNotes = (list: Array<{ label: string; amount: number; source?: unknown }>, takeoff?: unknown): AppQuoteLine[] => {
+    const notes = businessSources(list, takeoff)
+    return list.map((l, i) => ({ label: l.label, amount: l.amount, ...(notes[i] && { source: notes[i]! }) }))
   }
   const content = (quote.content_json || {}) as { takeoff?: AppQuoteView['takeoff']; limitHold?: boolean }
   const customer = (quote.customer_json || {}) as { name?: unknown; email?: unknown; phone?: unknown }
@@ -106,7 +108,7 @@ export function appQuoteView(input: {
       serviceName: section.serviceName,
       addedBy: section.addedBy,
       subtotal: sectionSubtotal(section),
-      lines: split.lines.map(line),
+      lines: withNotes(split.lines),
       ...(split.minimum && { minimum: split.minimum }),
       ...(section.awaitingApproval === true && { awaitingApproval: true }),
     }
@@ -136,7 +138,7 @@ export function appQuoteView(input: {
     pricing: { total, currency: pricing.currency || 'USD', ...(pricing.estimate && { estimate: pricing.estimate }) },
     // the measured quantities of the main service; the price lines are `lines`
     takeoff: content.takeoff || [],
-    lines: main.lines.map(line),
+    lines: withNotes(main.lines, content.takeoff),
     ...(main.minimum && { minimum: main.minimum }),
     ...(sections.length > 0 && { sections, mainSubtotal: mainSubtotal(quote.pricing_json as Parameters<typeof mainSubtotal>[0]) }),
     totals: {

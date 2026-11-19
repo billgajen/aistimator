@@ -20,7 +20,7 @@ import { draftProgress, draftTitle, OUTBOX_COPY, type Draft } from '../../src/li
 import { groupQuotes, matchesSearch, rowWords, type ListGroup } from '../../src/lib/quote-list'
 import { TONE_STYLE, turnOfListItem } from '../../src/lib/status'
 import { Button, EmptyState, ErrorText, Icon, Muted, Notice, Pill, ProgressBar, Screen, Skeleton, TopBar } from '../../src/components/ui'
-import { colors, fonts, icon, radius, scale, space, touch, type } from '../../src/theme'
+import { colors, fonts, icon, radius, scale, space, tabular, touch, type } from '../../src/theme'
 
 export default function Quotes() {
   const api = useApi()
@@ -192,7 +192,8 @@ function QuoteRow({ item, onPress }: { item: QuoteListItem; onPress: () => void 
     >
       <View style={{ flex: 1, gap: space.xs }}>
         <View style={styles.rowTop}>
-          <Text style={[styles.name, { flex: 1 }]} numberOfLines={2} maxFontSizeMultiplier={scale.text}>
+          {/* a long name wraps onto more lines; the total beside it keeps its full width */}
+          <Text style={[styles.name, { flex: 1, flexShrink: 1 }]} maxFontSizeMultiplier={scale.text}>
             {words.customer}
           </Text>
           {words.total ? (
@@ -277,7 +278,7 @@ const styles = StyleSheet.create({
   count: { flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 26, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: 999, backgroundColor: colors.mist, justifyContent: 'center' },
   countNeedsYou: { backgroundColor: colors.accent },
   countMarker: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.onAccent },
-  countText: { color: colors.textSecondary, fontFamily: fonts.figureBold, fontSize: type.small },
+  countText: { color: colors.textSecondary, fontFamily: fonts.figureBold, fontVariant: tabular, fontSize: type.small },
   row: {
     minHeight: touch.row,
     flexDirection: 'row',
@@ -306,6 +307,6 @@ const styles = StyleSheet.create({
   },
   name: { color: colors.ink, fontFamily: fonts.bold, fontSize: type.large },
   service: { color: colors.textSecondary, fontFamily: fonts.body, fontSize: type.body },
-  total: { color: colors.ink, fontFamily: fonts.figureBold, fontSize: type.large },
+  total: { flexShrink: 0, textAlign: 'right', color: colors.ink, fontFamily: fonts.figureBold, fontVariant: tabular, fontSize: type.large },
   when: { color: colors.muted, fontFamily: fonts.body, fontSize: type.small },
 })

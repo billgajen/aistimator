@@ -441,7 +441,8 @@ const isTwoDp = (n: number) => n === roundMoney(n) && String(n).replace(/^-?\d+\
 const lineSum = (lines: Line[]) => roundMoney(lines.reduce((s, l) => s + l.amount, 0))
 check('18 x 34.6 in plain floating point is not 622.8 (what used to be stored)', 18 * 34.6 !== 622.8, 18 * 34.6)
 check('the 34.6 x 18 line stores exactly 622.8', walls?.amount === 622.8, walls)
-check('the engine’s label format is unchanged', walls?.label === 'Exterior walls  £18 x 34.6(Sqm)' && splitLabelMath(walls.label)[1] === '£18 × 34.6 Sqm', walls?.label)
+// T-185 changed the form of a line's detail on purpose ("£18 x 34.6(Sqm)" became "£18 × 34.6 sqm"); the shared reader reads both
+check('the engine writes the line detail in the one shared form, and the older form reads back the same', walls?.label === 'Exterior walls  £18 × 34.6 sqm' && splitLabelMath(walls.label)[1] === '£18 × 34.6 sqm' && splitLabelMath('Exterior walls  £18 x 34.6(Sqm)')[1] === '£18 × 34.6 sqm', walls?.label)
 check('every line has at most 2 decimals', pricing7.breakdown.length >= 2 && pricing7.breakdown.every((l) => isTwoDp(l.amount)), pricing7.breakdown.map((l) => l.amount))
 check('the lines add up to the subtotal', lineSum(pricing7.breakdown) === pricing7.subtotal, { lines: lineSum(pricing7.breakdown), subtotal: pricing7.subtotal })
 check('tax and total as before: 20% of the subtotal, total = subtotal + tax', pricing7.taxAmount === Math.round(pricing7.subtotal * 0.2 * 100) / 100 && pricing7.total === Math.round((pricing7.subtotal + pricing7.taxAmount) * 100) / 100, { tax: pricing7.taxAmount, total: pricing7.total })
@@ -480,7 +481,8 @@ check('text the business typed is not rewritten, even when it looks like maths',
 check('the saved lines add up to the saved subtotal', lineSum(b1) === s1.pricing_json.subtotal && s1.pricing_json.total === Math.round((s1.pricing_json.subtotal + s1.pricing_json.taxAmount) * 100) / 100, { lines: lineSum(b1), subtotal: s1.pricing_json.subtotal })
 
 // a quote stored before the engine rounded: no data migration, the next save cleans it
-const raw: Line[] = [{ label: 'Exterior walls  £18 x 34.6(Sqm)', amount: 18 * 34.6 }, { label: 'Trim and sills  £7.35 x 12.7(M)', amount: 0.1 + 0.2 }]
+// the labels are the ones this quote's own pricing wrote (its trace knows them as generated), with amounts as an unrounded engine stored them
+const raw: Line[] = [{ label: walls!.label, amount: 18 * 34.6 }, { label: trim.label, amount: 0.1 + 0.2 }]
 await patchRow('quotes', `id=eq.${q7.id}`, { pricing_json: { ...s1.pricing_json, breakdown: raw, subtotal: raw[0]!.amount + raw[1]!.amount } })
 const stored = (await row(q7.id, 'pricing_json')) as { pricing_json: Pricing }
 check('(an old quote is stored unrounded: 622.8000000000001)', stored.pricing_json.breakdown[0]!.amount !== 622.8, stored.pricing_json.breakdown[0]!.amount)

@@ -135,3 +135,46 @@ export function carrySources<T extends { label: string; amount: number; source?:
     return isLineSource(same.source) ? ({ ...rest, source: same.source } as T) : (rest as T)
   })
 }
+
+/**
+ * T-185: the note under each price line, from one place. Every screen that
+ * says where a line came from (the approval page, the review email, the
+ * on-site app) asks here, so a base fee reads the same on every quote:
+ *   - a line that carries its own source uses it (quotes priced since T-183);
+ *   - a line without one is matched to the quote's takeoff row with the same
+ *     amount whose item starts its label, once, and that row's words are read
+ *     (quotes priced before);
+ *   - a line the business typed, or one nothing is known about, has no note.
+ * `takeoff` is the main service's (`content_json.takeoff`); a section has
+ * none, so its lines are passed with no takeoff.
+ */
+export function businessSources(
+  lines: ReadonlyArray<{ label: string; amount: number; source?: unknown }>,
+  takeoff?: unknown
+): Array<string | null> {
+  const rows = (Array.isArray(takeoff) ? takeoff : [])
+    .filter((row): row is Record<string, unknown> => typeof row === 'object' && row !== null)
+    .map((row) => ({
+      item: typeof row.item === 'string' ? row.item.trim() : '',
+      amount: typeof row.amount === 'number' && Number.isFinite(row.amount) ? row.amount : 0,
+      method: typeof row.method === 'string' ? row.method : '',
+      source: row.source,
+      used: false,
+    }))
+  const rowFor = (line: { label: string; amount: number }, take: boolean) => {
+    const row = rows.find(
+      (r) => (!take || !r.used) && r.item !== '' && Math.abs(r.amount - line.amount) < 0.005 && (line.label === r.item || line.label.startsWith(`${r.item} `))
+    )
+    if (row && take) row.used = true
+    return row
+  }
+  return lines.map((line) => {
+    if (isLineSource(line.source)) {
+      // where a label was read is said in the takeoff's words for that line
+      const method = line.source === 'label' ? (rowFor(line, false)?.method ?? null) : null
+      return sourceForBusiness({ source: line.source, method })
+    }
+    const row = rowFor(line, true)
+    return row ? sourceForBusiness({ source: row.source, method: row.method }) : null
+  })
+}

@@ -45,7 +45,8 @@ const view = (over: Partial<AppQuoteRow> = {}, photos: Array<{ id: string; url: 
 describe('the minimum charge is a floor, said in a note (AD-048)', () => {
   it('is never among the lines, and the note carries the amount', () => {
     const v = view()
-    expect(v.lines).toEqual([
+    // (T-185: a line may also carry its note; this test is about which lines there are)
+    expect(v.lines!.map(({ label, amount }) => ({ label, amount }))).toEqual([
       { label: 'Call-out', amount: 45 },
       { label: 'Labour', amount: 40 },
     ])

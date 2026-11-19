@@ -86,6 +86,9 @@ are gone).
   | `text-display-xl` | 80 px | the marketing hero on a wide screen |
 
 - Display sizes are for marketing pages only. The dashboard stops at `text-4xl`.
+- **In the on-site app, money and dates are set in Instrument Sans with tabular figures** (every digit the same
+  width), not in Spline Sans Mono. The owner's ruling after the first phone test (T-185): the mono face read as
+  a different product on a small screen. The web keeps the mono face for figures.
 - Body text is 16 px on a phone. 12 px is the smallest size, for notes only.
 - Headings are bold or extra-bold. No thin weights.
 - **Sentence case** for every heading, label and button, on every page, email and PDF: "Scope of work", "View

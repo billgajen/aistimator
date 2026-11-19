@@ -273,10 +273,10 @@ describe('T-157: the engine rounds every line where it is created', () => {
     expect(trace.trace[0]!.runningTotal).toBe(622.8)
   })
 
-  it('does not change the label format the engine writes', () => {
+  it('writes the line detail in the one shared form (T-185 changed it from "£18 x 34.6(Sqm)", on purpose)', () => {
     const { result } = price(rules({ workSteps: [wallsStep] }), [{ fieldId: 'wall_area', value: 34.6 }])
-    expect(result.breakdown[0]!.label).toBe('Exterior walls  £18 x 34.6(Sqm)')
-    expect(splitLabelMath(result.breakdown[0]!.label)).toEqual(['Exterior walls', '£18 × 34.6 Sqm'])
+    expect(result.breakdown[0]!.label).toBe('Exterior walls  £18 × 34.6 sqm')
+    expect(splitLabelMath(result.breakdown[0]!.label)).toEqual(['Exterior walls', '£18 × 34.6 sqm'])
   })
 
   it('every line is 2 decimals and the subtotal is their sum, with a base fee, add-on, multiplier and tax', () => {

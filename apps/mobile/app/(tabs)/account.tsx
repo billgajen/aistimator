@@ -17,7 +17,7 @@ import { plainError } from '../../src/lib/errors'
 import { useOutbox, useOutboxState } from '../../src/lib/outbox-context'
 import { supabase } from '../../src/lib/supabase'
 import { Card, ErrorText, Label, LinkRow, Muted, ProgressBar, Screen, Skeleton, TopBar } from '../../src/components/ui'
-import { colors, fonts, radius, scale, space, type } from '../../src/theme'
+import { colors, fonts, radius, scale, space, tabular, type } from '../../src/theme'
 
 export default function Account() {
   const api = useApi()
@@ -169,6 +169,6 @@ const styles = StyleSheet.create({
   initialText: { color: colors.brand, fontFamily: fonts.display, fontSize: type.title },
   name: { flex: 1, color: colors.ink, fontFamily: fonts.display, fontSize: type.title, letterSpacing: -0.3 },
   plan: { color: colors.ink, fontFamily: fonts.displayBold, fontSize: type.large },
-  usage: { color: colors.textSecondary, fontFamily: fonts.figure, fontSize: type.body, marginTop: space.xs },
-  version: { color: colors.muted, fontFamily: fonts.figure, fontSize: type.note, textAlign: 'center', marginTop: space.md },
+  usage: { color: colors.textSecondary, fontFamily: fonts.figure, fontVariant: tabular, fontSize: type.body, marginTop: space.xs },
+  version: { color: colors.muted, fontFamily: fonts.figure, fontVariant: tabular, fontSize: type.note, textAlign: 'center', marginTop: space.md },
 })

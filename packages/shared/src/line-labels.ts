@@ -16,6 +16,8 @@
  * dashboard's rule descriptions use the same question and option lookups.
  */
 
+import { normalizeUnit, unitDisplayLabel } from './units'
+
 /** A question of the request form, as far as naming needs it */
 export interface LabelField {
   fieldId: string
@@ -128,4 +130,65 @@ export function answerText(field: LabelField | null | undefined, value: unknown)
   // an id with no label on file: "standard_(8_ft)" reads as "Standard (8 ft)"
   if (text.includes('_') && !text.includes(' ')) return readableId(text)
   return text
+}
+
+// ---------------------------------------------------------------------------
+// T-185: a line's detail, "$375 × 2 rooms"
+// ---------------------------------------------------------------------------
+
+/**
+ * A unit as it is read after a number. A measure the product knows (square
+ * feet, metres, gallons) is shown by its short label and never given an "s".
+ * Anything else is the business's own counting word: "Room" reads "rooms"
+ * after 2 and "room" after 1. Only a single plain word is changed; anything
+ * else ("Hrs", "per visit", "m²") is the business's text and is left alone.
+ */
+export function unitWords(unit: string | null | undefined, quantity: number): string {
+  const raw = (unit ?? '').trim()
+  if (!raw) return ''
+  if (normalizeUnit(raw)) return unitDisplayLabel(raw)
+  if (!/^[A-Za-z]{3,}$/.test(raw)) return raw
+  // "Room" and "ROOM" are a label's capitals, not a name's: after a number the word is lower case
+  const word = /^[A-Z][a-z]+$/.test(raw) || /^[A-Z]+$/.test(raw) ? raw.toLowerCase() : raw
+  if (quantity === 1) return /^[a-z]+$/.test(word) && word.endsWith('s') && !word.endsWith('ss') ? word.slice(0, -1) : word
+  if (word.endsWith('s')) return word
+  if (/(x|z|ch|sh)$/.test(word)) return `${word}es`
+  if (/[^aeiou]y$/.test(word)) return `${word.slice(0, -1)}ies`
+  return `${word}s`
+}
+
+/** "$375 × 2 rooms": the rate (already written with its currency), a multiplication sign, the quantity and its unit */
+export function lineDetail(rate: string, quantity: number, unit: string | null | undefined): string {
+  const words = unitWords(unit, quantity)
+  return `${rate} × ${quantity}${words ? ` ${words}` : ''}`
+}
+
+/**
+ * The label the pricing engine gives a line priced by quantity: the
+ * business's name for the step, two spaces, then the detail. The two spaces
+ * are how `lineLabelParts` finds where the name ends.
+ */
+export function quantityLineLabel(name: string, rate: string, quantity: number, unit: string | null | undefined): string {
+  return `${name}  ${lineDetail(rate, quantity, unit)}`
+}
+
+/**
+ * A line's name and its detail, apart. It reads the label the engine writes
+ * now ("Rooms  $375 × 2 rooms") and the one it wrote before T-185
+ * ("Rooms  $375 x 2(Room)"), so a quote priced earlier reads the same way.
+ * A label with no detail (the business typed it, or a fixed price) comes
+ * back whole.
+ */
+export function lineLabelParts(label: string): { name: string; detail: string | null } {
+  const now = /^(.*?)\s{2,}(\S+ × .+)$/.exec(label)
+  if (now) return { name: now[1] ?? label, detail: now[2] ?? null }
+  const before = /^(.*?)\s{2,}(\S+)\s+x\s+(\d[\d.,]*)\((.*)\)$/.exec(label)
+  if (before) {
+    const quantity = Number((before[3] ?? '').replace(/,/g, ''))
+    return { name: before[1] ?? label, detail: lineDetail(before[2] ?? '', Number.isFinite(quantity) ? quantity : 0, before[4]) }
+  }
+  // any other older shape that carries maths after two spaces
+  const loose = /^(.*?)\s{2,}([£$€].+\sx\s.+)$/.exec(label)
+  if (loose) return { name: loose[1] ?? label, detail: (loose[2] ?? '').replace(/\sx\s/, ' × ').replace(/\(/, ' ').replace(/\)/, '') }
+  return { name: label, detail: null }
 }

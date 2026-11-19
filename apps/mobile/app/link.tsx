@@ -87,6 +87,6 @@ const styles = StyleSheet.create({
   ask: { color: colors.textSecondary, fontFamily: fonts.body, fontSize: type.body, lineHeight: 23, textAlign: 'center' },
   // a white card with room round the code: scanners need the quiet edge
   code: { backgroundColor: '#FFFFFF', padding: space.sm, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line },
-  link: { color: colors.ink, fontFamily: fonts.figure, fontSize: type.body, textAlign: 'center' },
+  link: { color: colors.ink, fontFamily: fonts.semi, fontSize: type.body, textAlign: 'center' },
   copied: { color: colors.secondary, fontFamily: fonts.semi, fontSize: type.body },
 })

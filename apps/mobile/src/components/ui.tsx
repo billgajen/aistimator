@@ -15,7 +15,7 @@ import { useEffect, useRef, type ComponentProps, type ReactNode } from 'react'
 import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, fonts, icon, radius, scale, space, touch, type } from '../theme'
+import { colors, fonts, icon, radius, scale, space, tabular, touch, type } from '../theme'
 import { tap, useReduceMotion } from '../lib/feel'
 import type { ToneStyle } from '../lib/status'
 
@@ -127,7 +127,8 @@ export function Field(props: TextInputProps & { label: string; help?: string }) 
   )
 }
 
-type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger'
+/** `dangerText` is a small red text button for something that removes (it still asks before it does) */
+type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger' | 'dangerText'
 
 export function Button(props: {
   title: string
@@ -142,7 +143,7 @@ export function Button(props: {
 }) {
   const variant = props.variant ?? 'primary'
   const off = props.disabled || props.busy
-  const textColor = variant === 'primary' ? colors.white : variant === 'danger' ? colors.danger : colors.brand
+  const textColor = variant === 'primary' ? colors.white : variant === 'danger' || variant === 'dangerText' ? colors.danger : colors.brand
   return (
     <Pressable
       accessibilityRole="button"
@@ -160,6 +161,7 @@ export function Button(props: {
         variant === 'secondary' && styles.buttonSecondary,
         variant === 'danger' && styles.buttonSecondary,
         variant === 'quiet' && styles.buttonQuiet,
+        variant === 'dangerText' && styles.buttonDangerText,
         off && { opacity: 0.45 },
         pressed && variant === 'primary' && { backgroundColor: colors.brandPressed },
         pressed && variant !== 'primary' && { backgroundColor: colors.mint },
@@ -171,7 +173,7 @@ export function Button(props: {
         <>
           <View style={styles.buttonRow}>
             {props.icon ? <Icon name={props.icon} size={icon.row} color={textColor} /> : null}
-            <Text style={[styles.buttonText, { color: textColor }]} maxFontSizeMultiplier={scale.large}>
+            <Text style={[styles.buttonText, variant === 'dangerText' && styles.buttonTextSmall, { color: textColor }]} maxFontSizeMultiplier={scale.large}>
               {props.title}
             </Text>
           </View>
@@ -314,7 +316,7 @@ export function MoneyRow({ label, amount, note, strong }: { label: string; amoun
         </Text>
         {note ? <Muted>{note}</Muted> : null}
       </View>
-      <Text style={[styles.figure, strong && { fontFamily: fonts.figureBold }]} maxFontSizeMultiplier={scale.large}>
+      <Text style={[styles.figure, strong && { fontFamily: fonts.figureBold, fontVariant: tabular }]} maxFontSizeMultiplier={scale.large}>
         {amount}
       </Text>
     </View>
@@ -406,6 +408,9 @@ export const styles = StyleSheet.create({
   buttonPrimary: { backgroundColor: colors.brand },
   buttonSecondary: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.field },
   buttonQuiet: { minHeight: touch.min, backgroundColor: 'transparent' },
+  // still a 44 px target, but it takes only the room its words need
+  buttonDangerText: { minHeight: touch.min, alignSelf: 'center', backgroundColor: 'transparent', paddingVertical: space.sm },
+  buttonTextSmall: { fontFamily: fonts.semi, fontSize: type.small },
   buttonText: { fontFamily: fonts.bold, fontSize: type.large, textAlign: 'center' },
   buttonNote: { fontFamily: fonts.body, fontSize: type.note, marginTop: 2, textAlign: 'center' },
   bottomBar: {
@@ -462,7 +467,7 @@ export const styles = StyleSheet.create({
   error: { color: colors.danger, fontFamily: fonts.body, fontSize: type.body, marginVertical: space.sm },
   moneyRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: space.sm },
   moneyLabel: { color: colors.ink, fontFamily: fonts.body, fontSize: type.body },
-  figure: { color: colors.ink, fontFamily: fonts.figure, fontSize: type.body },
+  figure: { color: colors.ink, fontFamily: fonts.figure, fontVariant: tabular, fontSize: type.body },
   skeleton: { backgroundColor: colors.line, borderRadius: radius.sm },
   empty: { alignItems: 'center', paddingHorizontal: space.xl, paddingVertical: space.xl * 2, gap: space.sm },
   emptyMark: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.mint, alignItems: 'center', justifyContent: 'center', marginBottom: space.sm },

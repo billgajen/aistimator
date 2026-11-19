@@ -22,7 +22,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as Clipboard from 'expo-clipboard'
-import { customerFirstName, formatMoney, parseMoneyInput, quoteTracker, QUOTE_TURN_COPY, type AppQuoteSection, type AppQuoteView } from '@qolumns/shared'
+import { certaintySentence, customerFirstName, formatMoney, lineLabelParts, parseMoneyInput, quoteSteps, QUOTE_TURN_COPY, type AppQuoteLine, type AppQuoteSection, type AppQuoteView } from '@qolumns/shared'
 import { useApi } from '../../src/lib/api-context'
 import { toApiError } from '../../src/lib/api'
 import { config } from '../../src/lib/config'
@@ -36,7 +36,7 @@ import { evidenceWords, shareMessage } from '../../src/lib/share'
 import { TONE_STYLE, turnOfQuote } from '../../src/lib/status'
 import { PricingStages } from '../../src/components/PricingStages'
 import { Body, BottomBar, Button, Card, ErrorText, Field, Icon, Label, LinkRow, MoneyRow, Muted, Notice, Pill, Rows, Screen, Skeleton, Title } from '../../src/components/ui'
-import { colors, fonts, icon, radius, scale, space, touch, type } from '../../src/theme'
+import { colors, fonts, icon, radius, scale, space, tabular, touch, type } from '../../src/theme'
 
 /** How often the screen asks again while the price is worked out (first price takes 20 to 60 seconds) */
 const POLL_MS = 3000
@@ -222,7 +222,8 @@ export default function QuoteDetail() {
   const hasRequest = Boolean(request && (request.description || request.answers.length > 0 || request.address || request.postcode))
   const pricing = isPricing(quote.status)
   const sentToCustomer = action === 'share'
-  const tracker = quoteTracker({
+  // T-185: the steps by name (Received, Approve and send, Opened, Accepted), each done, current or later
+  const steps = quoteSteps({
     status: quote.status,
     total: quote.pricing.total,
     held: quote.held === true,
@@ -268,8 +269,9 @@ export default function QuoteDetail() {
                   {figure}
                 </Text>
               ) : null}
-              {/* How sure the price is, in the sentence the dashboard gives the business. No grade letter: that is internal. */}
-              {figure && estimate?.description ? <Muted>{estimate.description}</Muted> : null}
+              {/* How sure the price is: the one plain sentence for this level, the same as on the dashboard (shared
+                  grading.ts). No grade letter, and none of the words the customer-language rules ban. */}
+              {figure && certaintySentence(estimate) ? <Muted>{certaintySentence(estimate)}</Muted> : null}
               <Body style={{ marginTop: space.md }}>{turn.sentence}</Body>
               {action === 'price_request' ? <Muted>Your plan is managed on the web, in your dashboard.</Muted> : null}
               {action === 'add_price' ? <Muted>The price is added on the web, in your dashboard.</Muted> : null}
@@ -342,8 +344,7 @@ export default function QuoteDetail() {
           <Card>
             <Label>{combined ? (quote.mainServiceName ?? 'Price') : 'Price'}</Label>
             {lines.map((line, i) => (
-              // where the quantity came from, in the business's words (the server's, T-183); else what the customer was told
-              <MoneyRow key={`${line.label}-${i}`} label={line.label} note={line.source ?? line.method} amount={formatMoney(line.amount, currency)} />
+              <LineRow key={`${line.label}-${i}`} line={line} currency={currency} />
             ))}
             {minimumNote(quote.minimum, currency) ? <Muted>{minimumNote(quote.minimum, currency)}</Muted> : null}
             {combined && quote.mainSubtotal !== undefined ? (
@@ -376,28 +377,52 @@ export default function QuoteDetail() {
           </Card>
         ) : null}
 
-        {/* 6. Where it stands: received, approved, opened by the customer, accepted (T-158) */}
+        {/* 6. Where it is on its way: Received, Approve and send, Opened, Accepted. Done steps are ticked
+            with their date, the current one stands out, later ones are grey (T-158's steps, named in T-185). */}
         {!pricing ? (
           <Card>
             <Label>{QUOTE_TURN_COPY.tracker.title}</Label>
-            {tracker.map((step) => (
-              <View key={step.key} style={styles.step} accessible accessibilityLabel={`${step.label}${step.date ? `, ${step.date}` : ''}${step.note ? `, ${step.note}` : ''}. ${step.done ? 'Done' : 'Not yet'}`}>
-                <View style={[styles.stepMark, step.done && (step.ended ? styles.stepEnded : styles.stepDone)]}>
-                  {step.done ? <Icon name={step.ended ? 'close' : 'checkmark'} size={14} color={colors.white} /> : null}
+            {steps.map((step, i) => {
+              const spoken = `${step.name}${step.date ? `, ${step.date}` : ''}${step.note ? `, ${step.note}` : ''}. ${
+                step.state === 'done' ? 'Done' : step.state === 'current' ? 'This is the step now' : step.state === 'ended' ? 'Ended here' : 'Not yet'
+              }`
+              return (
+                <View key={step.key} style={styles.step} accessible accessibilityLabel={spoken}>
+                  <View style={styles.stepRail}>
+                    <View
+                      style={[
+                        styles.stepMark,
+                        step.state === 'done' && styles.stepDone,
+                        step.state === 'ended' && styles.stepEnded,
+                        step.state === 'current' && styles.stepCurrent,
+                      ]}
+                    >
+                      {step.state === 'done' ? <Icon name="checkmark" size={14} color={colors.white} /> : null}
+                      {step.state === 'ended' ? <Icon name="close" size={14} color={colors.white} /> : null}
+                      {step.state === 'current' ? <View style={styles.stepDot} /> : null}
+                    </View>
+                    {i < steps.length - 1 ? <View style={[styles.stepLine, step.state === 'done' && { backgroundColor: colors.secondary }]} /> : null}
+                  </View>
+                  <View style={[styles.stepWords, step.state === 'current' && styles.stepWordsCurrent]}>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[styles.stepLabel, step.state === 'later' && { color: colors.muted, fontFamily: fonts.body }, step.state === 'current' && { fontFamily: fonts.bold }]}
+                        maxFontSizeMultiplier={scale.text}
+                      >
+                        {step.name}
+                      </Text>
+                      {step.note ? <Muted style={{ marginTop: 0 }}>{step.note}</Muted> : null}
+                      {step.state === 'current' ? <Muted style={{ marginTop: 0 }}>Now</Muted> : null}
+                    </View>
+                    {step.date ? (
+                      <Text style={styles.stepDate} maxFontSizeMultiplier={scale.large}>
+                        {step.date}
+                      </Text>
+                    ) : null}
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.stepLabel, !step.done && { color: colors.muted, fontFamily: fonts.body }]} maxFontSizeMultiplier={scale.text}>
-                    {step.label}
-                  </Text>
-                  {step.note ? <Muted style={{ marginTop: 0 }}>{step.note}</Muted> : null}
-                </View>
-                {step.date ? (
-                  <Text style={styles.stepDate} maxFontSizeMultiplier={scale.large}>
-                    {step.date}
-                  </Text>
-                ) : null}
-              </View>
-            ))}
+              )
+            })}
           </Card>
         ) : null}
 
@@ -520,6 +545,19 @@ function PhotoTile({ uri, label, onPress, onRetry }: { uri: string; label: strin
   )
 }
 
+/**
+ * One price line: the business's name for it, then its detail and note, then
+ * the amount. The detail ("$375 × 2 rooms") is read out of the label by the
+ * shared code that writes it (T-185). The note (where the quantity came from)
+ * is the server's alone, from the one shared rule, so a base fee reads the
+ * same on every quote.
+ */
+function LineRow({ line, currency }: { line: AppQuoteLine; currency: string }) {
+  const { name, detail } = lineLabelParts(line.label)
+  const note = [detail, line.source].filter(Boolean).join(' · ')
+  return <MoneyRow label={name} note={note || null} amount={formatMoney(line.amount, currency)} />
+}
+
 /** A service added to the quote (T-179): its own lines and subtotal, inside the one quote */
 function Section({ section, currency }: { section: AppQuoteSection; currency: string }) {
   return (
@@ -528,7 +566,7 @@ function Section({ section, currency }: { section: AppQuoteSection; currency: st
       <Muted>{section.addedBy === 'customer' ? 'Added by the customer' : 'Added by you'}</Muted>
       {section.awaitingApproval ? <Muted>Waiting for your approval. The customer does not see this part’s price yet.</Muted> : null}
       {section.lines.map((line, i) => (
-        <MoneyRow key={`${line.label}-${i}`} label={line.label} note={line.source} amount={formatMoney(line.amount, currency)} />
+        <LineRow key={`${line.label}-${i}`} line={line} currency={currency} />
       ))}
       {minimumNote(section.minimum, currency) ? <Muted>{minimumNote(section.minimum, currency)}</Muted> : null}
       <MoneyRow label={`${section.serviceName} subtotal`} amount={formatMoney(section.subtotal, currency)} strong />
@@ -539,7 +577,7 @@ function Section({ section, currency }: { section: AppQuoteSection; currency: st
 const styles = StyleSheet.create({
   customer: { color: colors.ink, fontFamily: fonts.display, fontSize: type.title, letterSpacing: -0.3 },
   service: { color: colors.textSecondary, fontFamily: fonts.body, fontSize: type.body, marginTop: 2 },
-  total: { color: colors.ink, fontFamily: fonts.figureBold, fontSize: type.figure, marginTop: space.md },
+  total: { color: colors.ink, fontFamily: fonts.figureBold, fontVariant: tabular, fontSize: type.figure, marginTop: space.md },
   note: { color: colors.secondary, fontFamily: fonts.semi, fontSize: type.body, marginTop: space.md },
   question: { color: colors.ink, fontFamily: fonts.bold, fontSize: type.large },
   section: { marginTop: space.lg, paddingTop: space.lg, borderTopWidth: 1, borderTopColor: colors.line },
@@ -547,12 +585,19 @@ const styles = StyleSheet.create({
   answer: { marginTop: space.md },
   asked: { paddingVertical: space.sm },
   askedLine: { borderTopWidth: 1, borderTopColor: colors.line },
-  step: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: touch.min },
+  step: { flexDirection: 'row', gap: space.md, minHeight: touch.min },
+  stepRail: { alignItems: 'center', width: 24 },
   stepMark: { width: 24, height: 24, borderRadius: 12, borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
   stepDone: { backgroundColor: colors.secondary, borderColor: colors.secondary },
   stepEnded: { backgroundColor: colors.muted, borderColor: colors.muted },
+  // the current step: a juniper ring with a dot, and its words on mint
+  stepCurrent: { borderColor: colors.brand, borderWidth: 2 },
+  stepDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.brand },
+  stepLine: { flex: 1, width: 2, backgroundColor: colors.line, marginVertical: 2 },
+  stepWords: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: space.md, paddingBottom: space.md, paddingTop: 2 },
+  stepWordsCurrent: { backgroundColor: colors.mint, borderRadius: radius.md, paddingHorizontal: space.sm, paddingTop: space.xs, paddingBottom: space.sm, marginBottom: space.sm, marginTop: -2 },
   stepLabel: { color: colors.ink, fontFamily: fonts.semi, fontSize: type.body },
-  stepDate: { color: colors.textSecondary, fontFamily: fonts.figure, fontSize: type.small },
+  stepDate: { color: colors.textSecondary, fontFamily: fonts.figure, fontVariant: tabular, fontSize: type.small },
   photos: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.xs },
   photo: { width: 96, height: 96, borderRadius: radius.md, backgroundColor: colors.mist, overflow: 'hidden' },
   photoImage: { width: 96, height: 96 },

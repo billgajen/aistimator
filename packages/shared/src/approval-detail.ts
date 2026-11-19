@@ -22,8 +22,15 @@
 import { checkerFindings } from './checker'
 import { formatMoney } from './format'
 import { minimumChargeNote, splitMinimum, type AppliedMinimum } from './minimum-charge'
-import { addedSections, alsoAskedOf, alsoAskedWithStates, mainSubtotal, sectionSubtotal, type AlsoAsked } from './quote-sections'
-import { isLineSource, sourceForBusiness } from './quantity-source'
+import {
+  addedSections,
+  alsoAskedOf,
+  alsoAskedWithStates,
+  mainSubtotal,
+  sectionSubtotal,
+  type AlsoAsked,
+} from './quote-sections'
+import { businessSources } from './quantity-source'
 import { serviceSuggestionOf, suggestedServiceReason } from './service-suggestion'
 
 export interface ApprovalWarning {
@@ -94,22 +101,33 @@ export const APPROVAL_COPY = {
   addedByYou: 'added by you',
   subtotal: 'Subtotal',
   total: 'Total',
-  photos: (count: number) => (count === 1 ? '1 photo from the customer' : `${count} photos from the customer`),
-  photosOnPage: (count: number) => (count === 1 ? '1 photo: view it on the approval page' : `${count} photos: view them on the approval page`),
+  photos: (count: number) =>
+    count === 1 ? '1 photo from the customer' : `${count} photos from the customer`,
+  photosOnPage: (count: number) =>
+    count === 1
+      ? '1 photo: view it on the approval page'
+      : `${count} photos: view them on the approval page`,
 } as const
 
 const ALSO_ASKED_STATE: Record<AlsoAsked['state'], string> = {
   added: 'Added by the customer.',
   offered: 'Not added yet.',
-  not_offered: 'Not one of your services. No price was given; the customer was told you will confirm it separately.',
+  not_offered:
+    'Not one of your services. No price was given; the customer was told you will confirm it separately.',
 }
 
 /** Where one thing the customer also asked for stands, in a sentence (the approval page, the email, the on-site app) */
-export function alsoAskedStateWords(item: Pick<AlsoAsked, 'state' | 'serviceId'>, addedBy?: 'customer' | 'business' | null): string {
-  return item.state === 'added' && addedBy === 'business' ? 'Added by you.' : ALSO_ASKED_STATE[item.state]
+export function alsoAskedStateWords(
+  item: Pick<AlsoAsked, 'state' | 'serviceId'>,
+  addedBy?: 'customer' | 'business' | null
+): string {
+  return item.state === 'added' && addedBy === 'business'
+    ? 'Added by you.'
+    : ALSO_ASKED_STATE[item.state]
 }
 
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v)
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
 const amountOf = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
 
@@ -131,28 +149,6 @@ function linesOf(raw: unknown): Line[] {
   }))
 }
 
-interface TakeoffRow {
-  item: string
-  amount: number
-  method: string
-  source?: unknown
-  used: boolean
-}
-
-/**
- * A quote priced before T-183 has no source on its lines. Its takeoff says,
- * for the same lines, how each was established: a line is matched to the
- * takeoff row with the same amount whose item starts its label, once.
- */
-function sourceFromTakeoff(line: Line, takeoff: TakeoffRow[]): string | null {
-  const row = takeoff.find(
-    (t) => !t.used && Math.abs(t.amount - line.amount) < 0.005 && t.item !== '' && (line.label === t.item || line.label.startsWith(`${t.item} `))
-  )
-  if (!row) return null
-  row.used = true
-  return sourceForBusiness({ source: row.source, method: row.method })
-}
-
 export function approvalDetail(input: ApprovalDetailInput): ApprovalDetail {
   const pricing = isRecord(input.pricing) ? input.pricing : {}
   const content = isRecord(input.content) ? input.content : {}
@@ -160,13 +156,6 @@ export function approvalDetail(input: ApprovalDetailInput): ApprovalDetail {
   const money = (n: number) => formatMoney(n, currency, input.locale)
 
   // ---- The parts: the main service, then each added one ---------------------
-  const takeoff: TakeoffRow[] = (Array.isArray(content.takeoff) ? content.takeoff.filter(isRecord) : []).map((t) => ({
-    item: text(t.item),
-    amount: amountOf(t.amount),
-    method: text(t.method),
-    source: t.source,
-    used: false,
-  }))
   const sections = addedSections(pricing)
   const combined = sections.length > 0
   const mainSplit = splitMinimum(linesOf(pricing.breakdown))
@@ -175,34 +164,40 @@ export function approvalDetail(input: ApprovalDetailInput): ApprovalDetail {
     split: { lines: Line[]; minimum: AppliedMinimum | null },
     subtotal: number,
     extra: Pick<ApprovalPart, 'main' | 'addedBy' | 'priceWaits'>,
-    fromTakeoff: boolean
-  ): ApprovalPart => ({
-    serviceName,
-    ...extra,
-    lines: split.lines.map((line) => ({
-      label: line.label,
-      amount: money(line.amount),
-      source: isLineSource(line.source) ? sourceForBusiness({ source: line.source, method: takeoffMethodFor(line, takeoff) }) : fromTakeoff ? sourceFromTakeoff(line, takeoff) : null,
-    })),
-    minimumNote: split.minimum ? minimumChargeNote(money(split.minimum.minimumCharge)) : null,
-    subtotal: money(subtotal),
-  })
+    /** The main service's takeoff; a section has none */
+    takeoff?: unknown
+  ): ApprovalPart => {
+    // one place decides every line's note (quantity-source.ts)
+    const sources = businessSources(split.lines, takeoff)
+    return {
+      serviceName,
+      ...extra,
+      lines: split.lines.map((line, i) => ({
+        label: line.label,
+        amount: money(line.amount),
+        source: sources[i] ?? null,
+      })),
+      minimumNote: split.minimum ? minimumChargeNote(money(split.minimum.minimumCharge)) : null,
+      subtotal: money(subtotal),
+    }
+  }
 
   const parts: ApprovalPart[] = [
     part(
       input.mainServiceName,
       mainSplit,
-      combined ? mainSubtotal(pricing as Parameters<typeof mainSubtotal>[0]) : amountOf(pricing.subtotal),
+      combined
+        ? mainSubtotal(pricing as Parameters<typeof mainSubtotal>[0])
+        : amountOf(pricing.subtotal),
       { main: true, priceWaits: false },
-      true
+      content.takeoff
     ),
     ...sections.map((section) =>
       part(
         section.serviceName,
         splitMinimum(linesOf(section.breakdown)),
         sectionSubtotal(section),
-        { main: false, addedBy: section.addedBy, priceWaits: section.awaitingApproval === true },
-        false
+        { main: false, addedBy: section.addedBy, priceWaits: section.awaitingApproval === true }
       )
     ),
   ]
@@ -211,7 +206,11 @@ export function approvalDetail(input: ApprovalDetailInput): ApprovalDetail {
   const warnings: ApprovalWarning[] = []
   const suggestion = serviceSuggestionOf(input.requestSource)
   if (suggestion) {
-    warnings.push({ kind: 'service', title: APPROVAL_COPY.serviceTitle, lines: [suggestedServiceReason(suggestion, input.mainServiceName)] })
+    warnings.push({
+      kind: 'service',
+      title: APPROVAL_COPY.serviceTitle,
+      lines: [suggestedServiceReason(suggestion, input.mainServiceName)],
+    })
   }
   const asked = alsoAskedWithStates(alsoAskedOf(content), sections)
   if (asked.length > 0) {
@@ -226,7 +225,8 @@ export function approvalDetail(input: ApprovalDetailInput): ApprovalDetail {
     })
   }
   const findings = checkerFindings(input.checkerIssues, pricing.breakdown)
-  if (findings.length > 0) warnings.push({ kind: 'check', title: APPROVAL_COPY.checksTitle, lines: findings })
+  if (findings.length > 0)
+    warnings.push({ kind: 'check', title: APPROVAL_COPY.checksTitle, lines: findings })
 
   const taxAmount = amountOf(pricing.taxAmount)
   const photoCount = Math.max(0, Math.floor(input.photoCount) || 0)
@@ -236,17 +236,11 @@ export function approvalDetail(input: ApprovalDetailInput): ApprovalDetail {
     combined,
     totals: {
       subtotal: money(amountOf(pricing.subtotal)),
-      tax: taxAmount > 0 ? { label: text(pricing.taxLabel) || 'Tax', amount: money(taxAmount) } : null,
+      tax:
+        taxAmount > 0 ? { label: text(pricing.taxLabel) || 'Tax', amount: money(taxAmount) } : null,
       total: money(amountOf(pricing.total)),
     },
     photosLine: photoCount > 0 ? APPROVAL_COPY.photos(photoCount) : null,
     photoCount,
   }
-}
-
-/** For a line that carries its own source: the takeoff's words for it, which name where a label was read */
-function takeoffMethodFor(line: Line, takeoff: TakeoffRow[]): string | null {
-  if (line.source !== 'label') return null
-  const row = takeoff.find((t) => Math.abs(t.amount - line.amount) < 0.005 && t.item !== '' && (line.label === t.item || line.label.startsWith(`${t.item} `)))
-  return row ? row.method : null
 }

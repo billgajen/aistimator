@@ -15,11 +15,57 @@
 
 ## Issues & Resolutions
 
+### 2026-11-19: T-185 — Mobile polish from the owner's second phone test, and two leftovers
+
+Built and pushed, **not deployed**. The app, shared display rules, the worker (two display changes: a line's
+label and one email) and two web files. No change to any amount, the quote flow or Stripe. No migration.
+
+| # | What | Where |
+|---|---|---|
+| 1 | The progress card names four steps, **Received, Approve and send, Opened, Accepted**: done ones ticked with their date, the current one highlighted (the first that is not done), later ones grey. A quote that needs approval shows "Approve and send" as current; one sent with nobody approving it says "Sent automatically" under that step; a declined or expired quote ends on "Declined" or "Expired" with nothing current | `quoteSteps()` in `packages/shared/src/quote-turn.ts`, beside T-158's tracker (the dashboard's tracker is unchanged) |
+| 2 | The sentence under the total no longer ends "this price is exact". One plain sentence per level, none with a banned word or a dash; a unit test holds each against `findConfidenceLanguage`. A quote stored with the old words is shown the new sentence for its level. **The dashboard's quote page uses the same function** | `certaintySentence()` in `grading.ts`; the stored sentences were rewritten too |
+| 3 | In the app, money and dates are Instrument Sans with tabular figures. The mono face is out of the app and its package removed | `apps/mobile/src/theme.ts` (`fonts.figure`, `tabular`); recorded in `Docs/design/system.md` as the owner's ruling for the app (the web keeps the mono face) |
+| 4 | A line's detail reads "$375 × 2 rooms". **One shared function writes it and reads it back**: the engine writes it for new quotes; the customer's page and the app read both it and the old form ("$375 x 2(Room)"), so an older quote reads the same. The unit is the business's own word: a single plain word is made lower case and plural after a number; a measure the product knows (sq ft, m²) keeps its short label; anything else is left alone | `unitWords`, `lineDetail`, `quantityLineLabel`, `lineLabelParts` in `line-labels.ts`; `splitLabelMath` and the editor's `dropStaleLabelMath` use it |
+| 5 | A quote row shows one time: when the quote last changed (the latest of arrived, sent, opened, accepted, paid, declined). The dashboard's detail line, which often carries a time of its own, is shown only when it is a reason (plan limit, no price yet, a question waiting). A long name wraps; the total keeps its width | `apps/mobile/src/lib/quote-list.ts`, `app/(tabs)/index.tsx` |
+| 6 | Every line's note comes from one function. A line with its own source uses it; a quote priced before T-183 is read from its takeoff; a line the business typed has none. So the base fee says "Your fixed price" on every quote. The app no longer chooses a note itself | `businessSources()` in `quantity-source.ts`, used by the approval page, the review email and the app's view |
+| 7 | "Delete this quote" is a small red text button (still a 44 px target), with the confirm it had | `Button variant="dangerText"` |
+| 8 | The worker's "New quote" email to the business has no "Powered by" line. The customer's email keeps it | `apps/worker/src/email/templates.ts` |
+
+**The label format was pinned by a T-157 test** ("does not change the label format the engine writes"). T-185
+changes that format on purpose, at the owner's request; the test now holds the new one, and the old form is
+still read everywhere it is displayed through the shared reader.
+
+**Where an older quote still shows the old detail:** the dashboard, the approval page, the review email and the
+PDF show a line's stored label as it is. A quote priced before this ticket therefore still reads
+"$375 x 2(Room)" in those four places. New quotes read the new way everywhere.
+
+**Verified:** app typecheck, lint, 90 unit tests (8 new), the full iOS bundle (3.9 MB); worker 652 unit tests
+(21 new: the steps, the sentences, the line detail through the engine and back, the notes, the email); web
+1,141 (4 new). **`pnpm check:quick`, once: 27 of 28 in 4 min 31 s.**
+`verify-t157` failed two checks that pinned the old line detail ("the engine's label format is unchanged",
+and an editor check that put old-form labels on a quote whose own pricing now writes the new form). The script
+was updated to the new form and still checks that the old form reads back the same; `pnpm check:failed` then
+passed 3 of 3 (96 checks).
+
+**Not verified:** anything on a phone (there is none here): how the card, the rows, the figures and the button
+look. `pnpm check:full` was not run, as the ticket asked for the quick level only; the worker's two changes are
+a label and an email footer.
+
+**Files:** `packages/shared/src/{line-labels,money,grading,quote-turn,quantity-source,approval-detail}.ts`,
+`apps/worker/src/pricing/rules-engine.ts`, `apps/worker/src/email/templates.ts`,
+`apps/web/src/lib/app-quote-view.ts`, `apps/web/src/app/(dashboard)/app/quotes/[quoteId]/page.tsx`,
+`apps/mobile/{app,src}/**`, tests, `Docs/design/system.md`, `OWNER-TODO.md`.
+
+---
+
 ### 2026-11-19: T-184 — The app as a professional on-site tool: tabs, the quote screen, Account, the room scan card, the look
 
-Built and pushed, **not deployed**. The app, and three small things on the web (two routes only the app uses,
-one display rule shared with the dashboard, and six emails). No worker change, no migration, no pricing, no
-Stripe. The owner tests the app in Expo Go; the web side must be deployed before that test.
+**Web deployed 2026-11-19, about 00:08 UTC, by the owner** (commit `6cff5e9`): deployment
+`dpl_2qBLUE6uWcnoFEgn5fjFjjtWyySn`, serving `qolumns.com` (read from Vercel at the start of T-185). Web only:
+no worker, no migration. No check was run on it from here.
+
+**As built:** the app, and three small things on the web (two routes only the app uses, one display rule shared
+with the dashboard, and six emails). No worker change, no migration, no pricing, no Stripe.
 
 Nobody has seen the app run: there is no iPhone, simulator or Xcode on the build machine.
 

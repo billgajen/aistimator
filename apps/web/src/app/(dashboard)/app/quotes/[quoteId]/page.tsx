@@ -3,7 +3,7 @@
 import { AcceptanceCard } from '@/components/quotes/AcceptanceCard'
 import type { AcceptanceDetails } from '@/lib/acceptance'
 import { useEffect, useState, useCallback } from 'react'
-import { formatMoney, quoteActions, quoteTurn, quoteTracker, customerFirstName, splitMinimum, addedSections, alsoAskedOf, alsoAskedWithStates, displaySections, sectionsAwaitingApproval } from '@qolumns/shared'
+import { certaintySentence, formatMoney, quoteActions, quoteTurn, quoteTracker, customerFirstName, splitMinimum, addedSections, alsoAskedOf, alsoAskedWithStates, displaySections, sectionsAwaitingApproval } from '@qolumns/shared'
 import { NextStepBox } from '@/components/quotes/NextStepBox'
 import { CustomerSent, ServiceSuggestionNote } from '@/components/quotes/CustomerSent'
 import { CustomerAlsoAsked } from '@/components/quotes/CustomerAlsoAsked'
@@ -816,7 +816,8 @@ function EstimateGradePanel({
             Grade {estimate.grade} · {estimate.label}
             <span className="ml-2 text-xs font-normal text-text-muted">Only visible to you</span>
           </p>
-          <p className="mt-0.5 text-sm text-text-secondary">{estimate.description}</p>
+          {/* T-185: the one plain sentence for this level (shared grading.ts); an older quote's stored words are replaced */}
+          <p className="mt-0.5 text-sm text-text-secondary">{certaintySentence(estimate)}</p>
           {estimate.rangeLow !== undefined && estimate.rangeHigh !== undefined && estimate.rangeHigh > estimate.rangeLow && (
             <p className="mt-1 text-xs text-text-muted">
               Range {formatCurrency(estimate.rangeLow, currency)} – {formatCurrency(estimate.rangeHigh, currency)}

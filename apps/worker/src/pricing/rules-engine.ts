@@ -9,7 +9,7 @@
  * IMPORTANT: AI does NOT set prices. All pricing is computed from rules.
  */
 
-import { adjustmentLineLabel, currencySymbol, roundMoney, MINIMUM_ENTRY_KIND, MINIMUM_ENTRY_LABEL, minimumChargeNote, minimumTopUp } from '@qolumns/shared'
+import { adjustmentLineLabel, quantityLineLabel, currencySymbol, roundMoney, MINIMUM_ENTRY_KIND, MINIMUM_ENTRY_LABEL, minimumChargeNote, minimumTopUp } from '@qolumns/shared'
 import type { ExtractedSignals } from '../ai/signals'
 import type {
   MeasurementModel,
@@ -1619,7 +1619,8 @@ export function calculatePricingWithTrace(
       let stepLabel = step.name
       if (stepResult.quantity !== undefined && stepResult.quantity > 1 && stepResult.unitLabel) {
         const symbol = getCurrencySymbol(currency).trim()
-        stepLabel = `${step.name}  ${symbol}${step.defaultCost} x ${stepResult.quantity}(${stepResult.unitLabel})`
+        // T-185: "$375 × 2 rooms", written by the one shared function that also reads it back
+        stepLabel = quantityLineLabel(step.name, `${symbol}${step.defaultCost}`, stepResult.quantity, stepResult.unitLabel)
       }
 
       traceSteps.push({

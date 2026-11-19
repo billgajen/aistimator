@@ -53,12 +53,24 @@ export interface RowWords {
   /** null when there is no price to state (held, failed, still being worked out) */
   total: string | null
   state: string
-  /** The reason or the detail under the state ("The plan's quotes are used up") */
+  /** The reason under the state, when there is one ("Your plan limit was reached"). Never a time. */
   detail: string | null
-  /** "2 hours ago" */
+  /** The one time on the row: when the quote last changed ("2 hours ago") */
   when: string | null
   /** One sentence for a screen reader */
   spoken: string
+}
+
+/** The next steps whose detail line is a reason, not a time (a held request, no price yet, a question waiting) */
+const REASON_ACTIONS = new Set<string>(['price_request', 'add_price', 'answer_question'])
+
+/** When the quote last changed: the latest of when it arrived, was sent, opened, accepted, paid or declined */
+export function lastChanged(item: Pick<QuoteListItem, 'createdAt' | 'sentAt' | 'viewedAt' | 'acceptedAt' | 'paidAt' | 'declinedAt'>): string {
+  const times = [item.createdAt, item.sentAt, item.viewedAt, item.acceptedAt, item.paidAt, item.declinedAt ?? null]
+    .filter((t): t is string => typeof t === 'string' && t !== '')
+    .map((t) => ({ t, at: new Date(t).getTime() }))
+    .filter((x) => Number.isFinite(x.at))
+  return times.reduce((latest, x) => (x.at > latest.at ? x : latest), times[0] ?? { t: item.createdAt, at: 0 }).t
 }
 
 /** Everything one row says */
@@ -66,14 +78,17 @@ export function rowWords(item: QuoteListItem, opts: QuoteTurnOptions = {}): RowW
   const turn = turnOfListItem(item, opts)
   const total = item.total > 0 && !item.held && item.status !== 'failed' && quoteGroupOf(item.status) !== 'working' ? formatMoney(item.total, item.currency) : null
   const customer = item.customerName?.trim() || 'Customer'
-  const when = agoWords(item.createdAt, opts)
+  // T-185: one time only. The dashboard's detail line often carries a time of its own ("Sent 2 days
+  // ago, not opened yet"); a phone row shows the state, a reason when there is one, and one time.
+  const when = agoWords(lastChanged(item), opts)
+  const detail = REASON_ACTIONS.has(turn.action ?? '') && turn.detail ? turn.detail : null
   return {
     customer,
     service: item.serviceName,
     total,
     state: turn.label,
-    detail: turn.detail ?? null,
+    detail,
     when,
-    spoken: [customer, item.serviceName, total, turn.label, turn.detail, when].filter(Boolean).join(', '),
+    spoken: [customer, item.serviceName, total, turn.label, detail, when].filter(Boolean).join(', '),
   }
 }

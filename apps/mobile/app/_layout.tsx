@@ -6,7 +6,6 @@ import * as SplashScreen from 'expo-splash-screen'
 import { useFonts } from 'expo-font'
 import { BricolageGrotesque_700Bold, BricolageGrotesque_800ExtraBold } from '@expo-google-fonts/bricolage-grotesque'
 import { InstrumentSans_400Regular, InstrumentSans_600SemiBold, InstrumentSans_700Bold } from '@expo-google-fonts/instrument-sans'
-import { SplineSansMono_500Medium, SplineSansMono_600SemiBold } from '@expo-google-fonts/spline-sans-mono'
 import type { Session } from '@supabase/supabase-js'
 import { PRODUCT_NAME } from '@qolumns/shared'
 import { supabase } from '../src/lib/supabase'
@@ -14,7 +13,7 @@ import { ApiProvider } from '../src/lib/api-context'
 import { OutboxProvider } from '../src/lib/outbox-context'
 import { configProblem } from '../src/lib/config'
 import { ErrorBoundary } from '../src/components/ErrorBoundary'
-import { colors, fonts, space, type } from '../src/theme'
+import { colors, fonts, space, tabular, type } from '../src/theme'
 
 // The splash stays until the brand faces are ready, so the first screen is never drawn in the wrong face
 void SplashScreen.preventAutoHideAsync().catch(() => undefined)
@@ -87,8 +86,6 @@ export default function RootLayout() {
     InstrumentSans_400Regular,
     InstrumentSans_600SemiBold,
     InstrumentSans_700Bold,
-    SplineSansMono_500Medium,
-    SplineSansMono_600SemiBold,
   })
   // A face that cannot be loaded must not keep the app shut: the phone's own font is used instead
   const ready = loaded || Boolean(failed)
@@ -109,5 +106,5 @@ const styles = StyleSheet.create({
   setUp: { flex: 1, justifyContent: 'center', padding: space.xl, backgroundColor: colors.paper },
   setUpTitle: { color: colors.ink, fontFamily: fonts.display, fontSize: type.title, marginBottom: space.md },
   setUpText: { color: colors.textSecondary, fontFamily: fonts.body, fontSize: type.body, lineHeight: 22, marginVertical: space.sm },
-  setUpName: { color: colors.ink, fontFamily: fonts.figure, fontSize: type.body, marginVertical: 2 },
+  setUpName: { color: colors.ink, fontFamily: fonts.figure, fontVariant: tabular, fontSize: type.body, marginVertical: 2 },
 })

@@ -136,6 +136,15 @@ export const QUOTE_TURN_COPY = {
     declined: 'Customer declined',
     expired: 'Expired',
     paid: (date: string) => `Paid ${date}`,
+    /** T-185: the steps by name (what is done to a quote), not by status */
+    steps: {
+      received: 'Received',
+      approve: 'Approve and send',
+      opened: 'Opened',
+      accepted: 'Accepted',
+      declined: 'Declined',
+      expired: 'Expired',
+    },
   },
   home: {
     title: 'Waiting for you',
@@ -567,6 +576,46 @@ export function quoteTracker(input: QuoteTrackerInput, opts: QuoteTurnOptions = 
   }
 
   return [step('received', T.received, true, input.createdAt), second, third, fourth]
+}
+
+/**
+ * T-185: the same four steps by name, for a card that shows where a quote is
+ * on its way: Received, Approve and send, Opened, Accepted. A step is done
+ * (with its date), the current one (the first that is not done), or later.
+ * A quote that ended without an acceptance has "Declined" or "Expired" as its
+ * last step, and nothing is current any more.
+ */
+export type QuoteStepState = 'done' | 'current' | 'later' | 'ended'
+
+export interface QuoteStep {
+  key: QuoteTrackerStep['key']
+  name: string
+  state: QuoteStepState
+  /** "12 Nov" on a done step that has a date */
+  date: string | null
+  /** A second line: "Sent automatically", "Paid 14 Nov" */
+  note: string | null
+}
+
+export function quoteSteps(input: QuoteTrackerInput, opts: QuoteTurnOptions = {}): QuoteStep[] {
+  const T = QUOTE_TURN_COPY.tracker
+  const tracked = quoteTracker(input, opts)
+  const over = input.status === 'declined' || input.status === 'expired'
+  const firstOpen = tracked.findIndex((step) => !step.done)
+  const nameOf = (step: QuoteTrackerStep): string => {
+    if (step.key === 'received') return T.steps.received
+    if (step.key === 'approved') return T.steps.approve
+    if (step.key === 'opened') return T.steps.opened
+    return input.status === 'declined' ? T.steps.declined : input.status === 'expired' ? T.steps.expired : T.steps.accepted
+  }
+  return tracked.map((step, index) => ({
+    key: step.key,
+    name: nameOf(step),
+    state: step.ended ? 'ended' : step.done ? 'done' : !over && index === firstOpen ? 'current' : 'later',
+    date: step.date,
+    // a quote nobody approved by hand was sent by itself: said under the step, not as its name
+    note: step.key === 'approved' && step.done && !input.approvedAt ? T.sentAutomatically : step.note,
+  }))
 }
 
 // ---------------------------------------------------------------------------

@@ -43,7 +43,7 @@ export interface BusinessEmailData {
 /**
  * Base email wrapper with consistent styling
  */
-function emailWrapper(content: string, _primaryColor: string = '#2563eb', options: { fromProduct?: boolean } = {}): string {
+function emailWrapper(content: string, _primaryColor: string = '#2563eb', options: { fromProduct?: boolean; toBusiness?: boolean } = {}): string {
   // T-183: an email that the product itself sends to the business says so at
   // the top, and has no "Powered by" line (that line is for the business's
   // own emails to its customers). The logo file does not exist yet: this row
@@ -56,7 +56,9 @@ function emailWrapper(content: string, _primaryColor: string = '#2563eb', option
           </tr>
         </table>`
     : ''
-  const footer = options.fromProduct
+  // T-185: no email to the business carries "Powered by" (it is from the product). Only the review
+  // email also has the logo row; the line itself is for the business's emails to its customers.
+  const footer = options.fromProduct || options.toBusiness
     ? ''
     : `<table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
           <tr>
@@ -242,7 +244,7 @@ export function businessNotificationEmail(data: BusinessEmailData): string {
     </p>
   `
 
-  return emailWrapper(content, primaryColor)
+  return emailWrapper(content, primaryColor, { toBusiness: true })
 }
 
 export interface ReviewEmailData {

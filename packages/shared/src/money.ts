@@ -6,6 +6,7 @@
  * point leaves dust on them (18 x 34.6 = 622.8000000000001), so every amount
  * that is stored or shown goes through `roundMoney` where it is created.
  */
+import { lineLabelParts } from './line-labels'
 
 /**
  * Round to 2 decimals, half away from zero (1.005 → 1.01, -1.005 → -1.01).
@@ -33,9 +34,9 @@ export function roundMoney(amount: number): number {
  * Returns [the plain label, the maths for display or null].
  */
 export function splitLabelMath(label: string): [string, string | null] {
-  const m = label.match(/^(.*?)\s{2,}([£$€].+\sx\s.+)$/)
-  if (!m) return [label, null]
-  return [m[1] ?? label, (m[2] ?? '').replace(/\sx\s/, ' × ').replace(/\(/, ' ').replace(/\)/, '')]
+  // T-185: one reader for both the label written now and the one written before (line-labels.ts)
+  const parts = lineLabelParts(label)
+  return [parts.name, parts.detail]
 }
 
 export interface MoneyLine {

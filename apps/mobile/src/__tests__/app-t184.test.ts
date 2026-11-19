@@ -362,19 +362,21 @@ describe('T-184: structure, the room scan card, look and feel', () => {
   it('the quote screen: no grade letter, photos open full screen, the link can be sent again and copied, editing is on the web', () => {
     const screen = read('app/quote/[id].tsx')
     expect(screen).not.toMatch(/Grade \{|estimate\.grade|estimate\.label/)
-    expect(screen).toContain('estimate.description')
+    // T-185: the sentence comes from the shared rule, never the stored words as they are
+    expect(screen).toContain('certaintySentence(estimate)')
     expect(screen).toContain("router.push(`/photo?index=${index}`)")
     expect(screen).toContain('title="Send the link again"')
     expect(screen).toContain('Clipboard.setStringAsync')
     expect(screen).toContain('title="Edit in the dashboard"')
     expect(screen).toContain('Customer also asked for')
-    expect(screen).toContain('quoteTracker(')
+    expect(screen).toContain('quoteSteps(')
     expect(screen).toContain('<PricingStages')
   })
 
   it('the brand faces are named by family, never by a weight beside them; one icon set', () => {
     const theme = read('src/theme.ts')
-    for (const face of ['BricolageGrotesque_800ExtraBold', 'InstrumentSans_400Regular', 'SplineSansMono_500Medium']) expect(theme).toContain(face)
+    // T-185: figures are in the text face with tabular digits; the mono face is no longer in the app
+    for (const face of ['BricolageGrotesque_800ExtraBold', 'InstrumentSans_400Regular', 'InstrumentSans_700Bold']) expect(theme).toContain(face)
     for (const file of ['src/components/ui.tsx', 'app/(tabs)/index.tsx', 'app/(tabs)/new.tsx', 'app/(tabs)/account.tsx', 'app/quote/[id].tsx', 'app/link.tsx', 'app/login.tsx', 'src/components/PricingStages.tsx']) {
       const source = read(file)
       expect(source, file).not.toMatch(/fontWeight:/)

@@ -570,7 +570,7 @@ describe('T-157: the maths label rule', () => {
   const traceLabels = [generated, 'Trim  £7 x 12(M)', 'Scaffold hire']
 
   it('splitLabelMath reads the label the engine writes', () => {
-    expect(splitLabelMath(generated)).toEqual(['Exterior walls', '£18 × 34.6 Sqm'])
+    expect(splitLabelMath(generated)).toEqual(['Exterior walls', '£18 × 34.6 sqm'])
     expect(splitLabelMath('Scaffold hire')).toEqual(['Scaffold hire', null])
     expect(splitLabelMath('2 x coats of paint')).toEqual(['2 x coats of paint', null])
   })

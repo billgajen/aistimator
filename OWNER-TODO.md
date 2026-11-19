@@ -2589,10 +2589,8 @@ quote page was asked for with a made-up link, so please open one real customer l
 
 ## T-184 — The app as a professional on-site tool
 
-Built and pushed 19 November 2026. **Not deployed.** The web side changed in three small ways (below), so say
-"deploy T-184" (web only: no worker, no migration) **before** you test the app against production. Without it
-the Account tab does not load, and the quote screen has no "Customer also asked for", no sources and shows
-answers as before.
+**Web deployed by you on 19 November 2026, about 00:08 UTC** (`dpl_2qBLUE6uWcnoFEgn5fjFjjtWyySn`, web only: no
+worker, no migration). The Account tab and the quote screen's new parts are live.
 
 I have still not seen the app run: there is no iPhone, simulator or Xcode on this machine.
 
@@ -2750,3 +2748,34 @@ check is still open); the commands above on your Mac.
 - Finer pricing stages (decision 1).
 - Phone notifications when a customer accepts; Android; "load more" on Quotes.
 - The App Store list from T-182 still stands (the reviewer's sign-in, the privacy answers, screenshots).
+
+---
+
+## T-185 — Mobile polish from your second phone test
+
+Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-185" (worker, then web; no
+migration). The app's own changes show in Expo Go as soon as you run it again; three things need the deploy
+first: the line detail on new quotes, the same note on every base fee, and the "New quote" email.
+
+### What to look at on the phone
+
+- [ ] **Progress card:** Received, Approve and send, Opened, Accepted. On a quote waiting for you, "Approve and
+  send" is the highlighted one. After you approve, "Opened" is.
+- [ ] **Under the total:** one plain sentence, with no "exact".
+- [ ] **Figures:** prices and dates are in the same face as the text, and line up in columns.
+- [ ] **A line's detail:** "$375 × 2 rooms" under the line's name (on a quote made after the deploy; an older
+  quote is read the same way in the app).
+- [ ] **Quotes rows:** one time on each, such as "2 hours ago". A long customer name wraps and the total stays
+  whole.
+- [ ] **The base fee's note** is the same on every quote ("Your fixed price").
+- [ ] **"Delete this quote"** is small red text and still asks first.
+
+### Not done, and why
+
+- **An older quote on the web still shows the old detail** ("$375 x 2(Room)") on the dashboard, the approval
+  page, the review email and the PDF, which show a line's stored words. New quotes read the new way everywhere.
+  Recommended: leave it; say if you want those four to re-read old quotes too (a small change).
+- **The dashboard's progress tracker keeps its own words** ("You approved", "Customer opened"). The ticket named
+  the app's card. Recommended: move the dashboard to the same four names in a design ticket, if you like them.
+- The full regression level was not run (the ticket asked for the quick one).
+

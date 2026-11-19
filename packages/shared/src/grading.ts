@@ -15,6 +15,7 @@
  *                  (customer answer or business edit) or scanned on site
  *                  with LiDAR (T-138). Exact price.
  */
+import { findConfidenceLanguage } from './customer-language'
 
 export type EstimateGrade = 'A' | 'B' | 'C'
 
@@ -41,19 +42,41 @@ export interface EstimateGradeResult {
   description: string
 }
 
+/**
+ * T-185: how sure the price is, in one plain sentence for the business. None
+ * of them uses a word the customer-language rules ban ("exact", "firm",
+ * "preliminary", "guaranteed"): the first one used to end "this price is
+ * exact". A unit test holds each against `findConfidenceLanguage`.
+ */
 const GRADE_META: Record<EstimateGrade, { label: string; description: string }> = {
   A: {
     label: 'Confirmed',
-    description: 'All price-driving quantities were provided or confirmed — this price is exact.',
+    description: 'Every quantity this price depends on was given or confirmed.',
   },
   B: {
     label: 'Measured',
-    description: 'Quantities were measured from your photos with good agreement — final price confirmed before work starts.',
+    description: 'The quantities were measured from the photos, and the measurements agree. Confirm them before work starts.',
   },
   C: {
     label: 'Concept',
-    description: 'Based on typical figures for a property like yours — confirm the details to tighten this estimate.',
+    description: 'This is worked out from typical figures for a property like this one. Confirm the details to narrow the price.',
   },
+}
+
+/**
+ * The sentence shown to the business under a price (the dashboard's quote
+ * page and the on-site app). It is the one stored with the quote, unless that
+ * one was written before T-185 and uses a banned word or a dash: then the
+ * sentence for the same level is shown in its place, so an older quote reads
+ * the same as a new one. Null when there is nothing to say.
+ */
+export function certaintySentence(estimate: { grade?: string | null; description?: string | null } | null | undefined): string | null {
+  if (!estimate) return null
+  const stored = (estimate.description ?? '').trim()
+  const plain = stored !== '' && findConfidenceLanguage(stored).length === 0 && !/[—–]/.test(stored)
+  if (plain) return stored
+  const meta = GRADE_META[estimate.grade as EstimateGrade]
+  return meta ? meta.description : null
 }
 
 /** Minimum measured confidence for a quantity to support Grade B */

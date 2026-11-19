@@ -56,9 +56,9 @@ export const type = {
 }
 
 /**
- * The three brand faces (Docs/design/system.md, Type): Bricolage Grotesque
- * for headings and the wordmark, Instrument Sans for text, Spline Sans Mono
- * for every figure. Each weight is its own font file, so a style names the
+ * The brand faces (Docs/design/system.md, Type): Bricolage Grotesque for
+ * headings and the wordmark, Instrument Sans for text and, in the app, for
+ * figures too (T-185). Each weight is its own font file, so a style names the
  * family and never sets `fontWeight` beside it (a weight on a custom face
  * falls back to the phone's own font). They are loaded once in app/_layout;
  * until then, and if they cannot be loaded, the phone's own font is used.
@@ -69,9 +69,14 @@ export const fonts = {
   body: 'InstrumentSans_400Regular',
   semi: 'InstrumentSans_600SemiBold',
   bold: 'InstrumentSans_700Bold',
-  figure: 'SplineSansMono_500Medium',
-  figureBold: 'SplineSansMono_600SemiBold',
+  // T-185 (owner, after the phone test): in the app, money and dates are set in the text face with
+  // tabular figures (every digit the same width, so columns line up), not in the mono face the web uses
+  figure: 'InstrumentSans_400Regular',
+  figureBold: 'InstrumentSans_700Bold',
 }
+
+/** Beside `fonts.figure` and `fonts.figureBold`: digits of one width, so amounts and dates line up */
+export const tabular: Array<'tabular-nums'> = ['tabular-nums']
 
 /**
  * Dynamic Type: text grows with the phone's text-size setting. The largest
