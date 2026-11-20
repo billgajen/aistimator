@@ -7,6 +7,7 @@
 
 import { formatMoney, lineLabelNow, splitMinimum, minimumChargeNote, displaySections } from '@qolumns/shared'
 import type {
+  CustomerRoomScanView,
   QuotePricing,
   QuoteContent,
   TenantBranding,
@@ -32,6 +33,8 @@ export interface QuotePdfData {
   locale?: string
   /** T-179: the quote's own service (the first section's heading on a combined quote) */
   serviceName?: string
+  /** T-193: what the room scan measured: each room's floor and wall area and its floor plan (no 3D model in a PDF) */
+  roomScan?: CustomerRoomScanView
 }
 
 function formatCurrency(amount: number, currency: string, locale: string): string {
@@ -182,6 +185,28 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
     </div>
   `
   sections.push(totalsSection)
+
+  // T-193: measured on site. The plan is our own SVG (only numbers and the escaped room name: floorPlanSvg).
+  if (data.roomScan && data.roomScan.rooms.length > 0) {
+    const rooms = data.roomScan.rooms
+      .map(
+        (room) => `
+        <div style="margin-bottom: 14px; page-break-inside: avoid;">
+          <h3 style="font-size: 14px; font-weight: 600; color: #111827; margin: 0 0 4px 0;">${escapeHtml(room.name)}</h3>
+          <p style="margin: 0 0 6px 0; font-size: 13px; color: #374151;">${room.floorArea ? `Floor area ${escapeHtml(room.floorArea)} · ` : ''}Wall area ${escapeHtml(room.wallArea)}</p>
+          ${room.planSvg ? `<div style="max-width: 360px;">${room.planSvg.replace('<svg ', '<svg style="width: 100%; height: auto;" ')}</div>` : ''}
+        </div>`
+      )
+      .join('')
+    sections.push(`
+      <div style="margin-bottom: 24px;">
+        <h2 style="font-size: 14px; font-weight: 600; color: ${primaryColor}; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">
+          Measured on site
+        </h2>
+        ${rooms}
+      </div>
+    `)
+  }
 
   // Assumptions
   if (template.includeAssumptions && content.assumptions && content.assumptions.length > 0) {

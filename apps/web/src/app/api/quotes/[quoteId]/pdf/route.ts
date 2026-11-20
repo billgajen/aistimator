@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { getRegion, canDownloadQuotePdf } from '@qolumns/shared'
+import { getRegion, canDownloadQuotePdf, customerRoomScanView, resolveRegionContext, roomScanOfAnswers } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
 import { generatePdf, isDocRaptorConfigured } from '@/lib/docraptor'
 import { generateQuotePdfHtml, type QuotePdfData } from '@/lib/pdf-template'
@@ -15,6 +15,15 @@ import type {
  * POST /api/quotes/:quoteId/pdf
  * Generate a PDF for a quote (dashboard use, requires auth)
  */
+/** T-193: the scan stored with the quote's request, as the customer sees it */
+function pdfRoomScan(quote: { quote_requests?: unknown }, tenant: { region?: string | null; unit_system?: string | null }): Pick<QuotePdfData, 'roomScan'> {
+  const request = ((r: unknown) => (Array.isArray(r) ? r[0] : r))(quote.quote_requests) as { job_answers?: unknown } | null
+  const scan = roomScanOfAnswers(request?.job_answers)
+  if (!scan) return {}
+  const region = resolveRegionContext(tenant)
+  return { roomScan: customerRoomScanView(scan, region.unitSystem, region.locale) }
+}
+
 export async function POST(
   _request: Request,
   { params }: { params: { quoteId: string } }
@@ -59,10 +68,12 @@ export async function POST(
           id,
           name,
           region,
+          unit_system,
           branding_json,
           template_json
         ),
-        services!service_id ( name )
+        services!service_id ( name ),
+        quote_requests!quote_request_id ( job_answers )
       `)
       .eq('id', quoteId)
       .eq('tenant_id', profile.tenant_id)
@@ -116,6 +127,7 @@ export async function POST(
       id: string
       name: string
       region?: string | null
+      unit_system?: string | null
       branding_json: TenantBranding | null
       template_json: TenantTemplate | null
     }
@@ -176,6 +188,8 @@ export async function POST(
       locale: getRegion(tenant.region).locale, // T-133
       // T-179: the first section's heading on a combined quote
       serviceName: (quote.services as { name?: string } | null)?.name,
+      // T-193: the room scan's sizes and floor plans, in the business's units
+      ...pdfRoomScan(quote, tenant),
     }
 
     // Generate HTML

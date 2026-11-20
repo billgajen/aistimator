@@ -15,9 +15,119 @@
 
 ## Issues & Resolutions
 
+### 2026-11-20: T-193 — Room scan results: sizes, floor plan, 3D model; room scan on Pro (AD-076)
+
+**Built and pushed, not deployed.** Needs deploying: **the web** (new routes, the cards, the viewer, the PDF, the
+bootstrap's units). **No migration** (the model's id lives in the stored scan; see AD-076). The worker is
+unchanged in code but bundles the shared package, so deploy it too for the new line notes in the review email
+(`businessSources`). The app reaches a phone by a rebuild (done onto the owner's iPhone in this ticket).
+
+**What broke (the owner's test, iPhone 15 Pro, full build):** the scan worked and priced the quote, but its sizes
+were shown nowhere: not before "Approve & send" in the app, not on the dashboard, not on the customer's page.
+The scan was only ever an input: `_room_scan` is kept in the request's answers, and every screen leaves out
+answers whose id starts with `_` (request-details.ts), so nothing read it back.
+
+#### 0. Room scan is a Pro feature (the owner's decision)
+- `plan_us_pro.features.lidar_scanning: true` (Business keeps it). The only plans offered are the US ones; the
+  legacy GB-era plans keep their exact features. No Stripe or price change.
+- The site follows from the plan definitions and the one live flag (`PLAN_FEATURE_LINES.lidar_scanning.live`,
+  still false): the Pro card lists "Measure a room by scanning it with your phone" marked "Coming soon"; Pricing's
+  compare table has it in the "Coming soon" group (Starter a dash, Pro "Coming soon"); Features ends its last
+  line with "Included in Pro." (`roomScanPlanLine()`, from the plans), and its second line now says the business
+  and the customer see the sizes with a floor plan and a 3D model ("you can still type over any of them" went: a
+  Features section has two or three lines, verify-t167, and Home's app section reads the third, the LiDAR note). Nothing enforces the feature by plan, as before (marketing-t170 keeps the plan
+  features file free of it).
+
+#### 1. The scanner captures more (native module)
+- Each wall and opening now carries `start` and `end`, its two ends on the floor plane ([x, z], metres): the
+  surface's transform translation plus and minus half its width along its own x axis. The room carries
+  `ceilingHeightM` (the tallest wall: RoomPlan's walls run floor to ceiling).
+- The room's 3D model: RoomPlan's own export (`export(to:exportOptions: .parametric)` on iOS 17+, `export(to:)`
+  on 16) into the app's documents, off the main thread. A failed export leaves `modelUri` out; the geometry is
+  returned either way.
+- `previewModel(uri)`: iOS Quick Look (`QLPreviewController`) for a file on the phone, or an https address it
+  downloads first. `removeModel(uri)` deletes a file.
+- The upload: like a photo, before the quote is sent, through `POST /api/app/room-models` (signed in; a signed
+  PUT for exactly the file's size and `model/vnd.usdz+zip`, 40 MB at most). Its id goes on the room at send time
+  (`withRoomModels`). **It can never cost the scan or the quote:** a model storage refuses, or one that fails
+  three times (`MAX_MODEL_TRIES`), is left out and the quote goes without it; with no signal it waits with the
+  quote and no try is counted (T-182's offline rules). A room scanned again or removed has its old file deleted
+  (`outbox.setRooms`).
+
+#### 2. One shared summary (`packages/shared/src/room-scan-report.ts`)
+- `roomScanReport(scan, unitSystem)`: per room and for the whole job: floor area, walls gross and less doors and
+  windows, ceiling height, perimeter, the walls (width × height) and the openings (type, size). The areas are
+  `summarizeRoomScan`'s, the same figures that price the quote, converted once. Units from one function,
+  `scanUnits(unitSystem)`: sq ft and ft, or m² and m. The app learns the unit system from the bootstrap
+  (`region.unitSystem`, new; an app that cached the form before T-193 goes by the region).
+- `roomScanView` (the business: everything, with each room's plan) and `customerRoomScanView` (each room's name,
+  floor area, wall area, plan and model; no wall-by-wall list). `roomScanOfAnswers` reads the stored scan back
+  and checks it again.
+- `floorPlanSvg(room, unitSystem)`: the room from above as a small SVG document: walls in ink with their lengths
+  outside the room (a ray-cast decides which side is outside; a label that would sit on another is moved
+  further out), doors in juniper, windows in amber ink (tertiary), open passages as gaps, a two-word key. Only
+  numbers and the escaped room name go in. Null for a scan with no positions.
+- Unit tests with a known room (4 × 3 m, 2.5 m high, a door and a window), metric and imperial
+  (`apps/web/src/__tests__/room-scan-t193.test.ts`), and that the new fields change no quantity a scan fills.
+
+#### 3. Shown to the business, the same data everywhere
+- **The app, straight after a scan:** the scan card lists every scanned room with its figures, its plan, its walls
+  and openings, "View in 3D" (Quick Look of the file on the phone), "Scan again" (replaces that room) and
+  "Remove this room" (`src/components/RoomScanSummary.tsx`). **The quote screen:** a "Room scan" card above the
+  price. The quote view carries `roomScan` with a signed address per model (10 minutes) for Quick Look.
+- **The dashboard quote page and the approval page:** one `RoomScanCard` (components/room-scan), above the price.
+  Butter and tape, as a measurement (system.md); the design-token test now allows them there.
+- **Price lines:** a line priced from a scanned quantity reads "Measured by room scan: 344.4 sq ft" (the takeoff
+  row's quantity and unit; "Measured by room scan" alone on an added service's line). One shared function
+  (`businessSources` → `scannedNote`), so the app, the dashboard, the approval page and the review email agree.
+
+#### 4. Shown to the customer
+- The quote page has a "Measured on site" block after "Measurement & takeoff": each room's floor and wall area,
+  its plan, and the viewer (with "Open in AR" on an iPhone or iPad). Not while the quote is still being worked out.
+- The PDF has "Measured on site": the sizes and the plan, no model.
+
+#### 5. The viewer
+- `RoomModelViewer` (client): nothing loads until "View the room in 3D" is pressed; then the page asks its own
+  route for the model's address and imports three.js (`three@0.187.0`, its `USDLoader`, which reads RoomPlan's
+  binary USDZ, and `OrbitControls`) as a separate piece of the page. Drag to turn, pinch or scroll to zoom. A
+  model that is missing or will not load says so in one line; the sizes and the plan stay.
+- The addresses: `GET /api/quotes/:id/room-models/:modelId` (signed in, the quote's tenant),
+  `GET /api/public/quotes/:id/room-models/:modelId?token=` (the quote's own token and expiry), and
+  `GET /api/public/approval/:token/room-models/:modelId` (a link that can still approve). Each signs for 10
+  minutes, only a model in that quote's own scan, under that quote's tenant. The two public ones are rate limited
+  (`room_model`, 30 a minute). Every refusal is the same 404.
+
+#### 6. Older scans
+- A scan from before T-193 has no positions and no model: its sizes are shown, with no plan and no viewer.
+
+**Checks:** lint 0, typecheck 0; unit tests web 1,334, worker 731, mobile 123; the iOS bundle builds.
+`pnpm check:quick` once: 27 of 28 in 5 min 10 s; t167 failed (the room scan section on Features had five lines,
+the rule is two or three). Fixed; the first `check:failed` stopped at the web build (Home's app section reads the
+third line, which the fix had removed); fixed again, `check:failed` 3 of 3 (t167 184/184) in 1 min 9 s. No new
+regression script (the ticket said none).
+
+**Not proven:** the export, the positions and Quick Look run only on a phone; three.js reading a real RoomPlan
+file has not been tried (no file here). If a model will not load in the browser, the block says so and the sizes
+and plan stay.
+
+### 2026-11-20: T-192 — Room scan build on the owner's iPhone (free route)
+
+**Built and installed, not deployed (nothing to deploy).** No code changed: the room scan module compiled the
+first time. What the build needed was all on this Mac: Xcode is in Downloads (not /Applications), so the build
+runs with `DEVELOPER_DIR` pointing into it; CocoaPods 1.15.2 is installed for the system Ruby in
+`~/.qolumns-pods-sys` (Homebrew's could not build here); Apple's WWDR G3 intermediate certificate was added to
+the login keychain so the owner's new development certificate is valid. Expo takes the phone by its hardware id,
+not the CoreDevice id. The owner trusted the developer on the phone, the app opened, and the owner tested the
+room scan (it priced the quote; T-193 is what that test found). The rebuild command is in OWNER-TODO (T-192): a
+free Personal Team build runs for 7 days.
+
 ### 2026-11-19: T-191 — App Store readiness, emails in the brand, refunds and disputes, Wrangler 4 (AD-074, AD-075)
 
-Built and pushed, **not deployed**. The web app, the worker (its emails, and Wrangler 4), the shared package and
+**Deployed by the owner on 2026-11-19:** the worker (with Wrangler 4), then the web. The two new events
+(`charge.refunded`, `charge.dispute.closed`) were added to the live Stripe webhook in the dashboard, which now has
+7 events; the setup script was not run on live. (Recorded in T-192 from the owner's note.)
+
+**As built:** the web app, the worker (its emails, and Wrangler 4), the shared package and
 the mobile app. No pricing or quote flow change. No migration, no new setting. One Stripe step: the webhook
 endpoint needs the two new events.
 
@@ -10355,6 +10465,27 @@ where it reads at 4.5:1 on white. A new email uses `emailHeadStyle()` and `EMAIL
 for figures where Spline Sans Mono is missing.
 
 ---
+
+### AD-076: A room scan is shown from one summary; its model is private to its quote (T-193)
+
+**Decision.** Every screen that shows a room scan (the app after scanning and on the quote, the dashboard, the
+approval page, the customer's page, the PDF) reads one shared summary (`room-scan-report.ts`) built from the
+scan stored with the request, in the business's units, and the same floor plan drawing. The areas are the ones
+that priced the quote; showing a scan changes no pricing. The 3D model is RoomPlan's own USDZ, kept in storage at
+`<tenant>/room-models/<id>.usdz`, where the server makes the id; the scan carries only the id.
+
+**Why no migration.** The model is not an asset row: an asset has a fixed set of types and the public upload
+route takes any form key. Keeping the id in the scan, and building every key from the quote's own tenant, gives
+the same isolation (an id from another business opens nothing) without a schema change. A model sits in the
+tenant's own folder, beside its photos.
+
+**Why three.js.** A browser cannot show a USDZ by itself, and RoomPlan writes the binary form; three.js's
+`USDLoader` (r187) reads it. It is loaded only when the viewer is opened, so no page carries it otherwise. On an
+iPhone the same file also opens in AR Quick Look.
+
+**Rules.** An address to a model is signed for minutes, only for a model in the asking quote's scan, and only
+after the quote's own check (sign-in and tenant, its token, or its approval link). A model never holds up a
+quote: refused or failing, it is left out.
 
 ## Known Constraints
 

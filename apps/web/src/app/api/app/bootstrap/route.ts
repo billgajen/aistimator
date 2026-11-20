@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getRegion, type AppBootstrapResponse } from '@qolumns/shared'
+import { getRegion, resolveRegionContext, type AppBootstrapResponse } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
 
 /**
@@ -14,7 +14,7 @@ export async function GET() {
   const { supabase, tenantId } = auth
 
   const [{ data: tenant }, { data: site }] = await Promise.all([
-    supabase.from('tenants').select('name, currency, region').eq('id', tenantId).single(),
+    supabase.from('tenants').select('name, currency, region, unit_system').eq('id', tenantId).single(),
     supabase
       .from('tenant_sites')
       .select('tenant_key')
@@ -38,7 +38,13 @@ export async function GET() {
     tenantName: tenant.name as string,
     tenantKey: site.tenant_key as string,
     currency: (tenant.currency as string) || 'USD',
-    region: { code: region.code, locale: region.locale, postalCodeLabel: region.copy.postalCodeLabel },
+    region: {
+      code: region.code,
+      locale: region.locale,
+      postalCodeLabel: region.copy.postalCodeLabel,
+      // T-193: the units a room scan is shown in
+      unitSystem: resolveRegionContext({ region: tenant.region as string | null, unit_system: (tenant as { unit_system?: string | null }).unit_system }).unitSystem,
+    },
   }
   return NextResponse.json(body)
 }

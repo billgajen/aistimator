@@ -13,20 +13,21 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
-import { formatNumber, scanAnswers, summarizeRoomScan, type AppBootstrapResponse, type RoomScanPayload } from '@qolumns/shared'
-import { roomScanAvailability, roomScanBlockedLine, scanRoom } from '../../modules/room-scan'
+import { getRegion, roomScanView, scanAnswers, type AppBootstrapResponse } from '@qolumns/shared'
+import { canPreviewModel, previewModel, roomScanAvailability, roomScanBlockedLine, scanRoom } from '../../modules/room-scan'
 import { useApi } from '../../src/lib/api-context'
 import { fieldsForService, toApiError, type WidgetConfigResponse } from '../../src/lib/api'
 import { fieldKind, isAnswered, missingRequired, optionLabel, optionValue, toSubmissionAnswers, toggleOption, visibleFields, type AppField, type RawAnswers } from '../../src/lib/answers'
 import { keepPhoto, readFormCache, writeFormCache, type PickedPhoto } from '../../src/lib/device-files'
 import { plainError } from '../../src/lib/errors'
-import { draftProgress, type Draft, type DraftPhoto } from '../../src/lib/outbox'
+import { draftProgress, scanForRequest, type Draft, type DraftPhoto, type DraftRoom } from '../../src/lib/outbox'
+import { RoomScanSummary } from '../../src/components/RoomScanSummary'
 import { useOutbox, useOutboxReady, useOutboxState } from '../../src/lib/outbox-context'
 import { pricingStages } from '../../src/lib/pricing-stages'
 import { currentUserId } from '../../src/lib/supabase'
 import { PricingStages } from '../../src/components/PricingStages'
 import { BottomBar, Button, EmptyState, ErrorText, Field, fieldLabel, Icon, Label, Muted, Notice, ProgressBar, Rows, Screen, Title, TopBar } from '../../src/components/ui'
-import { colors, fonts, radius, scale, space, tabular, touch, type } from '../../src/theme'
+import { colors, fonts, radius, scale, space, touch, type } from '../../src/theme'
 
 const STEPS = ['service', 'photos', 'questions', 'details'] as const
 type Step = (typeof STEPS)[number]
@@ -194,8 +195,11 @@ export default function NewQuote() {
   const showScan = scanSignals.length > 0 && scanState !== 'not_ios' && scanState !== 'no_lidar'
   const canScan = showScan && scanState === 'ready'
   const scanBlocked = roomScanBlockedLine(scanState)
-  const scan: RoomScanPayload | null =
-    draft.rooms.length > 0 ? { version: 1, rooms: draft.rooms, device: Platform.OS === 'ios' ? 'iPhone (LiDAR)' : undefined } : null
+  // the scan as it is sent: geometry only (each room's model goes up on its own, and its id is added then)
+  const scan = scanForRequest(draft.rooms, Platform.OS === 'ios' ? 'iPhone (LiDAR)' : undefined)
+  // T-193: the figures in the business's own units (an app that cached the form before T-193 goes by the region)
+  const unitSystem = form.boot.region.unitSystem ?? getRegion(form.boot.region.code).unitSystem
+  const scanView = scan ? roomScanView(scan, unitSystem, form.boot.region.locale) : null
   // What the scan fills (the server works it out again; this is what the screen shows)
   const scanFilled = scan
     ? scanAnswers({ scan, expectedSignals: scanSignals, fields: fields.map((f) => ({ fieldId: f.fieldId })), existingAnswers: [] })
@@ -254,10 +258,19 @@ export default function NewQuote() {
     if (!result.canceled) await addPicked(result.assets.slice(0, room), angleId)
   }
 
-  async function addScannedRoom() {
+  /** Scan a room: a new one, or (T-193 "Scan again") in place of the one at `replace` */
+  async function addScannedRoom(replace?: number) {
     try {
-      const room = await scanRoom()
-      outbox.update(draft!.id, { rooms: [...draft!.rooms, { ...room, name: `Room ${draft!.rooms.length + 1}` }] })
+      const { modelUri, modelSizeBytes, ...geometry } = await scanRoom()
+      const rooms = draft!.rooms
+      const index = replace ?? rooms.length
+      const room: DraftRoom = {
+        ...geometry,
+        name: rooms[index]?.name ?? `Room ${rooms.length + 1}`,
+        // T-193: the room's 3D model, when the export worked; it uploads in the background like a photo
+        ...(modelUri && modelSizeBytes && modelSizeBytes > 0 && { model: { uri: modelUri, sizeBytes: Number(modelSizeBytes), state: 'waiting' as const } }),
+      }
+      outbox.setRooms(draft!.id, replace === undefined ? [...rooms, room] : rooms.map((r, i) => (i === replace ? room : r)))
     } catch (e) {
       // closing the scanner is not a fault; anything else is said plainly, never in the scanner's own words
       const cancelled = e instanceof Error && /cancel/i.test(e.message)
@@ -374,10 +387,12 @@ export default function NewQuote() {
                   // another service has other questions and other photos to take
                   const changed = draft.serviceId !== null && draft.serviceId !== id
                   if (changed) for (const photo of draft.photos) outbox.removePhoto(draft.id, photo.id)
+                  // T-193: and its own rooms to scan (their model files are deleted with them)
+                  if (changed && draft.rooms.length > 0) outbox.setRooms(draft.id, [])
                   outbox.update(draft.id, {
                     serviceId: id,
                     serviceName: picked?.name ?? null,
-                    ...(changed && { answers: {}, rooms: [] }),
+                    ...(changed && { answers: {} }),
                     step: STEPS.indexOf('photos'),
                   })
                   setStepError(null)
@@ -465,17 +480,26 @@ export default function NewQuote() {
                       {scanBlocked}. You can still type the sizes in below.
                     </Text>
                   ) : null}
-                  {scan ? (
-                    <Text style={styles.scanSummary}>
-                      {(() => {
-                        const s = summarizeRoomScan(scan)
-                        return `${s.rooms} room${s.rooms === 1 ? '' : 's'} · ${formatNumber(s.wallAreaNetSqm)} m² walls · ${formatNumber(s.floorAreaSqm)} m² floor`
-                      })()}
-                    </Text>
+                  {/* T-193: what was measured, straight after the scan, so it can be checked before pricing */}
+                  {scanView ? (
+                    <View style={styles.scanResult}>
+                      <RoomScanSummary
+                        view={scanView}
+                        hasModel={(i) => canPreviewModel() && Boolean(draft.rooms[i]?.model && draft.rooms[i]!.model!.state !== 'dropped')}
+                        actions={{
+                          onModel: (i) => {
+                            const model = draft.rooms[i]?.model
+                            if (model) previewModel(model.uri).catch(() => setStepError('The 3D model could not be shown. The sizes are kept.'))
+                          },
+                          ...(canScan && { onScanAgain: (i: number) => void addScannedRoom(i) }),
+                          onRemove: (i) => outbox.setRooms(draft.id, draft.rooms.filter((_, r) => r !== i)),
+                        }}
+                      />
+                    </View>
                   ) : null}
                   <View style={{ gap: space.sm, marginTop: space.md }}>
-                    <Button title={draft.rooms.length ? 'Scan another room' : 'Scan a room'} icon="scan-outline" variant="secondary" disabled={!canScan} onPress={addScannedRoom} />
-                    {draft.rooms.length > 0 ? <Button title="Clear the scans" variant="quiet" onPress={() => outbox.update(draft.id, { rooms: [] })} /> : null}
+                    <Button title={draft.rooms.length ? 'Scan another room' : 'Scan a room'} icon="scan-outline" variant="secondary" disabled={!canScan} onPress={() => void addScannedRoom()} />
+                    {draft.rooms.length > 1 ? <Button title="Clear the scans" variant="quiet" onPress={() => outbox.setRooms(draft.id, [])} /> : null}
                   </View>
                 </View>
               ) : null}
@@ -684,8 +708,7 @@ const styles = StyleSheet.create({
   tileRemove: { minHeight: touch.min, justifyContent: 'center' },
   tileRemoveText: { color: colors.brand, fontFamily: fonts.semi, fontSize: type.small },
   scan: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg, padding: space.lg, marginBottom: space.xl },
-  // butter is for measurement, and a scan's result is one
-  scanSummary: { color: colors.ink, fontFamily: fonts.figure, fontVariant: tabular, marginTop: space.sm, backgroundColor: colors.butter, padding: space.sm, borderRadius: radius.md, overflow: 'hidden' },
+  scanResult: { marginTop: space.md },
   scanOff: { backgroundColor: colors.surface, borderStyle: 'dashed', borderColor: colors.lineStrong },
   scanHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   scanBlocked: { color: colors.ink, fontFamily: fonts.semi, fontSize: type.body, marginTop: space.sm },

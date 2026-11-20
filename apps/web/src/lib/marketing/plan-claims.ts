@@ -178,12 +178,21 @@ export const UPCOMING = {
     heading: 'Scan a room, and its sizes fill themselves in.',
     lines: [
       'Walk the room with your phone’s camera, in the app.',
-      'The room’s sizes go into the quote for you, and you can still type over any of them.',
+      'The room’s sizes go into the quote for you, and you and your customer see them with a floor plan and a 3D model.',
       'It needs an iPhone that has a LiDAR scanner.',
     ],
     screen: 'The app’s room scan card: “Walk each room with the camera”, and the button “Scan a room”.',
   },
 } as const
+
+/**
+ * T-193: which plan the room scan comes with, from the plan definitions: the first plan the site shows
+ * that includes it ("Included in Pro."). Null when no shown plan does.
+ */
+export function roomScanPlanLine(plans: PlanDefinition[] = sitePlans()): string | null {
+  const plan = plans.find((p) => p.features.lidar_scanning)
+  return plan ? `Included in ${plan.name}.` : null
+}
 
 /** "Coming soon to iPhone", or "On iPhone" once the app is live */
 export function appAvailability(): string {
@@ -285,8 +294,8 @@ export function planLines(plan: PlanDefinition): PlanLine[] {
  * The plans the public site shows: the Pricing page and Home's plan cards
  * (the owner's decision, 2026-11-16). A plan is left off until at least one
  * line of its own is live: a line the plan below it does not have. Today that
- * leaves Business off (LiDAR, team members and priority support are all
- * still to come) and shows Starter and Pro. It comes back by itself when one
+ * leaves Business off (team members and priority support are still to come;
+ * since T-193 the room scan is on Pro as well) and shows Starter and Pro. It comes back by itself when one
  * of its own lines is marked live above.
  *
  * Only the public pages read this. What a plan includes, its price, sign-up

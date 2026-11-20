@@ -2,6 +2,7 @@
  * API request/response types for the Qolumns platform
  */
 
+import type { CustomerRoomScanView, RoomScanView } from './room-scan-report'
 import type { QuoteListCounts, QuoteListGroup } from './quote-turn'
 import type { ServiceSuggestion } from './service-suggestion'
 import type { AskedQuestion } from './question-choices'
@@ -246,6 +247,8 @@ export interface QuoteViewResponse {
    * second question; Accept and Decline stay available.
    */
   questionPending?: boolean
+  /** T-193: "Measured on site": each scanned room's floor and wall area, its floor plan and its 3D model */
+  roomScan?: CustomerRoomScanView
 }
 
 export interface AcceptQuoteRequest {
@@ -633,6 +636,8 @@ export interface QuoteDetailResponse {
   businessQuestions?: AskedQuestion[]
   /** T-188: the customer's own open questions, so the business can answer for them (empty otherwise) */
   customerQuestions?: AskedQuestion[]
+  /** T-193: what the on-site room scan measured, in the business's units, with the floor plans (room-scan-report.ts) */
+  roomScan?: RoomScanView
 }
 
 /**
@@ -715,7 +720,8 @@ export interface AppBootstrapResponse {
   /** The tenant's widget key: the app uses the widget's public form and upload endpoints */
   tenantKey: string
   currency: string
-  region: { code: string; locale: string; postalCodeLabel: string }
+  /** T-193: `unitSystem` is the business's units (absent from an app that cached the form before T-193) */
+  region: { code: string; locale: string; postalCodeLabel: string; unitSystem?: 'imperial' | 'metric' }
 }
 
 export interface AppCreateQuoteRequest {
@@ -859,4 +865,9 @@ export interface AppQuoteView {
   photoCount?: number
   /** T-184: what else the customer asked for (T-179), as the dashboard lists it */
   alsoAsked?: AppAlsoAsked[]
+  /**
+   * T-193: what the room scan measured, with the floor plans. `modelUrl` per room id is a signed address
+   * that lasts a few minutes (asked for again by opening the quote), for iOS Quick Look.
+   */
+  roomScan?: RoomScanView & { modelUrls?: Record<string, string> }
 }

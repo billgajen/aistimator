@@ -15,9 +15,14 @@
  *
  * A safeguard on the server (a rate limit) is waited out, for as long as the
  * server asks; it is never worked around.
+ *
+ * T-193: a scanned room's 3D model is uploaded like a photo, before the quote
+ * is sent, and its id goes on the room. It is never allowed to cost the scan
+ * or the quote: a model that storage refuses, or that fails three times, is
+ * left out, and the quote goes without it.
  */
 
-import type { AppCreateQuoteRequest, AppCreateQuoteResponse, RoomScanRoom } from '@qolumns/shared'
+import type { AppCreateQuoteRequest, AppCreateQuoteResponse, RoomScanPayload, RoomScanRoom } from '@qolumns/shared'
 import { toApiError, type ApiError } from './api'
 import { clamp01, toNumber } from './numbers'
 import type { RawAnswers } from './answers'
@@ -60,6 +65,62 @@ export interface DraftProblem {
 
 export type DraftRequest = Omit<AppCreateQuoteRequest, 'assetIds' | 'clientRequestId'>
 
+/**
+ * T-193: a room's 3D model on the phone. waiting · uploading · done (it has its id) · dropped: it could
+ * not be uploaded and the quote goes without it (the scan itself is kept).
+ */
+export interface RoomModelFile {
+  uri: string
+  sizeBytes: number
+  state: 'waiting' | 'uploading' | 'done' | 'dropped'
+  modelId?: string
+  /** Failed tries; at MAX_MODEL_TRIES it is dropped */
+  tries?: number
+}
+
+/** A scanned room as the draft keeps it: the scan's geometry, and its model file when there is one */
+export type DraftRoom = RoomScanRoom & { model?: RoomModelFile }
+
+export const ROOM_MODEL_CONTENT_TYPE = 'model/vnd.usdz+zip'
+
+/** A model that fails this many times is left out (the quote never waits on it for long) */
+export const MAX_MODEL_TRIES = 3
+
+/** The scan as it is sent: the rooms' geometry only, nothing that lives on the phone */
+export function scanForRequest(rooms: readonly DraftRoom[], device?: string): RoomScanPayload | null {
+  if (rooms.length === 0) return null
+  return {
+    version: 1,
+    rooms: rooms.map((room) => {
+      const { model: _model, ...geometry } = room
+      void _model
+      return geometry
+    }),
+    ...(device && { device }),
+  }
+}
+
+/** The request with each uploaded model's id on its room (rooms are in the same order as the draft's) */
+export function withRoomModels(request: DraftRequest, rooms: readonly DraftRoom[]): DraftRequest {
+  const scan = request.scan as RoomScanPayload | undefined
+  if (!scan || !Array.isArray(scan.rooms)) return request
+  return {
+    ...request,
+    scan: {
+      ...scan,
+      rooms: scan.rooms.map((room, i) => {
+        const model = rooms[i]?.model
+        return model?.state === 'done' && model.modelId ? { ...room, modelId: model.modelId } : room
+      }),
+    },
+  }
+}
+
+/** Every model has an answer: uploaded, or left out */
+export function modelsSettled(rooms: readonly DraftRoom[]): boolean {
+  return rooms.every((room) => !room.model || room.model.state === 'done' || room.model.state === 'dropped')
+}
+
 export interface Draft {
   /** Also the id sent with every attempt, so a repeat never makes a second quote */
   id: string
@@ -74,7 +135,7 @@ export interface Draft {
   postcode: string
   description: string
   answers: RawAnswers
-  rooms: RoomScanRoom[]
+  rooms: DraftRoom[]
   photos: DraftPhoto[]
   send: SendState
   /** The request as it will be sent, fixed when "Price this job" was pressed */
@@ -119,6 +180,8 @@ export interface NewPhoto {
 export interface OutboxDeps {
   api: {
     startUpload(tenantKey: string, file: { fileName: string; contentType: string; sizeBytes: number }): Promise<{ assetId: string; uploadUrl: string }>
+    /** T-193: a signed address for one room model of exactly this size */
+    startModelUpload(sizeBytes: number): Promise<{ modelId: string; uploadUrl: string }>
     createQuote(body: AppCreateQuoteRequest): Promise<AppCreateQuoteResponse>
   }
   /** The business's form key (from /api/app/bootstrap); may need the network the first time */
@@ -127,8 +190,8 @@ export interface OutboxDeps {
   store: { read(): Promise<string | null>; write(json: string): Promise<void> }
   files: {
     /** Send the file to the signed address; throws an ApiError that says whether to try again */
-    put(uploadUrl: string, photo: DraftPhoto, onProgress: (fraction: number) => void): Promise<void>
-    /** Delete a photo's copy from the phone (never throws) */
+    put(uploadUrl: string, file: { uri: string; contentType: string }, onProgress: (fraction: number) => void): Promise<void>
+    /** Delete a photo's copy, or a room model, from the phone (never throws) */
     remove(uri: string): Promise<void>
   }
   /** Keep the customer's link for a quote this phone made */
@@ -233,6 +296,7 @@ export function restoreState(json: string | null): OutboxState {
           send: d.send === 'sending' ? 'queued' : d.send,
           nextTryAt: 0,
           photos: d.photos.map((p) => (p.state === 'uploading' ? { ...p, state: 'waiting' as const, progress: 0 } : p)),
+          rooms: (Array.isArray(d.rooms) ? d.rooms : []).map((r) => (r.model?.state === 'uploading' ? { ...r, model: { ...r.model, state: 'waiting' as const } } : r)),
         })),
       sent: [],
     }
@@ -351,6 +415,50 @@ export function createOutbox(deps: OutboxDeps) {
     return true
   }
 
+  const setModel = (draftId: string, index: number, patch: Partial<RoomModelFile>, save = true) =>
+    setDraft(
+      draftId,
+      (draft) => ({ ...draft, rooms: draft.rooms.map((room, i) => (i === index && room.model ? { ...room, model: { ...room.model, ...patch } } : room)) }),
+      save
+    )
+
+  /**
+   * T-193: upload one room's model. True when this draft can carry on (it is up, or it was left out);
+   * false when it should wait (no signal, the server is busy) and try again later.
+   */
+  async function uploadModel(draftId: string, index: number, model: RoomModelFile): Promise<boolean> {
+    setModel(draftId, index, { state: 'uploading' }, false)
+    const failed = (error: ApiError): boolean => {
+      // no signal: the quote cannot go either, so the model waits with it and no try is counted (T-182)
+      if (error.offline) {
+        setModel(draftId, index, { state: 'waiting' })
+        return false
+      }
+      const tries = (model.tries ?? 0) + 1
+      // storage turned it down for what it is, or it keeps failing: the quote goes without it
+      if (!error.retryable || tries >= MAX_MODEL_TRIES) {
+        setModel(draftId, index, { state: 'dropped', tries })
+        void deps.files.remove(model.uri)
+        return true
+      }
+      setModel(draftId, index, { state: 'waiting', tries })
+      return false
+    }
+    let started: { modelId: string; uploadUrl: string }
+    try {
+      started = await deps.api.startModelUpload(model.sizeBytes)
+    } catch (raw) {
+      return failed(toApiError(raw))
+    }
+    try {
+      await deps.files.put(started.uploadUrl, { uri: model.uri, contentType: ROOM_MODEL_CONTENT_TYPE }, () => {})
+    } catch (raw) {
+      return failed(toApiError(raw))
+    }
+    setModel(draftId, index, { state: 'done', modelId: started.modelId })
+    return true
+  }
+
   async function send(draft: Draft): Promise<void> {
     if (!draft.request) {
       setDraft(draft.id, (d) => ({ ...d, send: 'editing' }))
@@ -363,7 +471,7 @@ export function createOutbox(deps: OutboxDeps) {
     setDraft(draft.id, (d) => ({ ...d, send: 'sending', problem: null }), false)
     let created: AppCreateQuoteResponse
     try {
-      created = await deps.api.createQuote({ ...draft.request, assetIds, clientRequestId: draft.id })
+      created = await deps.api.createQuote({ ...withRoomModels(draft.request, draft.rooms), assetIds, clientRequestId: draft.id })
     } catch (raw) {
       const error = toApiError(raw)
       if (error.retryable || error.status === 401) {
@@ -399,6 +507,7 @@ export function createOutbox(deps: OutboxDeps) {
     emit()
     await persist()
     for (const photo of draft.photos) await deps.files.remove(photo.uri)
+    for (const room of draft.rooms) if (room.model) await deps.files.remove(room.model.uri)
   }
 
   async function work(): Promise<void> {
@@ -422,11 +531,23 @@ export function createOutbox(deps: OutboxDeps) {
       draft = find(snapshot.id)
       if (!draft || stalled) continue
 
+      // T-193: then the rooms' 3D models (a model that cannot go is left out, never the quote)
+      for (const [index, room] of draft.rooms.entries()) {
+        const current = find(draft.id)?.rooms[index]?.model
+        if (!room.model || !current || current.state !== 'waiting') continue
+        if (!(await uploadModel(draft.id, index, current))) {
+          stalled = true
+          break
+        }
+      }
+      draft = find(snapshot.id)
+      if (!draft || stalled) continue
+
       // every photo is up: nothing is wrong any more
       if (draft.problem && draft.problem.kind !== 'refused' && draft.send === 'editing') {
         setDraft(draft.id, (d) => ({ ...d, problem: null, attempts: 0 }))
       }
-      if (draft.send === 'queued' && draft.photos.every((p) => p.state === 'done')) {
+      if (draft.send === 'queued' && draft.photos.every((p) => p.state === 'done') && modelsSettled(draft.rooms)) {
         await send(draft)
       }
     }
@@ -479,6 +600,18 @@ export function createOutbox(deps: OutboxDeps) {
       setDraft(id, (draft) => ({ ...draft, ...patch }))
     },
 
+    /**
+     * T-193: the draft's scanned rooms. A room that is no longer there has its model file deleted; a new
+     * one's model starts uploading.
+     */
+    setRooms(id: string, rooms: DraftRoom[]): void {
+      const before = find(id)?.rooms ?? []
+      const kept = new Set(rooms.map((room) => room.model?.uri).filter(Boolean))
+      setDraft(id, (d) => ({ ...d, rooms }))
+      for (const room of before) if (room.model && !kept.has(room.model.uri)) void deps.files.remove(room.model.uri)
+      void this.pump()
+    },
+
     /** A new photo; one per guided angle (taking it again replaces the first) */
     addPhoto(id: string, photo: NewPhoto): void {
       const draft = find(id)
@@ -526,6 +659,7 @@ export function createOutbox(deps: OutboxDeps) {
       emit()
       void persist()
       for (const photo of draft.photos) void deps.files.remove(photo.uri)
+      for (const room of draft.rooms) if (room.model) void deps.files.remove(room.model.uri)
     },
 
     /** The quote a draft became, once; null while it is still on its way */
@@ -542,7 +676,11 @@ export function createOutbox(deps: OutboxDeps) {
     hasWork(): boolean {
       const owner = deps.owner()
       return state.drafts.some(
-        (d) => d.owner === owner && (d.send !== 'editing' || d.photos.some((p) => p.state === 'waiting' || p.state === 'uploading'))
+        (d) =>
+          d.owner === owner &&
+          (d.send !== 'editing' ||
+            d.photos.some((p) => p.state === 'waiting' || p.state === 'uploading') ||
+            d.rooms.some((r) => r.model?.state === 'waiting' || r.model?.state === 'uploading'))
       )
     },
 

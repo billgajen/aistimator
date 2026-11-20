@@ -74,7 +74,7 @@ export async function keepPhoto(picked: PickedPhoto, angleId: string | null): Pr
 }
 
 /** Send one photo to its signed address, reporting how far it has got */
-export async function putPhoto(uploadUrl: string, photo: DraftPhoto, onProgress: (fraction: number) => void): Promise<void> {
+export async function putPhoto(uploadUrl: string, photo: Pick<DraftPhoto, 'uri' | 'contentType'>, onProgress: (fraction: number) => void): Promise<void> {
   const file = new File(photo.uri)
   // the file is gone from the phone: no number of tries will send it
   if (!file.exists) throw new ApiError(410, 'PHOTO_MISSING', 'This photo is no longer on the phone. Take it again.')

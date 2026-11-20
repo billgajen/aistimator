@@ -16,6 +16,7 @@ import Link from 'next/link'
 import { FinalInvoiceCard } from '@/components/analytics/FinalInvoiceCard'
 import { UnderstoodPanel } from '@/components/quotes/UnderstoodPanel'
 import { Money } from '@/components/quote/document-parts'
+import { RoomScanCard } from '@/components/room-scan/RoomScanCard'
 import type {
   QuoteDetailResponse,
   QuotePricing,
@@ -520,6 +521,9 @@ export default function QuoteDetailPage({
 
       {/* 2. T-169: what the AI understood, with the customer's photos. Nothing when it produced nothing. */}
       <UnderstoodPanel understanding={data.understanding} photos={data.photos ?? []} customerName={customer.name} madeByBusiness={data.madeByBusiness === true} />
+
+      {/* T-193: what the room scan measured, above the price it priced */}
+      {data.roomScan && <RoomScanCard view={data.roomScan} modelPath={`/api/quotes/${quoteId}/room-models/{modelId}`} className="mb-6" />}
 
       {/* 3. The price: the total first, in the figure style the customer's page uses */}
       <section className="mb-6 rounded-2xl border border-border bg-white p-5 shadow-warm-md" aria-labelledby="pricing-title" data-testid="pricing">

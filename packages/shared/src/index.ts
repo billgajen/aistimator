@@ -23,6 +23,7 @@ export * from './review-mode'
 export * from './wording-repair'
 export * from './identification'
 export * from './room-scan'
+export * from './room-scan-report'
 export * from './accuracy'
 
 // Re-export deterministic quantity formulas (T-125)

@@ -34,6 +34,9 @@ function phone(opts: { owner?: string | null } = {}) {
     links: [] as Array<[string, string]>,
     /** What the next calls do instead of succeeding (one entry per call) */
     startFails: [] as ApiError[],
+    /** T-193 */
+    modelFails: [] as ApiError[],
+    modelStarts: [] as number[],
     putFails: [] as ApiError[],
     createFails: [] as ApiError[],
     createAnswer: { quoteId: 'qte_1', status: 'queued', quoteViewUrl: 'https://app.test/q/qte_1?token=tok' } as { quoteId: string; status: string; quoteViewUrl?: string; alreadyCreated?: boolean },
@@ -47,6 +50,15 @@ function phone(opts: { owner?: string | null } = {}) {
         if (fail) throw fail
         world.starts.push(file.fileName)
         return { assetId: `asset-${file.fileName}`, uploadUrl: `https://storage.test/${file.fileName}` }
+      },
+      // T-193: a room model's upload
+      async startModelUpload(sizeBytes) {
+        if (!world.online) throw OFFLINE()
+        const fail = world.modelFails.shift()
+        if (fail) throw fail
+        world.modelStarts.push(sizeBytes)
+        const modelId = `0000000${world.modelStarts.length}-0000-4000-8000-000000000000`
+        return { modelId, uploadUrl: `https://storage.test/model-${modelId}` }
       },
       async createQuote(body) {
         if (!world.online) throw OFFLINE()
@@ -122,6 +134,7 @@ describe('the sending queue: photos upload in the background', () => {
           sizes.push(file.sizeBytes)
           return { assetId: 'a', uploadUrl: 'u' }
         },
+        startModelUpload: async () => ({ modelId: 'm', uploadUrl: 'u' }),
         createQuote: async () => ({ quoteId: 'q', status: 'queued' }),
       },
       tenantKey: async () => 'k',

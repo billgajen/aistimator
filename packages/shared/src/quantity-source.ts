@@ -11,6 +11,9 @@
  * Pure. No business's words are known here.
  */
 
+import { formatNumber } from './format'
+import { unitDisplayLabel } from './units'
+
 export type LineSource =
   /** measured from the customer's photos */
   | 'photos'
@@ -54,7 +57,8 @@ const BUSINESS_WORDS: Record<LineSource, string> = {
   photos: 'Measured from photos',
   label: 'Read from a label in the photos',
   answer: "The customer's answer",
-  scan: 'On-site room scan',
+  // T-193: with the quantity when it is known ("Measured by room scan: 41.2 sq ft", scannedNote)
+  scan: 'Measured by room scan',
   details: "Estimated from the customer's details",
   calculated: "Worked out from the customer's answers",
   fixed: 'Your fixed price',
@@ -194,6 +198,8 @@ export function businessSources(
       amount: typeof row.amount === 'number' && Number.isFinite(row.amount) ? row.amount : 0,
       method: typeof row.method === 'string' ? row.method : '',
       source: row.source,
+      quantity: typeof row.quantity === 'number' && Number.isFinite(row.quantity) ? row.quantity : null,
+      unit: typeof row.unit === 'string' ? row.unit : null,
       used: false,
     }))
   const rowFor = (line: { label: string; amount: number }, take: boolean) => {
@@ -207,11 +213,24 @@ export function businessSources(
     if (isLineSource(line.source)) {
       // where a label was read is said in the takeoff's words for that line
       const method = line.source === 'label' ? (rowFor(line, false)?.method ?? null) : null
+      if (line.source === 'scan') return scannedNote(rowFor(line, false))
       return sourceForBusiness({ source: line.source, method }, opts)
     }
     const row = rowFor(line, true)
+    if (row && (isLineSource(row.source) ? row.source : sourceFromMethod(row.method)) === 'scan') return scannedNote(row)
     return row ? sourceForBusiness({ source: row.source, method: row.method }, opts) : null
   })
+}
+
+/**
+ * T-193: a line priced from a scanned quantity says so, with the quantity and its unit as the line was
+ * priced: "Measured by room scan: 41.2 sq ft". Without a takeoff row (an added service's line) it says
+ * only "Measured by room scan".
+ */
+export function scannedNote(row: { quantity?: number | null; unit?: string | null } | null | undefined): string {
+  const quantity = row?.quantity
+  if (typeof quantity !== 'number' || !Number.isFinite(quantity)) return BUSINESS_WORDS.scan
+  return `${BUSINESS_WORDS.scan}: ${formatNumber(quantity)}${row?.unit ? ` ${unitDisplayLabel(row.unit)}` : ''}`
 }
 
 /**

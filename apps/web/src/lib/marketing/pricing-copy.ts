@@ -71,8 +71,8 @@ const has = (plan: PlanDefinition, line: PlanLine): boolean => {
 /**
  * The compare table for the plans the site shows. A plan line appears once: in
  * its own group while it is live, in "Coming soon" while it is not. A line no
- * shown plan includes is left out (the room scan belongs to a plan the site
- * does not show yet).
+ * shown plan includes is left out. (Since T-193 the room scan is on Pro, so
+ * it is a "Coming soon" row.)
  */
 export function compareGroups(plans: PlanDefinition[] = sitePlans()): CompareGroup[] {
   const every = plans.map(() => true as CompareCell)

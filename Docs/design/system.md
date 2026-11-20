@@ -384,7 +384,9 @@ Rules for using one:
    the rule that makes a ring the focus colour. A control that draws its focus with `focus:ring-2` writes no ring
    colour of its own. (T-172 removed 129 of them.)
 2. **Butter and tape only in measurement,** as for the colours at full strength: the takeoff block and the range
-   bar of the customer quote page. Not on a notice, not on a step marker.
+   bar of the customer quote page, and (T-193) the room scan card and "Measured on site"
+   (`components/room-scan/RoomScanCard.tsx`). Not on a notice, not on a step marker. The floor plan drawing uses
+   ink walls, juniper doors and tertiary (amber ink) windows, all at full strength.
 3. **Never on the accent,** and never to thin text: text is a text token at full strength. (One place is allowed:
    the admin bar's light text on ink, 9:1 at 80%.)
 4. **Never on the edge of a control.** A field's edge, an error edge and an outlined button's edge are the full

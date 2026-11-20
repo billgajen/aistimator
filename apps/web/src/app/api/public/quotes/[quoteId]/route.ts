@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { quoteTokenFilter } from '@/lib/tokens'
-import { businessIsAsked, isMadeByBusiness, isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange, canCustomerDecide, displaySectionsForCustomer, alsoAskedOf, alsoAskedWithStates, addedSections } from '@qolumns/shared'
+import { businessIsAsked, isMadeByBusiness, isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange, canCustomerDecide, displaySectionsForCustomer, alsoAskedOf, alsoAskedWithStates, addedSections, roomScanOfAnswers, customerRoomScanView } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
@@ -55,6 +55,7 @@ export async function GET(
           name,
           region,
           currency,
+          unit_system,
           template_json,
           branding_json
         ),
@@ -65,7 +66,8 @@ export async function GET(
         quote_requests!quote_request_id (
           id,
           asset_ids,
-          source_json
+          source_json,
+          job_answers
         )
       `)
       .eq('id', quoteId)
@@ -134,6 +136,7 @@ export async function GET(
       name: string
       region?: string | null
       currency?: string | null
+      unit_system?: string | null
       template_json: Record<string, unknown> | null
       branding_json: {
         logoAssetId?: string | null
@@ -289,6 +292,8 @@ export async function GET(
 
     // T-133: locale + currency fallback come from the tenant's region
     const regionCtx = resolveRegionContext(tenant)
+    const scanOfRequest = roomScanOfAnswers((requestOfQuote as { job_answers?: unknown } | null | undefined)?.job_answers)
+    const customerScan = scanOfRequest ? customerRoomScanView(scanOfRequest, regionCtx.unitSystem, regionCtx.locale) : null
     // T-171: what was read or measured, in the customer's terms (no amounts, no label text).
     // Withheld with the takeoff while the price is still a range.
     const read = isProvisional
@@ -389,6 +394,8 @@ export async function GET(
       // (T-147) while an estimate shown early awaits the business's approval.
       acceptQuoteEnabled: !isProvisional && !shownEarly && tenant.template_json?.acceptQuoteEnabled !== false,
       ...(questionPending && { questionPending: true }),
+      // T-193: what the room scan measured, the plans and the models (asked for when the customer opens one)
+      ...(customerScan && !isQuoteProcessing(quote.status) && { roomScan: customerScan }),
     }
 
     return NextResponse.json(response)

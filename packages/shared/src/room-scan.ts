@@ -14,15 +14,28 @@
 
 import { fromCanonical, normalizeUnit, unitKind } from './units'
 
+/**
+ * T-193: a point on the floor plane, in metres: [x, z] in the scan's own
+ * frame (RoomPlan's y is up, so x and z span the floor). Seen from above, x
+ * runs right and z runs down.
+ */
+export type PlanPoint = [number, number]
+
 export interface RoomScanWall {
   widthM: number
   heightM: number
+  /** T-193: where the wall runs on the floor plan (its two ends). Scans before T-193 have none. */
+  start?: PlanPoint
+  end?: PlanPoint
 }
 
 export interface RoomScanOpening {
   type: 'door' | 'window' | 'opening'
   widthM: number
   heightM: number
+  /** T-193: where it sits on the floor plan (its two ends, along its wall) */
+  start?: PlanPoint
+  end?: PlanPoint
 }
 
 export interface RoomScanFloor {
@@ -38,6 +51,13 @@ export interface RoomScanRoom {
   walls: RoomScanWall[]
   openings: RoomScanOpening[]
   floors: RoomScanFloor[]
+  /** T-193: floor to ceiling, metres (RoomPlan's walls run floor to ceiling: their tallest) */
+  ceilingHeightM?: number
+  /**
+   * T-193: the room's 3D model (RoomPlan's own USDZ export), uploaded privately. The server made this
+   * id; the file is kept under the quote's own tenant (lib/room-models.ts), so an id alone opens nothing.
+   */
+  modelId?: string
 }
 
 export interface RoomScanPayload {
@@ -84,6 +104,9 @@ export interface RoomScanSummary {
 /** Plausibility limits: one residential scan, not a stadium */
 const LIMITS = { rooms: 40, walls: 40, openings: 60, maxDimM: 60 }
 
+/** T-193: the shape of a model id the server hands out (a UUID) */
+export const ROOM_MODEL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
 const round = (n: number, dp = 1) => Math.round(n * 10 ** dp) / 10 ** dp
 const positive = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0
 
@@ -110,6 +133,16 @@ export function parseRoomScan(raw: unknown): { ok: true; scan: RoomScanPayload }
   if (!Array.isArray(r.rooms) || r.rooms.length === 0) return { ok: false, error: 'scan has no rooms' }
   if (r.rooms.length > LIMITS.rooms) return { ok: false, error: `at most ${LIMITS.rooms} rooms per scan` }
   const dim = (n: unknown) => positive(n) && n <= LIMITS.maxDimM
+  // T-193: a floor-plan point; one that is not a pair of plausible numbers is left off (the sizes still count)
+  const point = (p: unknown): PlanPoint | null =>
+    Array.isArray(p) && p.length === 2 && p.every((c) => typeof c === 'number' && Number.isFinite(c) && Math.abs(c) <= LIMITS.maxDimM)
+      ? [p[0] as number, p[1] as number]
+      : null
+  const ends = (o: Record<string, unknown>): { start: PlanPoint; end: PlanPoint } | Record<string, never> => {
+    const start = point(o.start)
+    const end = point(o.end)
+    return start && end ? { start, end } : {}
+  }
 
   const rooms: RoomScanRoom[] = []
   for (const [i, roomRaw] of r.rooms.entries()) {
@@ -122,13 +155,13 @@ export function parseRoomScan(raw: unknown): { ok: true; scan: RoomScanPayload }
     const cleanWalls: RoomScanWall[] = []
     for (const w of walls as Array<Record<string, unknown>>) {
       if (!dim(w?.widthM) || !dim(w?.heightM)) return { ok: false, error: `room ${i + 1} has an invalid wall` }
-      cleanWalls.push({ widthM: w.widthM as number, heightM: w.heightM as number })
+      cleanWalls.push({ widthM: w.widthM as number, heightM: w.heightM as number, ...ends(w) })
     }
     const cleanOpenings: RoomScanOpening[] = []
     for (const o of openings as Array<Record<string, unknown>>) {
       const type = o?.type === 'door' || o?.type === 'window' || o?.type === 'opening' ? o.type : null
       if (!type || !dim(o.widthM) || !dim(o.heightM)) return { ok: false, error: `room ${i + 1} has an invalid opening` }
-      cleanOpenings.push({ type, widthM: o.widthM as number, heightM: o.heightM as number })
+      cleanOpenings.push({ type, widthM: o.widthM as number, heightM: o.heightM as number, ...ends(o) })
     }
     const cleanFloors: RoomScanFloor[] = []
     for (const f of floors as Array<Record<string, unknown>>) {
@@ -149,6 +182,8 @@ export function parseRoomScan(raw: unknown): { ok: true; scan: RoomScanPayload }
       walls: cleanWalls,
       openings: cleanOpenings,
       floors: cleanFloors,
+      ...(dim(room.ceilingHeightM) && { ceilingHeightM: room.ceilingHeightM as number }),
+      ...(typeof room.modelId === 'string' && ROOM_MODEL_ID.test(room.modelId) && { modelId: room.modelId }),
     })
   }
   return {

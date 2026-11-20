@@ -27,6 +27,7 @@ import type {
   QuoteDetailResponse,
   AmendmentSummary,
 } from '@qolumns/shared'
+import { roomScanOfAnswers, roomScanView } from '@qolumns/shared'
 import { CHECKER_SETTINGS_VERSION, QUESTIONS_OPEN_STATUS, askedQuestions, businessIsAsked, carrySources, isMadeByBusiness, serviceSuggestionOf, MAX_ADDED_SECTIONS, addedSections, alsoAskedOf, alsoAskedWithStates, editedSectionBreakdown, withSections } from '@qolumns/shared'
 import type { CombinedPricing, QuoteSection } from '@qolumns/shared'
 import { sectionTaxFor } from '@/lib/quote-sections-service'
@@ -192,6 +193,15 @@ export async function GET(
 
     const feedback = (feedbackResult.data || []) as QuoteFeedback[]
 
+    // T-193: what the on-site room scan measured, in the business's own units
+    const scan = roomScanOfAnswers(requestRow?.job_answers)
+    let roomScan: QuoteDetailResponse['roomScan']
+    if (scan) {
+      const { data: tenantRow } = await supabase.from('tenants').select('region, unit_system').eq('id', auth.tenantId).single()
+      const region = resolveRegionContext((tenantRow ?? {}) as { region?: string | null; unit_system?: string | null })
+      roomScan = roomScanView(scan, region.unitSystem, region.locale)
+    }
+
     const response: QuoteDetailResponse = {
       quote: {
         id: quote.id,
@@ -245,6 +255,7 @@ export async function GET(
         quote.status === QUESTIONS_OPEN_STATUS && !isMadeByBusiness(requestRow?.source_json)
           ? askedQuestions((quote as { clarification_questions_json?: unknown }).clarification_questions_json)
           : [],
+      ...(roomScan && { roomScan }),
     }
 
     return NextResponse.json(response)

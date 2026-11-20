@@ -15,6 +15,10 @@ import {
   approvalDetail,
   formatMoney,
   getRegion,
+  resolveRegionContext,
+  roomScanOfAnswers,
+  roomScanView,
+  type RoomScanView,
   displaySections,
   CHECKER_SETTINGS_VERSION,
   type ApprovalDetail,
@@ -42,7 +46,7 @@ interface QuoteRow {
   pricing_json: { total?: number; currency?: string; estimate?: { rangeLow?: number; rangeHigh?: number } } | null
   content_json: { limitHold?: boolean; scopeSummary?: string } | null
   customer_json: { name?: string } | null
-  tenants: { name: string; region?: string | null } | null
+  tenants: { name: string; region?: string | null; unit_system?: string | null } | null
   services: { name: string } | null
   /** T-183: the request's photos and the form's suggestion of another service */
   request?: unknown
@@ -79,6 +83,10 @@ export interface ApprovalSummary {
   detail?: ApprovalDetail
   /** T-183: the customer's photos, while the link can still approve */
   photos?: ApprovalPhoto[]
+  /** T-193: what the room scan measured, the floor plans, and where each room's 3D model is asked for */
+  roomScan?: RoomScanView
+  /** T-193: the path that answers a model's signed address (the link's own); `{modelId}` is replaced */
+  roomModelPath?: string
 }
 
 export interface LoadedLink {
@@ -121,7 +129,7 @@ export async function loadApprovalLink(admin: Admin, token: string, now: Date = 
   const { data: quote } = await admin
     .from('quotes')
     .select(
-      'id, status, approved_at, pricing_json, content_json, customer_json, tenants!tenant_id ( name, region ), services!service_id ( name ), request:quote_requests!quote_request_id ( asset_ids, source_json )'
+      'id, status, approved_at, pricing_json, content_json, customer_json, tenants!tenant_id ( name, region, unit_system ), services!service_id ( name ), request:quote_requests!quote_request_id ( asset_ids, source_json, job_answers )'
     )
     .eq('id', link.quote_id)
     .eq('tenant_id', link.tenant_id)
@@ -152,8 +160,11 @@ export async function loadApprovalLink(admin: Admin, token: string, now: Date = 
  * the photos are the request's own image assets of that tenant, and the
  * checker's findings come from the same marked rows the dashboard reads.
  */
-async function judgeable(admin: Admin, token: string, link: LinkRow, q: QuoteRow): Promise<Pick<ApprovalSummary, 'detail' | 'photos'>> {
-  const request = (Array.isArray(q.request) ? q.request[0] : q.request) as { source_json?: unknown } | null | undefined
+async function judgeable(admin: Admin, token: string, link: LinkRow, q: QuoteRow): Promise<Pick<ApprovalSummary, 'detail' | 'photos' | 'roomScan' | 'roomModelPath'>> {
+  const request = (Array.isArray(q.request) ? q.request[0] : q.request) as { source_json?: unknown; job_answers?: unknown } | null | undefined
+  // T-193: the room scan, in the business's units, as the dashboard shows it
+  const scan = roomScanOfAnswers(request?.job_answers)
+  const regionCtx = resolveRegionContext({ region: q.tenants?.region, unit_system: q.tenants?.unit_system })
   const assetIds = assetIdsOf(q.request)
   const [images, checker] = await Promise.all([
     assetIds.length > 0
@@ -192,7 +203,36 @@ async function judgeable(admin: Admin, token: string, link: LinkRow, q: QuoteRow
       const url = approvalPhotoUrl(token, id)
       return { id, url, smallUrl: `${url}?size=small` }
     }),
+    ...(scan && {
+      roomScan: roomScanView(scan, regionCtx.unitSystem, regionCtx.locale),
+      roomModelPath: `/api/public/approval/${encodeURIComponent(token)}/room-models/{modelId}`,
+    }),
   }
+}
+
+/**
+ * T-193: the link's own quote's tenant and scan, for a room model's address. Only a link that can still
+ * approve, as for its photos; null otherwise.
+ */
+export async function approvalQuoteScan(admin: Admin, token: string, now: Date = new Date()): Promise<{ tenantId: string; jobAnswers: unknown } | null> {
+  if (!isApprovalTokenShape(token)) return null
+  const hash = await hashApprovalToken(token)
+  const { data: link } = await admin
+    .from('quote_approval_tokens')
+    .select('id, quote_id, tenant_id, expires_at, used_at, invalidated_at, attempts')
+    .eq('token_hash', hash)
+    .maybeSingle()
+  if (!link || approvalLinkState(link as LinkRow, now) !== 'valid') return null
+  const row = link as LinkRow
+  const { data: quote } = await admin
+    .from('quotes')
+    .select('id, request:quote_requests!quote_request_id ( job_answers )')
+    .eq('id', row.quote_id)
+    .eq('tenant_id', row.tenant_id)
+    .maybeSingle()
+  if (!quote) return null
+  const request = ((r: unknown) => (Array.isArray(r) ? r[0] : r))((quote as { request?: unknown }).request) as { job_answers?: unknown } | null
+  return { tenantId: row.tenant_id, jobAnswers: request?.job_answers }
 }
 
 /**

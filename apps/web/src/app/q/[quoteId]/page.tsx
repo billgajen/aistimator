@@ -3,6 +3,7 @@
 import { AcceptDetailsForm } from '@/components/quote/AcceptDetailsForm'
 import { Money, SectionLabel } from '@/components/quote/document-parts'
 import { MinimumNote } from '@/components/quote/MinimumNote'
+import { MeasuredOnSite } from '@/components/room-scan/RoomScanCard'
 import { AlsoAskedCards } from '@/components/quote/AlsoAskedCards'
 import type { AddResult, AnswerValue } from '@/components/quote/AlsoAskedCards'
 import { useEffect, useState, useCallback } from 'react'
@@ -658,6 +659,16 @@ export default function QuotePage({ params }: QuotePageProps) {
                     ))}
                   </ul>
                 </div>
+              </section>
+            )}
+
+            {/* T-193: what the room scan measured on site: each room's floor and wall area, its plan and its 3D model */}
+            {quote.roomScan && quote.roomScan.rooms.length > 0 && (
+              <section className="mb-8">
+                <MeasuredOnSite
+                  view={quote.roomScan}
+                  modelPath={token ? `/api/public/quotes/${encodeURIComponent(quoteId)}/room-models/{modelId}?token=${encodeURIComponent(token)}` : null}
+                />
               </section>
             )}
 

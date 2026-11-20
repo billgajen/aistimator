@@ -98,7 +98,8 @@ export const PLANS: PlanDefinition[] = [
     annualPrice: annualFromMonthly(US_PRO_MONTHLY),
     quoteLimit: 200, // confirmed (T-180)
     channels: ['widget', 'sms', 'whatsapp', 'mobile_app'],
-    features: { ...BASE_FEATURES, custom_branding: true, calibration_insights: true },
+    // T-193 (owner's decision): room scan is a Pro feature (Business keeps it)
+    features: { ...BASE_FEATURES, custom_branding: true, calibration_insights: true, lidar_scanning: true },
     overageEnabled: false,
     // T-165 (owner's decision): no trial. The one free offer is the free
     // allowance (FREE_ALLOWANCE): 10 priced quotes, no card. A plan is paid

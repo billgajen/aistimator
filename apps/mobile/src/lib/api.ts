@@ -231,6 +231,10 @@ export function createApi(opts: {
       if (!upload) throw new ApiError(400, 'UPLOAD_REFUSED', init.errors?.[0]?.error ?? 'This photo could not be uploaded')
       return upload
     },
+
+    /** T-193: start a room model's upload: a signed address for exactly this size, in this business's own folder */
+    startModelUpload: (sizeBytes: number) =>
+      request<{ modelId: string; uploadUrl: string }>('/api/app/room-models', { method: 'POST', body: JSON.stringify({ sizeBytes }) }),
   }
 }
 

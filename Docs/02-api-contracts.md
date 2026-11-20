@@ -203,6 +203,24 @@ The browser does not call Supabase's auth directly. All answer `{ "ok": true }` 
 - `POST /api/auth/reset-password` `{ "password" }`. Signed-in only (the reset link signs the person in). 401 otherwise.
 - `/api/admin/*` and `/admin` need the role `admin`, which no sign-up has (`lib/roles.ts`; migration 43).
 
+## Room scan models (T-193, AD-076)
+
+- `POST /api/app/room-models` (signed in, the app). Body `{ sizeBytes }` (whole bytes, at most 40 MB). Answers
+  `{ modelId, uploadUrl }`: a signed PUT for exactly that size of `model/vnd.usdz+zip`, at
+  `<tenant>/room-models/<modelId>.usdz`. The app puts `modelId` on the room in the quote's `scan`.
+- The scan (`AppCreateQuoteRequest.scan`, `RoomScanPayload` version 1) may now carry, per wall and opening,
+  `start` and `end` (`[x, z]` metres on the floor plane), and per room `ceilingHeightM` and `modelId` (a UUID).
+  Each is optional; a bad one is left off and the sizes still count.
+- The address of a model, `{ url }` signed for 10 minutes, only for a model in that quote's own scan (404
+  otherwise): `GET /api/quotes/:quoteId/room-models/:modelId` (signed in, the quote's tenant);
+  `GET /api/public/quotes/:quoteId/room-models/:modelId?token=` (the quote's token, not expired);
+  `GET /api/public/approval/:token/room-models/:modelId` (an approval link that can still approve). The two
+  public ones are limited to 30 a minute (`room_model`).
+- Responses that now carry the scan: `QuoteDetailResponse.roomScan` and `AppQuoteView.roomScan` (`RoomScanView`;
+  the app's also has `modelUrls`, by model id), `QuoteViewResponse.roomScan` (`CustomerRoomScanView`: no
+  wall-by-wall list), the approval summary's `roomScan` and `roomModelPath`. `AppBootstrapResponse.region.unitSystem`
+  is new.
+
 ## Security notes
 - Quote view tokens have an expiry (`tokenExpiresAt`). Expired tokens return 403.
 - Future hardening: Consider HMAC-signed tokens for quote view URLs to prevent enumeration.

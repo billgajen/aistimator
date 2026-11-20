@@ -3085,12 +3085,13 @@ Built and pushed 19 November 2026. **Deployed by you on 19 November 2026:** the 
 
 ## T-191 — App Store readiness, branded emails, refunds and disputes, Wrangler 4
 
-Built and pushed 19 November 2026. **Not deployed.** To put it live: "deploy T-191", the worker, then the web.
-No migration, no new setting. **One Stripe step** (below). The app changes reach a phone in the next build.
+Built and pushed 19 November 2026. **Deployed by you on 19 November 2026:** the worker (Wrangler 4), then the
+web. The app changes reach a phone in the next build.
 
 ### Stripe: add two events to the webhook (after the web is deployed)
 
-- [ ] Run `cd apps/web && npx tsx scripts/stripe-setup-plans.mts --live --dry-run`, then without `--dry-run`. It
+- [x] **Done by you in the dashboard (19 November):** the live endpoint has the 7 events. The script was not needed.
+- (The script way, for reference:) `cd apps/web && npx tsx scripts/stripe-setup-plans.mts --live --dry-run`, then without `--dry-run`. It
   adds `charge.refunded` and `charge.dispute.closed` to the one endpoint and changes nothing else (the signing
   secret stays the same). Or add the two events by hand: Developers, Webhooks, the endpoint, "Add events".
 - What they do: a **full refund of the current month's (or year's) payment**, or a **dispute the bank decides
@@ -3190,3 +3191,66 @@ sites; there is no advertising, analytics or crash-reporting kit in the app.
 - Refunds and disputes were tested with Stripe stood in for (unit tests); no real refund or dispute was made in
   the sandbox.
 - The review account script has not run on production.
+
+## T-192 — Room scan build on your iPhone (free route)
+
+Built and installed on your iPhone 20 November 2026. Nothing to deploy. No code changed.
+
+### Rebuild when the 7 days run out
+
+A free (Personal Team) build stops opening after 7 days. Plug the iPhone in, unlock it, and run this one command
+from the project folder (choose your iPhone when it asks):
+
+```
+cd apps/mobile && DEVELOPER_DIR=$HOME/Downloads/Xcode.app/Contents/Developer GEM_HOME=$HOME/.qolumns-pods-sys PATH=$HOME/.qolumns-pods-sys/bin:$PATH LANG=en_US.UTF-8 APP_VARIANT=dev npx expo run:ios --device --configuration Release
+```
+
+- What the command relies on, all set up in T-192 on this Mac: Xcode stays in Downloads (if you move it to
+  Applications, change the `DEVELOPER_DIR` part to `/Applications/Xcode.app/Contents/Developer`); CocoaPods lives
+  in `~/.qolumns-pods-sys`; Apple's WWDR G3 certificate is in your login keychain.
+- If the phone says the developer is not trusted: Settings → General → VPN & Device Management → your Apple ID
+  under Developer App → Trust.
+- The three folders `~/.qolumns-pods`, `~/.qolumns-pods-x86` and `~/.qolumns-pods-x86b` are left over from tries
+  that did not work; you can delete them.
+
+## T-193 — Room scan results: sizes, floor plan, 3D model; room scan on Pro
+
+Built and pushed 20 November 2026. **Not deployed.** To put it live: "deploy T-193", the worker, then the web.
+**No migration, no new setting.** The app was rebuilt onto your iPhone in this ticket.
+
+### What changed
+
+- **Room scan is on Pro** (Business keeps it). The Pro card, Pricing's table and Features show it, still marked
+  "Coming soon" until the app is released (one flag, as before). No Stripe or price change.
+- **After a scan, in the app:** each room's floor, walls (and walls less doors and windows), ceiling height,
+  perimeter, a floor plan, the walls and the doors and windows, "View in 3D", "Scan again" and "Remove this room".
+- **The quote, in the app, on the dashboard and on the approval page:** a "Room scan" card above the price, the
+  same figures. A price line from a scanned quantity says "Measured by room scan: 344.4 sq ft".
+- **Your customer:** "Measured on site" on their quote page: each room's floor and wall area, the plan and the 3D
+  model (on an iPhone also "Open in AR"). The PDF has the sizes and the plan.
+- Sizes are in sq ft and ft for a US business, m² and m otherwise.
+
+### Test on your phone
+
+The app on your phone talks to qolumns.com, which has not got T-193's web part until it is deployed. **Before the
+deploy:** the scan result (sizes, plan, "View in 3D", "Scan again") works, and the quote is priced as before,
+without its model (the upload address does not exist yet, so the model is left out, as designed). **After the
+deploy:** the model goes up with the quote, and the quote screen shows the "Room scan" card.
+
+- [ ] New quote, a service with a room-sized question, scan a room: the sizes and the plan show at once. Tap
+  "View in 3D" (the model opens), then "Scan again" (the room is replaced).
+- [ ] (After the deploy) Price it, open the quote: the "Room scan" card is above the price; "View in 3D" opens the model.
+- [ ] Turn the signal off before pricing: the quote waits and sends with the model when the signal is back.
+
+### After the deploy
+
+- [ ] The dashboard quote page: the card, the plan, "View the room in 3D" turns with the mouse.
+- [ ] The customer's link on an iPhone: "Measured on site", the viewer, and "Open in AR".
+- [ ] A quote scanned before T-193 still shows its sizes (no plan, no model).
+
+### Not proven
+
+- The model export, the positions on the plan and Quick Look were built for the phone and run only there.
+- The browser viewer has not read a real RoomPlan file yet (none here). If one will not load, the block says so
+  and the sizes and plan stay.
+

@@ -5,6 +5,8 @@ import { assetIdsOf, DASHBOARD_PHOTO_URL_SECONDS } from '@/lib/quote-photos'
 import { fieldLabels, formFields, requestDetails, type FieldRow } from '@/lib/request-details'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import { photoKeyToServe } from '@/lib/small-photo-server'
+import { signedRoomModelUrl } from '@/lib/room-models'
+import { resolveRegionContext, roomScanOfAnswers, roomScanView, type AppQuoteView } from '@qolumns/shared'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +44,7 @@ export async function GET(_request: Request, { params }: { params: { quoteId: st
   }
   const [{ data: service }, { data: tenant }, { data: fieldRows }] = await Promise.all([
     supabase.from('services').select('name').eq('id', quote.service_id).single(),
-    supabase.from('tenants').select('name').eq('id', tenantId).single(),
+    supabase.from('tenants').select('name, region, unit_system').eq('id', tenantId).single(),
     supabase.from('widget_configs').select('service_id, config_json').eq('tenant_id', tenantId),
   ])
 
@@ -68,6 +70,19 @@ export async function GET(_request: Request, { params }: { params: { quoteId: st
     photoCount: photos.count,
     requestSource: requestRow?.source_json,
   })
+  // T-193: what the room scan measured, and each room's model at an address that lasts a few minutes
+  const scan = roomScanOfAnswers(requestRow?.job_answers)
+  if (scan) {
+    const region = resolveRegionContext((tenant ?? {}) as { region?: string | null; unit_system?: string | null })
+    const view: NonNullable<AppQuoteView['roomScan']> = roomScanView(scan, region.unitSystem, region.locale)
+    const modelUrls: Record<string, string> = {}
+    for (const room of scan.rooms) {
+      if (!room.modelId) continue
+      const url = await signedRoomModelUrl({ tenantId, jobAnswers: requestRow?.job_answers }, room.modelId)
+      if (url) modelUrls[room.modelId] = url
+    }
+    body.roomScan = { ...view, ...(Object.keys(modelUrls).length > 0 && { modelUrls }) }
+  }
   return NextResponse.json(body)
 }
 

@@ -8,9 +8,21 @@ import { Platform } from 'react-native'
 import { requireOptionalNativeModule } from 'expo-modules-core'
 import type { RoomScanRoom } from '@qolumns/shared'
 
+/**
+ * T-193: what the scanner hands back: the room's geometry, and its 3D model (RoomPlan's USDZ) as a file in
+ * the app's documents when the export worked. The model is not part of the scan that is sent: the outbox
+ * uploads it and puts its id on the room.
+ */
+export interface ScannedRoom extends Omit<RoomScanRoom, 'name' | 'modelId'> {
+  modelUri?: string
+  modelSizeBytes?: number
+}
+
 interface RoomScanNative {
   isSupported(): boolean
-  scanRoom(): Promise<Omit<RoomScanRoom, 'name'>>
+  scanRoom(): Promise<ScannedRoom>
+  previewModel(uri: string): Promise<void>
+  removeModel(uri: string): void
 }
 
 const native = requireOptionalNativeModule<RoomScanNative>('RoomScan')
@@ -45,8 +57,28 @@ export function isRoomScanSupported(): boolean {
   return roomScanAvailability() === 'ready'
 }
 
-/** Presents the scanner; resolves with one room's geometry (metres). Rejects on cancel. */
-export async function scanRoom(): Promise<RoomScanRoom> {
+/** Presents the scanner; resolves with one room's geometry (metres) and its model file. Rejects on cancel. */
+export async function scanRoom(): Promise<ScannedRoom> {
   if (!native) throw new Error('Room scan needs the full app')
   return native.scanRoom()
+}
+
+/** T-193: can this build show a 3D model? (the full app on an iPhone) */
+export function canPreviewModel(): boolean {
+  return Platform.OS === 'ios' && Boolean(native)
+}
+
+/** T-193: shows a room's 3D model in iOS Quick Look: a file on the phone, or a signed https address */
+export async function previewModel(uri: string): Promise<void> {
+  if (!native) throw new Error('The 3D model needs the full app')
+  return native.previewModel(uri)
+}
+
+/** T-193: deletes a model file from the phone (never throws) */
+export function removeModelFile(uri: string): void {
+  try {
+    native?.removeModel(uri)
+  } catch {
+    // a file that will not delete is not worth stopping for
+  }
 }

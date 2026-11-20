@@ -87,8 +87,10 @@ describe('T-187: what is not live yet is marked from one flag', () => {
       expect(compareGroups().find((g) => g.id === 'reach')!.rows.find((r) => r.label === whatsapp)!.cells).toEqual([false, true])
       expect(upcomingFaq()[0]!.a).not.toMatch(/coming soon/i)
     })
-    // with both of Pro's channels live, the last group has nothing left and is not drawn
-    whileLive(PLAN_CHANNEL_LINES.whatsapp, () => whileLive(PLAN_CHANNEL_LINES.mobile_app, () => expect(compareGroups().map((g) => g.id)).toEqual(['quotes', 'reach', 'ai', 'brand'])))
+    // with both of Pro's channels and (T-193) its room scan live, the last group has nothing left and is not drawn
+    whileLive(PLAN_CHANNEL_LINES.whatsapp, () =>
+      whileLive(PLAN_CHANNEL_LINES.mobile_app, () => whileLive(PLAN_FEATURE_LINES.lidar_scanning!, () => expect(compareGroups().map((g) => g.id)).toEqual(['quotes', 'reach', 'ai', 'brand'])))
+    )
   })
 
   it('every place that shows one of them draws the mark from the flag, and types neither the mark nor "soon"', () => {
@@ -203,11 +205,11 @@ describe('T-187: the plan cards, from the plan definitions and plan-claims', () 
       ['See how your estimates compare with your final invoices', true],
       ['Quotes inside WhatsApp, on your own business number', false],
       ['An app for pricing a job while you are on site', false],
+      // T-193 (owner's decision): the room scan is on Pro, marked "Coming soon" from its one flag
+      ['Measure a room by scanning it with your phone', false],
     ])
     // nothing of Starter's is repeated on Pro
     for (const line of starter!.lines) expect(pro!.lines.map((l) => l.label)).not.toContain(line.label)
-    // the room scan is a Business line; Business is off the site, so no card carries it
-    expect(planCards().flatMap((c) => c.lines.map((l) => l.label))).not.toContain(PLAN_FEATURE_LINES.lidar_scanning!.label)
   })
 
   it('one component draws them on Home and on Pricing: the price with "plus tax", monthly and yearly, one button', () => {
@@ -251,11 +253,11 @@ describe('T-187: Pricing’s compare table is built, in the owner’s five group
     expect(soon.rows).toEqual([
       { label: 'Quotes inside WhatsApp, on your own business number', cells: [false, 'Coming soon'] },
       { label: 'An app for pricing a job while you are on site', cells: [false, 'Coming soon'] },
+      // T-193: the room scan is on Pro (not on Starter), and not live yet
+      { label: 'Measure a room by scanning it with your phone', cells: [false, 'Coming soon'] },
     ])
     const notLive = soon.rows.map((r) => r.label)
     for (const group of groups.filter((g) => g.id !== 'soon')) for (const row of group.rows) expect(notLive).not.toContain(row.label)
-    // no shown plan includes the room scan, so the table has no row for it
-    expect(groups.flatMap((g) => g.rows.map((r) => r.label))).not.toContain(PLAN_FEATURE_LINES.lidar_scanning!.label)
     expect(JSON.stringify(groups)).not.toMatch(/\bSMS\b|text message/i)
   })
 

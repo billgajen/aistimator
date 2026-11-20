@@ -360,10 +360,12 @@ describe('T-164: colours come from our tokens', () => {
     expect(uses().filter((u) => u.utility === 'ring' && /focus/.test(u.variants)).map((u) => `${u.file} ${u.cls}`)).toEqual([])
   })
 
-  it('butter and tape take a modifier only in the measurement block and the range bar of the customer quote page', () => {
+  it('butter and tape take a modifier only in measurement: the customer quote page and (T-193) the room scan card', () => {
     const found = uses().filter((u) => u.token === 'butter' || u.token === 'tape')
-    expect(found.map((u) => u.file).filter((f) => f !== 'app/q/[quoteId]/page.tsx')).toEqual([])
-    expect(found.map((u) => u.cls).sort()).toEqual(['bg-butter/40', 'bg-butter/80', 'border-tape/40'])
+    const measurement = ['app/q/[quoteId]/page.tsx', 'components/room-scan/RoomScanCard.tsx']
+    expect(found.map((u) => u.file).filter((f) => !measurement.includes(f))).toEqual([])
+    expect(found.filter((u) => u.file === 'app/q/[quoteId]/page.tsx').map((u) => u.cls).sort()).toEqual(['bg-butter/40', 'bg-butter/80', 'border-tape/40'])
+    expect([...new Set(found.filter((u) => u.file === 'components/room-scan/RoomScanCard.tsx').map((u) => u.cls))].sort()).toEqual(['bg-butter/40', 'border-tape/30', 'border-tape/40'])
   })
 
   it('the accent takes no modifier (there is no pale yellow), and no text is thinned with one', () => {

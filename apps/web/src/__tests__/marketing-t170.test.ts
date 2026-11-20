@@ -235,7 +235,8 @@ describe('T-170: Pricing says only what a business can use today', () => {
       ['Every customer gets their own estimate page to open, accept and come back to', true],
     ])
     expect(planLines(pro!).filter((l) => l.live).map((l) => l.label).slice(2)).toEqual(['Estimates under your brand alone, with no badge of ours', 'See how your estimates compare with your final invoices'])
-    expect(planLines(pro!).filter((l) => !l.live).map((l) => l.label)).toEqual(['Quotes inside WhatsApp, on your own business number', 'An app for pricing a job while you are on site'])
+    // T-193: the room scan is on Pro
+    expect(planLines(pro!).filter((l) => !l.live).map((l) => l.label)).toEqual(['Quotes inside WhatsApp, on your own business number', 'An app for pricing a job while you are on site', 'Measure a room by scanning it with your phone'])
     expect(planLines(business!).filter((l) => !l.live).map((l) => l.label)).toEqual(['Quotes inside WhatsApp, on your own business number', 'An app for pricing a job while you are on site', 'Measure a room by scanning it with your phone', 'Logins for your whole team', 'Faster answers from us when you need help'])
     for (const plan of offeredPlans()) expect(planLines(plan).map((l) => l.label).join(' '), plan.id).not.toMatch(/\bSMS\b|text message|by text/i)
     expect(PLAN_CHANNEL_LINES.sms.shown).toBe(false)

@@ -10,7 +10,7 @@ import { AppPhone, AppQuoteScreen, ChatScreen, RoomScanCard } from '@/components
 import { appQuoteLines, marketingExample, twoServiceExample } from '@/lib/marketing/examples'
 import { MAIN_CTA, QUIET_BUTTON, QUIET_LINK } from '@/lib/marketing/cta'
 import { HERO_DEMO, NOTICES } from '@/lib/marketing/home-copy'
-import { UPCOMING, type NotLiveYet } from '@/lib/marketing/plan-claims'
+import { UPCOMING, roomScanPlanLine, type NotLiveYet } from '@/lib/marketing/plan-claims'
 import { FEATURES_META, FEATURES_HERO, FEATURE_SECTIONS, FEATURES_PRICE_EXAMPLE, FEATURES_UPCOMING_HEADING, FEATURES_CLOSING, type FeatureId } from '@/lib/marketing/features-copy'
 
 export const metadata: Metadata = {
@@ -133,7 +133,8 @@ export default function FeaturesPage() {
     {
       key: 'roomScan',
       heading: UPCOMING.roomScan.heading,
-      lines: UPCOMING.roomScan.lines,
+      // T-193: the plan it comes with, from the plan definitions, said after the last line (a section has three)
+      lines: UPCOMING.roomScan.lines.map((line, i, all) => (i === all.length - 1 && roomScanPlanLine() ? `${line} ${roomScanPlanLine()}` : line)),
       screen: UPCOMING.roomScan.screen,
       picture: <RoomScanCard className="mx-auto max-w-sm" />,
     },

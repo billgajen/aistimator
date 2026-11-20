@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { approvalOutcomeCopy, APPROVAL_COPY, PRODUCT_NAME, type ApprovalDetail, type ApprovalOutcome } from '@qolumns/shared'
 import type { ApprovalPhoto, ApprovalSummary } from '@/lib/approval-link'
+import { RoomScanCard } from '@/components/room-scan/RoomScanCard'
 
 /**
  * T-183: what the business judges the price by, in reading order: warnings
@@ -147,6 +148,8 @@ export function ApproveCard({ token, initialOutcome, summary }: { token: string;
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-tertiary">{summary.businessName}</p>
               <p className="mt-2 font-display text-xl font-bold text-text-primary">{summary.customerName}</p>
               <p className="text-sm text-text-secondary">{summary.serviceName}</p>
+              {/* T-193: what the room scan measured, above the price, as on the dashboard */}
+              {summary.detail && summary.roomScan && <RoomScanCard view={summary.roomScan} modelPath={summary.roomModelPath ?? null} className="mt-4" />}
               {/* T-183: while the link can approve, the full detail replaces the short list below */}
               {summary.detail && <Detail detail={summary.detail} />}
               {/* a measured range is said beside the total it surrounds; a single price is the total itself */}

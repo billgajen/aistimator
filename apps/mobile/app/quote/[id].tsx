@@ -39,6 +39,8 @@ import { loadQuoteToken, saveQuoteToken } from '../../src/lib/quote-tokens'
 import { evidenceWords, shareMessage } from '../../src/lib/share'
 import { storyOfQuote, TONE_STYLE } from '../../src/lib/status'
 import { PricingStages } from '../../src/components/PricingStages'
+import { RoomScanCard } from '../../src/components/RoomScanSummary'
+import { canPreviewModel, previewModel } from '../../modules/room-scan'
 import { Body, BottomBar, Button, Card, ErrorText, Field, Icon, Label, LinkRow, MoneyRow, Muted, Notice, Pill, Rows, Screen, Skeleton, Title } from '../../src/components/ui'
 import { colors, fonts, icon, radius, scale, space, tabular, touch, type } from '../../src/theme'
 
@@ -345,6 +347,22 @@ export default function QuoteDetail() {
               <LinkRow title={QUOTE_TURN_COPY.questions.answerForCustomer} icon="chatbubble-ellipses-outline" onPress={() => setForCustomer(true)} last />
             </Card>
           )
+        ) : null}
+
+        {/* 3c. T-193: what the room scan measured, above the price it priced; a room's model opens in Quick Look */}
+        {quote.roomScan && quote.roomScan.rooms.length > 0 ? (
+          <RoomScanCard
+            view={quote.roomScan}
+            hasModel={(i) => {
+              const id = quote.roomScan?.rooms[i]?.modelId
+              return canPreviewModel() && Boolean(id && quote.roomScan?.modelUrls?.[id])
+            }}
+            onModel={(i) => {
+              const id = quote.roomScan?.rooms[i]?.modelId
+              const url = id ? quote.roomScan?.modelUrls?.[id] : undefined
+              if (url) previewModel(url).catch(() => setNote('The 3D model could not be shown. The sizes are unaffected.'))
+            }}
+          />
         ) : null}
 
         {/* 4. The price: lines, the minimum as a note, added services as sections, one total */}
