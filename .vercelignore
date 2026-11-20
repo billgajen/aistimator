@@ -2,3 +2,33 @@ apps/mobile/ios
 apps/mobile/dist
 .checks
 brand/*.ai
+
+# T-194 deploy: a .vercelignore replaces .gitignore for Vercel uploads, so everything .gitignore keeps out
+# (secrets, personal test photos, test results, build output) is listed here too
+node_modules/
+.pnpm-store/
+dist/
+.next/
+.vercel/
+.wrangler/
+.env
+.env.local
+.env.*.local
+.dev.vars
+.claude/settings.local.json
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+pnpm-debug.log*
+coverage/
+test-assets/
+scripts/hardcore-test/results/
+.turbo/
+.vercel
+.claude/skills/design-taste-frontend/
+.checks/

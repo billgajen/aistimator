@@ -17,7 +17,19 @@
 
 ### 2026-11-20: T-194 — Room scan that earns its place: scans drive prices, areas, clean walls and plan, a 3D viewer, rescan (AD-077)
 
-**Built and pushed, not deployed.** Needs deploying: **the worker, then the web**. **No migration** (rooms
+**Deployed 20 Nov 2026:** `pnpm check:full` 40 of 40 (32 scripts, 2,763 checks) in 28 min 56 s; worker
+**65e8a09b-873b-423a-9c82-2a0d83da2563** (was 68a803c3), then web **estimator-8gu7codfb** on qolumns.com (was
+estimator-2wuui782v). Live check, read-only: worker /health 200 (production, model); home page 200 at 1280 and 390
+with no page or console errors; /room-model 200 (refuses with no model, as designed); the new rescan route answers
+401 without a sign-in. The 3D viewer on a real quote link was not checked live (the owner chose to skip it).
+
+**Deploy issue fixed: `.vercelignore` replaced `.gitignore`.** The first web deploy was refused (15,250 files, the
+limit is 15,000). A `.vercelignore` is used *instead of* `.gitignore`, so the four-line one committed with T-194 let in
+the test results (12,349 files), the `.next` output and the design skill, and would have let in `.env.local` and
+`test-assets/` (personal photos). Vercel refused at the file list, before uploading contents. `.vercelignore` now
+keeps its four lines and lists every `.gitignore` entry too; **keep the two in step** when either changes.
+
+(Was: built and pushed, not deployed.) Needs deploying: **the worker, then the web**. **No migration** (rooms
 covered and the area name ride in the stored scan; a line's `scanMeasure` rides in `content_json.takeoff`). The app
 reaches the phone by a rebuild (done onto the owner's iPhone). `.vercelignore` (iOS build folder, `dist`,
 `.checks`, `brand/*.ai`) committed. T-193 was deployed by the owner on 20 Nov (worker 68a803c3, then web).

@@ -3256,7 +3256,7 @@ deploy:** the model goes up with the quote, and the quote screen shows the "Room
 
 ## T-194 — Room scan that earns its place: scans drive prices, areas, clean walls and plan, 3D viewer, rescan
 
-Built and pushed 20 November 2026. **Not deployed.** To put it live: "deploy T-194", **the worker, then the web**.
+**Deployed 20 November 2026** (worker 65e8a09b, then the web, estimator-8gu7codfb). The 3D viewer on a live quote was not checked yet: open a scanned quote's link and tap "View in 3D".
 **No migration, no new setting.** The app was rebuilt onto your iPhone in this ticket.
 
 ### Before you test: your plan
