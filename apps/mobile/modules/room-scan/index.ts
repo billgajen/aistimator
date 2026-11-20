@@ -4,7 +4,7 @@
  * build). Expo Go cannot carry it: there the app says so on the scan card
  * instead of hiding the card (T-184), so the scan can always be found.
  */
-import { Platform } from 'react-native'
+import { Linking, Platform } from 'react-native'
 import { requireOptionalNativeModule } from 'expo-modules-core'
 import type { RoomScanRoom } from '@qolumns/shared'
 
@@ -21,7 +21,7 @@ export interface ScannedRoom extends Omit<RoomScanRoom, 'name' | 'modelId'> {
 interface RoomScanNative {
   isSupported(): boolean
   scanRoom(): Promise<ScannedRoom>
-  previewModel(uri: string): Promise<void>
+  openPage(url: string): Promise<void>
   removeModel(uri: string): void
 }
 
@@ -63,15 +63,13 @@ export async function scanRoom(): Promise<ScannedRoom> {
   return native.scanRoom()
 }
 
-/** T-193: can this build show a 3D model? (the full app on an iPhone) */
-export function canPreviewModel(): boolean {
-  return Platform.OS === 'ios' && Boolean(native)
-}
-
-/** T-193: shows a room's 3D model in iOS Quick Look: a file on the phone, or a signed https address */
-export async function previewModel(uri: string): Promise<void> {
-  if (!native) throw new Error('The 3D model needs the full app')
-  return native.previewModel(uri)
+/**
+ * T-194: opens a page (the web's 3D viewer) in Safari's in-app browser, over the app. Without the native
+ * module (Expo Go) the phone's own browser opens it instead.
+ */
+export async function openPage(url: string): Promise<void> {
+  if (native?.openPage) return native.openPage(url)
+  await Linking.openURL(url)
 }
 
 /** T-193: deletes a model file from the phone (never throws) */

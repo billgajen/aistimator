@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import type { WorkStepConfig, ExpectedSignalConfig, SuggestedField } from '@qolumns/shared'
+import { SCAN_FILL_CHOICES, stepScanMeasure, stepTakesScan, withStepScanMeasure, type WorkStepConfig, type ExpectedSignalConfig, type SuggestedField, type ScanMeasure, type UnitSystem } from '@qolumns/shared'
 
 /**
  * Work Step Editor Component
@@ -23,6 +23,10 @@ interface WorkStepEditorProps {
   expectedSignals?: ExpectedSignalConfig[]
   /** Customer questions (form fields) for displaying labels in trigger dropdown */
   suggestedFields?: SuggestedField[]
+  /** T-194: the line's "When you scan on site, fill this from:" setting is stored on these signals */
+  onExpectedSignalsChange?: (signals: ExpectedSignalConfig[]) => void
+  /** T-194: the business's units, for a scanned area or length the signal has no unit for */
+  unitSystem?: UnitSystem
 }
 
 const COST_TYPES: { value: WorkStepConfig['costType']; label: string; description: string }[] = [
@@ -115,6 +119,8 @@ export function WorkStepEditor({
   onChange,
   expectedSignals = [],
   suggestedFields = [],
+  onExpectedSignalsChange,
+  unitSystem = 'metric',
 }: WorkStepEditorProps) {
   // Build a map from signal key to question label for display
   const signalToLabel = new Map<string, string>()
@@ -577,6 +583,33 @@ export function WorkStepEditor({
                         </div>
                       )}
                     </div>
+
+                    {/* T-194: the room scan as one more source of this quantity (never a new requirement) */}
+                    {onExpectedSignalsChange && stepTakesScan(step) && (
+                      <div className="max-w-md">
+                        <label htmlFor={`scan-${step.id}`} className="mb-1 block text-sm font-medium text-text-secondary">
+                          When you scan on site, fill this from:
+                        </label>
+                        <select
+                          id={`scan-${step.id}`}
+                          value={stepScanMeasure(step, expectedSignals, suggestedFields) ?? ''}
+                          onChange={(e) =>
+                            onExpectedSignalsChange(withStepScanMeasure(step, (e.target.value || null) as ScanMeasure | null, expectedSignals, suggestedFields, unitSystem))
+                          }
+                          className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
+                          data-testid="step-scan-measure"
+                        >
+                          {SCAN_FILL_CHOICES.map((c) => (
+                            <option key={c.value || 'none'} value={c.value}>
+                              {c.label}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="mt-1 text-xs text-text-muted">
+                          Only for quotes you make in the app with a room scan. Your customers&apos; website form is unchanged, and a number you type on site is used instead.
+                        </p>
+                      </div>
+                    )}
 
                     {/* Unit Label - Only for per_unit */}
                     {step.costType === 'per_unit' && step.quantitySource && (

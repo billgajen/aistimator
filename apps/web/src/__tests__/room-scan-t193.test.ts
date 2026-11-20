@@ -82,16 +82,19 @@ describe('T-193: one summary of a scan, per room and for the whole job', () => {
       wallAreaGross: 35,
       wallAreaNet: 32,
       ceilingHeight: 2.5,
-      perimeter: 14,
+      // T-194: "Perimeter" is "Wall length"; and less the door for trim
+      wallLength: 14,
+      wallLengthLessDoors: 13.1,
       doors: 1,
       windows: 1,
       hasPlan: true,
     })
+    // T-194: lettered round the room, from the top wall
     expect(report.rooms[0]!.walls).toEqual([
-      { width: 4, height: 2.5 },
-      { width: 3, height: 2.5 },
-      { width: 4, height: 2.5 },
-      { width: 3, height: 2.5 },
+      { letter: 'A', width: 4, height: 2.5 },
+      { letter: 'B', width: 3, height: 2.5 },
+      { letter: 'C', width: 4, height: 2.5 },
+      { letter: 'D', width: 3, height: 2.5 },
     ])
     expect(report.rooms[0]!.openings).toEqual([
       { type: 'door', width: 0.9, height: 2 },
@@ -103,8 +106,8 @@ describe('T-193: one summary of a scan, per room and for the whole job', () => {
     const report = roomScanReport(scanOf(knownRoom()), 'imperial')
     expect(report.units).toMatchObject({ area: 'sqft', length: 'ft', areaLabel: 'sq ft', lengthLabel: 'ft' })
     // 12 m² = 129.17 sq ft; 35 m² = 376.74; 32 m² = 344.45; 14 m = 45.93 ft; 2.5 m = 8.20 ft
-    expect(report.rooms[0]).toMatchObject({ floorArea: 129.2, wallAreaGross: 376.7, wallAreaNet: 344.4, perimeter: 45.9, ceilingHeight: 8.2 })
-    expect(report.rooms[0]!.walls[0]).toEqual({ width: 13.1, height: 8.2 })
+    expect(report.rooms[0]).toMatchObject({ floorArea: 129.2, wallAreaGross: 376.7, wallAreaNet: 344.4, wallLength: 45.9, ceilingHeight: 8.2 })
+    expect(report.rooms[0]!.walls[0]).toEqual({ letter: 'A', width: 13.1, height: 8.2 })
   })
 
   it('units come from one function, by the business’s unit system', () => {
@@ -115,7 +118,7 @@ describe('T-193: one summary of a scan, per room and for the whole job', () => {
   it('the whole job adds the rooms up, from the same figures that price the quote', () => {
     const two = scanOf(knownRoom(), knownRoom({ name: 'Bedroom' }))
     const report = roomScanReport(two, 'metric')
-    expect(report.total).toEqual({ rooms: 2, floorArea: 24, wallAreaGross: 70, wallAreaNet: 64, perimeter: 28, doors: 2, windows: 2 })
+    expect(report.total).toEqual({ areas: 2, rooms: 2, floorArea: 24, wallAreaGross: 70, wallAreaNet: 64, wallLength: 28, wallLengthLessDoors: 26.2, doors: 2, windows: 2 })
     const priced = summarizeRoomScan(two)
     expect([priced.floorAreaSqm, priced.wallAreaGrossSqm, priced.wallAreaNetSqm]).toEqual([report.total.floorArea, report.total.wallAreaGross, report.total.wallAreaNet])
   })
@@ -128,16 +131,16 @@ describe('T-193: one summary of a scan, per room and for the whole job', () => {
     const withPositions = scanAnswers({ scan: scanOf(knownRoom({ modelId: MODEL })), expectedSignals: signals })
     const without = scanAnswers({ scan: scanOf(olderRoom()), expectedSignals: signals })
     expect(withPositions).toEqual(without)
-    expect(withPositions).toEqual([
+    expect(withPositions.map(({ fieldId, value }) => ({ fieldId, value }))).toEqual([
       { fieldId: 'wall_area', value: 344.4 },
       { fieldId: 'floor_area', value: 12 },
     ])
   })
 
-  it('the ceiling height is the tallest wall when the scan does not say it', () => {
+  it('T-194: the ceiling height is the most common wall height, with the tallest wall beside it', () => {
     const room = knownRoom({ ceilingHeightM: undefined })
     room.walls[1] = { ...room.walls[1]!, heightM: 2.7 }
-    expect(roomScanReport(scanOf(room), 'metric').rooms[0]!.ceilingHeight).toBe(2.7)
+    expect(roomScanReport(scanOf(room), 'metric').rooms[0]).toMatchObject({ ceilingHeight: 2.5, tallestWall: 2.7 })
   })
 })
 
@@ -181,8 +184,9 @@ describe('T-193: the floor plan', () => {
   it('top-down: every wall with its length beside it, the door and the window marked, a key', () => {
     expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"')).toBe(true)
     expect(svg.match(new RegExp(`stroke="${PLAN_COLOR.wall}"`, 'g'))).toHaveLength(4)
-    expect(svg.match(/>4 m</g)).toHaveLength(2)
-    expect(svg.match(/>3 m</g)).toHaveLength(2)
+    // T-194: each wall's letter, then its length
+    expect(svg.match(/> 4 m</g)).toHaveLength(2)
+    expect(svg.match(/> 3 m</g)).toHaveLength(2)
     expect(svg).toContain(`stroke="${PLAN_COLOR.door}"`)
     expect(svg).toContain(`stroke="${PLAN_COLOR.window}"`)
     expect(svg).toContain('>Door<')
@@ -190,7 +194,7 @@ describe('T-193: the floor plan', () => {
   })
 
   it('in the business’s units', () => {
-    expect(floorPlanSvg(knownRoom(), 'imperial')).toContain('>13.1 ft<')
+    expect(floorPlanSvg(knownRoom(), 'imperial')).toContain('> 13.1 ft<')
   })
 
   it('the room’s name is escaped, and only numbers go in otherwise', () => {
@@ -205,15 +209,18 @@ describe('T-193: the floor plan', () => {
     expect(view.rooms[0]!.planSvg).toBeUndefined()
     expect(view.rooms[0]!.modelId).toBeUndefined()
     const customer = customerRoomScanView(scanOf(olderRoom()), 'metric')
-    expect(customer.rooms[0]).toEqual({ name: 'Living room', floorArea: '12 m²', wallArea: '32 m²' })
+    // T-194: nothing priced from it is known, so its wall area and ceiling height
+    expect(customer.rooms[0]).toEqual({ name: 'Living room', roomsCovered: 1, figures: [{ label: 'Wall area', value: '32 m²' }, { label: 'Ceiling height', value: '2.5 m' }] })
   })
 })
 
 describe('T-193: the customer sees each room’s floor and wall area, the plan and the model; no wall-by-wall list', () => {
-  it('per room: name, floor area, wall area, plan, model id, and nothing else', () => {
-    const view = customerRoomScanView(scanOf(knownRoom({ modelId: MODEL })), 'imperial')
-    expect(Object.keys(view.rooms[0]!).sort()).toEqual(['floorArea', 'modelId', 'name', 'planSvg', 'wallArea'])
-    expect(view.rooms[0]).toMatchObject({ floorArea: '129.2 sq ft', wallArea: '344.4 sq ft', modelId: MODEL })
+  it('per area: name, the sizes that priced it, plan, model id, and nothing else (T-194)', () => {
+    const view = customerRoomScanView(scanOf(knownRoom({ modelId: MODEL })), 'imperial', 'en-US', {
+      takeoff: [{ item: 'Walls', quantity: 344.4, unit: 'sqft', amount: 860, method: 'From the on-site room scan', source: 'scan', scanMeasure: 'wall_area_net' }],
+    })
+    expect(Object.keys(view.rooms[0]!).sort()).toEqual(['figures', 'modelId', 'name', 'planSvg', 'roomsCovered'])
+    expect(view.rooms[0]).toMatchObject({ figures: [{ label: 'Wall area less doors and windows', value: '344.4 sq ft' }], modelId: MODEL })
   })
 
   it('the quote page shows it as "Measured on site", the PDF the sizes and the plan with no model', () => {
@@ -296,7 +303,8 @@ describe('T-193: the 3D model is private to its quote', async () => {
     expect(viewer.indexOf('await fetch(addressPath')).toBeLessThan(viewer.indexOf("import('three')"))
     // a model that will not load leaves the sizes and the plan alone
     expect(viewer).toContain('The 3D model could not be shown here. The sizes and the floor plan are unaffected.')
-    expect(viewer).toContain('rel="ar"')
+    // T-194: no AR anywhere
+    expect(viewer).not.toContain('rel="ar"')
   })
 })
 

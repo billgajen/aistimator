@@ -199,7 +199,8 @@ export async function GET(
     if (scan) {
       const { data: tenantRow } = await supabase.from('tenants').select('region, unit_system').eq('id', auth.tenantId).single()
       const region = resolveRegionContext((tenantRow ?? {}) as { region?: string | null; unit_system?: string | null })
-      roomScan = roomScanView(scan, region.unitSystem, region.locale)
+      // T-194: with which of its sizes priced the quote, read from the quote's own lines
+      roomScan = roomScanView(scan, region.unitSystem, region.locale, { takeoff: (quote.content_json as { takeoff?: unknown } | null)?.takeoff ?? [] })
     }
 
     const response: QuoteDetailResponse = {

@@ -54,6 +54,12 @@ export interface RoomScanRoom {
   /** T-193: floor to ceiling, metres (RoomPlan's walls run floor to ceiling: their tallest) */
   ceilingHeightM?: number
   /**
+   * T-194: how many rooms this scan covers. A scan is an area: one room, a whole floor, or a hallway and
+   * the room it opens into. The business says how many rooms it is (default 1), and `room_count` is the sum
+   * across the scans. Scans before T-194 have none: 1 each, as they were priced.
+   */
+  roomsCovered?: number
+  /**
    * T-193: the room's 3D model (RoomPlan's own USDZ export), uploaded privately. The server made this
    * id; the file is kept under the quote's own tenant (lib/room-models.ts), so an id alone opens nothing.
    */
@@ -183,6 +189,7 @@ export function parseRoomScan(raw: unknown): { ok: true; scan: RoomScanPayload }
       openings: cleanOpenings,
       floors: cleanFloors,
       ...(dim(room.ceilingHeightM) && { ceilingHeightM: room.ceilingHeightM as number }),
+      ...(Number.isInteger(room.roomsCovered) && (room.roomsCovered as number) >= 1 && (room.roomsCovered as number) <= LIMITS.rooms && { roomsCovered: room.roomsCovered as number }),
       ...(typeof room.modelId === 'string' && ROOM_MODEL_ID.test(room.modelId) && { modelId: room.modelId }),
     })
   }
@@ -197,7 +204,12 @@ export function parseRoomScan(raw: unknown): { ok: true; scan: RoomScanPayload }
   }
 }
 
-/** Totals across every scanned room (metric). Pure. */
+/** T-194: the rooms one scanned area stands for (1 for a scan made before areas) */
+export function roomsCoveredBy(room: RoomScanRoom): number {
+  return Number.isInteger(room.roomsCovered) && (room.roomsCovered as number) >= 1 ? (room.roomsCovered as number) : 1
+}
+
+/** Totals across every scanned area (metric); `rooms` is the rooms they cover (T-194). Pure. */
 export function summarizeRoomScan(scan: RoomScanPayload): RoomScanSummary {
   let gross = 0
   let openingArea = 0
@@ -205,7 +217,9 @@ export function summarizeRoomScan(scan: RoomScanPayload): RoomScanSummary {
   let perimeter = 0
   let doors = 0
   let windows = 0
+  let rooms = 0
   for (const room of scan.rooms) {
+    rooms += roomsCoveredBy(room)
     for (const w of room.walls) {
       gross += w.widthM * w.heightM
       perimeter += w.widthM
@@ -223,7 +237,7 @@ export function summarizeRoomScan(scan: RoomScanPayload): RoomScanSummary {
     }
   }
   return {
-    rooms: scan.rooms.length,
+    rooms,
     wallAreaGrossSqm: round(gross),
     wallAreaNetSqm: round(Math.max(0, gross - openingArea)),
     floorAreaSqm: round(floor),
@@ -278,6 +292,9 @@ export function scanMeasureValue(summary: RoomScanSummary, measure: ScanMeasure,
 export interface ScanAnswer {
   fieldId: string
   value: number
+  /** T-194: what the scan measured for it, and the signal it fills (never stored with the answers: see `mergeScanAnswers`) */
+  measure: ScanMeasure
+  signalKey: string
 }
 
 /**
@@ -308,12 +325,95 @@ export function scanAnswers(opts: {
       opts.fields?.find((f) => f.mapsToSignal === es.signalKey) ?? opts.fields?.find((f) => f.fieldId === es.signalKey)
     const fieldId = field?.fieldId ?? es.signalKey
     if (answered.has(fieldId) || out.some((o) => o.fieldId === fieldId)) continue
-    out.push({ fieldId, value })
+    out.push({ fieldId, value, measure: es.scan.measure, signalKey: es.signalKey })
   }
   return out
+}
+
+/** T-194: an answer typed on site that is not what the scan measured (the typed number is used) */
+export interface ScanDifference {
+  fieldId: string
+  typed: number
+  scanned: number
+  measure: ScanMeasure
+}
+
+/**
+ * T-194 (AD-028): the order of trust for one quantity on a quote the business made on site.
+ *   1. a number the business typed: always used, even when the scan says otherwise (`differences`);
+ *   2. the room scan: fills what was left blank, and is credited where the typed number is the scan's own;
+ *   3. the customer's answer: a scan is only ever made by the business, so a customer's quote has none,
+ *      and its answers are untouched (the worker honours a scan only on a quote the app made);
+ *   4. photo measurement: a quantity in the answers is never measured from photos
+ *      (`humanStatedQuantityKeys` in the worker), so a scanned one never is.
+ * Pure: returns the answers to price from (`{fieldId, value}` only), which of them the scan gave, and
+ * where a typed number and the scan differ.
+ */
+export function mergeScanAnswers(
+  answers: ReadonlyArray<{ fieldId: string; value: unknown }>,
+  filled: readonly ScanAnswer[]
+): { answers: Array<{ fieldId: string; value: unknown }>; scanned: Map<string, ScanMeasure>; differences: ScanDifference[] } {
+  let out = answers.map((a) => ({ fieldId: a.fieldId, value: a.value }))
+  const scanned = new Map<string, ScanMeasure>()
+  const differences: ScanDifference[] = []
+  for (const answer of filled) {
+    const existing = out.find((a) => a.fieldId === answer.fieldId)
+    const blank = !existing || existing.value === undefined || existing.value === null || String(existing.value).trim() === ''
+    if (blank) {
+      out = [...out.filter((a) => a.fieldId !== answer.fieldId), { fieldId: answer.fieldId, value: answer.value }]
+      scanned.set(answer.fieldId, answer.measure)
+      continue
+    }
+    const typed = Number(String(existing.value).replace(/,/g, ''))
+    if (typed === answer.value) scanned.set(answer.fieldId, answer.measure)
+    else if (Number.isFinite(typed)) differences.push({ fieldId: answer.fieldId, typed, scanned: answer.value, measure: answer.measure })
+  }
+  return { answers: out, scanned, differences }
+}
+
+/**
+ * T-194: each measure in plain words, as the service editor offers them ("When you scan on site, fill
+ * this from:") and as the app explains a difference. `perimeter` is the length of the walls.
+ */
+export const SCAN_MEASURE_WORDS: Record<ScanMeasure, string> = {
+  wall_area_net: 'Wall area less doors and windows',
+  wall_area_gross: 'Wall area',
+  ceiling_area: 'Ceiling area',
+  floor_area: 'Floor area',
+  perimeter: 'Wall length',
+  door_count: 'Doors',
+  window_count: 'Windows',
+  room_count: 'Rooms',
+}
+
+/** The kind of quantity a measure is: a count, an area, or a length (AD-030 converts the last two) */
+export function scanMeasureKind(measure: ScanMeasure): 'count' | 'area' | 'length' {
+  if (measure === 'perimeter') return 'length'
+  if (measure === 'room_count' || measure === 'door_count' || measure === 'window_count') return 'count'
+  return 'area'
 }
 
 /** Customer-facing audit line for a scanned quantity */
 export function scanEvidence(summary: RoomScanSummary, device?: string): string {
   return `Scanned on site with LiDAR${device ? ` (${device})` : ''}: ${summary.rooms} room${summary.rooms === 1 ? '' : 's'}`
+}
+
+/**
+ * T-194: the scan's sentence for the app when a typed number and the scan differ. The typed number is used.
+ * "The scan covers 1 room. You entered 2."
+ */
+export function scanDifferenceLine(d: ScanDifference, unitLabel?: string): string {
+  const n = (v: number) => (Math.round(v * 10) / 10).toLocaleString('en-US')
+  if (d.measure === 'room_count') return `The scan covers ${n(d.scanned)} room${d.scanned === 1 ? '' : 's'}. You entered ${n(d.typed)}.`
+  const unit = unitLabel ? ` ${unitLabel}` : ''
+  return `The scan measured ${n(d.scanned)}${unit} (${SCAN_MEASURE_WORDS[d.measure].toLowerCase()}). You entered ${n(d.typed)}${unit}.`
+}
+
+/**
+ * T-194: can the business still scan this quote again, or add an area? Until it is approved: a quote the
+ * business made waits for its approval (pending_review), or for its own answers (awaiting_clarification).
+ * After approval the customer has the quote, and its sizes stay as they were sent.
+ */
+export function canScanAgain(quote: { status: string; approvedAt?: string | null }): boolean {
+  return !quote.approvedAt && (quote.status === 'pending_review' || quote.status === 'awaiting_clarification')
 }

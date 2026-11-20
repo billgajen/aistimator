@@ -60,7 +60,7 @@ import { createAiClient } from './ai/factory'
 import type { AiClient } from './ai/client'
 import type { QuantityProvenance } from '@qolumns/shared'
 import type { QuestionField } from './agents/question-choices'
-import { computeEnvelope, enforceEnvelope, computeEstimateGrade, capFlatRateGrade, priceDependsOnJobFacts, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue, parseRoomScan, scanAnswers, scanEvidence, summarizeRoomScan, ROOM_SCAN_FIELD, decideReviewHold, reviewModeOf, customerEstimateRange, isMadeByBusiness, repairCustomerWording, businessPhrasesFrom } from '@qolumns/shared'
+import { computeEnvelope, enforceEnvelope, computeEstimateGrade, capFlatRateGrade, priceDependsOnJobFacts, isQuestionWorthAsking, extractFormulaIdentifiers, resolveRegionContext, resolveReferenceObjects, regionPromptBlock, matchPossibleValue, parseRoomScan, scanAnswers, scanEvidence, summarizeRoomScan, mergeScanAnswers, ROOM_SCAN_FIELD, type ScanMeasure, decideReviewHold, reviewModeOf, customerEstimateRange, isMadeByBusiness, repairCustomerWording, businessPhrasesFrom } from '@qolumns/shared'
 import { measureQuantities, decideAdjudication, adjudicateMeasurement, computeCalibrationFactor, DEFAULT_ADJUDICATION_VALUE_THRESHOLD, DEFAULT_ADJUDICATION_TIMEOUT_MS } from './ai/measurement'
 import { formatScopeAnswers } from './ai/scope-answers'
 import { fieldOptions, snapToOption, answersOutsideOptions, type OptionField } from './answer-options'
@@ -488,6 +488,8 @@ export async function processQuote(
   // Honoured only on quotes the business app created: a website customer
   // can't claim "scanned on site". The raw scan never reaches a prompt.
   const scannedFieldIds = new Set<string>()
+  // T-194: which size the scan gave each of them (the takeoff records it on the line)
+  const scannedMeasures = new Map<string, ScanMeasure>()
   let scanEvidenceText: string | null = null
   {
     const rawScanIndex = (quoteRequest.job_answers || []).findIndex((a) => a.fieldId === ROOM_SCAN_FIELD)
@@ -500,26 +502,25 @@ export async function processQuote(
       } else if (!parsedScan.ok) {
         console.warn(`[Processor] Room scan ignored: ${parsedScan.error}`)
       } else {
-        // Every quantity the scan can give (ignoring what's answered), then:
-        // unanswered → fill; answered with the scan's own value (the app route
-        // pre-fills for validation) → credit the scan; a different typed
-        // value → the person wins and the line isn't called scanned
+        // Every quantity the scan can give (ignoring what's answered), then the
+        // order of trust (T-194, mergeScanAnswers): unanswered → fill; answered
+        // with the scan's own value (the app route pre-fills for validation) →
+        // credit the scan; a different typed value → the person wins and the
+        // line isn't called scanned
         const filled = scanAnswers({
           scan: parsedScan.scan,
           expectedSignals: service.expected_signals || [],
           fields: [...(quoteData.widgetFields || []), ...(service.draft_config?.suggestedFields || [])],
           existingAnswers: [],
         })
-        for (const answer of filled) {
-          const existing = quoteRequest.job_answers.find((a) => a.fieldId === answer.fieldId)
-          if (!existing || existing.value === '' || existing.value === null) {
-            quoteRequest.job_answers = quoteRequest.job_answers.filter((a) => a.fieldId !== answer.fieldId)
-            quoteRequest.job_answers.push(answer)
-            scannedFieldIds.add(answer.fieldId)
-          } else if (Number(String(existing.value).replace(/,/g, '')) === answer.value) {
-            scannedFieldIds.add(answer.fieldId)
-          }
+        const merged = mergeScanAnswers(quoteRequest.job_answers, filled)
+        quoteRequest.job_answers = merged.answers as typeof quoteRequest.job_answers
+        for (const [fieldId, measure] of merged.scanned) {
+          scannedFieldIds.add(fieldId)
+          scannedMeasures.set(fieldId, measure)
         }
+        // and by the signal each fills, for a line that prices from the signal
+        for (const a of filled) if (merged.scanned.has(a.fieldId)) scannedMeasures.set(a.signalKey, a.measure)
         scanEvidenceText = scanEvidence(summarizeRoomScan(parsedScan.scan), parsedScan.scan.device)
         console.log(`[Processor] Room scan: ${[...scannedFieldIds].join(', ') || 'no mapped quantities'}`)
       }
@@ -1111,6 +1112,11 @@ export async function processQuote(
             existingSignal
           )
           structuredSignals.signals[existingSignalIndex] = formSignal
+        } else if (reprice && existingSignal.value !== value) {
+          // T-194: a reprice starts from the first pass's signals, which hold the answers as they were then.
+          // An answer changed since (the area scanned again on site, T-194) is the answer now.
+          console.log(`[Processor] Reprice: ${signalKey} = ${value} (was ${existingSignal.value})`)
+          structuredSignals.signals[existingSignalIndex] = formSignal
         } else {
           console.log(`[Processor] Keeping existing form signal "${signalKey}" = ${existingSignal.value}`)
         }
@@ -1484,7 +1490,7 @@ export async function processQuote(
     trace: pricingTrace,
     structuredSignals,
     workSteps: rulesWithWorkSteps.workSteps || [],
-    ...(scanEvidenceText && { scanned: { fieldIds: scannedFieldIds, evidence: scanEvidenceText } }),
+    ...(scanEvidenceText && { scanned: { fieldIds: scannedFieldIds, evidence: scanEvidenceText, measures: scannedMeasures } }),
     // the engine's own photo-condition extras, and the ones the photo pass added
     photoAddonIds: new Set([...photoAddonIds, ...(pricing.recommendedAddons ?? []).filter((a) => a.source === 'image_signal').map((a) => a.id)]),
   })

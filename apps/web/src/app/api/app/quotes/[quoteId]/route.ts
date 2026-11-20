@@ -6,7 +6,7 @@ import { fieldLabels, formFields, requestDetails, type FieldRow } from '@/lib/re
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import { photoKeyToServe } from '@/lib/small-photo-server'
 import { signedRoomModelUrl } from '@/lib/room-models'
-import { resolveRegionContext, roomScanOfAnswers, roomScanView, type AppQuoteView } from '@qolumns/shared'
+import { canScanAgain, resolveRegionContext, roomScanOfAnswers, roomScanView, type AppQuoteView } from '@qolumns/shared'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,11 +70,16 @@ export async function GET(_request: Request, { params }: { params: { quoteId: st
     photoCount: photos.count,
     requestSource: requestRow?.source_json,
   })
-  // T-193: what the room scan measured, and each room's model at an address that lasts a few minutes
+  // T-193: what the room scan measured, and each room's model at an address that lasts a few minutes.
+  // T-194: which sizes priced it (from the quote's own lines), and whether it can still be scanned again.
   const scan = roomScanOfAnswers(requestRow?.job_answers)
   if (scan) {
     const region = resolveRegionContext((tenant ?? {}) as { region?: string | null; unit_system?: string | null })
-    const view: NonNullable<AppQuoteView['roomScan']> = roomScanView(scan, region.unitSystem, region.locale)
+    const takeoff = (quote.content_json as { takeoff?: unknown } | null)?.takeoff
+    const view: NonNullable<AppQuoteView['roomScan']> = {
+      ...roomScanView(scan, region.unitSystem, region.locale, { takeoff: takeoff ?? [] }),
+      canScanAgain: canScanAgain({ status: quote.status as string, approvedAt: quote.approved_at as string | null }),
+    }
     const modelUrls: Record<string, string> = {}
     for (const room of scan.rooms) {
       if (!room.modelId) continue

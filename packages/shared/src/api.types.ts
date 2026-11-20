@@ -722,6 +722,11 @@ export interface AppBootstrapResponse {
   currency: string
   /** T-193: `unitSystem` is the business's units (absent from an app that cached the form before T-193) */
   region: { code: string; locale: string; postalCodeLabel: string; unitSystem?: 'imperial' | 'metric' }
+  /**
+   * T-194: does the business's plan include room scan (Pro and Business)? Absent from a server before
+   * T-194: the app then offers the scan, as it did, and the server decides.
+   */
+  roomScan?: boolean
 }
 
 export interface AppCreateQuoteRequest {
@@ -866,8 +871,19 @@ export interface AppQuoteView {
   /** T-184: what else the customer asked for (T-179), as the dashboard lists it */
   alsoAsked?: AppAlsoAsked[]
   /**
-   * T-193: what the room scan measured, with the floor plans. `modelUrl` per room id is a signed address
-   * that lasts a few minutes (asked for again by opening the quote), for iOS Quick Look.
+   * T-193: what the room scan measured, with the floor plans. `modelUrls` per model id is a signed address
+   * that lasts a few minutes (asked for again by opening the quote), opened in the 3D viewer (T-194).
+   * T-194: `canScanAgain` while the quote is not yet approved ("Scan again", "Add an area").
    */
-  roomScan?: RoomScanView & { modelUrls?: Record<string, string> }
+  roomScan?: RoomScanView & { modelUrls?: Record<string, string>; canScanAgain?: boolean }
+}
+
+/**
+ * T-194: POST /api/app/quotes/:quoteId/scan — one area scanned again (`index`: its place in the quote's
+ * scan) or added (no `index`). `area` is a RoomScanRoom (with its name, the rooms it covers, and its
+ * uploaded model's id), checked like any scan.
+ */
+export interface AppRescanRequest {
+  area: unknown
+  index?: number
 }

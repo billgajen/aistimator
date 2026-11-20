@@ -293,7 +293,8 @@ export async function GET(
     // T-133: locale + currency fallback come from the tenant's region
     const regionCtx = resolveRegionContext(tenant)
     const scanOfRequest = roomScanOfAnswers((requestOfQuote as { job_answers?: unknown } | null | undefined)?.job_answers)
-    const customerScan = scanOfRequest ? customerRoomScanView(scanOfRequest, regionCtx.unitSystem, regionCtx.locale) : null
+    // T-194: only the sizes that priced the quote (not known while the price is still a range)
+    const customerScan = scanOfRequest ? customerRoomScanView(scanOfRequest, regionCtx.unitSystem, regionCtx.locale, { takeoff: isProvisional ? [] : content.takeoff }) : null
     // T-171: what was read or measured, in the customer's terms (no amounts, no label text).
     // Withheld with the takeoff while the price is still a range.
     const read = isProvisional

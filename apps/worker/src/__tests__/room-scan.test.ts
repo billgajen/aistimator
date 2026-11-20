@@ -110,8 +110,8 @@ describe('scanAnswers (pack mapping)', () => {
     expect(
       scanAnswers({ scan: SCAN, expectedSignals: expected, fields: [{ fieldId: 'rooms', mapsToSignal: 'room_count' }] })
     ).toEqual([
-      { fieldId: 'rooms', value: 2 },
-      { fieldId: 'wall_area_sqft', value: 624.3 },
+      { fieldId: 'rooms', value: 2, measure: 'room_count', signalKey: 'room_count' },
+      { fieldId: 'wall_area_sqft', value: 624.3, measure: 'wall_area_net', signalKey: 'wall_area_sqft' },
     ])
   })
 

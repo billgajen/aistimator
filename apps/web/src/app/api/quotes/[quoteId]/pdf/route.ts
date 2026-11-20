@@ -16,12 +16,12 @@ import type {
  * Generate a PDF for a quote (dashboard use, requires auth)
  */
 /** T-193: the scan stored with the quote's request, as the customer sees it */
-function pdfRoomScan(quote: { quote_requests?: unknown }, tenant: { region?: string | null; unit_system?: string | null }): Pick<QuotePdfData, 'roomScan'> {
+function pdfRoomScan(quote: { quote_requests?: unknown; content_json?: unknown }, tenant: { region?: string | null; unit_system?: string | null }): Pick<QuotePdfData, 'roomScan'> {
   const request = ((r: unknown) => (Array.isArray(r) ? r[0] : r))(quote.quote_requests) as { job_answers?: unknown } | null
   const scan = roomScanOfAnswers(request?.job_answers)
   if (!scan) return {}
   const region = resolveRegionContext(tenant)
-  return { roomScan: customerRoomScanView(scan, region.unitSystem, region.locale) }
+  return { roomScan: customerRoomScanView(scan, region.unitSystem, region.locale, { takeoff: (quote.content_json as { takeoff?: unknown } | null)?.takeoff ?? [] }) }
 }
 
 export async function POST(

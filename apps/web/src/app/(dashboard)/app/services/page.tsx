@@ -1397,6 +1397,8 @@ export default function ServicesPage() {
                         onChange={(steps) => setFormData({ ...formData, workSteps: steps })}
                         expectedSignals={formData.expectedSignals}
                         suggestedFields={formData.suggestedFields}
+                        onExpectedSignalsChange={(signals) => setFormData({ ...formData, expectedSignals: signals })}
+                        unitSystem={getRegion(region).unitSystem}
                       />
                     </div>
 

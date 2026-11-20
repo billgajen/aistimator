@@ -3215,7 +3215,7 @@ cd apps/mobile && DEVELOPER_DIR=$HOME/Downloads/Xcode.app/Contents/Developer GEM
 
 ## T-193 — Room scan results: sizes, floor plan, 3D model; room scan on Pro
 
-Built and pushed 20 November 2026. **Not deployed.** To put it live: "deploy T-193", the worker, then the web.
+**Deployed by you on 20 November 2026** (worker 68a803c3, then the web). Built and pushed 20 November 2026.
 **No migration, no new setting.** The app was rebuilt onto your iPhone in this ticket.
 
 ### What changed
@@ -3253,4 +3253,48 @@ deploy:** the model goes up with the quote, and the quote screen shows the "Room
 - The model export, the positions on the plan and Quick Look were built for the phone and run only there.
 - The browser viewer has not read a real RoomPlan file yet (none here). If one will not load, the block says so
   and the sizes and plan stay.
+
+## T-194 — Room scan that earns its place: scans drive prices, areas, clean walls and plan, 3D viewer, rescan
+
+Built and pushed 20 November 2026. **Not deployed.** To put it live: "deploy T-194", **the worker, then the web**.
+**No migration, no new setting.** The app was rebuilt onto your iPhone in this ticket.
+
+### Before you test: your plan
+
+Room scan now needs Pro or Business. After the deploy, a business on another plan is refused a scan, and the app
+says "Room scan is part of Pro". Make sure the account you test with is on Pro or Business.
+
+### What changed
+
+- **Each scan is an area** (a room, a floor or the whole house). After a scan the app asks its name (your own earlier
+  names are offered) and how many rooms it covers. The room count is the rooms covered, added up.
+- **Scans drive prices where you say so:** in a service, on a line charged by a quantity, "When you scan on site, fill
+  this from:" (wall area, floor area, wall length, doors, rooms…). Interior painting stays per room. A number you type
+  on site still wins, and the app says when it differs from the scan.
+- **The card tells the truth:** "These sizes priced the quote: …", or "The price does not depend on these sizes."
+- **Walls:** pieces joined, small returns grouped, walls lettered A, B, C… as on the plan; ceiling height is the
+  usual wall height, with "Tallest wall" when one is taller. "Wall length" and "Wall length less doors".
+- **The plan** is turned square, its labels never overlap, and it opens larger with a tap.
+- **Rescan:** on the quote screen, until you approve it, "Scan again" per area and "Add an area"; the quote is priced again.
+- **3D:** one viewer everywhere, dark background, framed to fill the view, "Full screen" and "Reset view". No AR.
+  In the app, "View in 3D" opens it in an in-app browser.
+- **Your customer** sees area names, the plan, the model, and only the sizes that priced the quote.
+
+### Test on your phone
+
+The app talks to qolumns.com. **Before the deploy** the new screens show, but the server is still T-193: the plan
+check, the rescan route and the in-app viewer page are not there yet. Test after the deploy:
+
+- [ ] New quote (interior painting), scan your hallway, stairs and living room as one area: name it, set "covers" to 2.
+  The walls should be about 9 lettered with small returns grouped, ceiling 8.1 ft with "Tallest wall 12.1 ft".
+- [ ] Leave the room count blank: the quote prices 2 rooms and the card says "These sizes priced the quote".
+  Type 3 instead: the app says the scan covers 2, and the quote uses 3.
+- [ ] Tap the plan (larger), tap "View in 3D" (the in-app browser opens the model; "Reset view", drag, pinch).
+- [ ] On the quote, before approving: "Scan again" on the area, then "Add an area"; the price is worked out again.
+  After "Approve & send" both buttons are gone.
+
+### Not proven
+
+- A real RoomPlan model in the new viewer (proved with a made-up model of the same shape and part names).
+- The in-app browser and the rescan on the device. An area replaced keeps its old model file in storage.
 

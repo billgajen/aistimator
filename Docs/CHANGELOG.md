@@ -15,9 +15,129 @@
 
 ## Issues & Resolutions
 
+### 2026-11-20: T-194 — Room scan that earns its place: scans drive prices, areas, clean walls and plan, a 3D viewer, rescan (AD-077)
+
+**Built and pushed, not deployed.** Needs deploying: **the worker, then the web**. **No migration** (rooms
+covered and the area name ride in the stored scan; a line's `scanMeasure` rides in `content_json.takeoff`). The app
+reaches the phone by a rebuild (done onto the owner's iPhone). `.vercelignore` (iOS build folder, `dist`,
+`.checks`, `brand/*.ai`) committed. T-193 was deployed by the owner on 20 Nov (worker 68a803c3, then web).
+
+**What broke (the owner's test, quote qte_715b602154d77fc7a4ccdd69, a hallway, the stairs and a living room walked
+as one scan):** 18 walls listed (long walls in pieces, tiny returns); ceiling height 12.1 ft though most walls are
+8.1 ft (the scanner sends its tallest wall: the stairwell); a floor plan at RoomPlan's own angle with labels on top
+of each other; a small pale model on a pale page; and the card said "These sizes priced the quote" while the price
+was "$375 × 2 rooms · Your answer". **Root cause of the last:** in every pack the only scan mapping is
+`room_count` on interior painting, a scan counted as one room, and the owner typed 2: the typed number won (as it
+should) and the card's sentence was fixed text.
+
+#### 1. Scans drive prices (the scan is a source, never a new requirement)
+- **Order of trust** (AD-028, confirmed and now one shared function, `mergeScanAnswers` in room-scan.ts, used by the
+  worker, the app routes and the app): a number the business typed is used; the scan fills what was blank (and is
+  credited where the typed number is its own); a customer's answers are never touched (only a quote with
+  `source_json.type === 'app'` reads a scan); a quantity in the answers is never measured from photos
+  (`humanStatedQuantityKeys`, which runs after the merge). Tested in web and worker.
+- **Service editor:** on a line charged by a quantity, "When you scan on site, fill this from:" (the ScanMeasure
+  list in plain words, or nothing). Stored as the signal's `scan` spec (`scan-spec.ts`); an area or a length gets a
+  unit of its kind (the line's, the signal's, else the business's), AD-030. No pricing maths changed.
+- **Packs:** checked every expected signal. Only interior painting's `room_count` can be measured honestly by a
+  room scan (it already had its spec). Exterior wall area is outside; wallpaper's wall count is the walls to
+  paper, not every wall; the other trades price equipment. A test pins this.
+- **Typed and scanned differ:** the app says "The scan covers 1 room. You entered 2. Your number is used."
+- **Worker:** a line priced from the scan records `scanMeasure`; a line priced from an AI signal that the scan
+  filled (the editor's setting on an AI line) now says "scan" (it said "answer"); on a reprice, a form answer that
+  changed since the first pass is the answer now (the snapshot's old form signal used to be kept: "Keeping existing
+  form signal"). Totals of existing quotes are unchanged: nothing reprices them unless someone answers or rescans.
+
+#### 2. An honest card
+`scanPricedLines(takeoff)` (room-scan-report.ts) is the one answer to "which scanned sizes set a price line". The
+business's card (web and app) reads it: "These sizes priced the quote: Interior room, 2 rooms." or "The price does
+not depend on these sizes. They are here for planning the job." Nothing is said before the quote is priced.
+
+#### 3. Walls and figures (display only)
+`wallLayout`: pieces in one line, end to end, within 5 cm of one height are one wall (widths summed, so every total
+is unchanged); walls under 0.3 m are "Small returns: n, total length"; the rest are lettered A, B, C… round the space
+from the top wall, and the plan shows the same letters. `ceilingHeightOf`: the most common wall height by wall area
+(5 cm buckets), with "Tallest wall" beside it when it is 10 cm or more taller. "Perimeter" is "Wall length", and
+"Wall length less doors" (doors and open passages). All from the stored geometry, so older scans read better too.
+The owner's shape: 18 walls → 9 lettered + 3 small returns; ceiling 8.1 ft, tallest 12.1 ft.
+
+#### 4. Floor plan
+Turned so its longest wall is level; labels are 14 px, placed outside each wall and slid or pushed out until they
+overlap no other label and no wall line (a short wall keeps its letter and drops its length); doors juniper,
+windows amber, open passages a dashed gap, a key for each present. It is the card's width on a phone, and opens
+larger with a tap (a dialog on the web, a zoomable full screen in the app).
+
+#### 5. Scan a room, a floor or the whole house
+Each scan is an area: after it, the app asks its name (typed, with the business's own earlier names as quick picks,
+kept on the phone: `area-names.ts`; no words are suggested) and "How many rooms does this cover?" (default 1,
+1 to 40, checked by `parseRoomScan`). `room_count` = the rooms covered summed across the scans
+(`summarizeRoomScan`). "Scan another area" stays; the card shows the job's totals. One tip: "Scanning one room at a
+time is the most accurate. A whole floor works too, but is less precise." Older scans: their name, 1 room each.
+
+#### 6. Rescan after the estimate
+`POST /api/app/quotes/:quoteId/scan` `{ area, index? }`: an area scanned again or added, on a quote made in the app
+and not approved (`canScanAgain`: pending_review or awaiting_clarification, no approved_at). What the old scan
+filled goes, what was typed stays, the new scan fills the rest (`answersWithNewScan`), then the existing
+answer-and-reprice path (`repriceQuoteNow`, else the queue). The app's quote screen has "Scan again" per area and
+"Add an area" until approval; the area is named before "Use this scan".
+
+#### 7. 3D viewer, one component
+`RoomModelViewer` for the dashboard, approval page, customer page and the app: framed so the model's box, as the
+camera sees it, fills 80% of the view (`fitDistance`; the bounding sphere left a wide, low room small), from a
+three-quarter angle above; taller on phones; "Full screen" (a fixed layer, which works on iPhone Safari) and
+"Reset view". Ink stage, light walls with edge lines, mint floor, doors and windows in the page's brand colour
+(`--color-primary-rgb`, the business's own on its customer's page), furniture in field grey; a model without normals
+gets flat ones. **No AR anywhere** ("Open in AR" removed). The app's "View in 3D" opens the web page `/room-model`
+in Safari's in-app browser (SFSafariViewController from the app's own native module, replacing Quick Look: no new
+dependency); the model's signed address rides after "#", and the page opens only our storage's or its own
+addresses (`room-model-source.ts`). Straight after a scan, the model opens once it is uploaded
+(`GET /api/app/room-models/:modelId`, the business's own folder).
+
+#### 8. The customer's block
+Area names, rooms covered, the plan, the model, and only the sizes that priced the quote (per area, by the line's
+`scanMeasure`), with "Priced from these sizes: …"; where none did, wall area and ceiling height. No floor area unless a
+price line used it; no wall list. The PDF the same, without the model.
+
+#### 9. Plan check
+The server refuses a scan from a business whose plan has no room scan (`lidar_scanning`: Pro and Business), on
+create and on rescan, 403 `ROOM_SCAN_NOT_IN_PLAN`, before anything is stored. The bootstrap says `roomScan`; the app's
+scan card says "Room scan is part of Pro" (no price, no link). A queued quote refused for its scan is sent again
+without it (never lost).
+
+**Design system:** the 3D viewer's ink stage is the second allowed dark surface (system.md rule 5).
+
+**Checks:** unit tests web 1,374 (room-scan-t194: 40), worker 735, mobile 130; lint and typecheck 0 errors; iOS
+bundle builds. `pnpm check:quick`: 27 of 28 in 4 min 17 s (typecheck read stale `.next/types` of a deleted
+screenshot page), then `pnpm check:failed` 1 of 1 in 14 s. `pnpm check:full` once (the worker changed): the network
+dropped during it (DNS for the storage and AI hosts, local auth timeouts), so t169, t171, t172, t175–t177, t182 and
+t183 failed with those errors and it was stopped before t178–t180; those 11 run again at the full level: 13 of 13
+passed (978 checks) in 19 min 10 s.
+
+**Screenshots:** `.checks/t194/` (card, priced head, plan enlarged, customer block, viewer, viewer full screen;
+desktop and 390 wide). The viewer was proved with a synthetic RoomPlan-shaped USDZ (named Wall/Door/Window/Floor
+meshes), not a real RoomPlan file.
+
+**Not proven:** a real RoomPlan file in the viewer (its prim names drive the colours; anything unnamed is grey);
+SFSafariViewController and the rescan flow on the device; R2 serving the model to the `/room-model` page (the
+bucket's CORS already allows the main address). A replaced area's old model file stays in storage (unreferenced).
+A rescan needs a signal: offline, the new area stays on the screen until "Use this scan" works.
+
+**Files:** shared `room-scan.ts`, `room-scan-report.ts`, `scan-spec.ts`, `api.types.ts`, `database.types.ts`; worker
+`quote-processor.ts`, `takeoff.ts`; web `lib/room-scan-intake.ts`, `lib/room-model-source.ts`, routes `app/quotes`,
+`app/quotes/[id]/scan`, `app/room-models/[modelId]`, `app/bootstrap`, the four view routes and the PDF,
+`app/room-model/*`, `components/room-scan/*`, `WorkStepEditor.tsx`, services page, marketing screen words; mobile
+`new.tsx`, `quote/[id].tsx`, `RoomScanSummary.tsx`, `outbox.ts`, `api.ts`, `area-names.ts`, `model-viewer.ts`,
+`device-files.ts`, the native module; tests `room-scan-t194` (web, worker, mobile).
+
+**Relation:** extends T-138 (AD-028, AD-030) and T-193 (AD-076, which it amends: no AR). Keeps T-182's offline rules
+(a refused scan never costs the quote). T-186's "Your answer" wording is what the owner saw: correct, since the typed
+number won.
+
+---
+
 ### 2026-11-20: T-193 — Room scan results: sizes, floor plan, 3D model; room scan on Pro (AD-076)
 
-**Built and pushed, not deployed.** Needs deploying: **the web** (new routes, the cards, the viewer, the PDF, the
+**Deployed by the owner on 20 Nov 2026: worker 68a803c3, then the web.** (Was: built and pushed, not deployed.) Needed deploying: **the web** (new routes, the cards, the viewer, the PDF, the
 bootstrap's units). **No migration** (the model's id lives in the stored scan; see AD-076). The worker is
 unchanged in code but bundles the shared package, so deploy it too for the new line notes in the review email
 (`businessSources`). The app reaches a phone by a rebuild (done onto the owner's iPhone in this ticket).
@@ -10485,7 +10605,26 @@ iPhone the same file also opens in AR Quick Look.
 
 **Rules.** An address to a model is signed for minutes, only for a model in the asking quote's scan, and only
 after the quote's own check (sign-in and tenant, its token, or its approval link). A model never holds up a
-quote: refused or failing, it is left out.
+quote: refused or failing, it is left out. (T-194 / AD-077: no AR; the app opens the web viewer.)
+
+### AD-077: A scan is a source of a quantity, an area covers rooms, and one function says what it priced (T-194)
+
+**Decision.** A room scan is one more source of a quantity the business already prices, never a new requirement:
+the business chooses per line what it fills (stored as the signal's existing `scan` spec), and the order of trust is
+one function (`mergeScanAnswers`): typed by the business, then the scan, then the customer's answer, then photo
+measurement. A scan is an area that covers a number of rooms (the business says how many); `room_count` is their
+sum. Which scanned sizes priced a quote is read from the quote's own lines (`scanPricedLines`, a line's
+`scanMeasure`), and every card says that, or that the price does not depend on the sizes.
+
+**Display is not pricing.** Joined walls, letters, small returns, the ceiling height (the most common wall height)
+and the plan's turn are display only, worked out from the stored geometry; every total and priced quantity is as
+before.
+
+**One viewer.** The app shows the web's viewer in Safari's in-app browser rather than carrying a 3D library or
+Quick Look; there is no AR. The model's address goes after "#" and the page opens only our storage's addresses.
+
+**Plan.** Room scan needs a plan with `lidar_scanning` (Pro, Business); the server refuses a scan without it, the
+app says it is part of Pro, and a queued quote is never lost over it.
 
 ## Known Constraints
 

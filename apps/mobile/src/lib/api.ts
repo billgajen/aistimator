@@ -22,7 +22,7 @@ import type {
   QuoteListGroup,
   QuotesListResponse,
 } from '@qolumns/shared'
-import type { ScanMeasure } from '@qolumns/shared'
+import type { RoomScanRoom, ScanMeasure } from '@qolumns/shared'
 import type { AppField } from './answers'
 
 export interface ApiErrorBody {
@@ -235,6 +235,13 @@ export function createApi(opts: {
     /** T-193: start a room model's upload: a signed address for exactly this size, in this business's own folder */
     startModelUpload: (sizeBytes: number) =>
       request<{ modelId: string; uploadUrl: string }>('/api/app/room-models', { method: 'POST', body: JSON.stringify({ sizeBytes }) }),
+
+    /** T-194: a short-lived address for a model this business uploaded (straight after a scan, before the quote is sent) */
+    modelUrl: (modelId: string) => request<{ url: string }>(`/api/app/room-models/${encodeURIComponent(modelId)}`),
+
+    /** T-194: one area scanned again (`index`) or added (none); the quote is priced again */
+    rescan: (quoteId: string, area: RoomScanRoom, index?: number) =>
+      request<{ success: boolean }>(`/api/app/quotes/${encodeURIComponent(quoteId)}/scan`, { method: 'POST', body: JSON.stringify({ area, ...(index !== undefined && { index }) }) }),
   }
 }
 

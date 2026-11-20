@@ -221,6 +221,25 @@ The browser does not call Supabase's auth directly. All answer `{ "ok": true }` 
   wall-by-wall list), the approval summary's `roomScan` and `roomModelPath`. `AppBootstrapResponse.region.unitSystem`
   is new.
 
+## Room scan areas, rescan, plan (T-194, AD-077)
+
+- A scanned room is an **area**: `RoomScanRoom.roomsCovered` (a whole number 1 to 40; absent = 1) and its `name`.
+  `room_count` is filled with the rooms covered summed across the areas.
+- `POST /api/app/quotes` with a `scan`, and the rescan below, answer **403 `ROOM_SCAN_NOT_IN_PLAN`** when the
+  business's plan has no room scan (Pro and Business have it). `AppBootstrapResponse.roomScan` says which.
+- `POST /api/app/quotes/:quoteId/scan` (signed in). Body `{ area, index? }`: `area` is a `RoomScanRoom` (with
+  `modelId` when its model was uploaded); `index` replaces that area, none adds one. Only a quote made in the app
+  (`source_json.type = 'app'`), not approved (status `pending_review` or `awaiting_clarification`, no `approved_at`;
+  409 `INVALID_STATUS` otherwise). The quote is queued and priced again. Answers `{ success }`.
+- `GET /api/app/room-models/:modelId` (signed in): `{ url }` signed for 10 minutes, for a model in the business's own
+  folder (the app's "View in 3D" before the quote is sent).
+- `/room-model#src=<signed url>&name=<area>`: the 3D viewer page the app opens; only addresses on our storage or the
+  site itself are opened.
+- `TakeoffEntry.scanMeasure` on a line the scan priced. `RoomScanView.pricing` (`kind`, `lines`, `sentence`),
+  `AppQuoteView.roomScan.canScanAgain`. Per area the views now carry `roomsCovered`, `wallLength` (was `perimeter`),
+  `wallLengthLessDoors`, `tallestWall`, lettered `walls`, `smallReturns`; totals carry `areas`.
+  `CustomerRoomScanView` is `{ rooms: [{ name, roomsCovered, figures, planSvg?, modelId? }], priced }`.
+
 ## Security notes
 - Quote view tokens have an expiry (`tokenExpiresAt`). Expired tokens return 403.
 - Future hardening: Consider HMAC-signed tokens for quote view URLs to prevent enumeration.

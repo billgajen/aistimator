@@ -488,6 +488,17 @@ export function createOutbox(deps: OutboxDeps) {
         }))
         return
       }
+      if (error.code === 'ROOM_SCAN_NOT_IN_PLAN' && draft.request.scan !== undefined) {
+        // T-194: the plan has no room scan (it changed since the scan was made): the quote goes without it,
+        // never lost; a size the scan would have filled is then asked for like any other answer
+        setDraft(draft.id, (d) => {
+          if (!d.request) return d
+          const { scan: _scan, ...request } = d.request
+          void _scan
+          return { ...d, request, send: 'queued' }
+        })
+        return
+      }
       // the request itself was refused (a missing answer, a photo too few): the trade puts it right
       setDraft(draft.id, (d) => ({ ...d, send: 'editing', problem: { kind: 'refused', message: error.message }, attempts: 0, nextTryAt: 0 }))
       return

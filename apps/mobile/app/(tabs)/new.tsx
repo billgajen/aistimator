@@ -13,15 +13,18 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
-import { getRegion, roomScanView, scanAnswers, type AppBootstrapResponse } from '@qolumns/shared'
-import { canPreviewModel, previewModel, roomScanAvailability, roomScanBlockedLine, scanRoom } from '../../modules/room-scan'
+import { getRegion, mergeScanAnswers, roomScanView, scanAnswers, scanDifferenceLine, unitDisplayLabel, type AppBootstrapResponse } from '@qolumns/shared'
+import { openPage, roomScanAvailability, roomScanBlockedLine, scanRoom } from '../../modules/room-scan'
 import { useApi } from '../../src/lib/api-context'
 import { fieldsForService, toApiError, type WidgetConfigResponse } from '../../src/lib/api'
 import { fieldKind, isAnswered, missingRequired, optionLabel, optionValue, toSubmissionAnswers, toggleOption, visibleFields, type AppField, type RawAnswers } from '../../src/lib/answers'
-import { keepPhoto, readFormCache, writeFormCache, type PickedPhoto } from '../../src/lib/device-files'
+import { keepPhoto, loadAreaNames, readFormCache, saveAreaNames, writeFormCache, type PickedPhoto } from '../../src/lib/device-files'
+import { rememberAreaName } from '../../src/lib/area-names'
+import { config } from '../../src/lib/config'
+import { viewerAddress } from '../../src/lib/model-viewer'
 import { plainError } from '../../src/lib/errors'
 import { draftProgress, scanForRequest, type Draft, type DraftPhoto, type DraftRoom } from '../../src/lib/outbox'
-import { RoomScanSummary } from '../../src/components/RoomScanSummary'
+import { RoomScanSummary, SCAN_TIP } from '../../src/components/RoomScanSummary'
 import { useOutbox, useOutboxReady, useOutboxState } from '../../src/lib/outbox-context'
 import { pricingStages } from '../../src/lib/pricing-stages'
 import { currentUserId } from '../../src/lib/supabase'
@@ -64,6 +67,12 @@ export default function NewQuote() {
   // T-184: the scan card is always shown where a service can use a scan; where the scan cannot run
   // (Expo Go has no scanner in it) the card says why instead of disappearing
   const scanState = useMemo(() => roomScanAvailability(), [])
+  // T-194: the business's own earlier names for scanned areas, offered as quick picks
+  const [areaNames, setAreaNames] = useState<string[]>([])
+  useEffect(() => {
+    const owner = currentUserId()
+    if (owner) void loadAreaNames(owner).then(setAreaNames)
+  }, [])
 
   // The draft: the waiting one that was tapped, or the one being written (a new one if there is none)
   const [attempt, setAttempt] = useState(0)
@@ -193,8 +202,10 @@ export default function NewQuote() {
   const scanSignals = (service?.expectedSignals ?? []).filter((s) => s.scan)
   // the card shows for a service with a quantity a scan can measure, on an iPhone; it can be used when the phone can scan
   const showScan = scanSignals.length > 0 && scanState !== 'not_ios' && scanState !== 'no_lidar'
-  const canScan = showScan && scanState === 'ready'
-  const scanBlocked = roomScanBlockedLine(scanState)
+  // T-194: room scan is part of Pro and Business (a server before T-194 does not say: the scan is offered)
+  const scanInPlan = form.boot.roomScan !== false
+  const canScan = showScan && scanState === 'ready' && scanInPlan
+  const scanBlocked = scanInPlan ? roomScanBlockedLine(scanState) : 'Room scan is part of Pro'
   // the scan as it is sent: geometry only (each room's model goes up on its own, and its id is added then)
   const scan = scanForRequest(draft.rooms, Platform.OS === 'ios' ? 'iPhone (LiDAR)' : undefined)
   // T-193: the figures in the business's own units (an app that cached the form before T-193 goes by the region)
@@ -205,6 +216,16 @@ export default function NewQuote() {
     ? scanAnswers({ scan, expectedSignals: scanSignals, fields: fields.map((f) => ({ fieldId: f.fieldId })), existingAnswers: [] })
     : []
   const effective: RawAnswers = { ...Object.fromEntries(scanFilled.map((a) => [a.fieldId, String(a.value)])), ...draft.answers }
+  // T-194: a number typed on site that is not what the scan measured: said, and the typed number is used
+  const typedAnswers = Object.entries(draft.answers)
+    .filter(([, v]) => typeof v === 'string' && v.trim() !== '')
+    .map(([fieldId, value]) => ({ fieldId, value }))
+  const scanDifferences = mergeScanAnswers(typedAnswers, scanFilled).differences.map((d) => {
+    const field = fields.find((f) => f.fieldId === d.fieldId)
+    const signalKey = scanFilled.find((a) => a.fieldId === d.fieldId)?.signalKey
+    const unit = scanSignals.find((s) => s.signalKey === signalKey)?.unit
+    return { fieldId: d.fieldId, line: `${field?.label ? `${field.label}: ` : ''}${scanDifferenceLine(d, unit ? unitDisplayLabel(unit) : undefined)}` }
+  })
 
   const hasQuestions = fields.length > 0 || showScan
   const stepsShown: Step[] = STEPS.filter((s) => (s === 'service' ? services.length > 1 : s === 'questions' ? hasQuestions : true))
@@ -266,7 +287,9 @@ export default function NewQuote() {
       const index = replace ?? rooms.length
       const room: DraftRoom = {
         ...geometry,
-        name: rooms[index]?.name ?? `Room ${rooms.length + 1}`,
+        // T-194: scanned again, it keeps its name and the rooms it covers; a new area is named straight after
+        name: rooms[index]?.name ?? '',
+        roomsCovered: rooms[index]?.roomsCovered ?? 1,
         // T-193: the room's 3D model, when the export worked; it uploads in the background like a photo
         ...(modelUri && modelSizeBytes && modelSizeBytes > 0 && { model: { uri: modelUri, sizeBytes: Number(modelSizeBytes), state: 'waiting' as const } }),
       }
@@ -325,6 +348,13 @@ export default function NewQuote() {
       return
     }
     setStepError(null)
+    // T-194: the areas' names are offered next time
+    const owner = currentUserId()
+    if (owner && draft.rooms.some((r) => r.name?.trim())) {
+      const names = draft.rooms.reduce((list, r) => rememberAreaName(list, r.name ?? ''), areaNames)
+      setAreaNames(names)
+      void saveAreaNames(owner, names)
+    }
     outbox.queue(
       draft.id,
       {
@@ -474,7 +504,8 @@ export default function NewQuote() {
                     <Icon name="scan-outline" color={canScan ? colors.brand : colors.muted} />
                     <Label>Room scan</Label>
                   </View>
-                  <Muted>Walk each room with the camera. A scanned room is measured, not estimated.</Muted>
+                  <Muted>Walk the space with the camera: one room, a floor, or the whole house. What is scanned is measured, not estimated.</Muted>
+                  {canScan ? <Muted style={{ marginTop: space.xs }}>{SCAN_TIP}</Muted> : null}
                   {!canScan ? (
                     <Text style={styles.scanBlocked} maxFontSizeMultiplier={scale.text}>
                       {scanBlocked}. You can still type the sizes in below.
@@ -485,20 +516,37 @@ export default function NewQuote() {
                     <View style={styles.scanResult}>
                       <RoomScanSummary
                         view={scanView}
-                        hasModel={(i) => canPreviewModel() && Boolean(draft.rooms[i]?.model && draft.rooms[i]!.model!.state !== 'dropped')}
+                        // T-194: the model opens in the web's viewer once it is uploaded (it needs an address)
+                        hasModel={(i) => draft.rooms[i]?.model?.state === 'done' && Boolean(draft.rooms[i]?.model?.modelId)}
                         actions={{
                           onModel: (i) => {
-                            const model = draft.rooms[i]?.model
-                            if (model) previewModel(model.uri).catch(() => setStepError('The 3D model could not be shown. The sizes are kept.'))
+                            const modelId = draft.rooms[i]?.model?.modelId
+                            if (!modelId) return
+                            api
+                              .modelUrl(modelId)
+                              .then(({ url }) => openPage(viewerAddress(config.apiUrl, url, scanView.rooms[i]?.name ?? '')))
+                              .catch(() => setStepError('The 3D model could not be shown. The sizes are kept.'))
                           },
                           ...(canScan && { onScanAgain: (i: number) => void addScannedRoom(i) }),
                           onRemove: (i) => outbox.setRooms(draft.id, draft.rooms.filter((_, r) => r !== i)),
                         }}
+                        editing={{
+                          names: areaNames,
+                          typedNames: draft.rooms.map((r) => r.name),
+                          onName: (i, name) => outbox.setRooms(draft.id, draft.rooms.map((r, n) => (n === i ? { ...r, name } : r))),
+                          onRoomsCovered: (i, roomsCovered) => outbox.setRooms(draft.id, draft.rooms.map((r, n) => (n === i ? { ...r, roomsCovered } : r))),
+                        }}
+                        inset={space.lg * 4 + space.xs * 2}
                       />
+                      {scanDifferences.map((d) => (
+                        <Text key={d.fieldId} style={styles.scanBlocked} maxFontSizeMultiplier={scale.text}>
+                          {`${d.line} Your number is used.`}
+                        </Text>
+                      ))}
                     </View>
                   ) : null}
                   <View style={{ gap: space.sm, marginTop: space.md }}>
-                    <Button title={draft.rooms.length ? 'Scan another room' : 'Scan a room'} icon="scan-outline" variant="secondary" disabled={!canScan} onPress={() => void addScannedRoom()} />
+                    <Button title={draft.rooms.length ? 'Scan another area' : 'Scan an area'} icon="scan-outline" variant="secondary" disabled={!canScan} onPress={() => void addScannedRoom()} />
                     {draft.rooms.length > 1 ? <Button title="Clear the scans" variant="quiet" onPress={() => outbox.setRooms(draft.id, [])} /> : null}
                   </View>
                 </View>

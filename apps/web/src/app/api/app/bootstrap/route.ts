@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getRegion, resolveRegionContext, type AppBootstrapResponse } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
+import { planHasRoomScan } from '@/lib/room-scan-intake'
+import { createAdminClient } from '@/lib/supabase/server'
 
 /**
  * GET /api/app/bootstrap (T-137) — what the business app needs to start:
@@ -13,7 +15,7 @@ export async function GET() {
   if (!auth.ok) return auth.response
   const { supabase, tenantId } = auth
 
-  const [{ data: tenant }, { data: site }] = await Promise.all([
+  const [{ data: tenant }, { data: site }, roomScan] = await Promise.all([
     supabase.from('tenants').select('name, currency, region, unit_system').eq('id', tenantId).single(),
     supabase
       .from('tenant_sites')
@@ -23,6 +25,8 @@ export async function GET() {
       .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle(),
+    // T-194: room scan is part of Pro and Business
+    planHasRoomScan(createAdminClient(), tenantId),
   ])
   if (!tenant) {
     return NextResponse.json({ error: { code: 'TENANT_NOT_FOUND', message: 'Tenant not found' } }, { status: 404 })
@@ -45,6 +49,7 @@ export async function GET() {
       // T-193: the units a room scan is shown in
       unitSystem: resolveRegionContext({ region: tenant.region as string | null, unit_system: (tenant as { unit_system?: string | null }).unit_system }).unitSystem,
     },
+    roomScan,
   }
   return NextResponse.json(body)
 }

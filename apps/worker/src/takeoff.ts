@@ -11,6 +11,7 @@
 
 import { CUSTOMER_METHOD } from '@qolumns/shared'
 import type {
+  ScanMeasure,
   PricingTrace,
   ExtractedSignalsV2,
   WorkStepConfig,
@@ -74,8 +75,8 @@ export function buildTakeoff(opts: {
   trace: PricingTrace
   structuredSignals: ExtractedSignalsV2 | null
   workSteps: WorkStepConfig[]
-  /** T-138: form fields filled by an on-site LiDAR scan, with the audit line */
-  scanned?: { fieldIds: Set<string>; evidence: string }
+  /** T-138: form fields filled by an on-site LiDAR scan, with the audit line; T-194: and the size each one is */
+  scanned?: { fieldIds: Set<string>; evidence: string; measures?: ReadonlyMap<string, ScanMeasure> }
   /** T-188: the extras that were added because of what the photos show (the others the product added came from what was written) */
   photoAddonIds?: ReadonlySet<string>
 }): TakeoffEntry[] {
@@ -106,6 +107,7 @@ export function buildTakeoff(opts: {
         let method: string
         let source: LineSource
         let evidence: string | undefined
+        let scanMeasure: ScanMeasure | undefined
         switch (step.quantitySource) {
           case 'form_field': {
             const fieldId = config?.quantitySource?.fieldId
@@ -113,6 +115,7 @@ export function buildTakeoff(opts: {
               method = PLAIN.scan
               source = 'scan'
               evidence = opts.scanned.evidence
+              scanMeasure = opts.scanned.measures?.get(fieldId)
             } else {
               method = PLAIN.quantityGiven
               source = 'answer'
@@ -131,6 +134,13 @@ export function buildTakeoff(opts: {
             method = plainSource(signal)
             source = signalSource(signal)
             evidence = signal?.evidence
+            // T-194: a quantity the business set to come from the scan ("When you scan on site, fill this
+            // from") reaches an AI signal as a scanned answer; it says so, as a form field's does
+            if (signal?.basis === 'scanned' && opts.scanned) {
+              method = PLAIN.scan
+              source = 'scan'
+              scanMeasure = signalKey ? opts.scanned.measures?.get(signalKey) : undefined
+            }
             break
           }
           case 'derived':
@@ -178,6 +188,7 @@ export function buildTakeoff(opts: {
           method,
           source,
           ...(evidence && { evidence }),
+          ...(scanMeasure && { scanMeasure }),
         })
         break
       }

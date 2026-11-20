@@ -59,8 +59,9 @@ export const SCREEN_WORDS = {
     tabs: { quotes: 'Quotes', newQuote: 'New quote', account: 'Account' },
     priceTitle: 'Price',
     scanTitle: 'Room scan',
-    scanLead: 'Walk each room with the camera. A scanned room is measured, not estimated.',
-    scanButton: 'Scan a room',
+    // T-194: a scan is an area: one room, a floor, or the whole house
+    scanLead: 'Walk the space with the camera: one room, a floor, or the whole house. What is scanned is measured, not estimated.',
+    scanButton: 'Scan an area',
   },
   /** Setup's price check (components/onboarding/CheckPricesStep) */
   prices: {

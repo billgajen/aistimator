@@ -3,10 +3,12 @@ import {
   formatScanArea,
   formatScanLength,
   formatScanSize,
+  roomsCoveredWords,
   type CustomerRoomScanView,
   type RoomScanView,
   type ScanRoomView,
 } from '@qolumns/shared'
+import { PlanView } from './PlanView'
 import { RoomModelViewer } from './RoomModelViewer'
 
 /**
@@ -17,11 +19,16 @@ import { RoomModelViewer } from './RoomModelViewer'
  * own units. A scan made before T-193 has no positions and no model: its
  * sizes are shown, without a plan or a viewer.
  *
+ * T-194: each scan is an area with its name and the rooms it covers; the
+ * walls are lettered as on the plan; the card's sentence says which sizes
+ * priced the quote, or that the price does not depend on them
+ * (`scanPricedLines`). Never "these sizes priced the quote" when they did not.
+ *
  * A room scan is a measurement, so the card is the takeoff's butter and tape
  * (system.md, Colour).
  */
 
-/** `{modelId}` in a path is replaced by the room's model id */
+/** `{modelId}` in a path is replaced by the area's model id */
 export const modelAddress = (path: string, modelId: string) => path.replace('{modelId}', encodeURIComponent(modelId))
 
 function Figure({ label, value }: { label: string; value: string }) {
@@ -33,40 +40,47 @@ function Figure({ label, value }: { label: string; value: string }) {
   )
 }
 
-/** The plan is our own SVG: only numbers and the escaped room name go into it (floorPlanSvg) */
-function Plan({ svg }: { svg: string }) {
+function AreaHeading({ name, roomsCovered }: { name: string; roomsCovered: number }) {
+  const covers = roomsCoveredWords(roomsCovered)
   return (
-    <div
-      className="mt-3 overflow-hidden rounded-xl border border-tape/40 bg-white p-2 [&>svg]:mx-auto [&>svg]:h-auto [&>svg]:max-w-full"
-      data-testid="room-plan"
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    <h3 className="text-sm font-bold text-text-primary">
+      {name}
+      {covers && <span className="font-normal text-text-secondary"> · {covers}</span>}
+    </h3>
   )
 }
 
-function Room({ room, view, modelPath, showName }: { room: ScanRoomView; view: RoomScanView; modelPath: string | null; showName: boolean }) {
+function Area({ room, view, modelPath }: { room: ScanRoomView; view: RoomScanView; modelPath: string | null }) {
   const u = view.units
   return (
     <section className="border-t border-tape/30 pt-4 first:border-t-0 first:pt-0" data-testid="scan-room">
-      {showName && <h3 className="text-sm font-bold text-text-primary">{room.name}</h3>}
+      <AreaHeading name={room.name} roomsCovered={room.roomsCovered} />
       <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
         <Figure label="Floor" value={room.floorArea === null ? 'Not found' : formatScanArea(room.floorArea, u)} />
         <Figure label="Walls" value={formatScanArea(room.wallAreaGross, u)} />
         <Figure label="Walls less doors and windows" value={formatScanArea(room.wallAreaNet, u)} />
         <Figure label="Ceiling height" value={room.ceilingHeight === null ? 'Not found' : formatScanLength(room.ceilingHeight, u)} />
-        <Figure label="Perimeter" value={formatScanLength(room.perimeter, u)} />
+        {room.tallestWall !== null && <Figure label="Tallest wall" value={formatScanLength(room.tallestWall, u)} />}
+        <Figure label="Wall length" value={formatScanLength(room.wallLength, u)} />
+        <Figure label="Wall length less doors" value={formatScanLength(room.wallLengthLessDoors, u)} />
       </dl>
-      {room.planSvg && <Plan svg={room.planSvg} />}
+      {room.planSvg && <PlanView svg={room.planSvg} name={room.name} />}
       <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
         <div>
           <p className="text-xs font-semibold uppercase text-text-secondary">Walls</p>
           <ol className="mt-1 space-y-0.5" data-testid="scan-walls">
-            {room.walls.map((wall, i) => (
-              <li key={i} className="flex justify-between gap-3">
-                <span className="text-text-secondary">Wall {i + 1}</span>
+            {room.walls.map((wall) => (
+              <li key={wall.letter} className="flex justify-between gap-3">
+                <span className="text-text-secondary">Wall {wall.letter}</span>
                 <span className="figure text-text-primary">{formatScanSize(wall.width, wall.height, u)}</span>
               </li>
             ))}
+            {room.smallReturns && (
+              <li className="flex justify-between gap-3" data-testid="scan-returns">
+                <span className="text-text-secondary">Small returns: {room.smallReturns.count}</span>
+                <span className="figure text-text-primary">{formatScanLength(room.smallReturns.length, u)} in all</span>
+              </li>
+            )}
           </ol>
         </div>
         <div>
@@ -96,21 +110,28 @@ function Room({ room, view, modelPath, showName }: { room: ScanRoomView; view: R
 
 export function RoomScanCard({ view, modelPath, className = '' }: { view: RoomScanView; modelPath: string | null; className?: string }) {
   const u = view.units
+  const t = view.total
   const several = view.rooms.length > 1
   return (
     <div className={`overflow-hidden rounded-2xl border border-tape/40 bg-butter/40 ${className}`} data-testid="room-scan-card">
       <div className="px-5 pb-3 pt-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Room scan</p>
-        <p className="mt-0.5 text-sm text-text-primary">
-          {several
-            ? `${view.total.rooms} rooms measured on site: ${view.total.floorArea === null ? '' : `${formatScanArea(view.total.floorArea, u)} of floor, `}${formatScanArea(view.total.wallAreaNet, u)} of wall less doors and windows.`
-            : 'Measured on site with the room scan.'}
+        <p className="mt-0.5 text-sm text-text-primary" data-testid="room-scan-priced">
+          {view.pricing?.sentence ?? 'Measured on site with the room scan.'}
         </p>
+        {several && (
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4" data-testid="scan-totals">
+            <Figure label="Areas scanned" value={`${t.areas}, covering ${t.rooms} room${t.rooms === 1 ? '' : 's'}`} />
+            {t.floorArea !== null && <Figure label="Floor in all" value={formatScanArea(t.floorArea, u)} />}
+            <Figure label="Walls less doors and windows" value={formatScanArea(t.wallAreaNet, u)} />
+            <Figure label="Wall length in all" value={formatScanLength(t.wallLength, u)} />
+          </dl>
+        )}
       </div>
       <div className="tape-rule mx-5" />
       <div className="space-y-4 px-5 py-4">
         {view.rooms.map((room, i) => (
-          <Room key={i} room={room} view={view} modelPath={modelPath} showName={several || Boolean(room.name)} />
+          <Area key={i} room={room} view={view} modelPath={modelPath} />
         ))}
       </div>
     </div>
@@ -118,26 +139,29 @@ export function RoomScanCard({ view, modelPath, className = '' }: { view: RoomSc
 }
 
 /**
- * T-193: the customer's "Measured on site" block: each room's floor and wall area, its plan and its 3D
- * model. No wall-by-wall list (the business's card has it).
+ * T-193/T-194: the customer's "Measured on site" block: each area's name, its plan and its 3D model, and
+ * only the sizes that priced the quote (where none did, its wall area and ceiling height). No wall list.
  */
 export function MeasuredOnSite({ view, modelPath }: { view: CustomerRoomScanView; modelPath: string | null }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-tape/40 bg-butter/40" data-testid="measured-on-site">
       <div className="px-5 pb-3 pt-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Measured on site</p>
-        <p className="text-xs text-text-muted">Measured with a room scan when the job was looked at.</p>
+        <p className="text-xs text-text-muted">
+          {view.priced.length > 0 ? `Priced from these sizes: ${view.priced.join('; ')}.` : 'Measured with a room scan when the job was looked at.'}
+        </p>
       </div>
       <div className="tape-rule mx-5" />
       <div className="space-y-5 px-5 py-4">
         {view.rooms.map((room, i) => (
           <section key={i} className="border-t border-tape/30 pt-4 first:border-t-0 first:pt-0" data-testid="measured-room">
-            <h3 className="text-sm font-bold text-text-primary">{room.name}</h3>
+            <AreaHeading name={room.name} roomsCovered={room.roomsCovered} />
             <dl className="mt-2 grid grid-cols-2 gap-4">
-              {room.floorArea && <Figure label="Floor area" value={room.floorArea} />}
-              <Figure label="Wall area" value={room.wallArea} />
+              {room.figures.map((f) => (
+                <Figure key={f.label} label={f.label} value={f.value} />
+              ))}
             </dl>
-            {room.planSvg && <Plan svg={room.planSvg} />}
+            {room.planSvg && <PlanView svg={room.planSvg} name={room.name} />}
             {room.modelId && modelPath && (
               <div className="mt-3">
                 <RoomModelViewer addressPath={modelAddress(modelPath, room.modelId)} roomName={room.name} />

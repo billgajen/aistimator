@@ -26,7 +26,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as Clipboard from 'expo-clipboard'
-import { ANSWER_NOTE_MAX, allAnswered, certaintySentence, chosenChoice, customerFirstName, formatMoney, isTypedAnswer, lineLabelParts, noteToSend, parseMoneyInput, questionChoices, questionTextBox, QUOTE_TURN_COPY, type AppQuoteLine, type AppQuoteSection, type AppQuoteView } from '@qolumns/shared'
+import { ANSWER_NOTE_MAX, allAnswered, roomScanView, type RoomScanRoom, certaintySentence, chosenChoice, customerFirstName, formatMoney, isTypedAnswer, lineLabelParts, noteToSend, parseMoneyInput, questionChoices, questionTextBox, QUOTE_TURN_COPY, type AppQuoteLine, type AppQuoteSection, type AppQuoteView } from '@qolumns/shared'
 import { useApi } from '../../src/lib/api-context'
 import { toApiError } from '../../src/lib/api'
 import { config } from '../../src/lib/config'
@@ -39,8 +39,13 @@ import { loadQuoteToken, saveQuoteToken } from '../../src/lib/quote-tokens'
 import { evidenceWords, shareMessage } from '../../src/lib/share'
 import { storyOfQuote, TONE_STYLE } from '../../src/lib/status'
 import { PricingStages } from '../../src/components/PricingStages'
-import { RoomScanCard } from '../../src/components/RoomScanSummary'
-import { canPreviewModel, previewModel } from '../../modules/room-scan'
+import { RoomScanCard, RoomScanSummary, SCAN_TIP } from '../../src/components/RoomScanSummary'
+import { openPage, removeModelFile, roomScanAvailability, scanRoom } from '../../modules/room-scan'
+import { loadAreaNames, putPhoto, saveAreaNames } from '../../src/lib/device-files'
+import { rememberAreaName } from '../../src/lib/area-names'
+import { viewerAddress } from '../../src/lib/model-viewer'
+import { ROOM_MODEL_CONTENT_TYPE } from '../../src/lib/outbox'
+import { currentUserId } from '../../src/lib/supabase'
 import { Body, BottomBar, Button, Card, ErrorText, Field, Icon, Label, LinkRow, MoneyRow, Muted, Notice, Pill, Rows, Screen, Skeleton, Title } from '../../src/components/ui'
 import { colors, fonts, icon, radius, scale, space, tabular, touch, type } from '../../src/theme'
 
@@ -67,6 +72,13 @@ export default function QuoteDetail() {
   const [note, setNote] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const alive = useRef(true)
+  // T-194: an area just scanned again (`index`) or added, named before it is sent
+  const [pending, setPending] = useState<{ index?: number; geometry: RoomScanRoom; model?: { uri: string; sizeBytes: number } } | null>(null)
+  const [areaNames, setAreaNames] = useState<string[]>([])
+  useEffect(() => {
+    const owner = currentUserId()
+    if (owner) void loadAreaNames(owner).then(setAreaNames)
+  }, [])
 
   const load = useCallback(async (): Promise<AppQuoteView | null> => {
     if (timer.current) clearTimeout(timer.current)
@@ -116,6 +128,58 @@ export default function QuoteDetail() {
   }
 
   const setAnswer = (id: string, value: string) => setAnswers((a) => ({ ...a, [id]: value }))
+
+  /** T-194: scan an area again (`index`) or a new one; it is named and checked here before it is sent */
+  async function scanArea(index?: number) {
+    setError(null)
+    try {
+      const { modelUri, modelSizeBytes, ...geometry } = await scanRoom()
+      const before = index !== undefined ? quote?.roomScan?.rooms[index] : undefined
+      setPending({
+        index,
+        geometry: { ...geometry, name: before?.name ?? '', roomsCovered: before?.roomsCovered ?? 1 },
+        ...(modelUri && modelSizeBytes && modelSizeBytes > 0 && { model: { uri: modelUri, sizeBytes: Number(modelSizeBytes) } }),
+      })
+    } catch (e) {
+      const cancelled = e instanceof Error && /cancel/i.test(e.message)
+      if (!cancelled) setError('The scan did not finish. Try again.')
+    }
+  }
+
+  /** The area goes to the quote, which is priced again; its model is uploaded first and never holds it up */
+  const sendArea = () =>
+    run(async () => {
+      if (!quote || !pending) return
+      let modelId: string | undefined
+      if (pending.model) {
+        try {
+          const started = await api.startModelUpload(pending.model.sizeBytes)
+          await putPhoto(started.uploadUrl, { uri: pending.model.uri, contentType: ROOM_MODEL_CONTENT_TYPE }, () => {})
+          modelId = started.modelId
+        } catch {
+          // the sizes go without the 3D model
+        }
+      }
+      const name = (pending.geometry.name ?? '').trim()
+      await api.rescan(quote.id, { ...pending.geometry, ...(name ? { name } : { name: undefined }), ...(modelId && { modelId }) }, pending.index)
+      if (pending.model) removeModelFile(pending.model.uri)
+      const owner = currentUserId()
+      if (owner && name) {
+        const names = rememberAreaName(areaNames, name)
+        setAreaNames(names)
+        void saveAreaNames(owner, names)
+      }
+      setPending(null)
+      await load()
+    })
+
+  /** T-194: an area's model in the web's viewer, in the in-app browser */
+  function viewModel(index: number) {
+    const area = quote?.roomScan?.rooms[index]
+    const url = area?.modelId ? quote?.roomScan?.modelUrls?.[area.modelId] : undefined
+    if (!area || !url) return
+    openPage(viewerAddress(config.apiUrl, url, area.name)).catch(() => setNote('The 3D model could not be shown. The sizes are unaffected.'))
+  }
 
   /**
    * Send the answers, and the price is worked out again. `asked` is the business's own questions, or
@@ -349,19 +413,43 @@ export default function QuoteDetail() {
           )
         ) : null}
 
-        {/* 3c. T-193: what the room scan measured, above the price it priced; a room's model opens in Quick Look */}
-        {quote.roomScan && quote.roomScan.rooms.length > 0 ? (
+        {/* 3c. T-193: what the room scan measured, above the price; T-194: which sizes priced it, its model in the
+            web's viewer, and (until it is approved) "Scan again" and "Add an area", priced again as an answer is */}
+        {quote.roomScan && quote.roomScan.rooms.length > 0 && pending ? (
+          <Card>
+            <Label>{pending.index === undefined ? 'New area' : 'Scanned again'}</Label>
+            <Muted style={{ marginBottom: space.md }}>{SCAN_TIP}</Muted>
+            <RoomScanSummary
+              view={roomScanView({ version: 1, rooms: [pending.geometry] }, quote.roomScan.units.system)}
+              editing={{
+                names: areaNames,
+                typedNames: [pending.geometry.name],
+                onName: (_, name) => setPending((p) => (p ? { ...p, geometry: { ...p.geometry, name } } : p)),
+                onRoomsCovered: (_, roomsCovered) => setPending((p) => (p ? { ...p, geometry: { ...p.geometry, roomsCovered } } : p)),
+              }}
+            />
+            <View style={{ gap: space.sm, marginTop: space.md }}>
+              <Button title="Use this scan" note="The quote is priced again" onPress={sendArea} busy={busy} />
+              <Button
+                title="Leave it as it was"
+                variant="quiet"
+                onPress={() => {
+                  if (pending.model) removeModelFile(pending.model.uri)
+                  setPending(null)
+                }}
+              />
+            </View>
+          </Card>
+        ) : quote.roomScan && quote.roomScan.rooms.length > 0 ? (
           <RoomScanCard
             view={quote.roomScan}
             hasModel={(i) => {
               const id = quote.roomScan?.rooms[i]?.modelId
-              return canPreviewModel() && Boolean(id && quote.roomScan?.modelUrls?.[id])
+              return Boolean(id && quote.roomScan?.modelUrls?.[id])
             }}
-            onModel={(i) => {
-              const id = quote.roomScan?.rooms[i]?.modelId
-              const url = id ? quote.roomScan?.modelUrls?.[id] : undefined
-              if (url) previewModel(url).catch(() => setNote('The 3D model could not be shown. The sizes are unaffected.'))
-            }}
+            onModel={viewModel}
+            {...(quote.roomScan.canScanAgain && roomScanAvailability() === 'ready' && { onScanAgain: (i: number) => void scanArea(i), onAddArea: () => void scanArea() })}
+            busy={busy}
           />
         ) : null}
 

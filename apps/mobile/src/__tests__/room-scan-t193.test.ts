@@ -173,9 +173,10 @@ describe('T-193: the screens', () => {
     expect(quote.indexOf('<RoomScanCard')).toBeLessThan(quote.indexOf('{/* 4. The price'))
   })
 
-  it('the model opens in iOS Quick Look; a model that will not open leaves the sizes', () => {
+  it('the model opens in the web viewer (T-194: no Quick Look); a model that will not open leaves the sizes', () => {
     const native = read('modules/room-scan/ios/RoomScanModule.swift')
-    expect(native).toContain('QLPreviewController')
+    expect(native).not.toContain('QLPreviewController')
+    expect(native).toContain('SFSafariViewController')
     expect(native).toContain('exportOptions: .parametric')
     // the scan is returned whether or not the export worked
     expect(native).toMatch(/if let model = Self\.exportModel\(processedResult\) \{[\s\S]*?\}\n\s*DispatchQueue\.main\.async \{ self\.finish\(\.success\(room\)\) \}/)

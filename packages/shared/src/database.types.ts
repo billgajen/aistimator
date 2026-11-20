@@ -2,7 +2,7 @@ import type { AlsoAsked } from './quote-sections'
 import type { RegionCode, UnitSystem, ReferenceObject } from './regions/types'
 import type { AiUsageSummary } from './ai-models'
 import type { IdentificationSpec } from './identification'
-import type { ScanSpec } from './room-scan'
+import type { ScanMeasure, ScanSpec } from './room-scan'
 import type { WordingRepairRecord } from './wording-repair'
 import type { LineSource } from './quantity-source'
 import type { CertaintyReason } from './grading'
@@ -669,6 +669,11 @@ export interface TakeoffEntry {
    * model number). Business-facing only; the public quote API strips it.
    */
   evidence?: string
+  /**
+   * T-194: on a line whose quantity the room scan gave, which size it was (the room scan card says
+   * which sizes priced the quote). Lines priced before T-194 have none.
+   */
+  scanMeasure?: ScanMeasure
 }
 
 export interface QuoteContent {

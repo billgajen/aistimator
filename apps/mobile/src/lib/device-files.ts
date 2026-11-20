@@ -137,3 +137,13 @@ export async function writeFormCache(owner: string, value: unknown): Promise<voi
     // only a convenience: the form is asked for again next time
   }
 }
+
+/** T-194: the business's earlier names for scanned areas (lib/area-names.ts), kept with the form cache */
+export async function loadAreaNames(owner: string): Promise<string[]> {
+  const stored = await readFormCache<unknown>(`${owner}-areas`)
+  return Array.isArray(stored) ? stored.filter((n): n is string => typeof n === 'string').slice(0, 12) : []
+}
+
+export async function saveAreaNames(owner: string, names: readonly string[]): Promise<void> {
+  await writeFormCache(`${owner}-areas`, names.slice(0, 12))
+}

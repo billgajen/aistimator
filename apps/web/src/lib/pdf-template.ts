@@ -5,7 +5,7 @@
  * Uses inline styles for consistent rendering across PDF generators.
  */
 
-import { formatMoney, lineLabelNow, splitMinimum, minimumChargeNote, displaySections } from '@qolumns/shared'
+import { formatMoney, lineLabelNow, splitMinimum, minimumChargeNote, displaySections, roomsCoveredWords } from '@qolumns/shared'
 import type {
   CustomerRoomScanView,
   QuotePricing,
@@ -192,8 +192,8 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
       .map(
         (room) => `
         <div style="margin-bottom: 14px; page-break-inside: avoid;">
-          <h3 style="font-size: 14px; font-weight: 600; color: #111827; margin: 0 0 4px 0;">${escapeHtml(room.name)}</h3>
-          <p style="margin: 0 0 6px 0; font-size: 13px; color: #374151;">${room.floorArea ? `Floor area ${escapeHtml(room.floorArea)} · ` : ''}Wall area ${escapeHtml(room.wallArea)}</p>
+          <h3 style="font-size: 14px; font-weight: 600; color: #111827; margin: 0 0 4px 0;">${escapeHtml(room.name)}${room.roomsCovered > 1 ? ` <span style="font-weight: 400; color: #374151;">· ${escapeHtml(roomsCoveredWords(room.roomsCovered) ?? '')}</span>` : ''}</h3>
+          <p style="margin: 0 0 6px 0; font-size: 13px; color: #374151;">${room.figures.map((f) => `${escapeHtml(f.label)} ${escapeHtml(f.value)}`).join(' · ')}</p>
           ${room.planSvg ? `<div style="max-width: 360px;">${room.planSvg.replace('<svg ', '<svg style="width: 100%; height: auto;" ')}</div>` : ''}
         </div>`
       )
@@ -203,6 +203,7 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
         <h2 style="font-size: 14px; font-weight: 600; color: ${primaryColor}; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">
           Measured on site
         </h2>
+        ${data.roomScan.priced.length > 0 ? `<p style="margin: 0 0 10px 0; font-size: 13px; color: #374151;">Priced from these sizes: ${data.roomScan.priced.map(escapeHtml).join('; ')}</p>` : ''}
         ${rooms}
       </div>
     `)

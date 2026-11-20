@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
-import { parseRoomScan, scanAnswers, ROOM_SCAN_FIELD, type AppCreateQuoteRequest, type AppCreateQuoteResponse, type ExpectedSignalConfig, type QuoteStatus, type ServiceDraftConfig } from '@qolumns/shared'
+import { parseRoomScan, type AppCreateQuoteRequest, type AppCreateQuoteResponse, type ExpectedSignalConfig, type QuoteStatus, type ServiceDraftConfig } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
 import { createAdminClient } from '@/lib/supabase/server'
 import { createQuoteSubmission } from '@/lib/quote-intake'
+import { answersWithScan, planHasRoomScan, SCAN_NOT_IN_PLAN } from '@/lib/room-scan-intake'
 
 export const maxDuration = 60
 
@@ -81,12 +82,16 @@ export async function POST(request: Request) {
 
   // T-138: an on-site LiDAR scan. Validated here (untrusted input); the
   // quantities it maps are filled as answers so the form's required fields
-  // pass, and the raw scan rides along for the worker's audit line
+  // pass, and the raw scan rides along for the worker's audit line.
+  // T-194: only on a plan that includes room scan (Pro and Business).
   let job = body.job
   if (body.scan !== undefined) {
     const parsed = parseRoomScan(body.scan)
     if (!parsed.ok) {
       return NextResponse.json({ error: { code: 'INVALID_SCAN', message: parsed.error } }, { status: 400 })
+    }
+    if (!(await planHasRoomScan(createAdminClient(), auth.tenantId))) {
+      return NextResponse.json({ error: SCAN_NOT_IN_PLAN }, { status: 403 })
     }
     const { data: service } = await auth.supabase
       .from('services')
@@ -94,20 +99,12 @@ export async function POST(request: Request) {
       .eq('id', body.serviceId)
       .eq('tenant_id', auth.tenantId)
       .single()
-    const answers = [...(job?.answers || [])]
-    const filled = scanAnswers({
-      scan: parsed.scan,
-      expectedSignals: ((service?.expected_signals as ExpectedSignalConfig[] | null) || []),
-      fields: ((service?.draft_config as ServiceDraftConfig | null)?.suggestedFields || []),
-      existingAnswers: answers,
-    })
     job = {
       ...job,
-      answers: [
-        ...answers,
-        ...filled,
-        { fieldId: ROOM_SCAN_FIELD, value: parsed.scan as unknown as string },
-      ],
+      answers: answersWithScan(job?.answers || [], parsed.scan, {
+        expected_signals: service?.expected_signals as ExpectedSignalConfig[] | null,
+        draft_config: service?.draft_config as ServiceDraftConfig | null,
+      }) as NonNullable<typeof job>['answers'],
     }
   }
 

@@ -44,7 +44,7 @@ interface QuoteRow {
   status: string
   approved_at: string | null
   pricing_json: { total?: number; currency?: string; estimate?: { rangeLow?: number; rangeHigh?: number } } | null
-  content_json: { limitHold?: boolean; scopeSummary?: string } | null
+  content_json: { limitHold?: boolean; scopeSummary?: string; takeoff?: unknown } | null
   customer_json: { name?: string } | null
   tenants: { name: string; region?: string | null; unit_system?: string | null } | null
   services: { name: string } | null
@@ -204,7 +204,7 @@ async function judgeable(admin: Admin, token: string, link: LinkRow, q: QuoteRow
       return { id, url, smallUrl: `${url}?size=small` }
     }),
     ...(scan && {
-      roomScan: roomScanView(scan, regionCtx.unitSystem, regionCtx.locale),
+      roomScan: roomScanView(scan, regionCtx.unitSystem, regionCtx.locale, { takeoff: q.content_json?.takeoff ?? [] }),
       roomModelPath: `/api/public/approval/${encodeURIComponent(token)}/room-models/{modelId}`,
     }),
   }

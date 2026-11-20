@@ -51,7 +51,10 @@ Rules:
    **There is no pale yellow tint.** A pale yellow reads as butter.
 4. **Butter and tape are for measurement only:** the takeoff, grades, ranges, the tape rule. A warning is
    `tertiary`. "Needs you" is the strong yellow with its small dark marker (Status colours).
-5. **No dark panels, no glass, no gradients.** The dark code block on the Quote link page is the one dark surface.
+5. **No dark panels, no glass, no gradients.** The dark code block on the Quote link page is one dark surface; the
+   room scan's 3D viewer stage (T-194, ink) is the other: a light model on a light page was lost, so the model sits on
+   ink with light walls, drawn edges, a mint floor and doors and windows in the brand colour (the business's own on
+   its customer's page). Its buttons are white on ink.
    The one gradient allowed is a scene photograph fading into the ground its band already has, where words sit
    beside it: paper, or juniper on the closing band (Imagery, T-168, T-170).
 6. **Never choose a colour from a skill's catalogue,** and never write a raw Tailwind palette colour

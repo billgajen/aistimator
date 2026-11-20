@@ -181,7 +181,7 @@ export const UPCOMING = {
       'The room’s sizes go into the quote for you, and you and your customer see them with a floor plan and a 3D model.',
       'It needs an iPhone that has a LiDAR scanner.',
     ],
-    screen: 'The app’s room scan card: “Walk each room with the camera”, and the button “Scan a room”.',
+    screen: 'The app’s room scan card: “Walk the space with the camera”, and the button “Scan an area”.',
   },
 } as const
 
