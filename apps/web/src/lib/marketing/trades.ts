@@ -64,7 +64,7 @@ export const TRADES: TradePage[] = [
     packId: 'hvac-replacement-us',
     label: 'HVAC',
     templateName: 'HVAC',
-    metaTitle: `Instant AC, Heat Pump & Furnace Replacement Estimates | ${PRODUCT_NAME}`,
+    metaTitle: `Instant AC, Heat Pump, Furnace & Mini-Split Estimates | ${PRODUCT_NAME}`,
     metaDescription:
       'Homeowners photograph the rating plate and see a replacement estimate from your own prices straight away. You get the lead and confirm it.',
     eyebrow: 'For HVAC contractors',
@@ -93,6 +93,8 @@ export const TRADES: TradePage[] = [
     ],
     features: [
       { title: 'AC, heat pump and furnace templates', text: 'Start from typical US replacement pricing and make it yours in minutes.' },
+      // T-195: the mini-split is priced from the customer's answers (ai-capabilities.md, section 5)
+      { title: 'Mini-splits by the room', text: says(['pricing-engine'], 'The customer says how many rooms. Your per-room prices set the estimate.') },
       { title: 'Your quote link', text: 'Share it on Google, Facebook or WhatsApp, or put the QR code on your van. No website needed.' },
       { title: 'You confirm first', text: 'By default the customer sees the estimate at once and can accept once you’ve confirmed it.' },
     ],

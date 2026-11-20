@@ -3298,3 +3298,27 @@ check, the rescan route and the in-app viewer page are not there yet. Test after
 - A real RoomPlan model in the new viewer (proved with a made-up model of the same shape and part names).
 - The in-app browser and the rescan on the device. An area replaced keeps its old model file in storage.
 
+## T-195 — Mini-split, three new templates, "Who it's for"
+
+Built 20 November 2026. **Not deployed.** Web only (no worker change, no migration). To put it live: "deploy T-195", the web.
+
+### Rates to review (all placeholders, marked TODO-OWNER in the templates, USD)
+
+- **Ductless Mini-Split Installation** (HVAC): outdoor unit, first room and startup $3,600; each additional room $2,400;
+  larger indoor unit $400 each; upstairs room $250 each; remove the old system $350; wall bracket $180; roof
+  mounting $550; longer line run $300. Extras: line set cover $160, condensate pump $220, new dedicated circuit $480.
+  Site visit suggested above $15,000.
+- **Junk Removal:** a few items $95; quarter truck $150; half $280; three-quarter $400; full $520. Inside, ground
+  floor $30; upstairs or basement $60. Mattress $40 each; fridge, freezer or AC unit $60 each. Minimum $95.
+- **Pressure Washing:** driveway $120 / $180 / $260; patio or deck $90 / $140 / $200; siding $320 / $520; walkways
+  $60. Minimum $150. Extras: sealing prep $80, gutter face brightening $90.
+- **Fence Installation:** per foot at 6 ft: wood $32, vinyl $42, chain link $22; 4 ft is 15% less; gate $350 each;
+  old fence removal $5 per foot; sloped ground +10% (of the fence run). Site visit suggested above $8,000.
+
+### Could not be done as data only (needs an engine change; not made)
+
+- "Site visit suggested when an answer is Not sure" (mini-split, fence): a site visit can only be suggested always,
+  below a confidence, or above an amount. The amount rule is set; a "Not sure" answer prices as the other answers do.
+- "1 to 5 rooms" and "None as the default choice": a question has no minimum, maximum or default. The help text
+  says "From 1 to 5"; "None" is the first choice, and a surface left blank is not priced.
+

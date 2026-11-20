@@ -70,7 +70,7 @@ screen (the suggestion is on the form, the question on the question screen, the 
 | id | What it does | Where | Code | Evidence |
 |---|---|---|---|---|
 | `price-sentence` | Turns pricing written in plain English ("$375 per room, heavy prep adds $250") into a price list, shown back to the business to check and edit. The business confirms it; nothing is priced from an unchecked sentence. | Setup, and the service editor. | `apps/web/src/app/api/services/ai-draft/compile`, `components/services/PricingComposer.tsx` | Exercised by the hardcore harness (`scripts/hardcore-test/run.mjs`). No per-call log exists. |
-| `service-draft` | Drafts a service for a trade without a template: its questions, scope and price structure, from a description. | Setup, "any other trade". | `apps/web/src/app/api/services/ai-draft`, `apps/worker/src/ai/service-draft.ts` | Same harness. No per-call log exists. |
+| `service-draft` | Drafts a service for a trade without a template: its questions, scope and price structure, from a description, or (the same route, T-105) from the business's website, with a price only where the site states one. | Setup, "Something else": "Read my website" or "I'll describe it". | `apps/web/src/app/api/services/ai-draft`, `apps/worker/src/ai/service-draft.ts` | Same harness. No per-call log exists. |
 | `service-match` | Checks that what the customer described fits the service they picked, and suggests the right one when it does not. It does not pick the service from a message: the customer picks, and this checks the pick. | Request intake, when the customer wrote a description (and the business has not switched the check off). | `apps/web/src/lib/ai/service-matcher.ts`, `lib/quote-intake.ts` | Nothing is stored for a suggestion, so there is no count. 4 stored quotes went to the business as a general enquiry because no service fitted. **Seen working live on the local stack, 2026-11-17 (T-173):** a request sent to Wallpaper Installation that said "I need three bedrooms repainted" was answered "Did you mean Interior Painting?" and nothing was created. Claimable since then. |
 
 ## 3. Product checks that are not AI (say them without the word "AI")
@@ -99,11 +99,14 @@ screen (the suggestion is on the form, the question on the question screen, the 
 | Trade page | `label-reading` | `photo-measurement` | Says instead |
 |---|---|---|---|
 | Water heaters | yes: capacity and fuel | no | |
-| HVAC | yes: tonnage, furnace input | no | |
+| HVAC | yes: tonnage, furnace input | no | Mini-splits are priced from the customer’s answers. |
 | Electrical | yes: panel amps | no | Run length and charger supply are the customer's answers. |
 | Painting | no | yes: exterior wall area only | Interiors are priced per room from the customer's count. |
 | Plumbing | no | no | The customer counts fixtures; photos arrive with the request for the business to see. |
 | Garage doors | no | no | Size, style and spring count are the customer's answers. |
+| Fence installation | no | no | Priced from the customer's answers (length, height, material, gates, slope). No label reading, no photo measurement. No trade page yet (T-195). |
+| Junk removal | no | no | Priced from the customer's answers (how much of a truck, where it is, mattresses and appliances). No label reading, no photo measurement. No trade page yet (T-195). |
+| Pressure washing | no | no | Priced from the customer's answers (which surfaces and how big). No label reading, no photo measurement. No trade page yet (T-195). |
 
 Every trade page may use `confirm-question` only with a reading it has, and may use `range-and-question`,
 `extras-from-description`, `scope-wording`, `price-sentence`, `photo-quality-check` and `pricing-engine`.

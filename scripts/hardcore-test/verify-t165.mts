@@ -437,7 +437,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
     // T-187: the on-site app has a section of its own after "Add it anywhere"
     check(`${width}: the sections are in order: hero, the figures, "What it notices", your prices, setup, add it anywhere, the app, plans, questions, the closing band`, JSON.stringify(order) === JSON.stringify(['hero', 'homeowners', 'notices', 'control', 'setup', 'add-it-section', 'app', 'plans', 'questions', 'closing']), order)
     const pills = await p.locator('[data-testid=setup-step]').first().locator('[data-testid=trades-row] a').allInnerTexts()
-    check(`${width}: the trade links sit inside "Choose your trade", ending with "Other trades"; there is no trades row of its own`, (await p.locator('[data-testid=trades-row]').count()) === 1 && pills.length === 7 && pills[6]!.trim() === 'Other trades: describe your prices in plain English', pills.length)
+    check(`${width}: the trade links sit inside "Choose your trade", ending with "Any other business" (T-195); there is no trades row of its own`, (await p.locator('[data-testid=trades-row]').count()) === 1 && pills.length === 7 && pills[6]!.trim() === 'Any other business: add your own services and prices', pills.length)
 
     // the one moment: the price lines land when the section comes into view, and stay
     await p.locator('[data-testid=price-sentence]').scrollIntoViewIfNeeded()

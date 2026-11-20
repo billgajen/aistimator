@@ -225,7 +225,8 @@ describe('T-165: login and small fixes', () => {
     // T-187: four columns. Written once each: four product links, one per trade (a loop) and "All trades",
     // two company links, three legal ones. The support address is a link of the same height.
     expect(footer.match(/className=\{FOOT_LINK\}/g)).toHaveLength(11)
-    expect(footer).toContain('{TRADES.map((trade) => (')
+    // T-195: the trades with a page, in the template order
+    expect(footer).toContain('{templateTrades(listPacks().map((p) => p.id)).map((trade) => (')
     expect(footer).toMatch(/data-testid="footer-support"/)
     expect(footer).toMatch(/inline-flex min-h-\[44px\] items-center font-semibold text-primary/)
   })

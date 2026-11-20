@@ -32,7 +32,7 @@ export const HERO = {
 }
 
 /** T-167: the last pill of the trade links inside "Choose your trade" (the standalone trades row is gone) */
-export const OTHER_TRADES = 'Other trades: describe your prices in plain English'
+export const OTHER_TRADES = 'Any other business: add your own services and prices'
 
 /**
  * The hero's product demo. T-168: three frames of the same height, one idea
@@ -88,7 +88,7 @@ export const SETUP = {
   steps: [
     {
       title: 'Choose your trade',
-      text: 'Start from a ready-made template with the usual services and questions. Any other trade: describe what you do in plain English.',
+      text: 'Start from a ready-made template with the usual services and questions. Any other business: add your own services and prices.',
     },
     {
       title: 'Check your prices',

@@ -2,7 +2,8 @@ import Link from 'next/link'
 import { PRODUCT_NAME, SUPPORT_EMAIL, freeOfferLabel, operatorLine } from '@qolumns/shared'
 import { Wordmark } from '@/components/brand/Wordmark'
 import { DATA_DELETION, FOOTER } from '@/lib/marketing/site-copy'
-import { TRADES, tradeHref } from '@/lib/marketing/trades'
+import { templateTrades, tradeHref } from '@/lib/marketing/trades'
+import { listPacks } from '@/lib/vertical-packs'
 
 /**
  * Marketing site footer, shared across all public pages.
@@ -54,10 +55,11 @@ export function SiteFooter() {
             <div>
               <p className={COLUMN_TITLE}>{FOOTER.columns.trades}</p>
               <ul className="mt-3 text-sm sm:space-y-2">
-                {TRADES.map((trade) => (
+                {/* T-195: the trades with a page, in the template order (lib/vertical-packs) */}
+                {templateTrades(listPacks().map((p) => p.id)).map((trade) => (
                   <li key={trade.slug}><Link href={tradeHref(trade)} className={FOOT_LINK}>{trade.label}</Link></li>
                 ))}
-                <li><Link href="/trades" className={FOOT_LINK}>{L.allTrades}</Link></li>
+                <li><Link href="/trades#other" className={FOOT_LINK}>{L.allTrades}</Link></li>
               </ul>
             </div>
             <div>

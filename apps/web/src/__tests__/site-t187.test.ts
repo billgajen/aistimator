@@ -486,7 +486,7 @@ describe('T-187: the footer', () => {
   })
 
   it('four link columns, the support address, and who runs it, with the company number from the setting', () => {
-    expect(Object.values(FOOTER.columns)).toEqual(['Product', 'Trades', 'Company', 'Legal'])
+    expect(Object.values(FOOTER.columns)).toEqual(['Product', 'Who it’s for', 'Company', 'Legal'])
     for (const column of ['product', 'trades', 'company', 'legal']) expect(footer).toContain(`{FOOTER.columns.${column}}`)
     expect(footer).toContain('href={`mailto:${SUPPORT_EMAIL}`}')
     expect(footer).toContain('{operatorLine(process.env.NEXT_PUBLIC_COMPANY_NUMBER)}')
@@ -494,7 +494,7 @@ describe('T-187: the footer', () => {
     expect(operatorLine('')).toBe('Run by Billiom Limited, a company registered in England and Wales.')
     // no company number is typed anywhere in the site's source
     expect(footer).not.toMatch(/company number \d/)
-    for (const href of ['/features', '/pricing', '/demo', '/signup', '/trades', '/login', '/terms', '/privacy']) expect(footer).toContain(`href="${href}"`)
+    for (const href of ['/features', '/pricing', '/demo', '/signup', '/trades#other', '/login', '/terms', '/privacy']) expect(footer).toContain(`href="${href}"`)
   })
 })
 

@@ -107,7 +107,7 @@ export function TradeLanding({ trade }: { trade: TradePage }) {
       </section>
 
       <section className="border-t border-border bg-mint py-16">
-        <div className={`${WRAP} grid gap-6 sm:grid-cols-3`}>
+        <div className={`${WRAP} grid gap-6 ${trade.features.length === 4 ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}>
           {trade.features.map((f) => (
             <div key={f.title} className="rounded-xl bg-white p-5 shadow-warm">
               <h3 className="font-semibold text-text-primary">{f.title}</h3>

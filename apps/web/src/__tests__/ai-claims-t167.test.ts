@@ -21,6 +21,7 @@ import { CAPABILITIES, CLAIM_WORDS, NOT_YET_ON_A_PAGE, recordedClaims, type Capa
 import * as homeCopy from '@/lib/marketing/home-copy'
 import * as featuresCopy from '@/lib/marketing/features-copy'
 import * as siteCopy from '@/lib/marketing/site-copy'
+import * as whoCopy from '@/lib/marketing/who-its-for'
 import * as pricingCopy from '@/lib/marketing/pricing-copy'
 import * as tradesCopy from '@/lib/marketing/trades'
 import { TRADES } from '@/lib/marketing/trades'
@@ -65,7 +66,7 @@ function strings(value: unknown, into: string[] = []): string[] {
   return into
 }
 // T-187: Pricing's words (the compare table's rows about what the product does) are a copy file too
-const COPY = { 'home-copy.ts': homeCopy, 'features-copy.ts': featuresCopy, 'site-copy.ts': siteCopy, 'pricing-copy.ts': pricingCopy, 'trades.ts': tradesCopy }
+const COPY = { 'home-copy.ts': homeCopy, 'features-copy.ts': featuresCopy, 'site-copy.ts': siteCopy, 'pricing-copy.ts': pricingCopy, 'trades.ts': tradesCopy, 'who-its-for.ts': whoCopy }
 
 /**
  * Sentences that match the claim words and are not claims about the product's
@@ -99,7 +100,9 @@ describe('T-167: the inventory and the code agree on what may be claimed', () =>
   })
 
   it('section 5 covers every trade page', () => {
-    expect([...byTrade.keys()].sort()).toEqual(TRADES.map((t) => t.label).sort())
+    // T-195: and the templates with no trade page yet, which are priced from the customer's answers only
+    expect([...byTrade.keys()].sort()).toEqual([...TRADES.map((t) => t.label), 'Fence installation', 'Junk removal', 'Pressure washing'].sort())
+    for (const t of ['Fence installation', 'Junk removal', 'Pressure washing']) expect(byTrade.get(t)).toEqual({ label: false, measure: false })
     expect(byTrade.get('Water heaters')).toEqual({ label: true, measure: false })
     expect(byTrade.get('Painting')).toEqual({ label: false, measure: true })
     expect(byTrade.get('Plumbing')).toEqual({ label: false, measure: false })

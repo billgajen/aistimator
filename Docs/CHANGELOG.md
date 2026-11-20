@@ -15,6 +15,66 @@
 
 ## Issues & Resolutions
 
+### 2026-11-20: T-195 — Mini-split, three new templates, and "Trades" becomes "Who it's for" (AD-078)
+
+**Built, not deployed.** Web only: data and marketing pages. **No engine, worker, pricing-logic or database change,
+no migration.** Needs deploying: the web.
+
+**Why.** The Trades page read as if only six trades were served. The product prices any business's own services;
+templates are a head start.
+
+#### What changed
+- **Mini-split** (fourth service in `hvac-us.ts`, pack id kept `hvac-replacement-us`, name now "HVAC (US)"): six
+  questions from the ticket, priced only from the answers: first room $3,600, each additional room $2,400
+  (`derived: max(0, ms_rooms - 1)`), large room $400 and upstairs room $250 each (counts, blank = none), removal
+  $350, wall bracket $180, roof $550, longer run $300 (each an answer's `when`); extras $160 / $220 / $480. Site visit
+  above $15,000, as the other HVAC services set theirs. Guidance: never size equipment from a photo.
+- **Three new packs:** `junk-removal-us` (truck-load answer selects one fixed line; where it is; mattresses and
+  appliances per item; minimum $95), `pressure-washing-us` (each surface a choice starting "None"; a step per size;
+  minimum $150; two extras), `fencing-us` (per-foot line per material from the length answer; 4 ft is a −15% percent
+  line and sloped ground a +10% percent line on the fence run (T-125 `percentOf`); gates $350 each; removal $5/ft;
+  site visit above $8,000). All rates TODO-OWNER, listed in OWNER-TODO.md. No label reading, no photo measurement.
+- **One template order**, set in the pack registry (`lib/vertical-packs/index.ts`): water heaters, HVAC, electrical,
+  plumbing, garage doors, painting, fence, junk removal, pressure washing (then the UK painting pack). Setup, "Add from
+  a template", home's step 1, the footer and the new page all follow it; `listPacks(region)` still puts a UK
+  business's packs first.
+- **/trades is "Who it's for"** (URL kept): copy and the card list as data (`lib/marketing/who-its-for.ts`); nine
+  cards, services read from each pack; "See how it works" to a trade page where one exists, else "Start with this
+  template" to sign-up. `#other` shows setup's ways to add a business in setup's order and words (a template; "Read
+  my website"; "I'll describe it"), "Businesses like:" pills (not links), and the free-offer button.
+- **Wording:** nav and phone menu "Who it's for"; footer column "Who it's for", only trades with a page, in the
+  template order, "Any other business" → `/trades#other`; home step 1 "Any other business: add your own services
+  and prices". Tests pinning the old words updated (unit tests and verify t154, t155, t165, t167).
+- **HVAC trade page:** title "Instant AC, Heat Pump, Furnace & Mini-Split Estimates"; feature "Mini-splits by the
+  room" (its four features sit in a two-then-four column grid). `ai-capabilities.md` section 5: HVAC "Says
+  instead", and rows for fence, junk removal and pressure washing; `service-draft` now names the website route too.
+
+#### Decisions (AD-078)
+**AD-078: one template order, the URL kept, new templates priced from answers only, no landing pages yet.** The pack
+registry's order is the only order; nothing else sorts templates. `/trades` keeps its URL (links and search). The
+new templates price only from the customer's answers (no reading or measuring rules) and photos are for the
+business. They have no landing page; they appear on "Who it's for" and in setup, and get a page only when one is
+written.
+
+#### Could not be done as data only (left out, no engine change)
+- **Site visit when an answer is "Not sure"** (mini-split, fence): site-visit rules are only always / confidence /
+  amount. The amount rule is set.
+- **"1 to 5" rooms and "None" as a default:** questions have no min, max or default. The help text says "From 1 to
+  5"; "None" is the first choice and a blank surface is not priced.
+- **Copy:** "the next firm" became "the next company": "firm" is a banned customer word (it reads as a firm price).
+  "Read my website" goes through `says(['service-draft'])` as the claims test requires.
+
+**Checks:** unit tests (web 1,404 + T-195: templates-t195 11, who-its-for-t195 9; each new template priced by the
+worker's real rules engine for two sets of answers), lint and typecheck clean. `pnpm check:quick`: 24 of 28 in
+6 min 23 s (t154, t155, t165, t167 pinned the old words), then `pnpm check:failed`: 6 of 6 in 1 min 24 s. Local
+stack with the AI stand-in priced one request per new template at the hand-worked totals: mini-split $8,980, junk
+$350, pressure washing $380, fence $4,190. Screenshots in `.checks/t195/`.
+
+**Relation:** T-113 (packs as data), T-125 (percent lines), T-126 (`when`), T-131 (blank counts), T-154/T-167 (trade
+pages, claims), T-187 (footer).
+
+---
+
 ### 2026-11-20: T-194 — Room scan that earns its place: scans drive prices, areas, clean walls and plan, a 3D viewer, rescan (AD-077)
 
 **Deployed 20 Nov 2026:** `pnpm check:full` 40 of 40 (32 scripts, 2,763 checks) in 28 min 56 s; worker

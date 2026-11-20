@@ -147,7 +147,7 @@ check('menu: the hero buttons and product frames are under it', await p.evaluate
   })
 }))
 const links = (await menu.locator('li a').allInnerTexts()).map((s) => s.trim())
-check('menu: the five links', JSON.stringify(links) === JSON.stringify(['Features', 'Pricing', 'Trades', 'Try it as a customer', 'Log in']), links)
+check('menu: the five links', JSON.stringify(links) === JSON.stringify(['Features', 'Pricing', 'Who it’s for', 'Try it as a customer', 'Log in']), links)
 const signup = menu.getByTestId('site-menu-signup')
 const signupBox = (await signup.boundingBox())!
 const lastLink = (await menu.locator('li a').last().boundingBox())!

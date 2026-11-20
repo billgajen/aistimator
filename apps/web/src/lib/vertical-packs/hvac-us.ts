@@ -89,11 +89,179 @@ const HARD_ACCESS_MULTIPLIERS = [
   { when: { fieldId: 'indoor_location', operator: 'equals', equals: 'Crawl space' }, multiplier: 1.15 }, // TODO-OWNER
 ]
 
+/**
+ * T-195: the ductless mini-split. Priced only from the customer's answers (rooms, which are large or
+ * upstairs, new or replacing, where the outdoor unit goes): nothing is read from a photo, and the
+ * photos are for the business to check. Equipment is never sized from a photo.
+ */
+const MS_NEW = 'No, this is a new install'
+const MS_REPLACE = 'Yes, replace the old one'
+const MS_GROUND = 'On the ground'
+const MS_BRACKET = 'On a wall bracket'
+const MS_ROOF = 'On the roof'
+const MS_FAR = 'No, it is further away'
+const NOT_SURE = 'Not sure'
+
+const miniSplit: VerticalPack['services'][number] = {
+  name: 'Ductless Mini-Split Installation',
+  description: 'Install a ductless mini-split: one outdoor unit and an indoor unit in each room.',
+  draft: {
+    scope: {
+      included: [
+        'Outdoor unit and an indoor unit for each room',
+        'Line set up to 25 ft per room',
+        'Wall penetration, sealed',
+        'Startup and test',
+      ],
+      excluded: [
+        'Panel upgrades',
+        'Wall repairs beyond the line-set hole',
+        'Permit fees where the city charges them separately',
+      ],
+      assumptions: ['Indoor units go on an outside wall', 'An adequate circuit is available for the outdoor unit'],
+    },
+    media: {
+      minPhotos: 1,
+      maxPhotos: 8,
+      photoGuidance: 'The spot for the outdoor unit, then the wall in each room where an indoor unit goes. When replacing, the label on the old outdoor unit.',
+      requiredAngles: [
+        { id: 'outdoor_spot', label: 'Where the outdoor unit goes', guidance: 'The ground, wall or roof spot, with a little of the house around it' },
+        { id: 'indoor_wall', label: 'The wall in each room', guidance: 'One photo per room, of the wall where the indoor unit goes' },
+        { id: 'old_label', label: 'The old outdoor unit\'s label', guidance: 'Only when replacing: the data label on the side of the old outdoor unit' },
+      ],
+    },
+    pricing: {
+      pricingModel: 'per_unit',
+      unitType: 'room',
+      baseFee: 0,
+      minimumCharge: 0,
+      workSteps: [
+        {
+          id: 'ms_first_room',
+          name: 'Outdoor unit, first room and startup',
+          description: 'Outdoor unit, the first indoor unit, line set, wall penetration, startup and test',
+          costType: 'fixed',
+          defaultCost: 3600, // TODO-OWNER: placeholder rate
+          optional: false,
+        },
+        {
+          id: 'ms_more_rooms',
+          name: 'Each additional room',
+          description: 'Another indoor unit with its line set, on the same outdoor unit',
+          costType: 'per_unit',
+          defaultCost: 2400, // TODO-OWNER: placeholder rate per room
+          optional: false,
+          unitLabel: 'room',
+          quantitySource: { type: 'derived', formula: 'max(0, ms_rooms - 1)' },
+        },
+        {
+          id: 'ms_large_room',
+          name: 'Larger indoor unit',
+          description: 'A larger indoor unit for a large or open-plan room',
+          costType: 'per_unit',
+          defaultCost: 400, // TODO-OWNER: placeholder rate per room
+          optional: false,
+          unitLabel: 'room',
+          quantitySource: { type: 'form_field', fieldId: 'ms_large_rooms', missingMeansZero: true },
+        },
+        {
+          id: 'ms_upstairs_room',
+          name: 'Upstairs room',
+          description: 'A longer line run and more work to reach an upstairs room',
+          costType: 'per_unit',
+          defaultCost: 250, // TODO-OWNER: placeholder rate per room
+          optional: false,
+          unitLabel: 'room',
+          quantitySource: { type: 'form_field', fieldId: 'ms_upstairs_rooms', missingMeansZero: true },
+        },
+        {
+          id: 'ms_removal',
+          name: 'Remove and dispose of the old system',
+          description: 'Recover the refrigerant, remove and dispose of the old units',
+          costType: 'fixed',
+          defaultCost: 350, // TODO-OWNER: placeholder rate
+          optional: true,
+          when: { fieldId: 'ms_existing', operator: 'equals', equals: MS_REPLACE },
+        },
+        {
+          id: 'ms_wall_bracket',
+          name: 'Wall bracket for the outdoor unit',
+          description: 'A wall bracket instead of a pad on the ground',
+          costType: 'fixed',
+          defaultCost: 180, // TODO-OWNER: placeholder rate
+          optional: true,
+          when: { fieldId: 'ms_outdoor_spot', operator: 'equals', equals: MS_BRACKET },
+        },
+        {
+          id: 'ms_roof',
+          name: 'Roof mounting',
+          description: 'A roof stand and the work of getting the outdoor unit on the roof',
+          costType: 'fixed',
+          defaultCost: 550, // TODO-OWNER: placeholder rate
+          optional: true,
+          when: { fieldId: 'ms_outdoor_spot', operator: 'equals', equals: MS_ROOF },
+        },
+        {
+          id: 'ms_long_run',
+          name: 'Longer line run',
+          description: 'The outdoor unit sits further from the rooms',
+          costType: 'fixed',
+          defaultCost: 300, // TODO-OWNER: placeholder rate
+          optional: true,
+          when: { fieldId: 'ms_close', operator: 'equals', equals: MS_FAR },
+        },
+      ],
+      addOns: [
+        { name: 'Line set cover', price: 160, description: 'A cover over the line set on the outside wall' }, // TODO-OWNER
+        { name: 'Condensate pump', price: 220, description: 'Where the condensate cannot drain by gravity' }, // TODO-OWNER
+        { name: 'New dedicated circuit', price: 480, description: 'A new circuit from the panel for the outdoor unit' }, // TODO-OWNER
+      ],
+      siteVisit: { alwaysRecommend: false, confidenceBelowPct: 50, estimateAbove: 15000 },
+    },
+    expectedSignals: [],
+    suggestedFields: [
+      {
+        label: 'How many rooms do you want to heat and cool?',
+        fieldId: 'ms_rooms',
+        type: 'number',
+        required: true,
+        criticalForPricing: true,
+        helpText: 'From 1 to 5.',
+      },
+      {
+        label: 'How many of those rooms are large or open plan?',
+        fieldId: 'ms_large_rooms',
+        type: 'number',
+        required: false,
+        helpText: 'Bigger than a large bedroom. Leave blank for none.',
+      },
+      {
+        label: 'How many of those rooms are upstairs?',
+        fieldId: 'ms_upstairs_rooms',
+        type: 'number',
+        required: false,
+        helpText: 'Leave blank for none.',
+      },
+      { label: 'Is there a mini-split there now?', fieldId: 'ms_existing', type: 'dropdown', required: true, criticalForPricing: true, options: [MS_NEW, MS_REPLACE] },
+      { label: 'Where should the outdoor unit go?', fieldId: 'ms_outdoor_spot', type: 'dropdown', required: true, criticalForPricing: true, options: [MS_GROUND, MS_BRACKET, MS_ROOF, NOT_SURE] },
+      { label: 'Can the outdoor unit sit right outside those rooms?', fieldId: 'ms_close', type: 'dropdown', required: true, criticalForPricing: true, options: ['Yes', MS_FAR, NOT_SURE] },
+    ],
+  },
+  addons: [
+    { id: 'addon_line_set_cover', label: 'Line set cover', price: 160, triggerKeywords: ['line set cover', 'lineset cover'] }, // TODO-OWNER
+    { id: 'addon_condensate_pump', label: 'Condensate pump', price: 220, triggerKeywords: ['condensate pump'] }, // TODO-OWNER
+    { id: 'addon_dedicated_circuit', label: 'New dedicated circuit', price: 480, triggerKeywords: ['dedicated circuit', 'new circuit'] }, // TODO-OWNER
+  ],
+  multipliers: [],
+  promptContext:
+    'The price comes from the customer\'s answers. Describe what the photos show. Never size equipment from a photo.',
+}
+
 export const hvacPackUS: VerticalPack = {
   id: 'hvac-replacement-us',
-  name: 'HVAC replacement (US)',
+  name: 'HVAC (US)',
   description:
-    'Central AC, heat pump and gas furnace replacement — priced from the size on the rating plate in the customer\'s photo.',
+    'Central AC, heat pump and gas furnace replacement, priced from the size on the rating plate in the customer\'s photo; and ductless mini-splits, priced from the customer\'s answers.',
   icon: '❄️',
   rateCurrency: 'USD',
   region: 'US',
@@ -331,5 +499,6 @@ export const hvacPackUS: VerticalPack = {
       promptContext:
         'The price is set by the INPUT rating on the furnace\'s rating plate. Report what the plate shows; never estimate it from the furnace\'s appearance.',
     },
+    miniSplit,
   ],
 }

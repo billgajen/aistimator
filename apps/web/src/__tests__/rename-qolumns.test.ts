@@ -75,7 +75,8 @@ describe('T-162: the name people read', () => {
       'apps/web/src/app/pricing/page.tsx',
       'apps/web/src/app/privacy/page.tsx',
       'apps/web/src/app/terms/page.tsx',
-      'apps/web/src/app/trades/page.tsx',
+      // T-195: the trades page's title is data now
+      'apps/web/src/lib/marketing/who-its-for.ts',
       'apps/web/src/components/marketing/SiteFooter.tsx',
       'apps/web/src/lib/marketing/trades.ts',
       'apps/mobile/app/login.tsx',

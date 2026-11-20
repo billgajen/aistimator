@@ -2,7 +2,7 @@
 export const NAV_LINKS = [
   { href: '/features', label: 'Features' },
   { href: '/pricing', label: 'Pricing' },
-  { href: '/trades', label: 'Trades' },
+  { href: '/trades', label: 'Who it’s for' },
   { href: '/demo', label: 'Try it as a customer' },
   { href: '/login', label: 'Log in' },
 ] as const

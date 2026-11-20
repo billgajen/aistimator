@@ -80,7 +80,7 @@ describe('T-154: the approved copy', () => {
     // T-167, reworded in T-168 (the owner's wording): what the AI does in one plain sentence, then where the price comes from
     expect(HERO.subline).toBe('The AI reads what your customer tells you and the photos they send, and works out the job. The price comes from your own price list, and you confirm it.')
     // T-167: the trades row and its heading are gone; the links sit in step 1 of "Set up in minutes", ending with this pill
-    expect(OTHER_TRADES).toBe('Other trades: describe your prices in plain English')
+    expect(OTHER_TRADES).toBe('Any other business: add your own services and prices')
   })
 
   it('T-155: the small line under the hero buttons doesn’t contradict "on your website"', () => {
@@ -211,10 +211,11 @@ describe('T-154: visuals priced from the packs', () => {
     for (const t of TRADES) expect(EXAMPLE_TRADES).toContain(t.slug)
   })
 
-  it('the trades row lists every US template, in the pack registry’s order, each linking to its page', () => {
+  it('the trades row lists every US template that has a page, in the pack registry’s order, each linking to it', () => {
     const ids = listPacks('US').filter((p) => p.region === 'US').map((p) => p.id)
     const row = templateTrades(ids)
-    expect(row).toHaveLength(ids.length)
+    // T-195: the three newest templates have no landing page yet; they are on "Who it's for" instead
+    expect(row.map((t) => t.packId)).toEqual(ids.filter((id) => !['fencing-us', 'junk-removal-us', 'pressure-washing-us'].includes(id)))
     expect(row.map(tradeHref)).toContain('/painting')
     expect(row.map(tradeHref)).toContain('/trades/hvac')
   })
@@ -225,7 +226,7 @@ describe('T-154: phone menu, buttons, metadata', () => {
     expect(NAV_LINKS.map((l) => [l.label, l.href])).toEqual([
       ['Features', '/features'],
       ['Pricing', '/pricing'],
-      ['Trades', '/trades'],
+      ['Who it’s for', '/trades'],
       ['Try it as a customer', '/demo'],
       ['Log in', '/login'],
     ])
@@ -292,7 +293,7 @@ describe('T-155: the open phone menu', () => {
 
   it('has the five links, then one sign-up button, and an X', () => {
     const labels = [...html.matchAll(/<a [^>]*>([^<]+)<\/a>/g)].map((m) => m[1])
-    expect(labels).toEqual(['Features', 'Pricing', 'Trades', 'Try it as a customer', 'Log in', 'Try it free: 10 quotes, no card'])
+    expect(labels).toEqual(['Features', 'Pricing', 'Who it’s for', 'Try it as a customer', 'Log in', 'Try it free: 10 quotes, no card'])
     expect(html).toMatch(/data-testid="site-menu-signup"/)
     expect(html).toContain('aria-label="Close menu"')
   })

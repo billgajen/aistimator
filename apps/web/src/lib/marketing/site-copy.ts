@@ -15,12 +15,12 @@ import { says } from './ai-claims'
 export const FOOTER = {
   /** Under the wordmark */
   line: 'Instant quotes for your customers, in your own prices.',
-  columns: { product: 'Product', trades: 'Trades', company: 'Company', legal: 'Legal' },
+  columns: { product: 'Product', trades: 'Who it’s for', company: 'Company', legal: 'Legal' },
   links: {
     features: 'Features',
     pricing: 'Pricing',
     demo: 'Try it as a customer',
-    allTrades: 'All trades',
+    allTrades: 'Any other business',
     logIn: 'Log in',
     contact: 'Contact us',
     terms: 'Terms of service',

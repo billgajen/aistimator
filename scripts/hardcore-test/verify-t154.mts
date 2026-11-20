@@ -50,7 +50,7 @@ check('390 px home: tap targets at least 40 px tall', small.length === 0, small.
 
 await p.getByTestId('site-menu-button').click()
 const items = (await p.getByTestId('site-menu').locator('li a').allInnerTexts()).map((s) => s.trim())
-check('the phone menu opens with Features, Pricing, Trades, the demo and Log in', JSON.stringify(items) === JSON.stringify(['Features', 'Pricing', 'Trades', 'Try it as a customer', 'Log in']), items)
+check('the phone menu opens with Features, Pricing, Who it’s for (T-195), the demo and Log in', JSON.stringify(items) === JSON.stringify(['Features', 'Pricing', 'Who it’s for', 'Try it as a customer', 'Log in']), items)
 await p.screenshot({ path: `${out}/menu-390.png` })
 await p.getByTestId('site-menu').getByRole('link', { name: 'Pricing', exact: true }).click()
 await p.waitForURL(/\/pricing$/)

@@ -12,7 +12,7 @@ import { UPCOMING, isLive } from '@/lib/marketing/plan-claims'
  * so no two neighbours share a layout.
  *
  * T-167: the links to the trade pages live here, under step 1 ("Choose your
- * trade"), as pills on a line that wraps; the last pill is "Other trades".
+ * trade"), as pills on a line that wraps; the last pill is "Any other business" (T-195).
  * (They were a row of their own under the hero.)
  *
  * T-187: step 3 keeps the link and QR box and says where else the same form
@@ -39,7 +39,7 @@ export function SetupSteps({
   serviceName: string
   prices: Array<{ label: string; amount: number }>
   quoteLink: string
-  /** T-167: the trade pages, linked from step 1; the last one is "Other trades" */
+  /** T-167: the trade pages, linked from step 1; the last one is "Any other business" */
   tradeLinks: ReadonlyArray<{ label: string; href: string; other?: boolean }>
   /** T-187: under step 3: the live place by name, and the link down to "Add it anywhere" */
   elsewhere: { website: string; link: { label: string; href: string } }
