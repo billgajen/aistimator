@@ -43,6 +43,26 @@ EAS) are written out step by step in `OWNER-TODO.md` under T-184. A trial build 
 (`app.config.js`): it gets its own identifier, `com.qolumns.app.dev`, so the real one stays free for the App
 Store. `eas.json` holds the build settings. Neither way has been tried: there is no Xcode on the build machine.
 
+## Notifications (T-196)
+
+Three notifications, and nothing else: a customer's new request, an accepted estimate, a customer's question.
+The server sends them (`packages/shared/src/push.ts`); the app registers the phone, shows the three switches on the
+Account tab and opens the quote of a tapped notification.
+
+**They belong to the App Store build only.** A free Personal Team cannot sign an app that asks for the push
+entitlement, so `app.config.js` builds the two variants differently:
+
+| | App Store build (no `APP_VARIANT`) | Dev build (`APP_VARIANT=dev`) |
+|---|---|---|
+| The `expo-notifications` plugin | with its defaults: adds the push entitlement | named with `enableRemoteNotifications: false`, and the entitlement is deleted from an existing `ios` folder |
+| `extra.push` | `true` | `false` |
+| In the app | asks once on the home tab, registers the phone, three switches | never loads the notifications module; Account says "Available in the App Store version" |
+
+Leaving the plugin out of the dev build is not enough: Expo applies the plugin of an installed package by itself,
+and that adds the entitlement. `src/lib/notifications.ts` is the only file that touches the module, and every
+function in it returns first when `pushBuild` is false. The App Store build also needs the Expo project id
+(`npx eas init` writes `extra.eas.projectId`); without it the app behaves as the dev build does.
+
 ## Run it
 
 ```bash

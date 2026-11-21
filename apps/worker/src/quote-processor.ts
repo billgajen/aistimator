@@ -73,6 +73,7 @@ import { createSentenceRewriter } from './ai/wording-repair'
 import { sendQuoteEmails, sendReviewRequestEmail, sendEstimateShownEmail, isEmailConfigured } from './email'
 import { issueApprovalLink } from './approval-link'
 import { loadBusinessEmail } from './business-email'
+import { notifyPhones } from './push'
 import { incrementUsageCounter } from './usage'
 
 /** T-153: photos a demo request reads at most (matches DEMO_MAX_PHOTOS in shared) */
@@ -2581,6 +2582,10 @@ export async function processQuote(
   // T-153: a demo request sends no email to anyone (not even the from-address
   // fallback the business email uses when there's no owner)
   const emailOn = quoteData.quote.is_demo !== true && isEmailConfigured(env.POSTMARK_API_TOKEN, env.POSTMARK_FROM_EMAIL)
+  // T-196: the business's phones hear of a customer's new request here, where its email is sent: once per
+  // request (a reprice claims nothing), never for a quote the business made itself, a setup test or the
+  // demo, and never the customer's details. It never throws and does not depend on the email.
+  await notifyPhones(supabase, env, 'new_request', quoteId)
   if (quoteData.quote.is_demo === true) console.log('[Processor] Demo request: no emails')
   if (finalStatus === 'pending_review') {
     if (shownEarly && quoteToken && quoteRequest.customer_email && emailOn) {

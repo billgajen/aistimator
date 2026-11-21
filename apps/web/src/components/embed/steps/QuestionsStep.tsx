@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { fieldExample } from '@qolumns/shared'
 import type { MeasurementModel, WidgetField } from '../EstimateWidget'
 import { RequiredMark, StepTitle } from '../StepTitle'
 
@@ -173,7 +174,7 @@ export function QuestionsStep({
                   value={(answers[field.fieldId] as string) || ''}
                   onChange={(e) => onFieldChange(field.fieldId, e.target.value)}
                   onBlur={() => handleFieldBlur(field.fieldId)}
-                  placeholder={field.placeholder}
+                  placeholder={fieldExample(field)}
                   aria-labelledby={`q-${field.fieldId}`}
                   aria-required={field.required || undefined}
                   className={`w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}
@@ -186,7 +187,7 @@ export function QuestionsStep({
                   value={(answers[field.fieldId] as string) || ''}
                   onChange={(e) => onFieldChange(field.fieldId, e.target.value)}
                   onBlur={() => handleFieldBlur(field.fieldId)}
-                  placeholder={field.placeholder}
+                  placeholder={fieldExample(field)}
                   aria-labelledby={`q-${field.fieldId}`}
                   aria-required={field.required || undefined}
                   rows={3}
@@ -201,7 +202,7 @@ export function QuestionsStep({
                   value={(answers[field.fieldId] as number) ?? ''}
                   onChange={(e) => onFieldChange(field.fieldId, e.target.value ? Number(e.target.value) : '')}
                   onBlur={() => handleFieldBlur(field.fieldId)}
-                  placeholder={field.placeholder}
+                  placeholder={fieldExample(field)}
                   aria-labelledby={`q-${field.fieldId}`}
                   aria-required={field.required || undefined}
                   className={`w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition ${fieldClass}`}

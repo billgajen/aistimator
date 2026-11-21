@@ -10,6 +10,7 @@ import {
 } from '@/lib/postmark'
 import { generateFeedbackNotificationEmailHtml } from '@/lib/email-templates'
 import { resolveBusinessEmail } from '@/lib/business-email'
+import { notifyPhones } from '@/lib/push'
 import type { SubmitFeedbackRequest, SubmitFeedbackResponse } from '@qolumns/shared'
 import type { TenantBranding } from '@qolumns/shared'
 
@@ -109,7 +110,7 @@ export async function POST(
     }
 
     // Insert feedback
-    const { error: insertError } = await supabase
+    const { data: saved, error: insertError } = await supabase
       .from('quote_feedback')
       .insert({
         quote_id: quoteId,
@@ -118,6 +119,8 @@ export async function POST(
         feedback_text: body.feedbackText?.trim() || null,
         status: 'pending',
       })
+      .select('id')
+      .single()
 
     if (insertError) {
       console.error('Failed to insert feedback:', insertError)
@@ -186,6 +189,12 @@ export async function POST(
       if (!emailResult.success) {
         console.error('Failed to send feedback notification email:', emailResult.error)
       }
+    }
+
+    // T-196: a question from the "Ask a question" box reaches the business's phones too, beside the
+    // email. One per question; the customer's words are never in it. Never throws.
+    if (body.feedbackType === 'feedback') {
+      await notifyPhones('question', quoteId, (saved as { id?: string } | null)?.id ?? null, supabase)
     }
 
     const response: SubmitFeedbackResponse = {

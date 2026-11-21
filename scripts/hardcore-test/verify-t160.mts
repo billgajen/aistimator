@@ -276,22 +276,22 @@ check('…worded "Sarah accepted the quote", "Sarah asked a question", "Sarah op
 check('…each with how long ago ("just now" or minutes for today’s, "3 hours ago" for the decline)', activityLines.slice(0, 5).every((l) => /(just now|\d+ minutes? ago)$/.test(l.words)) && activityLines[5]!.words.endsWith('3 hours ago'), activityLines.map((l) => l.words.split(' ').slice(-3).join(' ')))
 check('…each linking to its quote', activityLines.slice(0, 5).every((l) => l.href === `/app/quotes/${q1.id}`) && activityLines[5]!.href === `/app/quotes/${declined}`)
 check('…with no "his" or "her", and nothing from the test quote', !/\b(his|her)\b/i.test(text(block(home, 'home-activity'))) && !home.includes('Tess'))
-// T-169: a figure may carry a small line (a sparkline) after its words; a card's words end where the line begins
-const numbersBlock = block(home, 'home-numbers')
-const numberCards = [...numbersBlock.matchAll(/data-testid="home-number">([\s\S]*?)(?:<div[^>]*data-testid="sparkline"|<\/div>)/g)].map((m) => text(m[1]!).trim())
+// T-196 (AD-079): this business has an accepted estimate, so "Won through Qolumns" is the one home for
+// requests, estimates sent, accepted and their value, and the four "Last 30 days" cards are not drawn.
+// (The cards' own words, "up 3" and "down $2,600", are held by the home-numbers unit tests; a business with
+// nothing accepted yet still gets the cards, which verify-t196 checks.)
 const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`
-check('Last 30 days: Requests 4, Estimates sent 3, Accepted 1, Value accepted (the real quote’s total)',
-  numberCards.length === 4 && numberCards[0]!.startsWith('Requests 4') && numberCards[1]!.startsWith('Estimates sent 3') && numberCards[2]!.startsWith('Accepted 1') && numberCards[3]!.startsWith(`Value accepted ${money(total)}`), numberCards)
-check('…each against the 30 days before: "up 3", "up 2", "same", "same"', numberCards[0]!.endsWith('up 3') && numberCards[1]!.endsWith('up 2') && numberCards[2]!.endsWith('same') && numberCards[3]!.endsWith('same') && text(numbersBlock).includes('Compared with the 30 days before.'), numberCards)
-// a bigger job accepted in the period before: the value goes down by a money amount
-const bigBefore = await copyOf(q1.id, 'Piper Before', { status: 'accepted', created_at: ago(50 * DAY), approved_at: ago(50 * DAY), sent_at: ago(50 * DAY), viewed_at: ago(48 * DAY), accepted_at: ago(45 * DAY), pricing_json: { ...(await fullRow(q1.id)).pricing_json, total: total + 1200 } })
-void bigBefore
-const numberCards2 = [...block((await page(`${cfg.appUrl}/app`, a.cookie)).html, 'home-numbers').matchAll(/data-testid="home-number">([\s\S]*?)(?:<div[^>]*data-testid="sparkline"|<\/div>)/g)].map((m) => text(m[1]!).trim())
-check('…and money changes read "down $2,600" (and counts follow: accepted "down 1")', numberCards2[3]!.endsWith(`down ${money(total + 1200)}`) && numberCards2[2]!.endsWith('down 1') && numberCards2[0]!.endsWith('up 2'), numberCards2)
+const wonHeadlineOf = (html: string) => text(/data-testid="won-headline"[^>]*>([\s\S]*?)<\/p>/.exec(html)?.[1] ?? '').trim()
+check('Won through Qolumns: the one job accepted this month and its total (the real quote’s total)', home.includes('data-testid="won-panel"') && wonHeadlineOf(home) === `Won this month: ${money(total)} from 1 job`, wonHeadlineOf(home))
+check('…and the four "Last 30 days" cards are not drawn beside it: a number has one home', !home.includes('data-testid="home-numbers"') && !home.includes('data-testid="home-number"'))
+// a bigger job accepted 45 days ago is not this month's: the headline does not move
+await copyOf(q1.id, 'Piper Before', { status: 'accepted', created_at: ago(50 * DAY), approved_at: ago(50 * DAY), sent_at: ago(50 * DAY), viewed_at: ago(48 * DAY), accepted_at: ago(45 * DAY), pricing_json: { ...(await fullRow(q1.id)).pricing_json, total: total + 1200 } })
+const homeLater = (await page(`${cfg.appUrl}/app`, a.cookie)).html
+check('…a job accepted 45 days ago is not in this month’s figure', wonHeadlineOf(homeLater) === `Won this month: ${money(total)} from 1 job`, wonHeadlineOf(homeLater))
 const linkBlock = block(home, 'home-quote-link')
 check('Your quote link: the link, Copy, Open, and "QR code and website form" to the Quote link page', text(linkBlock).includes('Your quote link') && linkBlock.includes(`/quote/${a.slug}`) && />Copy</.test(linkBlock) && />Open</.test(linkBlock) && /href="\/app\/quote-link"[^>]*>QR code and website form</.test(linkBlock))
-const order = ['data-testid="waiting-for-you"', 'data-testid="home-stand"', 'data-testid="home-activity"', 'data-testid="home-quote-link"', 'data-testid="home-numbers"'].map((s) => home.indexOf(s))
-check('Home order: waiting for you, where quotes stand, latest activity, quote link, numbers', order.every((i) => i > 0) && [...order].sort((x, y) => x - y).join() === order.join(), order)
+const order = ['data-testid="waiting-for-you"', 'data-testid="won-panel"', 'data-testid="home-stand"', 'data-testid="home-activity"', 'data-testid="home-quote-link"'].map((s) => home.indexOf(s))
+check('Home order: waiting for you, won this month, where quotes stand, latest activity, quote link', order.every((i) => i > 0) && [...order].sort((x, y) => x - y).join() === order.join(), order)
 check('"Waiting for you" is as T-158 left it (the quote to approve, with Approve & send)', /data-testid="waiting-quote"[\s\S]*?Avery Approve[\s\S]*?Approve &(amp;)? send/.test(home) && /data-testid="waiting-count"[\s\S]{0,80}>1<[\s\S]{0,40}needs you/.test(home))
 
 // a brand-new business: friendly lines, not zeros and an empty box
@@ -355,7 +355,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
   const p = await ctxA.newPage()
   watch(p)
   await p.goto(`${cfg.appUrl}/app`, { waitUntil: 'networkidle' })
-  await p.getByTestId('home-numbers').waitFor({ timeout: 30_000 })
+  await p.getByTestId('won-panel').waitFor({ timeout: 30_000 })
   const menu = await menuOf(p)
   check('menu, desktop: three sections — Work (Home, Quotes, Unfinished requests, Analytics), Set up (Services, Quote link, WhatsApp), Account (Settings)', sameMenu(menu), menu.map((s) => [s.heading, ...s.items.map((i) => i.label)]))
   check('menu: no SMS, Prices or Share item', !menu.flatMap((s) => s.items).some((i) => /^(SMS|Prices|Share)$/.test(i.label)))
@@ -418,7 +418,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
   check('menu: on the Unfinished tab, "Unfinished requests" is the current item (not Quotes)', JSON.stringify(activeOf(await menuOf(p))) === JSON.stringify(['Unfinished requests']), activeOf(await menuOf(p)))
   await shot(p, 'unfinished-list')
   await p.goto(`${cfg.appUrl}/app`, { waitUntil: 'networkidle' })
-  await p.getByTestId('home-numbers').waitFor({ timeout: 30_000 })
+  await p.getByTestId('won-panel').waitFor({ timeout: 30_000 })
   check('…and Home’s banner is gone', (await p.getByTestId('unfinished-count').count()) === 0 && (await p.getByTestId('nav-badge').count()) === 0)
   // a new person
   const quin = expectOk('lead', await startLead(a, svcA, 'Quin Latest')).leadId as string
@@ -499,22 +499,23 @@ if (!process.env.PLAYWRIGHT_DIR) {
   const ctxPhone = await contextFor(a, { width: 390, height: 844 })
   const ph = await ctxPhone.newPage()
   await ph.goto(`${cfg.appUrl}/app`, { waitUntil: 'networkidle' })
-  await ph.getByTestId('home-numbers').waitFor({ timeout: 30_000 })
+  await ph.getByTestId('won-panel').waitFor({ timeout: 30_000 })
   // (no helper functions inside evaluate: the bundler's name helper is not defined in the page)
   const phoneHome = await ph.evaluate(() => {
     const tiles = Array.from(document.querySelectorAll('[data-testid="stand-tile"]')).map((el) => el.getBoundingClientRect())
     const activity = document.querySelector('[data-testid="home-activity"]')?.getBoundingClientRect()
     const link = document.querySelector('[data-testid="home-quote-link"]')?.getBoundingClientRect()
-    const numbers = Array.from(document.querySelectorAll('[data-testid="home-number"]')).map((el) => el.getBoundingClientRect())
+    // T-196: this business has an accepted estimate, so the four numbers are the panel's four steps
+    const numbers = Array.from(document.querySelectorAll('[data-testid="won-step"]')).map((el) => el.getBoundingClientRect())
     return {
       pageOverflow: document.documentElement.scrollWidth > window.innerWidth,
       tilesStacked: tiles.every((r, i) => i === 0 || r.top >= tiles[i - 1]!.bottom - 1),
       linkUnderActivity: Boolean(activity && link && link.top >= activity.bottom - 1),
       numbersTwoByTwo: numbers.length === 4 && Math.abs(numbers[0]!.top - numbers[1]!.top) < 2 && numbers[2]!.top > numbers[0]!.bottom - 1,
-      order: ['waiting-for-you', 'home-stand', 'home-activity', 'home-quote-link', 'home-numbers'].map((id) => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect().top ?? -1),
+      order: ['waiting-for-you', 'won-panel', 'home-stand', 'home-activity', 'home-quote-link'].map((id) => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect().top ?? -1),
     }
   })
-  check('phone, Home: one column in the same order, the three counts stacked, the numbers two by two, nothing wider than the screen',
+  check('phone, Home: one column in the same order, the three counts stacked, the four steps two by two, nothing wider than the screen',
     !phoneHome.pageOverflow && phoneHome.tilesStacked && phoneHome.linkUnderActivity && phoneHome.numbersTwoByTwo && [...phoneHome.order].sort((x, y) => x - y).join() === phoneHome.order.join(), phoneHome)
   await shot(ph, 'phone-home')
   const menuHidden = await ph.locator('aside').evaluate((el) => el.getBoundingClientRect().right <= 0)

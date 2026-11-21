@@ -16,6 +16,7 @@ import type { createAdminClient } from '@/lib/supabase/server'
 import { isPostmarkConfigured, sendEmail } from '@/lib/postmark'
 import { resolveBusinessEmail } from '@/lib/business-email'
 import { sendOpsAlert } from '@/lib/ops-alert'
+import { notifyPhones } from '@/lib/push'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -59,6 +60,10 @@ export async function markQuoteFailed(supabase: Admin, quoteId: string, reason: 
         console.error(`[FailedQuote] email error for ${quoteId}: ${emailError instanceof Error ? emailError.name : 'unknown error'}`)
       }
     }
+
+    // T-196: a request that could not be priced is still a new request: the business's phones hear of it
+    // once (never twice: the event is claimed), whether or not an email could be sent. Never throws.
+    if (quote) await notifyPhones('new_request', quoteId, null, supabase)
 
     const now = new Date().toISOString()
     const { error } = await supabase

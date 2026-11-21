@@ -1,6 +1,7 @@
 /**
  * The Account tab (T-184): whose app this is, how much of the plan is used,
- * the quote link to show a customer, help, sign out, and (T-191) delete your account.
+ * the quote link to show a customer, (T-196) the three notification
+ * switches, help, sign out, and (T-191) delete your account.
  *
  * Nothing here is a price or a way to buy: an app may not point at a
  * purchase outside it. The plan is named and its use is counted, no more.
@@ -9,15 +10,16 @@ import { useCallback, useState } from 'react'
 import { Alert, Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
 import Constants from 'expo-constants'
-import { PRODUCT_NAME, SUPPORT_EMAIL, type AppAccountResponse } from '@qolumns/shared'
+import { PRODUCT_NAME, PUSH_COPY, SUPPORT_EMAIL, type AppAccountResponse } from '@qolumns/shared'
 import { useApi } from '../../src/lib/api-context'
 import { deleteAccountUrl, planLine, shortLink, usageFraction, usageLine } from '../../src/lib/account'
 import { config } from '../../src/lib/config'
 import { toApiError } from '../../src/lib/api'
 import { plainError } from '../../src/lib/errors'
 import { useOutbox, useOutboxState } from '../../src/lib/outbox-context'
-import { supabase } from '../../src/lib/supabase'
-import { Card, ErrorText, Label, LinkRow, Muted, ProgressBar, Screen, Skeleton, TopBar } from '../../src/components/ui'
+import { usePush } from '../../src/lib/push-context'
+import { PUSH_SWITCHES } from '../../src/lib/push'
+import { Card, ErrorText, Label, LinkRow, Muted, ProgressBar, Screen, Skeleton, SwitchRow, TopBar } from '../../src/components/ui'
 import { colors, fonts, radius, scale, space, tabular, type } from '../../src/theme'
 
 export default function Account() {
@@ -25,6 +27,7 @@ export default function Account() {
   const router = useRouter()
   const outbox = useOutbox()
   useOutboxState()
+  const push = usePush()
   const [account, setAccount] = useState<AppAccountResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -57,15 +60,21 @@ export default function Account() {
     if (drafts.length === 0) {
       Alert.alert('Sign out?', undefined, [
         { text: 'Stay signed in', style: 'cancel' },
-        { text: 'Sign out', style: 'destructive', onPress: () => void supabase.auth.signOut() },
+        { text: 'Sign out', style: 'destructive', onPress: () => void push.signOut() },
       ])
       return
     }
     Alert.alert('Sign out?', 'A quote on this phone has not been sent yet. It stays saved and is sent when you sign in again.', [
       { text: 'Stay signed in', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => void supabase.auth.signOut() },
+      { text: 'Sign out', style: 'destructive', onPress: () => void push.signOut() },
     ])
   }
+
+  // T-196: a switch that could not be saved goes back, and says so
+  async function setSwitch(key: (typeof PUSH_SWITCHES)[number], value: boolean) {
+    if (!(await push.setPref(key, value))) setError(PUSH_COPY.saveFailed)
+  }
+  const notifications = push.section
 
   const fraction = account ? usageFraction(account) : null
   const version = Constants.expoConfig?.version ?? ''
@@ -144,7 +153,35 @@ export default function Account() {
           />
         </Card>
 
-        {/* 4. Help, the version, signing out */}
+        {/* 4. T-196: the three notifications, each with its switch. A build that cannot receive them says so. */}
+        <Card>
+          <Label>{PUSH_COPY.section}</Label>
+          {notifications.kind === 'unavailable' ? (
+            <Muted style={{ marginTop: 0 }}>{notifications.line}</Muted>
+          ) : notifications.kind === 'ask' ? (
+            <LinkRow title={PUSH_COPY.askTitle} note={PUSH_COPY.ask} icon="notifications-outline" onPress={() => void push.turnOn()} last />
+          ) : (
+            <>
+              {notifications.kind === 'refused' ? <Muted style={{ marginTop: 0, marginBottom: space.sm }}>{notifications.line}</Muted> : null}
+              {PUSH_SWITCHES.map((key, i) => (
+                <SwitchRow
+                  key={key}
+                  title={PUSH_COPY.switches[key].title}
+                  note={PUSH_COPY.switches[key].note}
+                  value={notifications.prefs[key]}
+                  disabled={notifications.kind === 'refused'}
+                  onChange={(value) => void setSwitch(key, value)}
+                  last={notifications.kind !== 'refused' && i === PUSH_SWITCHES.length - 1}
+                />
+              ))}
+              {notifications.kind === 'refused' ? (
+                <LinkRow title={PUSH_COPY.openSettings} icon="settings-outline" onPress={() => void Linking.openSettings().catch(() => undefined)} last />
+              ) : null}
+            </>
+          )}
+        </Card>
+
+        {/* 5. Help, the version, signing out */}
         <Card>
           <LinkRow
             title="Help"

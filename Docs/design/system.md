@@ -239,6 +239,10 @@ prompt, what was kept and what was rejected).
   - *A fact is shown once.* The price lines are in the breakdown; what was read or measured is in its own block
     with no amounts.
   - *"Powered by" and "Prepared with"* are 12 px in `text-muted`.
+- **Home shows a number once** (T-196, AD-079). "Won through Qolumns" is one white card: a headline sentence in the
+  display face with its figures in the figure face, four grey step tiles in a row (two by two on a phone) with the
+  share that moved on between them, and the on-site line under a rule, quieter. While it shows, the four "Last 30
+  days" cards are not drawn. It is not drawn at all before the first accepted estimate.
 - **The dashboard quote page reads in one order** (T-169): the next step, what the AI understood (with the
   customer's photos), the price, then the rest in one card divided by rules. The total is the mono figure at
   `text-4xl`. A new block on that page goes into one of those four, not into a box of its own.

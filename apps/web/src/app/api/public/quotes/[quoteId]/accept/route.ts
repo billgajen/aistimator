@@ -9,6 +9,7 @@ import { sendEmail, isPostmarkConfigured } from '@/lib/postmark'
 import { generateQuoteAcceptedEmailHtml } from '@/lib/email-templates'
 import { checkAcceptance, timingLabel, type AcceptanceDetails } from '@/lib/acceptance'
 import { resolveBusinessEmail } from '@/lib/business-email'
+import { notifyPhones } from '@/lib/push'
 import { canCustomerDecide } from '@qolumns/shared'
 import type { AcceptQuoteResponse, QuotePricing, TenantBranding } from '@qolumns/shared'
 
@@ -180,6 +181,8 @@ export async function POST(
     } catch (emailError) {
       console.error('[Accept] Failed to send business notification:', emailError)
     }
+    // T-196: and the business's phones, beside the email. Never throws; a demo quote notifies no one.
+    await notifyPhones('accepted', quoteId, null, supabase)
 
     const response: AcceptQuoteResponse = {
       status: 'accepted',

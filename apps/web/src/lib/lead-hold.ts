@@ -8,6 +8,7 @@
 import { sendEmail, isPostmarkConfigured } from './postmark'
 import { generateLeadHeldEmailHtml } from './email-templates'
 import { businessEmailFor } from './business-email'
+import { notifyPhones } from './push'
 
 /** Customer-facing message for a held lead (never mentions billing). */
 export function leadHeldMessage(businessName: string): string {
@@ -23,10 +24,14 @@ export function leadHoldContent(businessName: string): Record<string, unknown> {
   }
 }
 
-/** Email the business about a held lead. Never throws — capture must not depend on email. */
+/**
+ * Tell the business about a held lead: its phones (T-196: a held lead is a new request like any
+ * other) and an email. Never throws — capture must not depend on either.
+ */
 export async function notifyLeadHeld(
   opts: { tenantId: string; businessName: string; customerName: string; serviceName: string; quoteId: string; used: number; limit: number; per?: 'month' | 'total' }
 ): Promise<void> {
+  await notifyPhones('new_request', opts.quoteId)
   try {
     if (!isPostmarkConfigured()) return
     // T-157: the one business email rule (setting, else the first user's account email)

@@ -53,6 +53,8 @@ export interface RegionDefinition {
   currency: string
   /** BCP 47 locale for Intl formatting */
   locale: string
+  /** T-196: the time zone a month is counted in until the business's own is known (tenants.time_zone) */
+  timeZone: string
   /** Default unit system (tenants can override) */
   unitSystem: UnitSystem
   /** Regex source that validates a postal code (case-insensitive) */

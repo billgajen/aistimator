@@ -42,6 +42,19 @@ export interface TemplateCard {
 }
 
 /** In the pack registry's order (a test checks it) */
+/**
+ * T-196: a card's line of services. Nothing when the template's only service
+ * has the card's own name (it would say the title twice). The "·" between
+ * two names is tied to the name before it by a space that does not break, so
+ * a line never starts with one.
+ */
+export function cardServiceLine(label: string, serviceNames: string[]): string | null {
+  const names = serviceNames.map((n) => n.trim()).filter(Boolean)
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
+  if (names.length === 0 || (names.length === 1 && same(names[0] ?? '', label.trim()))) return null
+  return names.join('\u00A0· ')
+}
+
 export const TEMPLATE_CARDS: readonly TemplateCard[] = [
   { packId: 'water-heater-us', label: 'Water heaters', customer: 'The customer photographs the label on the tank and says where it is.' },
   { packId: 'hvac-replacement-us', label: 'HVAC', customer: 'The customer photographs the rating plate. For a mini-split, they say how many rooms.' },

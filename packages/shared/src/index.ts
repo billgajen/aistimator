@@ -70,6 +70,10 @@ export * from './quantity-source'
 // T-186: how a question on a quote is answered (buttons, then "Other")
 export * from './question-choices'
 export * from './approval-detail'
+// T-196: won this month, and the phone's notifications
+export * from './won'
+export * from './push'
+export * from './field-hint'
 
 // ID prefixes for stable, readable IDs
 export const ID_PREFIXES = {

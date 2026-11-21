@@ -187,6 +187,34 @@ routes, one webhook and one admin route. Plan numbers come from `packages/shared
 - **The public quote's price lines**: the customer's page words an added line from the line's `source`
   (`seen` / `words`), not from `recommendationReason`, which is still sent and no longer shown.
 
+## T-196: won this month, the phone's notifications, the time zone
+
+- **`GET /api/app/bootstrap`** gains `won`: `{ "headline": "Won this month: $12,400 from 7 jobs" | null,
+  "onSite": "Plus $3,200 from 2 estimates you made on site." | null } | null`. The sentences are written by the
+  server in the business's currency, the same ones Home shows (`packages/shared/src/won.ts`). `won` is null
+  before the business's first accepted estimate, and when there is nothing to say this month; `headline` is null
+  for a business that only quotes on site (its `onSite` then has no "Plus"). Optional query `?tz=<IANA name>`:
+  the phone's time zone, kept the first time when the business has none.
+- **`/api/app/push-token`** (session cookie or bearer; every row is the signed-in user's own):
+  - `GET` → `{ "prefs": { "newRequest": true, "accepted": true, "question": true }, "registered": false }`
+  - `PUT { "token": "ExponentPushToken[…]", "platform": "ios" | "android" }` registers this phone or refreshes
+    it; a phone another user had signed in on moves to this user. A new phone starts with the user's switches.
+    Same answer as `GET`. 400 `INVALID_TOKEN`, `INVALID_PLATFORM`. The user and business written are always
+    the signed-in ones; anything else in the body is ignored.
+  - `PATCH { "newRequest"?, "accepted"?, "question"? }` sets switches on every phone of the user. 400
+    `INVALID_SWITCH`, `NO_CHANGE`; 409 `NO_DEVICE` when no phone is registered yet.
+  - `DELETE { "token" }` forgets this phone (sign-out). Only the caller's own row can be deleted.
+- **`POST /api/tenant/time-zone { "timeZone": "Europe/London" }`**: the dashboard reports the browser's zone;
+  only the first one is kept. 400 `INVALID_TIME_ZONE`. `{ "ok": true, "kept": boolean }`.
+- **Notifications have no route of their own.** They are sent beside the business's emails for three events
+  and nothing else (`packages/shared/src/push.ts`): a customer's new request (the worker after pricing, a
+  request held at the plan limit, a request that could not be priced), an accepted estimate
+  (`POST /api/public/quotes/:id/accept`) and a question from "Ask a question"
+  (`POST /api/public/quotes/:id/feedback` with `feedbackType: "feedback"`; a review request does not notify).
+  Body: one sentence (customer name, service name or total). Data: `{ quoteId, event }`. Never the customer's
+  message, address, phone or email. A failed send is logged with the quote id and counts, and never changes any
+  route's answer. Settings: `EXPO_ACCESS_TOKEN` (optional, web and worker).
+
 ## Account routes (T-173)
 The browser does not call Supabase's auth directly. All answer `{ "ok": true }` or the standard error envelope.
 - `POST /api/auth/signup` `{ "email", "password", "businessName", "plan"?, "turnstileToken"?, "website"? }`.
@@ -780,6 +808,7 @@ The app uses the widget's public `GET /api/public/widget/config?tenantKey=` and 
 
 GET /api/app/bootstrap
 200: `{ "tenantName": "…", "tenantKey": "tkey_…", "currency": "USD", "region": { "code": "US", "locale": "en-US", "postalCodeLabel": "ZIP code" } }`
+(T-196: also `won`, and the optional `?tz=`; see "T-196" above.)
 409 `NO_SITE` when the tenant has no active widget site (the app uses the widget's form).
 
 GET /api/app/account (T-184)

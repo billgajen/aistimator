@@ -11,11 +11,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, RefreshControl, SectionList, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
-import type { QuoteListItem } from '@qolumns/shared'
+import type { AppWonLines, QuoteListItem } from '@qolumns/shared'
 import { useApi } from '../../src/lib/api-context'
 import { toApiError, type AccountNotice } from '../../src/lib/api'
 import { plainError } from '../../src/lib/errors'
 import { useOutbox, useOutboxState } from '../../src/lib/outbox-context'
+import { usePush } from '../../src/lib/push-context'
 import { draftProgress, draftTitle, OUTBOX_COPY, type Draft } from '../../src/lib/outbox'
 import { groupQuotes, matchesSearch, rowWords, type ListGroup } from '../../src/lib/quote-list'
 import { TONE_STYLE, turnOfListItem } from '../../src/lib/status'
@@ -29,6 +30,9 @@ export default function Quotes() {
   useOutboxState() // redraw when a draft moves
   const [items, setItems] = useState<QuoteListItem[] | null>(null)
   const [notice, setNotice] = useState<AccountNotice | null>(null)
+  // T-196: "Won this month", as the dashboard's Home says it; nothing before the first accepted estimate
+  const [won, setWon] = useState<AppWonLines | null>(null)
+  const push = usePush()
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -53,6 +57,8 @@ export default function Quotes() {
       }
       // the account line is a courtesy: the list never waits on it
       api.accountNotice().then(setNotice, () => undefined)
+      // so is the won line (the phone's time zone goes with it: the month starts at the business's midnight)
+      api.bootstrap(phoneTimeZone()).then((start) => setWon(start.won ?? null), () => undefined)
     },
     [api]
   )
@@ -63,7 +69,9 @@ export default function Quotes() {
   useFocusEffect(
     useCallback(() => {
       void load(searching.current)
-    }, [load])
+      // T-196: the first time the home tab is reached after signing in, ask about notifications (once, and not in the dev build)
+      push.askOnHome()
+    }, [load, push.askOnHome])
   )
   const firstSearch = useRef(true)
   useEffect(() => {
@@ -116,6 +124,20 @@ export default function Quotes() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(search, true)} tintColor={colors.brand} />}
         ListHeaderComponent={
           <View style={{ paddingTop: space.md }}>
+            {won && (won.headline || won.onSite) ? (
+              <View style={styles.won} accessible accessibilityLabel={[won.headline, won.onSite].filter(Boolean).join('. ')}>
+                {won.headline ? (
+                  <Text style={styles.wonLine} maxFontSizeMultiplier={scale.text}>
+                    {won.headline}
+                  </Text>
+                ) : null}
+                {won.onSite ? (
+                  <Text style={won.headline ? styles.wonQuiet : styles.wonLine} maxFontSizeMultiplier={scale.text}>
+                    {won.onSite}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
             {notice ? <Notice tone={notice.kind === 'suspended' ? 'danger' : 'notice'}>{notice.line}</Notice> : null}
             {error ? <ErrorText>{error}</ErrorText> : null}
             {waiting.length > 0 || unfinished ? <GroupHeader title="On this phone" count={waiting.length + (unfinished ? 1 : 0)} /> : null}
@@ -160,6 +182,15 @@ export default function Quotes() {
       />
     </Screen>
   )
+}
+
+/** The phone's time zone name, when it can be read */
+function phoneTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined
+  } catch {
+    return undefined
+  }
 }
 
 /** A group's name and how many are in it. "Needs you" carries the strong yellow and its dark marker (system.md, Status colours). */
@@ -260,6 +291,9 @@ function SkeletonRows() {
 }
 
 const styles = StyleSheet.create({
+  won: { marginBottom: space.md, gap: space.xs },
+  wonLine: { color: colors.ink, fontFamily: fonts.bold, fontVariant: tabular, fontSize: type.large },
+  wonQuiet: { color: colors.textSecondary, fontFamily: fonts.body, fontVariant: tabular, fontSize: type.body },
   search: {
     minHeight: touch.min,
     flexDirection: 'row',

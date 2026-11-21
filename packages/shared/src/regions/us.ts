@@ -9,6 +9,7 @@ export const US_REGION: RegionDefinition = {
   name: 'United States',
   currency: 'USD',
   locale: 'en-US',
+  timeZone: 'America/New_York',
   unitSystem: 'imperial',
   postalCodePattern: '^\\d{5}(-\\d{4})?$',
   callingCode: '1',

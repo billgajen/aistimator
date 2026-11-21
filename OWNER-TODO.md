@@ -3322,3 +3322,76 @@ Built 20 November 2026. **Not deployed.** Web only (no worker change, no migrati
 - "1 to 5 rooms" and "None as the default choice": a question has no minimum, maximum or default. The help text
   says "From 1 to 5"; "None" is the first choice, and a surface left blank is not priced.
 
+## T-196 — "Won through Qolumns", phone notifications, small fixes
+
+Built 21 November 2026. **Not deployed.** To put it live: "deploy T-196": **migration 46 first**
+(`bash scripts/deploy-migration-46.sh`), then the worker, then the web. The app reaches your phone by a rebuild
+(the T-192 command, unchanged).
+
+### Nothing to do now
+
+- The dashboard panel and the app's "Won this month" line work as soon as it is deployed. Your business's time
+  zone is picked up by itself the first time you open the dashboard (or the app) after the deploy, and kept.
+- Your dev build (`APP_VARIANT=dev`, the free Personal Team) builds and runs as before. Its Account tab says
+  "Notifications: Available in the App Store version". It never asks for permission and never registers the phone.
+
+### For notifications, once the Apple Developer account exists
+
+Notifications cannot be tested before this: Apple gives the push entitlement only to a paid account.
+
+- [ ] **Apple Developer account** ($99 a year), as in T-184 (b).
+- [ ] **Link the app to Expo:** in `apps/mobile`, `npx eas login`, then `npx eas init`. This writes the project id
+  into `app.json` (`extra.eas.projectId`). Commit that change. Without it the App Store build shows
+  "Available in the App Store version" too.
+- [ ] **Let Expo make the push key:** `npx eas credentials` → iOS → production → "Push Notifications: Set up".
+  Expo creates an APNs key in your Apple account and keeps it. Nothing is added to Vercel or Cloudflare for this.
+- [ ] **Build without `APP_VARIANT`:** `npx eas build --platform ios --profile production` (or `preview` for
+  TestFlight testers). That build has the push entitlement; the dev build never does.
+- [ ] **Test on your phone** (TestFlight build, signed in as your business):
+  1. Open the app. On the Quotes tab it asks "Turn on notifications?" with one line saying what you get. Turn on,
+     then allow on the phone's own question.
+  2. Account → Notifications shows three switches, all on.
+  3. From another device, send a request through your quote link. Expect "New request from (name): (service)".
+  4. Accept that estimate on its page. Expect "(name) accepted your estimate: (total)".
+  5. On another estimate, use "Ask a question". Expect "(name) asked a question about their estimate".
+  6. Tap a notification: it opens that quote.
+  7. Turn one switch off and repeat its step: nothing arrives. The other two still do.
+  8. In the phone's Settings, turn notifications off for the app: the three switches read "Turned off in your
+     phone's settings".
+- [ ] **Optional:** if you turn on "enhanced security for push notifications" in the Expo account, add the
+  access token it gives you as `EXPO_ACCESS_TOKEN` in Vercel and as a worker secret
+  (`npx wrangler secret put EXPO_ACCESS_TOKEN`). Not needed otherwise.
+- [ ] **Android (its own ticket):** the notification channel ("Requests and estimates") is already made by the
+  app, and the server already posts to it. That ticket needs a Firebase project and its key given to Expo
+  (`npx eas credentials` → Android); no code here changes.
+
+### Decisions I made that you may want to change
+
+- **The four stat cards on Home go away once the panel shows.** The panel is then the one home for requests,
+  estimates sent, accepted and their value (you asked for no figure twice). Before the first accepted estimate
+  Home is exactly as it was. "Where your quotes stand" still shows "Accepted, in the last 30 days": it is the
+  status board, with a different period, and I left it.
+- **The four steps count what happened this month**, each by its own date, the way Home has always counted (a
+  request by when it arrived, an acceptance by when it was accepted). So "Accepted" is the same number as the
+  headline's jobs. A share between two steps is left out when it cannot be said (nothing to divide, or more
+  arrived than left, which a job requested last month and accepted this month can cause).
+- **A quiet month:** when there is nothing won yet the headline reads "No jobs won yet this month", and the row
+  of steps is left out when all four would be 0.
+- **On-site only:** the line reads "$3,200 from 2 estimates you made on site." without "Plus", since nothing
+  stands above it. In a month with no accepted on-site estimate that business sees no panel (and its stat
+  cards), because the ticket asked for no empty panel.
+- **"New request" also notifies for a request saved at the plan limit and one that could not be priced**: both
+  are customers' requests, and both already email you. Still once per request.
+- **A request that needs the customer's answers first notifies when it is priced**, which is when its email goes.
+- **A customer accepting or asking about an estimate you made on site does notify.** Only the "new request"
+  notification leaves out estimates you made yourself.
+
+### Left as it is
+
+- **"$40 × 2 items" on the mattress line.** The plural is made by the pricing engine's label rule
+  (`unitWords`), which keeps a word ending in "s" as it is, so "mattress" would read "2 mattress". A template
+  cannot carry its own plural as data; that needs an engine change, which this ticket did not make. One line
+  in that rule ("ss" takes "es") would fix it for every business: say the word and I will do it as its own change.
+- **No setting to change the time zone.** It is kept the first time and not asked for. A business that moves
+  would need it set by hand; a Settings field is a small later ticket.
+

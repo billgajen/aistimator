@@ -12,7 +12,7 @@
  * label on every control.
  */
 import { useEffect, useRef, type ComponentProps, type ReactNode } from 'react'
-import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native'
+import { ActivityIndicator, Animated, Pressable, StyleSheet, Switch, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, fonts, icon, radius, scale, space, tabular, touch, type } from '../theme'
@@ -252,6 +252,30 @@ export function LinkRow(props: { title: string; note?: string | null; icon?: Ico
       </View>
       {props.danger ? null : <Icon name="chevron-forward" size={icon.small} color={colors.muted} />}
     </Pressable>
+  )
+}
+
+/** T-196: a setting that is on or off. The whole row is the switch's label; 44 pt tall at least. */
+export function SwitchRow(props: { title: string; note?: string | null; value: boolean; onChange: (value: boolean) => void; disabled?: boolean; last?: boolean }) {
+  return (
+    <View style={[styles.linkRow, !props.last && styles.linkRowLine]}>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.linkRowTitle, { color: props.disabled ? colors.muted : colors.ink }]} maxFontSizeMultiplier={scale.text}>
+          {props.title}
+        </Text>
+        {props.note ? <Muted style={{ marginTop: 2 }}>{props.note}</Muted> : null}
+      </View>
+      <Switch
+        accessibilityRole="switch"
+        accessibilityLabel={props.note ? `${props.title}. ${props.note}` : props.title}
+        accessibilityState={{ checked: props.value, disabled: props.disabled === true }}
+        value={props.value}
+        onValueChange={props.onChange}
+        disabled={props.disabled}
+        trackColor={{ false: colors.lineStrong, true: colors.brand }}
+        ios_backgroundColor={colors.lineStrong}
+      />
+    </View>
   )
 }
 

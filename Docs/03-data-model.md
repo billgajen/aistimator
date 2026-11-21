@@ -196,6 +196,27 @@ limit and adds one in a single step, one business at a time; `release_plan_quote
 - `suspended_at`, `suspended_reason`: the platform admin's suspend switch (new requests held, WhatsApp silent,
   sent quotes still open). `free_warning_sent_at`: the one "2 free quotes left" email.
 
+### push_devices (T-196, migration 46)
+- token (primary key: the phone's Expo push token), tenant_id, user_id, platform (`ios` | `android`)
+- notify_new_request, notify_accepted, notify_question (the user's three switches; all true by default, kept the
+  same on every phone of one user)
+- last_ticket_id (the id Expo gave the last notification sent to this phone; its receipt is read before the next
+  send, and a phone Expo reports as gone is deleted), created_at, updated_at
+- Row-level rules: a user reads, adds, changes and deletes **only their own rows** (`user_id = auth.uid()`, in
+  their own business). Not another business, not another user of the same business, not signed out. The server
+  registers a token with the service role, because a phone that changes hands moves its token to the new user.
+
+### push_events (T-196, migration 46)
+- quote_id, event_key (`new_request`, `accepted`, or `question:<the question's id>`), tenant_id, created_at;
+  primary key (quote_id, event_key)
+- A row is written before a notification is sent, and an event that is already there is not sent again: one
+  notification per event, whatever is repriced, re-sent or run twice. Service role only (no policy).
+
+### tenants: time zone (T-196, migration 46)
+- `time_zone`: the business's time zone as an IANA name (`Europe/London`). Null until the dashboard or the app
+  first reports it, then kept (never overwritten by a later report). "This month" on Home starts at the business's
+  midnight; until the column is set, the region's zone is used (`RegionDefinition.timeZone`).
+
 ## Indexes
 - quotes: (tenant_id, created_at desc), (tenant_id, status), (quote_request_id)
 - quote_requests: (tenant_id, created_at desc), (customer_email), (job_postcode)

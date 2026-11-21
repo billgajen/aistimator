@@ -11,6 +11,7 @@ import { PRODUCT_NAME } from '@qolumns/shared'
 import { supabase } from '../src/lib/supabase'
 import { ApiProvider } from '../src/lib/api-context'
 import { OutboxProvider } from '../src/lib/outbox-context'
+import { PushProvider } from '../src/lib/push-context'
 import { configProblem } from '../src/lib/config'
 import { ErrorBoundary } from '../src/components/ErrorBoundary'
 import { colors, fonts, space, tabular, type } from '../src/theme'
@@ -55,6 +56,8 @@ function SignedInArea() {
 
   return (
     <ApiProvider>
+      {/* T-196: registers the phone for notifications and opens a tapped one's quote (nothing in the dev build) */}
+      <PushProvider userId={session?.user.id ?? null}>
       <OutboxProvider>
         <Stack
           screenOptions={{
@@ -75,6 +78,7 @@ function SignedInArea() {
           <Stack.Screen name="link" options={{ title: 'Your quote link', presentation: 'modal' }} />
         </Stack>
       </OutboxProvider>
+      </PushProvider>
     </ApiProvider>
   )
 }

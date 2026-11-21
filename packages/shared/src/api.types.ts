@@ -727,6 +727,27 @@ export interface AppBootstrapResponse {
    * T-194: the app then offers the scan, as it did, and the server decides.
    */
   roomScan?: boolean
+  /**
+   * T-196: what the business won this calendar month, as the dashboard's Home says it, already written in the
+   * business's currency. Null before the first accepted estimate (the app then shows nothing); absent from a
+   * server before T-196.
+   */
+  won?: AppWonLines | null
+}
+
+/** T-196: the home tab's lines. `headline` is null for a business that only quotes on site. */
+export interface AppWonLines {
+  /** "Won this month: $12,400 from 7 jobs" */
+  headline: string | null
+  /** "Plus $3,200 from 2 estimates you made on site." */
+  onSite: string | null
+}
+
+/** T-196: GET, PUT and PATCH /api/app/push-token */
+export interface AppPushPrefsResponse {
+  prefs: { newRequest: boolean; accepted: boolean; question: boolean }
+  /** At least one phone of this user is registered for notifications */
+  registered: boolean
 }
 
 export interface AppCreateQuoteRequest {

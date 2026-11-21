@@ -5,7 +5,7 @@ import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { MAIN_CTA } from '@/lib/marketing/cta'
 import { TRADES, tradeHref } from '@/lib/marketing/trades'
-import { TEMPLATE_CARDS, WHO_CLOSING, WHO_FITS, WHO_HERO, WHO_META, WHO_OTHER, WHO_TEMPLATES } from '@/lib/marketing/who-its-for'
+import { TEMPLATE_CARDS, cardServiceLine, WHO_CLOSING, WHO_FITS, WHO_HERO, WHO_META, WHO_OTHER, WHO_TEMPLATES } from '@/lib/marketing/who-its-for'
 import { getPack } from '@/lib/vertical-packs'
 
 /**
@@ -52,12 +52,16 @@ export default function WhoItsFor() {
             {TEMPLATE_CARDS.map((card) => {
               const pack = getPack(card.packId)
               const page = TRADES.find((t) => t.packId === card.packId)
+              // T-196: no line when it would only repeat the title; "·" never starts a line
+              const services = cardServiceLine(card.label, (pack?.services ?? []).map((s) => s.name))
               return (
                 <li key={card.packId} className="flex flex-col rounded-xl border border-border bg-white p-6" data-testid="template-card">
                   <h3 className="text-lg font-semibold text-text-primary">{card.label}</h3>
-                  <p className="mt-1 text-sm text-text-muted" data-testid="template-services">
-                    {(pack?.services ?? []).map((s) => s.name).join(' · ')}
-                  </p>
+                  {services && (
+                    <p className="mt-1 text-sm text-text-muted" data-testid="template-services">
+                      {services}
+                    </p>
+                  )}
                   <p className="mt-3 text-sm text-text-secondary">{card.customer}</p>
                   <div className="mt-auto">
                     {page ? (

@@ -215,11 +215,14 @@ await sb.insert('quote_validation_logs', {
 })
 // a waiting row with a photo for Home, whatever the real quote's status ended as
 const waitingWithPhoto = heaterRow.status === 'pending_review' ? heater.id : await copyOf(heater.id, 'Wanda Pemberton', { status: 'pending_review', approved_at: null, sent_at: null })
-// two periods for the small lines: one accepted quote in the 30 days before
+// two periods for the small lines: one quote sent and opened in the 30 days before, one in the last 30.
+// T-196 (AD-079): neither is accepted. Once a business has an accepted estimate, "Won through Qolumns" takes
+// the place of these four figures; the trend marks and small lines checked below are what a business sees
+// before that.
 const DAY = 24 * 60 * 60 * 1000
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString()
-await copyOf(door.id, 'Olive Hartwell', { status: 'accepted', created_at: ago(40 * DAY), approved_at: ago(39 * DAY), sent_at: ago(39 * DAY), viewed_at: ago(38 * DAY), accepted_at: ago(35 * DAY) })
-await copyOf(door.id, 'Noor Castellan', { status: 'accepted', created_at: ago(8 * DAY), approved_at: ago(8 * DAY), sent_at: ago(8 * DAY), viewed_at: ago(7 * DAY), accepted_at: ago(6 * DAY) })
+await copyOf(door.id, 'Olive Hartwell', { status: 'viewed', created_at: ago(40 * DAY), approved_at: ago(39 * DAY), sent_at: ago(39 * DAY), viewed_at: ago(38 * DAY), accepted_at: null })
+await copyOf(door.id, 'Noor Castellan', { status: 'viewed', created_at: ago(8 * DAY), approved_at: ago(8 * DAY), sent_at: ago(8 * DAY), viewed_at: ago(7 * DAY), accepted_at: null })
 
 // ====================================================================
 section('1. The data: what the quote API says the AI understood')

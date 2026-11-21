@@ -15,6 +15,124 @@
 
 ## Issues & Resolutions
 
+### 2026-11-21: T-196 — "Won through Qolumns", phone notifications, small fixes (AD-079, AD-080)
+
+**Built, not deployed.** Needs deploying: **migration 46 first** (`bash scripts/deploy-migration-46.sh`), then the
+worker, then the web. The app reaches a phone by a rebuild. The live code keeps working with migration 46 in place
+(it only adds); without it the T-196 code still prices every quote and sends every email (a notification is
+simply not sent, and the month is counted in the region's time zone).
+
+#### 1. "Won through Qolumns" (dashboard Home, and one line in the app)
+- **The rule is one pure function**, `wonSummary` in `packages/shared/src/won.ts`, with every word beside it
+  (`WON_COPY`, `wonLines`). Home and the app's bootstrap route both use it.
+- **When it shows:** only once the business has an accepted estimate of any kind (`everAccepted`, two counts read
+  in `lib/won.ts`). Before that Home is exactly as it was: no panel, no zeros.
+- **Two parts, split by `isMadeByBusiness`** (quote-turn.ts, the only rule; the database filter for "a customer
+  made it" is written from the same list, `customerMadeFilter`):
+  - *Won from customer requests:* "Won this month: $12,400 from 7 jobs", then Requests, Estimates sent, Opened,
+    Accepted with the share that moved on between them. Shown when there is a customer request this month or a
+    customer's estimate was ever accepted.
+  - *Quoted on site:* "Plus $3,200 from 2 estimates you made on site." Never added to the headline or the steps.
+    A business that only quotes on site gets the title "Quoted on site this month" and that line alone (without
+    "Plus").
+- **Counted by when it happened**, as Home always has (home-numbers.ts): a request by when it arrived, an
+  acceptance by when it was accepted. So "Accepted" equals the headline's jobs. A step with no date of its own
+  was still passed when a later one happened (an estimate accepted this month was opened). A share is left out
+  when it cannot be said (nothing to divide, or more arrived than left).
+- **Value** is the accepted estimate's stored total. Setup tests never count. "Last month" is said when last month
+  has data. A quiet month reads "No jobs won yet this month" with no row of zeros.
+- **The month is the business's.** `monthStart(now, timeZone, monthsBack)` finds midnight on the 1st in an IANA
+  zone (clock changes included). The zone is `tenants.time_zone` (migration 46), reported once by the dashboard
+  (`RememberTimeZone` → `POST /api/tenant/time-zone`) or the app (`/api/app/bootstrap?tz=`) and never
+  overwritten; until then the region's zone (`RegionDefinition.timeZone`).
+- **Home reuses the rows it already loads** (no second set): the one quotes read now reaches back to whichever is
+  earlier, 60 days ago or the start of last month.
+- **The app:** `GET /api/app/bootstrap` answers `won: { headline, onSite } | null`, the same sentences; the home
+  tab shows them at the top.
+
+#### 2. Phone notifications
+- **Three, and nothing else:** `new_request` ("New request from {name}: {service}"), `accepted` ("{name} accepted
+  your estimate: {total}"), `question` ("{name} asked a question about their estimate"). The rule, the wording
+  and the sender are one shared module, `packages/shared/src/push.ts`; the web app and the worker each give it a
+  small store over their own database client (`lib/push.ts`, `worker/src/push.ts`), the way they share the
+  business-email rule.
+- **Sent from the places that email the business** for those events, one line beside each: the worker after
+  pricing and when a request cannot be priced; the web app on accept, on a question (`feedbackType: 'feedback'`
+  only), on a request held at the plan limit, and when a request cannot be handed to the worker. A test reads
+  those files and fails if a call is removed, or added to the request-updated, approval or decline paths.
+- **Never one the business made itself** for `new_request` (`isMadeByBusiness`); never a setup test or the demo.
+- **No customer details:** the body is the sentence; the data is `{ quoteId, event }`. Never the message, address,
+  phone or email. Logs name the quote and counts only.
+- **One per event:** the event is claimed first in `push_events` (primary key quote + event; a question's key
+  carries its own id). A reprice, a re-send, a retried job or a second accept claims nothing and sends nothing.
+- **Never blocks:** `sendBusinessPush` never throws, each call to Expo gives up after 4 s, and no route's answer
+  depends on it.
+- **Dead tokens:** a token Expo answers `DeviceNotRegistered` for is deleted. Expo usually learns that only after
+  delivery, so each phone's last ticket id is kept and its receipt is read before the next send.
+- **Migration 46:** `push_devices` (token, tenant, user, platform, the three switches, last ticket, times) with
+  row-level rules: a user's own rows only; `push_events` (service role only); `tenants.time_zone`.
+- **Routes:** `/api/app/push-token` GET, PUT, PATCH, DELETE (02-api-contracts.md). The switches are saved per
+  user: a change is written to every phone of the user, and a new phone starts with them.
+- **The app:** `expo-notifications` ~58.1.9. `push-context.tsx` registers the phone on sign-in and every launch
+  (and when the app comes back to the front), opens the quote of a tapped notification (also one that started
+  the app), asks once per sign-in on the home tab after one plain line, and forgets the phone before signing
+  out (waiting at most 4 s). Account has a "Notifications" section: three switches; "Turned off in your phone's
+  settings" with a link to them when the phone refuses; a row that asks when the user said "Not now".
+- **Android:** the channel `quotes` ("Requests and estimates") is created by the app at launch, set as the
+  plugin's default channel, and named in every message.
+
+#### AD-079: once "Won through Qolumns" shows, it is the one home for those numbers
+The four "Last 30 days" cards (requests, estimates sent, accepted, value accepted) are not drawn while the panel
+shows; before the first accepted estimate they are drawn as before. "Where your quotes stand" keeps its
+"Accepted, in the last 30 days" tile: it is the status board and has its own period.
+
+#### AD-080: push belongs to the App Store variant only; the dev build never touches it
+**What would have broken:** a free Personal Team cannot sign an app with the push entitlement, and **Expo adds
+the entitlement by itself** once `expo-notifications` is installed (it applies an installed package's plugin
+with its defaults), even when the plugin is not in the app's list. Found by running the dev prebuild: the
+entitlements file gained `aps-environment`.
+**Decision:** `app.config.js` names the plugin in both variants. The App Store variant uses its defaults; the dev
+variant passes `enableRemoteNotifications: false` and also deletes `aps-environment` from the entitlements (an
+existing `ios` folder may already hold it). `extra.push` says which build the app is. `src/lib/notifications.ts`
+is the only file that touches the module: it imports only its types, loads it with one `require` inside a
+function, and every function returns first when `pushBuild` is false. A unit test holds each of these.
+**Proved here:** `APP_VARIANT=dev expo prebuild` leaves an empty entitlements file; the dev variant built and ran
+on the iPhone 17 simulator; and it built in Release for a real iPhone signed with the Personal Team, the signed
+app's entitlements being `application-identifier`, `com.apple.developer.team-identifier`, `get-task-allow` only.
+
+#### 3. Small fixes
+- **A question's hint showed twice** (inside the box, cut off, and under it). Root cause: `widgetConfigRow` copied
+  the hint into `placeholder`. It no longer does, and `fieldExample` (shared) drops a placeholder that only
+  repeats the hint, so services saved before this are right too (web form and app). No data change.
+- **"Who it's for" cards:** no service line when the template's only service has the card's name;
+  the "·" is tied to the name before it by a non-breaking space (`cardServiceLine`), so it never starts a line
+  (measured in a browser at 1280 and 390: no line starts with it).
+- **"$40 × 2 items" left as it is:** the plural comes from the engine's label rule (`unitWords`), which keeps a
+  word ending in "s". A template cannot carry its own plural as data. Not changed (engine).
+
+#### Could not be tested without a paid Apple account
+A real notification arriving on a phone; the phone's own permission question; tapping a delivered notification;
+the token Expo issues; the receipt of a delivered message. Everything up to Expo's door is tested against a
+stand-in for its push service, and everything after the app's door by unit tests of the app's rules.
+
+**Checks:** lint and typecheck clean. New unit tests: web `won-t196` 24 and `push-t196` 24, app `push-t196` 15,
+worker `push-t196` 7. `scripts/deploy-migration-46.sh` run whole against a local copy at migration 45 (the
+lesson of migration 44's script), then again to prove it can be re-run. **`pnpm check:quick`: 27 of 28 in 3 min 52 s** (t160 expected the four
+cards on a Home that now shows the panel; updated), then `pnpm check:failed`: 3 of 3 in 53 s. **`pnpm check:full`:
+40 of 41 (33 scripts, 2,818 checks) in 33 min 15 s** (t169's six card checks, the same cause: its fixture is now a
+business with nothing accepted yet, which is who still sees the cards; t171 passed on its second try, alone), then
+`pnpm check:failed`: 3 of 3 in 1 min 20 s. The ticket's own script, **`verify-t196`, 61 of 61** with the real model
+(own server set `t196`: the web app and the worker post to a stand-in for Expo's push service on port 8792; full
+level, or `pnpm check:quick --only t196 --sets t196`). The App Store variant's JavaScript bundles
+(`npx expo export --platform ios`). Screenshots in `.checks/t196/` (the two app ones from the dev build on the
+iPhone 17 simulator, against the local stack).
+
+**Relation:** T-152/T-160/T-169 (Home's numbers, which the panel reuses and replaces), T-186 (`isMadeByBusiness`),
+T-157 (the business-email rule the push store sits beside), T-178 (a failed request is never silent), T-134 (a
+request held at the plan limit), T-184/T-192 (the dev variant and its build), T-195 (the cards, the mattress line).
+
+---
+
 ### 2026-11-20: T-195 — Mini-split, three new templates, and "Trades" becomes "Who it's for" (AD-078)
 
 **Built, not deployed.** Web only: data and marketing pages. **No engine, worker, pricing-logic or database change,

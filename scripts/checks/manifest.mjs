@@ -70,6 +70,12 @@ export const SERVERS = {
     worker: { SECTION_AI_BASE_URL: 'http://127.0.0.1:8796/note' },
     devOnly: true,
   },
+  // T-196: a stand-in for Expo's push service (the script starts it, on port 8792), for the web app and the worker
+  t196: {
+    web: { ...DEMO_AND_CRON, EXPO_PUSH_BASE_URL: 'http://127.0.0.1:8792/push' },
+    worker: { EXPO_PUSH_BASE_URL: 'http://127.0.0.1:8792/push' },
+    devOnly: true,
+  },
   // T-180: a Postmark stand-in and no worker; it talks to the Stripe sandbox
   t180: {
     web: { CLOUDFLARE_WORKER_URL: '', POSTMARK_API_TOKEN: 'local-postmark-t180', POSTMARK_FROM_EMAIL: 'quotes@example.test', POSTMARK_API_BASE_URL: 'http://127.0.0.1:8794/postmark' },
@@ -132,6 +138,8 @@ export const SCRIPTS = [
   { id: 't178', server: 't178', model: 'none', browser: true },
   { id: 't179', server: 't179', model: 'none', browser: true },
   { id: 't180', server: 't180', model: 'none', browser: true, external: 'the Stripe sandbox', minutes: 20 },
+  // T-196 reads what the web app and the worker post to its stand-in for the push service
+  { id: 't196', server: 't196', model: 'none', minutes: 20 },
 ]
 
 /** Lint, typecheck and unit tests: every level runs these first */

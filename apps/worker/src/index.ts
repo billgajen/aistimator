@@ -31,6 +31,9 @@ export interface Env {
 
   // Environment variables
   ENVIRONMENT?: string
+  // T-196: the phone's notifications (push.ts). Both optional.
+  EXPO_ACCESS_TOKEN?: string
+  EXPO_PUSH_BASE_URL?: string
   SUPABASE_URL?: string
   SUPABASE_SERVICE_KEY?: string
   UPSTASH_REDIS_URL?: string

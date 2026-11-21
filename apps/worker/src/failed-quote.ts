@@ -17,8 +17,9 @@ import { failedRequestEmail } from '@qolumns/shared'
 import { loadBusinessEmail } from './business-email'
 import { sendEmail } from './email/postmark'
 import { sendOpsAlert } from './ops-alert'
+import { notifyPhones, type PushEnv } from './push'
 
-export interface FailedQuoteEnv {
+export interface FailedQuoteEnv extends PushEnv {
   POSTMARK_API_TOKEN?: string
   POSTMARK_FROM_EMAIL?: string
   APP_URL?: string
@@ -83,6 +84,10 @@ export async function markQuoteFailed(
         console.error(`[Worker] Failed-request email error for ${quoteId}: ${emailError instanceof Error ? emailError.name : 'unknown error'}`)
       }
     }
+
+    // T-196: a request that could not be priced is still a new request: the business's phones hear of it
+    // once (the event is claimed, so never twice), whether or not an email could be sent. Never throws.
+    if (quote) await notifyPhones(supabase, env, 'new_request', quoteId)
 
     const now = new Date().toISOString()
     const { error: updateError } = await supabase

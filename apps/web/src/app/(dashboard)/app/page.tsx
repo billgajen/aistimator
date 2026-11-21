@@ -1,7 +1,7 @@
 import { syncSelectedPlan } from '@/lib/signup-choices'
 import { createClient } from '@/lib/supabase/server'
 import { headers } from 'next/headers'
-import { QUOTE_TURN_COPY, agoWords, businessIsAsked, formatMoney, freeQuotesLeftLine, getRegion, isMadeByBusiness, quoteActivityLine, quoteTurn } from '@qolumns/shared'
+import { QUOTE_TURN_COPY, agoWords, businessIsAsked, formatMoney, freeQuotesLeftLine, getRegion, isMadeByBusiness, monthStart, quoteActivityLine, quoteTurn, wonLines, wonSummary } from '@qolumns/shared'
 import { applyGroupFilter, businessAskedQuoteIds, groupFilter, questionCountOf, requestSourceOf } from '@/lib/business-asked'
 import { buildChecklist } from '@/lib/setup-checklist'
 import {
@@ -28,6 +28,9 @@ import { NeedsYouDot } from '@/components/quotes/NeedsYouDot'
 import { NEEDS_YOU_MARK } from '@/lib/status-tone'
 import { LatestActivity, type ActivityLine } from '@/components/home/LatestActivity'
 import { HomeQuoteLink } from '@/components/home/HomeQuoteLink'
+import { WonPanel } from '@/components/home/WonPanel'
+import { RememberTimeZone } from '@/components/home/RememberTimeZone'
+import { businessTimeZone, everAccepted, wonReadsFrom } from '@/lib/won'
 import { checkPlanLimit } from '@/lib/plan-limits'
 import { PageHeader } from '@/components/dashboard/EmptyState'
 import Link from 'next/link'
@@ -42,9 +45,11 @@ export const dynamic = 'force-dynamic'
  * b. new unfinished requests (only ones the business has not seen)
  *    (then the plan usage banner, when there is one)
  * c. the setup checklist until it is done
+ * w. T-196: "Won through Qolumns", this calendar month, once an estimate has been accepted
  * d. Where your quotes stand: three counts by whose turn it is
  * e. Latest activity   f. Your quote link
  * g. four numbers for the last 30 days, each against the 30 days before
+ *    (only while w does not show: a number has one home, AD-079)
  *
  * Every query is scoped to the signed-in user's tenant, and their number is
  * fixed: nothing is fetched per quote. Setup tests stay out of every count.
@@ -75,7 +80,7 @@ export default async function DashboardPage() {
   const [{ data: tenant }, planLimit] = await Promise.all([
     supabase
       .from('tenants')
-      .select('name, slug, region, currency, quote_link_copied_at, quote_link_first_visit_at, selected_plan, onboarding_skipped_at, prices_checked_at')
+      .select('name, slug, region, currency, time_zone, quote_link_copied_at, quote_link_first_visit_at, selected_plan, onboarding_skipped_at, prices_checked_at')
       .eq('id', profile.tenant_id)
       .single(),
     checkPlanLimit(supabase, profile.tenant_id),
@@ -93,6 +98,7 @@ export default async function DashboardPage() {
     slug?: string | null
     region?: string | null
     currency?: string | null
+    time_zone?: string | null
     selected_plan?: string | null
     onboarding_skipped_at?: string | null
     quote_link_copied_at?: string | null
@@ -105,6 +111,12 @@ export default async function DashboardPage() {
   const since = new Date(now.getTime() - HOME_WINDOW_DAYS * 24 * 60 * 60 * 1000)
   // T-160: the 30 days before, for "up 3 / down 1 / same"
   const sinceBefore = new Date(now.getTime() - 2 * HOME_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+  // T-196: "Won through Qolumns" counts calendar months in the business's time zone. The same rows
+  // serve it, so the read reaches back to whichever starts earlier: 60 days ago or last month.
+  const timeZone = businessTimeZone(tenantRow)
+  const earliest = (a: Date, b: Date) => (a.getTime() < b.getTime() ? a : b)
+  const readFrom = earliest(sinceBefore, wonReadsFrom(now, timeZone))
+  const readEventsFrom = earliest(since, monthStart(now, timeZone))
 
   // T-186: quotes the business made that have open questions need the business, not a customer
   const businessAsked = await businessAskedQuoteIds(supabase, profile.tenant_id)
@@ -112,7 +124,7 @@ export default async function DashboardPage() {
   const forCustomer = groupFilter('waiting', businessAsked)
 
   // Every query below is scoped to this tenant (RLS + explicit filter)
-  const [servicesResult, waitingResult, recentResult, realRequestResult, waitingCountResult, anyQuoteResult, questionsResult] = await Promise.all([
+  const [servicesResult, waitingResult, recentResult, realRequestResult, waitingCountResult, anyQuoteResult, questionsResult, everWon] = await Promise.all([
     supabase.from('services').select('id').eq('tenant_id', profile.tenant_id).eq('active', true).limit(1),
     // a. waiting for the owner, newest first (T-158: also customer questions
     // and requests that could not be priced)
@@ -135,8 +147,8 @@ export default async function DashboardPage() {
       .eq('tenant_id', profile.tenant_id)
       .or(
         [
-          ...['created_at', 'sent_at', 'accepted_at'].map((column) => `${column}.gte.${sinceBefore.toISOString()}`),
-          ...['approved_at', 'viewed_at', 'declined_at'].map((column) => `${column}.gte.${since.toISOString()}`),
+          ...['created_at', 'sent_at', 'accepted_at'].map((column) => `${column}.gte.${readFrom.toISOString()}`),
+          ...['approved_at', 'viewed_at', 'declined_at'].map((column) => `${column}.gte.${readEventsFrom.toISOString()}`),
         ].join(',')
       ),
     // c. first real request: a customer's (not a setup test, not the business's
@@ -172,6 +184,8 @@ export default async function DashboardPage() {
       .gte('created_at', since.toISOString())
       .order('created_at', { ascending: false })
       .limit(20),
+    // w. T-196: has an estimate ever been accepted (any kind, and from a customer's own request)
+    everAccepted(supabase, profile.tenant_id),
   ])
 
   const hasService = (servicesResult.data?.length ?? 0) > 0
@@ -252,6 +266,12 @@ export default async function DashboardPage() {
   const money = (amount: number) => formatMoney(amount, currency, locale, { decimals: 0 })
   // T-169: the same numbers in 5-day steps across both periods, for the small line under each
   const series = changes ? homeSeries(recentRows, sinceBefore, now) : null
+
+  // w. T-196: won this calendar month, from the rows above; null until the first accepted estimate
+  const won = wonSummary(
+    recentRows.map((q) => ({ ...q, source: q.source_type })),
+    { now, timeZone, everAccepted: everWon }
+  )
 
   // d. where the quotes stand
   const hasQuotes = (anyQuoteResult.count ?? 0) > 0
@@ -397,6 +417,10 @@ export default async function DashboardPage() {
         </section>
       )}
 
+      {/* w. T-196: what was won this month. Not before the first accepted estimate. */}
+      {won && <WonPanel summary={won} lines={wonLines(won, currency, locale)} />}
+      {!tenantRow?.time_zone && <RememberTimeZone />}
+
       {/* d. T-160: where every quote stands, by whose turn it is */}
       <QuoteStand needsYou={stand.needsYou} waiting={stand.waiting} accepted={stand.accepted} hasQuotes={hasQuotes} />
 
@@ -409,7 +433,9 @@ export default async function DashboardPage() {
         {quoteLink && <HomeQuoteLink link={quoteLink} />}
       </div>
 
-      {/* g. Four numbers for the last 30 days, each against the 30 days before */}
+      {/* g. Four numbers for the last 30 days, each against the 30 days before. T-196: once the panel above
+          shows, it is the one home for requests, sent, accepted and their value (AD-079). */}
+      {!won && (
       <section data-testid="home-numbers">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
@@ -427,6 +453,7 @@ export default async function DashboardPage() {
           <StatCard title={N.valueAccepted} value={money(numbers.valueAccepted)} change={changes?.valueAccepted} points={series?.valueAccepted} format={money} />
         </div>
       </section>
+      )}
     </div>
   )
 }

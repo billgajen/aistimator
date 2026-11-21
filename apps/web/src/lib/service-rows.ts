@@ -91,7 +91,7 @@ export function widgetConfigRow(tenantId: string, serviceId: string, body: Servi
     label: f.label,
     type: f.type === 'dropdown' ? 'select' : f.type === 'boolean' ? 'boolean' : f.type,
     required: f.required || f.criticalForPricing || false,
-    placeholder: f.helpText || undefined,
+    // T-196: the hint is shown once, under the box; it is no longer copied into the box
     helpText: f.helpText || undefined,
     criticalForPricing: f.criticalForPricing || false,
     mapsToSignal: f.mapsToSignal || undefined,

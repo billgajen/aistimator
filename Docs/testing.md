@@ -99,9 +99,10 @@ starts the next.
 | `t178` | `verify-t178` | the development server | no |
 | `t179` | `verify-t179` | the development server | no |
 | `t180` | `verify-t180` | the development server, no worker | no (it talks to the Stripe sandbox) |
+| `t196` | `verify-t196` | the development server; the worker | no |
 
-**Why five sets need the development server:** their scripts point the web app at their own stand-in for an
-outside service (Meta, Upstash, Turnstile, Postmark, a model), and the web app honours such an address only
+**Why six sets need the development server:** their scripts point the web app at their own stand-in for an
+outside service (Meta, Upstash, Turnstile, Postmark, a model, Expo's push service), and the web app honours such an address only
 outside a production build. That rule is a safeguard and stays. So those sets are started one after another,
 their scripts run one at a time, and they are in the full level. `pnpm check:quick --sets all` adds them to a
 quick run when a ticket touches what they cover (WhatsApp, the protections, a request that could not be priced,
@@ -116,6 +117,7 @@ Run `pnpm check:list` for the current list. At T-183, of 32 scripts, 20 are in t
 | `t148`, `t153`, `t169`, `t171`, `t172` | each checks something only a real model produces (marked `model: 'real'`) |
 | `t173`, `t175`, `t176`, `t177`, `t178`, `t179` | each needs its own development servers (a `devOnly` set) |
 | `t180` | the Stripe sandbox, and its own servers |
+| `t196` (added by T-196) | its own development servers: it reads what the web app and the worker post to its stand-in for the push service. `pnpm check:quick --only t196 --sets t196` runs it alone in about 40 seconds |
 
 ## Running at once
 

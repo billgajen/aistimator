@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
-import { getRegion, mergeScanAnswers, roomScanView, scanAnswers, scanDifferenceLine, unitDisplayLabel, type AppBootstrapResponse } from '@qolumns/shared'
+import { fieldExample, getRegion, mergeScanAnswers, roomScanView, scanAnswers, scanDifferenceLine, unitDisplayLabel, type AppBootstrapResponse } from '@qolumns/shared'
 import { openPage, roomScanAvailability, roomScanBlockedLine, scanRoom } from '../../modules/room-scan'
 import { useApi } from '../../src/lib/api-context'
 import { fieldsForService, toApiError, type WidgetConfigResponse } from '../../src/lib/api'
@@ -679,7 +679,7 @@ function Question({ field, value, onChange }: { field: AppField; value: RawAnswe
     <Field
       label={label}
       help={field.helpText}
-      placeholder={field.placeholder}
+      placeholder={fieldExample(field)}
       value={typeof value === 'string' ? value : ''}
       onChangeText={onChange}
       keyboardType={kind === 'number' ? 'decimal-pad' : 'default'}
