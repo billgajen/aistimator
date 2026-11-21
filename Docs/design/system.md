@@ -243,6 +243,12 @@ prompt, what was kept and what was rejected).
   display face with its figures in the figure face, four grey step tiles in a row (two by two on a phone) with the
   share that moved on between them, and the on-site line under a rule, quieter. While it shows, the four "Last 30
   days" cards are not drawn. It is not drawn at all before the first accepted estimate.
+- **Help is a panel, not a page** (T-197). The menu's Help item sits above Sign out and opens a white side panel
+  on the right (26 rem, `rounded-2xl`, `shadow-warm-lg`, inset 12 px like the menu); on a phone it is a
+  full-screen sheet. It is a dialog: Escape and the scrim close it, and its heading takes the focus. No entrance
+  animation. An unread reply is the "needs you" mark (yellow with the dark dot) on the Help item and on the
+  list. A status is a pill in the status colours, always with its word. The estimate report is a quiet underlined
+  link under the quote page that opens its form in place; it is not a fifth block of that page's four.
 - **The dashboard quote page reads in one order** (T-169): the next step, what the AI understood (with the
   customer's photos), the price, then the rest in one card divided by rules. The total is the mono figure at
   `text-4xl`. A new block on that page goes into one of those four, not into a box of its own.

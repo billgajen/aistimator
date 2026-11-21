@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { SupportNavLink } from '@/components/admin/SupportNavLink'
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -28,6 +29,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               >
                 Tenants
               </Link>
+              <SupportNavLink className="rounded-xl px-3 py-1 text-sm text-surface/80 hover:bg-white/10 transition-colors" />
               <Link
                 href="/admin/activity"
                 className="rounded-xl px-3 py-1 text-sm text-surface/80 hover:bg-white/10 transition-colors"

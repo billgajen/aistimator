@@ -11,6 +11,8 @@
  *   - the worker hit an error of its own, or
  *     the web app could not reach it         (`worker_error`)
  *   - requests have been waiting too long    (`queue_backed_up`)
+ *   - a business reported a problem sorted
+ *     as high severity (T-197)               (`support_high`)
  *
  * At most one email per kind per hour. The count of what was held back in
  * between is said in the next one. The email carries ids and counts only:
@@ -23,7 +25,7 @@
 import { PRODUCT_NAME } from './brand'
 import { EMAIL_FONT, emailHeadStyle } from './email-style'
 
-export type OpsAlertKind = 'quote_failed' | 'worker_error' | 'queue_backed_up'
+export type OpsAlertKind = 'quote_failed' | 'worker_error' | 'queue_backed_up' | 'support_high'
 
 /** One email per kind in this many seconds */
 export const OPS_ALERT_EVERY_SECONDS = 3600
@@ -38,7 +40,7 @@ export interface OpsAlert {
   details: Record<string, string | number>
 }
 
-const WORDS: Record<OpsAlertKind, { subject: string; what: string; look: string }> = {
+const WORDS: Record<OpsAlertKind, { subject: string; what: string; look: string; adminPath?: string }> = {
   quote_failed: {
     subject: 'A quote could not be priced',
     what: 'A request came in and no price could be worked out for it. The business has been emailed to reply to its customer itself, and the customer has been told the business has the request.',
@@ -53,6 +55,13 @@ const WORDS: Record<OpsAlertKind, { subject: string; what: string; look: string 
     subject: 'Requests are waiting to be priced',
     what: `One or more requests have been waiting more than ${QUEUE_WAIT_MINUTES} minutes for a price.`,
     look: 'Check the worker and its queue. Requests waiting can be retried from the admin area.',
+  },
+  // T-197: a business reported a problem the AI sorted as high severity
+  support_high: {
+    subject: 'A business reported a serious problem',
+    what: 'A business sent a problem report that was sorted as high severity: quoting is blocked, a wrong price reached a customer, or data or security is at risk.',
+    look: 'Open the support inbox. The report, what was attached and a draft fix ticket are there.',
+    adminPath: '/admin/support',
   },
 }
 
@@ -78,7 +87,7 @@ export function opsAlertEmail(alert: OpsAlert, opts: OpsAlertEmailOptions = {}):
   const subject = `${PRODUCT_NAME} alert${where}: ${words.subject}`
   const facts = Object.entries(alert.details).map(([label, value]) => `${label}: ${String(value).slice(0, 200)}`)
   const held = opts.heldBack && opts.heldBack > 0 ? `${opts.heldBack} more of this kind happened in the last hour and were not emailed.` : ''
-  const admin = opts.appUrl ? `${opts.appUrl.replace(/\/$/, '')}/admin/quotes` : ''
+  const admin = opts.appUrl ? `${opts.appUrl.replace(/\/$/, '')}${words.adminPath ?? '/admin/quotes'}` : ''
   const off = 'These alerts go to the ALERT_EMAIL address, at most one of each kind an hour. To turn them off, remove that setting.'
   const lines = [words.what, ...facts, held, words.look, admin, off].filter(Boolean)
   const html = `<!DOCTYPE html>

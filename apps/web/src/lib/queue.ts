@@ -123,6 +123,29 @@ export async function repriceQuoteNow(
 }
 
 /**
+ * T-197: ask the worker something that is not a quote job (the support
+ * inbox's sorting and matching). Answers the worker's JSON, or null when the
+ * worker is not configured, did not answer in time, or answered with an
+ * error. Never throws: the caller has already saved what matters.
+ */
+export async function askWorker<T>(path: string, body: Record<string, unknown>, timeoutMs: number): Promise<T | null> {
+  const workerUrl = getWorkerUrl()
+  if (!workerUrl) return null
+  try {
+    const response = await fetch(`${workerUrl}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...workerAuthHeaders() },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (!response.ok) return null
+    return (await response.json()) as T
+  } catch {
+    return null
+  }
+}
+
+/**
  * Check the health of the queue worker
  */
 export async function checkQueueHealth(): Promise<{

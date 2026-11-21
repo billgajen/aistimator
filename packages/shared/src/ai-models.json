@@ -36,6 +36,16 @@
       "provider": "gemini",
       "model": "gemini-3.8-flash",
       "thinkingLevel": "low"
+    },
+    "support_sort": {
+      "provider": "gemini",
+      "model": "gemini-3.8-flash",
+      "thinkingLevel": "medium"
+    },
+    "feature_match": {
+      "provider": "gemini",
+      "model": "gemini-3.8-flash",
+      "thinkingLevel": "low"
     }
   },
   "harness": {

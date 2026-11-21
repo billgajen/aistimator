@@ -17,6 +17,7 @@ import { FinalInvoiceCard } from '@/components/analytics/FinalInvoiceCard'
 import { UnderstoodPanel } from '@/components/quotes/UnderstoodPanel'
 import { Money } from '@/components/quote/document-parts'
 import { RoomScanCard } from '@/components/room-scan/RoomScanCard'
+import { EstimateReport } from '@/components/help/EstimateReport'
 import type {
   QuoteDetailResponse,
   QuotePricing,
@@ -692,6 +693,9 @@ export default function QuoteDetailPage({
           recordedAt={quote.final_invoice_recorded_at ?? null}
         />
       )}
+
+      {/* T-197: a quiet link under everything else. It records a report; it changes nothing on this estimate. */}
+      <EstimateReport quoteId={quote.id} currency={pricing.currency} isTest={(quote as { is_test?: boolean }).is_test === true} />
     </div>
   )
 }

@@ -51,6 +51,12 @@ export default function AdminQuotesPage() {
     }
   }, [search, statusFilter])
 
+  // T-197: a link from the support inbox opens this page on one quote (/admin/quotes?search=qte_…)
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get('search')
+    if (wanted) setSearch(wanted)
+  }, [])
+
   useEffect(() => {
     fetchQuotes()
   }, [fetchQuotes])

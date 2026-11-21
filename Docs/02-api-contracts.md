@@ -187,6 +187,66 @@ routes, one webhook and one admin route. Plan numbers come from `packages/shared
 - **The public quote's price lines**: the customer's page words an added line from the line's `source`
   (`seen` / `words`), not from `recommendationReason`, which is still sent and no longer shown.
 
+## T-197: Help, reports, feature requests, the support inbox
+
+Every `/api/support` route is the signed-in user's own business (session cookie): 401 signed out; another
+business's report is 404. Every `/api/admin/support` route is the platform admin's: 403 for anyone else. Errors
+are `{ "error": { "code", "message" } }`; the message is written for the person to read.
+
+**The business**
+- **`GET /api/support`** → `{ "plan": "Free", "reports": [MyReport], "requests": [MyRequest], "unread": 1 }`,
+  newest first. `MyReport`: `{ id, kind: "problem" | "estimate", body, choices, quoteId, isTest, status,
+  statusLabel, setupHint: { line, rate, serviceId } | null, unread, createdAt }`. `MyRequest`: `{ id, text,
+  status, statusLabel, createdAt }` (never who else asked or how many).
+  `GET /api/support?quoteId=…` → `{ "reports": [...] }`: only the reports ON that estimate.
+- **`GET /api/support/unread`** → `{ "count": 1 }` (the dot on the Help item).
+- **`POST /api/support/reports`**
+  - `{ "kind": "problem", "body": "…", "screenshotAssetId"?: "ast_…", "context"?: { page, quoteId, browser,
+    screen, lastError } }`. The screenshot is an upload made through `POST /api/uploads/init` (an image, up to
+    10 MB, the business's own). Of `context` only those keys are kept; the server adds the plan.
+  - `{ "kind": "estimate", "quoteId": "qte_…", "choices": ["too_high", …], "body"?: "…", "expectedTotal"?: 750 }`.
+    At least one choice; `body` is required with `other`. `expectedTotal` is recorded only.
+  - → `{ "report": MyReport, "message": "Thanks, we’ve got it. You’ll see our reply here and by email." }`.
+    The report is saved first; sorting follows in the worker and its failure changes nothing here.
+  - 400 `MISSING_TEXT` / `MISSING_CHOICE` / `INVALID_TOTAL` / `INVALID_SCREENSHOT`, 404 `QUOTE_NOT_FOUND`,
+    429 `DAILY_LIMIT` (20 reports a day per business; a count that cannot be read allows the report).
+- **`GET /api/support/reports/:reportId`** → `{ "report": MyReport, "messages": [{ id, from: "business" | "team",
+  body, createdAt }] }`. Opening it marks our reply as read.
+- **`POST /api/support/reports/:reportId/messages`** `{ "body": "…" }` → `{ "message": {...} }`. A reply on a
+  report we had closed sets it to `new` again.
+- **`POST /api/support/features`**
+  - `{ "text": "…" }` → `{ "step": "match", "matches": [{ id, title, summary }] }` (up to three; nothing is saved
+    yet) or `{ "step": "saved", "voted": false, "message": "…" }`. The match step waits five seconds at most;
+    after that, or on any failure, the request is saved as new.
+  - `{ "text": "…", "voteFor": "<request id>" }` → `{ "step": "saved", "voted": true }`; 409 `ALREADY_VOTED`
+    ("You’ve already asked for this."); 404 for a request that may not be offered.
+  - `{ "text": "…", "different": true }` → saved as a new request.
+  - 429 `DAILY_LIMIT` (20 a day per business).
+
+**The owner (platform admin)**
+- **`GET /api/admin/support`** → `{ "problems": [ProblemRow], "features": [FeatureRow], "count": 7 }`.
+  Problems by priority (severity, businesses affected, age); a merged report is counted under the one it joined.
+  Feature requests by votes, then by paying businesses. `?count=1` → `{ "count": 7 }` only (new items).
+- **`GET /api/admin/support/problems/:id`** → `{ "problem": {...} }`: the business and plan, its words, the
+  screenshot (a short-lived signed address), what was attached, the estimate cut down to line names, sums and
+  the business's prices, the AI's sorting and draft fix ticket, look-alikes, merged reports, the thread.
+- **`POST /api/admin/support/problems/:id`** `{ "action": … }`:
+  `reply { body }` · `status { status }` (not `fixed`) · `fixed { message?, confirm }` (`confirm: false` →
+  `{ "preview": { businesses, subject, html } }`; `true` sets every attached report to fixed and tells each
+  attached business once → `{ ok, businesses, emailed }`) · `merge { into }` · `unmerge` · `approve { approved }`
+  · `note { note }` · `sort` (one more try).
+- **`GET /api/admin/support/features/:id`** → `{ "feature": {...} }` with the businesses that asked and their
+  own words. **`POST`** `{ "action": … }`: `rename { title?, summary? }` · `status { status }` (not `shipped`) ·
+  `shipped { confirm }` (preview, then set and email every business that voted, once) · `merge { into }` ·
+  `split { voteId }`.
+
+**The worker** (the web app's bearer token, like `/process`)
+- **`POST /support/job`** `{ "kind": "support_sort" | "feature_title", "id": "…", "mode"?: "queue" | "wait" }` →
+  202. `queue`: the job goes on the quote queue (production). Otherwise it runs after the answer is sent
+  (`wait` answers with the outcome). A job is tried once and acknowledged whatever happened.
+- **`POST /support/match`** `{ "words": "…" }` → `{ "success": true, "matches": [{ id, title, summary }] }`.
+  Empty on any failure.
+
 ## T-196: won this month, the phone's notifications, the time zone
 
 - **`GET /api/app/bootstrap`** gains `won`: `{ "headline": "Won this month: $12,400 from 7 jobs" | null,

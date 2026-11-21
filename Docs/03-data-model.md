@@ -217,6 +217,55 @@ limit and adds one in a single step, one business at a time; `release_plan_quote
   first reports it, then kept (never overwritten by a later report). "This month" on Home starts at the business's
   midnight; until the column is set, the region's zone is used (`RegionDefinition.timeZone`).
 
+### support_reports (T-197, migration 47)
+- id (uuid), tenant_id, user_id (who sent it; kept as null when the user is removed)
+- kind: `problem` ("What went wrong?") | `estimate` (a report on one estimate)
+- body (the business's own words), choices (an estimate report's ticks: `too_high`, `too_low`, `wrong_reading`,
+  `missed`, `extra`, `wording`, `other`)
+- expected_total, currency: "What should the total have been?" **Recorded only.** Nothing that prices, sends or
+  shows an estimate reads it (a unit test fails if anything outside the support code names it).
+- quote_id (the estimate, by id: nothing is copied out of the quote), is_test
+- screenshot_asset_id (an `assets` row of the same business: private storage, an image within the upload limit)
+- context_json: `{ page, quoteId?, plan?, browser?, screen?, lastError? }`. Only these keys are kept.
+- status: `new` | `looking` | `fixed` | `answered` | `not_a_fault` (the business reads `new` as "Sent")
+- setup_hint: `{ line, rate, serviceId }` or null: the one thing the sorter shows the business ("This may be down
+  to your prices: {line} is set to {rate}"), written from the business's own setup
+- reply_unread (a reply from us nobody at the business has opened: the dot on the Help item), created_at,
+  updated_at
+- Row-level rules: a business **reads its own rows and may add one** (its own user, its own business, status
+  `new`, nothing of ours on it, and only its own estimate and upload). It cannot change or delete a report. Not
+  another business, not signed out.
+
+### support_report_internal (T-197, migration 47)
+- report_id (primary key), title, summary, ai_kind (`fault` | `how_to` | `billing` | `feature` | `other`),
+  severity (`high` | `medium` | `low`), similar_json (`[{ id, confidence }]`, up to three open problems that look
+  the same), likely_cause (`setup` | `ai_reading` | `fault` | `unknown`; estimate reports only), evidence,
+  fix_ticket (the draft, in the house format), service_template (the template the estimate's service matches by
+  name, or null)
+- sort_state (`waiting` | `sorted` | `failed`), sort_attempts, sorted_at
+- merged_into (another report), merged_at, approved_at ("Approved for fixing"), owner_note,
+  fixed_emailed_at (when this business was told the problem is fixed: once)
+- **Service role only (no policy).** A business can never read the AI's sorting, the ticket or the note.
+
+### support_messages (T-197, migration 47)
+- id, report_id, tenant_id, author (`business` | `team`), user_id, body, created_at
+- Row-level rules: a business reads its own threads and adds **its own side** on its own report. Our replies
+  are written by the server.
+
+### feature_requests and feature_votes (T-197, migration 47)
+- feature_requests: id, title, summary, title_source (`words` = still the first business's own words, never
+  shown to another business | `ai` | `owner`), status (`under_review` | `planned` | `shipped` | `not_planned`),
+  merged_into, reviewed_at (when the owner first opened it), created_at, updated_at. Not tied to one business.
+- feature_votes: id, request_id, tenant_id, user_id, body (the business's own words), shipped_emailed_at (when
+  this business was told it shipped: once), created_at. **Unique (request_id, tenant_id): one vote per business
+  per request.**
+- Row-level rules: a business reads **its own votes** and **the requests it voted for**, and writes neither
+  (the server writes both for the signed-in user's business). It can never read who else asked or how many.
+
+Every one of the five hangs off `tenants(id) ON DELETE CASCADE` (directly or through its report): when a closed
+account's data is deleted after the export window, its reports, threads and votes go with it. A feature request
+that loses its last vote this way stays, with no business on it, for the owner.
+
 ## Indexes
 - quotes: (tenant_id, created_at desc), (tenant_id, status), (quote_request_id)
 - quote_requests: (tenant_id, created_at desc), (customer_email), (job_postcode)

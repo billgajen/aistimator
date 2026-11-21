@@ -118,6 +118,7 @@ Run `pnpm check:list` for the current list. At T-183, of 32 scripts, 20 are in t
 | `t173`, `t175`, `t176`, `t177`, `t178`, `t179` | each needs its own development servers (a `devOnly` set) |
 | `t180` | the Stripe sandbox, and its own servers |
 | `t196` (added by T-196) | its own development servers: it reads what the web app and the worker post to its stand-in for the push service. `pnpm check:quick --only t196 --sets t196` runs it alone in about 40 seconds |
+| `t197` (added by T-197) | the real model: it sorts three sample problems, finds a duplicate, reads a wrong rate as "Your price setup" and matches two feature requests. It closes the open support items earlier runs left in the local database first, so the model compares only this run's own. It prints "What the model got wrong" at the end. No email is sent (the local web app has no email token) |
 
 ## Running at once
 

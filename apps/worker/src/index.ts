@@ -18,10 +18,11 @@ import { processQuote } from './quote-processor'
 import { authorizeJobRequest } from './auth'
 import { PRODUCT_NAME, errorNameOf } from '@qolumns/shared'
 import { aiStandInOn } from './ai/client'
+import { isSupportJob, matchFeatures, runSupportJob, supportDaily, type SupportJob } from './support'
 
 export interface Env {
-  // Queue binding (production only — see wrangler.toml)
-  QUOTE_JOBS?: Queue
+  // Queue binding (production only — see wrangler.toml). T-197: it also carries the support inbox's jobs.
+  QUOTE_JOBS?: Queue<QuoteJobMessage | SupportJob>
 
   // Shared secret the web app sends as a Bearer token to /process, /trigger, /stats
   CLOUDFLARE_WORKER_TOKEN?: string
@@ -47,6 +48,9 @@ export interface Env {
   AI_MODEL_WORDING?: string
   AI_MODEL_IDENTIFICATION?: string
   AI_MODEL_SERVICE_MATCH?: string
+  // T-197: the support inbox's two tasks (support.ts). They read and sort; they price nothing.
+  AI_MODEL_SUPPORT_SORT?: string
+  AI_MODEL_FEATURE_MATCH?: string
   // Per-task Gemini 3 thinking level override: low | medium | high | default
   AI_THINKING_EXTRACTION_PASS?: string
   AI_THINKING_ADJUDICATION?: string
@@ -156,7 +160,7 @@ async function processQuoteJob(
 
 export default {
   // HTTP handler (for health checks and manual triggers)
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
 
     // Health check endpoint
@@ -199,6 +203,42 @@ export default {
       return new Response(JSON.stringify(stats), {
         headers: { 'Content-Type': 'application/json' },
       })
+    }
+
+    // T-197: the support inbox's jobs (sorting a problem report, titling a feature request). The web
+    // app has already saved the report; this only asks for it to be sorted, and answers at once:
+    //   mode "queue"  the job goes on the queue, like a quote in production
+    //   otherwise     it runs after the answer is sent (local development, where quotes run directly)
+    // A job is tried once. If it cannot even be started the report is still there, unsorted.
+    if (url.pathname === '/support/job' && request.method === 'POST') {
+      const body = (await request.json().catch(() => null)) as (SupportJob & { mode?: string }) | null
+      if (!isSupportJob(body)) return jsonResponse({ error: 'Invalid request body' }, 400)
+      const job: SupportJob = { kind: body.kind, id: body.id }
+      if (body.mode === 'queue' && env.QUOTE_JOBS) {
+        try {
+          await env.QUOTE_JOBS.send(job)
+          return jsonResponse({ success: true, queued: true }, 202)
+        } catch (error) {
+          console.error(`[Worker] Support job could not be queued (${errorNameOf(error)}); running it directly`)
+        }
+      }
+      const supabase = getSupabaseClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY)
+      if (!supabase) return jsonResponse({ error: 'Supabase not configured' }, 503)
+      const work = runSupportJob(supabase, env, job)
+      if (body.mode === 'wait' || !ctx) return jsonResponse({ success: true, outcome: await work }, 200)
+      ctx.waitUntil(work)
+      return jsonResponse({ success: true, queued: false }, 202)
+    }
+
+    // T-197: which existing feature requests mean the same as these words? The web app waits for this
+    // (five seconds at most) before it saves a request; an empty answer means "save it as new".
+    if (url.pathname === '/support/match' && request.method === 'POST') {
+      const body = (await request.json().catch(() => null)) as { words?: unknown } | null
+      const words = typeof body?.words === 'string' ? body.words.trim() : ''
+      if (!words) return jsonResponse({ error: 'Missing required field: words' }, 400)
+      const supabase = getSupabaseClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY)
+      if (!supabase) return jsonResponse({ error: 'Supabase not configured' }, 503)
+      return jsonResponse({ success: true, matches: await matchFeatures(supabase, env, words) }, 200)
     }
 
     // Enqueue endpoint — the web app's production path (SYNC_QUOTE_PROCESSING=false)
@@ -351,7 +391,7 @@ export default {
   },
 
   // Queue consumer handler
-  async queue(batch: MessageBatch<QuoteJobMessage>, env: Env): Promise<void> {
+  async queue(batch: MessageBatch<QuoteJobMessage | SupportJob>, env: Env): Promise<void> {
     // Initialize services
     const rateLimiter: RateLimiter | null = createRateLimiter(
       env.UPSTASH_REDIS_URL,
@@ -372,9 +412,21 @@ export default {
     }
 
     for (const message of batch.messages) {
+      // T-197: a support job (sorting a report, titling a request) is tried once and then acknowledged,
+      // whatever happened: a report that could not be sorted stays in the inbox, unsorted, and is never
+      // put back on the queue. It has no part in the quote rules below.
+      if (isSupportJob(message.body)) {
+        try {
+          await runSupportJob(supabase, env, message.body)
+        } catch (error) {
+          console.error(`[Worker] Support job error: ${errorNameOf(error)}`)
+        }
+        message.ack()
+        continue
+      }
       try {
         // T-178: the rules for one job (limiter fails open, retries, failure) are in queue-consumer.ts
-        await handleQuoteJob<QuoteJobMessage>(message, {
+        await handleQuoteJob<QuoteJobMessage>(message as Message<QuoteJobMessage>, {
           limiter: rateLimiter,
           process: (job, queueWaitMs) => processQuoteJob(job, supabase, env, queueWaitMs),
           markFailed: async (job, error) => {
@@ -404,5 +456,8 @@ export default {
       console.error(`[Worker] Queue check error: ${errorNameOf(error)}`)
       await workerError(env, 'the check of waiting requests', error)
     }
+    // T-197: the owner's daily support summary (at most one a day, and only when something is new).
+    // It never throws; it is after the queue check so that it can never hold that up.
+    await supportDaily(supabase, env)
   },
 }

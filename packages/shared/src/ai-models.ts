@@ -18,6 +18,10 @@ export type AiTask =
   | 'identification'
   /** T-177: is a WhatsApp message a price request for a service this business offers? */
   | 'whatsapp_intent'
+  /** T-197: sort a problem a business reported (title, kind, severity, likely cause, draft fix ticket). Reads and sorts only. */
+  | 'support_sort'
+  /** T-197: find existing feature requests that mean the same thing, and give a new one a plain title */
+  | 'feature_match'
 
 export const AI_TASKS: AiTask[] = [
   'extraction_pass',
@@ -28,6 +32,8 @@ export const AI_TASKS: AiTask[] = [
   'service_match',
   'identification',
   'whatsapp_intent',
+  'support_sort',
+  'feature_match',
 ]
 
 export interface ModelRoute {

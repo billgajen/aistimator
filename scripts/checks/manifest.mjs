@@ -140,6 +140,8 @@ export const SCRIPTS = [
   { id: 't180', server: 't180', model: 'none', browser: true, external: 'the Stripe sandbox', minutes: 20 },
   // T-196 reads what the web app and the worker post to its stand-in for the push service
   { id: 't196', server: 't196', model: 'none', minutes: 20 },
+  // T-197 has the real model sort problem reports, find a duplicate and match feature requests
+  { id: 't197', server: 'standard', model: 'real', browser: true, minutes: 20 },
 ]
 
 /** Lint, typecheck and unit tests: every level runs these first */

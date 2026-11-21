@@ -74,6 +74,10 @@ export * from './approval-detail'
 export * from './won'
 export * from './push'
 export * from './field-hint'
+// T-197: the Help button: reports, feature requests, the AI's sorting, the support emails
+export * from './support'
+export * from './support-sort'
+export * from './support-emails'
 
 // ID prefixes for stable, readable IDs
 export const ID_PREFIXES = {

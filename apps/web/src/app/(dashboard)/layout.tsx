@@ -3,11 +3,15 @@
 import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useState } from 'react'
-import { PRODUCT_NAME, QUOTE_TURN_COPY } from '@qolumns/shared'
+import { PRODUCT_NAME, QUOTE_TURN_COPY, SUPPORT_COPY, parseHelpParam } from '@qolumns/shared'
 import { UNFINISHED_CHANGED_EVENT } from '@/lib/unfinished-leads'
 import { NEEDS_YOU_MARK } from '@/lib/status-tone'
 import { Wordmark } from '@/components/brand/Wordmark'
 import { AccountNotice } from '@/components/billing/AccountNotice'
+import { HelpBoundary } from '@/components/help/HelpBoundary'
+import { HelpPanel, type HelpView } from '@/components/help/HelpPanel'
+import { NeedsYouDot } from '@/components/quotes/NeedsYouDot'
+import { watchPageErrors } from '@/lib/help-context'
 
 /**
  * Dashboard shell — "the studio desk", panel edition.
@@ -38,6 +42,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [loadNewUnfinished])
   const closeMenu = useCallback(() => setSidebarOpen(false), [])
 
+  // T-197: the Help panel. It is an extra: its dot is read on its own, it loads nothing until it
+  // is opened, and a fault in it never reaches the page (HelpBoundary).
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [helpAt, setHelpAt] = useState<HelpView>({ name: 'menu' })
+  const [helpUnread, setHelpUnread] = useState(0)
+  useEffect(() => {
+    fetch('/api/support/unread')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json: { count?: number } | null) => {
+        if (typeof json?.count === 'number') setHelpUnread(json.count)
+      })
+      .catch(() => undefined)
+  }, [pathname])
+  // The last error the page raised is one of the things a problem report includes
+  useEffect(() => watchPageErrors(window), [])
+  // A link from one of our emails opens the panel on the business's own item: /app?help=report:<id>
+  useEffect(() => {
+    const target = parseHelpParam(new URLSearchParams(window.location.search).get('help'))
+    if (!target) return
+    setHelpAt(target.kind === 'report' ? { name: 'report', id: target.id } : target.kind === 'request' ? { name: 'list' } : { name: 'menu' })
+    setHelpOpen(true)
+  }, [])
+  const openHelp = useCallback(() => {
+    setHelpAt({ name: 'menu' })
+    setHelpOpen(true)
+    setSidebarOpen(false)
+  }, [])
+  const closeHelp = useCallback(() => setHelpOpen(false), [])
+
   const panel = (
     <div className="flex h-full flex-col rounded-3xl bg-white shadow-warm-md">
       {/* Wordmark */}
@@ -58,8 +91,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </Suspense>
       </nav>
 
-      {/* Sign out */}
+      {/* Help (T-197), above Sign out */}
       <div className="border-t border-border px-3 py-3">
+        <button
+          type="button"
+          onClick={openHelp}
+          aria-haspopup="dialog"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium text-text-secondary hover:bg-surface hover:text-text-primary transition-colors"
+          data-testid="help-button"
+        >
+          <HelpIcon className="h-5 w-5 text-text-muted" />
+          <span className="min-w-0 flex-1 text-left">{SUPPORT_COPY.help}</span>
+          {helpUnread > 0 && (
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ${NEEDS_YOU_MARK}`} data-testid="help-dot" aria-label="New reply">
+              <NeedsYouDot />
+              New
+            </span>
+          )}
+        </button>
         <form action="/api/auth/signout" method="POST">
           <button
             type="submit"
@@ -114,6 +163,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
+
+      <HelpBoundary>
+        <HelpPanel open={helpOpen} initial={helpAt} pathname={pathname} onClose={closeHelp} onUnread={setHelpUnread} />
+      </HelpBoundary>
     </div>
   )
 }
@@ -285,6 +338,14 @@ function SignOutIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+    </svg>
+  )
+}
+
+function HelpIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
     </svg>
   )
 }

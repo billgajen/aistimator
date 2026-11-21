@@ -57,6 +57,18 @@ Ship a compact SaaS that a business can:
   services counts as ONE quote on the plan. On the website form and the quote link; WhatsApp and the on-site app
   show a combined quote but do not add to one.
 
+### Support (T-197, the owner's decision, 21 Nov 2026)
+- **One place for a business to get help**, in the dashboard: a Help item on every page that opens a panel to
+  report a problem, report a problem with one estimate, suggest a feature, and see its own reports and requests
+  with our replies. Web only; the on-site app is not changed.
+- **One queue for the owner**, in the admin area: every report sorted and de-duplicated by the AI, with a draft
+  fix ticket; feature requests by votes; the business is told when a problem is fixed or a request has shipped.
+- **The AI reads and sorts.** It never changes a price, a setting, a service or a quote, never merges by itself,
+  and is sent no customer details. A report is saved before anything else happens to it.
+- It is an extra: it must never slow, block or break quoting, the dashboard or sign-in.
+- Not in this scope: a chatbot ("Ask Qolumns" is T-198), a public roadmap, votes shown to businesses, support
+  from inside the on-site app.
+
 ### Basic analytics
 - Quotes created
 - Quote viewed

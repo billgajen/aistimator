@@ -71,6 +71,32 @@ export default function AdminDashboard() {
           </p>
         </Link>
 
+        {/* Support Card (T-197) */}
+        <Link
+          href="/admin/support"
+          className="block rounded-xl bg-surface p-6 shadow-warm transition-shadow hover:shadow-warm-hover"
+        >
+          <div className="flex items-center gap-4">
+            <div className="rounded-xl bg-primary-light p-3">
+              <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+                />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-text-primary">Support</h2>
+              <p className="text-sm text-text-muted">Problems and feature requests</p>
+            </div>
+          </div>
+          <p className="mt-4 text-sm text-text-secondary">
+            Every report from a business, sorted by priority, with a draft fix ticket. Feature requests by votes.
+          </p>
+        </Link>
+
         {/* Activity Card */}
         <Link
           href="/admin/activity"

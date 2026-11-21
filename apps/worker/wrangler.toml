@@ -49,6 +49,9 @@ max_retries = 3
 #   cannot be priced, the worker errors, or requests wait too long. Not set = alerts off.
 #   The web app has the same setting.)
 # - CLOUDFLARE_WORKER_TOKEN (same value as the web app's; required outside local dev)
+# - AI_MODEL_SUPPORT_SORT, AI_MODEL_FEATURE_MATCH (optional, T-197: the support inbox's two tasks. The
+#   defaults are in packages/shared/src/ai-models.json; set one only to try another model. They read and
+#   sort problem reports and feature requests; they never price anything.)
 # - EXPO_ACCESS_TOKEN (optional, T-196: only if "enhanced security for push notifications" is
 #   turned on in the Expo account; the web app has the same setting)
 #

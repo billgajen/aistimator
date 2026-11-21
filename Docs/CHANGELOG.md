@@ -15,6 +15,159 @@
 
 ## Issues & Resolutions
 
+### 2026-11-21: T-197 — Help button, problem reports, estimate reports, feature requests, support inbox (AD-081, AD-082)
+
+**Built, not deployed.** Needs deploying: **migration 47 first** (`bash scripts/deploy-migration-47.sh`), then the
+worker, then the web (the web hands support jobs to the worker; a worker from before this ticket would take one
+for a quote job). The live code keeps working with migration 47 in place (it only adds). Without it the T-197 code
+still prices every quote and every page still works: the Help panel says a report could not be sent.
+
+Web only. The on-site app is not changed (a unit test holds it).
+
+#### What a business gets
+- **Help**, in the menu above Sign out on every dashboard page. It opens a side panel (a full-screen sheet on a
+  phone): "Report a problem", "Suggest a feature", "Your reports and requests", and "Or email hello@qolumns.com"
+  (`SUPPORT_EMAIL`). Nothing is shown for "Ask Qolumns" (T-198); it will be one more entry in `ENTRIES`
+  (`components/help/HelpPanel.tsx`).
+- **Report a problem:** one box and an optional screenshot (the dashboard's own upload route: private storage,
+  an image, 10 MB). The "We'll include" list is shown before sending: the page, the quote if the page is one, the
+  plan, the browser, the screen size, the last error the page showed. The server keeps only those keys
+  (`cleanSupportContext`) and adds the plan itself. Sent → "Thanks, we've got it. You'll see our reply here and by
+  email." No promise of a time.
+- **Report a problem with this estimate:** a quiet link under every quote in the dashboard. Seven choices (one or
+  more), "Tell us more" (required for "Something else"), "What should the total have been?", and the line about
+  what we look at. The report links to the quote by id; nothing is copied out of it. A test estimate is marked.
+  A quote can be reported more than once; the page shows "Reported on 21 Nov" with the status for each.
+- **Suggest a feature:** one box. Before saving, the worker looks for up to three requests that mean the same
+  (five seconds at most). If there are any the business chooses: "Yes, add my vote" on one, or "No, mine is
+  different". One vote per business per request (the table's own unique rule; a second answers "You've already
+  asked for this."). A business never sees who else asked or how many.
+- **Your reports and requests:** the business's own, newest first, each with a status; a report opens to its
+  thread, with our replies and a box to answer. A reply puts the "needs you" mark on the Help item until someone
+  at the business opens the report. Every user of the business sees the same list.
+
+#### What the owner gets
+- **Support** in the admin area (platform admin only), with a count of new items in the admin menu. Three tabs:
+  Problems (problem and estimate reports together, by severity, then businesses affected, then age), Feature
+  requests (by votes, then by paying businesses), All. Filters: kind, status, severity, likely cause, service
+  template. It opens on what is still open.
+- **A problem's page:** the business and its plan; its words and screenshot; what was attached; for an estimate
+  report the choices, the "should have been" figure, a link to the quote and its pricing trace laid out; the
+  AI's sorting; the draft fix ticket ("Copy fix ticket", and a tick "Approved for fixing" with the date); the
+  thread. Actions: reply; status; **Fixed** (the email and the number of businesses are shown first, and it is
+  sent only on confirming, to every business attached); merge into another problem and undo; a private note;
+  "Sort again".
+- **A feature request's page:** rename, edit the one-line summary, merge, split one business out, set a status.
+  **Shipped** is confirmed first and emails every business that voted.
+- **Alerts:** a problem sorted as high severity raises the existing owner's alert at once (`support_high`, a
+  fourth kind in `ops-alerts.ts`, with the same one-an-hour held-back rule). Once a day the worker sends one
+  summary when something is new (counts by kind, the top three by priority); nothing new, no email, and the day
+  is not used up.
+
+#### AD-081: the AI reads and sorts; it changes nothing and is sent no customer
+- **Two new tasks in the registry** (`ai-models.json`): `support_sort` and `feature_match`, overridable with
+  `AI_MODEL_SUPPORT_SORT` / `AI_MODEL_FEATURE_MATCH`. No model name is in the code (a unit test).
+- **What it produces, per problem** (`packages/shared/src/support-sort.ts`, run by `apps/worker/src/support.ts`):
+  a one-line title and a plain summary; a kind (fault, how-to question, billing, feature request filed as a
+  problem, other); a severity; up to three open problems that look the same, each with a confidence; for an
+  estimate report the likely cause read from the pricing trace ("Your price setup", "The AI's reading of the
+  photos or words", "A fault in Qolumns", "Can't tell") with a sentence or two of evidence; and the four
+  descriptions of a fix ticket. The ticket's format is ours (`formatFixTicket`: a title line, the SAFETY line,
+  RULES, what is wrong, the evidence, what should happen instead, how to check it); the AI supplies only the
+  descriptions, and is told to name no files and guess at no code.
+- **It never acts.** A look-alike at 0.85 or more is shown to the owner as "Suggested: merge into this"; nothing
+  is merged without the owner. The worker's support code writes to the five support tables and nothing else (a
+  unit test reads its writes). The "should have been" figure is stored on the report and named by nothing
+  outside the support code (a unit test walks the source).
+- **No customer details.** The model is sent ids, numbers, the names of price lines, the business's own prices
+  and the business's own words. A trace step's signals keep their numbers and yes/no values only (a text answer
+  is the customer's). The business's words go through `scrubCustomerDetails` first: every email address and
+  phone number, and the name and address of the customer of the estimate the report is about. The AI's answer
+  goes through it again before it is stored. Logs carry ids, a kind, a severity and an error's name.
+  **Found by the unit test while writing it:** names were taken out before email addresses, so
+  "megan.grant@example.test" became "[customer].[customer]@example.test" and the address's domain was left.
+  Emails and phone numbers are now taken out first.
+- **Every answer is checked against what was sent.** A kind or severity that is not one of ours is a failed sort.
+  A look-alike we did not offer, or a price line that is not in the business's setup, is dropped.
+- **"This may be down to your prices: {line} is set to {rate}. Check it in Services."** is shown to the business
+  only when the cause is "Your price setup", the AI named one price line, that line is in the business's own
+  setup AND was priced on this estimate. The line's name and rate are written from the setup, never from the AI
+  (`setupHintFor`). It is a possibility; nothing is changed for them.
+- **A failed sort loses nothing.** The report is saved before the worker is asked. If sorting fails, answers
+  nonsense, or takes over 25 seconds, the report stays "New", marked unsorted, with "Sort again" for the owner.
+  A support job on the queue is tried once and acknowledged whatever happened; it is never put back.
+- **A feature request's first title is the business's own words**, so it is not offered to any other business
+  until the worker has written a plain title and one line for it (or the owner has). Another business is shown
+  only requests that are open, not merged away, and titled by the AI or the owner.
+
+#### AD-082: support is an extra; it rides on what is already there
+- **No new queue, no new provider, no new setting.** Support jobs travel on the quote queue (`QUOTE_JOBS`) as a
+  different message (`{ kind: 'support_sort' | 'feature_title', id }`), branched off before the quote rules, so
+  a support job never meets the limiter, the retries or `markQuoteFailed`. In local development they run after
+  the worker has answered (`ctx.waitUntil`), the way quotes run directly there. The daily summary is the
+  worker's existing five-minute timer, claimed once a day through `claim_ops_alert`. The AI provider is the one
+  already listed as a sub-processor, so `lib/legal/sub-processors` is unchanged.
+- **It cannot break a page.** The Help panel loads nothing until it is opened and is wrapped in an error boundary
+  (`HelpBoundary`): if it throws it is taken away and the page carries on. The dot is one small request of its
+  own, and a count that cannot be read is no dot. The estimate report reads its own list; without it the quote
+  page reads the same.
+- **The daily limit is counted in the database** (20 reports and 20 feature requests a day per business,
+  `sentToday` + `underDailyLimit`). A count that cannot be read allows the report: the limit is never the reason
+  one is lost. Over it: a plain message with the support address.
+- **Isolation is the database's.** A business's reports and replies are written through its own signed-in
+  client, so migration 47's row-level rules are what keep businesses apart: a business reads its own reports,
+  threads and votes, and the requests it voted for; it adds its own reports and its own side of a thread; it
+  changes nothing. The owner's side (`support_report_internal`) has no policy at all. Feature requests and votes
+  are written by the server for the signed-in user's business only.
+- **Told once.** `fixed_emailed_at` on the report and `shipped_emailed_at` on the vote are written before the
+  email is tried: a second "Fixed" or "Shipped" tells only a business not yet told (one that joined by a later
+  merge), and a business is told in its Help panel whether or not an email can be sent.
+
+#### Where it differs from the ticket, and why
+- **The dot is the business's, not each user's.** One user opening the report clears it for all of them. A
+  per-user mark needs a row per user per reply; the ticket's "every user of the business sees the business's
+  items" is kept.
+- **A reply from the business on a report we had closed sets it to "New" again**, so it comes back into the count.
+- **"Service template" is matched by name.** A service does not record the template it came from, so the filter
+  uses the rule the services page already uses for "you already have this one" (the pack's own names).
+- **The inbox opens on "Open"** (New and Looking into it). "Any status" is one choice away. With everything shown,
+  fixed high-severity problems sat on top of new ones.
+- **The estimate report is listed on the quote page only when it was made there.** A general problem sent while
+  a quote's page was open is linked to that quote for the owner, and is not shown as "Reported on" on the page.
+- **"Once a day"** is 24 hours after the last summary, at the worker's next five-minute tick, not a fixed hour.
+- **The fix ticket's count of businesses** is brought up to date when the ticket is shown (a problem gains
+  businesses when others are merged into it after it was drafted).
+- **The admin Quotes page reads `?search=`**, so the inbox's "Open the quote" lands on that quote.
+
+#### Constraints
+- A scrubbed text can lose a long number that was not a phone (nine or more digits written together becomes
+  "[phone]"). Privacy errs on the safe side; the owner still reads the business's own words unscrubbed.
+- The screenshot uses the dashboard's upload route, which also takes documents; the report route accepts the
+  upload only when it is the business's own image within the image limit.
+- A feature request that loses its last vote when an account's data is deleted stays, with no business on it.
+- No email is sent from a machine without a Postmark token (local): a reply is then delivered to the Help panel
+  only, and the inbox says how many were emailed.
+
+#### Checks
+- Unit: `apps/web/src/__tests__/support-t197.test.ts` (62) and `apps/worker/src/__tests__/support-t197.test.ts`
+  (25), against a database held in memory (`packages/shared/src/testing/memory-db.ts`, tests only). They hold:
+  isolation in the migration and on every route; one vote per business; a failed, unreadable or slow sort keeps
+  the report and is not tried again; no customer details in what is sent to the AI or logged; "Fixed" and
+  "Shipped" tell the right businesses once; the limit fails open; the "should have been" figure is named by
+  nothing that prices. Three existing rules caught new code before the run and were met, not relaxed: an opacity
+  on text only in the admin layout, the list of files that send email, "minimum charge applied" written once.
+- `scripts/hardcore-test/verify-t197.mts` (full level, the real model, a real browser): 104 of 104. Three sample
+  problems sorted (fault and high; how-to; billing), the duplicate from a second business found at 0.95 and
+  only suggested, the estimate with a rate ten times too high read as "Your price setup" with the hint written
+  from the setup, two feature requests matched, a different one saved as new. **What the model got wrong: nothing
+  in this run** (the script prints it each time; it is not a pass or a fail of ours).
+- `scripts/deploy-migration-47.sh` run whole against a local copy at migration 46 through a stand-in for the
+  management API, then run again: 5 tables, 5 with row-level rules, 6 policies, none on the owner's table,
+  tenants, quotes and assets unchanged.
+- `pnpm check:quick`: 28 of 28 (20 scripts, 1,717 checks) in 4 min 1 s. `pnpm check:full`: 42 of 42 (34 scripts,
+  2,928 checks) in 32 min 1 s. `pnpm check:failed` was not needed.
+- Screens in `.checks/t197/` (25 pictures and the four emails as HTML).
+
 ### 2026-11-21: T-196 — "Won through Qolumns", phone notifications, small fixes (AD-079, AD-080)
 
 **Built, not deployed.** Needs deploying: **migration 46 first** (`bash scripts/deploy-migration-46.sh`), then the

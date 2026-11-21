@@ -3395,3 +3395,46 @@ Notifications cannot be tested before this: Apple gives the push entitlement onl
 - **No setting to change the time zone.** It is kept the first time and not asked for. A business that moves
   would need it set by hand; a Settings field is a small later ticket.
 
+## T-197 — Help button, problem and estimate reports, feature requests, support inbox
+
+Built 21 November 2026. **Not deployed.** To put it live: "deploy T-197": **migration 47 first**
+(`bash scripts/deploy-migration-47.sh`), then the worker, then the web.
+
+### Nothing to set
+
+- No new setting, no new provider, no new queue. The alerts use the `ALERT_EMAIL` you set in T-189 (worker and
+  web). Replies, "Fixed" and "Shipped" go out through Postmark as the other emails to a business do.
+- After the deploy: **Admin → Support** is the inbox. The number beside it is what is new.
+
+### To try once it is live (as Bluum, then as yourself)
+
+- [ ] In the dashboard, press **Help** (above Sign out). Send a problem; then open a quote and use "Report a
+  problem with this estimate" at the bottom of the page.
+- [ ] In **Admin → Support**, open the report: the AI's sorting and the draft fix ticket should be there within
+  about half a minute. Reply to it; the dot appears on Bluum's Help item, and the reply arrives by email.
+- [ ] "Set to fixed…" shows the email and how many businesses get it. Nothing is sent until you confirm.
+- [ ] Suggest a feature from two businesses in the same words: the second is offered the first.
+
+### Decisions I made that you may want to change
+
+- **The dot is per business**, not per user: one person opening the report clears it for everyone there.
+- **A reply from the business on a closed report sets it to "New" again.**
+- **The inbox opens on what is open** (New, Looking into it). "Any status" shows the rest.
+- **The daily summary** goes 24 hours after the last one, when something is new. It has no fixed hour.
+- **A new feature request is not offered to other businesses until it has a plain title** (the AI writes one in a
+  few seconds; until then it is the first business's own words). If the AI could not title one, the inbox says
+  so on the request and you can give it a title yourself.
+
+### Not proven here
+
+- **No email was sent.** This Mac has no Postmark token, so replies reached the Help panel only. The emails'
+  words, who gets them and "once" are unit tests; their look is in `.checks/t197/email-*.png`.
+- **The queue path.** Locally a support job runs straight after the worker answers; in production it goes on the
+  quote queue. The branch that takes it off the queue is covered by a unit test, not by a real queue.
+- **A screenshot shown in the inbox** was not looked at: the check sends reports without one. The upload is the
+  dashboard's existing route.
+
+### Later
+
+- "Ask Qolumns" (T-198) has its place in the Help panel and nothing on the screen yet.
+- Support from inside the on-site app.
