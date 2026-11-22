@@ -9,20 +9,17 @@
  * earlier names stay reserved.
  */
 
-import { DEMO_SLUG } from '@qolumns/shared'
+import { DEMO_SLUG, RESERVED_NAMES } from '@qolumns/shared'
 
 export const SLUG_MIN_LENGTH = 3
 export const SLUG_MAX_LENGTH = 40
 
-/** Words that would collide with app routes or mislead a customer. Sorted. */
-export const RESERVED_SLUGS: readonly string[] = [
-  'about', 'account', 'admin', 'aistimator', 'api', 'app', 'assets', 'auth',
-  'billing', 'blog', 'business', 'contact', 'dashboard', 'demo', 'docs', 'embed',
-  'estimate', 'estimates', 'estimator', 'example', 'features', 'help', 'home', 'login',
-  'logout', 'mail', 'new', 'null', 'official', 'painting', 'pricing', 'privacy',
-  'qolumns', 'qolums', 'quote', 'quotes', 'root', 'settings', 'setup', 'share', 'signup', 'static',
-  'support', 'terms', 'test', 'trades', 'undefined', 'widget', 'www',
-]
+/**
+ * Words that would collide with app routes or mislead a customer. T-199: the
+ * one list is `RESERVED_NAMES` (packages/shared/src/own-address.ts), shared
+ * with a business's own address: a name refused for one is refused for both.
+ */
+export const RESERVED_SLUGS: readonly string[] = RESERVED_NAMES
 
 const ACCENTS: Record<string, string> = {
   a: 'àáâãäåā', c: 'çćč', e: 'èéêëēėę', i: 'ìíîïīį', n: 'ñń', o: 'òóôõöøō',
@@ -52,10 +49,11 @@ export type SlugProblem = 'too_short' | 'too_long' | 'invalid_characters' | 'res
 
 /** Why a slug can't be used (format and reserved words only; availability is a DB check). */
 export function slugProblem(slug: string): SlugProblem | null {
+  // reserved first: a reserved name is reserved whatever its length ("m", "q")
+  if (RESERVED_SLUGS.includes(slug) || slug === DEMO_SLUG) return 'reserved'
   if (slug.length < SLUG_MIN_LENGTH) return 'too_short'
   if (slug.length > SLUG_MAX_LENGTH) return 'too_long'
   if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(slug) || slug.includes('--')) return 'invalid_characters'
-  if (RESERVED_SLUGS.includes(slug) || slug === DEMO_SLUG) return 'reserved'
   return null
 }
 

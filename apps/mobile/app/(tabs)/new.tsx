@@ -27,6 +27,7 @@ import { draftProgress, scanForRequest, type Draft, type DraftPhoto, type DraftR
 import { RoomScanSummary, SCAN_TIP } from '../../src/components/RoomScanSummary'
 import { useOutbox, useOutboxReady, useOutboxState } from '../../src/lib/outbox-context'
 import { pricingStages } from '../../src/lib/pricing-stages'
+import { onsiteGate } from '../../src/lib/onsite-gate'
 import { currentUserId } from '../../src/lib/supabase'
 import { PricingStages } from '../../src/components/PricingStages'
 import { BottomBar, Button, EmptyState, ErrorText, Field, fieldLabel, Icon, Label, Muted, Notice, ProgressBar, Rows, Screen, Title, TopBar } from '../../src/components/ui'
@@ -51,7 +52,67 @@ function photoLine(photo: DraftPhoto, offline: boolean): string {
   return offline ? 'Waiting for a signal' : 'Waiting to upload'
 }
 
-export default function NewQuote() {
+/**
+ * T-199: the tab itself. Any business can use the app; starting a quote on site needs a plan that
+ * includes it. When the server says this business cannot, the tab shows one screen and nothing is
+ * started: the form (which makes a draft the moment it opens) is never mounted.
+ */
+export default function NewQuoteTab() {
+  const api = useApi()
+  const router = useRouter()
+  const [boot, setBoot] = useState<Pick<AppBootstrapResponse, 'onsiteQuotes' | 'onsiteNotInPlan'> | null>(null)
+  const [settled, setSettled] = useState(false)
+
+  // asked each time the tab is opened, so a change of plan shows without restarting the app
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true
+      const owner = currentUserId()
+      ;(async () => {
+        if (owner) {
+          const cached = await readFormCache<FormConfig>(owner)
+          if (alive && cached?.boot) setBoot((current) => current ?? cached.boot)
+        }
+        try {
+          const live = await api.bootstrap()
+          if (alive) setBoot(live)
+        } catch {
+          // no signal: what the phone remembers stands; with nothing remembered the form opens and the server decides
+        } finally {
+          if (alive) setSettled(true)
+        }
+      })()
+      return () => {
+        alive = false
+      }
+    }, [api])
+  )
+
+  const gate = onsiteGate(boot, settled)
+  if (gate.state === 'checking') {
+    return (
+      <Shell title="New quote">
+        <View style={styles.centre}>
+          <ActivityIndicator color={colors.brand} accessibilityLabel="Loading" />
+        </View>
+      </Shell>
+    )
+  }
+  if (gate.state === 'closed') {
+    return (
+      <Shell title="New quote">
+        <View style={styles.gate} testID="onsite-not-in-plan">
+          <Title>{gate.words.heading}</Title>
+          <Muted style={styles.gateText}>{gate.words.text}</Muted>
+          <Button title={gate.words.button} onPress={() => router.navigate('/')} />
+        </View>
+      </Shell>
+    )
+  }
+  return <NewQuote />
+}
+
+function NewQuote() {
   const api = useApi()
   const router = useRouter()
   const outbox = useOutbox()
@@ -732,6 +793,9 @@ function Sending({ draft }: { draft: Draft }) {
 
 const styles = StyleSheet.create({
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.xl, gap: space.md },
+  // T-199: the "part of the plan" screen: the words in the middle, the one button under them
+  gate: { flex: 1, justifyContent: 'center', padding: space.xl, gap: space.md },
+  gateText: { marginTop: 0, marginBottom: space.md },
   stepCount: { color: colors.textSecondary, fontFamily: fonts.semi, fontSize: type.small, marginTop: space.sm, marginBottom: space.sm },
   angle: {
     minHeight: touch.row,

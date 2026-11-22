@@ -202,6 +202,10 @@ if (!process.env.PLAYWRIGHT_DIR) {
     p.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
     const popups: string[] = []
     ctx.on('page', (np) => { if (np !== p) popups.push(np.url()) })
+    // T-199: a business on the free start works like Pro, which has no "Powered by" line on its form and no
+    // "Prepared with" line on its quote. Both are checked here for a business on a plan that keeps them
+    // (Starter); the row is taken away again after the quote page's check.
+    await sb.insert('subscriptions', { tenant_id: a.tenantId, plan_id: 'plan_us_starter', status: 'active' })
     await p.goto(`${cfg.appUrl}/quote/${a.slug}`, { waitUntil: 'networkidle' })
     await p.getByRole('button', { name: 'Water Heater Replacement', exact: true }).waitFor({ timeout: 30_000 })
     let f = await formState(p)
@@ -323,6 +327,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
     check(`${width} quote: nothing of the engine's or the database's, none of the words a customer never sees, none of our yellow, nothing sideways`, !ENGINE_WORDS.test(q.all) && findConfidenceLanguage(q.all).length === 0 && (await accentOn(p)) === 0 && (await sideways(p)) <= 0, { engine: q.all.match(ENGINE_WORDS)?.[0], language: findConfidenceLanguage(q.all), accent: await accentOn(p) })
     const prepared = await worst(p, await painted(p), '[data-testid=prepared-with]')
     check(`${width} quote: "Prepared with Qolumns" is readable: ${prepared?.size} px at ${prepared?.ratio}:1`, !!prepared && prepared.size >= 12 && prepared.ratio >= 4.5, prepared)
+    await fetch(`${cfg.supabaseUrl}/rest/v1/subscriptions?tenant_id=eq.${a.tenantId}`, { method: 'DELETE', headers: admin })
     await shot(p, `quote-estimate-${width}`)
 
     // the business confirms it; the customer accepts

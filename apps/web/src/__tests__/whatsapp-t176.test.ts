@@ -227,7 +227,7 @@ function fakeAdmin(stored: Stored) {
         },
         order: () => builder,
         limit: () => builder,
-        maybeSingle: async () => ({ data: table === 'whatsapp_configs' ? stored.config : table === 'subscriptions' ? (stored.subscription === undefined ? { plan_id: 'plan_us_pro', status: 'active' } : stored.subscription) : null }),
+        maybeSingle: async () => ({ data: table === 'tenants' ? { region: 'US', suspended_at: null } : table === 'whatsapp_configs' ? stored.config : table === 'subscriptions' ? (stored.subscription === undefined ? { plan_id: 'plan_us_pro', status: 'active' } : stored.subscription) : null }),
         insert: async (row: Record<string, unknown>) => {
           stored.inserted.push({ table, ...row })
           return { error: null }

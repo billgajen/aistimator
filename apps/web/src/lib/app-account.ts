@@ -6,18 +6,16 @@
  * name and how many quotes have been used. The limit is the plan's own
  * (packages/shared/src/plans.ts), read by the same function that enforces it.
  */
-import { SUPPORT_EMAIL, type AppAccountResponse } from '@qolumns/shared'
-import { quoteLinkUrl } from '@/lib/quote-link-url'
+import { SUPPORT_EMAIL, type AppAccountResponse, type BusinessLinks } from '@qolumns/shared'
 
 export function appAccount(input: {
   businessName: string
   logoUrl: string | null
   planName: string | null
   limit: { used: number; limit: number; unlimited: boolean; per: 'month' | 'total' }
-  slug: string | null
-  appUrl: string
+  /** T-199: the business's links, main first (its own address when it has one and can use it); null when it has no quote link */
+  links: BusinessLinks | null
 }): AppAccountResponse {
-  const base = input.appUrl.replace(/\/+$/, '')
   return {
     businessName: input.businessName,
     logoUrl: input.logoUrl,
@@ -28,8 +26,9 @@ export function appAccount(input: {
       unlimited: input.limit.unlimited,
       per: input.limit.per,
     },
-    // the same address the dashboard's Quote link page shows (T-149)
-    quoteLink: input.slug ? quoteLinkUrl(base, input.slug) : null,
+    // the same link the dashboard's Quote link page shows first (T-149, T-199)
+    quoteLink: input.links?.main ?? null,
+    alsoLink: input.links?.also ?? null,
     supportEmail: SUPPORT_EMAIL,
   }
 }

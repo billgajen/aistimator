@@ -53,18 +53,25 @@ You connect your own business WhatsApp number and keep using WhatsApp as you do 
 ## Which plans include quotes inside WhatsApp?
 <!-- id: whatsapp-plans; page: /app/whatsapp; flags: whatsapp -->
 
-{{whatsapp.plans}}. The free quotes a new business starts with do not include it.
+{{whatsapp.plans}}. A new business that has never had a plan also has it while it still has free quotes left: until they are used up, it works like {{freeStart.plan}}.
 
-{{#soon whatsapp}}It is {{soon}} on those plans: no business can connect a number yet. Sending your quote link in a WhatsApp chat works today on every plan, the free quotes included.{{/soon}}
-{{#live whatsapp}}Your subscription also has to be active. If it lapses, the "WhatsApp" page says "Your WhatsApp assistant is paused until your plan is active again." Your number stays connected, and {{product}} answers again as soon as the plan is active. Sending your quote link in a WhatsApp chat works on every plan.{{/live}}
+{{#soon whatsapp}}It is {{soon}}: no business can connect a number yet. Sending your quote link in a WhatsApp chat works today on every plan, and without a plan.{{/soon}}
+{{#live whatsapp}}
+On a plan, your subscription also has to be active. If it lapses, the "WhatsApp" page says "Your WhatsApp assistant is paused until your plan is active again." Your number stays connected, and {{product}} answers again as soon as the plan is active.
+
+If you end up without it, the assistant stops pricing in your chats. That happens when your free quotes are used up and you have no plan, when you pick or move down to a plan without it, or when your plan ends. Your own WhatsApp is untouched, the connection is kept, and your chats and settings stay. The assistant prices again as soon as you move to a plan that includes it.
+
+Sending your quote link in a WhatsApp chat works on every plan, and without a plan.
+{{/live}}
 
 ## What does the "WhatsApp" page in my dashboard show?
 <!-- id: whatsapp-page-today; page: /app/whatsapp; flags: whatsapp -->
 
-It depends on your plan.
+It depends on what your business can use.
 
-- On a plan without it, and on the free quotes, the page shows one line saying which plans WhatsApp quoting is part of, and a "See plans" button that opens your billing page.
-- On {{whatsapp.plans}}, the page shows "Connect your WhatsApp number", a "Connect WhatsApp" button, and under it "Connect manually", for a business that has its own Meta app.
+- On a plan without it, and on no plan once your free quotes are used up, the page shows one line saying which plans WhatsApp quoting is part of, and a "See plans" button that opens your billing page.
+- On {{whatsapp.plans}}, and for a new business while it still has free quotes left, the page shows "Connect your WhatsApp number", a "Connect WhatsApp" button, and under it "Connect manually", for a business that has its own Meta app.
+- While you are on your free quotes, a small "{{freeStart.plan}}" tag sits beside the page's title, "WhatsApp".
 
 {{#soon whatsapp}}Quotes inside a chat are {{soon}}. The page is there already, but connecting a number is not open to businesses yet. Until it is, use "Use it on WhatsApp" on the "Quote link" page.{{/soon}}
 {{#live whatsapp}}Once a number is connected, the page shows "Connected" with your number, "What happens next", "Try it" for a test message, and "Disconnect".{{/live}}
@@ -76,7 +83,7 @@ It depends on your plan.
 You cannot yet. Connecting a number is {{soon}}. Today, send your quote link in your chats instead: open "Quote link" and use "Use it on WhatsApp".
 {{/soon}}
 {{#live whatsapp}}
-Connect it on the "WhatsApp" page. It takes a few minutes. Your plan has to include it ({{whatsapp.plans}}).
+Connect it on the "WhatsApp" page. It takes a few minutes. Your plan has to include it ({{whatsapp.plans}}), or you are a new business that still has free quotes left.
 
 1. Open "WhatsApp" in the menu.
 2. Press "Connect WhatsApp". Meta, the company behind WhatsApp, opens in a small window.

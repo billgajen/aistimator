@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { getRegion, resolveRegionContext, type AppBootstrapResponse } from '@qolumns/shared'
+import { canUse, getRegion, onsiteNotInPlan, resolveRegionContext, type AppBootstrapResponse } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
-import { planHasRoomScan } from '@/lib/room-scan-intake'
+import { loadAccess } from '@/lib/access'
 import { loadWonLines, rememberTimeZone } from '@/lib/won'
 import { createAdminClient } from '@/lib/supabase/server'
 
@@ -14,13 +14,17 @@ import { createAdminClient } from '@/lib/supabase/server'
  * T-196: also `won`, the home tab's "Won this month" lines (null before the
  * first accepted estimate). `?tz=` is the phone's time zone: kept the first
  * time, when the business has none.
+ *
+ * T-199: any business can use the app, on any plan or none. `onsiteQuotes`
+ * says whether it can start a quote in it; the route that makes the quote
+ * decides again (POST /api/app/quotes).
  */
 export async function GET(request: Request) {
   const auth = await requireTenant()
   if (!auth.ok) return auth.response
   const { supabase, tenantId } = auth
 
-  const [{ data: tenant }, { data: site }, roomScan] = await Promise.all([
+  const [{ data: tenant }, { data: site }, access] = await Promise.all([
     supabase.from('tenants').select('name, currency, region, unit_system, time_zone').eq('id', tenantId).single(),
     supabase
       .from('tenant_sites')
@@ -30,8 +34,8 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle(),
-    // T-194: room scan is part of Pro and Business
-    planHasRoomScan(createAdminClient(), tenantId),
+    // T-199: what this business can use, by the one rule (room scan and on-site quotes)
+    loadAccess(createAdminClient(), tenantId),
   ])
   if (!tenant) {
     return NextResponse.json({ error: { code: 'TENANT_NOT_FOUND', message: 'Tenant not found' } }, { status: 404 })
@@ -58,7 +62,9 @@ export async function GET(request: Request) {
       // T-193: the units a room scan is shown in
       unitSystem: resolveRegionContext({ region: tenant.region as string | null, unit_system: (tenant as { unit_system?: string | null }).unit_system }).unitSystem,
     },
-    roomScan,
+    roomScan: canUse(access, 'room_scan'),
+    onsiteQuotes: canUse(access, 'onsite_quotes'),
+    onsiteNotInPlan: (({ heading, text, button }) => ({ heading, text, button }))(onsiteNotInPlan()),
     won: won ? { headline: won.lines.headline, onSite: won.lines.onSite } : null,
   }
   return NextResponse.json(body)

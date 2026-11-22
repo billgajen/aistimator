@@ -1,3 +1,4 @@
+import { PlanTag } from '@/components/dashboard/PlanTag'
 import {
   OPENING_WORDS,
   formatScanArea,
@@ -108,14 +109,17 @@ function Area({ room, view, modelPath }: { room: ScanRoomView; view: RoomScanVie
   )
 }
 
-export function RoomScanCard({ view, modelPath, className = '' }: { view: RoomScanView; modelPath: string | null; className?: string }) {
+export function RoomScanCard({ view, modelPath, className = '', tag = null }: { view: RoomScanView; modelPath: string | null; className?: string; /** T-199: on the free start, the plan that keeps room scan */ tag?: string | null }) {
   const u = view.units
   const t = view.total
   const several = view.rooms.length > 1
   return (
     <div className={`overflow-hidden rounded-2xl border border-tape/40 bg-butter/40 ${className}`} data-testid="room-scan-card">
       <div className="px-5 pb-3 pt-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Room scan</p>
+        <p className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+          Room scan
+          <PlanTag name={tag} className="normal-case" />
+        </p>
         <p className="mt-0.5 text-sm text-text-primary" data-testid="room-scan-priced">
           {view.pricing?.sentence ?? 'Measured on site with the room scan.'}
         </p>

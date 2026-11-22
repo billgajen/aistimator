@@ -24,6 +24,8 @@ export interface MemoryDbOptions {
   users?: Record<string, string>
   /** Tables whose rows are keyed by a column other than `id` (a one-to-one row) */
   keys?: Record<string, string>
+  /** T-199: database functions a test stands in for, by name (the answer is the function's own) */
+  functions?: Record<string, (args: MemRow, tables: Record<string, MemRow[]>) => unknown>
 }
 
 type Filter = (row: MemRow) => boolean
@@ -203,6 +205,8 @@ export function memoryDb(tables: Record<string, MemRow[]>, options: MemoryDbOpti
     from: (table: string) => new Query(table),
     rpc: async (name: string, args: MemRow) => {
       log.push({ table: `rpc:${name}`, op: 'rpc', payload: args })
+      const stand = options.functions?.[name]
+      if (stand) return { data: stand(args, tables), error: null }
       if (name !== 'claim_ops_alert') return { data: null, error: { code: 'XX000' } }
       const kind = args.p_kind as string
       const existing = rowsOf('ops_alerts').find((r) => r.kind === kind)

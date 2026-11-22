@@ -12,7 +12,7 @@
  *
  * What a plan includes is the owner's decision and is not changed here.
  */
-import { offeredPlans } from '@qolumns/shared'
+import { ADDRESS_COPY, APP_DOMAIN, addressHostFrom, appPlanLines, offeredPlans } from '@qolumns/shared'
 import type { PlanChannel, PlanDefinition, PlanFeatureSet } from '@qolumns/shared'
 import { PRICING_DEMO_LINKS } from './site-copy'
 
@@ -68,10 +68,34 @@ export const PLAN_CHANNEL_LINES: Record<PlanChannel, PlanLine> = {
     found: 'Built, and running for our own test business since 17 November 2026. Not open to other businesses: Meta has not reviewed the app, so nobody else can connect a number (OWNER-TODO, T-181). (Sharing your quote link in a WhatsApp chat works on every plan and is not this.)',
   },
   mobile_app: {
-    label: 'An app for pricing a job while you are on site',
+    // T-199: the app itself comes with every plan (PLAN_APP below); this channel is starting a quote in it
+    label: 'On-site quotes in the app: price a job while you are there',
     live: false,
-    found: 'Built, not released: the app is in no app store and no business has it.',
+    found: 'Built, not released: the app is in no app store and no business has it. Since T-199 the app is open to every business; starting a quote in it is for plans with this channel, and for the free start.',
   },
+}
+
+/**
+ * T-199 (the owner's decision): the mobile app comes with every plan: quotes, approve and send,
+ * notifications, the account. Only starting a quote in it is a plan matter (`mobile_app` above).
+ * One flag for both lines (the `live` of `mobile_app`): the app is released or it is not.
+ */
+export const PLAN_APP: PlanLine = {
+  label: 'The mobile app: see, approve and send your quotes from your phone',
+  // not a switch of its own: it reads the app's one flag, the `live` of the `mobile_app` line above
+  get live(): boolean {
+    return PLAN_CHANNEL_LINES.mobile_app.live
+  },
+  found: 'Built, not released (as above). Any business can sign in: no plan check stands in front of the app.',
+}
+
+/**
+ * T-199: is a business's own address (yourname.<our domain>) switched on? ONE setting says so for the
+ * whole product: `NEXT_PUBLIC_OWN_ADDRESS_HOST`, set once the Worker and its DNS record serve
+ * (Docs/OWNER-TODO.md). Until then the dashboard offers nothing and the site says "Coming soon".
+ */
+export function ownAddressLive(): boolean {
+  return addressHostFrom(process.env.NEXT_PUBLIC_OWN_ADDRESS_HOST) !== null
 }
 
 export const PLAN_FEATURE_LINES: Partial<Record<keyof PlanFeatureSet, PlanLine>> = {
@@ -89,6 +113,11 @@ export const PLAN_FEATURE_LINES: Partial<Record<keyof PlanFeatureSet, PlanLine>>
     label: 'Measure a room by scanning it with your phone',
     live: false,
     found: 'Built, not released: it needs the on-site app in a build that has never been shipped.',
+  },
+  own_address: {
+    label: ADDRESS_COPY.planLine(APP_DOMAIN),
+    live: ownAddressLive(),
+    found: 'Built in T-199. Live once the Worker that serves the addresses is deployed and NEXT_PUBLIC_OWN_ADDRESS_HOST is set; until then nothing in the dashboard offers it.',
   },
   multiple_users: {
     label: 'Logins for your whole team',
@@ -116,12 +145,14 @@ export const PLAN_FEATURE_LINES: Partial<Record<keyof PlanFeatureSet, PlanLine>>
  * something a business cannot use yet, so they are not claims about the live
  * product and are never written through `says`.
  */
-export type NotLiveYet = 'whatsapp' | 'app' | 'roomScan'
+export type NotLiveYet = 'whatsapp' | 'app' | 'roomScan' | 'ownAddress'
 
 const FLAG_LINE: Record<NotLiveYet, PlanLine> = {
   whatsapp: PLAN_CHANNEL_LINES.whatsapp,
   app: PLAN_CHANNEL_LINES.mobile_app,
   roomScan: PLAN_FEATURE_LINES.lidar_scanning!,
+  // T-199: a fourth thing shown before it is live
+  ownAddress: PLAN_FEATURE_LINES.own_address!,
 }
 
 /** Can a business use it today? */
@@ -194,6 +225,12 @@ export function roomScanPlanLine(plans: PlanDefinition[] = sitePlans()): string 
   return plan ? `Included in ${plan.name}.` : null
 }
 
+/** T-199: "Mobile app: every plan. On-site quotes in the app: Pro." The plans named are the ones the site shows. */
+export function appPlanSentence(plans: PlanDefinition[] = sitePlans()): string {
+  const lines = appPlanLines(plans)
+  return `${lines.everyPlan}. ${lines.onsite}.`
+}
+
 /** "Coming soon to iPhone", or "On iPhone" once the app is live */
 export function appAvailability(): string {
   return isLive('app') ? `On ${UPCOMING.app.platform}` : `${COMING_SOON} to ${UPCOMING.app.platform}`
@@ -215,9 +252,12 @@ export function upcomingFaq(): Array<{ q: string; a: string }> {
     },
     {
       q: 'Is there an app?',
-      a: isLive('app')
-        ? `Yes. The ${UPCOMING.app.platform} app prices a job while you are on site, and your dashboard works in any phone’s browser.`
-        : `An ${UPCOMING.app.platform} app for pricing a job while you are on site is coming soon. Today your dashboard works in your phone’s browser.`,
+      // T-199: who gets the app and who can start a quote in it, in the words of `appPlanLines`
+      a: `${
+        isLive('app')
+          ? `Yes. The ${UPCOMING.app.platform} app shows your quotes and lets you approve and send them, and your dashboard works in any phone’s browser.`
+          : `An ${UPCOMING.app.platform} app is coming soon. Today your dashboard works in your phone’s browser.`
+      } ${appPlanSentence()}`,
     },
   ]
 }
@@ -281,8 +321,10 @@ export const PLAN_HOSTED_PAGES: PlanLine = {
  * group.
  */
 export function planLines(plan: PlanDefinition): PlanLine[] {
-  const lines: PlanLine[] = [...plan.channels.map((c) => PLAN_CHANNEL_LINES[c]), PLAN_HOSTED_PAGES]
-  for (const key of ['custom_branding', 'calibration_insights', 'lidar_scanning', 'multiple_users', 'priority_support'] as const) {
+  // T-199: the app is on every plan (PLAN_APP); starting a quote in it is the `mobile_app` channel's own line
+  const onsite = plan.channels.includes('mobile_app') ? [PLAN_CHANNEL_LINES.mobile_app] : []
+  const lines: PlanLine[] = [...plan.channels.filter((c) => c !== 'mobile_app').map((c) => PLAN_CHANNEL_LINES[c]), PLAN_HOSTED_PAGES, PLAN_APP, ...onsite]
+  for (const key of ['custom_branding', 'calibration_insights', 'lidar_scanning', 'own_address', 'multiple_users', 'priority_support'] as const) {
     const line = PLAN_FEATURE_LINES[key]
     if (plan.features[key] && line) lines.push(line)
   }

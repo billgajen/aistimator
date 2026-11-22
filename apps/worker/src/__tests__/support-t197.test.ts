@@ -345,8 +345,9 @@ describe('the owner’s daily summary', () => {
     const { supabase } = fresh()
     const { sent, send } = recorder()
     vi.spyOn(console, 'log').mockImplementation(() => undefined)
-    await supportDaily(supabase, ENV, new Date(), send)
-    expect(await supportDaily(supabase, ENV, new Date(), send)).toBe('too_soon')
+    // at the fixtures' own time, not the clock's (with the clock's, the fixtures are a day old the day after they were written)
+    await supportDaily(supabase, ENV, NOW, send)
+    expect(await supportDaily(supabase, ENV, new Date(NOW.getTime() + 60_000), send)).toBe('too_soon')
     expect(sent).toHaveLength(1)
   })
 

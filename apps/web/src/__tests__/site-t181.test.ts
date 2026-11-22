@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { FREE_ALLOWANCE, SUPPORT_EMAIL, offeredPlans } from '@qolumns/shared'
 import { HERO, NOTICES, PAGE_META } from '@/lib/marketing/home-copy'
 import { marketingExample } from '@/lib/marketing/examples'
-import { BILLED_IN_ADVANCE, PLAN_CHANNEL_LINES, PLUS_TAX, PRICING_DESCRIPTION, planCards, planLines, sitePlans } from '@/lib/marketing/plan-claims'
+import { BILLED_IN_ADVANCE, PLAN_CHANNEL_LINES, PLAN_FEATURE_LINES, PLUS_TAX, PRICING_DESCRIPTION, planCards, planLines, sitePlans } from '@/lib/marketing/plan-claims'
 import { DATA_DELETION, FOOTER } from '@/lib/marketing/site-copy'
 
 const ROOT = join(__dirname, '..', '..', '..', '..')
@@ -48,7 +48,8 @@ describe('T-181: plan cards say what the business gets', () => {
   it('each line is a sentence about the business or its customers, not a feature’s name', () => {
     for (const plan of offeredPlans()) {
       for (const line of planLines(plan)) {
-        expect(line.label.split(' ').length, line.label).toBeGreaterThanOrEqual(5)
+        // T-199: the own-address line is the owner's own wording, with the address as its example
+        if (line !== PLAN_FEATURE_LINES.own_address) expect(line.label.split(' ').length, line.label).toBeGreaterThanOrEqual(5)
         expect(line.label, line.label).not.toMatch(/^(Website widget|Hosted estimate pages|Priority support|Multiple team members|WhatsApp quoting)$/)
       }
     }

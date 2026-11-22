@@ -3548,3 +3548,164 @@ cd apps/mobile && DEVELOPER_DIR=$HOME/Downloads/Xcode.app/Contents/Developer GEM
 - **The 90-day deletion** ran against a database held in memory, not on a real timer.
 - **The model varies.** It scored 33 of 33 in the last run; the check passes at 85% and prints every wrong
   answer word for word, so read that part of a full run's log.
+
+## T-199 — The free start works like Pro, on-site quotes need Pro, own address on Pro
+
+Built 22 November 2026. **Not deployed.** It sits on top of T-197 and T-198, which are also not deployed. To put
+all three live: "deploy T-197, T-198 and T-199": **migrations 47, 48, then 49**
+(`bash scripts/deploy-migration-49.sh`), then the worker (for T-197 and T-198; T-199 did not change it), then
+the web.
+
+**A business's own address stays off after that deploy.** Nothing is offered in the dashboard and the site says
+"Coming soon" beside it, until you do "Switching the addresses on" below. Everything else in this ticket (the
+free start, the app's rule, the new wording) is live with the web deploy.
+
+### What changes for businesses the moment the web is deployed
+
+- **Every business with no subscription and free quotes left gets Pro's features**: WhatsApp quoting (once that
+  is live), on-site quotes and room scan in the app, no "Prepared with Qolumns" badge. Home tells them: "You're
+  trying everything in Pro. N free quotes left."
+- **A business on Starter, or with no plan and no free quotes left, cannot start a quote in the app.** Before,
+  the site said the app was for Pro and Business but the server never checked: any signed-in business could
+  start one. Now anyone can sign in and use the rest of the app, "New quote" shows "On-site quotes are part of
+  Pro" for these businesses, and the server refuses too. (The app is in no store, so no business is using it.)
+- **The badge:** a free-start business's estimates lose the "Prepared with Qolumns" line while its free quotes
+  last, and get it back when they are used up, unless it is then on Pro or Business.
+
+### The deploy script prints who holds a reserved name
+
+- `deploy-migration-49.sh` prints `holders` before and after: every business whose quote-link name is one of
+  the reserved names. **Expected: only `example-home-services`** (the public demo; its name is reserved for it).
+  If another business is listed, tell me: nobody is renamed, their link keeps working, and they simply could not
+  choose that name again.
+- I ran the script whole against a local copy at migration 48, and again at 49. I could not read production.
+
+### One thing to look at in Cloudflare first
+
+- [ ] Open **Cloudflare → qolumns.com → DNS → Records** and read the names of every record. I could not read
+  this list (the read was refused here). From public DNS I found two subdomains, `www` and `pm-bounces`, and
+  both are reserved. **If you see any other subdomain there, tell me its name before switching the addresses
+  on**, so I can reserve it: otherwise a business could choose it as its address.
+
+### Switching the addresses on (when you want them; about 15 minutes; no cost)
+
+Cost check: a proxied wildcard record, its certificate (the zone's own, which covers `*.qolumns.com`) and the
+Worker are all on Cloudflare's free plan. The limit is **100,000 Worker requests a day**; one view of a quote
+page is about 11, so roughly 9,000 page views a day across every business's address. Vercel needs no change.
+
+Do these in order. Each step is safe to stop after.
+
+- [ ] **1. Make a key** and keep it for steps 2 and 3: `openssl rand -hex 32`
+- [ ] **2. Deploy the addresses Worker and give it the key:**
+
+```
+cd apps/worker && pnpm deploy:addresses
+npx wrangler secret put ADDRESS_PROXY_KEY -c wrangler.addresses.toml --env production
+```
+
+  The first command creates a Worker named `qolumns-addresses` with the route `*.qolumns.com/*`. It is separate
+  from the job worker (`estimator-worker`) and touches nothing of it. The second asks for the key: paste it.
+- [ ] **3. Vercel → estimator-web → Settings → Environment Variables (Production):** add `ADDRESS_PROXY_KEY` with
+  the same key. Do not redeploy yet.
+- [ ] **4. Add the DNS record** (Cloudflare → qolumns.com → DNS → Records → Add record):
+
+  | Field | Value |
+  |---|---|
+  | Type | `AAAA` |
+  | Name | `*` |
+  | IPv6 address | `100::` |
+  | Proxy status | **Proxied** (orange cloud) |
+  | TTL | Auto |
+
+  `100::` is Cloudflare's own placeholder for "a Worker answers this, there is no server behind it". The record
+  must be proxied: a grey cloud would make every address fail. `www` and `pm-bounces` keep their own records,
+  which win over the wildcard. If `www` is itself proxied (orange cloud), the Worker answers it with a redirect
+  to the same page on `qolumns.com`, which is where `www` goes today.
+- [ ] **5. Let the storage bucket take photos from the addresses:**
+
+```
+bash scripts/deploy-t174-settings.sh cors
+```
+
+  A customer's photo goes from the page straight to the storage bucket, and the bucket only accepts pages it
+  knows. This adds `https://*.qolumns.com` to the list (it prints the list when done; the four addresses it had
+  stay). **Without this step a customer on an address cannot add a photo.** `--dry-run` first shows what it
+  would send.
+- [ ] **6. Check before any business sees it:**
+  - `https://nobody-here.qolumns.com` lands on `https://qolumns.com`.
+  - `https://nobody-here.qolumns.com/login` lands on `https://qolumns.com/login`.
+  - `https://www.qolumns.com` and `https://qolumns.com` open the main site as before, and an email still sends
+    (pm-bounces is Postmark's).
+- [ ] **7. Switch it on:** in Vercel add `NEXT_PUBLIC_OWN_ADDRESS_HOST` = `qolumns.com` (Production), then
+  redeploy the web (this value is built into the pages, so it needs a deploy, not only a save).
+
+### To test with one business (Bluum, on Pro), after step 7
+
+- [ ] Home shows "Choose your own address" with the box filled with Bluum's quote-link name. Type `www`: "can't
+  be used". Type a name: "… is free".
+- [ ] Press "Choose this address", read the confirm step, press "Use ….qolumns.com".
+- [ ] The Quote link page now shows the address first and "Also works" with the old link. Scan the QR code: it
+  opens the address.
+- [ ] Open the address on your phone. The address bar keeps it. Send a request **with a photo**: the photo
+  uploads, and the estimate opens on the same address. (If the photo will not upload, step 5 was missed.)
+- [ ] Open `https://<the address>.qolumns.com/app`: it goes to `https://qolumns.com/app`.
+- [ ] Open the old link (`qolumns.com/quote/<name>`): it still works.
+- [ ] **Admin → Tenants:** Bluum's row shows its address, with the change box. You do not need to change it.
+- To see the forward: a test business on Starter with an address (set by you in Admin) opens its quote link
+  instead, and the address bar changes to `qolumns.com/quote/…`.
+
+To switch the addresses off again: remove `NEXT_PUBLIC_OWN_ADDRESS_HOST` in Vercel and redeploy. Every address
+then forwards to the main site within about a minute, and every quote link keeps working. Nothing is lost.
+
+### Decisions I made that you may want to change
+
+- **Addresses are off until you switch them on** (one setting), so no business is ever shown an address that
+  does not open.
+- **A business that has ever had a subscription never goes back to the free start**, even with free quotes
+  left. Cancelling gives no Pro features.
+- **A failed read means "no Pro features"** for that one request (the opposite of the quote limit, which lets
+  the quote through). A customer's request is still always priced.
+- **Starter's line about the address is on the Quote link page only.** A business with no plan at all sees the
+  usual "pick a plan" flow, not this line.
+- **An address your admin change removes or replaces is held for 90 days**, also from the business that had it
+  if it is deleted.
+- **In the app, a failed payment now reads** "A payment for your account did not go through. Your quotes keep
+  running while it is tried again." The old line told them to update their card, which the App Store rule does
+  not allow. The dashboard still says it with its button.
+- **A business with no plan and no free quotes left** used to get an on-site quote "saved, not priced". It is
+  now refused before anything is saved.
+
+### The app on your iPhone
+
+- The phone showed as "unavailable" to this Mac (not plugged in, or locked), so I did not rebuild. Plug it in,
+  unlock it, and run (the same command as T-192):
+
+```
+cd apps/mobile && DEVELOPER_DIR=$HOME/Downloads/Xcode.app/Contents/Developer GEM_HOME=$HOME/.qolumns-pods-sys PATH=$HOME/.qolumns-pods-sys/bin:$PATH LANG=en_US.UTF-8 APP_VARIANT=dev npx expo run:ios --device --configuration Release
+```
+
+- The app talks to the live site. Until T-199's web is deployed, the live server says nothing about on-site
+  quotes, so the new build opens the form as before for every business. Bluum is on Pro, so you will not see the
+  new screen on your phone unless you sign in as a Starter test business after the deploy.
+
+### Not proven here
+
+- **The addresses on the real domain.** I ran the Worker on this Mac (`<name>.localhost:8799`) against the local
+  site, in a real browser: the form, a request sent without a photo, the customer's question page on the same
+  address, no cookie set, and the dashboard path sent to the main address. The forward when a plan ends is a
+  unit test and a curl check, not a browser run. Cloudflare's route, the wildcard
+  record and its certificate have not been seen working, and neither has Vercel answering the Worker's requests
+  at volume.
+- **A photo added on an address.** On this Mac the upload from a local address was refused by the storage
+  bucket, which is what its rule says today. Step 5 adds the addresses to that rule; I could not run it (it is
+  your setting) and so have not seen a photo go through on an address. The test list above has you try it.
+  The room scan's 3D viewer on an address needs the same step.
+- **The human check (Turnstile) on an address.** Its key is for `qolumns.com`, which by Cloudflare's rules
+  covers its subdomains, and a check that does not run never blocks a customer (T-178). Not seen on the real
+  domain.
+- **What Cloudflare does past 100,000 requests in a day.** By its documentation the addresses stop opening until
+  the next day (UTC) and the quote links are unaffected. Not tried.
+- **The Cloudflare DNS list** (above).
+- **The app on a real phone.** I saw the "On-site quotes are part of Pro" screen in the iPhone simulator against
+  the local stack (`.checks/t199/app-onsite-part-of-pro.png`).
+- **The billing webhook bringing the card back after an upgrade** is a unit test, not a real Stripe upgrade.

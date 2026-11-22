@@ -27,7 +27,8 @@ import type {
   QuoteDetailResponse,
   AmendmentSummary,
 } from '@qolumns/shared'
-import { roomScanOfAnswers, roomScanView } from '@qolumns/shared'
+import { freeStartTag, roomScanOfAnswers, roomScanView } from '@qolumns/shared'
+import { loadAccess } from '@/lib/access'
 import { CHECKER_SETTINGS_VERSION, QUESTIONS_OPEN_STATUS, askedQuestions, businessIsAsked, carrySources, isMadeByBusiness, serviceSuggestionOf, MAX_ADDED_SECTIONS, addedSections, alsoAskedOf, alsoAskedWithStates, editedSectionBreakdown, withSections } from '@qolumns/shared'
 import type { CombinedPricing, QuoteSection } from '@qolumns/shared'
 import { sectionTaxFor } from '@/lib/quote-sections-service'
@@ -256,7 +257,7 @@ export async function GET(
         quote.status === QUESTIONS_OPEN_STATUS && !isMadeByBusiness(requestRow?.source_json)
           ? askedQuestions((quote as { clarification_questions_json?: unknown }).clarification_questions_json)
           : [],
-      ...(roomScan && { roomScan }),
+      ...(roomScan && { roomScan, roomScanTag: freeStartTag(await loadAccess(supabase, auth.tenantId), 'room_scan') }),
     }
 
     return NextResponse.json(response)

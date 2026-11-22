@@ -18,11 +18,12 @@
  */
 import type Stripe from 'stripe'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { planForStripePrice, storedSubscriptionStatus, subscriptionLive } from '@qolumns/shared'
+import { businessAccess, canUse, planForStripePrice, storedSubscriptionStatus, subscriptionLive } from '@qolumns/shared'
 import type { PlanInterval, StoredSubscriptionStatus } from '@qolumns/shared'
 import { sendEmail, isPostmarkConfigured } from './postmark'
 import { paymentFailedEmail } from './billing-emails'
 import { businessEmailFor } from './business-email'
+import { offerAddressAgain } from './own-address'
 
 const iso = (seconds: number | null | undefined): string | null => (typeof seconds === 'number' && Number.isFinite(seconds) ? new Date(seconds * 1000).toISOString() : null)
 const idOf = (value: string | { id: string } | null | undefined): string | null => (typeof value === 'string' ? value : value?.id ?? null)
@@ -186,6 +187,11 @@ export async function syncSubscriptionFromStripe(
     return { ok: false, why: 'write_failed' }
   }
   console.log(`[Billing] Subscription stored for ${tenantId}: ${decision.row.plan_id} ${facts.status}`)
+
+  // T-199: a plan that includes the business's own address has just started: Home offers it again
+  // (the one rule decides what each row gives; nothing is read here but the two rows)
+  const gives = (row: { plan_id?: string | null; status?: string | null } | null) => canUse(businessAccess({ subscription: row, region: null, quotesUsed: null }), 'own_address')
+  if (gives(decision.row as { plan_id?: string | null; status?: string | null }) && !gives(existing)) await offerAddressAgain(admin as Parameters<typeof offerAddressAgain>[0], tenantId)
 
   if (decision.paymentFailed) await notifyPaymentFailedOnce(admin, tenantId)
   return { ok: true, tenantId, status: facts.status, planId: decision.row.plan_id as string }

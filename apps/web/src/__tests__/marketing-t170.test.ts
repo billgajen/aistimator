@@ -233,11 +233,13 @@ describe('T-170: Pricing says only what a business can use today', () => {
     expect(planLines(starter!).map((l) => [l.label, l.live])).toEqual([
       ['Customers see your price straight away, on your website or from a link you share', true],
       ['Every customer gets their own estimate page to open, accept and come back to', true],
+      // T-199: the mobile app comes with every plan (not released yet)
+      ['The mobile app: see, approve and send your quotes from your phone', false],
     ])
     expect(planLines(pro!).filter((l) => l.live).map((l) => l.label).slice(2)).toEqual(['Estimates under your brand alone, with no badge of ours', 'See how your estimates compare with your final invoices'])
     // T-193: the room scan is on Pro
-    expect(planLines(pro!).filter((l) => !l.live).map((l) => l.label)).toEqual(['Quotes inside WhatsApp, on your own business number', 'An app for pricing a job while you are on site', 'Measure a room by scanning it with your phone'])
-    expect(planLines(business!).filter((l) => !l.live).map((l) => l.label)).toEqual(['Quotes inside WhatsApp, on your own business number', 'An app for pricing a job while you are on site', 'Measure a room by scanning it with your phone', 'Logins for your whole team', 'Faster answers from us when you need help'])
+    expect(planLines(pro!).filter((l) => !l.live).map((l) => l.label)).toEqual(['Quotes inside WhatsApp, on your own business number', 'The mobile app: see, approve and send your quotes from your phone', 'On-site quotes in the app: price a job while you are there', 'Measure a room by scanning it with your phone', 'Your own address: yourname.qolumns.com'])
+    expect(planLines(business!).filter((l) => !l.live).map((l) => l.label)).toEqual(['Quotes inside WhatsApp, on your own business number', 'The mobile app: see, approve and send your quotes from your phone', 'On-site quotes in the app: price a job while you are there', 'Measure a room by scanning it with your phone', 'Your own address: yourname.qolumns.com', 'Logins for your whole team', 'Faster answers from us when you need help'])
     for (const plan of offeredPlans()) expect(planLines(plan).map((l) => l.label).join(' '), plan.id).not.toMatch(/\bSMS\b|text message|by text/i)
     expect(PLAN_CHANNEL_LINES.sms.shown).toBe(false)
     for (const plan of offeredPlans()) {

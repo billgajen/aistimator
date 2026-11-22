@@ -130,6 +130,8 @@ export interface HelpState {
   quotesAllowed: number | null
   /** The free offer is counted in total; a plan by the month */
   allowancePer: 'month' | 'total' | null
+  /** T-199: on the free start, the plan the business works like while free quotes are left, and how many are left */
+  freeStart?: { plan: string; left: number } | null
   services: Array<{ name: string; active: boolean }> | null
   /** The business has confirmed its prices (Home's "Check your prices") */
   pricesChecked: boolean | null
@@ -176,6 +178,7 @@ export function stateLines(state: HelpState): string[] {
         : 'no limit on quotes'
     lines.push(`plan: ${state.plan} (${allowed}${used})`)
   }
+  if (state.freeStart) lines.push(`free start: every ${state.freeStart.plan} feature while free quotes are left (${state.freeStart.left} left)`)
   if (state.services) {
     const names = state.services.slice(0, 20).map((s) => `"${oneLine(s.name, 60).replace(/"/g, '')}" (${s.active ? 'on' : 'off'})`)
     lines.push(`services: ${state.services.length}${names.length ? `: ${names.join(', ')}` : ''}`)

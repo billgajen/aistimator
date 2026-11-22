@@ -15,6 +15,228 @@
 
 ## Issues & Resolutions
 
+### 2026-11-22: T-199 — The free start works like Pro; on-site quotes need Pro; Pro chooses its own address (AD-085, AD-086)
+
+**Built, not deployed.** Needs deploying after T-197 and T-198: **migration 49 first**
+(`bash scripts/deploy-migration-49.sh`), then the web. The job worker's code did not change. The live code keeps
+working with migration 49 in place (it only adds, and the quote link is untouched). **A business's own address
+stays off until the owner switches it on** (a DNS record, a second small Worker, two settings: OWNER-TODO, T-199).
+Until then the dashboard offers no address and the site says "Coming soon" beside it.
+
+#### What a business gets
+- **The free start works like Pro** (the owner's decision, 21 Nov 2026; it replaces part of T-165, see the note
+  there). A business that has never had a subscription and still has free quotes left gets every Pro feature and
+  channel: WhatsApp quoting, on-site quotes in the app, room scan, no "Prepared with" badge, calibration
+  insights, and choosing its own address. The allowance is unchanged: 10 priced quotes in total, no card.
+- **Home says so in one quiet line:** "You're trying everything in Pro. 7 free quotes left." A small "Pro" tag
+  sits beside each Pro feature it is lent (the WhatsApp page, the own-address card on Home and on the Quote link
+  page, a quote's room scan card), so it knows what it would keep on Pro.
+- **The free offer reads "Try every Pro feature free: 10 quotes, no card"** everywhere the full offer is shown
+  (`freeOfferLabel()`; the header's short "Try it free" is unchanged).
+- **The app is open to every business**, on any plan or none: its quotes, approve and send, notifications, the
+  account, reporting a problem. **"New quote" needs on-site quotes** (Pro, Business, the free start). For
+  everyone else the tab shows one screen and starts nothing: "On-site quotes are part of Pro", "Your plan
+  includes everything else in the app. To add on-site quotes, change your plan in your Qolumns account.", "OK".
+- **Its own address** (`yourname.qolumns.com`), once switched on: a "Choose your own address" card at the top of
+  Home and of the Quote link page, a live check as it types ("bluum.qolumns.com is free" / "is taken" / "can't be
+  used"), and a confirm step ("This is your address for good. You can't change it yourself later."). Then the
+  address is the main link on the Quote link page, in the QR code, on every copy button and in the app, with the
+  old link under it as "Also works". Starter sees its normal link and one quiet line on the Quote link page:
+  "Get your own address, like bluum.qolumns.com, on Pro."
+- **Pricing and Features:** "Mobile app: every plan", "On-site quotes in the app: Pro and Business", and "Your own
+  address: yourname.qolumns.com" for Pro and Business, marked "Coming soon" until the address is switched on.
+
+#### AD-085: one rule says what a business can use; the free start is Pro's features on the free allowance
+- **The rule is `businessAccess` in `packages/shared/src/access.ts`** (pure), with `canUse(access, capability)`.
+  Three cases: on a live plan, that plan's features and channels; no subscription row ever and free quotes left,
+  the features of `FREE_START_PLAN_ID` (Pro); anything else, nothing that needs a plan. Six capabilities, each
+  one channel or one feature of the plan definitions: `whatsapp`, `onsite_quotes`, `room_scan`, `no_badge`,
+  `calibration_insights`, `own_address`.
+- **One reader per app.** The web's is `lib/access.ts` (`loadAccess`, `businessCan`): three reads (the
+  subscription row, every month's usage, the region). Every gate asks it: the WhatsApp assistant
+  (`whatsapp-access.ts`), room scan (`room-scan-intake.ts`), the badge (`plan-features.ts`), on-site quotes
+  (`POST /api/app/quotes`), the address (`own-address.ts`), and the help assistant's account of the business
+  (`help/state.ts`). The app asks the server (`onsiteQuotes` in the bootstrap). The job worker gates nothing by
+  plan, and still does not.
+- **No plan check is written inline.** A unit test walks `apps/web/src`, `apps/worker/src` and the app and fails
+  on any file that reads a plan's channels or features to decide; the three files that describe plans (Pricing's
+  cards and table, the billing page's mapping) are named as the exceptions. The old helpers (`planHasRoomScan`
+  and the like) are gone.
+- **A read that fails answers "nothing"** (`NO_ACCESS`): a feature that needs a plan stays off rather than run
+  for a business that may not have it. This is the opposite of the quote limit, which fails open
+  (`lib/plan-limits.ts`): a customer's request is always priced; an extra is not lent on a guess.
+- **Losing a capability deletes nothing.** The rule is read on every use, so quotes, scans, chats, the WhatsApp
+  connection, the logo and colours, and the address all stay, and work again the moment the business has the
+  capability back. What switches off, and how:
+  - WhatsApp: the assistant stops pricing, exactly as for a business without the plan before. The business's
+    own WhatsApp is untouched.
+  - Room scan: refused with the existing "Room scan is part of Pro" line.
+  - On-site quotes: the app's screen, and a 403 from the server in the same words (below).
+  - The address: answers with a redirect to the quote link (AD-086).
+  - Branding: the "Prepared with Qolumns" badge returns.
+- **The free start is only for the allowance that never resets** (`per: 'total'`). The older monthly allowance
+  would otherwise make a business Pro for ever.
+- **A subscription row, live or not, ends the free start.** A business that cancels, or drops to Starter, does
+  not go back to being lent Pro, whatever its count of free quotes.
+- **The server decides on-site quotes too.** `POST /api/app/quotes` answers **403
+  `ONSITE_QUOTES_NOT_IN_PLAN`** with the screen's own words, so an older build of the app cannot get round it. A
+  send that already made its quote is answered before the check: nothing made is ever refused. The app's screen
+  takes its words from the server (`onsiteNotInPlan` in the bootstrap), with the shared ones as the fallback.
+- **The App Store rule holds by test.** No price, link, "Upgrade" or "Buy", and no instruction to go to a website
+  to pay, anywhere in the app: a unit test reads every string in `apps/mobile/app` and `apps/mobile/src`.
+  **One line was removed:** the home tab's "Update your card to keep your quotes running." (a failed payment)
+  now reads "A payment for your account did not go through. Your quotes keep running while it is tried again."
+  in the app only (`accountNoticeLine`); the dashboard keeps its own wording and its button.
+
+#### AD-086: a business's own address is its own field, served by a Worker that holds nothing
+- **Its own field** (`tenants.own_address`, migration 49), not the quote-link name. Choosing it does not use up
+  the quote link's one change. **The quote link is never touched:** `qolumns.com/quote/<name>` keeps working for
+  every business on every plan (AD-042, AD-052).
+- **One name, one business, across both fields.** No address may equal another business's quote-link name
+  (current or former), and no new quote-link name may equal another business's address or a held one. The
+  database answers (`own_address_taken`, the new `tenant_slug_taken`), and a trigger on `tenants` holds it with
+  a lock per name, so two requests for one name take turns. A business may use its own quote-link name as its
+  address (the box starts with it).
+- **Chosen once.** Only the service role writes the address (the same trigger refuses anyone else). The business
+  gets one choice (`PUT /api/tenant/address`); after that only the admin area changes it
+  (`PUT /api/admin/tenants/:id/address`), which writes `own_address_changes` and `admin_activity_logs` with who
+  did it. **The old name is held for 90 days** (`ADDRESS_HOLD_DAYS`), and the hold is written before the change,
+  so the name is never free even for a moment.
+- **Reserved names are one list** (`RESERVED_NAMES` in `packages/shared/src/own-address.ts`), shared by the
+  address and the quote-link name; the database keeps a copy (`reserved_slugs`) and a unit test checks they
+  match. T-199 added `cdn`, `dev`, `email`, `m`, `pm-bounces`, `q`, `staging`, `status`. **Nobody is renamed:** a
+  business already holding one as its quote-link name keeps it, and the deploy script lists any such business.
+- **Serving is a second, small Worker** (`apps/worker/src/addresses.ts` and `address-handler.ts`, settings in
+  `wrangler.addresses.toml`, route `*.qolumns.com/*`). It has no queue, no bucket and no database access. For a
+  request to `<name>.qolumns.com`:
+  - `/` shows the business's quote page: the main site's `/quote/<its quote-link name>`, fetched and answered
+    there, so the address bar keeps the address. Not a redirect.
+  - the paths under the quote page (`/q/`, `/room-model/`, `/api/public/`, `/_next/`, `/brand/`, `/photos/`, the
+    icons) are fetched from the main site as they are, so the estimate, the widget and their assets work there;
+  - **anything else (sign-in, the dashboard, the admin area, the rest of the site) is a 302 to the main
+    address**; a path that climbs out (`..`, `//`) counts as "anything else";
+  - an address whose business cannot use it now is a **302 to its quote link**; the address stays its own and
+    serves again when the business can use it;
+  - nobody's address, and reserved names such as `www`, are a 302 to the main address.
+- **No cookie crosses it:** none is passed on to the main site and `Set-Cookie` is taken off every answer.
+- **Whose address it is comes from the web app** (`GET /api/public/address/:name` → `{ slug, serve }`), kept for
+  a minute in the data centre's cache. So a plan that ends stops being served within about a minute.
+- **The customer stays on the address.** After the form is sent, the move to the estimate keeps the address
+  when the customer is on one (`onSameAddress`, in the widget), and a redirect of the main site's to a served
+  page is rewritten to the address.
+- **Rate limits stay per customer.** Everyone coming through the Worker would look like one caller to the main
+  site. The Worker passes each caller's own address on with a key both sides hold (`ADDRESS_PROXY_KEY`); the main
+  site believes it only with the right key (compared in full). **Without the key the Worker serves nothing:**
+  every address answers with a redirect to its quote link, which is always safe.
+- **One setting switches the feature on:** `NEXT_PUBLIC_OWN_ADDRESS_HOST` (the web) and `ADDRESS_HOST` (the
+  Worker) say where addresses live. Empty, nothing is offered, no address is shown as a link, the look-up
+  answers 404 and the site says "Coming soon". So no business is ever given a link that does not open.
+- **The live check is rate limited** (`address_check`, 120 a minute per business) and fails open like every
+  limit (AD-055). A check that cannot be made answers "taken", never "free".
+- **Offered again after an upgrade:** when the billing webhook stores a plan that includes the address for a
+  business whose row did not, "Later" is cleared and Home shows the card again (`offerAddressAgain`).
+
+#### The cost check (the ticket's rule: no extra cost)
+- Confirmed from Cloudflare's own documentation before building item 3: a proxied wildcard DNS record is
+  available on the free plan, its certificate is covered by the zone's Universal SSL (one level of subdomain),
+  and Workers' free allowance is 100,000 requests a day. One view of a quote page made 11 requests through the
+  Worker locally, so the first limit is roughly 9,000 page views a day across every business's address. Vercel
+  needs no plan change: the Worker asks the main site as any visitor does.
+- If traffic ever approaches the allowance, the Worker's paid plan is the only thing that would cost money, and
+  the owner decides then. Past the allowance the free plan answers with an error for the addresses; the quote
+  links are unaffected.
+
+#### Where it differs from the ticket, and why
+- **Addresses are built but switched off.** The ticket has the plan line "shown as coming soon until deployed";
+  the one setting above makes that true of the whole feature, not only of the line.
+- **"Emails" in the list of places the address shows:** no email of ours carries a business's quote link
+  (customer emails link to the customer's own estimate), so nothing changed there.
+- **The Cloudflare DNS list could not be read from here** (the read was refused). The reserved names include the
+  two subdomains public DNS shows (`www`, `pm-bounces`). The owner checks the list once (OWNER-TODO).
+- **Reserved-name holders are listed by the deploy script, not in this report:** production cannot be read from
+  here. Locally only the public demo holds one, and its name is reserved for it.
+- **A behaviour change beyond the ticket's list:** a business with no plan and its free quotes used up used to
+  get an on-site quote "saved, not priced" (T-182). It is now refused before anything is saved, as the ticket's
+  rule says. `verify-t182` was reworked to match.
+- **Starter could start a quote in the app until now.** The site said the app was for Pro and Business, but no
+  route checked: `POST /api/app/quotes` priced an on-site quote for any signed-in business within its quote
+  limit. It now asks the rule. The app is in no store, so no business loses anything it was using.
+- **Starter's quiet line is on the Quote link page only**, and only for a business on a plan that lacks the
+  address. A business with no plan at all is shown the "pick a plan" flow as before, not a second line.
+- **`a.b.qolumns.com` is not an address:** the certificate covers one level, so a deeper name is sent to the
+  main site.
+
+#### Found by running it
+- **The Worker would not start:** its entry file exported its handler and its helpers, and the Workers runtime
+  refuses an entry that exports anything else. The rules moved to `address-handler.ts`; a unit test holds the
+  entry to one export.
+- **The look-up kept answering "serve" after a plan ended:** Next reused the route's database reads. The route
+  now reads the request's headers, which makes every call fresh (the quote page has the same line for the same
+  reason, T-178, KC-006).
+- **A worker unit test of T-197 failed the day after it was written** (`support-t197`: the fixtures' date against
+  the clock). It now runs at the fixtures' own time.
+- **A photo could not have been added on an address in production.** The form sends a photo from the page
+  straight to the storage bucket, and the bucket's rule lists the pages it accepts by exact address (T-174):
+  the main address, the previous one and local development. A page open at `bluum.qolumns.com` is none of them.
+  Found on resuming, by reading how the form uploads, and then seen in a browser on this machine (the upload
+  from a local address was refused: "blocked by CORS policy"); nothing in the unit tests could see it. The bucket's rule
+  accepts one `*` in an address (Cloudflare's documentation), so `scripts/deploy-t174-settings.sh cors` now also
+  sends `https://*.qolumns.com`. **It is a setting, so the owner runs it** (OWNER-TODO, step 5 of switching the
+  addresses on); the room scan's 3D model, which the viewer fetches from the bucket, needs the same rule.
+- **The ticket stopped part-way on 22 Nov:** the Mac's disk filled while the simulator took the app's screenshot,
+  and the machine was restarted. Nothing was lost; on resuming, one unit test failed (`backlog-t189`: the two new
+  settings were not yet named as our own in its list of providers) and was fixed.
+
+#### Constraints
+- Ask the rule. A new gate is `canUse(await loadAccess(db, tenantId), '<capability>')`; a new thing a plan
+  switches on is one more line in `CAPABILITIES`. The unit test fails on an inline plan check.
+- When a DNS record is added for a new subdomain of the main domain, add its name to `RESERVED_NAMES` and to a
+  migration first: the wildcard would otherwise let a business choose it.
+- Do not set `NEXT_PUBLIC_OWN_ADDRESS_HOST` before the Worker and its DNS record serve.
+- Anything a quote page fetches from another origin (the bucket today) must accept `https://*.<main>` as well
+  as the main address: the page's origin on an address is the address.
+- A new public path that a quote page loads must be added to `SERVED_PREFIXES` (`own-address.ts`), or it is sent
+  to the main site and the page on an address loses it.
+- The addresses Worker's entry file exports its handler and nothing else.
+- The app carries no price, link or buying words; a new string there is read by the unit test.
+
+#### Checks
+- Unit, new: web `access-t199` (26: the one rule, each switch-off and that nothing is deleted, the on-site route,
+  no inline plan check, the words) and `own-address-t199` (31: the name, choosing once, uniqueness across both
+  fields, reserved names, the admin's change and the 90-day hold, serving, forwarding and coming back, showing);
+  worker `addresses-t199` (16: the quote page at the address, what an address never does, forwarding, the
+  look-up kept a minute, its settings); app `access-t199` (11: "New quote" shows the screen and starts no quote;
+  no price, link or buying words in any string of the app). Updated for what this ticket changed on purpose:
+  the tests that pin the free offer's words, `app-t184`, `billing-t180`, `quote-link`, `room-scan-t194`,
+  `whatsapp-t176`, `whatsapp-t177`, `site-t181`, `site-t187`, `rename-qolumns`, `backlog-t189`, `t174`, and
+  worker `support-t197`. Totals: web 1,640, worker 802, app 163, all passing after the last edit.
+- `scripts/deploy-migration-49.sh` ran whole against a local copy at migration 48 through the stand-in, then
+  again at 49 (before the restart): 3 columns, 1 table with row-level security, 0 policies, 0 grants to users, 3
+  functions, 1 trigger, reserved names 50 to 58; `holders` listed only the public demo; businesses, quote-link
+  names and quotes unchanged.
+- `pnpm check:quick` once: 28 of 28 (20 scripts, 1,721 checks) in 4 min 32 s.
+- `pnpm check:full` once: 42 of 43 (35 scripts, 3,000 checks) in 37 min 25 s. Failed: **t171**, one check of 97:
+  the form's "Powered by" line at 390. Mine: its fixture has no subscription, so since this ticket it is on the
+  free start and has no such line; the script gave it a Starter row for the quote page's line only. The row now
+  goes in before the form is opened. **t197** passed only on its second try, alone (its first try, beside three
+  others, failed two checks: the duplicate was not found, and a 403 it did not expect); nothing of this ticket.
+- `pnpm check:failed` once, after the fix: 3 of 3 (t171 97 of 97) in 3 min 11 s.
+- **A request through an address, in a real browser on this machine** (the development server with the address
+  switched on, the addresses Worker on port 8799, the job worker; by hand, no script kept): a free-start
+  business chose an address through the API; the form opened at `<name>.localhost:8799`; a request was sent;
+  the customer landed on its question page at the same address; no cookie was set at any point; `/app/quotes`
+  on the address answered 302 to the main address. 7 of 7 (an eighth check of mine expected a price where the
+  product rightly asked the customer two questions). `.checks/t199/address-request-sent-390.png`.
+- **The same run with a photo failed at the photo, as the storage rule says it must:** the browser refused the
+  upload from the address ("blocked by CORS policy"). See "Found by running it". It cannot be shown working
+  here: the local page's address is not one the bucket's rule can be given without changing the bucket.
+- Screenshots in `.checks/t199/` (24 from before the restart, 3 after): Home on the free start, the address
+  card in each state at both widths, the confirm step, the Quote link page on the free start, on Pro with and
+  without an address and on Starter, the WhatsApp page's tag, a quote page on a local address, Pricing, and the
+  app's "On-site quotes are part of Pro" screen (iPhone simulator, local stack).
+- The app was not rebuilt onto the owner's iPhone: it showed as "unavailable" to this Mac. The command is in
+  OWNER-TODO.
+
 ### 2026-11-21: T-198 — Ask Qolumns (the help assistant), the help guide, and small fixes (AD-083, AD-084)
 
 **Built, not deployed.** Needs deploying after T-197: **migration 48 first**
@@ -5281,6 +5503,11 @@ product instead of describing it. `Docs/design/system.md` was changed first, the
   paying?". Every page says one thing: 10 quotes free, no card.
 - **Not changed:** prices, limits, the free allowance, and a subscription that is already in a trial (its status
   and "Trial ends" date still show; Stripe ends it as it would have).
+- **Changed by T-199 (the owner's decision, 21 Nov 2026):** there is still one free offer and still no trial, but
+  the free offer is no longer "the product without Pro". While a new business has free quotes left it gets every
+  Pro feature and channel, and the offer reads "Try every Pro feature free: 10 quotes, no card". The allowance
+  (10 priced quotes in total, no card) and "a plan is paid from the day it is chosen" are as written here. See
+  the T-199 entry (AD-085).
 - The Stripe setup script creates plain recurring prices and never set a trial (the trial was applied at
   checkout); it now says so. Nothing needs changing in Stripe.
 
@@ -10299,6 +10526,8 @@ if (pricingResult.estimatedTotal <= 0) {
 ### AD-047: One free offer: no trial (the owner's pricing decision, T-165)
 
 **Decision:** the only free offer is the free allowance: 10 priced quotes in total, with no card (AD-039). No plan has a trial. A plan is paid from the day it is chosen. Every page, the pricing FAQ and the billing page say the same thing.
+
+**Since T-199 (AD-085, the owner's decision of 21 Nov 2026):** the one free offer now lends every Pro feature while free quotes are left ("Try every Pro feature free: 10 quotes, no card"). It is still not a trial: nothing is timed, no card is taken, and it ends with the tenth priced quote or with the first subscription, whichever comes first.
 
 **Why:** there were two free offers with different rules (10 quotes without a card; 14 days of Pro with a card), and every button on the site promised the first while Pricing also sold the second. A reader could not tell which they were getting. The owner chose one.
 

@@ -4,6 +4,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { hasRandomLink } from '@/lib/clean-slug-server'
 import { getOrCreateTenantKey, appOriginFrom } from '@/lib/tenant-site'
 import { SharePageClient } from '@/components/share/SharePageClient'
+import { addressView } from '@/lib/own-address'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,6 +40,7 @@ export default async function SharePage() {
       initialSlug={tenant.slug}
       changeable={!tenant.slug_changed_at}
       random={await hasRandomLink(createAdminClient(), tenant)}
+      address={await addressView(createAdminClient(), profile.tenant_id)}
     />
   )
 }

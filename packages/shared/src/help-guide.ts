@@ -10,8 +10,8 @@
  * Docs/help/README.md has the format.
  */
 
-/** The three things the site shows before they are live (`plan-claims.ts`); one flag each */
-export const HELP_FLAGS = ['whatsapp', 'app', 'roomScan'] as const
+/** The things the site shows before they are live (`plan-claims.ts`); one flag each. T-199 added a business's own address. */
+export const HELP_FLAGS = ['whatsapp', 'app', 'roomScan', 'ownAddress'] as const
 export type HelpFlag = (typeof HELP_FLAGS)[number]
 
 /** A page that names one of these is talking about something behind a flag, and must say so */
@@ -19,6 +19,7 @@ export const HELP_FLAG_WORDS: Record<HelpFlag, RegExp> = {
   whatsapp: /whatsapp/i,
   app: /(?:phone|iphone|mobile|on-site) app|app store|\bthe app\b/i,
   roomScan: /room scan|lidar|scan (?:a|the|each|your) room/i,
+  ownAddress: /your own address|own address|choose (?:an|your) address/i,
 }
 
 export interface HelpPageSource {

@@ -638,6 +638,8 @@ export interface QuoteDetailResponse {
   customerQuestions?: AskedQuestion[]
   /** T-193: what the on-site room scan measured, in the business's units, with the floor plans (room-scan-report.ts) */
   roomScan?: RoomScanView
+  /** T-199: on the free start, the plan that keeps room scan ("Pro"), for the small tag beside it */
+  roomScanTag?: string | null
 }
 
 /**
@@ -728,6 +730,14 @@ export interface AppBootstrapResponse {
    */
   roomScan?: boolean
   /**
+   * T-199: can this business start a quote in the app (Pro, Business and the free start)? The app itself is
+   * open to every business. False: "New quote" shows the "part of Pro" screen and starts nothing. Absent from
+   * a server before T-199: the app then opens the form, as it did, and the server decides.
+   */
+  onsiteQuotes?: boolean
+  /** T-199: the words of that screen, from the server so every build says the same */
+  onsiteNotInPlan?: { heading: string; text: string; button: string }
+  /**
    * T-196: what the business won this calendar month, as the dashboard's Home says it, already written in the
    * business's currency. Null before the first accepted estimate (the app then shows nothing); absent from a
    * server before T-196.
@@ -800,7 +810,7 @@ export interface AppAccountResponse {
   businessName: string
   /** A short-lived signed address of the business's logo, or null */
   logoUrl: string | null
-  /** "Pro", or null for a business on the free allowance */
+  /** "Pro", or null for a business with no plan (the free quotes, or a plan that ended) */
   planName: string | null
   usage: {
     used: number
@@ -812,6 +822,8 @@ export interface AppAccountResponse {
   }
   /** The business's own request page, to show a customer on site (T-149); null when it has none */
   quoteLink: string | null
+  /** T-199: when `quoteLink` is the business's own address, its quote link too ("Also works"); null otherwise */
+  alsoLink?: string | null
   supportEmail: string
 }
 

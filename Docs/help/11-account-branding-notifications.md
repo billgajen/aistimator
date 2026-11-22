@@ -142,12 +142,12 @@ They are on the "Branding" tab. Press "Save Changes" at the bottom when you are 
 ## Can I remove "Prepared with {{product}}" from my quotes?
 <!-- id: account-badge; page: /app/settings/branding -->
 
-Yes, on {{badge.plans}}. It is removed for you. There is no switch.
+Yes, on {{badge.plans}}. It is removed for you. There is no switch. It is also removed for a new business that has never had a plan, while it still has free quotes left.
 
-- On those plans the quote page no longer says "Prepared with {{product}}", and the request form no longer says "Powered by {{product}}".
+- Then the quote page no longer says "Prepared with {{product}}", and the request form no longer says "Powered by {{product}}".
 - Emails to your customers still say "Powered by {{product}}" at the bottom, on every plan.
 - The PDF of a quote does not carry the line on any plan.
-- The line comes back if your plan ends, and while a payment that failed is being tried again.
+- The line comes back if your plan ends. While a payment that failed is being tried again, your plan still holds and the line stays off. It also comes back when your free quotes are used up, until you pick one of those plans.
 
 ## Where do notifications go, and how do I change the address?
 <!-- id: account-notifications-email; page: /app/settings/notifications -->

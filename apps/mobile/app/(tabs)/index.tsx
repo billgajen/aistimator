@@ -8,6 +8,7 @@
  * still on this phone (unfinished, or waiting for a signal) sit above them
  * all. Search by customer name; pull down to refresh.
  */
+import { accountNoticeLine } from '../../src/lib/onsite-gate'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, RefreshControl, SectionList, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
@@ -138,7 +139,7 @@ export default function Quotes() {
                 ) : null}
               </View>
             ) : null}
-            {notice ? <Notice tone={notice.kind === 'suspended' ? 'danger' : 'notice'}>{notice.line}</Notice> : null}
+            {notice ? <Notice tone={notice.kind === 'suspended' ? 'danger' : 'notice'}>{accountNoticeLine(notice)}</Notice> : null}
             {error ? <ErrorText>{error}</ErrorText> : null}
             {waiting.length > 0 || unfinished ? <GroupHeader title="On this phone" count={waiting.length + (unfinished ? 1 : 0)} /> : null}
             {waiting.map((draft) => (

@@ -299,7 +299,8 @@ describe('T-189 item 4: data processing in the Terms', () => {
       SUPABASE: 'Supabase', UPSTASH: 'Upstash', R2: 'Cloudflare', CLOUDFLARE: 'Cloudflare', GEMINI: 'Google', DOCRAPTOR: 'DocRaptor',
       POSTMARK: 'Postmark', STRIPE: 'Stripe', WHATSAPP: 'Meta',
     }
-    const ours = /^(NEXT_PUBLIC_APP_URL|NEXT_PUBLIC_COMPANY_NUMBER|SYNC_QUOTE_PROCESSING|CRON_SECRET|DEMO_DAILY_CAP|APP_STORE_URL|PLAY_STORE_URL|ALERT_EMAIL|SMS_TEST_MODE|NEXT_PUBLIC_TURNSTILE_SITE_KEY|TURNSTILE_SECRET_KEY|RATE_LIMIT.*)$/
+    // T-199: the own-address host and the key its Worker sends are our own settings (the Worker runs on Cloudflare, already listed)
+    const ours = /^(NEXT_PUBLIC_APP_URL|NEXT_PUBLIC_OWN_ADDRESS_HOST|ADDRESS_PROXY_KEY|NEXT_PUBLIC_COMPANY_NUMBER|SYNC_QUOTE_PROCESSING|CRON_SECRET|DEMO_DAILY_CAP|APP_STORE_URL|PLAY_STORE_URL|ALERT_EMAIL|SMS_TEST_MODE|NEXT_PUBLIC_TURNSTILE_SITE_KEY|TURNSTILE_SECRET_KEY|RATE_LIMIT.*)$/
     const listed = new Set(SUB_PROCESSORS.map((p) => p.name))
     for (const setting of settings) {
       if (ours.test(setting)) continue

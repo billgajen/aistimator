@@ -31,6 +31,7 @@ import { createOutbox, type DraftPhoto, type DraftRequest, type Outbox } from '.
 import { headlinePrice, mainAction, minimumNote, priceLines } from '../../apps/mobile/src/lib/price'
 import { turnOfListItem, turnOfQuote } from '../../apps/mobile/src/lib/status'
 import { QUOTE_TURN_COPY } from '../../packages/shared/src/quote-turn'
+import { getPlan } from '../../packages/shared/src/plans'
 import type { AppQuoteView } from '../../packages/shared/src/api.types'
 
 type Row = Record<string, unknown>
@@ -351,6 +352,24 @@ section('F. The plan limit: saved, not priced; the limit stands until there is a
 // The ten free quotes are used up (the count is the server's; the check sets it as verify-t180 does)
 const period = `${new Date().getUTCFullYear()}${String(new Date().getUTCMonth() + 1).padStart(2, '0')}`
 await patch('usage_counters', `tenant_id=eq.${a.tenantId}&period_yyyymm=eq.${period}`, { estimates_created: 10 })
+
+// T-199: with the free quotes used and no plan, the business no longer has on-site quotes. The app is open to it
+// (its quotes, its account), but a new quote is not started: the app is told so, and the server refuses in the
+// same words, so an older build cannot get round it. Nothing is saved and nothing is counted.
+const requestsBefore = ((await sb.select('quote_requests', `tenant_id=eq.${a.tenantId}&select=id`)) as Row[]).length
+const bootUsedUp = await pa.api.bootstrap()
+const refusedOnsite = await call('POST', `${app}/api/app/quotes`, { headers: { Authorization: `Bearer ${a.accessToken}` }, body: { ...requestFor(oneId, 'Jordan Reyes', 'Front step'), assetIds: [] } })
+check('T-199: free quotes used, no plan: the app is told on-site quotes are not included, with the screen\'s words and no price or link in them', bootUsedUp.onsiteQuotes === false && /^On-site quotes are part of \w+$/.test(bootUsedUp.onsiteNotInPlan?.heading ?? '') && bootUsedUp.onsiteNotInPlan?.button === 'OK' && !/[$£€]|https?:|upgrade|buy/i.test(JSON.stringify(bootUsedUp.onsiteNotInPlan)), bootUsedUp.onsiteNotInPlan)
+check('T-199: …and the server refuses a new on-site quote in the same words: 403, nothing saved, nothing counted', refusedOnsite.status === 403 && refusedOnsite.json?.error?.code === 'ONSITE_QUOTES_NOT_IN_PLAN' && String(refusedOnsite.json?.error?.message).startsWith(bootUsedUp.onsiteNotInPlan?.heading ?? 'x') && ((await sb.select('quote_requests', `tenant_id=eq.${a.tenantId}&select=id`)) as Row[]).length === requestsBefore && (await usedTotal(a.tenantId)) === 10, refusedOnsite.json)
+check('T-199: …while the rest of the app still answers (its quotes and its account)', (await pa.api.listQuotes()).items.length > 0 && Boolean((await pa.api.account()).businessName))
+
+// The plan limit itself is shown on a plan that includes on-site quotes, with that plan's quotes for the month used
+// (a plan row with no Stripe customer, as a free test account has)
+const ONSITE_PLAN = getPlan('plan_us_pro')!
+await sb.insert('subscriptions', { tenant_id: a.tenantId, plan_id: ONSITE_PLAN.id, status: 'active', current_period_start: new Date().toISOString() })
+await patch('usage_counters', `tenant_id=eq.${a.tenantId}&period_yyyymm=eq.${period}`, { estimates_created: ONSITE_PLAN.quoteLimit })
+const bootOnPlan = await pa.api.bootstrap()
+check('T-199: on a plan that includes them, the app is told on-site quotes are on', bootOnPlan.onsiteQuotes === true)
 const usedAtLimit = await usedTotal(a.tenantId)
 
 // a photo, sent as the phone sends it: its real size first, then the file to the signed address
@@ -387,8 +406,8 @@ const suspendUrl = `${app}/api/admin/tenants/${a.tenantId}/suspend`
 expectOk('suspend', await call('POST', suspendUrl, { headers: platformAdmin.cookie, body: { suspended: true, reason: 'verify-t182 check' } }))
 const notice = await pa.api.accountNotice()
 check('the app shows the same account line the dashboard shows, and never the admin’s reason', notice?.kind === 'suspended' && /paused/i.test(notice.line) && !JSON.stringify(notice).includes('verify-t182'), notice?.line)
-// put on a plan the way a free test account is (a plan row with no Stripe customer), so only the pause is in the way
-await sb.insert('subscriptions', { tenant_id: a.tenantId, plan_id: 'plan_us_pro', status: 'active', current_period_start: new Date().toISOString() })
+// the plan row is already there (section F); the month's count goes back under the plan's limit, so only the pause is in the way
+await patch('usage_counters', `tenant_id=eq.${a.tenantId}&period_yyyymm=eq.${period}`, { estimates_created: 10 })
 const paused = await pa.api.priceHeldRequest(sent4!.quoteId).catch((e: ApiError) => e)
 check('"Price this request" on a paused account: refused with 403 (the pause stands)', paused instanceof ApiError && paused.status === 403 && paused.code === 'ACCOUNT_PAUSED', paused instanceof ApiError ? paused.message : 'priced')
 const d5 = pa.outbox.start()!

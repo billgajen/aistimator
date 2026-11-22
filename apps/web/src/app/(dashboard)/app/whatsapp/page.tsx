@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { PageHeader } from '@/components/dashboard/EmptyState'
+import { PlanTag } from '@/components/dashboard/PlanTag'
 import Link from 'next/link'
 import { PRODUCT_NAME } from '@qolumns/shared'
 import { ConnectWhatsApp, type ConnectSettings } from '@/components/whatsapp/ConnectWhatsApp'
@@ -54,7 +55,18 @@ export default function WhatsAppSettingsPage() {
     }
   }, [])
 
-  const header = <PageHeader title="WhatsApp" description="Let customers ask for a quote on WhatsApp." />
+  // T-199: on the free start, a small tag says which plan keeps WhatsApp
+  const header = (
+    <PageHeader
+      title={
+        <span className="flex flex-wrap items-center gap-3">
+          WhatsApp
+          <PlanTag name={data?.access?.tag} />
+        </span>
+      }
+      description="Let customers ask for a quote on WhatsApp."
+    />
+  )
 
   if (error) {
     return (

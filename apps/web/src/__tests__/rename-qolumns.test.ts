@@ -208,12 +208,13 @@ describe('T-162: what is left of the earlier names', () => {
   it(`"${SECOND_NAME.slice(0, 5)}…" is left only in history, migration 32, the reserved list and the storage bucket name`, () => {
     const left = filesWith('-i', SECOND_NAME).filter((f) => !isHistory(f)).sort()
     expect(left).toEqual([
-      'apps/web/src/lib/tenant-slug.ts',
       'apps/worker/wrangler.toml',
+      // T-199: the reserved list moved here (one list for quote-link names and addresses)
+      'packages/shared/src/own-address.ts',
       'supabase/migrations/00000000000032_quote_link.sql',
     ])
     // the reserved word, once
-    expect(linesWith('-i', SECOND_NAME, 'apps/web/src/lib/tenant-slug.ts')).toHaveLength(1)
+    expect(linesWith('-i', SECOND_NAME, 'packages/shared/src/own-address.ts')).toHaveLength(1)
     // section 5 of the ticket: the bucket keeps its name until the owner renames it
     const bucket = linesWith('-i', SECOND_NAME, 'apps/worker/wrangler.toml')
     expect(bucket).toHaveLength(2)

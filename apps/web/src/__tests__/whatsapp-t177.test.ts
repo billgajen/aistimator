@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import jpeg from 'jpeg-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { GOVERNING_LAW, OPERATOR, PLANS, PRODUCT_NAME, offeredPlansWithChannel, operatorStatement, planHasChannel, subscriptionLive } from '@qolumns/shared'
+import { FREE_ALLOWANCE, businessAccess, GOVERNING_LAW, OPERATOR, PLANS, PRODUCT_NAME, offeredPlansWithChannel, operatorStatement, planHasChannel, subscriptionLive } from '@qolumns/shared'
 import type { WhatsAppConversation, WhatsAppIntakeState } from '@qolumns/shared'
 
 const createQuoteFromIntake = vi.fn()
@@ -72,6 +72,8 @@ interface World {
   services: Array<Record<string, unknown>>
   config?: Record<string, unknown> | null
   subscription?: { plan_id: string; status: string } | null
+  /** T-199: priced quotes so far (none unless set) */
+  used?: number
   conversations?: Array<Record<string, unknown>>
   writes: Array<{ table: string; op: 'insert' | 'update'; values: Record<string, unknown> }>
 }
@@ -95,7 +97,9 @@ function fakeAdmin(world: World) {
           world.writes.push({ table, op: 'update', values })
           return builder
         },
-        then: (resolve: (value: { data: unknown[] }) => void) => resolve({ data: table === 'services' ? world.services : table === 'whatsapp_conversations' ? (world.conversations ?? []) : [] }),
+        // T-199: `used` is the business's priced quotes so far (the free start ends when its free quotes are used)
+        then: (resolve: (value: { data: unknown[] }) => void) =>
+          resolve({ data: table === 'services' ? world.services : table === 'whatsapp_conversations' ? (world.conversations ?? []) : table === 'usage_counters' && world.used ? [{ estimates_created: world.used }] : [] }),
       }
       return builder
     },
@@ -576,27 +580,34 @@ describe('T-177 items 5 and 7: the plan must include WhatsApp, and the subscript
   it('a live subscription on a plan with WhatsApp may speak; every other case is silent', () => {
     const has = PLANS.find((p) => p.offered && p.channels.includes('whatsapp'))!.id
     const lacks = PLANS.find((p) => p.offered && !p.channels.includes('whatsapp'))!.id
-    for (const status of ['active', 'trialing']) expect(whatsappAccessFor({ plan_id: has, status }), status).toEqual({ allowed: true })
+    // T-199: the answer comes from the one rule (`businessAccess`), fed the subscription row and the quotes used
+    const acc = (subscription: { plan_id: string | null; status: string | null } | null, used = 0) => businessAccess({ subscription, region: 'US', quotesUsed: used })
+    for (const status of ['active', 'trialing']) expect(whatsappAccessFor(acc({ plan_id: has, status })), status).toEqual({ allowed: true })
     // cancelled, and anything a later billing change may add
     for (const status of ['canceled', 'unpaid', 'incomplete', 'incomplete_expired', 'paused', '', null]) {
-      expect(whatsappAccessFor({ plan_id: has, status }), String(status)).toEqual({ allowed: false, why: 'subscription' })
+      expect(whatsappAccessFor(acc({ plan_id: has, status })), String(status)).toEqual({ allowed: false, why: 'subscription' })
       expect(subscriptionLive(status)).toBe(false)
     }
-    // a plan without WhatsApp, and no plan at all (the free allowance)
-    expect(whatsappAccessFor({ plan_id: lacks, status: 'active' })).toEqual({ allowed: false, why: 'plan' })
-    expect(whatsappAccessFor(null)).toEqual({ allowed: false, why: 'plan' })
-    expect(whatsappAccessFor({ plan_id: null, status: 'active' })).toEqual({ allowed: false, why: 'plan' })
+    // a plan without WhatsApp, and no plan at all once the free quotes are used
+    expect(whatsappAccessFor(acc({ plan_id: lacks, status: 'active' }))).toEqual({ allowed: false, why: 'plan' })
+    expect(whatsappAccessFor(acc(null, FREE_ALLOWANCE.US!.quotes))).toEqual({ allowed: false, why: 'plan' })
+    expect(whatsappAccessFor(acc({ plan_id: null, status: 'active' }))).toEqual({ allowed: false, why: 'plan' })
+    // T-199 (owner's decision): with free quotes left, a new business works like Pro, WhatsApp included
+    expect(whatsappAccessFor(acc(null, 0))).toEqual({ allowed: true })
   })
 
   it('a payment that failed and is being retried (past due) does not pause WhatsApp: it has the same grace as the quote limit', () => {
     const has = PLANS.find((p) => p.offered && p.channels.includes('whatsapp'))!.id
-    expect(whatsappAccessFor({ plan_id: has, status: 'past_due' })).toEqual({ allowed: true })
+    const acc = (status: string) => businessAccess({ subscription: { plan_id: has, status }, region: 'US', quotesUsed: 0 })
+    expect(whatsappAccessFor(acc('past_due'))).toEqual({ allowed: true })
     // one rule for both: the assistant and the quote limit read the same function
     expect(subscriptionLive('past_due')).toBe(true)
-    expect(code('apps/web/src/lib/whatsapp-access.ts')).toContain('subscriptionLive(subscription.status)')
+    // T-199: the assistant asks the one rule, and the rule reads that function
+    expect(code('apps/web/src/lib/whatsapp-access.ts')).toContain("canUse(access, 'whatsapp')")
+    expect(code('packages/shared/src/access.ts')).toContain('subscriptionLive(row.status)')
     expect(code('apps/web/src/lib/plan-limits.ts')).toContain('subscriptionLive(subscription.status as string)')
     // and when the subscription is then cancelled, it pauses
-    expect(whatsappAccessFor({ plan_id: has, status: 'canceled' })).toEqual({ allowed: false, why: 'subscription' })
+    expect(whatsappAccessFor(acc('canceled'))).toEqual({ allowed: false, why: 'subscription' })
   })
 
   it('the two lines the page shows: the owner’s words when paused, the plans that have it (from the definitions) when not included', () => {
@@ -605,7 +616,7 @@ describe('T-177 items 5 and 7: the plan must include WhatsApp, and the subscript
     const names = offeredPlansWithChannel('whatsapp').map((p) => p.name)
     for (const name of names) expect(upgradeLine()).toContain(name)
     expect(accessView({ allowed: false, why: 'plan' })).toEqual({ allowed: false, why: 'plan', line: upgradeLine() })
-    expect(accessView({ allowed: true })).toEqual({ allowed: true, why: null, line: null })
+    expect(accessView({ allowed: true })).toEqual({ allowed: true, why: null, line: null, tag: null })
     expect(accessRefusal({ allowed: true })).toBeNull()
     expect(accessRefusal({ allowed: false, why: 'plan' })).toMatchObject({ status: 403, code: 'PLAN_REQUIRED' })
     expect(accessRefusal({ allowed: false, why: 'subscription' })).toMatchObject({ status: 403, code: 'ASSISTANT_PAUSED', message: PAUSED_LINE })
@@ -625,7 +636,9 @@ describe('T-177 items 5 and 7: the plan must include WhatsApp, and the subscript
     const broken = { from: () => { throw new Error('db down') } } as never
     expect(await whatsappAccess(broken, 'tenant-a')).toEqual({ allowed: false, why: 'subscription' })
     expect(await whatsappAccess(fakeAdmin(world({ subscription: { plan_id: 'plan_us_pro', status: 'active' } })), 'tenant-a')).toEqual({ allowed: true })
-    expect(await whatsappAccess(fakeAdmin(world({ subscription: null })), 'tenant-a')).toEqual({ allowed: false, why: 'plan' })
+    // no plan, and the free quotes used (T-199: with free quotes left it works like Pro)
+    expect(await whatsappAccess(fakeAdmin(world({ subscription: null, used: FREE_ALLOWANCE.US!.quotes })), 'tenant-a')).toEqual({ allowed: false, why: 'plan' })
+    expect(await whatsappAccess(fakeAdmin(world({ subscription: null })), 'tenant-a')).toEqual({ allowed: true })
   })
 
   it('an inactive subscription means no outbound message in any path', async () => {

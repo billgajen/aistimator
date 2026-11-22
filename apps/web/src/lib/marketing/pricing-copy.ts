@@ -9,13 +9,15 @@
  * set. A row about what the product reads or works out is written through
  * `says`, like every claim on the site.
  */
-import { FREE_ALLOWANCE } from '@qolumns/shared'
+import { FREE_ALLOWANCE, freeStartPlan } from '@qolumns/shared'
 import type { PlanDefinition } from '@qolumns/shared'
 import { says } from './ai-claims'
-import { BILLED_IN_ADVANCE, COMING_SOON, PLAN_CHANNEL_LINES, PLAN_FEATURE_LINES, PLAN_HOSTED_PAGES, sitePlans, type PlanLine } from './plan-claims'
+import { BILLED_IN_ADVANCE, COMING_SOON, PLAN_APP, PLAN_CHANNEL_LINES, PLAN_FEATURE_LINES, PLAN_HOSTED_PAGES, sitePlans, type PlanLine } from './plan-claims'
 import { PRICING_AI_FAQ } from './site-copy'
 
 const FREE_QUOTES = FREE_ALLOWANCE.US!.quotes
+/** T-199: the plan the free start works like ("Pro"), from the plan definitions */
+const FREE_START_PLAN = freeStartPlan()?.name ?? ''
 
 export const PRICING_HERO = {
   headline: 'One missed job pays for the year.',
@@ -62,7 +64,8 @@ const AI_ROWS: readonly string[] = [
 ]
 
 const has = (plan: PlanDefinition, line: PlanLine): boolean => {
-  if (line === PLAN_HOSTED_PAGES) return true
+  // every plan has its estimate pages and (T-199) the mobile app
+  if (line === PLAN_HOSTED_PAGES || line === PLAN_APP) return true
   for (const channel of plan.channels) if (PLAN_CHANNEL_LINES[channel] === line) return true
   for (const [key, value] of Object.entries(PLAN_FEATURE_LINES)) if (value === line && plan.features[key as keyof PlanDefinition['features']]) return true
   return false
@@ -82,6 +85,7 @@ export function compareGroups(plans: PlanDefinition[] = sitePlans()): CompareGro
   const offered = (line: PlanLine) => plans.some((plan) => has(plan, line))
   const branding = PLAN_FEATURE_LINES.custom_branding!
   const insights = PLAN_FEATURE_LINES.calibration_insights!
+  const ownAddress = PLAN_FEATURE_LINES.own_address!
 
   const groups: CompareGroup[] = [
     {
@@ -100,19 +104,25 @@ export function compareGroups(plans: PlanDefinition[] = sitePlans()): CompareGro
         { label: 'Your own quote page, with a link and a QR code', cells: plans.map((plan) => plan.channels.includes('widget')) },
         { label: 'The same form on your website', cells: plans.map((plan) => plan.channels.includes('widget')) },
         row(PLAN_HOSTED_PAGES),
-        ...channelLines.filter((line) => line.live && line !== PLAN_CHANNEL_LINES.widget && offered(line)).map(row),
+        ...[...channelLines.filter((line) => line !== PLAN_CHANNEL_LINES.mobile_app), PLAN_APP, PLAN_CHANNEL_LINES.mobile_app].filter((line) => line.live && line !== PLAN_CHANNEL_LINES.widget && offered(line)).map(row),
       ],
     },
     { id: 'ai', title: COMPARE.groups.ai, rows: AI_ROWS.map((label) => ({ label, cells: every })) },
     {
       id: 'brand',
       title: COMPARE.groups.brand,
-      rows: [{ label: 'Your name, logo and colour on every estimate', cells: every }, ...(branding.live && offered(branding) ? [row(branding)] : [])],
+      rows: [
+        { label: 'Your name, logo and colour on every estimate', cells: every },
+        ...(branding.live && offered(branding) ? [row(branding)] : []),
+        // T-199: the business's own address, once it is switched on
+        ...(ownAddress.live && offered(ownAddress) ? [row(ownAddress)] : []),
+      ],
     },
     {
       id: 'soon',
       title: COMPARE.groups.soon,
-      rows: [...channelLines, ...featureLines].filter((line) => !line.live && offered(line)).map(row),
+      // T-199: the app (every plan) sits just above starting a quote in it (the plans with that channel)
+      rows: [...channelLines.filter((line) => line !== PLAN_CHANNEL_LINES.mobile_app), PLAN_APP, PLAN_CHANNEL_LINES.mobile_app, ...featureLines].filter((line) => !line.live && offered(line)).map(row),
     },
   ]
   return groups.filter((group) => group.rows.length > 0)
@@ -135,7 +145,7 @@ export const PRICING_FAQ_HEADING = 'Questions about pricing'
 export const PRICING_FAQ: ReadonlyArray<{ q: string; a: string }> = [
   {
     q: 'Can I try it for free?',
-    a: `Yes. Every new business gets ${FREE_QUOTES} priced quotes free, with no card. They don’t reset each month: it’s ${FREE_QUOTES} in total, so you can try it with real customers. Test quotes from setup and requests a customer didn’t finish don’t count.`,
+    a: `Yes. Every new business gets ${FREE_QUOTES} priced quotes free, with no card${FREE_START_PLAN ? `, and every ${FREE_START_PLAN} feature while they last` : ''}. They don’t reset each month: it’s ${FREE_QUOTES} in total, so you can try it with real customers. Test quotes from setup and requests a customer didn’t finish don’t count.`,
   },
   {
     q: 'What counts as a quote?',

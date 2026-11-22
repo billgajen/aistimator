@@ -37,6 +37,8 @@ export async function GET(request: Request) {
         created_at,
         updated_at,
         suspended_at,
+        slug,
+        own_address,
         signup_source,
         subscriptions!tenant_id (
           status,
@@ -119,6 +121,9 @@ export async function GET(request: Request) {
         quoteCount: quoteCounts[tenant.id] || 0,
         // T-180: the suspend switch, and a plan nobody pays for (never revenue)
         suspendedAt: (tenant as { suspended_at?: string | null }).suspended_at ?? null,
+        // T-199: the business's quote-link name and its own address (changed only here, by an admin)
+        slug: (tenant as { slug?: string | null }).slug ?? null,
+        ownAddress: (tenant as { own_address?: string | null }).own_address ?? null,
         // T-189: where the business came from, in one line
         cameFrom: signupSourceLine((tenant as { signup_source?: unknown }).signup_source),
         testAccount: isFreeTestAccount(subscription as { status?: string; stripe_customer_id?: string | null; stripe_subscription_id?: string | null } | null),

@@ -121,6 +121,38 @@ Run `pnpm check:list` for the current list. At T-183, of 32 scripts, 20 are in t
 | `t197` (added by T-197) | the real model: it sorts three sample problems, finds a duplicate, reads a wrong rate as "Your price setup" and matches two feature requests. It closes the open support items earlier runs left in the local database first, so the model compares only this run's own. It prints "What the model got wrong" at the end. No email is sent (the local web app has no email token) |
 | `t198` (added by T-198) | the real model: the Help assistant is asked 33 questions, each with what a right answer must contain or must not (a how-to for each area of the guide, a plan question, things that are not live, a thing that does not exist, a price on a quote with a wrong rate, a refund, a legal question, another business, an attempt to change its rules, another language). It needs 85% right to pass, and prints **the score and every wrong answer word for word**. It also checks the hand-off to the team, the owner's Questions tab, the draft reply, and the home page's fixes. Screens go to `.checks/t198/` |
 
+## T-199: no script of its own, and how to see an address locally
+
+T-199 added no verify script (the ticket's rule). What it changed is held by unit tests (web `access-t199` and
+`own-address-t199`, worker `addresses-t199`, app `access-t199`) and by checks added to scripts that already ran:
+
+- `verify-t182` (quick): with the free quotes used and no plan, the app is told on-site quotes are off, the
+  server refuses a new one with 403 `ONSITE_QUOTES_NOT_IN_PLAN` and saves nothing, and the rest of the app still
+  answers. Its plan-limit part now runs on a plan that includes on-site quotes.
+- `verify-t177` (the `meta` lane): a business on the free start is allowed WhatsApp and told which plan keeps
+  it; "no plan" in that script now means no subscription **and** the free quotes used.
+- `verify-t162` and `verify-t171`: the "Prepared with" line (and, in `t171`, the form's "Powered by" line) is
+  checked for a business on Starter. A business on
+  the free start works like Pro and has no such line, so a fixture that needs the line needs a Starter row.
+- `verify-t152`, `t155`, `t165`, `t167`: the free offer's new words.
+
+**A fixture rule that follows:** a business made with no subscription row is on the free start and has every Pro
+feature until its tenth priced quote. A script that means "a business without Pro features" must give it a
+Starter row, or use up its free quotes (a `usage_counters` row with `estimates_created` at the allowance).
+
+To see a business's own address on this machine (it is off in both levels, as it is in production until the
+owner switches it on):
+
+```bash
+# apps/web/.env.local:  NEXT_PUBLIC_OWN_ADDRESS_HOST=localhost:8799  and  ADDRESS_PROXY_KEY=<any value>
+pnpm dev:web
+cd apps/worker && npx wrangler dev -c wrangler.addresses.toml --port 8799 --var ADDRESS_PROXY_KEY:<the same value>
+# then open http://<the business's address>.localhost:8799/
+```
+
+Take both settings out of `.env.local` again before a check run: with the host set, the dashboard offers the
+address card, which the scripts' pictures of Home and of the Quote link page do not expect.
+
 ## Running at once
 
 Against the built web app, scripts run four at a time (`--jobs`). Each makes its own businesses, so they do not
@@ -167,5 +199,6 @@ what `pnpm check:failed` reads. The exit code is 0 only when everything passed.
 ## What is not in either level
 
 - The scripts before `verify-t146`: historical, out of date since T-146, never run and never fixed.
-- The mobile app on a device (there is no simulator here; `verify-t182` drives its API client and queue).
+- The mobile app on a device. `verify-t182` drives its API client and queue; since T-196 its screens are looked
+  at in an iPhone simulator by hand (the recipe is in the project memory), which no level runs.
 - Anything on production. Both levels run on this machine only.

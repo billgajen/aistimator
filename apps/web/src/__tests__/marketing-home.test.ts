@@ -266,7 +266,7 @@ describe('T-155, T-165: the header button', () => {
     expect(nav).not.toContain('md:hidden')
     // one line, never wrapped into a two-line pill
     expect(nav).toMatch(/href="\/signup"\s+className="[^"]*whitespace-nowrap/)
-    expect(freeOfferLabel()).toBe('Try it free: 10 quotes, no card')
+    expect(freeOfferLabel()).toBe('Try every Pro feature free: 10 quotes, no card')
   })
 
   it('in-page buttons keep the full offer', () => {
@@ -293,7 +293,7 @@ describe('T-155: the open phone menu', () => {
 
   it('has the five links, then one sign-up button, and an X', () => {
     const labels = [...html.matchAll(/<a [^>]*>([^<]+)<\/a>/g)].map((m) => m[1])
-    expect(labels).toEqual(['Features', 'Pricing', 'Who it’s for', 'Try it as a customer', 'Log in', 'Try it free: 10 quotes, no card'])
+    expect(labels).toEqual(['Features', 'Pricing', 'Who it’s for', 'Try it as a customer', 'Log in', 'Try every Pro feature free: 10 quotes, no card'])
     expect(html).toMatch(/data-testid="site-menu-signup"/)
     expect(html).toContain('aria-label="Close menu"')
   })

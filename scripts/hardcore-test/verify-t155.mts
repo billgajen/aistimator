@@ -16,7 +16,7 @@ import { browserDeps, checker, MARKETING_PAGES } from './browser.mjs'
 const app = loadEnv().appUrl
 const { chromium, PNG } = browserDeps()
 const { check, finish } = checker()
-const OFFER = 'Try it free: 10 quotes, no card'
+const OFFER = 'Try every Pro feature free: 10 quotes, no card'
 /** Content-to-button spacing is 12 px; the frames' contents differ a little by trade */
 const MAX_GAP = 64
 // T-165: the home page's hero is now the product demo (verify-t165).

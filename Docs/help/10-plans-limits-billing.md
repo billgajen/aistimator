@@ -15,6 +15,8 @@ Every price is before tax. You pay for the plan only: there is no commission and
 
 A new business gets {{free.quotes}} priced quotes free, with no card. They are counted in total, not each month, so they do not start again when a new month begins.
 
+While any are left, and you have never had a plan, your business works like {{freeStart.plan}}: every feature that plan includes. The site says it this way: "{{free.offer}}".
+
 These do not use up a free quote:
 
 - a test request you send yourself during setup;
@@ -22,6 +24,38 @@ These do not use up a free quote:
 - a request that was saved without a price because you had none left.
 
 The "Billing" tab shows how many you have used, under "Free quotes used". When you are nearly out, {{product}} emails you once and shows a line on the "Billing" tab.
+
+## What do my free quotes include, and what happens when they are used up?
+<!-- id: billing-free-start; page: /app/settings/billing; flags: whatsapp, app, roomScan, ownAddress -->
+
+A new business that has never had a plan and still has free quotes left works like {{freeStart.plan}}: every feature of that plan, with no card. The number of free quotes is the same as before: {{free.quotes}} priced quotes in total. The site says it this way: "{{free.offer}}".
+
+What that includes:
+
+- Estimates without the "Prepared with {{product}}" line.
+- The comparison of your estimates with your final invoices, on "Analytics".
+- {{#soon whatsapp}}Quotes inside a WhatsApp chat, on your own business number. This is {{soon}} for every business.{{/soon}}{{#live whatsapp}}Quotes inside a WhatsApp chat, on your own business number.{{/live}}
+- {{#soon app}}On-site quotes in the phone app. The phone app is {{soon}}.{{/soon}}{{#live app}}On-site quotes in the phone app.{{/live}}
+- {{#soon roomScan}}The room scan, which measures a room with your phone. It is {{soon}}.{{/soon}}{{#live roomScan}}The room scan, which measures a room with your phone.{{/live}}
+- {{#soon ownAddress}}Choosing your own address for your quote page. This is {{soon}}.{{/soon}}{{#live ownAddress}}Choosing your own address for your quote page, like {{ownAddress.example}}.{{/live}}
+
+While you are on your free quotes, "Home" shows one quiet line under your business name: "You're trying everything in {{freeStart.plan}}." followed by how many free quotes are left. Where one of these features shows in your dashboard, a small "{{freeStart.plan}}" tag sits beside it, for example beside the title of the "WhatsApp" page.
+
+When the free quotes are used up, you are on no plan. New requests are saved but not priced until you pick a plan. On a plan, that plan's features apply: {{plan.starter.name}} has what {{plan.starter.name}} includes, and no more.
+
+You can end up without one of these features in four ways: your free quotes are used up, you pick a plan without it, you cancel, or you move down from a plan that has it. Then:
+
+- The "Prepared with {{product}}" line returns on your quote pages.
+
+{{#live whatsapp}}- The WhatsApp assistant stops pricing in your chats. Your own WhatsApp is untouched and the connection is kept.{{/live}}
+
+{{#live roomScan}}- A room scan is refused with the line "Room scan is part of Pro."{{/live}}
+
+{{#live app}}- "New quote" in the phone app opens a screen headed "On-site quotes are part of Pro", and no quote is started. The rest of the phone app keeps working.{{/live}}
+
+{{#live ownAddress}}- Your own address forwards to your normal quote link, and stays reserved for you.{{/live}}
+
+Nothing you already made is lost. Your quotes, scans, chats and settings stay, and each feature works again as soon as you move to a plan that includes it.
 
 ## What counts as a quote on my plan, and when does the count start again?
 <!-- id: billing-what-counts; page: /app/settings/billing -->
@@ -77,6 +111,7 @@ Once you have a plan, you change it on Stripe's billing page, not with the plan 
 
 - Moving up to a bigger plan happens at once. Stripe charges the difference.
 - Moving down to a smaller plan, or from yearly to monthly, happens at the end of the time you have already paid for. Until then the "Billing" tab says "Changes to" with the new plan and the date, and your plan works as normal.
+- When the smaller plan starts, anything it does not include stops. Nothing you made is deleted, and it works again if you move back up.
 
 If the plan you want is not offered on Stripe's billing page, email {{support.email}}.
 
@@ -106,7 +141,7 @@ Your plan keeps working while the payment is tried again over the next days. New
 - Every page of the dashboard shows "Your payment didn't go through. Update your card to keep your quotes running."
 - You get one email about it.
 - The "Billing" tab shows "Payment problem".
-- Until the payment goes through, the "Prepared with {{product}}" line shows again on your quote pages, even on a plan that removes it.
+- Your plan keeps everything it includes while the payment is tried again, the estimate without the "Prepared with {{product}}" line too.
 
 To fix it:
 
@@ -131,6 +166,7 @@ When the plan has ended:
 - The tab shows "No plan". New requests are saved for you but not priced until you pick a plan.
 - Your free quotes do not come back. Every quote you have ever priced counts against them.
 - Your services, prices, settings and quotes stay. Quotes you have sent still open for your customers.
+- Anything that only your plan included stops. Nothing you made is deleted, and it works again when you pick a plan that includes it.
 - You can pick a plan again with "Select Plan".
 
 Cancelling a plan does not close your account.
@@ -145,9 +181,9 @@ If the payment for the period you are in is refunded in full, the plan ends stra
 ## Which plans remove the "Prepared with" line?
 <!-- id: billing-badge; page: /app/settings/billing -->
 
-The line is removed on {{badge.plans}}. On other plans, and without a plan, your quote pages say "Prepared with {{product}}" at the bottom and your request form says "Powered by {{product}}".
+The line is removed on {{badge.plans}}. It is also removed for a new business that has never had a plan, while it still has free quotes left. On other plans, and on no plan once the free quotes are used up, your quote pages say "Prepared with {{product}}" at the bottom and your request form says "Powered by {{product}}".
 
-There is no switch for it: it goes when you are on one of those plans and comes back if the plan ends. Your logo and your colour work on every plan.
+There is no switch for it: it goes when you are on one of those plans and comes back if the plan ends. It also comes back when your free quotes are used up, until you pick one of those plans. Your logo and your colour work on every plan.
 
 ## Where do I see how many quotes I have used?
 <!-- id: billing-usage; page: /app/settings/billing -->
@@ -160,16 +196,19 @@ On the "Billing" tab, under "Current Plan".
 
 {{product}} also emails you when you have used all your quotes.
 
-## Which plans include WhatsApp quotes, the phone app and the room scan?
-<!-- id: billing-coming-soon-features; page: /app/settings/billing; flags: whatsapp, app, roomScan -->
+## Which plans include WhatsApp quotes, on-site quotes in the phone app, the room scan and your own address?
+<!-- id: billing-coming-soon-features; page: /app/settings/billing; flags: whatsapp, app, roomScan, ownAddress -->
 
-Each plan card under "Available Plans" lists what the plan includes, and marks any line that cannot be used yet.
+Each plan card under "Available Plans" lists what the plan includes, and marks any line that cannot be used yet. A new business that has never had a plan and still has free quotes left works like {{freeStart.plan}}, so what {{freeStart.plan}} includes applies to it too.
 
 {{#soon whatsapp}}Quotes inside a WhatsApp chat, on your own business number: {{soon}}. They are part of {{whatsapp.plans}}. Today you can send your quote link in any WhatsApp chat, on every plan.{{/soon}}
 {{#live whatsapp}}Quotes inside a WhatsApp chat, on your own business number, are included in {{whatsapp.plans}}.{{/live}}
 
-{{#soon app}}The phone app for pricing a job on site: {{soon}}. It is part of {{app.plans}}. Today you work from the dashboard.{{/soon}}
-{{#live app}}The phone app for pricing a job on site is included in {{app.plans}}.{{/live}}
+{{#soon app}}The phone app: {{soon}}. It will come with every plan, and with no plan at all. Starting a quote on site in it will be part of {{onsite.plans}}. Today you work from the dashboard.{{/soon}}
+{{#live app}}The phone app comes with every plan, and with no plan at all. Starting a quote on site in it is part of {{onsite.plans}}.{{/live}}
 
 {{#soon roomScan}}Measuring a room by scanning it with your phone: {{soon}}. The room scan is part of {{roomScan.plans}}.{{/soon}}
 {{#live roomScan}}The room scan, which measures a room with your phone, is included in {{roomScan.plans}}.{{/live}}
+
+{{#soon ownAddress}}Your own address for your quote page, like {{ownAddress.example}}: {{soon}}. It is part of {{ownAddress.plans}}. Today your quote link works on every plan.{{/soon}}
+{{#live ownAddress}}Your own address for your quote page, like {{ownAddress.example}}, is included in {{ownAddress.plans}}. Your quote link keeps working on every plan.{{/live}}

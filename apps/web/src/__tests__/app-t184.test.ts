@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { answerText, PRODUCT_NAME, SUPPORT_EMAIL } from '@qolumns/shared'
+import { answerText, businessLinks, PRODUCT_NAME, SUPPORT_EMAIL } from '@qolumns/shared'
 import { formFields, fieldLabels, requestDetails, type FieldRow } from '@/lib/request-details'
 import { appQuoteView } from '@/lib/app-quote-view'
 import { appAccount } from '@/lib/app-account'
@@ -162,7 +162,7 @@ describe('T-184: the app’s view of a quote', () => {
 })
 
 describe('T-184: the Account read', () => {
-  const base = { businessName: 'Business A', logoUrl: null, planName: 'Pro', limit: { used: 37, limit: 200, unlimited: false, per: 'month' as const }, slug: 'business-a', appUrl: 'https://qolumns.com/' }
+  const base = { businessName: 'Business A', logoUrl: null, planName: 'Pro', limit: { used: 37, limit: 200, unlimited: false, per: 'month' as const }, links: businessLinks({ appUrl: 'https://qolumns.com/', slug: 'business-a', ownAddress: null, canUseAddress: false, host: null }) }
 
   it('the name, the plan’s name, its use, the quote link and the support address', () => {
     expect(appAccount(base)).toEqual({
@@ -171,6 +171,8 @@ describe('T-184: the Account read', () => {
       planName: 'Pro',
       usage: { used: 37, limit: 200, unlimited: false, per: 'month' },
       quoteLink: 'https://qolumns.com/quote/business-a',
+      // T-199: only set when the business's own address is its main link
+      alsoLink: null,
       supportEmail: SUPPORT_EMAIL,
     })
   })
@@ -178,7 +180,10 @@ describe('T-184: the Account read', () => {
   it('a business on the free allowance, one with no limit, one with no link', () => {
     expect(appAccount({ ...base, planName: null, limit: { used: 8, limit: 10, unlimited: false, per: 'total' } }).usage).toEqual({ used: 8, limit: 10, unlimited: false, per: 'total' })
     expect(appAccount({ ...base, limit: { used: 5, limit: 0, unlimited: true, per: 'month' } }).usage).toEqual({ used: 5, limit: 0, unlimited: true, per: 'month' })
-    expect(appAccount({ ...base, slug: null }).quoteLink).toBeNull()
+    expect(appAccount({ ...base, links: null }).quoteLink).toBeNull()
+    // T-199: with its own address, that is the link the app shows and puts in the QR code; the quote link "also works"
+    const own = appAccount({ ...base, links: businessLinks({ appUrl: 'https://qolumns.com', slug: 'business-a', ownAddress: 'business-a', canUseAddress: true, host: 'qolumns.com' }) })
+    expect([own.quoteLink, own.alsoLink]).toEqual(['https://business-a.qolumns.com', 'https://qolumns.com/quote/business-a'])
   })
 
   it('answers no price, no upgrade and no link to billing (an app may not point at a purchase outside it)', () => {

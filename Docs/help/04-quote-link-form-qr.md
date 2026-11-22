@@ -44,7 +44,7 @@ Yes. Sending your quote link in a WhatsApp chat works today, on every plan, with
 If you use the WhatsApp Business app, the same section has three ready texts under "For the WhatsApp Business app": "Greeting message", "Away message" and "Quick reply". Each shows where it goes in WhatsApp Business's own settings. Press "Copy", then paste it there.
 
 {{#soon whatsapp}}Quotes worked out inside the WhatsApp chat itself, on your own business number, are a different thing. That is {{soon}}, as part of the {{whatsapp.plans}} plans, and is not open to businesses yet. The link "Connect your WhatsApp number for full in-chat quoting (advanced)" at the bottom of the section is for that. Today the customer taps your link in the chat and finishes on your request page.{{/soon}}
-{{#live whatsapp}}Quotes worked out inside the WhatsApp chat itself, on your own business number, are a different thing, and are part of the {{whatsapp.plans}} plans. To set that up, press "Connect your WhatsApp number for full in-chat quoting (advanced)" at the bottom of the section. It opens the WhatsApp page.{{/live}}
+{{#live whatsapp}}Quotes worked out inside the WhatsApp chat itself, on your own business number, are a different thing. They are part of the {{whatsapp.plans}} plans, and a new business has them while it still has free quotes left. To set that up, press "Connect your WhatsApp number for full in-chat quoting (advanced)" at the bottom of the section. It opens the WhatsApp page.{{/live}}
 
 ## Can I change my quote link?
 <!-- id: link-change-name; page: /app/quote-link -->
@@ -71,6 +71,78 @@ Yes. If your link still ends in random characters, the page shows "Get a cleaner
 3. Press "Use this link".
 
 Your old link keeps working and sends people to the new one. If you do not see the box, your link is not a random one.
+
+## How do I choose my own address for my quote page?
+<!-- id: link-address-choose; page: /app/quote-link; flags: ownAddress -->
+
+{{#soon ownAddress}}
+You cannot yet. Choosing your own address, like {{ownAddress.example}}, is {{soon}}. Today customers reach you through your quote link, which works on every plan.
+
+When it is live, it will be part of {{ownAddress.plans}}, and a new business will have it while it still has free quotes left. You will choose the name once, on a card called "Choose your own address" on "Home" and on the "Quote link" page. Your quote link will keep working.
+{{/soon}}
+{{#live ownAddress}}
+You choose it once, on the card "Choose your own address". The address looks like {{ownAddress.example}} and opens your quote page. It is part of {{ownAddress.plans}}, and a new business has it while it still has free quotes left.
+
+1. Open "Quote link" in the menu. The card "Choose your own address" is at the top. The same card is at the top of "Home".
+2. The box starts with the name from your quote link. Type the name you want. What comes after the name is shown beside the box.
+3. Read the line under the box. It gives the full address and says it "is free", "is taken" or "can't be used".
+4. When it is free, press "Choose this address".
+5. Read "This is your address for good. You can't change it yourself later." Press the button that says "Use" and your address, or press "Back" to pick another name.
+
+The name must be 3 to 30 characters: lowercase letters, numbers and single hyphens. It cannot start or end with a hyphen. Some names are reserved. A name that is another business's address or quote-link name cannot be used.
+
+On "Home" the card also has "Later". It hides the card on "Home". The card stays on the "Quote link" page.
+
+While you are on your free quotes, a small "{{freeStart.plan}}" tag sits beside the card's heading.
+
+On a plan that does not include it, there is no card. The "Quote link" page shows one quiet line under your link instead: "Get your own address, like {{ownAddress.example}}, on Pro." The example in that line uses your own quote-link name.
+{{/live}}
+
+## Which link do I share once I have my own address?
+<!-- id: link-address-also-works; page: /app/quote-link; flags: ownAddress, app -->
+
+{{#soon ownAddress}}
+Choosing your own address is {{soon}}, so today the link to share is your quote link.
+
+When it is live, your address will be the main link on the "Quote link" page, and your quote link will keep working under it as "Also works".
+{{/soon}}
+{{#live ownAddress}}
+Share your address. Once you have chosen one, and while you can use it, it is the main link on the "Quote link" page:
+
+- "Copy" and "Open" under "Your quote link" use your address.
+- The QR code is for your address.
+- The ready-made wording to paste has your address in it.
+
+Your normal quote link is shown under it, after "Also works", with its own "Copy". It keeps working for ever, on every plan, so anything you already shared or printed is still good.
+
+Choosing an address does not use up the one-time change of your quote link.
+
+Your address shows your public quote pages only. Signing in and your dashboard stay at the main {{product}} site.
+
+While you are on your free quotes, a small "{{freeStart.plan}}" tag sits beside "Your quote link".
+{{/live}}
+
+{{#soon app}}The phone app, which is {{soon}}, will show the same links as the "Quote link" page on its "Account" tab.{{/soon}}
+{{#live app}}The phone app's "Account" tab shows the same links as the "Quote link" page.{{/live}}
+
+## Can I change my own address, and what happens if my plan stops including it?
+<!-- id: link-address-change; page: /app/quote-link; flags: ownAddress -->
+
+{{#soon ownAddress}}
+Choosing your own address is {{soon}}, so there is nothing to change today.
+
+When it is live, an address will be fixed once you choose it. Only the {{product}} team will be able to change it.
+{{/soon}}
+{{#live ownAddress}}
+You cannot change it yourself. An address is fixed once you choose it. Only the {{product}} team can change it: write to {{support.email}}. The old name is then held for {{ownAddress.holdDays}} days before anyone else can take it.
+
+If you can no longer use it, the address is not lost. That happens when your free quotes are used up and you have no plan, when you pick or move down to a plan without it, or when your plan ends.
+
+- Your address then forwards to your normal quote link, so a customer who opens it still reaches your quote page.
+- The address stays reserved for you.
+- The "Quote link" page shows your normal quote link as the main link again.
+- When you move to a plan that includes it, your address works again as before.
+{{/live}}
 
 ## How do I put the form on my website?
 <!-- id: link-website-form; page: /app/quote-link -->

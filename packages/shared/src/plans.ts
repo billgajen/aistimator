@@ -31,6 +31,8 @@ export interface PlanFeatureSet {
   calibration_insights: boolean
   lidar_scanning: boolean
   multiple_users: boolean
+  /** T-199: the business chooses its own address (yourname.<our domain>) for its quote page */
+  own_address: boolean
 }
 
 export interface PlanDefinition {
@@ -65,6 +67,7 @@ const BASE_FEATURES: PlanFeatureSet = {
   calibration_insights: false,
   lidar_scanning: false,
   multiple_users: false,
+  own_address: false,
 }
 
 /** Annual billing = 10 × monthly ("2 months free"). */
@@ -99,7 +102,8 @@ export const PLANS: PlanDefinition[] = [
     quoteLimit: 200, // confirmed (T-180)
     channels: ['widget', 'sms', 'whatsapp', 'mobile_app'],
     // T-193 (owner's decision): room scan is a Pro feature (Business keeps it)
-    features: { ...BASE_FEATURES, custom_branding: true, calibration_insights: true, lidar_scanning: true },
+    // T-199 (owner's decision): choosing its own address is a Pro feature (Business keeps it)
+    features: { ...BASE_FEATURES, custom_branding: true, calibration_insights: true, lidar_scanning: true, own_address: true },
     overageEnabled: false,
     // T-165 (owner's decision): no trial. The one free offer is the free
     // allowance (FREE_ALLOWANCE): 10 priced quotes, no card. A plan is paid
@@ -122,6 +126,7 @@ export const PLANS: PlanDefinition[] = [
       lidar_scanning: true,
       multiple_users: true,
       priority_support: true,
+      own_address: true,
     },
     overageEnabled: false,
     offered: true,
@@ -193,9 +198,22 @@ export const NO_SUBSCRIPTION_LIMIT: Record<string, number> = Object.fromEntries(
   Object.entries(FREE_ALLOWANCE).map(([region, a]) => [region, a.quotes])
 )
 
+/**
+ * T-199 (owner's decision, 21 Nov 2026): while a new business still has free
+ * quotes left, it works like this plan: every feature and channel of it. The
+ * rule itself is `businessAccess` (access.ts); this only names the plan.
+ */
+export const FREE_START_PLAN_ID = 'plan_us_pro'
+
+export function freeStartPlan(): PlanDefinition | null {
+  return PLANS.find((p) => p.id === FREE_START_PLAN_ID) ?? null
+}
+
 /** The free offer for new businesses (the launch market), in the words the site uses. */
 export function freeOfferLabel(): string {
-  return `Try it free: ${FREE_ALLOWANCE.US!.quotes} quotes, no card`
+  const plan = freeStartPlan()
+  const quotes = FREE_ALLOWANCE.US!.quotes
+  return plan ? `Try every ${plan.name} feature free: ${quotes} quotes, no card` : `Try it free: ${quotes} quotes, no card`
 }
 
 export function getPlan(id: string | null | undefined): PlanDefinition | null {

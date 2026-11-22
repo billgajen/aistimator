@@ -1,41 +1,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getPlan, type PlanDefinition, type PlanFeatureSet, type PlanChannel } from '@qolumns/shared'
+import { businessCan } from '@/lib/access'
 
 /**
- * Plan feature lookups (T-134: from the plan definitions in @qolumns/shared,
- * not the plans table). Fail-safe: any error or no live subscription → null
- * plan → every gated feature off.
- */
-export async function getActivePlan(supabase: SupabaseClient, tenantId: string): Promise<PlanDefinition | null> {
-  try {
-    const { data } = await supabase
-      .from('subscriptions')
-      .select('status, plan_id')
-      .eq('tenant_id', tenantId)
-      .in('status', ['active', 'trialing'])
-      .maybeSingle()
-    return data ? getPlan((data as { plan_id?: string }).plan_id) : null
-  } catch {
-    return null
-  }
-}
-
-export async function hasPlanFeature(
-  supabase: SupabaseClient,
-  tenantId: string,
-  feature: keyof PlanFeatureSet
-): Promise<boolean> {
-  return Boolean((await getActivePlan(supabase, tenantId))?.features[feature])
-}
-
-export async function hasPlanChannel(supabase: SupabaseClient, tenantId: string, channel: PlanChannel): Promise<boolean> {
-  return Boolean((await getActivePlan(supabase, tenantId))?.channels.includes(channel))
-}
-
-/**
- * custom_branding = white-label: the "Prepared with Qolumns" badge is
- * dropped from customer-facing surfaces.
+ * The badge on customer-facing pages. T-199: decided by the one rule
+ * (`businessAccess`, @qolumns/shared), through lib/access.ts: a plan that
+ * includes it, or the free start. Any error or no plan: the badge shows.
+ *
+ * White-label: the "Prepared with Qolumns" badge is dropped from the
+ * estimate and the request form.
  */
 export async function hasCustomBranding(supabase: SupabaseClient, tenantId: string): Promise<boolean> {
-  return hasPlanFeature(supabase, tenantId, 'custom_branding')
+  return businessCan(supabase, tenantId, 'no_badge')
 }

@@ -46,7 +46,7 @@ describe('T-165: one free offer (the owner’s pricing decision)', () => {
 
   it('the free offer is the same everywhere: 10 quotes, no card', () => {
     expect(FREE_ALLOWANCE.US!.quotes).toBe(10)
-    expect(freeOfferLabel()).toBe('Try it free: 10 quotes, no card')
+    expect(freeOfferLabel()).toBe('Try every Pro feature free: 10 quotes, no card')
   })
 
   it('no marketing page or shared marketing copy says "trial" or "14-day"', () => {

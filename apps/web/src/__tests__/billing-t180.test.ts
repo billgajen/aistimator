@@ -18,6 +18,7 @@ import {
   offeredPlans,
   storedSubscriptionStatus,
   subscriptionLive,
+  businessAccess,
 } from '@qolumns/shared'
 import { checkoutSessionParams } from '@/lib/stripe'
 import { decideSync, invoiceSubscriptionId, subscriptionFacts, type StoredSubscription } from '@/lib/billing-sync'
@@ -69,12 +70,13 @@ describe('T-180: one rule for who has a plan', () => {
   })
 
   it('the WhatsApp assistant follows the same grace as the quote limit, and suspension silences it first', () => {
-    const pro = { plan_id: 'plan_us_pro' }
-    expect(whatsappAccessFor({ ...pro, status: 'active' })).toEqual({ allowed: true })
-    expect(whatsappAccessFor({ ...pro, status: 'past_due' })).toEqual({ allowed: true }) // being retried: still on
-    expect(whatsappAccessFor({ ...pro, status: storedSubscriptionStatus('unpaid') })).toEqual({ allowed: false, why: 'subscription' })
-    expect(whatsappAccessFor({ ...pro, status: 'canceled' })).toEqual({ allowed: false, why: 'subscription' })
-    expect(whatsappAccessFor({ ...pro, status: 'active' }, true)).toEqual({ allowed: false, why: 'suspended' })
+    // T-199: the answer comes from the one rule (`businessAccess`), fed the subscription row
+    const pro = (status: string) => businessAccess({ subscription: { plan_id: 'plan_us_pro', status }, region: 'US', quotesUsed: 0 })
+    expect(whatsappAccessFor(pro('active'))).toEqual({ allowed: true })
+    expect(whatsappAccessFor(pro('past_due'))).toEqual({ allowed: true }) // being retried: still on
+    expect(whatsappAccessFor(pro(storedSubscriptionStatus('unpaid')))).toEqual({ allowed: false, why: 'subscription' })
+    expect(whatsappAccessFor(pro('canceled'))).toEqual({ allowed: false, why: 'subscription' })
+    expect(whatsappAccessFor(pro('active'), true)).toEqual({ allowed: false, why: 'suspended' })
   })
 
   it('a free test account is a live row Stripe has never heard of', () => {

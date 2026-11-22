@@ -252,7 +252,8 @@ describe('T-174: what the deploy script sends', () => {
     const out = run('cors')
     const sent = JSON.parse(out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1)) as { rules: Array<{ allowed: { origins: string[]; methods: string[] } }> }
     expect(sent.rules).toHaveLength(1)
-    expect(sent.rules[0]!.allowed.origins).toEqual(['http://localhost:3000', 'http://localhost:3001', 'https://estimator-web-phi.vercel.app', 'https://qolumns.com'])
+    // T-199: and from businesses' own addresses (a photo goes from the page straight to the bucket)
+    expect(sent.rules[0]!.allowed.origins).toEqual(['http://localhost:3000', 'http://localhost:3001', 'https://estimator-web-phi.vercel.app', 'https://qolumns.com', 'https://*.qolumns.com'])
     expect(sent.rules[0]!.allowed.methods).toContain('PUT')
   })
 

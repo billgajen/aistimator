@@ -29,7 +29,7 @@ import { createRequire } from 'node:module'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { ROOT, loadEnv, makeSupabase, sessionCookieHeader, http as call, expectOk, shortId, runStamp } from './lib.mjs'
 import { garageDoorsPackUS } from '../../apps/web/src/lib/vertical-packs/garage-doors-us'
-import { PLANS, offeredPlansWithChannel } from '../../packages/shared/src/plans'
+import { FREE_ALLOWANCE, PLANS, offeredPlansWithChannel } from '../../packages/shared/src/plans'
 
 const jpeg = createRequire(path.join(ROOT, 'apps/web/package.json'))('jpeg-js') as {
   encode: (image: { width: number; height: number; data: Buffer }, quality: number) => { data: Buffer }
@@ -44,6 +44,7 @@ const APP_SECRET = 'local-app-secret-t175'
 const VERIFY_TOKEN = 'local-verify-t175'
 const TEMPLATE_NAME = 'estimate_ready'
 const WITH_WHATSAPP = offeredPlansWithChannel('whatsapp')[0]!.id
+const WITH_NAME = offeredPlansWithChannel('whatsapp')[0]!.name
 const WITHOUT_WHATSAPP = PLANS.find((p) => p.offered && !p.channels.includes('whatsapp'))!.id
 
 const cfg = loadEnv()
@@ -332,10 +333,16 @@ const SPRINGS = garageDoorsPackUS.services[1]!.name
 // =====================================================================================
 section('1. Items 5 and 7: only a plan with WhatsApp, with a live subscription')
 const withNames = offeredPlansWithChannel('whatsapp').map((p) => p.name)
+// T-199: a business with free quotes left works like Pro (the free start), WhatsApp included
+const Trying = await business(`Trying Doors ${shortId()}`, { plan: null })
+const tryingConfig = expectOk('config', await configOf(Trying))
+check('T-199: no plan, free quotes left (the free start): WhatsApp is allowed, and the page is told which plan keeps it', tryingConfig.access?.allowed === true && tryingConfig.access?.tag === WITH_NAME, tryingConfig.access)
+// "no plan" from here on: no subscription, and the free quotes used up
 const F = await business(`Free Doors ${shortId()}`, { plan: null })
+await sb.insert('usage_counters', { tenant_id: F.tenantId, period_yyyymm: `${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}`, estimates_created: FREE_ALLOWANCE.US!.quotes, estimates_sent: 0 })
 const accF = newAccount()
 const freeConfig = expectOk('config', await configOf(F))
-check('no plan (the free allowance): the page is told WhatsApp is not included, in one line that names the plans that have it', freeConfig.access?.allowed === false && freeConfig.access?.why === 'plan' && withNames.every((n) => String(freeConfig.access?.line).includes(n)), freeConfig.access)
+check('no plan and the free quotes used: the page is told WhatsApp is not included, in one line that names the plans that have it', freeConfig.access?.allowed === false && freeConfig.access?.why === 'plan' && withNames.every((n) => String(freeConfig.access?.line).includes(n)), freeConfig.access)
 const callsBefore = calls.length
 const freeConnect = await connect(F, accF)
 check('…and it cannot connect: 403, nothing is sent to Meta, nothing is saved', freeConnect.status === 403 && freeConnect.json?.error?.code === 'PLAN_REQUIRED' && calls.length === callsBefore && (await rowOf(F)) === null, freeConnect.json)
@@ -691,6 +698,8 @@ const JUNIPER = 'rgb(32, 94, 86)'
 const YELLOW = 'rgb(255, 197, 61)'
 for (const width of [390, 1440]) {
   const P = await business(`Page Business ${shortId()}`, { plan: null })
+  // T-199: "no plan" is no subscription and the free quotes used (with free quotes left it would work like Pro)
+  await sb.insert('usage_counters', { tenant_id: P.tenantId, period_yyyymm: `${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}`, estimates_created: FREE_ALLOWANCE.US!.quotes, estimates_sent: 0 })
   const accP = newAccount({ onBizApp: true })
   const ctx = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce' })
   await ctx.addInitScript('globalThis.__name = (f) => f')

@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
-import { parseRoomScan, type AppCreateQuoteRequest, type AppCreateQuoteResponse, type ExpectedSignalConfig, type QuoteStatus, type ServiceDraftConfig } from '@qolumns/shared'
+import { canUse, onsiteNotInPlan, parseRoomScan, type AppCreateQuoteRequest, type AppCreateQuoteResponse, type ExpectedSignalConfig, type QuoteStatus, type ServiceDraftConfig } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
 import { createAdminClient } from '@/lib/supabase/server'
 import { createQuoteSubmission } from '@/lib/quote-intake'
-import { answersWithScan, planHasRoomScan, SCAN_NOT_IN_PLAN } from '@/lib/room-scan-intake'
+import { answersWithScan, SCAN_NOT_IN_PLAN } from '@/lib/room-scan-intake'
+import { loadAccess } from '@/lib/access'
 
 export const maxDuration = 60
 
@@ -80,17 +81,26 @@ export async function POST(request: Request) {
     }
   }
 
+  // T-199: on-site quotes are for a business that can use them (Pro, Business, the free start), by the
+  // one rule. Decided here as well as in the app, so an older build cannot get round it. A send that
+  // already made its quote was answered above: nothing made is ever refused.
+  const access = await loadAccess(createAdminClient(), auth.tenantId)
+  if (!canUse(access, 'onsite_quotes')) {
+    const words = onsiteNotInPlan()
+    return NextResponse.json({ error: { code: words.code, message: `${words.heading}. ${words.text}` } }, { status: 403 })
+  }
+
   // T-138: an on-site LiDAR scan. Validated here (untrusted input); the
   // quantities it maps are filled as answers so the form's required fields
   // pass, and the raw scan rides along for the worker's audit line.
-  // T-194: only on a plan that includes room scan (Pro and Business).
+  // T-194: only for a business that can use room scan.
   let job = body.job
   if (body.scan !== undefined) {
     const parsed = parseRoomScan(body.scan)
     if (!parsed.ok) {
       return NextResponse.json({ error: { code: 'INVALID_SCAN', message: parsed.error } }, { status: 400 })
     }
-    if (!(await planHasRoomScan(createAdminClient(), auth.tenantId))) {
+    if (!canUse(access, 'room_scan')) {
       return NextResponse.json({ error: SCAN_NOT_IN_PLAN }, { status: 403 })
     }
     const { data: service } = await auth.supabase

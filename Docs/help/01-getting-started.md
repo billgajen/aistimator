@@ -61,9 +61,16 @@ A test link works for two hours; "Open it again" gives you a fresh one. There is
 This test is only offered in setup. After setup, if you open your quote link yourself and send a request, it is treated as a real request and it counts.
 
 ## What is on the Home page?
-<!-- id: start-home-page; page: /app -->
+<!-- id: start-home-page; page: /app; flags: ownAddress -->
 
-"Home" shows what needs you first, then how your quotes are doing. The page's title is your business name. From top to bottom:
+"Home" shows what needs you first, then how your quotes are doing. The page's title is your business name.
+
+A new business that has never had a plan and still has free quotes left sees one quiet line under its name: "You're trying everything in {{freeStart.plan}}." followed by how many free quotes are left.
+
+{{#soon ownAddress}}A card for choosing your own address for your quote page is {{soon}}. It is not on "Home" today.{{/soon}}
+{{#live ownAddress}}If you can choose your own address for your quote page and have not chosen one yet, the card "Choose your own address" comes next. "Later" hides it on "Home". It stays on the "Quote link" page.{{/live}}
+
+Then, from top to bottom:
 
 1. "Waiting for you": quotes to approve, customer questions and requests that could not be priced. A quote to approve has an "Approve & send" button right there. This part is hidden when nothing is waiting.
 2. A line saying how many new people started a request but did not finish, with "See who". It only counts ones you have not seen yet.
@@ -111,7 +118,7 @@ The menu is on the left, in three groups: "Work", "Set up" and "Account". On a p
 - "Analytics": how your quotes are doing, such as how many were created, viewed and accepted.
 - "Services": your services and what you charge for each. Add, edit, disable or delete a service here, or add one from a template.
 - "Quote link": the link you give customers, its QR code, and the code that puts the form on your website.
-- "WhatsApp": {{#soon whatsapp}}quotes inside a WhatsApp chat, on your own business number. {{soon}}. Today you can share your quote link in a WhatsApp chat: see "Use it on WhatsApp" on the "Quote link" page.{{/soon}}{{#live whatsapp}}connect your business number so customers can ask for a quote inside a WhatsApp chat. It comes with {{whatsapp.plans}}.{{/live}}
+- "WhatsApp": {{#soon whatsapp}}quotes inside a WhatsApp chat, on your own business number. {{soon}}. Today you can share your quote link in a WhatsApp chat: see "Use it on WhatsApp" on the "Quote link" page.{{/soon}}{{#live whatsapp}}connect your business number so customers can ask for a quote inside a WhatsApp chat. It comes with {{whatsapp.plans}}, and with a new business's free quotes while some are left.{{/live}}
 - "Settings": four tabs, "Business", "Branding", "Billing" and "Notifications".
 - "Help": at the bottom of the menu. It opens a panel with "Ask {{product}}" (an assistant that answers questions about using {{product}}), "Report a problem", "Suggest a feature" and "Your reports and requests". A "New" mark beside it means we have replied to you.
 - "Sign out": under "Help".
@@ -119,15 +126,17 @@ The menu is on the left, in three groups: "Work", "Set up" and "Account". On a p
 ## What do I get for free, and how are the free quotes counted?
 <!-- id: start-free-offer; page: /app/settings/billing -->
 
-You get {{free.quotes}} free quotes, and no card is needed. They are counted in total: they do not start again each month.
+You get {{free.quotes}} free quotes, and no card is needed. They are counted in total: they do not start again each month. The site says it this way: "{{free.offer}}".
+
+While you have never had a plan and still have free quotes left, your business works like {{freeStart.plan}}: you can use every feature that plan includes. "Home" says so in one line under your business name, with how many free quotes are left. The "Billing" tab lists what each plan includes.
 
 - Each request a customer sends in counts as one, however many services it asks for.
 - Test requests from setup do not count.
 - Unfinished requests (someone started and did not finish) do not count.
 
-When you have only a few left, "Home" shows a notice with a "Pick a plan" button, and we email you once. After they are used up, new requests are still saved, but they are not priced: the customer is told you will send their estimate shortly. Pick a plan to price them.
+When you have only a few left, "Home" shows a notice with a "Pick a plan" button, and we email you once. After they are used up, you are on no plan. New requests are still saved, but they are not priced: the customer is told you will send their estimate shortly. Pick a plan to price them. The features of {{freeStart.plan}} stop as well, until you pick a plan that includes them. Nothing you made is lost.
 
-"Settings", then "Billing", shows "Free quotes used". A business set to the United Kingdom has a free allowance that is counted by calendar month instead; "Billing" shows it as "Quotes this month".
+"Settings", then "Billing", shows "Free quotes used". A business set to the United Kingdom has a free allowance that is counted by calendar month instead; "Billing" shows it as "Quotes this month". That monthly allowance does not come with the features of {{freeStart.plan}}.
 
 ## How do I sign in and sign out?
 <!-- id: start-sign-in-out; page: /app -->

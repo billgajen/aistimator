@@ -38,7 +38,7 @@ that claims what its template does not do. The words "AI" and what it does are t
 Home page (T-165, reordered in T-167; `Docs/design/system.md` decides the look), top to bottom, one idea per
 section, and no two neighbours sharing a layout or a background:
 1. **Hero** (paper): "Instant quotes for your customers, in your prices.", then one line on what the AI does and where
-   the price comes from, the one yellow button ("Try it free: 10 quotes, no card") and a quiet "Try it as a
+   the price comes from, the one yellow button ("Try every Pro feature free: 10 quotes, no card" since T-199; `freeOfferLabel()`) and a quiet "Try it as a
    customer". Under it the **product demo** (`HeroDemo`, T-168): **three frames of the same height, side by
    side, one idea each**, built from the product's own parts in the example business's colour. 1 "Your customer
    asks": one question with its answer and "Get my estimate". 2 "They see your price": a short estimate (a line
@@ -180,9 +180,9 @@ Every marketing page starts with a "Skip to content" link, and footer links are 
 is the name in the display font, drawn by one component (`components/brand/Wordmark.tsx`).
 
 Header and phone menu (T-155, T-165): the header button reads "Try it free" on one line at every width (T-165; from
-`md` up it used to carry the full offer). Every in-page button reads "Try it free: 10 quotes, no card". The phone menu (`MobileMenu`) opens full screen over the page (a
+`md` up it used to carry the full offer). Every in-page button reads the full offer (`freeOfferLabel()`: "Try every Pro feature free: 10 quotes, no card" since T-199). The phone menu (`MobileMenu`) opens full screen over the page (a
 modal dialog, the page behind locked from scrolling), with Features, Pricing, Trades, Try it as a customer, Log in and
-one "Try it free: 10 quotes, no card" button. It closes on a link, the X or Escape, and focus goes back to the menu
+one full-offer button. It closes on a link, the X or Escape, and focus goes back to the menu
 button (on the next page's button after a link).
 
 Routes:
@@ -205,12 +205,13 @@ Example Home Services is an example business with example prices, then the real 
   details. No email or text will be sent to anyone.";
 - "Use a sample photo" on the photo step (the drawn label in `public/demo/`, through the normal upload);
 - when priced, the estimate on the same page, then "What the business sees" (a static new-lead card with Approve &
-  send) and "Try it free: 10 quotes, no card";
+  send) and the full-offer button;
 - over the demo's limits, a recorded example estimate with the same signup button.
 /demo?tenantKey=… keeps the old developer view (the Share page links there).
 
-Free offer (T-152): every "Start free" now reads "Try it free: 10 quotes, no card" (`freeOfferLabel()` from
-`packages/shared/src/plans.ts`). The free allowance is 10 priced quotes **in total** (it never resets); the pricing
+Free offer (T-152, T-199): every "Start free" reads the full offer from `freeOfferLabel()`
+(`packages/shared/src/plans.ts`): "Try every Pro feature free: 10 quotes, no card" since T-199 (it was "Try it
+free: 10 quotes, no card"). While free quotes are left the business has every Pro feature (AD-085). The free allowance is 10 priced quotes **in total** (it never resets); the pricing
 FAQ ("Can I try it for free?") and the billing page say the same.
 
 ### 2) Dashboard (authenticated)
@@ -341,6 +342,29 @@ options built from its own stored details and checked free, "Type my own" with t
 link". Each option is a tap row (one button the size of its row, 44 px or more), not a small radio button. With nothing to build from, only the box to type one. It is free and leaves the one change; afterwards the
 card says what the link now is and that the old one still works. The same offer is on setup's last step, under
 the link (`components/share/CleanLinkOffer.tsx`, which asks `GET /api/tenant/slug` itself).
+
+The free start, the "Pro" tag and a business's own address (T-199, AD-085, AD-086):
+- **Home, on the free start:** one quiet line under the heading, "You're trying everything in Pro. 7 free quotes
+  left." (`freeStartLine`). No button and no yellow.
+- **The "Pro" tag** (`components/dashboard/PlanTag.tsx`): a small tag beside a Pro feature the free
+  start lends: the WhatsApp page's heading, the own-address card, a quote's room scan card. Shown only on the
+  free start; a business on Pro sees no tag.
+- **"Choose your own address"** (`components/home/HomeAddressCard.tsx` on Home, `components/share/OwnAddressCard.tsx`
+  on the Quote link page; both only when the feature is switched on and the business can choose): a box with
+  ".qolumns.com" after it, pre-filled with the quote-link name; under it the live check ("bluum.qolumns.com is
+  free" / "is taken" / "can't be used", announced politely to a screen reader), then the rule line. "Choose
+  this address" opens the confirm step in the same card: "This is your address for good. You can't change it
+  yourself later.", "Use bluum.qolumns.com" / "Back". On Home, "Later" hides the card (it comes back when a plan
+  that includes the address starts); the Quote link page always keeps it.
+- **With an address:** the Quote link page shows the address first (it is what "Copy", "Open" and the QR code
+  use), then "Also works" with the old link and its own "Copy". Home's "Your quote link" shows the address.
+- **Starter:** the normal link and one quiet line under it on the Quote link page: "Get your own address, like
+  bluum.qolumns.com, on Pro." Not in the app.
+- **The app:** the "New quote" tab shows "On-site quotes are part of Pro", one sentence and "OK" for a business
+  without on-site quotes, and mounts no form. The Account tab shows the main link, and "Also works: …" under it
+  when that is the address. No price, link or buying words anywhere in the app.
+- **Pricing and Features:** "Mobile app: every plan" and "On-site quotes in the app: Pro and Business" (`appPlanLines`),
+  and "Your own address: yourname.qolumns.com" on Pro and Business, with "Coming soon" until the address is on.
 
 Quote link page (T-149 + T-152; "Share" until T-160): quote link · QR code · where to put it · **Use it on WhatsApp** ("Send on WhatsApp" via
 wa.me with the link; greeting, away and quick-reply texts for the WhatsApp Business app with where to paste them;

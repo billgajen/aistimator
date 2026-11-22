@@ -3,7 +3,7 @@
 import { questionsSpread } from './step-count'
 import { makeSmallPhoto, smallPhotoDeclaration, uploadSmallPhoto } from '@/lib/small-photo-client'
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { EMBED_NAMES, formatMoney, PRODUCT_NAME, splitMinimum, SLOW_PREPARING_MS, slowPreparingLine, failedRequestLine } from '@qolumns/shared'
+import { addressHostFrom, onSameAddress, EMBED_NAMES, formatMoney, PRODUCT_NAME, splitMinimum, SLOW_PREPARING_MS, slowPreparingLine, failedRequestLine } from '@qolumns/shared'
 import { useSearchParams } from 'next/navigation'
 import { assessImageQuality } from '@/lib/image-quality'
 import { brandStyleVars } from '@/lib/color'
@@ -1689,7 +1689,10 @@ function SuccessState({
   const destination =
     liveStatus === 'awaiting_clarification' && clarifyUrl ? clarifyUrl : (liveStatus === 'pending_review' && estimateShown) || isReady ? quoteUrl : null
   useEffect(() => {
-    if (hosted && destination) window.location.assign(destination)
+    if (!hosted || !destination) return
+    // T-199: a customer on the business's own address stays on it (the same page, served there)
+    const here = { host: window.location.host, origin: window.location.origin }
+    window.location.assign(onSameAddress(destination, here, process.env.NEXT_PUBLIC_APP_URL || window.location.origin, addressHostFrom(process.env.NEXT_PUBLIC_OWN_ADDRESS_HOST)))
   }, [hosted, destination])
 
   // T-133: Intl formatting in the tenant's locale, whole units for a range

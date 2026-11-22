@@ -189,7 +189,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
     check(`${width}: Home does not scroll sideways`, await noSideways(p))
     const perScreen = await yellowPerScreen(p)
     const yellow = await yellowButtons(p)
-    check(`${width}: one yellow call to action per screen, never two: the hero's and the closing band's`, Math.max(...perScreen) === 1 && perScreen[0] === 1 && yellow.length === 2 && yellow.every((y) => y.text === 'Try it free: 10 quotes, no card'), { screens: perScreen.length, max: Math.max(...perScreen), yellow: yellow.map((y) => y.id) })
+    check(`${width}: one yellow call to action per screen, never two: the hero's and the closing band's`, Math.max(...perScreen) === 1 && perScreen[0] === 1 && yellow.length === 2 && yellow.every((y) => y.text === 'Try every Pro feature free: 10 quotes, no card'), { screens: perScreen.length, max: Math.max(...perScreen), yellow: yellow.map((y) => y.id) })
     await shot(p, `home-${width}`)
     await ctx.close()
 
@@ -239,7 +239,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
     check(`${width}: no chat form, no "minimum job", no "Learn" claim, no PDF; the price sentence is Home's`, !/chat form|form or a chat/i.test(fText) && !/minimum job/i.test(fText) && !/corrections improve|Learns from/i.test(fText) && !/\bPDFs?\b/.test(fText) && fText.includes('“$375 per room, heavy prep adds $250.”'))
     const fYellow = await yellowButtons(f)
     const fPer = await yellowPerScreen(f)
-    check(`${width}: the main button is yellow, one per screen: the hero's and the closing band's`, fYellow.length === 2 && fYellow.every((y) => y.href === '/signup' && y.text === 'Try it free: 10 quotes, no card') && Math.max(...fPer) === 1 && fPer[0] === 1, { ids: fYellow.map((y) => y.id), max: Math.max(...fPer) })
+    check(`${width}: the main button is yellow, one per screen: the hero's and the closing band's`, fYellow.length === 2 && fYellow.every((y) => y.href === '/signup' && y.text === 'Try every Pro feature free: 10 quotes, no card') && Math.max(...fPer) === 1 && fPer[0] === 1, { ids: fYellow.map((y) => y.id), max: Math.max(...fPer) })
     check(`${width}: Features does not scroll sideways, and has no page error`, (await noSideways(f)) && fErrors.length === 0, fErrors)
     await shot(f, `features-${width}`)
     await fctx.close()

@@ -39,17 +39,22 @@ export async function hasRandomLink(admin: Admin, tenant: SlugTenant): Promise<b
 export async function freeSlugs(admin: Admin, candidates: readonly string[], tenantId: string): Promise<string[]> {
   if (candidates.length === 0) return []
   const list = [...candidates]
-  const [reserved, owned, former] = await Promise.all([
+  const [reserved, owned, former, addresses, held] = await Promise.all([
     admin.from('reserved_slugs').select('slug').in('slug', list),
     admin.from('tenants').select('slug').in('slug', list).neq('id', tenantId),
     admin.from('tenant_slug_history').select('old_slug').in('old_slug', list),
+    // T-199: another business's own address, or one held after a change, is taken too
+    admin.from('tenants').select('own_address').in('own_address', list).neq('id', tenantId),
+    admin.from('own_address_changes').select('old_address').in('old_address', list).gt('held_until', new Date().toISOString()).or(`tenant_id.is.null,tenant_id.neq.${tenantId}`),
   ])
   // a failed read offers nothing rather than a link that may be taken
-  if (reserved.error || owned.error || former.error) return []
+  if (reserved.error || owned.error || former.error || addresses.error || held.error) return []
   const taken = new Set<string>([
     ...((reserved.data ?? []) as { slug: string }[]).map((r) => r.slug),
     ...((owned.data ?? []) as { slug: string }[]).map((r) => r.slug),
     ...((former.data ?? []) as { old_slug: string }[]).map((r) => r.old_slug),
+    ...((addresses.data ?? []) as { own_address: string }[]).map((r) => r.own_address),
+    ...((held.data ?? []) as { old_address: string }[]).map((r) => r.old_address),
   ])
   return list.filter((slug) => !taken.has(slug))
 }

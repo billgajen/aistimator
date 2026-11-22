@@ -187,6 +187,71 @@ routes, one webhook and one admin route. Plan numbers come from `packages/shared
 - **The public quote's price lines**: the customer's page words an added line from the line's `source`
   (`seen` / `words`), not from `recommendationReason`, which is still sent and no longer shown.
 
+## T-199: what a business can use, on-site quotes, a business's own address (AD-085, AD-086)
+
+**What a business can use is one rule** (`businessAccess` / `canUse` in `packages/shared/src/access.ts`, read on
+the server by `lib/access.ts`). No route checks a plan by itself. A business on a live plan has that plan's
+features; a business that never had a subscription and has free quotes left has Pro's (the "free start");
+anyone else has nothing that needs a plan. A read that fails answers "nothing".
+
+On-site quotes (the app is open to every business; starting a quote in it is not):
+- **`GET /api/app/bootstrap`** gains `onsiteQuotes: boolean` and `onsiteNotInPlan: { "heading": "On-site quotes
+  are part of Pro", "text": "Your plan includes everything else in the app. To add on-site quotes, change your
+  plan in your Qolumns account.", "button": "OK" }`. `roomScan` is now the same rule's answer. A server from
+  before T-199 sends neither; the app then opens the form and the server decides.
+- **`POST /api/app/quotes`** answers **403 `ONSITE_QUOTES_NOT_IN_PLAN`** for a business without on-site quotes,
+  with `message` = the heading, a full stop, and the text above. Nothing is saved and nothing is counted. A
+  send that already made its quote (the same `clientId`) is answered as before: nothing made is refused. (Until
+  T-199 a business with no plan and no free quotes left had its on-site quote saved, not priced.)
+- `403 ROOM_SCAN_NOT_IN_PLAN` (T-194) is unchanged in words; who gets it is now the rule's answer, so a business
+  on the free start can scan.
+- **`GET /api/app/account`**: `quoteLink` is the business's main link (its own address when it has one and can
+  use it, else its quote link), and `alsoLink` is its quote link when the address is the main one, else null.
+  `planName` is the plan held, and null on the free start. Still no price, upgrade or billing link.
+
+Small additions for the "Pro" tag shown on the free start (null or absent otherwise):
+- `GET /api/whatsapp/config` → `access.tag: "Pro" | null`.
+- `GET /api/quotes/:id` → `roomScanTag: "Pro" | null`, beside `roomScan`.
+
+A business's own address (`<name>.<our domain>`). Off until `NEXT_PUBLIC_OWN_ADDRESS_HOST` is set: then
+`live` is false, nothing can be chosen and the public look-up answers 404.
+- **`GET /api/tenant/address[?check=<name>]`** (signed in) → `{ "address": { "live", "host", "address": "bluum"
+  | null, "canChoose", "later", "suggested", "links": { "main", "also": "…" | null, "quoteLink",
+  "addressHostname": "bluum.qolumns.com" | null }, "planLine": "Get your own address, like bluum.qolumns.com, on
+  Pro." | null, "tag": "Pro" | null }, "check?": { "name", "hostname", "state": "free" | "taken" | "invalid",
+  "message": "bluum.qolumns.com is free" } }`. `check` is answered only when the business can choose. `taken`
+  is another business's address, another business's current or former quote-link name, a held name, or a
+  check that could not be made (never "free" on a failed read). `invalid`
+  is the shape (3 to 30 characters, lowercase letters, numbers, single hyphens) and the reserved names. Limited
+  to 120 a minute per business (`address_check`), failing open; over it, the usual 429.
+- **`PUT /api/tenant/address`** `{ "address": "bluum" }` → the same `address` view. The business's one choice.
+  **403 `PLAN_REQUIRED`** without the capability, **409 `ALREADY_CHOSEN`**, **409 `ADDRESS_TAKEN`**, **400
+  `INVALID_ADDRESS`**, **409 `NOT_AVAILABLE`** while the feature is off. Written with the service role for the
+  signed-in user's own business only, and logged in `own_address_changes`.
+- **`PATCH /api/tenant/address`** `{ "later": true }` → the same view. "Later" on Home's card.
+- **`PUT /api/admin/tenants/:tenantId/address`** `{ "address": "new-name" | null, "note?": "…" }` (platform
+  admin) → `{ "tenantId", "address", "held": { "address": "old-name", "until": "<ISO date>" } | null }`. Changes
+  or removes an address whatever the business's plan. The old name is held 90 days; the change is written to
+  `own_address_changes` and `admin_activity_logs` (`change_address`). 403 for anyone else; 400 / 409 as above.
+  `GET /api/admin/tenants` gains `slug` and `ownAddress` per business.
+- **`GET /api/public/address/:name`** (public, read-only; for the Worker that serves the addresses) → `{ "slug":
+  "bluum-painting", "serve": true | false }`, or **404** for nobody's address. `serve: false`: the business
+  cannot use its address now, so the Worker answers with a redirect to `/quote/<slug>`. Reusable for 60 seconds
+  (`s-maxage`); it reads fresh on every call.
+- **`GET /api/tenant/slug?check=`** and **`PUT /api/tenant/slug`**: a name that is another business's address,
+  or held, is now taken (`available: false`), and the eight newly reserved names are refused.
+
+What the Worker on `*.<our domain>/*` answers (it is not part of the web app; `apps/worker/src/address-handler.ts`):
+- `/` → the business's quote page, fetched from the main site, 200 at the address. `?…` is passed on.
+- `/q/…`, `/room-model/…`, `/api/public/…`, `/_next/…`, `/brand/…`, `/photos/…`, the icons → passed through.
+- any other path → **302** to the same path on the main address.
+- an address whose business cannot use it, or a Worker with no `ADDRESS_PROXY_KEY` → **302** to the quote link.
+- nobody's address or a reserved name → **302** to the main address. The main site not answering → **503** with
+  `Retry-After: 10`.
+- It never passes on `Cookie` or `Authorization`, and removes `Set-Cookie` from every answer. It sends
+  `x-address-proxy-key` and `x-address-client-ip`; the web app counts its public limits against that address
+  only when the key is right, and ignores both headers from anyone else.
+
 ## T-198: "Ask Qolumns" (the Help assistant) and the owner's Questions tab
 
 The same rules as T-197's routes: every `/api/support/ask` route is the signed-in user's own business; every

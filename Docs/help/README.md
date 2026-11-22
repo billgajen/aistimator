@@ -31,9 +31,11 @@ One or two short sentences that answer the question.
 - Optional keys, separated by `;`:
   - `section: Tax Settings` — the entry covers that section of the Settings page (the section's heading, as the
     page shows it).
-  - `flags: whatsapp, app, roomScan` — the entry talks about something that has a "Coming soon" flag in
-    `apps/web/src/lib/marketing/plan-claims.ts`. An entry that names WhatsApp, the phone app or the room scan
-    must carry the flag, and must say what is true today with the blocks below.
+  - `flags: whatsapp, app, roomScan, ownAddress` — the entry talks about something that has a "Coming soon"
+    flag in `apps/web/src/lib/marketing/plan-claims.ts`. An entry that names WhatsApp, the phone app, the room
+    scan or a business's own address must carry the flag, and must say what is true today with the blocks
+    below. The words that count are `HELP_FLAG_WORDS` in `packages/shared/src/help-guide.ts`: "own address"
+    is one of them, so an entry that is not about it says "your quote link" instead.
 - **A short answer first, then numbered steps where there are steps.** Plain words. No marketing. Say what the
   product does today; say plainly what it does not do.
 
@@ -46,9 +48,13 @@ Plan facts and "is it live" are filled in when the guide is built (`apps/web/src
 |---|---|
 | `{{product}}` | the product's name |
 | `{{free.quotes}}` | the number of free quotes a new business gets |
+| `{{free.offer}}` | the free offer, in the words the site uses |
+| `{{freeStart.plan}}` | the plan a new business works like while it still has free quotes left |
 | `{{plans}}` | every plan a business can choose: its price by month and by year, its quotes a month, what it includes, and what is coming soon |
 | `{{plan.starter.name}}` `{{plan.starter.monthly}}` `{{plan.starter.yearly}}` `{{plan.starter.quotes}}` | one plan's name, prices and quotes a month (also `pro`, `business`) |
-| `{{whatsapp.plans}}` `{{app.plans}}` `{{roomScan.plans}}` `{{badge.plans}}` | the plans that include it ("Pro and Business") |
+| `{{whatsapp.plans}}` `{{onsite.plans}}` `{{roomScan.plans}}` `{{badge.plans}}` `{{ownAddress.plans}}` | the plans that include it ("Pro and Business"). `onsite` is starting a quote in the phone app: the app itself is open to every business, on any plan or none, so there is no token for it |
+| `{{ownAddress.example}}` | what a business's own address looks like: "yourname." and our domain |
+| `{{ownAddress.holdDays}}` | how many days an old address is held after the team changes it |
 | `{{soon}}` | "Coming soon" |
 | `{{support.email}}` | the support address |
 | `{{support.dailyReports}}` `{{ask.dailyQuestions}}` | the daily limits of the Help panel |
@@ -61,8 +67,9 @@ What is live and what is not:
 {{#live whatsapp}}Open WhatsApp in the menu and …{{/live}}
 ```
 
-`whatsapp`, `app` and `roomScan` are the three flags. A `soon` block is kept while the flag says "not live" and
-dropped once it is live; a `live` block is the other way round.
+`whatsapp`, `app`, `roomScan` and `ownAddress` are the four flags. A `soon` block is kept while the flag says
+"not live" and dropped once it is live; a `live` block is the other way round. A block cannot sit inside
+another block: write them one after the other.
 
 ## What the unit test holds (`apps/web/src/__tests__/help-guide-t198.test.ts`)
 

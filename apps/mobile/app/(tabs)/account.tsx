@@ -10,7 +10,7 @@ import { useCallback, useState } from 'react'
 import { Alert, Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
 import Constants from 'expo-constants'
-import { PRODUCT_NAME, PUSH_COPY, SUPPORT_EMAIL, type AppAccountResponse } from '@qolumns/shared'
+import { ADDRESS_COPY, PRODUCT_NAME, PUSH_COPY, SUPPORT_EMAIL, type AppAccountResponse } from '@qolumns/shared'
 import { useApi } from '../../src/lib/api-context'
 import { deleteAccountUrl, planLine, shortLink, usageFraction, usageLine } from '../../src/lib/account'
 import { config } from '../../src/lib/config'
@@ -144,6 +144,8 @@ export default function Account() {
         <Card>
           <Label>Your quote link</Label>
           {account?.quoteLink ? <Muted style={{ marginTop: 0, marginBottom: space.sm }}>{shortLink(account.quoteLink)}</Muted> : null}
+          {/* T-199: when the business's own address is its main link, its quote link still works */}
+          {account?.alsoLink ? <Muted style={{ marginTop: 0, marginBottom: space.sm }}>{`${ADDRESS_COPY.alsoWorks}: ${shortLink(account.alsoLink)}`}</Muted> : null}
           <LinkRow
             title="Show the QR code"
             note="A customer points their camera at it to ask for a quote"

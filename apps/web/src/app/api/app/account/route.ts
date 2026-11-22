@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getPlan, subscriptionLive } from '@qolumns/shared'
+import { businessAccess, businessLinks, canUse } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
 import { appAccount } from '@/lib/app-account'
 import { checkPlanLimit } from '@/lib/plan-limits'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
+import { appUrlFrom, ownAddressHost } from '@/lib/own-address'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +25,7 @@ export async function GET() {
   const { supabase, tenantId } = auth
 
   const [{ data: tenant }, { data: subscription }, limit] = await Promise.all([
-    supabase.from('tenants').select('name, slug, branding_json').eq('id', tenantId).single(),
+    supabase.from('tenants').select('name, slug, own_address, region, branding_json').eq('id', tenantId).single(),
     supabase.from('subscriptions').select('status, plan_id').eq('tenant_id', tenantId).maybeSingle(),
     checkPlanLimit(supabase, tenantId),
   ])
@@ -42,14 +43,19 @@ export async function GET() {
     }
   }
 
-  const live = subscription && subscriptionLive(subscription.status as string)
+  // T-199: the one rule says what the business holds. The plan's name is shown only for a plan it holds
+  // (not for the free start, which lends another plan's features); `limit.used` is every month's count
+  // exactly when the allowance is the one that never resets, which is when the free start can apply.
+  const access = businessAccess({ subscription, region: tenant.region as string | null, quotesUsed: limit.per === 'total' ? limit.used : null })
+  const slug = (tenant.slug as string | null) || null
   const body = appAccount({
     businessName: (tenant.name as string) || '',
     logoUrl,
-    planName: live ? (getPlan(subscription.plan_id as string)?.name ?? null) : null,
+    planName: access.basis === 'plan' ? (access.plan?.name ?? null) : null,
     limit,
-    slug: (tenant.slug as string | null) || null,
-    appUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    links: slug
+      ? businessLinks({ appUrl: appUrlFrom(), slug, ownAddress: (tenant as { own_address?: string | null }).own_address ?? null, canUseAddress: canUse(access, 'own_address'), host: ownAddressHost() })
+      : null,
   })
   return NextResponse.json(body)
 }

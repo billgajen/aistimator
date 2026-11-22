@@ -171,6 +171,11 @@ One row per business, written only by `lib/billing-sync.ts` from what Stripe say
 trialing, past_due (the plan still works) or canceled ("no plan"; the Stripe customer id is kept, the Stripe
 subscription id is cleared). A row with no Stripe customer and no Stripe subscription is a free test account.
 
+T-199 (AD-085): **what a business can use is read from this row by one rule** (`businessAccess`,
+`packages/shared/src/access.ts`), never by a query of its own. A live row gives its plan's features. **No row at
+all**, with free quotes left (`usage_counters`, every month together, against the allowance that never resets),
+gives Pro's features: the free start. A row that is not live gives none, and ends the free start for good.
+
 ### usage_counters
 - id
 - tenant_id
@@ -292,6 +297,39 @@ Every one of the five hangs off `tenants(id) ON DELETE CASCADE` (directly or thr
 account's data is deleted after the export window, its reports, threads and votes go with it. A feature request
 that loses its last vote this way stays, with no business on it, for the owner.
 
+### tenants: its own address (T-199, migration 49)
+- own_address (text, null until chosen): the name in `<name>.<our domain>`. Its own field: it is not `slug`
+  (the quote-link name), and choosing it does not use up the quote link's one change. 3 to 30 characters,
+  lowercase letters, numbers and single hyphens (a check constraint). Unique where not null.
+- own_address_chosen_at: when it was chosen, or last changed by an admin.
+- own_address_later_at: when the business pressed "Later" on Home's card; cleared when a plan that includes the
+  address starts.
+- **Only the service role writes the three** (the trigger `tenants_own_address_guard` refuses anyone else). The
+  business chooses once, through the server; afterwards only the admin area changes it.
+- **One name, one business, across `own_address` and `slug`.** `own_address_taken(candidate, for_tenant)` is true
+  for a reserved name, another business's address, another business's current or former quote-link name, and a
+  held name. `tenant_slug_taken` (migration 32) now also refuses another business's address and a held name. The
+  same trigger checks both on insert and update, under a lock per name, so two requests for one name take turns.
+  A business may use its own quote-link name as its address.
+- Whether an address is **served** is not stored: it is the one rule (`businessAccess`, `packages/shared/src/access.ts`),
+  read each time. A business that loses the capability keeps its address; it forwards to the quote link until
+  the business has the capability again.
+- `reserved_slugs` gains `cdn`, `dev`, `email`, `m`, `pm-bounces`, `q`, `staging`, `status`. The whole list is
+  `RESERVED_NAMES` (`packages/shared/src/own-address.ts`); a unit test checks the database's copy against it.
+  A business that already holds one as its quote-link name keeps it.
+
+### own_address_changes (T-199, migration 49)
+Every choice and every change of an address, and the hold on a changed one.
+- id, tenant_id (**`ON DELETE SET NULL`**, so a held name stays held when the business is deleted)
+- old_address, new_address (either may be null: the first choice has no old one; a removal has no new one)
+- changed_from: `business` (its one choice) | `admin` (the owner's change, from the admin area)
+- changed_by (the user), note (the admin's own, up to 500 characters)
+- held_until: until when `old_address` may not be taken by another business (90 days after an admin's change;
+  null for a first choice). `own_address_held(candidate, for_tenant)` reads it.
+- created_at
+- **Row-level rules: none, and nothing is granted to a signed-in or signed-out user.** Only the server reads or
+  writes it. An admin's change is also written to `admin_activity_logs` (`change_address`).
+
 ## Indexes
 - quotes: (tenant_id, created_at desc), (tenant_id, status), (quote_request_id)
 - quote_requests: (tenant_id, created_at desc), (customer_email), (job_postcode)
@@ -308,7 +346,9 @@ that loses its last vote this way stays, with no business on it, for the owner.
   `role`; a user can change its own `display_name`.
 - `subscriptions`: read by the business, written by the server only.
 - Guarded columns on `tenants`: `slug` (migration 32), `is_demo` (migration 36), `suspended_at`, `suspended_reason`
-  and `free_warning_sent_at` (migration 44).
+  and `free_warning_sent_at` (migration 44), `own_address`, `own_address_chosen_at` and `own_address_later_at`
+  (migration 49).
+- `own_address_changes` (migration 49): no rule and no grant; the server only.
 ### WhatsApp channel (migration 25; T-175, migration 42)
 - whatsapp_configs: one row per business, **server-only** (no policy or grant for a signed-in browser since
   migration 42). tenant_id (unique), phone_number_id (unique: the webhook routes by it), display_phone_number,

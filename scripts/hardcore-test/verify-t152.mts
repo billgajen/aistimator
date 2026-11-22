@@ -214,10 +214,10 @@ check('the Branding page gets the region for its placeholders', brandingApi.regi
 
 // ---------- 7. public wording ----------
 const pricing = text((await page(`${cfg.appUrl}/pricing`)).html)
-check('pricing page: "Try it free: 10 quotes, no card"', pricing.includes('Try it free: 10 quotes, no card'))
+check('pricing page: "Try every Pro feature free: 10 quotes, no card"', pricing.includes('Try every Pro feature free: 10 quotes, no card'))
 check('pricing FAQ: 10 in total, not reset monthly', pricing.includes('Can I try it for free?') && pricing.includes('don’t reset each month'))
 const landing = text((await page(`${cfg.appUrl}/`)).html)
-check('home page: no "Start free"; the offer instead', !/Start free/.test(landing) && landing.includes('Try it free: 10 quotes, no card'))
+check('home page: no "Start free"; the offer instead', !/Start free/.test(landing) && landing.includes('Try every Pro feature free: 10 quotes, no card'))
 const login = text((await page(`${cfg.appUrl}/login`)).html)
 check('the login page shows the product name', login.includes('Qolumns') && !OLD_PRODUCT_NAMES.some((old) => login.includes(old)))
 

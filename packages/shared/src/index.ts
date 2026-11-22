@@ -41,6 +41,8 @@ export * from './ai-models'
 
 // Re-export plan definitions (T-134)
 export * from './plans'
+export * from './access'
+export * from './own-address'
 export * from './brand'
 export * from './product-logo'
 export * from './colour-contrast'

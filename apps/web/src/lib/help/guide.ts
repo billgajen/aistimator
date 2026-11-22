@@ -21,6 +21,11 @@ import {
   selectEntries,
   formatMoney,
   offeredPlans,
+  planNamesFor,
+  freeStartPlan,
+  freeOfferLabel,
+  APP_DOMAIN,
+  ADDRESS_HOLD_DAYS,
   routeOf,
   type HelpFacts,
   type HelpFlag,
@@ -39,8 +44,6 @@ const GUIDE_REGION = 'US'
 export function planMoney(minor: number, currency = GUIDE_CURRENCY): string {
   return formatMoney(minor / 100, currency, 'en-US', { decimals: minor % 100 === 0 ? 0 : 2 })
 }
-
-const listOf = (names: string[]): string => (names.length <= 1 ? (names[0] ?? 'no plan') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`)
 
 /** "starter" for plan_us_starter: the name a page uses in {{plan.starter.monthly}} */
 export const planKey = (plan: PlanDefinition): string => plan.id.replace(/^plan_(?:us_)?/, '')
@@ -68,10 +71,18 @@ export function helpFacts(plans: PlanDefinition[] = offeredPlans()): HelpFacts {
     'support.dailyReports': String(SUPPORT_DAILY_LIMIT),
     'ask.dailyQuestions': String(ASK_DAILY_LIMIT),
     'ask.keepDays': String(ASK_KEEP_DAYS),
-    'whatsapp.plans': listOf(plans.filter((p) => p.channels.includes('whatsapp')).map((p) => p.name)),
-    'app.plans': listOf(plans.filter((p) => p.channels.includes('mobile_app')).map((p) => p.name)),
-    'roomScan.plans': listOf(plans.filter((p) => p.features.lidar_scanning).map((p) => p.name)),
-    'badge.plans': listOf(plans.filter((p) => p.features.custom_branding).map((p) => p.name)),
+    // T-199: which plans include a thing is asked of the one rule (`plansWith`), never worked out here
+    'whatsapp.plans': planNamesFor('whatsapp', plans) || 'no plan',
+    // the app itself is open to every business; starting a quote in it is a plan matter
+    'onsite.plans': planNamesFor('onsite_quotes', plans) || 'no plan',
+    'roomScan.plans': planNamesFor('room_scan', plans) || 'no plan',
+    'badge.plans': planNamesFor('no_badge', plans) || 'no plan',
+    'ownAddress.plans': planNamesFor('own_address', plans) || 'no plan',
+    'ownAddress.example': `yourname.${APP_DOMAIN}`,
+    'ownAddress.holdDays': String(ADDRESS_HOLD_DAYS),
+    // the plan a new business works like while it has free quotes left, and the offer in the site's words
+    'freeStart.plan': freeStartPlan()?.name ?? 'no plan',
+    'free.offer': freeOfferLabel(),
   }
   for (const plan of plans) {
     const key = planKey(plan)
@@ -80,7 +91,7 @@ export function helpFacts(plans: PlanDefinition[] = offeredPlans()): HelpFacts {
     if (typeof plan.annualPrice?.[GUIDE_CURRENCY] === 'number') tokens[`plan.${key}.yearly`] = planMoney(plan.annualPrice[GUIDE_CURRENCY]!)
     tokens[`plan.${key}.quotes`] = plan.quoteLimit > 0 ? plan.quoteLimit.toLocaleString('en-US') : 'unlimited'
   }
-  const live = Object.fromEntries((['whatsapp', 'app', 'roomScan'] satisfies NotLiveYet[]).map((flag) => [flag, isLive(flag)])) as Record<HelpFlag, boolean>
+  const live = Object.fromEntries((['whatsapp', 'app', 'roomScan', 'ownAddress'] satisfies NotLiveYet[]).map((flag) => [flag, isLive(flag)])) as Record<HelpFlag, boolean>
   return { tokens, live }
 }
 

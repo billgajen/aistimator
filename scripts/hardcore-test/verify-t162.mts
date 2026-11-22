@@ -300,11 +300,15 @@ if (!process.env.PLAYWRIGHT_DIR) {
     check('home: the header and the footer both say Qolumns', (await p.locator('nav svg[data-testid=wordmark]').first().getAttribute('aria-label')) === NAME && (await p.locator('footer').innerText()).includes(`© ${new Date().getFullYear()} Qolumns.`))
     await p.goto(`${cfg.appUrl}/login`)
     await pageCheck(p, 'login', 'login')
+    // T-199: a business on the free start works like Pro, which carries no "Powered by" or "Prepared with" line.
+    // These two pages are checked for a business on a plan that keeps the lines (Starter); the row goes again after.
+    await sb.insert('subscriptions', { tenant_id: a.tenantId, plan_id: 'plan_us_starter', status: 'active' })
     await p.goto(`${cfg.appUrl}/quote/${a.slug}`)
     await pageCheck(p, 'the public request page (/quote/<slug>)', 'request-page', 'Powered by Qolumns')
     await p.goto(quote.viewUrl)
     await p.waitForFunction(() => /\$\d/.test(document.body.innerText), null, { timeout: 30_000 }).catch(() => {})
     await pageCheck(p, 'a customer quote page', 'customer-quote-page', 'Prepared with Qolumns')
+    await fetch(`${cfg.supabaseUrl}/rest/v1/subscriptions?tenant_id=eq.${a.tenantId}`, { method: 'DELETE', headers: { apikey: cfg.serviceKey, Authorization: `Bearer ${cfg.serviceKey}` } })
     await p.close()
   }
   {

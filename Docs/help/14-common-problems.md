@@ -218,7 +218,7 @@ Your business has no quotes left, or your account is paused. The requests are no
 
 Open "Settings", then the "Billing" tab, and read what it says under "Current Plan":
 
-- "Free quotes used": you have used your {{free.quotes}} free quotes. They do not start again each month. Pick a plan.
+- "Free quotes used": you have used your {{free.quotes}} free quotes. They do not start again each month. Pick a plan. The features of {{freeStart.plan}} that you had while free quotes were left have stopped too, until you pick a plan that includes them.
 - "Limit reached": you have used this month's quotes on your plan. Move to a bigger plan, or wait for the first day of next month.
 - "Your … plan has ended": the plan was cancelled, or a failed payment could not be taken. Pick a plan again.
 - "Your account is paused": press "Email us" in the notice at the top of the page.

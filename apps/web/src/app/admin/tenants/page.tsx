@@ -13,6 +13,9 @@ interface TenantItem {
   planPrice: number
   quoteCount: number
   suspendedAt: string | null
+  /** T-199: the quote-link name, and the business's own address (null until chosen) */
+  slug?: string | null
+  ownAddress?: string | null
   testAccount: boolean
   /** T-189: where the business came from at sign-up, in one line */
   cameFrom?: string
@@ -28,6 +31,36 @@ export default function AdminTenantsPage() {
   const [suspending, setSuspending] = useState<string | null>(null)
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // T-199: changing a business's own address (it chooses once; only an admin changes it afterwards)
+  const [addressing, setAddressing] = useState<string | null>(null)
+  const [addressDraft, setAddressDraft] = useState('')
+  const [addressNote, setAddressNote] = useState('')
+  const [addressSaid, setAddressSaid] = useState<string | null>(null)
+
+  const changeAddress = async (tenantId: string, address: string | null) => {
+    setSaving(true)
+    setError(null)
+    setAddressSaid(null)
+    try {
+      const response = await fetch(`/api/admin/tenants/${tenantId}/address`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, note: addressNote }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error?.message || 'Could not change the address')
+      setTenants((prev) => prev.map((t) => (t.tenantId === tenantId ? { ...t, ownAddress: result.address } : t)))
+      if (result.held) setAddressSaid(`“${result.held.address}” is held until ${new Date(result.held.until).toLocaleDateString()}: nobody else can take it before then.`)
+      setAddressing(null)
+      setAddressDraft('')
+      setAddressNote('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not change the address')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const setSuspended = async (tenantId: string, suspended: boolean, why: string) => {
     setSaving(true)
@@ -124,6 +157,11 @@ export default function AdminTenantsPage() {
 
       {/* Error State */}
       {error && <div className="mt-4 rounded-xl bg-danger-light p-4 text-danger">{error}</div>}
+      {addressSaid && (
+        <div className="mt-4 rounded-xl border border-border bg-white p-4 text-sm text-text-primary" role="status" data-testid="address-held">
+          {addressSaid}
+        </div>
+      )}
 
       {/* Results Table */}
       <div className="mt-6 overflow-hidden rounded-xl bg-surface shadow">
@@ -156,6 +194,66 @@ export default function AdminTenantsPage() {
                 <td className="px-4 py-3">
                   <div className="text-sm font-medium text-text-primary">{tenant.name}</div>
                   <code className="text-xs text-text-muted">{tenant.tenantId}</code>
+                  {/* T-199: the business's own address. It chooses once; a change is made here, and logged. */}
+                  <div className="mt-1 text-xs text-text-secondary" data-testid="tenant-address">
+                    Address: <span className="font-medium text-text-primary">{tenant.ownAddress ?? 'none'}</span>
+                    {tenant.slug ? <span className="text-text-muted"> · link: {tenant.slug}</span> : null}{' '}
+                    {addressing !== tenant.tenantId && (
+                      <button
+                        type="button"
+                        className="font-medium text-primary underline underline-offset-2"
+                        onClick={() => {
+                          setAddressing(tenant.tenantId)
+                          setAddressDraft(tenant.ownAddress ?? '')
+                          setAddressNote('')
+                        }}
+                      >
+                        Change
+                      </button>
+                    )}
+                  </div>
+                  {addressing === tenant.tenantId && (
+                    <div className="mt-2 max-w-xs space-y-2" data-testid="tenant-address-form">
+                      <label className="block text-xs text-text-secondary">
+                        New address (the name only)
+                        <input
+                          value={addressDraft}
+                          onChange={(e) => setAddressDraft(e.target.value)}
+                          className="mt-1 block w-full rounded-lg border border-field bg-white px-2 py-1.5 text-sm text-text-primary"
+                          autoCapitalize="none"
+                          spellCheck={false}
+                        />
+                      </label>
+                      <label className="block text-xs text-text-secondary">
+                        Why (kept in the log)
+                        <input value={addressNote} onChange={(e) => setAddressNote(e.target.value)} className="mt-1 block w-full rounded-lg border border-field bg-white px-2 py-1.5 text-sm text-text-primary" />
+                      </label>
+                      <p className="text-xs text-text-muted">The old name is held for 90 days before anyone else can take it.</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={saving || !addressDraft.trim()}
+                          onClick={() => changeAddress(tenant.tenantId, addressDraft.trim())}
+                          className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover disabled:opacity-50"
+                        >
+                          Save address
+                        </button>
+                        <button type="button" disabled={saving} onClick={() => setAddressing(null)} className="rounded-lg border border-field px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-background">
+                          Cancel
+                        </button>
+                        {tenant.ownAddress && (
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => changeAddress(tenant.tenantId, null)}
+                            className="ml-4 rounded-lg border border-danger-line px-3 py-1.5 text-sm font-medium text-danger hover:bg-danger-light disabled:opacity-50"
+                          >
+                            Remove address
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {tenant.suspendedAt && (
                     <div className="mt-1">
                       <span className="inline-flex items-center rounded-full bg-danger-light px-2 py-1 text-xs font-medium text-danger" data-testid="suspended-tag">

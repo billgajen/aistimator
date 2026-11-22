@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { PLATFORM_ADMIN_ROLE } from '@/lib/roles'
+import { addressProxyCaller } from '@qolumns/shared'
 import { quotePageLimit, tooManyPageResponse } from '@/lib/rate-limit-edge'
 
 // Routes that require authentication
@@ -26,7 +27,9 @@ export async function middleware(request: NextRequest) {
   if (request.method === 'GET' && pathname.startsWith('/quote/')) {
     let limit
     try {
-      limit = await quotePageLimit(pathname, request.headers.get('x-forwarded-for'), request.headers.get('x-real-ip'))
+      // T-199: a visit through a business's own address is counted against the customer's own address
+      const caller = addressProxyCaller(request.headers, process.env.ADDRESS_PROXY_KEY) ?? request.headers.get('x-forwarded-for')
+      limit = await quotePageLimit(pathname, caller, request.headers.get('x-real-ip'))
     } catch {
       limit = null // a slug that cannot be decoded: the page itself answers "not found"
     }

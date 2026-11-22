@@ -15,6 +15,7 @@
 import { EMPTY_HELP_STATE, getRegion, type HelpState } from '@qolumns/shared'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { checkPlanLimit } from '@/lib/plan-limits'
+import { loadAccess } from '@/lib/access'
 import { hasCustomBranding } from '@/lib/setup-checklist'
 import { planName } from '@/lib/support'
 
@@ -85,6 +86,9 @@ export async function loadHelpState(
     state.allowancePer = limit.per
   }
   if (plan) state.plan = plan
+  // T-199: on the free start the business works like another plan while free quotes are left (the one rule)
+  const access = await attempt(() => loadAccess(supabase, tenantId))
+  if (access?.basis === 'free_start' && access.plan && access.freeLeft !== null) state.freeStart = { plan: access.plan.name, left: access.freeLeft }
   if (request && !request.error) state.hasRequest = (request.data?.length ?? 0) > 0
   if (typeof whatsapp === 'boolean') state.whatsappConnected = whatsapp
   return state

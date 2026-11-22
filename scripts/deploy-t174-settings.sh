@@ -8,7 +8,11 @@
 #
 # Steps, in the order to run them (each can be run again safely):
 #   cors     the storage bucket accepts photo uploads from the main address as
-#            well as the previous one (additive; safe before anything else)
+#            well as the previous one (additive; safe before anything else).
+#            T-199: and from every business's own address (https://*.<main>):
+#            a customer's photo goes from the page straight to the bucket, so
+#            the bucket must accept the address the page is open at. Run this
+#            step again before switching the addresses on.
 #   auth     Supabase auth: Site URL = the main address; allowed redirect URLs
 #            = the main and the previous address
 #   app-url  the worker's APP_URL and Vercel's NEXT_PUBLIC_APP_URL (production)
@@ -48,11 +52,13 @@ if [ "${#STEPS[@]}" -eq 0 ]; then
   exit 2
 fi
 
-# The bucket's CORS rule: local development, every previous address, the main address
+# The bucket's CORS rule: local development, every previous address, the main address, and (T-199)
+# businesses' own addresses under it. One "*" is allowed in an origin and it does not match the main
+# address itself, so both are listed.
 cors_json() {
   jq '{rules: [{
         allowed: {
-          origins: (["http://localhost:3000", "http://localhost:3001"] + [.previous[] | "https://" + .] + ["https://" + .main]),
+          origins: (["http://localhost:3000", "http://localhost:3001"] + [.previous[] | "https://" + .] + ["https://" + .main, "https://*." + .main]),
           methods: ["GET", "PUT", "POST", "DELETE", "HEAD"],
           headers: ["*"]
         },

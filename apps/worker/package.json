@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
-    "build": "wrangler deploy --dry-run --outdir=dist",
+    "build": "wrangler deploy --dry-run --outdir=dist && wrangler deploy --dry-run -c wrangler.addresses.toml --outdir=dist/addresses",
     "deploy": "wrangler deploy",
+    "dev:addresses": "wrangler dev -c wrangler.addresses.toml --port 8799",
+    "deploy:addresses": "wrangler deploy -c wrangler.addresses.toml --env production",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

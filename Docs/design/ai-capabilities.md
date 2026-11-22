@@ -156,10 +156,17 @@ lines only.
 | See how your estimates compare with your final invoices | Pro, Business | live | Analytics has the panel (T-143): it compares estimates with the final invoices a business records on a quote. **It is not held back from Starter or the free allowance**: no code checks `calibration_insights`. True for Pro and Business; not exclusive to them. |
 | Quoting by text message | Pro, Business | **not shown on the site (T-181)** | Built (`lib/sms-intake.ts`, `/app/sms`). Production runs it in test mode with no number provider, so no business has a number. |
 | Quotes inside WhatsApp, on your own business number | Pro, Business | **coming soon** ("coming later" until T-187) | Built, with a setup page in the dashboard. Production has no WhatsApp keys and no conversation has ever run (section 4, `whatsapp-conversation`). Sharing the quote link in a WhatsApp chat works on every plan and is not this. |
-| An app for pricing a job while you are on site | Pro, Business | **coming later** | Built (`apps/mobile`). It is in no app store and no business has it. |
-| Measure a room by scanning it with your phone | Business | **coming later** | Built in the on-site app (T-138), in a build that has never been shipped. Nothing checks `lidar_scanning`. |
+| The mobile app: see, approve and send your quotes from your phone | all (T-199) | **coming soon** | Built (`apps/mobile`). It is in no app store and no business has it. Since T-199 any business can sign in to it, on any plan or none: no plan check stands in front of the app. |
+| On-site quotes in the app: price a job while you are there | Pro, Business, and the free start (T-199) | **coming soon** | The same app. Starting a quote in it is the `mobile_app` channel: the app shows "On-site quotes are part of Pro" and starts nothing for a business without it, and `POST /api/app/quotes` refuses in the same words. (Until T-199 this line read "An app for pricing a job while you are on site".) |
+| Measure a room by scanning it with your phone | Pro, Business, and the free start | **coming soon** | Built in the on-site app (T-138, T-193, T-194), in a build that has never been shipped. Refused by the server for a business without it (`canUse(…, 'room_scan')`). |
+| Your own address: yourname.qolumns.com | Pro, Business, and the free start (T-199) | **coming soon** until switched on | Built in T-199: the business chooses a name, and a small Cloudflare Worker serves its quote page there. Live once that Worker and its DNS record are deployed and `NEXT_PUBLIC_OWN_ADDRESS_HOST` is set; until then the dashboard offers nothing. |
 | Logins for your whole team | Business | **coming later** | Not built: there is no way to invite a second person to a business. |
 | Faster answers from us when you need help | Business | **coming later** | The site has no support address (`SUPPORT_EMAIL` is empty), so there is no support to give priority in. |
+
+**T-199 (2026-11-22):** what a business can use is decided by one rule (`businessAccess`,
+`packages/shared/src/access.ts`). A new business with free quotes left works like Pro, so every "Pro, Business"
+line above is also true of the free start. The free offer on the site reads "Try every Pro feature free: 10
+quotes, no card" (`freeOfferLabel`).
 
 **Also changed on that page:** the plans' own taglines name things that are not live ("Website, text and WhatsApp
 — plus the on-site app", "On-site measurement with LiDAR scanning"), so Pricing shows a line of its own for Pro

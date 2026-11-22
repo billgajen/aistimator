@@ -4,7 +4,7 @@ import { currentTenant } from '@/lib/current-tenant'
 import { disconnect, embeddedSignupAvailable, loadConnection, manualNeedsSecret, saveManualConnection } from '@/lib/whatsapp-connect'
 import { GRAPH_API_VERSION } from '@/lib/whatsapp-graph'
 import { EMBEDDED_SIGNUP_VERSION } from '@/lib/whatsapp-signup'
-import { accessRefusal, accessView, whatsappAccess } from '@/lib/whatsapp-access'
+import { accessRefusal, accessView, whatsappAccess, whatsappAccessWithTag } from '@/lib/whatsapp-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,7 +30,8 @@ export async function GET() {
   const admin = createAdminClient()
   const config = await loadConnection(admin, auth.tenantId)
   // T-177: may this business use WhatsApp (its plan includes it and its subscription is live)?
-  const access = accessView(await whatsappAccess(admin, auth.tenantId))
+  const allowed = await whatsappAccessWithTag(admin, auth.tenantId)
+  const access = accessView(allowed.access, allowed.tag)
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, '')
   return NextResponse.json({
     configured: Boolean(config),

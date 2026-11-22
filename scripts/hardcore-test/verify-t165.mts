@@ -84,7 +84,7 @@ for (const pathname of PUBLIC_PAGES) {
 check('no public page says "14-day" or "trial" (twelve pages)', offending.length === 0, offending)
 const pricingText = visibleText(await (await fetch(`${cfg.appUrl}/pricing`)).text())
 // T-170 (owner's decision): the page shows the plans that have a line of their own live today (Starter and Pro)
-check(`pricing: every plan button is "Choose <plan>" (${SITE_PLANS.map((pl) => pl.name).join(', ')}), and the offer is the free quotes`, SITE_PLANS.map((pl) => `Choose ${pl.name}`).every((b) => pricingText.includes(b)) && pricingText.includes('Try it free: 10 quotes, no card') && pricingText.includes('When do I start paying?'))
+check(`pricing: every plan button is "Choose <plan>" (${SITE_PLANS.map((pl) => pl.name).join(', ')}), and the offer is the free quotes`, SITE_PLANS.map((pl) => `Choose ${pl.name}`).every((b) => pricingText.includes(b)) && pricingText.includes('Try every Pro feature free: 10 quotes, no card') && pricingText.includes('When do I start paying?'))
 
 // ---------- a business with one request waiting for it ----------
 async function business(name: string) {
@@ -388,9 +388,9 @@ if (!process.env.PLAYWRIGHT_DIR) {
     }, YELLOW)
     check(`${width}: one yellow call to action per screen, never two (the first screen has the hero’s, a later one the closing band’s)`, Math.max(...perScreen) === 1 && perScreen[0] === 1 && perScreen.slice(Math.floor(perScreen.length / 2)).includes(1), { screens: perScreen.length, max: Math.max(...perScreen) })
     const yellowTotal = await p.locator('a, button').evaluateAll((els, yellow) => els.filter((el) => { const m = getComputedStyle(el).backgroundColor.match(/\d+/g) ?? []; return '#' + m.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, '0')).join('').toUpperCase() === yellow }).map((el) => (el as HTMLElement).innerText.trim()), YELLOW)
-    check(`${width}: the yellow buttons are the hero's and the closing band's, both the free offer`, yellowTotal.length === 2 && yellowTotal.every((t) => t === 'Try it free: 10 quotes, no card'), yellowTotal)
+    check(`${width}: the yellow buttons are the hero's and the closing band's, both the free offer`, yellowTotal.length === 2 && yellowTotal.every((t) => t === 'Try every Pro feature free: 10 quotes, no card'), yellowTotal)
     check(`${width}: the header button keeps its own style (juniper)`, hexOf(await style(p, '[data-testid=nav-signup]', 'background-color')) === '#205E56')
-    check(`${width}: the header button reads "Try it free"; the hero button keeps the full offer`, (await p.locator('[data-testid=nav-signup]').innerText()).trim() === 'Try it free' && (await p.locator('[data-testid=hero-signup]').innerText()).trim() === 'Try it free: 10 quotes, no card')
+    check(`${width}: the header button reads "Try it free"; the hero button keeps the full offer`, (await p.locator('[data-testid=nav-signup]').innerText()).trim() === 'Try it free' && (await p.locator('[data-testid=hero-signup]').innerText()).trim() === 'Try every Pro feature free: 10 quotes, no card')
 
     if (width >= 1000) {
       // the shape of each section: how many equal columns its widest row has, and what they hold

@@ -15,6 +15,7 @@
 import { Redis } from '@upstash/redis'
 import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
+import { addressProxyCaller } from '@qolumns/shared'
 import { RATE_LIMIT_TIMEOUT_MS, blockedMessage, rateLimitsSwitchedOff, type LimitWindow, type RateLimitScope } from './rate-limit-config'
 import { buildCounters, evaluateCounters, getScopeWindows, type RateLimitResult, type WindowCounter } from './rate-limit-counters'
 
@@ -134,8 +135,16 @@ export function emailKey(email: string): string {
   return createHash('sha256').update(email.trim().toLowerCase()).digest('hex').slice(0, 32)
 }
 
-/** Extract the client IP from proxy headers (Vercel sets x-forwarded-for). */
+/**
+ * Extract the client IP from proxy headers (Vercel sets x-forwarded-for).
+ * T-199: a request that came through the Worker serving businesses' own
+ * addresses carries the customer's own address, believed only with the key
+ * both sides hold (ADDRESS_PROXY_KEY); otherwise every customer on every
+ * address would be counted as one caller.
+ */
 export function getClientIp(request: Request | { headers: Headers }): string {
+  const throughAddress = addressProxyCaller(request.headers, process.env.ADDRESS_PROXY_KEY)
+  if (throughAddress) return throughAddress
   const forwarded = request.headers.get('x-forwarded-for')
   if (forwarded) {
     const first = forwarded.split(',')[0]?.trim()

@@ -67,6 +67,8 @@ export const RATE_LIMITS = {
   approval_photo: [{ seconds: MINUTE, perIp: 120, perKey: 120 }],
   // T-193: the address of a room's 3D model, asked for when a viewer is opened (the key is the quote or the link)
   room_model: [{ seconds: MINUTE, perIp: 30, perKey: 30 }],
+  // T-199: the live check as a business types its own address (signed in; the key is the business)
+  address_check: [{ seconds: MINUTE, perIp: 120, perKey: 120 }],
   // The sign-up relay to Meta: a person signs up once
   marketing: [{ seconds: MINUTE, perIp: 5, perKey: 1000 }],
   // Sign-up: the key is the email address (so one address cannot be sent email after email)

@@ -34,7 +34,7 @@ describe('T-152: the free allowance is 10 quotes in total', () => {
     expect(freeAllowance('GB')).toEqual({ quotes: 50, per: 'month' })
     expect(freeAllowance(null)).toEqual({ quotes: 50, per: 'month' })
     expect(noSubscriptionLimit('US')).toBe(10)
-    expect(freeOfferLabel()).toBe('Try it free: 10 quotes, no card')
+    expect(freeOfferLabel()).toBe('Try every Pro feature free: 10 quotes, no card')
   })
 
   it('counts this month, or every month for an allowance that never resets', () => {

@@ -2,8 +2,8 @@
  * T-194: a room scan arriving from the business app, for a new quote
  * (POST /api/app/quotes) or scanned again on a quote already priced
  * (POST /api/app/quotes/:id/scan). One place decides:
- *   - that the business's plan includes room scan (Pro and Business): the
- *     server refuses a scan from a business without it;
+ *   - that the business can use room scan (T-199: the one rule, lib/access.ts):
+ *     the server refuses a scan from a business without it;
  *   - which answers the scan fills, in the order of trust (AD-028,
  *     `mergeScanAnswers`): a number the business typed is kept, the scan fills
  *     what was left blank. Only `{ fieldId, value }` is stored.
@@ -11,17 +11,17 @@
  * Pure apart from the plan lookup.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { mergeScanAnswers, scanAnswers, ROOM_SCAN_FIELD, type ExpectedSignalConfig, type RoomScanPayload, type ServiceDraftConfig } from '@qolumns/shared'
-import { hasPlanFeature } from '@/lib/plan-features'
+import { mergeScanAnswers, planNameFor, scanAnswers, ROOM_SCAN_FIELD, type ExpectedSignalConfig, type RoomScanPayload, type ServiceDraftConfig } from '@qolumns/shared'
+import { businessCan } from '@/lib/access'
 
 type Answer = { fieldId: string; value: unknown }
 
-/** What the app is told when the plan has no room scan (no price, no link: the app says it is part of Pro) */
-export const SCAN_NOT_IN_PLAN = { code: 'ROOM_SCAN_NOT_IN_PLAN', message: 'Room scan is part of Pro.' } as const
+/** What the app is told when the plan has no room scan (no price, no link: the app says which plan it is part of) */
+export const SCAN_NOT_IN_PLAN = { code: 'ROOM_SCAN_NOT_IN_PLAN', message: `Room scan is part of ${planNameFor('room_scan')}.` } as const
 
-/** Does this business's plan include room scan? (No live plan: no.) */
+/** Can this business use room scan? T-199: the one rule decides (a plan that includes it, or the free start). */
 export async function planHasRoomScan(supabase: SupabaseClient, tenantId: string): Promise<boolean> {
-  return hasPlanFeature(supabase, tenantId, 'lidar_scanning')
+  return businessCan(supabase, tenantId, 'room_scan')
 }
 
 export interface ScanService {

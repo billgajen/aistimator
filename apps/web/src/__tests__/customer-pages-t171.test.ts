@@ -242,7 +242,9 @@ describe('T-171: the request form', () => {
   it('nothing in the form opens a new tab; the quote link page moves straight on; a framed form shows the estimate itself', () => {
     expect(widget).not.toMatch(/target="_blank"/)
     expect(widget).toContain("const sameTab = framed ? { target: '_top' } : {}")
-    expect(widget).toContain('if (hosted && destination) window.location.assign(destination)')
+    // T-199: the same move, kept on the business's own address when the customer is on it
+    expect(widget).toContain('if (!hosted || !destination) return')
+    expect(widget).toContain('window.location.assign(onSameAddress(destination, here,')
     expect(widget).toContain('data-testid="finished-estimate"')
     expect(widget).toContain('hosted={hosted} shownBelow={Boolean(demo)}')
     // T-146: "estimate" until the business has reviewed it
@@ -263,8 +265,8 @@ describe('T-171: the billing page, and the small leftovers', () => {
     expect(billing).not.toMatch(/FeatureItem|label="LiDAR scanning"|label="Quoting by text/)
     // Business stays on offer there, with its lines marked
     const business = offeredPlans().find((p) => p.id === 'plan_us_business')!
-    // T-181: five, not six: text messages are no longer on any page
-    expect(planLines(business).filter((l) => !l.live).length).toBe(5)
+    // T-181: text messages are no longer on any page. T-199: seven, with the mobile app (every plan) and its own address
+    expect(planLines(business).filter((l) => !l.live).length).toBe(7)
     expect(read('apps/web/src/app/api/billing/route.ts')).toContain('offeredPlans().map((p) => toPlanInfo(p))')
   })
 

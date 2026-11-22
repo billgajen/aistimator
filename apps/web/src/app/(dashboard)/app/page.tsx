@@ -1,7 +1,7 @@
 import { syncSelectedPlan } from '@/lib/signup-choices'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { headers } from 'next/headers'
-import { QUOTE_TURN_COPY, agoWords, businessIsAsked, formatMoney, freeQuotesLeftLine, getRegion, isMadeByBusiness, monthStart, quoteActivityLine, quoteTurn, wonLines, wonSummary } from '@qolumns/shared'
+import { QUOTE_TURN_COPY, agoWords, businessIsAsked, formatMoney, freeQuotesLeftLine, freeStartLine, getRegion, isMadeByBusiness, monthStart, quoteActivityLine, quoteTurn, wonLines, wonSummary } from '@qolumns/shared'
 import { applyGroupFilter, businessAskedQuoteIds, groupFilter, questionCountOf, requestSourceOf } from '@/lib/business-asked'
 import { buildChecklist } from '@/lib/setup-checklist'
 import {
@@ -29,6 +29,8 @@ import { NEEDS_YOU_MARK } from '@/lib/status-tone'
 import { LatestActivity, type ActivityLine } from '@/components/home/LatestActivity'
 import { HomeQuoteLink } from '@/components/home/HomeQuoteLink'
 import { WonPanel } from '@/components/home/WonPanel'
+import { HomeAddressCard } from '@/components/home/HomeAddressCard'
+import { addressAndAccess } from '@/lib/own-address'
 import { RememberTimeZone } from '@/components/home/RememberTimeZone'
 import { businessTimeZone, everAccepted, wonReadsFrom } from '@/lib/won'
 import { checkPlanLimit } from '@/lib/plan-limits'
@@ -78,7 +80,9 @@ export default async function DashboardPage() {
     redirect('/signup?error=account_incomplete')
   }
 
-  const [{ data: tenant }, planLimit] = await Promise.all([
+  // T-199: what the business can use (the one rule), for the free start's line and its own address
+  const [{ access, address }, { data: tenant }, planLimit] = await Promise.all([
+    addressAndAccess(createAdminClient(), profile.tenant_id),
     supabase
       .from('tenants')
       .select('name, slug, region, currency, time_zone, quote_link_copied_at, quote_link_first_visit_at, selected_plan, onboarding_skipped_at, prices_checked_at')
@@ -298,7 +302,8 @@ export default async function DashboardPage() {
   }))
 
   // f. the business's own quote link
-  const quoteLink = tenantRow?.slug ? `${appOriginFrom(headers().get('host'))}/quote/${tenantRow.slug}` : null
+  // T-199: the business's own address when it has one and can use it; its quote link otherwise
+  const quoteLink = address?.links.addressHostname ? address.links.main : tenantRow?.slug ? `${appOriginFrom(headers().get('host'))}/quote/${tenantRow.slug}` : null
   const N = QUOTE_TURN_COPY.home.numbers
   const U = QUOTE_TURN_COPY.unfinished
 
@@ -310,6 +315,16 @@ export default async function DashboardPage() {
   return (
     <div>
       <PageHeader title={tenant?.name || 'Home'} />
+
+      {/* T-199: on the free start, one quiet line: what is being tried, and how many free quotes are left */}
+      {freeStartLine(access) && (
+        <p className="-mt-3 mb-6 text-sm text-text-secondary" data-testid="free-start-line">
+          {freeStartLine(access)}
+        </p>
+      )}
+
+      {/* T-199: a business that can choose its own address and has not: asked here until chosen or put off */}
+      {address && <HomeAddressCard view={address} />}
 
       {/* a. T-152: the work waiting for the owner comes first */}
       <WaitingForYou quotes={waiting} />

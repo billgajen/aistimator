@@ -345,18 +345,20 @@ describe('T-194: room scan needs a plan with it (Pro and Business)', () => {
   it('the server refuses a scan from a business without it, before anything is stored', () => {
     for (const path of ['apps/web/src/app/api/app/quotes/route.ts', 'apps/web/src/app/api/app/quotes/[quoteId]/scan/route.ts']) {
       const route = read(path)
-      expect(route).toContain('planHasRoomScan(')
+      // T-199: the one rule decides (`canUse(…, 'room_scan')`), asked directly or through planHasRoomScan
+      const asked = route.search(/planHasRoomScan\(|canUse\(access, 'room_scan'\)/)
+      expect(asked, path).toBeGreaterThan(0)
       expect(route).toContain('SCAN_NOT_IN_PLAN }, { status: 403 }')
-      expect(route.indexOf('planHasRoomScan(')).toBeLessThan(route.search(/createQuoteSubmission\(|\.update\(\{ job_answers/))
+      expect(asked).toBeLessThan(route.search(/createQuoteSubmission\(|\.update\(\{ job_answers/))
     }
-    expect(read('apps/web/src/lib/room-scan-intake.ts')).toContain("hasPlanFeature(supabase, tenantId, 'lidar_scanning')")
+    expect(read('apps/web/src/lib/room-scan-intake.ts')).toContain("businessCan(supabase, tenantId, 'room_scan')")
   })
 
   it('the app says it is part of Pro, with no price and no purchase link', () => {
     const screen = read('apps/mobile/app/(tabs)/new.tsx')
     expect(screen).toContain("'Room scan is part of Pro'")
     expect(screen).toContain('form.boot.roomScan !== false')
-    expect(read('apps/web/src/app/api/app/bootstrap/route.ts')).toContain('planHasRoomScan(createAdminClient(), tenantId)')
+    expect(read('apps/web/src/app/api/app/bootstrap/route.ts')).toContain("roomScan: canUse(access, 'room_scan')")
   })
 })
 

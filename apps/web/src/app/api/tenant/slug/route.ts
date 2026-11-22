@@ -6,14 +6,19 @@ import { cleanSlugOptions, hasRandomLink } from '@/lib/clean-slug-server'
 
 type Admin = ReturnType<typeof createAdminClient>
 
-/** Is a well-formed slug free for this tenant? (reserved, current or former slugs are not) */
+/**
+ * Is a well-formed slug taken for this tenant? Reserved, current or former slugs are, and (T-199) so is
+ * another business's own address, or one held after a change: one name belongs to one business across both.
+ */
 async function isTaken(admin: Admin, slug: string, tenantId: string): Promise<boolean> {
-  const [reserved, owner, former] = await Promise.all([
+  const [reserved, owner, former, address, held] = await Promise.all([
     admin.from('reserved_slugs').select('slug').eq('slug', slug).maybeSingle(),
     admin.from('tenants').select('id').eq('slug', slug).neq('id', tenantId).maybeSingle(),
     admin.from('tenant_slug_history').select('old_slug').eq('old_slug', slug).maybeSingle(),
+    admin.from('tenants').select('id').eq('own_address', slug).neq('id', tenantId).maybeSingle(),
+    admin.from('own_address_changes').select('id').eq('old_address', slug).gt('held_until', new Date().toISOString()).or(`tenant_id.is.null,tenant_id.neq.${tenantId}`).limit(1),
   ])
-  return Boolean(reserved.data || owner.data || former.data)
+  return Boolean(reserved.data || owner.data || former.data || address.data || (held.data ?? []).length > 0)
 }
 
 type Check = { slug: string; available: boolean; reason?: string; message?: string }

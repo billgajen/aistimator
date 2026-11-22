@@ -5,6 +5,8 @@ import { PageHeader } from '@/components/dashboard/EmptyState'
 import { buildShareTexts } from '@/lib/share-texts'
 import { quoteLinkUrl } from '@/lib/quote-link-url'
 import { QuoteLinkCard } from './QuoteLinkCard'
+import { OwnAddressCard } from './OwnAddressCard'
+import type { AddressView } from '@/lib/own-address'
 import { QrCode } from './QrCode'
 import { WhereToPutIt } from './WhereToPutIt'
 import { UseItOnWhatsApp } from './UseItOnWhatsApp'
@@ -21,18 +23,29 @@ export function SharePageClient(props: {
   changeable: boolean
   /** T-174: the link still ends in random characters, so cleaner ones are offered */
   random?: boolean
+  /** T-199: the business's own address: what it has, whether it can choose one, the links to show */
+  address?: AddressView | null
 }) {
   const [slug, setSlug] = useState(props.initialSlug)
   const [changeable, setChangeable] = useState(props.changeable)
   // T-174: the offer stays up after a replacement (it then says what happened); the one-time change returns on the next visit
   const [random] = useState(Boolean(props.random))
-  const link = quoteLinkUrl(props.appOrigin, slug)
+  const [address, setAddress] = useState<AddressView | null>(props.address ?? null)
+  const quoteLink = quoteLinkUrl(props.appOrigin, slug)
+  // T-199: the address is the main link (the QR code, every copy button, the wording to paste) when the
+  // business has one and can use it; its quote link is shown under it and keeps working
+  const ownAddress = address?.links.addressHostname ? { url: address.links.main, tag: address.tag } : null
+  const link = ownAddress?.url ?? quoteLink
 
   return (
     <div className="space-y-6">
       <PageHeader title="Quote link" description="Give customers this link, or put the form on your website." />
 
+      {address?.canChoose && <OwnAddressCard view={address} place="quote-link" onChosen={setAddress} />}
+
       <QuoteLinkCard
+        address={ownAddress}
+        planLine={address?.planLine ?? null}
         appOrigin={props.appOrigin}
         slug={slug}
         changeable={changeable}
