@@ -394,7 +394,8 @@ describe('Home', () => {
   it('where your quotes stand uses the T-158 groups and names, and each count opens its tab', () => {
     const stand = read('apps/web/src/components/home/QuoteStand.tsx')
     expect(QUOTE_TURN_COPY.home.stand.title).toBe('Where your quotes stand')
-    expect(QUOTE_TURN_COPY.home.stand.acceptedNote).toBe('in the last 30 days')
+    // T-198: the Accepted card counts this calendar month, the period "Won through …" counts
+    expect(QUOTE_TURN_COPY.home.stand.acceptedNote).toBe('this month')
     for (const label of ['T.needs_you', 'T.waiting', 'T.accepted']) expect(stand).toContain(label)
     expect(stand).toContain('href={`/app/quotes?tab=${tile.key}`}')
     // T-186: the waiting count is the shared group, less the quotes whose questions are the business's own

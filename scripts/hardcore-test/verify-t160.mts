@@ -266,7 +266,8 @@ const home = (await page(`${cfg.appUrl}/app`, a.cookie)).html
 const standTiles = [...block(home, 'home-stand').matchAll(/data-testid="stand-tile" data-group="(\w+)"[\s\S]*?data-testid="stand-count">(\d+)</g)].map((m) => `${m[1]} ${m[2]}`)
 check('Where your quotes stand: Needs you 1, Waiting for customer 1, Accepted 1 (the test quote is not counted)', JSON.stringify(standTiles) === JSON.stringify(['needs_you 1', 'waiting 1', 'accepted 1']), standTiles)
 const standText = text(block(home, 'home-stand'))
-check('…named as on the quotes list, with "in the last 30 days" on Accepted', standText.includes('Where your quotes stand') && standText.includes('Needs you') && standText.includes('Waiting for customer') && /Accepted in the last 30 days/.test(standText), standText.trim())
+// T-198: the Accepted card counts this calendar month, the period "Won through …" counts
+check('…named as on the quotes list, with "this month" on Accepted', standText.includes('Where your quotes stand') && standText.includes('Needs you') && standText.includes('Waiting for customer') && /Accepted this month/.test(standText), standText.trim())
 const activityLines = [...block(home, 'home-activity').matchAll(/data-testid="activity-line" data-kind="(\w+)"><a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)].map((m) => ({ kind: m[1]!, href: m[2]!, words: text(m[3]!).trim() }))
 check('Latest activity: the last six events, newest first',
   JSON.stringify(activityLines.map((l) => l.kind)) === JSON.stringify(['accepted', 'question', 'opened', 'approved', 'request', 'declined']), activityLines.map((l) => l.words))

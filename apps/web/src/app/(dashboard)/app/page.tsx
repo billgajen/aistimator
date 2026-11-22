@@ -44,8 +44,9 @@ export const dynamic = 'force-dynamic'
  *    could not be priced
  * b. new unfinished requests (only ones the business has not seen)
  *    (then the plan usage banner, when there is one)
- * c. the setup checklist until it is done
  * w. T-196: "Won through Qolumns", this calendar month, once an estimate has been accepted
+ *    (T-198: above the checklist)
+ * c. the setup checklist until it is done
  * d. Where your quotes stand: three counts by whose turn it is
  * e. Latest activity   f. Your quote link
  * g. four numbers for the last 30 days, each against the 30 days before
@@ -275,7 +276,8 @@ export default async function DashboardPage() {
 
   // d. where the quotes stand
   const hasQuotes = (anyQuoteResult.count ?? 0) > 0
-  const stand = { needsYou: waitingResult.count ?? 0, waiting: waitingCountResult.count ?? 0, accepted: numbers.accepted }
+  // T-198: Accepted counts this calendar month, the period the panel above counts
+  const stand = { needsYou: waitingResult.count ?? 0, waiting: waitingCountResult.count ?? 0, accepted: homeNumbers(recentRows, monthStart(now, timeZone)).accepted }
 
   // e. latest activity, from timestamps the quotes already carry
   const questionRows: HomeQuestionRow[] = (
@@ -371,6 +373,10 @@ export default async function DashboardPage() {
         />
       )}
 
+      {/* w. T-196: what was won this month. Not before the first accepted estimate.
+          T-198: once it shows, it sits above "Get set up". */}
+      {won && <WonPanel summary={won} lines={wonLines(won, currency, locale)} />}
+
       {/* c. Setup checklist until complete (T-152) */}
       {!checklist.complete && (
         <section className="mb-8 rounded-2xl bg-white p-6 shadow-warm-md" data-testid="setup-checklist">
@@ -417,8 +423,6 @@ export default async function DashboardPage() {
         </section>
       )}
 
-      {/* w. T-196: what was won this month. Not before the first accepted estimate. */}
-      {won && <WonPanel summary={won} lines={wonLines(won, currency, locale)} />}
       {!tenantRow?.time_zone && <RememberTimeZone />}
 
       {/* d. T-160: where every quote stands, by whose turn it is */}

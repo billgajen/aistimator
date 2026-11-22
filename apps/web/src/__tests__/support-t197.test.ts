@@ -143,7 +143,8 @@ describe('the routes: every one is the signed-in business’s own, or the platfo
 
   it('a business route starts by finding the signed-in user’s business, and reads with that business’s id', () => {
     const routes = routesUnder('apps/web/src/app/api/support')
-    expect(routes.length).toBe(6)
+    // T-198 added the assistant's two routes (ask, and the rating of one answer)
+    expect(routes.length).toBe(8)
     for (const route of routes) {
       const source = read(route)
       const handlers = source.split(/export async function (?:GET|POST)/).slice(1)
@@ -160,7 +161,8 @@ describe('the routes: every one is the signed-in business’s own, or the platfo
 
   it('an inbox route refuses anyone who is not the platform admin before it does anything', () => {
     const routes = routesUnder('apps/web/src/app/api/admin/support')
-    expect(routes.length).toBe(3)
+    // T-198 added one question's route
+    expect(routes.length).toBe(4)
     for (const route of routes) {
       const source = read(route)
       for (const handler of source.split(/export async function (?:GET|POST)/).slice(1)) {
@@ -374,7 +376,8 @@ describe('nothing about a customer reaches the AI', () => {
     expect(logs.length).toBeGreaterThan(3)
     // everything a log line puts in from the running program is an id, a kind, a severity or an error's name
     const put = logs.flatMap((line) => [...line.matchAll(/\$\{([^}]+)\}/g)].map((m) => m[1]!))
-    expect([...new Set(put)].sort()).toEqual(['errorNameOf(error)', 'reportId', 'requestId', "result.success ? 'sent' : 'failed'", 'result.kind', 'result.severity'].sort())
+    // T-198: and how many of the assistant's old questions were deleted (a number)
+    expect([...new Set(put)].sort()).toEqual(['count ?? 0', 'errorNameOf(error)', 'reportId', 'requestId', "result.success ? 'sent' : 'failed'", 'result.kind', 'result.severity'].sort())
   })
 })
 
@@ -478,7 +481,8 @@ describe('the "should have been" figure changes no price', () => {
     for (const file of ['apps/worker/src/support.ts', 'apps/web/src/lib/support.ts', 'apps/web/src/lib/support-admin.ts', 'apps/web/src/app/api/support/reports/route.ts', 'apps/web/src/app/api/support/features/route.ts']) {
       const source = read(file)
       const writes = [...source.matchAll(/\.from\('(\w+)'\)\s*(?:\n\s*)?\.(insert|update|upsert|delete)\(/g)].map((m) => m[1])
-      for (const table of writes) expect(['support_reports', 'support_report_internal', 'support_messages', 'feature_requests', 'feature_votes'], `${file} writes ${table}`).toContain(table)
+      // T-198: and the Help assistant's own table (old questions are deleted; a conversation is pointed at the report it became)
+      for (const table of writes) expect(['support_reports', 'support_report_internal', 'support_messages', 'feature_requests', 'feature_votes', 'help_questions'], `${file} writes ${table}`).toContain(table)
     }
   })
 })

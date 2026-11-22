@@ -10,6 +10,7 @@ import { Wordmark } from '@/components/brand/Wordmark'
 import { AccountNotice } from '@/components/billing/AccountNotice'
 import { HelpBoundary } from '@/components/help/HelpBoundary'
 import { HelpPanel, type HelpView } from '@/components/help/HelpPanel'
+import { clearConversation } from '@/components/help/ask-store'
 import { NeedsYouDot } from '@/components/quotes/NeedsYouDot'
 import { watchPageErrors } from '@/lib/help-context'
 
@@ -109,7 +110,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </span>
           )}
         </button>
-        <form action="/api/auth/signout" method="POST">
+        {/* T-198: the conversation with the assistant ends with the session */}
+        <form action="/api/auth/signout" method="POST" onSubmit={clearConversation}>
           <button
             type="submit"
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium text-text-muted hover:bg-surface hover:text-text-primary transition-colors"

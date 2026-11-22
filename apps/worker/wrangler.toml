@@ -49,6 +49,8 @@ max_retries = 3
 #   cannot be priced, the worker errors, or requests wait too long. Not set = alerts off.
 #   The web app has the same setting.)
 # - CLOUDFLARE_WORKER_TOKEN (same value as the web app's; required outside local dev)
+# - AI_MODEL_SUPPORT_REPLY (optional, T-198: the draft reply to a report that is not a fault; same rule as the
+#   two below. The Help assistant's own task, AI_MODEL_HELP_ANSWER, is the web app's.)
 # - AI_MODEL_SUPPORT_SORT, AI_MODEL_FEATURE_MATCH (optional, T-197: the support inbox's two tasks. The
 #   defaults are in packages/shared/src/ai-models.json; set one only to try another model. They read and
 #   sort problem reports and feature requests; they never price anything.)

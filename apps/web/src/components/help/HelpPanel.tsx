@@ -6,21 +6,29 @@
  *
  * It is an extra: it loads nothing until it is opened, and a fault inside it
  * never reaches the page behind it (the layout wraps it in an error
- * boundary). "Ask Qolumns" (T-198) will be one more entry in ENTRIES; there
- * is nothing on the screen for it yet.
+ * boundary).
+ *
+ * T-198: "Ask Qolumns" comes first: a box, three questions to start from,
+ * and the conversation it opens. The other three options stay below it. If
+ * the assistant fails, the options below still work.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { SUPPORT_COPY, SUPPORT_EMAIL } from '@qolumns/shared'
+import { ASK_COPY, SUPPORT_COPY, SUPPORT_EMAIL } from '@qolumns/shared'
 import type { MyReport, MyRequest } from '@/lib/support'
 import { NEEDS_YOU_MARK } from '@/lib/status-tone'
 import { NeedsYouDot } from '@/components/quotes/NeedsYouDot'
 import { ProblemForm } from './ProblemForm'
 import { FeatureForm } from './FeatureForm'
 import { MyItems, ReportThread } from './MyItems'
+import { AskBox, AskThread } from './Ask'
+import { problemText, useAsk } from './useAsk'
+import type { AskTurnView } from './ask-store'
+import { gatherContext, lastShownError } from '@/lib/help-context'
 
 const C = SUPPORT_COPY
 
-export type HelpView = { name: 'menu' | 'problem' | 'feature' | 'list' } | { name: 'report'; id: string }
+/** `text`: words carried into the problem or feature form from a conversation with the assistant */
+export type HelpView = { name: 'menu' | 'list' | 'ask' | 'problem' | 'feature'; text?: string } | { name: 'report'; id: string }
 
 interface Mine {
   plan: string | null
@@ -28,7 +36,7 @@ interface Mine {
   requests: MyRequest[]
 }
 
-/** The panel's entries, in order. T-198 adds "Ask Qolumns" here. */
+/** The panel's entries, in order, under "Ask Qolumns" */
 const ENTRIES: Array<{ view: 'problem' | 'feature' | 'list'; label: string; hint?: string }> = [
   { view: 'problem', label: C.reportProblem, hint: C.reportProblemHint },
   { view: 'feature', label: C.suggestFeature, hint: C.suggestFeatureHint },
@@ -37,6 +45,7 @@ const ENTRIES: Array<{ view: 'problem' | 'feature' | 'list'; label: string; hint
 
 const TITLES: Record<HelpView['name'], string> = {
   menu: C.panelTitle,
+  ask: ASK_COPY.title,
   problem: C.reportProblem,
   feature: C.suggestFeature,
   list: C.yours,
@@ -61,6 +70,21 @@ export function HelpPanel({
   const [view, setView] = useState<HelpView>(initial)
   const [mine, setMine] = useState<Mine | null>(null)
   const heading = useRef<HTMLHeadingElement>(null)
+  // T-198: the conversation lives here, so it is still there when the panel is opened again
+  const assistant = useAsk(pathname)
+  const askAndShow = (question: string) => {
+    setView({ name: 'ask' })
+    void assistant.ask(question)
+  }
+  const onAskAction = (kind: 'team' | 'feature' | 'problem', turn: AskTurnView): Promise<boolean> | void => {
+    if (kind === 'feature') return setView({ name: 'feature', text: turn.question })
+    if (kind === 'problem') return setView({ name: 'problem', text: problemText(turn, assistant.conversation.turns) })
+    const context = gatherContext({ pathname, userAgent: navigator.userAgent, width: window.innerWidth, height: window.innerHeight, lastError: lastShownError(document), plan: mine?.plan ?? null })
+    return assistant.sendToTeam(turn, context).then((ok) => {
+      if (ok) void load()
+      return ok
+    })
+  }
 
   const load = useCallback(async () => {
     try {
@@ -91,7 +115,7 @@ export function HelpPanel({
   }, [open, onClose])
   useEffect(() => {
     if (open) heading.current?.focus()
-  }, [open, view])
+  }, [open, view.name])
 
   if (!open) return null
   const unread = mine?.reports.filter((r) => r.unread).length ?? 0
@@ -139,6 +163,7 @@ export function HelpPanel({
         <div className="flex-1 overflow-y-auto px-4 py-5">
           {view.name === 'menu' && (
             <div data-testid="help-menu">
+              <AskBox pathname={pathname} turns={assistant.conversation.turns.length} busy={assistant.busy} onAsk={askAndShow} onResume={() => setView({ name: 'ask' })} />
               <ul className="space-y-2">
                 {ENTRIES.map((entry) => (
                   <li key={entry.view}>
@@ -174,8 +199,19 @@ export function HelpPanel({
               </p>
             </div>
           )}
-          {view.name === 'problem' && <ProblemForm pathname={pathname} plan={mine?.plan ?? null} onSent={load} onDone={toMenu} />}
-          {view.name === 'feature' && <FeatureForm onSent={load} onDone={toMenu} />}
+          {view.name === 'ask' && (
+            <AskThread
+              turns={assistant.conversation.turns}
+              busy={assistant.busy}
+              onAsk={(question) => void assistant.ask(question)}
+              onOpen={onClose}
+              onAction={onAskAction}
+              onRate={assistant.rate}
+              onStartAgain={assistant.startAgain}
+            />
+          )}
+          {view.name === 'problem' && <ProblemForm key={view.text ?? ''} pathname={pathname} plan={mine?.plan ?? null} initialText={view.text} onSent={load} onDone={toMenu} />}
+          {view.name === 'feature' && <FeatureForm key={view.text ?? ''} initialText={view.text} onSent={load} onDone={toMenu} />}
           {view.name === 'list' && <MyItems reports={mine?.reports ?? []} requests={mine?.requests ?? []} onOpen={(id) => setView({ name: 'report', id })} />}
           {view.name === 'report' && <ReportThread reportId={view.id} onRead={load} />}
         </div>

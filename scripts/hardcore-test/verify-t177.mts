@@ -639,8 +639,9 @@ const terms = await pageText('/terms')
 const privacy = await pageText('/privacy')
 const operator = /Qolumns is run by Billiom Limited, a company registered in England and Wales( \(company number [^)]+\))?\./
 check('both pages say who runs the product', operator.test(terms) && operator.test(privacy))
-// T-189 added the data-processing section to the Terms and the sign-up source to the Privacy Policy
-check('both carry the new date', terms.includes('Last updated: 19 November 2026') && privacy.includes('Last updated: 19 November 2026'))
+// T-189 added the data-processing section to the Terms and the sign-up source to the Privacy Policy;
+// T-198 added what is sent to Help and to the help assistant (the Privacy Policy only)
+check('both carry the new date', terms.includes('Last updated: 19 November 2026') && privacy.includes('Last updated: 21 November 2026'))
 check('the Terms name the governing law', terms.includes('These terms are governed by the law of England and Wales.'))
 check('the Terms have the WhatsApp section: a number the business owns, WhatsApp’s policies, and that the assistant may be paused', /11\. WhatsApp/.test(terms) && /a number your business owns and has the right to use/.test(terms) && /WhatsApp Business Messaging Policy and the WhatsApp Commerce Policy/.test(terms) && /may pause the assistant on your number if Meta restricts or suspends it/.test(terms))
 check('the Privacy page says what happens to a WhatsApp message that is not a price request', /its text is not kept/.test(privacy))

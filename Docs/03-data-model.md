@@ -252,6 +252,32 @@ limit and adds one in a single step, one business at a time; `release_plan_quote
 - Row-level rules: a business reads its own threads and adds **its own side** on its own report. Our replies
   are written by the server.
 
+### help_questions (T-198, migration 48)
+Every question a business put to "Ask Qolumns" (the assistant in the Help panel), with the answer it was given.
+- id, tenant_id, user_id, conversation_id (the questions of one sitting; made in the browser)
+- question (the business's own words **after** customer details are taken out: every email and phone number,
+  and the name and address of the customer of the quote it was asked from), answer (null when no answer came)
+- outcome: `answered` | `not_sure` | `not_offered` | `broken` | `team` | `declined` | `failed`
+- entries (TEXT[]: the ids of the Docs/help entries the answer rested on), page (the dashboard path it was asked
+  from), quote_id (when that page was a quote's)
+- rating: `yes` | `no` | null ("Did this answer it?")
+- review: `open` | `guide_updated` | `nothing_to_do`, owner_note (the owner's side; never shown to a business)
+- report_id (the support report it became, when the business pressed "Send this to the Qolumns team"), model
+- created_at, updated_at
+- **Row-level rules: none, and nothing is granted to a signed-in user.** Only the server reads or writes it,
+  always for the signed-in user's own business (the question, the rating) or for the platform admin (the
+  Questions tab). A business's conversation is kept in its own browser for the session.
+- **Kept 90 days** (`ASK_KEEP_DAYS`): the worker's timer deletes older rows once a day (`helpCleanup`).
+- Needs the owner's eye (`needsAttention`): `review = 'open'` and (`outcome = 'not_sure'` or `rating = 'no'`).
+- Hangs off `tenants(id) ON DELETE CASCADE`.
+
+Two columns added by the same migration:
+- `support_reports.from_assistant` (boolean, default false): the report was made with "Send this to the Qolumns
+  team". The sorter files it as a how-to question whatever the model calls it.
+- `support_report_internal.draft_reply` (text): for a report whose kind is not a fault, the AI's draft reply,
+  written a few seconds after the sorting (null until then, and when no usable draft came).
+  `fix_ticket` is now written only when the kind is a fault. Nothing sends a draft: the owner edits and sends it.
+
 ### feature_requests and feature_votes (T-197, migration 47)
 - feature_requests: id, title, summary, title_source (`words` = still the first business's own words, never
   shown to another business | `ai` | `owner`), status (`under_review` | `planned` | `shipped` | `not_planned`),

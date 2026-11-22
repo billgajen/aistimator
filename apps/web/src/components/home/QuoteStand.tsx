@@ -17,7 +17,7 @@ export function QuoteStand({
 }: {
   needsYou: number
   waiting: number
-  /** Accepted in the last 30 days */
+  /** T-198: accepted this calendar month, the period "Won through …" counts */
   accepted: number
   hasQuotes: boolean
 }) {

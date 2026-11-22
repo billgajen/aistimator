@@ -210,7 +210,8 @@ export const QUOTE_TURN_COPY = {
     /** T-160: "Where your quotes stand" */
     stand: {
       title: 'Where your quotes stand',
-      acceptedNote: 'in the last 30 days',
+      /** T-198: the same period as "Won through …": this calendar month */
+      acceptedNote: 'this month',
       empty: 'No quotes yet. When a customer sends a request, you will see here whose turn it is.',
     },
     /** T-160: "Latest activity" */

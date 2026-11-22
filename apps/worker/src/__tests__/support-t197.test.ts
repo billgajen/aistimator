@@ -91,10 +91,11 @@ afterEach(() => {
 describe('sorting a problem report', () => {
   it('stores the title, kind, severity, likely cause, evidence and the draft fix ticket on the owner’s side', async () => {
     const { tables, supabase } = world()
-    const model = asks(GOOD)
+    // T-198: a fix ticket is drafted only for a fault (help-t198.test.ts has the other kinds)
+    const model = asks({ ...GOOD, kind: 'fault' })
     expect(await sortReport(supabase, ENV, 'r-est', { ask: model.ask, alert: noAlert })).toBe('sorted')
     const internal = tables.support_report_internal!.find((r) => r.report_id === 'r-est')!
-    expect(internal).toMatchObject({ title: GOOD.title, ai_kind: 'how_to', severity: 'medium', likely_cause: 'setup', sort_state: 'sorted', sort_attempts: 1, similar_json: [] })
+    expect(internal).toMatchObject({ title: GOOD.title, ai_kind: 'fault', severity: 'medium', likely_cause: 'setup', sort_state: 'sorted', sort_attempts: 1, similar_json: [] })
     expect(internal.fix_ticket).toContain(TICKET_SAFETY_LINE)
     expect(internal.fix_ticket).toContain('Support report r-est, estimate qte_1')
     expect(model.calls.map((c) => c.task)).toEqual(['support_sort'])

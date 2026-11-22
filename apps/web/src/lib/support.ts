@@ -208,8 +208,9 @@ export async function sentToday(supabase: Db, table: 'support_reports' | 'featur
  * cannot be reached the row stays as it is: the owner sees the report
  * unsorted and can press "Sort again".
  */
-export async function requestSupportJob(kind: 'support_sort' | 'feature_title', id: string): Promise<boolean> {
-  const answer = await askWorker<{ success?: boolean }>('/support/job', { kind, id, mode: isSyncProcessing() ? 'direct' : 'queue' }, 3000)
+export async function requestSupportJob(kind: 'support_sort' | 'feature_title', id: string, help?: string): Promise<boolean> {
+  // T-198: `help` is what the help guide says near the report's words, for the draft reply (our own text, nothing of a customer's)
+  const answer = await askWorker<{ success?: boolean }>('/support/job', { kind, id, mode: isSyncProcessing() ? 'direct' : 'queue', ...(kind === 'support_sort' && help ? { help } : {}) }, 3000)
   if (!answer?.success) console.warn(`[Support] the worker did not take ${kind} for ${id}; it stays unsorted`)
   return answer?.success === true
 }

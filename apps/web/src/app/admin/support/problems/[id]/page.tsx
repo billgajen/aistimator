@@ -233,6 +233,29 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
         </section>
       )}
 
+      {/* T-198: not a fault, so no fix ticket: a draft reply instead. It goes nowhere until the owner sends it. */}
+      {sorting.draftReply && (
+        <section className={CARD} aria-labelledby="draft-reply" data-testid="draft-reply">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="draft-reply" className={CARD_TITLE}>Draft reply</h2>
+            <button
+              type="button"
+              onClick={() => {
+                setReply(sorting.draftReply ?? '')
+                setNote({ text: 'The draft is in the reply box below. Edit it, then press Send reply.', tone: 'ok' })
+                document.getElementById('admin-reply')?.focus()
+              }}
+              className={ADMIN_QUIET}
+              data-testid="use-draft-reply"
+            >
+              Use this reply
+            </button>
+          </div>
+          <p className="mt-3 whitespace-pre-wrap break-words rounded-lg bg-surface p-4 text-sm text-text-primary" data-testid="draft-reply-text">{sorting.draftReply}</p>
+          <p className="mt-2 text-xs text-text-muted">Written by the AI from the report and what was attached. Nothing is sent until you press Send reply.</p>
+        </section>
+      )}
+
       {estimate && (
         <section className={CARD} aria-labelledby="estimate" data-testid="problem-estimate">
           <div className="flex flex-wrap items-center justify-between gap-3">

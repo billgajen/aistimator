@@ -119,6 +119,7 @@ Run `pnpm check:list` for the current list. At T-183, of 32 scripts, 20 are in t
 | `t180` | the Stripe sandbox, and its own servers |
 | `t196` (added by T-196) | its own development servers: it reads what the web app and the worker post to its stand-in for the push service. `pnpm check:quick --only t196 --sets t196` runs it alone in about 40 seconds |
 | `t197` (added by T-197) | the real model: it sorts three sample problems, finds a duplicate, reads a wrong rate as "Your price setup" and matches two feature requests. It closes the open support items earlier runs left in the local database first, so the model compares only this run's own. It prints "What the model got wrong" at the end. No email is sent (the local web app has no email token) |
+| `t198` (added by T-198) | the real model: the Help assistant is asked 33 questions, each with what a right answer must contain or must not (a how-to for each area of the guide, a plan question, things that are not live, a thing that does not exist, a price on a quote with a wrong rate, a refund, a legal question, another business, an attempt to change its rules, another language). It needs 85% right to pass, and prints **the score and every wrong answer word for word**. It also checks the hand-off to the team, the owner's Questions tab, the draft reply, and the home page's fixes. Screens go to `.checks/t198/` |
 
 ## Running at once
 

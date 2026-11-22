@@ -40,6 +40,10 @@ export function EstimateReport({ quoteId, currency, isTest }: { quoteId: string;
     void load()
   }, [load])
 
+  // the list is newest first: the latest report, and the newest note about the business's own prices
+  const latest = reports[0] ?? null
+  const hint = reports.find((report) => report.setupHint)?.setupHint ?? null
+
   const toggle = (choice: EstimateChoice) => setChoices((current) => (current.includes(choice) ? current.filter((c) => c !== choice) : [...current, choice]))
   const needsMore = choices.includes('other')
 
@@ -62,28 +66,25 @@ export function EstimateReport({ quoteId, currency, isTest }: { quoteId: string;
 
   return (
     <section className="mb-6" aria-label={C.title} data-testid="estimate-report">
-      {reports.length > 0 && (
-        <ul className="mb-3 space-y-2" data-testid="estimate-reported">
-          {reports.map((report) => (
-            <li key={report.id} className="text-sm text-text-secondary" data-testid="estimate-reported-item">
-              <span className="flex flex-wrap items-center gap-2">
-                <span>
-                  {C.reportedOn('')}
-                  <span className="figure">{shortDate(report.createdAt)}</span>
-                </span>
-                <StatusPill status={report.status} />
-              </span>
-              {report.setupHint && (
-                <span className="mt-1.5 block rounded-lg border border-tertiary-line bg-white px-3 py-2 text-text-primary" data-testid="setup-hint">
-                  {SUPPORT_COPY.setupHint(report.setupHint.line, report.setupHint.rate)}{' '}
-                  <Link href="/app/services" className="font-semibold text-primary underline underline-offset-2">
-                    {SUPPORT_COPY.setupHintLink}
-                  </Link>
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
+      {/* T-198: one line however many times it was reported, with the latest report's date and status */}
+      {latest && (
+        <div className="mb-3 text-sm text-text-secondary" data-testid="estimate-reported" data-times={reports.length}>
+          <span className="flex flex-wrap items-center gap-2" data-testid="estimate-reported-item">
+            <span>
+              {C.reportedLine(reports.length, '')}
+              <span className="figure">{shortDate(latest.createdAt)}</span>
+            </span>
+            <StatusPill status={latest.status} />
+          </span>
+          {hint && (
+            <span className="mt-1.5 block rounded-lg border border-tertiary-line bg-white px-3 py-2 text-text-primary" data-testid="setup-hint">
+              {SUPPORT_COPY.setupHint(hint.line, hint.rate)}{' '}
+              <Link href="/app/services" className="font-semibold text-primary underline underline-offset-2">
+                {SUPPORT_COPY.setupHintLink}
+              </Link>
+            </span>
+          )}
+        </div>
       )}
 
       {thanks && !open && (

@@ -46,6 +46,16 @@
       "provider": "gemini",
       "model": "gemini-3.8-flash",
       "thinkingLevel": "low"
+    },
+    "support_reply": {
+      "provider": "gemini",
+      "model": "gemini-3.8-flash",
+      "thinkingLevel": "low"
+    },
+    "help_answer": {
+      "provider": "gemini",
+      "model": "gemini-3.8-flash",
+      "thinkingLevel": "low"
     }
   },
   "harness": {

@@ -18,7 +18,7 @@ import { processQuote } from './quote-processor'
 import { authorizeJobRequest } from './auth'
 import { PRODUCT_NAME, errorNameOf } from '@qolumns/shared'
 import { aiStandInOn } from './ai/client'
-import { isSupportJob, matchFeatures, runSupportJob, supportDaily, type SupportJob } from './support'
+import { helpCleanup, isSupportJob, matchFeatures, runSupportJob, supportDaily, type SupportJob } from './support'
 
 export interface Env {
   // Queue binding (production only — see wrangler.toml). T-197: it also carries the support inbox's jobs.
@@ -51,6 +51,7 @@ export interface Env {
   // T-197: the support inbox's two tasks (support.ts). They read and sort; they price nothing.
   AI_MODEL_SUPPORT_SORT?: string
   AI_MODEL_FEATURE_MATCH?: string
+  AI_MODEL_SUPPORT_REPLY?: string
   // Per-task Gemini 3 thinking level override: low | medium | high | default
   AI_THINKING_EXTRACTION_PASS?: string
   AI_THINKING_ADJUDICATION?: string
@@ -213,7 +214,7 @@ export default {
     if (url.pathname === '/support/job' && request.method === 'POST') {
       const body = (await request.json().catch(() => null)) as (SupportJob & { mode?: string }) | null
       if (!isSupportJob(body)) return jsonResponse({ error: 'Invalid request body' }, 400)
-      const job: SupportJob = { kind: body.kind, id: body.id }
+      const job: SupportJob = body.kind === 'support_sort' ? { kind: body.kind, id: body.id, ...(body.help && { help: body.help }) } : { kind: body.kind, id: body.id }
       if (body.mode === 'queue' && env.QUOTE_JOBS) {
         try {
           await env.QUOTE_JOBS.send(job)
@@ -459,5 +460,7 @@ export default {
     // T-197: the owner's daily support summary (at most one a day, and only when something is new).
     // It never throws; it is after the queue check so that it can never hold that up.
     await supportDaily(supabase, env)
+    // T-198: the Help assistant's questions are kept 90 days (once a day; it never throws)
+    await helpCleanup(supabase)
   },
 }

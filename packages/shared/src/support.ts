@@ -62,6 +62,8 @@ export const FEATURE_BODY_MAX = 2000
 export const FEATURE_MATCH_TIMEOUT_MS = 5000
 /** How long the worker gives one sorting call before the report is left unsorted */
 export const SUPPORT_SORT_TIMEOUT_MS = 25_000
+/** T-198: a draft reply is asked for after the sorting is stored; it is short, and is given up on sooner */
+export const SUPPORT_REPLY_TIMEOUT_MS = 15_000
 /** At or above this confidence a look-alike is suggested to the owner as a merge. Never merged by itself. */
 export const SUPPORT_MERGE_SUGGEST_AT = 0.85
 /** Below this a look-alike is not kept at all */
@@ -120,6 +122,8 @@ export const SUPPORT_COPY = {
     chooseOne: 'Choose at least one.',
     moreNeeded: 'Tell us more about what is wrong.',
     reportedOn: (date: string) => `Reported on ${date}`,
+    /** T-198: one line however many times a quote was reported: "Reported on Nov 21", "Reported 2 times, latest Nov 21" */
+    reportedLine: (times: number, date: string) => (times > 1 ? `Reported ${times} times, latest ${date}` : `Reported on ${date}`),
     test: 'Test estimate',
   },
   choices: {

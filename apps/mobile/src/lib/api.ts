@@ -23,7 +23,7 @@ import type {
   QuoteListGroup,
   QuotesListResponse,
 } from '@qolumns/shared'
-import type { RoomScanRoom, ScanMeasure } from '@qolumns/shared'
+import type { RoomScanRoom, ScanMeasure, SupportStatus } from '@qolumns/shared'
 import type { AppField } from './answers'
 
 export interface ApiErrorBody {
@@ -227,6 +227,14 @@ export function createApi(opts: {
         method: 'PUT',
         body: JSON.stringify({ amount, ...(note && { note }) }),
       }),
+
+    /** T-198: the business's own reports on one of its estimates, newest first (the quote screen's "Reported on …") */
+    estimateReports: (quoteId: string) =>
+      request<{ reports?: Array<{ id: string; status: SupportStatus; statusLabel: string; createdAt: string }> }>(`/api/support?quoteId=${encodeURIComponent(quoteId)}`),
+
+    /** T-198: "Report a problem with this estimate": the dashboard's own route. The figure is recorded only; nothing that prices reads it. */
+    reportEstimate: (body: { kind: 'estimate'; quoteId: string; choices: string[]; body: string; expectedTotal: number | null }) =>
+      request<{ message?: string }>('/api/support/reports', { method: 'POST', body: JSON.stringify(body) }),
 
     /**
      * Start one photo's upload: the server makes its record and answers a

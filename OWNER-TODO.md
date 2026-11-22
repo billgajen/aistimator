@@ -3438,3 +3438,113 @@ Built 21 November 2026. **Not deployed.** To put it live: "deploy T-197": **migr
 
 - "Ask Qolumns" (T-198) has its place in the Help panel and nothing on the screen yet.
 - Support from inside the on-site app.
+
+## T-198 — Ask Qolumns (the help assistant), the help guide, and small fixes
+
+Built 21 November 2026. **Not deployed.** It sits on top of T-197, which is also not deployed. To put both live:
+"deploy T-197 and T-198": **migration 47, then migration 48** (`bash scripts/deploy-migration-48.sh`), then the
+worker, then the web.
+
+### Nothing to set
+
+- No new setting and no new provider. The assistant uses the model key the web app already has
+  (`GEMINI_API_KEY` on Vercel); the model is `help_answer` in `ai-models.json` (`AI_MODEL_HELP_ANSWER` overrides
+  it). The draft reply is `support_reply`, in the worker (`AI_MODEL_SUPPORT_REPLY`).
+
+### What it costs
+
+- Every question is sent with the whole help guide (about 140,000 characters, roughly 36,000 tokens). At the
+  registry's price for the model that is **about 3 cents a question**, and at most 60 questions a day for one
+  business. Answers took 3 to 4 seconds here. If that is too much, the guide can be sent in part (the entries
+  that match the question); the code for that is there and is used by itself once the guide outgrows its budget.
+
+### To try once it is live
+
+- [ ] Press **Help**. Ask "How do I add a service?" and press "Open Services" under the answer.
+- [ ] Open a quote and ask "Why is this estimate so high?". It should name the line and the rate from that
+  quote, and nothing about the customer.
+- [ ] Ask something it cannot know ("Can I change the font on my quote page?"). It should say "I’m not sure
+  about that." Press "Send this to the Qolumns team", then look in **Admin → Support**: the report is there as a
+  how-to question with a draft reply, and the question is under **Questions**.
+- [ ] On the report, press "Use this reply": the draft goes into the reply box. Nothing is sent until you press
+  "Send reply".
+
+### The help guide is now part of every ticket
+
+- `Docs/help` is what the assistant answers from. CLAUDE.md says: when a ticket changes what a business sees or
+  can do, update Docs/help in the same ticket (then `pnpm help:build`). A unit test fails if a dashboard page has
+  no entry, a link is dead, a plan fact is typed by hand, or something not live is described as live.
+- **Please read the guide once.** It was written from the code, not from using the product as a customer would.
+  Where the product does something odd today, the guide says what it does (list below), so a wrong line in the
+  guide is a wrong answer from the assistant.
+
+### Decisions I made that you may want to change
+
+- **"Not sure" shows only our sentence.** Whatever else the model wrote is thrown away, so a guess can never
+  follow "I’m not sure about that."
+- **It says "Qolumns does not do that" only for things the guide lists as not offered** (text messages, taking
+  payment, invoices, booking a job, a second login, marking a job won yourself). For anything else the guide
+  does not mention, it says it is not sure. Add to that list in `Docs/help/14-common-problems.md`.
+- **Questions are kept with customer details already taken out**, so you read "[customer]" where the business
+  typed a name.
+- **A day of answered questions alone sends you no summary email**; one the assistant could not answer does.
+- **`/app/sms` is not in the guide** (it is not in the menu). The guide says quoting by text message is not
+  offered.
+
+### Found while writing the guide (not changed in this ticket)
+
+Each of these is how the product behaves today. The guide describes it as it is. Say which you want fixed.
+
+- **Services:** questions are saved only for a service that was started from a description, a template or an
+  import (one made with an empty "Description" loses its questions on save). Changing a question's "Label"
+  breaks the price lines that use it. "Regenerate" on "Scope & Photos" overwrites questions, price lines and
+  add-ons. "Describe your pricing" silently keeps at most 10 lines and 10 questions. The amount boxes show "$"
+  whatever the currency. A fixed line ticked "Only include when…" with no question shows in the preview but is
+  never charged.
+- **Setup and templates:** there is no test estimate after setup, and opening your own quote link ticks "Share
+  your quote link". "Add" from a template switches the service on at once with example prices. Switching every
+  service off sends Home back to setup. There is no change-password in Settings.
+- **Quote link and estimates:** "Preview on a demo page" opens a developer page ("Widget Demo", "Tenant Key").
+  The Advanced tip says "Go to Pricing Rules", which is not a page. An estimate sent automatically still tells
+  the customer the business "will review and confirm it". "Hold until I approve" promises no price but shows a
+  low and high figure. A request that could not be priced has no "try again". "Pricing trace" is under "More"
+  only, after sending, and shows raw data under "Extracted Signals". There is no way to mark a job won or lost,
+  and nothing ever sets "Paid".
+- **Follow-up:** one automatic reminder goes to the customer after three days, with no switch to turn it off;
+  the public site no longer mentions it. The WhatsApp page shows "Connect WhatsApp" with no "Coming soon" mark.
+- **Analytics:** "Total Quotes" includes setup tests; "Conversion Rate" leaves declined quotes out; "Quotes
+  Viewed" drops opened-then-declined; "Paid" is always zero; there is no date range; there is no way to stop
+  sharing benchmarks.
+- **Settings and billing:** saving "Quote Template" switches "Allow customers to accept quotes directly" back
+  on (the guide warns of this; remove the warning when it is fixed). "Default Terms & Conditions" is saved but
+  printed nowhere. The Quote Template tick boxes change only the PDF. "County/State" service area is never
+  checked. The Branding page says "Growth and Pro" remove the badge (old plan names). The badge comes back
+  during a payment retry. Requests saved without a price are not priced by themselves after a plan is bought,
+  though the free-quotes email says they are. After a plan ends, the free allowance counts every quote ever
+  priced. Customer emails always say "Powered by" and never carry the logo.
+- **Home:** the "Accepted this month" card counts every accepted estimate; the panel's Accepted step counts
+  customer requests only.
+
+### The app on your iPhone
+
+- The estimate report is in the app's code. I tried to rebuild onto your iPhone: it is paired, but the build
+  stopped because the phone was locked ("may need to be unlocked"). Plug it in, unlock it, and run (the same command as
+  T-192):
+
+```
+cd apps/mobile && DEVELOPER_DIR=$HOME/Downloads/Xcode.app/Contents/Developer GEM_HOME=$HOME/.qolumns-pods-sys PATH=$HOME/.qolumns-pods-sys/bin:$PATH LANG=en_US.UTF-8 APP_VARIANT=dev npx expo run:ios --device --configuration Release
+```
+
+- The app talks to the live site, so "Report a problem with this estimate" works on your phone only once T-197
+  and T-198 are deployed. Until then the card shows and sending says it could not be sent.
+
+### Not proven here
+
+- **The assistant on Vercel.** It ran here against the development server. An answer that arrives piece by piece
+  through Vercel, and the 20-second limit inside Vercel's own limits, have not been seen.
+- **The app on a real phone.** I saw it in the iPhone simulator against the local stack (three pictures in
+  `.checks/t198/app-*.png`), not on your phone.
+- **No email was sent** (no Postmark token on this Mac): the daily summary's new line is a unit test.
+- **The 90-day deletion** ran against a database held in memory, not on a real timer.
+- **The model varies.** It scored 33 of 33 in the last run; the check passes at 85% and prints every wrong
+  answer word for word, so read that part of a full run's log.

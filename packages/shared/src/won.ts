@@ -208,8 +208,8 @@ export const WON_COPY = {
   onSite: (money: string, jobs: number, alone: boolean) =>
     `${alone ? '' : 'Plus '}${money} from ${jobs} ${jobs === 1 ? 'estimate' : 'estimates'} you made on site.`,
   lastMonth: (money: string, jobs: number, noun: 'job' | 'estimate') => `Last month: ${money} from ${jobs} ${jobs === 1 ? noun : `${noun}s`}`,
-  /** What a screen reader hears between two steps */
-  shareSpoken: (share: string) => `${share} moved on`,
+  /** T-198: under a step, what its share is a share of: "67% of requests", "100% of sent", "100% of opened" */
+  shareOf: (share: string, before: 'requests' | 'sent' | 'opened' | 'accepted') => `${share} of ${{ requests: 'requests', sent: 'sent', opened: 'opened', accepted: 'accepted' }[before]}`,
 } as const
 
 export interface WonLines {

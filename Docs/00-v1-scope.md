@@ -66,8 +66,22 @@ Ship a compact SaaS that a business can:
 - **The AI reads and sorts.** It never changes a price, a setting, a service or a quote, never merges by itself,
   and is sent no customer details. A report is saved before anything else happens to it.
 - It is an extra: it must never slow, block or break quoting, the dashboard or sign-in.
-- Not in this scope: a chatbot ("Ask Qolumns" is T-198), a public roadmap, votes shown to businesses, support
-  from inside the on-site app.
+- Not in this scope: a public roadmap, votes shown to businesses.
+
+### The help guide and "Ask Qolumns" (T-198, the owner's decision, 21 Nov 2026)
+- **A help guide** (`Docs/help`): plain pages of questions and answers, one per area, written from what the
+  product does today. Plan facts and "is it live" are filled in from the plan definitions and the site's flags,
+  never typed. A unit test holds it complete and true; every ticket that changes what a business sees or can do
+  updates it.
+- **"Ask Qolumns"**, first in the Help panel: an assistant that answers a business's questions from the guide,
+  the business's own state and, on a quote's page, that quote's pricing record. It reads and answers: it never
+  changes a price, a setting, a service or a quote, and never sends anything to a customer. When the guide does
+  not cover a question it says "I'm not sure about that" and offers to send the question to the team.
+- **The owner sees every question** (admin Support, Questions), opening on the ones the assistant could not
+  answer or the business said did not help. Questions and answers are kept 90 days.
+- "Report a problem with this estimate" is also on the on-site app's quote screen.
+- Not in this scope: the assistant doing a step for the business, answering customers, a search of the guide on
+  the public site, any language but English.
 
 ### Basic analytics
 - Quotes created

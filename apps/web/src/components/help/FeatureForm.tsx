@@ -23,8 +23,8 @@ interface Answer {
   message?: string
 }
 
-export function FeatureForm({ onSent, onDone }: { onSent: () => void; onDone: () => void }) {
-  const [text, setText] = useState('')
+export function FeatureForm({ initialText, onSent, onDone }: { /** T-198: words carried over from a conversation with the assistant */ initialText?: string; onSent: () => void; onDone: () => void }) {
+  const [text, setText] = useState(initialText ?? '')
   const [matches, setMatches] = useState<Match[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)

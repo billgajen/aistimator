@@ -2,20 +2,24 @@
 
 /**
  * T-197: the support inbox. Platform admin only (the middleware and every
- * route it reads check it). Three tabs: Problems (problem reports and
- * estimate reports together, by priority), Feature requests (by votes), All.
+ * route it reads check it). Tabs: Problems (problem reports and estimate
+ * reports together, by priority), Feature requests (by votes), All, and
+ * (T-198) Questions: what businesses asked the Help assistant, opening on
+ * the ones that need a look ("not sure" answers and "No" ratings).
  */
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { FEATURE_OPEN_STATUSES, FEATURE_STATUSES, SUPPORT_CAUSES, SUPPORT_COPY, SUPPORT_OPEN_STATUSES, SUPPORT_REPORT_KINDS, SUPPORT_SEVERITIES, SUPPORT_STATUSES, ageWords } from '@qolumns/shared'
+import { ASK_COPY, FEATURE_OPEN_STATUSES, FEATURE_STATUSES, SUPPORT_CAUSES, SUPPORT_COPY, SUPPORT_OPEN_STATUSES, SUPPORT_REPORT_KINDS, SUPPORT_SEVERITIES, SUPPORT_STATUSES, ageWords } from '@qolumns/shared'
 import type { FeatureRow, ProblemRow } from '@/lib/support-admin'
+import type { QuestionRow } from '@/lib/help-admin'
 import { FeatureStatusPill, StatusPill } from '@/components/help/parts'
 import { SeverityMark } from '@/components/admin/SupportParts'
 
-type Tab = 'problems' | 'features' | 'all'
+type Tab = 'problems' | 'features' | 'questions' | 'all'
 const TABS: Array<{ key: Tab; label: string }> = [
   { key: 'problems', label: 'Problems' },
   { key: 'features', label: 'Feature requests' },
+  { key: 'questions', label: 'Questions' },
   { key: 'all', label: 'All' },
 ]
 const C = SUPPORT_COPY
@@ -30,6 +34,9 @@ export default function SupportInboxPage() {
   const [tab, setTab] = useState<Tab>('problems')
   const [problems, setProblems] = useState<ProblemRow[]>([])
   const [features, setFeatures] = useState<FeatureRow[]>([])
+  const [questions, setQuestions] = useState<QuestionRow[]>([])
+  /** The Questions tab opens on what needs a look */
+  const [allQuestions, setAllQuestions] = useState(false)
   const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading')
   const [kind, setKind] = useState('')
   const [status, setStatus] = useState(OPEN)
@@ -40,9 +47,10 @@ export default function SupportInboxPage() {
   useEffect(() => {
     fetch('/api/admin/support')
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('failed'))))
-      .then((data: { problems: ProblemRow[]; features: FeatureRow[] }) => {
+      .then((data: { problems: ProblemRow[]; features: FeatureRow[]; questions?: QuestionRow[] }) => {
         setProblems(data.problems)
         setFeatures(data.features)
+        setQuestions(data.questions ?? [])
         setState('ready')
       })
       .catch(() => setState('failed'))
@@ -61,6 +69,8 @@ export default function SupportInboxPage() {
   // the number on each tab is what is still open, whatever the filters show
   const openProblems = problems.filter((p) => isOpen(p.status)).length
   const openFeatures = features.filter((f) => isOpen(f.status)).length
+  const questionsToLookAt = questions.filter((q) => q.needsAttention).length
+  const shownQuestions = allQuestions ? questions : questions.filter((q) => q.needsAttention)
   const now = new Date()
 
   return (
@@ -83,12 +93,21 @@ export default function SupportInboxPage() {
             data-tab={item.key}
           >
             {item.label}
-            <span className="figure ml-2 font-normal">{item.key === 'problems' ? openProblems : item.key === 'features' ? openFeatures : openProblems + openFeatures}</span>
+            <span className="figure ml-2 font-normal">{item.key === 'problems' ? openProblems : item.key === 'features' ? openFeatures : item.key === 'questions' ? questionsToLookAt : openProblems + openFeatures}</span>
           </button>
         ))}
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2" data-testid="inbox-filters">
+      {tab === 'questions' && (
+        <div className="mt-4 flex flex-wrap gap-2" data-testid="question-filters">
+          <select value={allQuestions ? 'all' : 'look'} onChange={(e) => setAllQuestions(e.target.value === 'all')} className={SELECT} aria-label="Which questions">
+            <option value="look">Needs a look</option>
+            <option value="all">Every question</option>
+          </select>
+        </div>
+      )}
+
+      <div className={`mt-4 flex flex-wrap gap-2 ${tab === 'questions' ? 'hidden' : ''}`} data-testid="inbox-filters">
         {tab !== 'features' && (
           <select value={kind} onChange={(e) => setKind(e.target.value)} className={SELECT} aria-label="Kind">
             <option value="">Any kind</option>
@@ -135,7 +154,7 @@ export default function SupportInboxPage() {
       {state === 'failed' && <p role="alert" className="mt-6 rounded-xl bg-danger-light p-4 text-danger">The inbox could not be loaded.</p>}
       {state === 'loading' && <p className="mt-6 text-text-muted">Loading…</p>}
 
-      {state === 'ready' && tab !== 'features' && (
+      {state === 'ready' && tab !== 'features' && tab !== 'questions' && (
         <div className="mt-6 overflow-x-auto rounded-xl bg-white shadow-warm-md" data-testid="problems-table">
           <table className="min-w-full divide-y divide-border">
             <thead className="bg-surface">
@@ -182,7 +201,7 @@ export default function SupportInboxPage() {
         </div>
       )}
 
-      {state === 'ready' && tab !== 'problems' && (
+      {state === 'ready' && tab !== 'problems' && tab !== 'questions' && (
         <div className="mt-6 overflow-x-auto rounded-xl bg-white shadow-warm-md" data-testid="features-table">
           <table className="min-w-full divide-y divide-border">
             <thead className="bg-surface">
@@ -214,6 +233,40 @@ export default function SupportInboxPage() {
               ))}
               {shownFeatures.length === 0 && (
                 <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-text-muted">No feature requests here.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {state === 'ready' && tab === 'questions' && (
+        <div className="mt-6 overflow-x-auto rounded-xl bg-white shadow-warm-md" data-testid="questions-table">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-surface">
+              <tr>
+                <th className={TH}>Question</th>
+                <th className={TH}>Answer</th>
+                <th className={TH}>Did it answer?</th>
+                <th className={TH}>Yours</th>
+                <th className={TH}>Age</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {shownQuestions.map((q) => (
+                <tr key={q.id} className="hover:bg-background" data-testid="question-row" data-id={q.id} data-outcome={q.outcome}>
+                  <td className="max-w-md px-4 py-3">
+                    <Link href={`/admin/support/questions/${q.id}`} className="text-sm font-semibold text-primary underline-offset-2 hover:underline">
+                      {q.question}
+                    </Link>
+                    <p className="mt-0.5 text-xs text-text-muted">{q.business}</p>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-text-secondary">{ASK_COPY.outcome[q.outcome]}</td>
+                  <td className="px-4 py-3 text-sm text-text-secondary">{q.rating ? ASK_COPY.ratingLabel[q.rating] : 'Not said'}</td>
+                  <td className="px-4 py-3 text-sm text-text-secondary">{ASK_COPY.review[q.review]}</td>
+                  <td className="figure whitespace-nowrap px-4 py-3 text-sm text-text-secondary">{ageWords(q.createdAt, now)}</td>
+                </tr>
+              ))}
+              {shownQuestions.length === 0 && (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-text-muted">{allQuestions ? 'No questions in the last 90 days.' : 'Nothing needs a look.'}</td></tr>
               )}
             </tbody>
           </table>

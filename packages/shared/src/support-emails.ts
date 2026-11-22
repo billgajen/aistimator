@@ -138,17 +138,32 @@ export interface DailySummaryInput {
   top: Array<{ title: string; severity: SupportSeverity | null; businesses: number }>
   inboxUrl: string
   environment?: string
+  /** T-198: questions put to the Help assistant since the last summary, and how many it could not answer */
+  questions?: { asked: number; unanswered: number }
 }
 
-/** The owner's daily summary. Null when there is nothing new: then no email is sent. */
+/** T-198: the summary's one line about the assistant. Null when nobody asked anything. */
+export function questionsLine(questions: { asked: number; unanswered: number } | undefined): string | null {
+  const asked = Math.max(0, questions?.asked ?? 0)
+  if (asked <= 0) return null
+  const unanswered = Math.min(asked, Math.max(0, questions?.unanswered ?? 0))
+  return `Questions asked: ${asked}. The assistant could not answer: ${unanswered}.`
+}
+
+/**
+ * The owner's daily summary. Null when there is nothing new: then no email is
+ * sent. T-198: a question the assistant could not answer is something new; a
+ * day of answered questions alone is not.
+ */
 export function supportDailyEmail(input: DailySummaryInput): (SupportEmail & { text: string }) | null {
   const kinds = (Object.entries(input.problems) as Array<[SupportAiKind | 'unsorted', number]>).filter(([, n]) => n > 0)
   const problems = kinds.reduce((sum, [, n]) => sum + n, 0)
   const total = problems + Math.max(0, input.featureRequests)
-  if (total <= 0) return null
+  const asked = questionsLine(input.questions)
+  if (total <= 0 && (input.questions?.unanswered ?? 0) <= 0) return null
   const where = input.environment && input.environment !== 'production' ? ` (${input.environment})` : ''
   const label = (kind: SupportAiKind | 'unsorted') => (kind === 'unsorted' ? 'Not sorted yet' : SUPPORT_COPY.aiKind[kind])
-  const counts = [...kinds.map(([kind, n]) => `${label(kind)}: ${n}`), ...(input.featureRequests > 0 ? [`Feature requests: ${input.featureRequests}`] : [])]
+  const counts = [...kinds.map(([kind, n]) => `${label(kind)}: ${n}`), ...(input.featureRequests > 0 ? [`Feature requests: ${input.featureRequests}`] : []), ...(asked ? [asked] : [])]
   const top = input.top.slice(0, 3).map((item) => {
     const severity = item.severity ? SUPPORT_COPY.severity[item.severity] : 'Not sorted'
     return `${item.title} (${severity}; ${item.businesses} ${item.businesses === 1 ? 'business' : 'businesses'})`

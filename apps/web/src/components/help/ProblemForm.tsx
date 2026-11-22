@@ -28,8 +28,8 @@ async function uploadScreenshot(file: File): Promise<string | null> {
   }
 }
 
-export function ProblemForm({ pathname, plan, onSent, onDone }: { pathname: string; plan: string | null; onSent: () => void; onDone: () => void }) {
-  const [text, setText] = useState('')
+export function ProblemForm({ pathname, plan, initialText, onSent, onDone }: { pathname: string; plan: string | null; /** T-198: words carried over from a conversation with the assistant */ initialText?: string; onSent: () => void; onDone: () => void }) {
+  const [text, setText] = useState(initialText ?? '')
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)

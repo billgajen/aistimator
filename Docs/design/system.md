@@ -249,6 +249,13 @@ prompt, what was kept and what was rejected).
   animation. An unread reply is the "needs you" mark (yellow with the dark dot) on the Help item and on the
   list. A status is a pill in the status colours, always with its word. The estimate report is a quiet underlined
   link under the quote page that opens its form in place; it is not a fifth block of that page's four.
+- **"Ask Qolumns" comes first in the Help panel** (T-198): one box on the `surface` tint with its caution line,
+  the question field and a juniper "Ask" button, then up to three suggested questions as white rows. The other
+  three options stay below it as they were. A conversation is two kinds of block: the business's question on
+  mint, right-hand; the answer on white with a `border` edge, left-hand, plain text. Under an answer: its
+  buttons (white, `field` edge: a page to open, or one of the panel's own forms), then "Did this answer it?"
+  with Yes and No. Nothing in it is yellow: an answer is not something that needs the business. No typing
+  animation and no avatar; while an answer is on its way the block says "Looking that up…".
 - **The dashboard quote page reads in one order** (T-169): the next step, what the AI understood (with the
   customer's photos), the price, then the rest in one card divided by rules. The total is the mono figure at
   `text-4xl`. A new block on that page goes into one of those four, not into a box of its own.

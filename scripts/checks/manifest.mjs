@@ -142,6 +142,8 @@ export const SCRIPTS = [
   { id: 't196', server: 't196', model: 'none', minutes: 20 },
   // T-197 has the real model sort problem reports, find a duplicate and match feature requests
   { id: 't197', server: 'standard', model: 'real', browser: true, minutes: 20 },
+  // T-198 asks the Help assistant thirty-one questions with the real model and prints its score
+  { id: 't198', server: 'standard', model: 'real', browser: true, minutes: 25 },
 ]
 
 /** Lint, typecheck and unit tests: every level runs these first */

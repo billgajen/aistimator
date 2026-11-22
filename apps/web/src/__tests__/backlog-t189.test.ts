@@ -441,7 +441,8 @@ describe('T-189 item 6: where a new business came from', () => {
     const privacy = src('app/privacy/page.tsx')
     expect(privacy).toMatch(/When a business signs up we also keep how it found us: the site it came from, any campaign tags on the link it followed, and the first page of ours it opened\./)
     expect(privacy).toMatch(/This is not a cookie, holds nothing that identifies you, and reaches us only if you sign up\./)
-    expect(privacy).toContain('Last updated: 19 November 2026')
+    // T-198 added what is sent to Help and to the help assistant
+    expect(privacy).toContain('Last updated: 21 November 2026')
   })
 })
 

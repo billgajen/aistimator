@@ -187,6 +187,49 @@ routes, one webhook and one admin route. Plan numbers come from `packages/shared
 - **The public quote's price lines**: the customer's page words an added line from the line's `source`
   (`seen` / `words`), not from `recommendationReason`, which is still sent and no longer shown.
 
+## T-198: "Ask Qolumns" (the Help assistant) and the owner's Questions tab
+
+The same rules as T-197's routes: every `/api/support/ask` route is the signed-in user's own business; every
+`/api/admin/support/questions` route is the platform admin's. The assistant reads and answers: these routes
+write one table (`help_questions`) and nothing else.
+
+- **`GET /api/support/ask?page=/app/services`** → `{ "suggestions": [{ "entry": "services-add", "question":
+  "How do I add a service?" }] }`: up to three, chosen from the business's own state. No AI is asked. Each is
+  the heading of an entry in Docs/help.
+- **`POST /api/support/ask`** `{ "question": "…", "conversationId": "<uuid>", "page": "/app/quotes/…" }` →
+  `application/x-ndjson`, one JSON object a line, as the answer is written:
+  - `{ "t": "text", "v": "…" }` for each piece of an answer in the model's own words;
+  - last, `{ "t": "done", "id": "<question id>" | null, "outcome": "answered" | "not_sure" | "not_offered" |
+    "broken" | "team" | "declined" | "failed", "text": "<the whole answer, as kept>", "actions": [{ "kind":
+    "open", "href": "/app/services", "label": "Open Services" } | { "kind": "team" | "feature" | "problem",
+    "label": "…" }], "rate": true }`.
+  - For `not_sure`, `team` and `declined` there are no pieces: `text` is our own sentence. `failed` is "I
+    couldn't answer just now." (any failure, or more than 20 seconds) with the report form offered.
+  - 400 `MISSING_QUESTION` / `TOO_LONG` (1,000 characters); 429 `DAILY_LIMIT` (60 a day per business, counted
+    in the database; a count that cannot be read allows the question).
+  - What the model is given: the help guide, the business's own state (plan, quotes used and allowed, its
+    services, prices checked, link shared, WhatsApp connected, branding set, region, currency, the page), and,
+    from a quote's page, that quote's lines, rates, quantities and where each quantity came from. Never a
+    customer's name, email, phone, address, photos or message.
+- **`POST /api/support/ask/:id`** `{ "rating": "yes" | "no" }` → `{ "success": true }`; 404 for a question that
+  is not this business's.
+- **`POST /api/support/reports`** also takes `{ "kind": "problem", "fromAssistant": "<conversation id>",
+  "turns"?: [{ question, answer }], "context"? }`: "Send this to the Qolumns team". The report's words are the
+  conversation as we kept it for this business (`turns` is used only when nothing was kept). The report is
+  marked `from_assistant` and its questions point at it.
+- **`GET /api/admin/support`** now also returns `"questions": [QuestionRow]` (newest first), and `count`
+  includes the questions that need a look.
+- **`GET /api/admin/support/questions/:id`** → `{ "question": {...} }`: the question, the answer, the guide
+  entries used, the rating, the business and its plan, the page, the report it became, the same sitting.
+  **`POST`** `{ "review"?: "guide_updated" | "nothing_to_do" | "open", "note"?: "…" }`.
+- **`GET /api/admin/support/problems/:id`**: `sorting.fixTicket` is set only for a fault; `sorting.draftReply`
+  for every other kind.
+- **The worker's `POST /support/job`** also takes `"help": "…"` on a `support_sort` job: what the help guide says
+  near the report's words (at most 9,000 characters). It is used only for the draft reply, which the worker asks
+  for in a second call (`support_reply`) after the sorting is stored, and only when the kind is not a fault.
+- **The phone app** uses `GET /api/support?quoteId=…` and `POST /api/support/reports` (`kind: "estimate"`) as
+  they are, with its bearer token.
+
 ## T-197: Help, reports, feature requests, the support inbox
 
 Every `/api/support` route is the signed-in user's own business (session cookie): 401 signed out; another

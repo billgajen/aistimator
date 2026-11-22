@@ -805,8 +805,9 @@ describe('T-177 item 9: the Privacy and Terms pages', () => {
     for (const page of ['apps/web/src/app/privacy/page.tsx', 'apps/web/src/app/terms/page.tsx']) {
       const src = code(page)
       expect(src, page).toContain('{operatorStatement(process.env.NEXT_PUBLIC_COMPANY_NUMBER)}')
-      // T-189 added the data-processing section to the Terms and the sign-up source to the Privacy Policy
-      expect(src, page).toContain('Last updated: 19 November 2026')
+      // T-189 added the data-processing section to the Terms and the sign-up source to the Privacy Policy;
+      // T-198 added what is sent to Help and to the help assistant (the Privacy Policy only)
+      expect(src, page).toContain(page.includes('privacy') ? 'Last updated: 21 November 2026' : 'Last updated: 19 November 2026')
       expect(src, page).not.toMatch(/Billiom|company number \d/)
     }
     expect(read('apps/web/.env.example')).toMatch(/^NEXT_PUBLIC_COMPANY_NUMBER=$/m)

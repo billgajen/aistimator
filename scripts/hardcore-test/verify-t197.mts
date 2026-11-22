@@ -536,7 +536,8 @@ for (const [label, viewport] of [['desktop', { width: 1440, height: 1000 }], ['3
   const link = p.getByTestId('estimate-report-link')
   await link.scrollIntoViewIfNeeded()
   const reported = await p.getByTestId('estimate-reported').innerText()
-  if (label === 'desktop') check('the quote page says "Reported on …" with the status, and the "may be down to your prices" note', /Reported on (\d{1,2} \w{3}|\w{3} \d{1,2})/.test(reported.replace(/\s+/g, ' ')) && reported.includes(SUPPORT_COPY.setupHint(WRONG.line, '$3,750.00 per room')), reported.replace(/\n/g, ' | '))
+  // T-198: the quote was reported twice above, so the page shows one line for both
+  if (label === 'desktop') check('the quote page says "Reported 2 times, latest …" with the status, and the "may be down to your prices" note', /Reported 2 times, latest (\d{1,2} \w{3}|\w{3} \d{1,2})/.test(reported.replace(/\s+/g, ' ')) && reported.includes(SUPPORT_COPY.setupHint(WRONG.line, '$3,750.00 per room')), reported.replace(/\n/g, ' | '))
   await shot(p, `quote-reported-and-price-note-${label}`)
   await link.click()
   await p.getByTestId('estimate-report-form').waitFor()
@@ -587,7 +588,13 @@ for (const [label, viewport] of [['desktop', { width: 1440, height: 1000 }], ['3
   await p.goto(`${app}/admin/support/problems/${estimateId}`, { waitUntil: 'networkidle' })
   await p.getByTestId('problem-sorting').waitFor()
   const sorting = await p.getByTestId('problem-sorting').innerText()
-  check('a problem’s page shows the AI’s sorting, the likely cause and the draft fix ticket', sorting.includes(SUPPORT_COPY.cause[(cause as 'setup') ?? 'unknown']) && (await p.getByTestId('fix-ticket-text').innerText()).includes(TICKET_SAFETY_LINE) && (await p.getByTestId('problem-trace').innerText()).includes(WRONG.line))
+  // T-198: a fix ticket is drafted only for a fault; any other kind gets a draft reply instead
+  const estimateKind = (await internalOf(estimateId))?.ai_kind
+  const hasTicket = (await p.getByTestId('fix-ticket-text').count()) === 1
+  const hasDraft = (await p.getByTestId('draft-reply-text').count()) === 1
+  const rightOne = estimateKind === 'fault' ? hasTicket && !hasDraft && (await p.getByTestId('fix-ticket-text').innerText()).includes(TICKET_SAFETY_LINE) : !hasTicket
+  if (estimateKind !== 'fault' && !hasDraft) modelNotes.push('the estimate report (not a fault) has no draft reply: the model wrote none, or used a figure that was not sent')
+  check('a problem’s page shows the AI’s sorting, the likely cause, and a fix ticket only when it is a fault', sorting.includes(SUPPORT_COPY.cause[(cause as 'setup') ?? 'unknown']) && rightOne && (await p.getByTestId('problem-trace').innerText()).includes(WRONG.line), { kind: estimateKind, hasTicket, hasDraft })
   await shot(p, 'inbox-problem-page', true)
 
   // the "Fixed" confirmation, on a problem with two businesses not yet told (a fresh pair)
@@ -603,7 +610,9 @@ for (const [label, viewport] of [['desktop', { width: 1440, height: 1000 }], ['3
   await p.getByTestId('confirm-send').scrollIntoViewIfNeeded()
   // the email inside the confirmation is drawn in its own frame, with the brand fonts: give them a moment
   await p.waitForTimeout(4000)
-  check('the draft fix ticket counts the businesses as they stand now, after the merge', (await p.getByTestId('fix-ticket-text').innerText()).includes('Reported by 2 businesses'))
+  // T-198: there is a ticket only when the model sorted the blank PDF as a fault
+  if ((await p.getByTestId('fix-ticket-text').count()) === 1) check('the draft fix ticket counts the businesses as they stand now, after the merge', (await p.getByTestId('fix-ticket-text').innerText()).includes('Reported by 2 businesses'))
+  else modelNotes.push('the blank PDF report was not sorted as a fault, so it has no fix ticket to count businesses on')
   await shot(p, 'inbox-fixed-confirmation', true)
   await ctx.close()
 }

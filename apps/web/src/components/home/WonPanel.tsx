@@ -4,8 +4,8 @@ import { WON_COPY, type WonLines, type WonSummary } from '@qolumns/shared'
 /**
  * T-196: "Won through Qolumns" on Home — what the business won this calendar
  * month. Customer requests carry the headline and four steps (Requests,
- * Estimates sent, Opened, Accepted) with the share that moved on between
- * them; estimates the business made on site are one quieter line that is
+ * Estimates sent, Opened, Accepted), each with its share of the step before
+ * ("67% of requests", T-198); estimates the business made on site are one quieter line that is
  * never added in. The page shows this only once an estimate has been
  * accepted; the rule and every word are the shared ones (won.ts).
  */
@@ -53,11 +53,10 @@ export function WonPanel({ summary, lines }: { summary: WonSummary; lines: WonLi
             <ol className="mt-5 grid grid-cols-2 gap-x-3 gap-y-4 sm:flex sm:items-stretch sm:gap-0" data-testid="won-steps">
               {steps.map((step, i) => (
                 <li key={step.key} className="flex min-w-0 items-stretch sm:flex-1" data-testid="won-step" data-step={step.key}>
-                  {/* between two steps: the share that moved on. On a phone it sits above the count instead. */}
+                  {/* between two steps on a wide screen: a rule. T-198: the share is said under the step, at every width. */}
                   {i > 0 && (
-                    <span className="hidden w-16 shrink-0 flex-col items-center justify-center px-1 text-center sm:flex" aria-hidden="true">
-                      <span className="figure text-xs font-semibold text-text-secondary">{step.share ?? ''}</span>
-                      <span className="mt-1 block h-px w-full bg-border" />
+                    <span className="hidden w-8 shrink-0 items-center justify-center px-1 sm:flex" aria-hidden="true">
+                      <span className="block h-px w-full bg-border" />
                     </span>
                   )}
                   <span className="min-w-0 flex-1 rounded-xl bg-surface px-4 py-3">
@@ -66,8 +65,8 @@ export function WonPanel({ summary, lines }: { summary: WonSummary; lines: WonLi
                       {step.count}
                     </span>
                     {i > 0 && step.share && (
-                      <span className="figure mt-0.5 block text-xs text-text-secondary sm:sr-only" data-testid="won-step-share">
-                        {WON_COPY.shareSpoken(step.share)}
+                      <span className="mt-0.5 block text-xs text-text-secondary" data-testid="won-step-share">
+                        <Figures text={WON_COPY.shareOf(step.share, steps[i - 1]!.key)} />
                       </span>
                     )}
                   </span>

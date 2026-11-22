@@ -78,6 +78,9 @@ export * from './field-hint'
 export * from './support'
 export * from './support-sort'
 export * from './support-emails'
+// T-198: the help guide and the assistant that answers from it
+export * from './help-guide'
+export * from './help-ask'
 
 // ID prefixes for stable, readable IDs
 export const ID_PREFIXES = {

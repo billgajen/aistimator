@@ -39,6 +39,7 @@ import { loadQuoteToken, saveQuoteToken } from '../../src/lib/quote-tokens'
 import { evidenceWords, shareMessage } from '../../src/lib/share'
 import { storyOfQuote, TONE_STYLE } from '../../src/lib/status'
 import { PricingStages } from '../../src/components/PricingStages'
+import { EstimateReport } from '../../src/components/EstimateReport'
 import { RoomScanCard, RoomScanSummary, SCAN_TIP } from '../../src/components/RoomScanSummary'
 import { openPage, removeModelFile, roomScanAvailability, scanRoom } from '../../modules/room-scan'
 import { loadAreaNames, putPhoto, saveAreaNames } from '../../src/lib/device-files'
@@ -597,6 +598,9 @@ export default function QuoteDetail() {
             <Button title="Save final invoice" variant="secondary" onPress={saveInvoice} busy={busy} disabled={parseMoneyInput(invoice) === null} />
           </Card>
         ) : null}
+
+        {/* T-198: report a problem with this estimate, and the one line that says it was reported */}
+        {!pricing ? <EstimateReport quoteId={quote.id} currency={currency} /> : null}
 
         {/* 10. Nothing is edited in the app */}
         {!pricing ? (

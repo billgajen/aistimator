@@ -92,8 +92,9 @@ export function memoryDb(tables: Record<string, MemRow[]>, options: MemoryDbOpti
       this.conflict = opts.onConflict ?? keyOf(this.table)
       return this
     }
-    delete() {
+    delete(opts: { count?: string } = {}) {
       this.op = 'delete'
+      this.wantCount = Boolean(opts.count)
       return this
     }
     eq(column: string, value: unknown) {
@@ -114,6 +115,10 @@ export function memoryDb(tables: Record<string, MemRow[]>, options: MemoryDbOpti
     }
     gt(column: string, value: string | number) {
       this.filters.push((r) => (r[column] as string | number) > value)
+      return this
+    }
+    lt(column: string, value: string | number) {
+      this.filters.push((r) => (r[column] as string | number) < value)
       return this
     }
     /** "id.eq.A,merged_into.eq.A" */

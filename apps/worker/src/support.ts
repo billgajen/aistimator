@@ -23,6 +23,12 @@ import {
   FEATURE_OPEN_STATUSES,
   MATCH_RESPONSE_SCHEMA,
   MATCH_SYSTEM_PROMPT,
+  REPLY_RESPONSE_SCHEMA,
+  REPLY_SYSTEM_PROMPT,
+  SORT_HELP_MAX,
+  SUPPORT_REPLY_TIMEOUT_MS,
+  buildReplyPrompt,
+  parseReplyAnswer,
   SORT_RESPONSE_SCHEMA,
   SORT_SYSTEM_PROMPT,
   SUPPORT_OPEN_STATUSES,
@@ -32,8 +38,10 @@ import {
   buildMatchPrompt,
   buildSortPrompt,
   buildTitlePrompt,
+  askCutoff,
   byPriority,
   cleanSupportContext,
+  couldNotAnswer,
   errorNameOf,
   estimateChoicesOf,
   estimateDigest,
@@ -50,6 +58,7 @@ import {
   type KnownRequest,
   type OpenProblem,
   type SortInput,
+  type StoredAskOutcome,
   type SupportAiKind,
   type SupportSeverity,
 } from '@qolumns/shared'
@@ -62,6 +71,7 @@ export interface SupportEnv extends AiEnv, OpsAlertEnv {
   /** Per-task model overrides (ai-models.json holds the defaults) */
   AI_MODEL_SUPPORT_SORT?: string
   AI_MODEL_FEATURE_MATCH?: string
+  AI_MODEL_SUPPORT_REPLY?: string
 }
 
 /** One question to a model, answered as JSON. Throws when there is no answer. */
@@ -113,6 +123,7 @@ interface ReportRow {
   expected_total: number | string | null
   quote_id: string | null
   context_json: unknown
+  from_assistant?: boolean | null
 }
 
 interface Loaded {
@@ -130,7 +141,7 @@ interface Loaded {
 export async function loadSortInput(supabase: Db, reportId: string): Promise<Loaded | null> {
   const { data: reportData } = await supabase
     .from('support_reports')
-    .select('id, tenant_id, kind, body, choices, expected_total, quote_id, context_json, tenant:tenants!tenant_id (region)')
+    .select('id, tenant_id, kind, body, choices, expected_total, quote_id, context_json, from_assistant, tenant:tenants!tenant_id (region)')
     .eq('id', reportId)
     .maybeSingle()
   if (!reportData) return null
@@ -221,6 +232,8 @@ export async function loadSortInput(supabase: Db, reportId: string): Promise<Loa
       customers,
       estimate,
       open,
+      // T-198: sent on from the Help assistant: a how-to question, whatever the model calls it
+      fromAssistant: report.from_assistant === true,
     },
   }
 }
@@ -233,6 +246,9 @@ export interface SortDeps {
   timeoutMs?: number
   alert?: typeof sendOpsAlert
   now?: () => Date
+  /** T-198: what the help guide says near the report's words, for the draft reply */
+  help?: string
+  replyTimeoutMs?: number
 }
 
 /**
@@ -250,8 +266,9 @@ export async function sortReport(supabase: SupabaseClient, env: SupportEnv, repo
     const ask = deps.ask === undefined ? modelAsk(env) : deps.ask
     if (!ask) throw new SupportUnsorted('NoModel')
 
-    const raw = await within(deps.timeoutMs ?? SUPPORT_SORT_TIMEOUT_MS, () => ask('support_sort', buildSortPrompt(loaded.sort), SORT_RESPONSE_SCHEMA, SORT_SYSTEM_PROMPT))
-    const result = parseSortAnswer(raw, loaded.sort)
+    const sort = deps.help ? { ...loaded.sort, help: deps.help } : loaded.sort
+    const raw = await within(deps.timeoutMs ?? SUPPORT_SORT_TIMEOUT_MS, () => ask('support_sort', buildSortPrompt(sort), SORT_RESPONSE_SCHEMA, SORT_SYSTEM_PROMPT))
+    const result = parseSortAnswer(raw, sort)
     if (!result) throw new SupportUnsorted('UnreadableAnswer')
 
     const hint = setupHintFor(loaded.estimate, result.setupLineId, loaded.locale)
@@ -267,7 +284,9 @@ export async function sortReport(supabase: SupabaseClient, env: SupportEnv, repo
           similar_json: result.similar,
           likely_cause: result.likelyCause,
           evidence: result.evidence || null,
-          fix_ticket: formatFixTicket(result.ticket, { reportId, businesses: loaded.businesses, quoteId: loaded.report.quote_id, severity: result.severity }),
+          // T-198: a fix ticket only for a fault; every other kind gets a draft reply, asked for below
+          fix_ticket: result.ticket ? formatFixTicket(result.ticket, { reportId, businesses: loaded.businesses, quoteId: loaded.report.quote_id, severity: result.severity }) : null,
+          draft_reply: null,
           sort_state: 'sorted',
           sort_attempts: attempts,
           sorted_at: now.toISOString(),
@@ -283,6 +302,9 @@ export async function sortReport(supabase: SupabaseClient, env: SupportEnv, repo
     if (result.severity === 'high' && loaded.previousSeverity !== 'high') {
       await (deps.alert ?? sendOpsAlert)(supabase, env, { kind: 'support_high', details: { Report: reportId, Kind: result.kind, Businesses: loaded.businesses } })
     }
+    // T-198: the sorting is stored and the owner told. Only now the draft reply, on its own: if it is slow,
+    // fails or invents a figure there is simply no draft, and the report keeps its sorting.
+    if (result.kind !== 'fault') await draftReply(supabase, ask, reportId, sort, result, deps.replyTimeoutMs)
     return 'sorted'
   } catch (error) {
     console.error(`[Support] sorting ${reportId} failed (${errorNameOf(error)}); the report is kept, unsorted`)
@@ -369,16 +391,34 @@ export async function matchFeatures(supabase: Db, env: SupportEnv, words: string
 // The jobs, as the queue and the HTTP handler run them
 // ---------------------------------------------------------------------------
 
-export type SupportJob = { kind: 'support_sort'; id: string } | { kind: 'feature_title'; id: string }
+/** `help`: the help guide's entries that share words with the report (T-198), sent by the web app for the draft reply */
+/**
+ * T-198: draft a reply to a report that is not a fault, for the owner to edit
+ * and send. It writes one column on the owner's side and sends nothing. Never
+ * throws.
+ */
+async function draftReply(supabase: SupabaseClient, ask: Ask, reportId: string, sort: SortInput, sorted: { title: string; summary: string; kind: SupportAiKind }, timeoutMs?: number): Promise<void> {
+  try {
+    const prompt = buildReplyPrompt(sort, sorted)
+    const raw = await within(timeoutMs ?? SUPPORT_REPLY_TIMEOUT_MS, () => ask('support_reply', prompt, REPLY_RESPONSE_SCHEMA, REPLY_SYSTEM_PROMPT))
+    const reply = parseReplyAnswer(raw, sort, prompt)
+    if (reply) await supabase.from('support_report_internal').update({ draft_reply: reply }).eq('report_id', reportId)
+  } catch (error) {
+    console.error(`[Support] no draft reply for ${reportId} (${errorNameOf(error)}); its sorting is kept`)
+  }
+}
+
+export type SupportJob = { kind: 'support_sort'; id: string; help?: string } | { kind: 'feature_title'; id: string }
 
 export function isSupportJob(body: unknown): body is SupportJob {
   const job = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>
+  if (job.help !== undefined && (typeof job.help !== 'string' || job.help.length > SORT_HELP_MAX)) return false
   return (job.kind === 'support_sort' || job.kind === 'feature_title') && typeof job.id === 'string' && /^[A-Za-z0-9-]{1,64}$/.test(job.id)
 }
 
 /** Run one support job. Never throws; a job is never run twice by the queue (the caller acknowledges it whatever happens). */
 export async function runSupportJob(supabase: SupabaseClient, env: SupportEnv, job: SupportJob, deps: SortDeps = {}): Promise<string> {
-  return job.kind === 'support_sort' ? sortReport(supabase, env, job.id, deps) : titleFeature(supabase, env, job.id, deps)
+  return job.kind === 'support_sort' ? sortReport(supabase, env, job.id, { ...deps, help: job.help ?? deps.help }) : titleFeature(supabase, env, job.id, deps)
 }
 
 // ---------------------------------------------------------------------------
@@ -418,6 +458,9 @@ export async function supportDaily(
       return { id: row.id, createdAt: row.created_at, title: internal?.title ?? null, kind: internal?.ai_kind ?? null, severity: internal?.severity ?? null, merged: Boolean(internal?.merged_into) }
     })
     const { count: featureCount } = await supabase.from('feature_requests').select('id', { count: 'exact', head: true }).gt('created_at', since.toISOString())
+    // T-198: questions put to the Help assistant, and how many it could not answer (outcomes only: no words are read)
+    const { data: askedData } = await supabase.from('help_questions').select('outcome').gt('created_at', since.toISOString()).limit(5000)
+    const asked = (askedData ?? []) as Array<{ outcome: StoredAskOutcome }>
 
     const problems: Partial<Record<SupportAiKind | 'unsorted', number>> = {}
     for (const report of reports) problems[report.kind ?? 'unsorted'] = (problems[report.kind ?? 'unsorted'] ?? 0) + 1
@@ -432,6 +475,7 @@ export async function supportDaily(
       top,
       inboxUrl: `${(env.APP_URL ?? '').replace(/\/+$/, '')}/admin/support`,
       environment: env.ENVIRONMENT,
+      questions: { asked: asked.length, unanswered: asked.filter((q) => couldNotAnswer(q.outcome)).length },
     })
     if (!email) return 'nothing'
 
@@ -447,6 +491,37 @@ export async function supportDaily(
     return result.success ? 'sent' : 'failed'
   } catch (error) {
     console.error(`[Support] daily summary failed (${errorNameOf(error)})`)
+    return 'failed'
+  }
+}
+
+// ---------------------------------------------------------------------------
+// T-198: questions put to the Help assistant are kept 90 days
+// ---------------------------------------------------------------------------
+
+const HELP_CLEANUP = 'help_cleanup'
+
+/**
+ * Once a day, delete the Help assistant's questions and answers that are
+ * older than 90 days (`ASK_KEEP_DAYS`). The day is claimed through the same
+ * rule the alerts use, so every copy of the worker does it once between
+ * them. Never throws; a day that fails is tried again the next day.
+ */
+export async function helpCleanup(supabase: SupabaseClient, now: Date = new Date()): Promise<'too_soon' | 'done' | 'failed'> {
+  try {
+    // look before claiming: a claim that is refused is counted as "held back", and this runs every five minutes
+    const { data: lastData } = await supabase.from('ops_alerts').select('last_sent_at').eq('kind', HELP_CLEANUP).maybeSingle()
+    const last = (lastData as { last_sent_at?: string } | null)?.last_sent_at
+    if (last && now.getTime() - new Date(last).getTime() < DAY_SECONDS * 1000) return 'too_soon'
+    const { data: claim, error: claimError } = await supabase.rpc('claim_ops_alert', { p_kind: HELP_CLEANUP, p_every_seconds: DAY_SECONDS })
+    const row = (Array.isArray(claim) ? claim[0] : claim) as { send?: boolean } | null
+    if (claimError || !row?.send) return 'too_soon'
+    const { error, count } = await supabase.from('help_questions').delete({ count: 'exact' }).lt('created_at', askCutoff(now).toISOString())
+    if (error) throw new SupportUnsorted('NotDeleted')
+    console.log(`[Support] help questions past their 90 days: ${count ?? 0} deleted`)
+    return 'done'
+  } catch (error) {
+    console.error(`[Support] deleting old help questions failed (${errorNameOf(error)})`)
     return 'failed'
   }
 }

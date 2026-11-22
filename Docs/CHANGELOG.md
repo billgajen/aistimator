@@ -15,6 +15,172 @@
 
 ## Issues & Resolutions
 
+### 2026-11-21: T-198 — Ask Qolumns (the help assistant), the help guide, and small fixes (AD-083, AD-084)
+
+**Built, not deployed.** Needs deploying after T-197: **migration 48 first**
+(`bash scripts/deploy-migration-48.sh`), then the worker, then the web. The live code keeps working with
+migration 48 in place (it only adds). Without it the T-198 web code still prices every quote and every page
+still works: the assistant answers but nothing is kept, and the support inbox does not load until the migration
+is in (it reads the new `draft_reply` column).
+
+#### What a business gets
+- **"Ask Qolumns"**, first in the Help panel: a box with the line "An AI assistant. It can be wrong, so check
+  anything important.", three suggested questions chosen from the business's own state (no AI call), and the
+  conversation it opens. Answers arrive as they are written. Under an answer: buttons that open the dashboard
+  page it is about ("Open Services"), and "Did this answer it?" Yes / No. The other three options stay below.
+- **It hands on when it cannot answer.** "I'm not sure about that" offers "Send this to the Qolumns team", which
+  makes one of the business's own reports with the conversation attached and shows the usual "Thanks, we've got
+  it" line. Something Qolumns does not do offers "Suggest this as a feature", and something that sounds broken
+  offers "Report a problem", each with the business's words filled in.
+- The conversation stays in the panel for the session (the tab's own storage), with "Start again"; signing out
+  ends it.
+- **In the on-site app:** "Report a problem with this estimate" on the quote screen (the same choices, note and
+  "should have been" figure, through the same route), and the same one line once a quote has been reported.
+
+#### What the owner gets
+- **Support → Questions**: every question, its answer, the guide entries the answer used, the rating and the
+  business. It opens on the ones that need a look ("not sure" answers and "No" ratings), newest first. One
+  question's page has "Guide updated", "Nothing to do" and a private note. The count joins the admin menu's.
+- The daily summary gains one line: "Questions asked: N. The assistant could not answer: M."
+- **A draft reply instead of a fix ticket** on every report that is not a fault, with "Use this reply".
+
+#### AD-083: the help guide is the product's own account of itself, and a test keeps it true
+- **`Docs/help`**: 14 pages, one per area, about 170 entries. Each entry is a question as a business would ask
+  it, a short answer, numbered steps, and the dashboard page it happens on. Written from the code, naming every
+  button as the screen names it. `Docs/help/README.md` has the format.
+- **Plan facts are never typed.** A page writes `{{plans}}`, `{{free.quotes}}`, `{{roomScan.plans}}` and the
+  like; `apps/web/src/lib/help/guide.ts` fills them in from `plans.ts` and `plan-claims.ts` each time the guide
+  is built. What is not live is written in `{{#soon whatsapp}}…{{/soon}}` / `{{#live …}}` blocks that follow the
+  same three flags the public site uses, so "Coming soon" leaves the guide by itself when a flag is turned on.
+- **The pages are copied into the web app** by `pnpm help:build` (`guide-pages.generated.ts`); Vercel does not
+  serve the Docs folder. Only the pages' own text is copied; the facts are filled in at run time.
+- **The unit test (`help-guide-t198.test.ts`) fails when:** a dashboard page or a Settings section has no entry
+  (pages are read from the folder; `/app/sms` is left out by name, with its reason); an entry's page is not a
+  real route; a page types a dollar amount, a number of quotes or a plan's name, or a price in the built guide
+  is not one in `plans.ts`; an entry names WhatsApp, the phone app or the room scan without carrying its flag,
+  or a flagged entry does not say "Coming soon" while the flag is off; the copy in the web app is stale.
+- **The rule is in CLAUDE.md** (Quality gates): a ticket that changes what a business sees or can do updates
+  Docs/help.
+- **The whole guide is given with every question** while it fits (about 135,000 characters, inside a budget of
+  160,000). Past that, entries are chosen by shared words, a rare word counting for more than a common one. No
+  vector database and no new dependency.
+
+#### AD-084: the assistant reads and answers; what must hold is held in code, not in the prompt
+- **The path is the chat task's own**: the web app asks the model directly (`lib/ai/stream.ts`), with the model
+  taken from the registry by task (`help_answer`, overridable with `AI_MODEL_HELP_ANSWER`). No model name is in
+  the code (a unit test).
+- **It cannot act.** It is given text and returns text. Its code writes one table, `help_questions`, and nothing
+  else (a unit test reads its writes); its buttons are links and the panel's own forms.
+- **"I'm not sure about that", the hand-off and the refusal are our own sentences.** The model's first line says
+  what kind of answer follows (`outcome | entry ids | pages`); nothing is passed to the browser before it is
+  read. For "not sure", the hand-off to the team and the refusal, nothing else the model wrote is read at all,
+  so a "not sure" can never carry a guess, and a refund or a legal question can never carry advice.
+- **Every claim it makes about itself is checked against what was sent:** an entry id or a page that was not in
+  the guide it was given is dropped; a page that is a quote's own gets no button; an answer that repeats a
+  sentence of its instructions is replaced by the refusal.
+- **Another business cannot appear**: the model is given this business's state and nothing about any other. The
+  quote is read by its id AND this business; earlier questions by the conversation's id AND this business.
+- **No customer details.** The question goes through `scrubCustomerDetails` first (every email and phone, and
+  the name and address of the customer of the quote it was asked from); a quote is cut down by T-197's
+  `estimateDigest` (line names, rates, quantities and where each quantity came from); the answer goes through
+  the scrub again; the question is kept as it was sent, not as it was typed. Logs carry an id, an outcome and an
+  error's name. **A fault the new unit test found:** the assistant's own support address was being scrubbed
+  out of its answers with every other email; it is now kept.
+- **It is an extra.** Any failure, or more than 20 seconds, is "I couldn't answer just now." with the report
+  form offered; the three other options never depend on it. The limit (60 questions a day per business) is
+  counted in the database and allows the question when the count cannot be read.
+- **`help_questions` has no row-level policy and nothing granted to a signed-in user** (migration 48): the
+  server writes the question and the rating for the signed-in user's own business; the owner's side reads it.
+  Rows are deleted after 90 days by the worker's timer (`helpCleanup`, once a day).
+
+#### The small fixes
+- **T-197: a fix ticket only for a fault.** Every other kind gets a draft reply
+  (`support_report_internal.draft_reply`), written by a second, short model call of its own (`support_reply` in
+  the registry, `AI_MODEL_SUPPORT_REPLY`) **after** the sorting is stored. A draft that uses a figure we did not
+  send is not kept (`replyWithinEvidence`); a draft that is slow (15 seconds), fails or cannot be read is simply
+  no draft, and the report keeps its sorting.
+  - **Found on the first try:** the first draft reply to "where do I upload my logo" was honest and useless
+    ("the recorded information does not indicate where…"), because the model knew nothing about the product.
+    The web app now sends the help guide's matching entries with the sort job (at most 9,000 characters), and
+    the draft answers from them ("open Settings, the Branding tab, under Logo press Replace…").
+  - **Found by the full run:** the draft was first asked for inside the sorter's own call. That made the call
+    slower, and in the full run about one sort in five passed its 25 seconds and was left unsorted (t197 failed
+    on it). The draft is now its own call, and the sorter's prompt is T-197's again, less the ticket for
+    non-faults. Sorting plus draft took 7 to 14 seconds in the runs after.
+- **T-197: one "Reported" line** however many times a quote was reported ("Reported 2 times, latest 21 Nov",
+  with the latest status), in the dashboard and in the app.
+- **T-196: the panel sits above "Get set up"** once it shows; **Accepted counts this calendar month** and says
+  "this month"; **under each step, what its share is of** ("67% of requests"), at every width.
+- **A report sent on from the assistant** (`support_reports.from_assistant`) is a how-to question whatever the
+  model calls it.
+
+#### Where it differs from the ticket, and why
+- **"Not sure" shows our sentence only.** The ticket's assistant "says 'I'm not sure about that'"; ours shows
+  exactly that and discards whatever else the model wrote, so that a guess cannot follow it.
+- **"Does not do it" is said only when the guide says so.** The guide has a list of what is not offered (text
+  messages, taking payment, invoices, booking, a second login). For anything the guide simply does not mention
+  the answer is "not sure": silence in the guide does not prove a thing does not exist. This came from the
+  first run, where "can I change the font" was answered "Qolumns does not offer that" from silence.
+- **The business's state is read on the server** (`lib/help/state.ts`), not gathered in the browser by
+  `help-context.ts` as the ticket has it: the browser is trusted only for the page it is on.
+- **"Did this answer it?" is asked where the assistant gave an answer of its own.** Under "not sure" and the
+  hand-off the "Send this to the team" button is already there.
+- **The question is kept with customer details already taken out**, so the owner reads "[customer]" where the
+  business typed a name.
+- **A day of answered questions alone sends no summary.** A question the assistant could not answer counts as
+  something new, like a report.
+- **The app's report has no "Test estimate" mark**: the app's quote view does not carry it. The server still
+  marks the report from the quote itself.
+- **"Accepted this month" counts every accepted estimate**, as the card did before; the panel's Accepted step
+  counts customer requests only. The period is now the same; the two sets are not.
+- **`/app/sms` has no entry in the guide.** It is not in the menu and text-message quoting is not switched on;
+  the guide says plainly that quoting by text message is not offered.
+- **One sentence in the Privacy Policy became one sentence with two halves**: what is kept, and that the
+  assistant's questions are deleted after 90 days. Its date is now 21 November 2026.
+
+#### Constraints
+- Run `pnpm help:build` after changing a page in Docs/help; the unit test fails until it is run.
+- An entry that names WhatsApp, the phone app or the room scan must carry the flag, even when it only says the
+  thing is not there yet.
+- `account-quote-template` in the guide warns that saving the Quote Template switches the accept button back on
+  (`PUT /api/tenant` drops `acceptQuoteEnabled`). Remove the warning when that is fixed.
+- The worker's `claim_ops_alert` is asked for `help_cleanup` only after its own row says a day has passed: a
+  refused claim is counted as "held back", and the timer runs every five minutes.
+
+#### Checks
+- Unit, new: web `help-guide-t198` (23: the guide's own test, AD-083) and `ask-t198` (46); worker `help-t198` (19);
+  app `estimate-report-t198` (7). They hold: isolation (another business's quote, conversation and question are
+  not found; the table has no policy); nothing customer-identifying in what is sent to the AI, kept or logged,
+  including from a quote's pricing record; the limit fails open; a failed, slow or unreadable answer leaves the
+  panel working; the 90-day deletion, once a day; a fix ticket only for a fault, and a draft that invents a
+  figure, is slow or fails costs the report nothing. Updated for what this ticket changed on purpose:
+  `support-t197` (web and worker), `home-and-menu`, `backlog-t189`, `whatsapp-t177`. Totals: web 1,583, worker
+  786, app 152.
+- Three existing rules caught new text before the runs and were met, not relaxed: "minimum charge applied" is
+  written in one place (two guide lines were reworded), and lint's rule on a generator with no `yield` (a test).
+- `scripts/deploy-migration-48.sh` ran whole against a local copy at migration 47 through the stand-in, then
+  again: 1 table with row-level security, 0 policies, 0 grants to users, 2 new columns, nothing else changed. Its
+  first run found the quote id typed as UUID where quotes use text; fixed.
+- `scripts/hardcore-test/verify-t198.mts` (full level, the real model, a real browser): **68 of 68; the
+  assistant answered 33 of 33 questions rightly**, 3 seconds an answer on average, in the full run and in two
+  runs by hand after it. No wrong answer in any of them, so none is quoted here; the script prints every wrong
+  answer word for word. What changed between runs because of what the first one showed: "does not offer" is said
+  only when the guide says so (it had said it of changing a font, from silence), and the guide now says the
+  plan's month is counted in UTC (it had been answered from the Home page's time-zone line).
+- `pnpm check:quick` once: 28 of 28 (20 scripts, 1,717 checks) in 3 min 57 s.
+- `pnpm check:full` once: 40 of 43 (35 scripts, 2,947 checks) in 26 min 28 s. t198 passed. Failed: **t197**
+  (four checks: sorts that ran past 25 seconds; mine, see "Found by the full run" above), **t177** (its check of
+  the Privacy Policy's date, which this ticket changed; the expectation was updated), **t180** (Stripe's own
+  sandbox portal page showed a spinner for 30 seconds; nothing of ours).
+- `pnpm check:failed` once, after the fix: 5 of 5 (t197 104 of 104 with "What the model got wrong: nothing",
+  t177 99 of 99, t180 108 of 108) in 13 min 35 s. t198 was run by hand against the changed worker before it: 68
+  of 68.
+- **Still true after the fix:** a sort sometimes takes over 25 seconds at the model provider (one in a by-hand
+  run, one in the last run's worker log). The product does what T-197 decided: the report is kept, unsorted,
+  with "Sort again". `verify-t198` presses "Sort again" once when that happens and says so at its end.
+- The app: seen in the iPhone simulator against the local stack (`.checks/t198/app-*.png`). The rebuild onto the
+  owner's iPhone compiled and then stopped: the phone was paired but locked.
+
 ### 2026-11-21: T-197 — Help button, problem reports, estimate reports, feature requests, support inbox (AD-081, AD-082)
 
 **Built, not deployed.** Needs deploying: **migration 47 first** (`bash scripts/deploy-migration-47.sh`), then the

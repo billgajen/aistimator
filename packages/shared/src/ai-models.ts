@@ -22,6 +22,10 @@ export type AiTask =
   | 'support_sort'
   /** T-197: find existing feature requests that mean the same thing, and give a new one a plain title */
   | 'feature_match'
+  /** T-198: draft a reply to a problem report that is not a fault, for the owner to edit and send. It sends nothing. */
+  | 'support_reply'
+  /** T-198: answer a business's question about using the product, from the help guide only. Reads and answers; changes nothing. */
+  | 'help_answer'
 
 export const AI_TASKS: AiTask[] = [
   'extraction_pass',
@@ -34,6 +38,8 @@ export const AI_TASKS: AiTask[] = [
   'whatsapp_intent',
   'support_sort',
   'feature_match',
+  'support_reply',
+  'help_answer',
 ]
 
 export interface ModelRoute {

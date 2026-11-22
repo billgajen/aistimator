@@ -55,6 +55,7 @@ For each ticket:
   that asks no AI model).
 - Ensure builds run for web and worker packages (`pnpm build:web`, `pnpm build:worker`; the full level runs both).
 - Update docs if any contracts or behaviour changes.
+- When a ticket changes what a business sees or can do, update Docs/help in the same ticket.
 
 ### Regression runs
 Two levels, one command each. `Docs/testing.md` has the detail.

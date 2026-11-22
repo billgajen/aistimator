@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
-import { PRODUCT_NAME, SUPPORT_EMAIL, operatorStatement } from '@qolumns/shared'
+import { ASK_KEEP_DAYS, PRODUCT_NAME, SUPPORT_EMAIL, operatorStatement } from '@qolumns/shared'
 import { subProcessorSentence } from '@/lib/legal/sub-processors'
 
 export const metadata: Metadata = {
@@ -16,7 +16,8 @@ const SECTIONS = [
   },
   {
     title: '2. What we collect',
-    body: 'For enquiries: contact details you provide (name, email, phone), job details, photos and documents you upload, and messages you send. For account holders: your login email, business configuration and billing details (payment cards are handled by Stripe and never touch our servers). When a business signs up we also keep how it found us: the site it came from, any campaign tags on the link it followed, and the first page of ours it opened. We also collect basic technical logs (IP address, timestamps) for security and rate limiting.',
+    // T-198: what is sent to Help and to the help assistant, and how long the assistant's questions are kept
+    body: `For enquiries: contact details you provide (name, email, phone), job details, photos and documents you upload, and messages you send. For account holders: your login email, business configuration and billing details (payment cards are handled by Stripe and never touch our servers). When a business signs up we also keep how it found us: the site it came from, any campaign tags on the link it followed, and the first page of ours it opened. We also collect basic technical logs (IP address, timestamps) for security and rate limiting. Messages you send to Help and to the help assistant are kept to answer you and to improve support; questions to the assistant and its answers are deleted after ${ASK_KEEP_DAYS} days.`,
   },
   {
     title: '3. How photos and AI are used',
@@ -54,7 +55,7 @@ export default function PrivacyPage() {
         <h1 className="font-display text-4xl font-extrabold tracking-tight text-text-primary">
           Privacy Policy
         </h1>
-        <p className="mt-3 text-sm text-text-muted">Last updated: 19 November 2026</p>
+        <p className="mt-3 text-sm text-text-muted">Last updated: 21 November 2026</p>
         {/* T-177: who runs the product. The company number comes from NEXT_PUBLIC_COMPANY_NUMBER. */}
         <p className="mt-3 leading-relaxed text-text-secondary" data-testid="operator">
           {operatorStatement(process.env.NEXT_PUBLIC_COMPANY_NUMBER)}

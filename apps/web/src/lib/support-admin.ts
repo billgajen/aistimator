@@ -45,6 +45,7 @@ import type { createAdminClient } from '@/lib/supabase/server'
 import { resolveBusinessEmail } from '@/lib/business-email'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import { emailOfUser, one, plansOf, requestSupportJob, threadOf, type ThreadMessage } from '@/lib/support'
+import { helpExcerpt } from '@/lib/help/guide'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -65,6 +66,8 @@ interface InternalRow {
   likely_cause: SupportCause | null
   evidence: string | null
   fix_ticket: string | null
+  /** T-198: for a report that is not a fault */
+  draft_reply: string | null
   service_template: string | null
   sort_state: 'waiting' | 'sorted' | 'failed'
   sort_attempts: number | null
@@ -96,7 +99,7 @@ interface ReportRow {
 }
 
 const INTERNAL_COLUMNS =
-  'title, summary, ai_kind, severity, similar_json, likely_cause, evidence, fix_ticket, service_template, sort_state, sort_attempts, sorted_at, merged_into, approved_at, owner_note, fixed_emailed_at'
+  'title, summary, ai_kind, severity, similar_json, likely_cause, evidence, fix_ticket, draft_reply, service_template, sort_state, sort_attempts, sorted_at, merged_into, approved_at, owner_note, fixed_emailed_at'
 const REPORT_COLUMNS = `id, tenant_id, user_id, kind, body, choices, expected_total, currency, quote_id, is_test, screenshot_asset_id, context_json, status, setup_hint, created_at, tenant:tenants!tenant_id (name), internal:support_report_internal!report_id (${INTERNAL_COLUMNS})`
 
 const internalOf = (row: ReportRow): InternalRow | null => one(row.internal as InternalRow | InternalRow[] | null)
@@ -275,6 +278,8 @@ export interface ProblemDetail {
     summary: string | null
     evidence: string | null
     fixTicket: string | null
+    /** T-198: the AI's draft reply for a report that is not a fault. The owner edits and sends it; nothing sends it by itself. */
+    draftReply: string | null
     similar: Array<{ id: string; title: string; confidence: number; suggestMerge: boolean; status: SupportStatus | null }>
   }
   mergedInto: { id: string; title: string } | null
@@ -346,7 +351,9 @@ export async function problemDetail(admin: Admin, id: string): Promise<ProblemDe
       sortedAt: internal?.sorted_at ?? null,
       summary: internal?.summary ?? null,
       evidence: internal?.evidence ?? null,
-      fixTicket: internal?.fix_ticket ? ticketWithBusinesses(internal.fix_ticket, businesses.get(row.id)?.size ?? 1) : null,
+      // T-198: a fix ticket only for a fault; for every other kind a draft reply (older rows may hold a ticket for a non-fault: it is not shown)
+      fixTicket: internal?.fix_ticket && internal.ai_kind === 'fault' ? ticketWithBusinesses(internal.fix_ticket, businesses.get(row.id)?.size ?? 1) : null,
+      draftReply: internal?.ai_kind && internal.ai_kind !== 'fault' ? (internal.draft_reply ?? null) : null,
       similar,
     },
     mergedInto: into ? { id: into.id, title: titleOf(into) } : null,
@@ -375,7 +382,8 @@ export const setApproved = (admin: Admin, id: string, approved: boolean, now: Da
 /** Ask for a report to be sorted again: one more try, by the worker. The report is not changed here. */
 export async function sortAgain(admin: Admin, id: string): Promise<boolean> {
   await internalPatch(admin, id, { sort_state: 'waiting' })
-  return requestSupportJob('support_sort', id)
+  const { data } = await admin.from('support_reports').select('body').eq('id', id).maybeSingle()
+  return requestSupportJob('support_sort', id, helpExcerpt((data as { body?: string | null } | null)?.body))
 }
 
 /**

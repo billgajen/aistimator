@@ -2,7 +2,8 @@
 
 /**
  * T-197: the admin menu's Support item, with the count of new items (problems
- * still "New", feature requests not opened yet). Read again on every page
+ * still "New", feature requests not opened yet; T-198: and questions to the
+ * Help assistant that need a look). Read again on every page
  * change; a count that cannot be read shows no number. It takes the admin
  * bar's own link style from the layout, so the bar's colours stay in one file.
  */
