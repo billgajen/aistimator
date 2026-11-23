@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { findConfidenceLanguage, offeredPlans } from '@qolumns/shared'
+import { findConfidenceLanguage, getPlan, offeredPlans } from '@qolumns/shared'
 import { customerReadLines, parseReading, readingQuestion, yourPlace } from '@/lib/customer-read'
 import { brandStyleVars, contrastRatio, readableTextOn } from '@/lib/color'
 import { usesTapRows, TAP_ROWS_MAX } from '@/components/embed/steps/QuestionsStep'
@@ -263,11 +263,12 @@ describe('T-171: the billing page, and the small leftovers', () => {
     expect(billing).toContain('{COMING_SOON}')
     // its own list of feature names is gone, so the two pages cannot disagree
     expect(billing).not.toMatch(/FeatureItem|label="LiDAR scanning"|label="Quoting by text/)
-    // Business stays on offer there, with its lines marked
-    const business = offeredPlans().find((p) => p.id === 'plan_us_business')!
+    // T-200: Business is no longer on offer there; a business that holds it still sees its card, with its lines marked
+    expect(offeredPlans().map((p) => p.id)).toEqual(['plan_us_starter', 'plan_us_pro'])
+    const business = getPlan('plan_us_business')!
     // T-181: text messages are no longer on any page. T-199: seven, with the mobile app (every plan) and its own address
     expect(planLines(business).filter((l) => !l.live).length).toBe(7)
-    expect(read('apps/web/src/app/api/billing/route.ts')).toContain('offeredPlans().map((p) => toPlanInfo(p))')
+    expect(read('apps/web/src/app/api/billing/route.ts')).toContain('billingPagePlans(currentPlan).map((p) => toPlanInfo(p))')
   })
 
   it('login and sign-up fields are 44 px tall, and the link to the other page is a clear link', () => {

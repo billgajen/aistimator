@@ -55,6 +55,9 @@ export function isExpoPushToken(value: unknown): value is string {
 /** The Android channel every notification is posted to (the app creates it; a second one would need a new id) */
 export const PUSH_ANDROID_CHANNEL = { id: 'quotes', name: 'Requests and estimates' } as const
 
+/** T-200: the brand colour (juniper) the Android channel's light and the small icon are drawn in */
+export const PUSH_ANDROID_COLOR = '#205E56'
+
 /** What the Account tab and the permission question say */
 export const PUSH_COPY = {
   section: 'Notifications',
@@ -73,6 +76,8 @@ export const PUSH_COPY = {
   openSettings: "Open your phone's settings",
   /** A build that cannot receive notifications (one installed from a Mac for testing) */
   unavailable: 'Available in the App Store version',
+  /** T-200: the same on Android, where no other shop is ever named (Google Play's rule) */
+  unavailableAndroid: 'Not in this version of the app yet',
   saveFailed: 'That could not be saved. Please try again.',
 } as const
 

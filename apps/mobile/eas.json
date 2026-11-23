@@ -1,17 +1,32 @@
 {
-  "cli": { "version": ">= 12.0.0", "appVersionSource": "remote" },
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "env": { "APP_VARIANT": "dev" },
-      "ios": { "resourceClass": "m-medium" }
+      "env": {
+        "APP_VARIANT": "dev"
+      },
+      "ios": {
+        "resourceClass": "m-medium"
+      }
     },
     "preview": {
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://qolumns.com",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ygsuzeveesgrafgpkrev.supabase.co"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      }
     }
   },
   "submit": {

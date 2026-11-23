@@ -85,7 +85,7 @@ export default function Account() {
       <TopBar title="Account" />
       <ScrollView
         contentContainerStyle={{ padding: space.lg, paddingBottom: space.xl }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={colors.brand} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={colors.brand} colors={[colors.brand]} />}
       >
         {error ? <ErrorText>{error}</ErrorText> : null}
 

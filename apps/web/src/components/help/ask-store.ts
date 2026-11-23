@@ -4,7 +4,7 @@
  * by "Start again" and by signing out. Nothing here can throw into a page: a
  * browser that will not store it simply forgets the conversation on reload.
  */
-import type { AskAction, AskRating, StoredAskOutcome } from '@qolumns/shared'
+import type { AskAction, AskRating, ShownAskOutcome } from '@qolumns/shared'
 
 export interface AskTurnView {
   key: string
@@ -12,8 +12,8 @@ export interface AskTurnView {
   id: string | null
   question: string
   text: string
-  /** Null while the answer is being written */
-  outcome: StoredAskOutcome | null
+  /** Null while the answer is being written. "clarify" (T-200): the question was asked back, with choices. */
+  outcome: ShownAskOutcome | null
   actions: AskAction[]
   rate: boolean
   rating: AskRating | null

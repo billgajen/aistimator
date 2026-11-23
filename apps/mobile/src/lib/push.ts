@@ -8,8 +8,10 @@
  * (packages/shared/src/push.ts). This file decides what the app shows:
  *
  *   - a build that cannot receive notifications (the dev build installed from
- *     a Mac, or one with no project id) says "Available in the App Store
- *     version" and never asks the phone for anything;
+ *     a Mac, one with no project id, or (T-200) an Android build made without
+ *     Firebase's file) says so in one line ("Available in the App Store
+ *     version"; on Android "Not in this version of the app yet") and never
+ *     asks the phone for anything;
  *   - permission is asked once, the first time the user reaches the home tab
  *     after signing in, after one plain line saying what they will get;
  *   - when the phone refuses, the switches say "Turned off in your phone's
@@ -21,14 +23,17 @@ import { DEFAULT_PUSH_PREFS, PUSH_COPY, quoteIdFromPushData, type PushPrefs } fr
 export type PushPermission = 'granted' | 'denied' | 'undetermined'
 
 /**
- * Can this build receive notifications at all? Only the App Store variant
+ * Can this build receive notifications at all? Only the store variant
  * (`extra.push`, set in app.config.js), on a phone, with the Expo project id
- * a push token is made for.
+ * a push token is made for. T-200: on Android the build must also have been
+ * made with Firebase's file (`extra.pushAndroid`): without it no token can be
+ * had, so the app must not ask for a permission it cannot use.
  */
 export function pushAvailable(build: { extra?: unknown; projectId?: unknown; platform?: unknown }): boolean {
-  const push = typeof build.extra === 'object' && build.extra !== null ? (build.extra as { push?: unknown }).push : undefined
+  const extra = typeof build.extra === 'object' && build.extra !== null ? (build.extra as { push?: unknown; pushAndroid?: unknown }) : {}
   const platform = build.platform
-  return push === true && typeof build.projectId === 'string' && build.projectId.length > 0 && (platform === 'ios' || platform === 'android')
+  if (extra.push !== true || typeof build.projectId !== 'string' || build.projectId.length === 0) return false
+  return platform === 'ios' || (platform === 'android' && extra.pushAndroid === true)
 }
 
 /** Ask now? Only where notifications can work, the phone has not been asked, and we have not asked since this sign-in. */
@@ -47,8 +52,8 @@ export type PushSection =
   | { kind: 'on'; prefs: PushPrefs }
 
 /** What the Account tab's Notifications section shows */
-export function pushSection(state: { available: boolean; permission: PushPermission; prefs?: PushPrefs | null }): PushSection {
-  if (!state.available) return { kind: 'unavailable', line: PUSH_COPY.unavailable }
+export function pushSection(state: { available: boolean; permission: PushPermission; prefs?: PushPrefs | null; platform?: string }): PushSection {
+  if (!state.available) return { kind: 'unavailable', line: state.platform === 'android' ? PUSH_COPY.unavailableAndroid : PUSH_COPY.unavailable }
   const prefs = state.prefs ?? { ...DEFAULT_PUSH_PREFS }
   if (state.permission === 'denied') return { kind: 'refused', line: PUSH_COPY.refused, prefs: { newRequest: false, accepted: false, question: false } }
   if (state.permission === 'undetermined') return { kind: 'ask', prefs }

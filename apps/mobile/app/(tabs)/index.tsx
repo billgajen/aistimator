@@ -122,7 +122,7 @@ export default function Quotes() {
         contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.xl }}
         stickySectionHeadersEnabled={false}
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(search, true)} tintColor={colors.brand} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(search, true)} tintColor={colors.brand} colors={[colors.brand]} />}
         ListHeaderComponent={
           <View style={{ paddingTop: space.md }}>
             {won && (won.headline || won.onSite) ? (

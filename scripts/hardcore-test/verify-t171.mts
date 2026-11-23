@@ -580,7 +580,17 @@ if (!process.env.PLAYWRIGHT_DIR) {
     await p.locator('[data-testid=plan-lines]').first().waitFor({ timeout: 60_000 })
     const cards = await p.locator('[data-testid=plan-lines]').evaluateAll((lists) => lists.map((ul) => ({ name: (ul.parentElement!.querySelector('h3') as HTMLElement).innerText.trim(), lines: [...ul.querySelectorAll('[data-testid=plan-line]')].map((li) => ({ text: (li as HTMLElement).innerText.replace(/\s+/g, ' ').trim(), live: li.getAttribute('data-live') === 'true' })), button: (ul.parentElement!.querySelector('button') as HTMLButtonElement).innerText.trim(), disabled: (ul.parentElement!.querySelector('button') as HTMLButtonElement).disabled })))
     const wanted = offeredPlans().map((plan) => ({ name: plan.name, lines: planLines(plan).map((l) => ({ text: l.live ? l.label : `${l.label} ${COMING_SOON}`, live: l.live })) }))
-    check(`${width} billing: every plan on offer is there, Business included, each one can be chosen`, cards.length === offeredPlans().length && cards.some((c) => c.name === 'Business') && cards.every((c) => !c.disabled && /Select Plan/.test(c.button)), cards.map((c) => [c.name, c.button]))
+    // T-200: Business is no longer offered: the two on offer are there, each can be chosen, and Business is not among them
+    check(`${width} billing: every plan on offer is there (Starter and Pro; Business is not offered), each one can be chosen`, cards.length === offeredPlans().length && cards.length === 2 && !cards.some((c) => c.name === 'Business') && cards.every((c) => !c.disabled && /Select Plan/.test(c.button)), cards.map((c) => [c.name, c.button]))
+    if (width === 1440) {
+      // T-200: the pair is centred in its panel
+      const pair = await p.locator('[data-testid=plan-cards]').evaluate((grid) => {
+        const outer = grid.parentElement!.getBoundingClientRect()
+        const box = grid.getBoundingClientRect()
+        return { left: Math.round(box.left - outer.left), right: Math.round(outer.right - box.right), columns: getComputedStyle(grid).gridTemplateColumns.split(' ').length }
+      })
+      check('1440 billing: the two plan cards are a centred pair', pair.columns === 2 && Math.abs(pair.left - pair.right) <= 2, pair)
+    }
     check(`${width} billing: each plan's lines are the public Pricing page's own, with "${COMING_SOON}" on what is not live (the same list feeds both; the words were "Coming later" until T-187)`, JSON.stringify(cards.map((c) => ({ name: c.name, lines: c.lines }))) === JSON.stringify(wanted), cards.map((c) => c.lines.filter((l) => !l.live).length))
     // the public page, for the plans it shows
     const pub = await ctx.newPage()

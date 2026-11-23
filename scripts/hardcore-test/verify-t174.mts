@@ -193,7 +193,8 @@ async function local() {
     const html = (await page(pathname)).html
     check(`${name}: no "Priya" on the page`, html.length > 1000 && !/priya/i.test(html))
   }
-  check('Home and the login page show "Megan G."', home.includes('Megan G.') && (await page('/login')).html.includes('Megan G.'))
+  // T-200: the log-in page is the form alone now (its example estimate, which carried the name, is gone)
+  check('Home shows "Megan G."; the login page has no example estimate any more', home.includes('Megan G.') && !(await page('/login')).html.includes('Megan G.'))
 
   // ------------------------------------------------------------------------------------
   section('3. The four addresses, and the previous one (requests carry the visitor’s Host)')

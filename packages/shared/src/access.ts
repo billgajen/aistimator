@@ -117,7 +117,7 @@ export function planNameFor(capability: Capability): string {
   return plansWith(capability)[0]?.name ?? ''
 }
 
-/** "Pro and Business" */
+/** The plans on offer that include it, as words: "Pro" (with two, "Pro and Business") */
 export function planNamesFor(capability: Capability, plans?: PlanDefinition[]): string {
   const names = plansWith(capability, plans).map((p) => p.name)
   return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`

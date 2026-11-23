@@ -62,7 +62,9 @@ describe('T-196: push belongs to the App Store build only', () => {
 
   it('a build can receive notifications only with the flag, a project id and a phone', () => {
     expect(pushAvailable({ extra: { push: true }, projectId: 'project-id', platform: 'ios' })).toBe(true)
-    expect(pushAvailable({ extra: { push: true }, projectId: 'project-id', platform: 'android' })).toBe(true)
+    // T-200: an Android build can only with Firebase's file in it as well (android-t200.test.ts)
+    expect(pushAvailable({ extra: { push: true, pushAndroid: true }, projectId: 'project-id', platform: 'android' })).toBe(true)
+    expect(pushAvailable({ extra: { push: true }, projectId: 'project-id', platform: 'android' })).toBe(false)
     expect(pushAvailable({ extra: { push: false }, projectId: 'project-id', platform: 'ios' })).toBe(false)
     expect(pushAvailable({ extra: {}, projectId: 'project-id', platform: 'ios' })).toBe(false)
     expect(pushAvailable({ extra: undefined, projectId: 'project-id', platform: 'ios' })).toBe(false)

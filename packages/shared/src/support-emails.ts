@@ -150,17 +150,46 @@ export function questionsLine(questions: { asked: number; unanswered: number } |
   return `Questions asked: ${asked}. The assistant could not answer: ${unanswered}.`
 }
 
+/** T-200: the summary's subject and heading when nothing needs the owner (never "0 new items") */
+export const SUPPORT_NOTHING_NEW = 'Nothing new today'
+
+const counted = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
+/**
+ * T-200: what needs the owner, in one line: "2 problem reports need you",
+ * "1 feature request needs you", "2 problem reports, 1 feature request and
+ * 3 questions the assistant could not answer need you". Only what there is
+ * is named, so a count of nought is never written; with nothing at all it is
+ * "Nothing new today". It is the email's subject and its heading.
+ */
+export function supportNeedsYouLine(input: { problems: number; featureRequests: number; unanswered: number }): string {
+  const n = (value: number) => (Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0)
+  const parts = [
+    n(input.problems) > 0 ? counted(n(input.problems), 'problem report', 'problem reports') : null,
+    n(input.featureRequests) > 0 ? counted(n(input.featureRequests), 'feature request', 'feature requests') : null,
+    n(input.unanswered) > 0 ? counted(n(input.unanswered), 'question the assistant could not answer', 'questions the assistant could not answer') : null,
+  ].filter((part): part is string => part !== null)
+  if (parts.length === 0) return SUPPORT_NOTHING_NEW
+  const one = parts.length === 1 && n(input.problems) + n(input.featureRequests) + n(input.unanswered) === 1
+  const list = parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+  return `${list} ${one ? 'needs' : 'need'} you`
+}
+
 /**
  * The owner's daily summary. Null when there is nothing new: then no email is
  * sent. T-198: a question the assistant could not answer is something new; a
- * day of answered questions alone is not.
+ * day of answered questions alone is not. T-200: the subject and the heading
+ * say what needs the owner (`supportNeedsYouLine`). Before, a day with only
+ * unanswered questions was sent as "0 new items".
  */
 export function supportDailyEmail(input: DailySummaryInput): (SupportEmail & { text: string }) | null {
   const kinds = (Object.entries(input.problems) as Array<[SupportAiKind | 'unsorted', number]>).filter(([, n]) => n > 0)
   const problems = kinds.reduce((sum, [, n]) => sum + n, 0)
   const total = problems + Math.max(0, input.featureRequests)
   const asked = questionsLine(input.questions)
-  if (total <= 0 && (input.questions?.unanswered ?? 0) <= 0) return null
+  const unanswered = Math.min(Math.max(0, input.questions?.asked ?? 0), Math.max(0, input.questions?.unanswered ?? 0))
+  if (total <= 0 && unanswered <= 0) return null
+  const needsYou = supportNeedsYouLine({ problems, featureRequests: input.featureRequests, unanswered })
   const where = input.environment && input.environment !== 'production' ? ` (${input.environment})` : ''
   const label = (kind: SupportAiKind | 'unsorted') => (kind === 'unsorted' ? 'Not sorted yet' : SUPPORT_COPY.aiKind[kind])
   const counts = [...kinds.map(([kind, n]) => `${label(kind)}: ${n}`), ...(input.featureRequests > 0 ? [`Feature requests: ${input.featureRequests}`] : []), ...(asked ? [asked] : [])]
@@ -168,11 +197,11 @@ export function supportDailyEmail(input: DailySummaryInput): (SupportEmail & { t
     const severity = item.severity ? SUPPORT_COPY.severity[item.severity] : 'Not sorted'
     return `${item.title} (${severity}; ${item.businesses} ${item.businesses === 1 ? 'business' : 'businesses'})`
   })
-  const subject = `${PRODUCT_NAME} support${where}: ${total} new ${total === 1 ? 'item' : 'items'}`
+  const subject = `${PRODUCT_NAME} support${where}: ${needsYou}`
   const html = page({
     title: 'New support items',
     label: 'Support, the last day',
-    heading: `${total} new ${total === 1 ? 'item' : 'items'}`,
+    heading: needsYou,
     body: `<ul style="margin:16px 0 0;padding-left:20px;font-size:15px;line-height:1.6;color:#1B2823;" data-role="counts">${counts.map((c) => `<li>${escape(c)}</li>`).join('')}</ul>${
       top.length
         ? `<p style="margin:20px 0 0;font-size:14px;font-weight:600;color:#4F5D57;">Top by priority</p><ol style="margin:8px 0 0;padding-left:20px;font-size:15px;line-height:1.6;color:#1B2823;" data-role="top">${top.map((t) => `<li>${escape(t)}</li>`).join('')}</ol>`
@@ -183,5 +212,5 @@ export function supportDailyEmail(input: DailySummaryInput): (SupportEmail & { t
     buttonLabel: 'Open the support inbox',
     buttonRole: 'open-inbox',
   })
-  return { subject, html, text: [`${total} new support ${total === 1 ? 'item' : 'items'}`, ...counts, ...(top.length ? ['Top by priority:', ...top.map((t, i) => `${i + 1}. ${t}`)] : []), input.inboxUrl].join('\n') }
+  return { subject, html, text: [needsYou, ...counts, ...(top.length ? ['Top by priority:', ...top.map((t, i) => `${i + 1}. ${t}`)] : []), input.inboxUrl].join('\n') }
 }

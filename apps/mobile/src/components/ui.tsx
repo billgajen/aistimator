@@ -11,8 +11,8 @@
  * actions, text that follows the phone's text-size setting, and a spoken
  * label on every control.
  */
-import { useEffect, useRef, type ComponentProps, type ReactNode } from 'react'
-import { ActivityIndicator, Animated, Pressable, StyleSheet, Switch, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native'
+import { useEffect, useRef, useState, type ComponentProps, type ComponentRef, type ReactNode } from 'react'
+import { ActivityIndicator, Animated, KeyboardAvoidingView, Pressable, StyleSheet, Switch, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, fonts, icon, radius, scale, space, tabular, touch, type } from '../theme'
@@ -38,6 +38,34 @@ export function Icon({ name, size = icon.row, color = colors.ink, label }: { nam
 
 export function Screen({ children }: { children: ReactNode }) {
   return <View style={styles.screen}>{children}</View>
+}
+
+/**
+ * T-200: room for the keyboard, on both phones. What is inside is made
+ * shorter by as much of the keyboard as covers it, so a field being typed in
+ * and the button under it stay in view.
+ *
+ * Android needs this as much as iOS: the app draws edge to edge (behind the
+ * status and navigation bars), and a window drawn that way is no longer made
+ * smaller by Android when the keyboard opens. So the padding is the same on
+ * both. Where this piece sits on the screen is measured, not assumed: under
+ * a navigation header its top is not the screen's top, and the keyboard's
+ * position is given from the screen's top.
+ */
+export function KeyboardSpace({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const outer = useRef<ComponentRef<typeof View>>(null)
+  const [top, setTop] = useState(0)
+  const measure = () =>
+    outer.current?.measureInWindow((_x: number, y: number) => {
+      if (Number.isFinite(y)) setTop(Math.max(0, y))
+    })
+  return (
+    <View ref={outer} style={styles.keyboardSpace} onLayout={measure} collapsable={false}>
+      <KeyboardAvoidingView style={[styles.keyboardSpace, style]} behavior="padding" keyboardVerticalOffset={top}>
+        {children}
+      </KeyboardAvoidingView>
+    </View>
+  )
 }
 
 /**
@@ -391,6 +419,7 @@ export function EmptyState({ icon: name, title, text, children }: { icon: IconNa
 
 export const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.paper },
+  keyboardSpace: { flex: 1 },
   topBar: { paddingHorizontal: space.lg, paddingBottom: space.md, backgroundColor: colors.paper, borderBottomWidth: 1, borderBottomColor: colors.line },
   topBarRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   topBarTitle: { color: colors.ink, fontFamily: fonts.display, fontSize: 28, letterSpacing: -0.5 },

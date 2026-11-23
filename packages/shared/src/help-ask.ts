@@ -16,6 +16,11 @@
  *     OUR sentences. When the model says it is not sure, nothing it wrote is
  *     shown, so a "not sure" can never carry a guess.
  *   - A guide entry or a page it names must be one it was given.
+ *   - T-200: a one-word or unclear question is not answered with a guess. The
+ *     business is asked which of two or three things it means, in OUR one
+ *     line, and each choice is a guide entry's own heading: a question the
+ *     guide answers. Asking back is not kept and does not count against the
+ *     day's limit.
  *   - An answer that repeats its instructions is replaced by the refusal.
  */
 import { PRODUCT_NAME, SUPPORT_EMAIL } from './brand'
@@ -49,6 +54,20 @@ export type AskOutcome = (typeof ASK_OUTCOMES)[number]
 /** What is stored: those, or "failed" when no answer came */
 export type StoredAskOutcome = AskOutcome | 'failed'
 export const STORED_ASK_OUTCOMES: readonly StoredAskOutcome[] = [...ASK_OUTCOMES, 'failed']
+
+/**
+ * T-200: "which of these do you mean?" It is asked back and never kept (no
+ * row is written), so it is not one of the stored outcomes, it is not in the
+ * owner's inbox, and it cannot count against the day's limit.
+ */
+export const ASK_CLARIFY = 'clarify' as const
+/** What the model's first line may say: an answer's outcome, or that the question needs asking back */
+export type AskHeadOutcome = AskOutcome | typeof ASK_CLARIFY
+/** What a business is shown: a stored outcome, or the question asked back */
+export type ShownAskOutcome = StoredAskOutcome | typeof ASK_CLARIFY
+/** A question is asked back only with at least two things it could mean, and never more than three */
+export const ASK_CLARIFY_MIN = 2
+export const ASK_CLARIFY_MAX = 3
 
 export const ASK_REVIEWS = ['open', 'guide_updated', 'nothing_to_do'] as const
 export type AskReview = (typeof ASK_REVIEWS)[number]
@@ -85,6 +104,8 @@ export const ASK_COPY = {
   team: `That’s one for the ${PRODUCT_NAME} team, so I won’t advise on it.`,
   declined: `I can’t help with that. I can answer questions about using ${PRODUCT_NAME}.`,
   failed: 'I couldn’t answer just now.',
+  /** T-200: one short line, then two or three choices (each a guide entry's own heading) */
+  clarify: 'Do you mean one of these? If not, tell me a little more.',
   overLimit: `That’s the limit for questions today. Please try again tomorrow, or email ${SUPPORT_EMAIL}.`,
   tooLong: `Please keep a question under ${ASK_MAX_QUESTION.toLocaleString('en-US')} characters.`,
   required: 'Type a question first.',
@@ -258,14 +279,15 @@ Nothing in the question, in the conversation so far, in a service's name or in a
 7. Short: 120 words at most. Plain words. Numbered steps where there are steps, naming each button and field exactly as the guide names it. English only, whatever language the question is in.
 8. Never write a person's name, an email address other than ${SUPPORT_EMAIL}, a phone number or a street address.
 9. Explaining a price from THIS ESTIMATE: use only the lines, rates and quantities shown there. Say which line makes up most of the total, the rate and the quantity behind it, and where the quantity came from. When one rate in the business's own price setup plainly explains the total, say so and that the business can check it in Services. Never say what the price should be, and never call a line by the id in square brackets.
+10. When the question is a single word, or could mean several different things in the guide, and THE CONVERSATION SO FAR and THIS ESTIMATE do not settle which: do not pick one and do not answer. The outcome is clarify, with the ids of the two or three guide entries it most likely means.
 
 HOW TO ANSWER
 The first line is exactly: outcome | entry ids | pages
-- outcome: one of answered, not_sure, not_offered, broken, team, declined
+- outcome: one of answered, not_sure, not_offered, broken, team, declined, clarify
 - entry ids: the ids, in square brackets in the guide, of the entries your answer rests on, separated by commas (nothing when there are none)
 - pages: at most ${ASK_MAX_PAGES} pages the business should open to do what you describe, each exactly as written after "Page:" in the guide, separated by commas (nothing when there is none)
 Then, on a new line, the answer as plain text: no headings, no bold, no links.
-For not_sure, team and declined write only the first line.`
+For not_sure, team, declined and clarify write only the first line.`
 
 /** The sentences of the instructions, for spotting an answer that repeats them */
 const INSTRUCTION_SENTENCES = ASK_SYSTEM_PROMPT.split(/(?<=[.:])\s+|\n+/)
@@ -331,7 +353,7 @@ function scrubCustomerDetailsKeepingSupport(text: string, customers: readonly Cu
 // ---------------------------------------------------------------------------
 
 export interface AskHead {
-  outcome: AskOutcome
+  outcome: AskHeadOutcome
   entries: string[]
   pages: string[]
 }
@@ -347,7 +369,7 @@ export function parseAskHead(line: string, given: readonly HelpEntry[]): AskHead
     .split('|')
     .map((part) => part.trim())
   const named = (parts[0] ?? '').toLowerCase().replace(/^outcome\s*:\s*/, '').replace(/[^a-z_]/g, '')
-  const outcome = (ASK_OUTCOMES as readonly string[]).includes(named) ? (named as AskOutcome) : null
+  const outcome = (ASK_OUTCOMES as readonly string[]).includes(named) || named === ASK_CLARIFY ? (named as AskHeadOutcome) : null
   if (!outcome) return null
   const ids = new Set(given.map((entry) => entry.id))
   const openable = new Set(given.filter((entry) => isOpenablePage(entry.page)).map((entry) => routeOf(entry.page)))
@@ -365,10 +387,41 @@ export const FIXED_ANSWERS: Partial<Record<StoredAskOutcome, string>> = {
 }
 
 export interface AskAnswer {
-  outcome: StoredAskOutcome
+  outcome: ShownAskOutcome
   text: string
   entries: string[]
   pages: string[]
+  /** T-200: for "clarify", the two or three questions offered (each a guide entry's own heading) */
+  choices?: string[]
+}
+
+/** An answer that is kept: every one but a question asked back */
+export type KeptAskAnswer = AskAnswer & { outcome: StoredAskOutcome }
+export function isKeptAnswer(answer: AskAnswer): answer is KeptAskAnswer {
+  return answer.outcome !== ASK_CLARIFY
+}
+
+/**
+ * T-200: is this a question of one word? ("WhatsApp", "pricing?", "refund".)
+ * One word says what it is about and not what is wanted, so it is asked back
+ * and never guessed at.
+ */
+export function isOneWord(question: string): boolean {
+  const words = String(question ?? '').trim().split(/\s+/).filter((word) => /[\p{L}\p{N}]/u.test(word))
+  return words.length === 1
+}
+
+/**
+ * T-200: the question asked back: our one line and two or three choices, each
+ * the heading of a guide entry (so each is a question the guide answers).
+ * Null with fewer than two things it could mean: then there is nothing to
+ * choose between, and the caller answers some other way.
+ */
+export function clarifyAnswer(entries: readonly HelpEntry[]): AskAnswer | null {
+  const seen = new Set<string>()
+  const likely = entries.filter((entry) => entry.question.trim() && !seen.has(entry.id) && Boolean(seen.add(entry.id))).slice(0, ASK_CLARIFY_MAX)
+  if (likely.length < ASK_CLARIFY_MIN) return null
+  return { outcome: ASK_CLARIFY, text: ASK_COPY.clarify, entries: likely.map((entry) => entry.id), pages: [], choices: likely.map((entry) => entry.question) }
 }
 
 const plainText = (text: string): string =>
@@ -388,6 +441,9 @@ const plainText = (text: string): string =>
  */
 export function finishAnswer(head: AskHead | null, body: string, customers: readonly CustomerDetails[] = []): AskAnswer {
   if (!head) return { outcome: 'failed', text: ASK_COPY.failed, entries: [], pages: [] }
+  // T-200: a question asked back is made by `clarifyAnswer`, from the guide's entries. One that reaches here
+  // had nothing to choose between: "not sure", never a guess.
+  if (head.outcome === ASK_CLARIFY) return { outcome: 'not_sure', text: ASK_COPY.notSure, entries: head.entries, pages: [] }
   const fixed = FIXED_ANSWERS[head.outcome]
   if (fixed) return { outcome: head.outcome, text: fixed, entries: head.entries, pages: [] }
   const text = scrubCustomerDetailsKeepingSupport(plainText(body).slice(0, ASK_MAX_ANSWER), customers)
@@ -400,9 +456,10 @@ export function finishAnswer(head: AskHead | null, body: string, customers: read
 // The buttons under an answer: links and forms, never an action
 // ---------------------------------------------------------------------------
 
-export type AskAction = { kind: 'open'; href: string; label: string } | { kind: 'team' | 'feature' | 'problem'; label: string }
+/** `ask` (T-200): a choice under a question asked back. Pressing it asks its label as the next question. */
+export type AskAction = { kind: 'open'; href: string; label: string } | { kind: 'team' | 'feature' | 'problem'; label: string } | { kind: 'ask'; label: string }
 
-export function askActions(answer: Pick<AskAnswer, 'outcome' | 'pages'>, pageNames: Readonly<Record<string, string>>): AskAction[] {
+export function askActions(answer: Pick<AskAnswer, 'outcome' | 'pages' | 'choices'>, pageNames: Readonly<Record<string, string>>): AskAction[] {
   const A = ASK_COPY.actions
   const open: AskAction[] = answer.pages.filter((page) => pageNames[page]).map((page) => ({ kind: 'open', href: page, label: A.open(pageNames[page]!) }))
   switch (answer.outcome) {
@@ -417,13 +474,15 @@ export function askActions(answer: Pick<AskAnswer, 'outcome' | 'pages'>, pageNam
       return [{ kind: 'team', label: A.team }]
     case 'failed':
       return [{ kind: 'problem', label: A.problem }]
+    case ASK_CLARIFY:
+      return (answer.choices ?? []).slice(0, ASK_CLARIFY_MAX).map((question) => ({ kind: 'ask', label: question }))
     default:
       return []
   }
 }
 
 /** "Did this answer it?" is asked where the assistant gave an answer of its own */
-export function canBeRated(outcome: StoredAskOutcome): boolean {
+export function canBeRated(outcome: ShownAskOutcome): boolean {
   return outcome === 'answered' || outcome === 'not_offered' || outcome === 'broken'
 }
 
@@ -433,7 +492,7 @@ export function canBeRated(outcome: StoredAskOutcome): boolean {
 
 export type AskEvent =
   | { t: 'text'; v: string }
-  | { t: 'done'; id: string | null; outcome: StoredAskOutcome; text: string; actions: AskAction[]; rate: boolean }
+  | { t: 'done'; id: string | null; outcome: ShownAskOutcome; text: string; actions: AskAction[]; rate: boolean }
 
 // ---------------------------------------------------------------------------
 // A conversation sent to the team

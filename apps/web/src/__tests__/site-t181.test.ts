@@ -67,7 +67,6 @@ describe('T-181: plan cards say what the business gets', () => {
     expect(offeredPlans().map((p) => [p.id, p.monthlyPrice.USD, p.annualPrice?.USD, p.quoteLimit])).toEqual([
       ['plan_us_starter', 4900, 49000, 50],
       ['plan_us_pro', 9900, 99000, 200],
-      ['plan_us_business', 19900, 199000, 600],
     ])
     expect(offeredPlans().find((p) => p.id === 'plan_us_pro')!.channels).toContain('sms')
     expect(FREE_ALLOWANCE.US).toEqual({ quotes: 10, per: 'total' })

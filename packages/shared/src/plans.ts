@@ -129,7 +129,9 @@ export const PLANS: PlanDefinition[] = [
       own_address: true,
     },
     overageEnabled: false,
-    offered: true,
+    // T-200 (owner's decision): not offered. A business already on it keeps it, with everything above,
+    // and its billing page names it; no page, sign-up or checkout offers it to anyone else.
+    offered: false,
   },
 
   // ── Legacy plans: existing (GB-era) subscribers keep their exact limits and overage ──
@@ -222,6 +224,17 @@ export function getPlan(id: string | null | undefined): PlanDefinition | null {
 
 export function offeredPlans(): PlanDefinition[] {
   return PLANS.filter((p) => p.offered)
+}
+
+/**
+ * T-200: the plan cards on the billing page. The plans on offer, and after
+ * them the business's own live plan when it is one that is no longer offered
+ * (Business since T-200, the legacy plans): it keeps it and sees it there as
+ * its current plan. Nobody else is shown a plan that is not on offer.
+ */
+export function billingPagePlans(current: PlanDefinition | null | undefined): PlanDefinition[] {
+  const offered = offeredPlans()
+  return current && !offered.some((p) => p.id === current.id) ? [...offered, current] : offered
 }
 
 /**

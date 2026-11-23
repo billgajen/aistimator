@@ -216,6 +216,8 @@ describe('the daily summary’s line about the assistant', () => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined)
     expect(await supportDaily(unsure.supabase, ENV, NOW, second.send)).toBe('sent')
     expect(second.sent[0]!.textBody).toContain('Questions asked: 2. The assistant could not answer: 1.')
+    // T-200: this email was sent as "0 new items"; its subject now says what needs the owner
+    expect(second.sent[0]!.subject).toBe('Qolumns support (development): 1 question the assistant could not answer needs you')
   })
 
   it('reads only how each question ended, never its words', () => {

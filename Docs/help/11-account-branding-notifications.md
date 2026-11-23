@@ -57,7 +57,7 @@ Today it changes the PDF of a quote, not the quote page your customer opens onli
 
 The same three tick boxes and the validity days are also on the "Branding" tab. Both places change the same settings.
 
-If you have unticked "Allow customers to accept quotes directly" on the "Branding" tab, check it after you press "Save Quote Template". Saving here switches it back on.
+"Allow customers to accept quotes directly" is on the "Branding" tab only. Saving here leaves it as you set it.
 
 ## Which contact details must my customers give?
 <!-- id: account-customer-contact; page: /app/settings; section: Customer contact details -->

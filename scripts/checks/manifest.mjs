@@ -144,6 +144,8 @@ export const SCRIPTS = [
   { id: 't197', server: 'standard', model: 'real', browser: true, minutes: 20 },
   // T-198 asks the Help assistant thirty-one questions with the real model and prints its score
   { id: 't198', server: 'standard', model: 'real', browser: true, minutes: 25 },
+  // T-200 (Part B): plans on offer, the Quote Template save, the assistant asking back, the log-in page
+  { id: 't200', server: 'standard', model: 'none' },
 ]
 
 /** Lint, typecheck and unit tests: every level runs these first */

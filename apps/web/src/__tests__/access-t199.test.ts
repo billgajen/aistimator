@@ -141,8 +141,10 @@ describe('T-199: the one rule', () => {
 
   it('names come from the plan definitions', () => {
     expect(planNameFor('onsite_quotes')).toBe(PRO.name)
-    expect(planNamesFor('own_address')).toBe(`${PRO.name} and ${BUSINESS.name}`)
-    expect(plansWith('whatsapp').map((p) => p.id)).toEqual([PRO.id, BUSINESS.id])
+    // T-200: Business is not offered, so no line names it as a plan to choose; the rule still joins two names
+    expect(planNamesFor('own_address')).toBe(PRO.name)
+    expect(plansWith('whatsapp').map((p) => p.id)).toEqual([PRO.id])
+    expect(planNamesFor('own_address', [PRO, BUSINESS])).toBe(`${PRO.name} and ${BUSINESS.name}`)
   })
 })
 
@@ -327,7 +329,7 @@ describe('T-199: the words', () => {
   })
 
   it('the site: the mobile app is on every plan, on-site quotes in it on the plans that have them', () => {
-    expect(appPlanLines()).toEqual({ everyPlan: 'Mobile app: every plan', onsite: 'On-site quotes in the app: Pro and Business' })
+    expect(appPlanLines()).toEqual({ everyPlan: 'Mobile app: every plan', onsite: 'On-site quotes in the app: Pro' })
     // the public pages name only the plans they show
     expect(appPlanSentence()).toBe(`Mobile app: every plan. On-site quotes in the app: ${planNamesFor('onsite_quotes', sitePlans())}.`)
     for (const plan of PLANS.filter((p) => p.offered)) {

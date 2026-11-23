@@ -12,13 +12,13 @@ import * as SecureStore from 'expo-secure-store'
 import { Platform } from 'react-native'
 // types only: nothing of the module is loaded by this line
 import type * as ExpoNotifications from 'expo-notifications'
-import { PUSH_ANDROID_CHANNEL, isExpoPushToken, type PushPlatform } from '@qolumns/shared'
+import { PUSH_ANDROID_CHANNEL, PUSH_ANDROID_COLOR, isExpoPushToken, type PushPlatform } from '@qolumns/shared'
 import { askedKey, pathForPush, pushAvailable, type PushPermission } from './push'
 
 const projectId: string | undefined =
   (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId ?? Constants.easConfig?.projectId ?? undefined
 
-/** Can this build receive notifications? False in the dev build. */
+/** Can this build receive notifications? False in the dev build, and (T-200) in an Android build made without Firebase's file. */
 export const pushBuild: boolean = pushAvailable({ extra: Constants.expoConfig?.extra, projectId, platform: Platform.OS })
 
 export const pushPlatform: PushPlatform = Platform.OS === 'android' ? 'android' : 'ios'
@@ -61,8 +61,10 @@ let prepared = false
 
 /**
  * Once per launch: the Android channel every notification is posted to
- * (Android shows nothing without one), and a notification that arrives while
- * the app is open is shown as a banner like any other.
+ * (Android shows nothing without one, and Android 13 and later will not even
+ * show its permission question until the app has a channel), and a
+ * notification that arrives while the app is open is shown as a banner like
+ * any other. T-200: the channel carries the brand colour.
  */
 export async function preparePush(): Promise<void> {
   if (!pushBuild || prepared) return
@@ -73,7 +75,7 @@ export async function preparePush(): Promise<void> {
       handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
     })
     if (Platform.OS === 'android') {
-      await N.setNotificationChannelAsync(PUSH_ANDROID_CHANNEL.id, { name: PUSH_ANDROID_CHANNEL.name, importance: N.AndroidImportance.HIGH })
+      await N.setNotificationChannelAsync(PUSH_ANDROID_CHANNEL.id, { name: PUSH_ANDROID_CHANNEL.name, importance: N.AndroidImportance.HIGH, lightColor: PUSH_ANDROID_COLOR })
     }
   } catch {
     // a phone that will not take the channel still runs the app

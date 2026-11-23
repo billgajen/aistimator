@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, existsSync, statSync } from 'fs'
 import { join } from 'path'
-import { offeredPlans, DEMO_SAMPLE_PHOTO_PATH } from '@qolumns/shared'
+import { getPlan, offeredPlans, DEMO_SAMPLE_PHOTO_PATH } from '@qolumns/shared'
 import { TRADES } from '@/lib/marketing/trades'
 import { TRADE_PHOTOS, CLOSING_PHOTO, VAN_PHOTO, scenePhotoSrc, type ScenePhoto } from '@/lib/marketing/photos'
 import { HERO_PHOTO } from '@/lib/marketing/hero-photo'
@@ -228,7 +228,9 @@ describe('T-170: Pricing says only what a business can use today', () => {
   const NOT_LIVE = /text message|by text|\bSMS\b|WhatsApp|on[- ]site|LiDAR|team member|priority support/i
 
   it('a line that is not live is listed after the live ones and marked "Coming soon" (T-187; it read "Coming later")', () => {
-    const [starter, pro, business] = offeredPlans()
+    const [starter, pro] = offeredPlans()
+    // T-200: Business is not offered; its lines are still what a business that holds it reads on its billing page
+    const business = getPlan('plan_us_business')
     // T-181: each line says what the business gets, and text messages are not on the site at all
     expect(planLines(starter!).map((l) => [l.label, l.live])).toEqual([
       ['Customers see your price straight away, on your website or from a link you share', true],
@@ -260,11 +262,11 @@ describe('T-170: Pricing says only what a business can use today', () => {
 
   it('the owner’s decision: a plan is left off the public pages until a line of its own is live, so Business is off and Starter and Pro stay', () => {
     expect(sitePlans().map((p) => p.id)).toEqual(['plan_us_starter', 'plan_us_pro'])
-    // nothing about the plans themselves changed: Business is still offered, at its price, with what it includes
-    const business = offeredPlans().find((p) => p.id === 'plan_us_business')!
-    expect([business.offered, business.monthlyPrice.USD, business.quoteLimit]).toEqual([true, 19900, 600])
+    // T-200: Business is no longer offered anywhere; the plan itself is as it was for a business that holds it
+    const business = getPlan('plan_us_business')!
+    expect([business.offered, business.monthlyPrice.USD, business.quoteLimit]).toEqual([false, 19900, 600])
     expect([business.features.lidar_scanning, business.features.multiple_users, business.features.priority_support]).toEqual([true, true, true])
-    expect(offeredPlans().map((p) => [p.id, p.monthlyPrice.USD])).toEqual([['plan_us_starter', 4900], ['plan_us_pro', 9900], ['plan_us_business', 19900]])
+    expect(offeredPlans().map((p) => [p.id, p.monthlyPrice.USD])).toEqual([['plan_us_starter', 4900], ['plan_us_pro', 9900]])
     // the rule, not a list of names: a plan shows once it has one live line the plan below it lacks
     const [starter, pro] = offeredPlans()
     const nothingOfItsOwnLive = { ...business, id: 'x', channels: [...business.channels], features: { ...business.features } }
@@ -279,7 +281,7 @@ describe('T-170: Pricing says only what a business can use today', () => {
     expect(code('apps/web/src/app/page.tsx')).toContain('<PlanCards')
     expect(code('apps/web/src/app/page.tsx')).not.toContain('offeredPlans')
     expect(page).not.toContain('offeredPlans')
-    expect(read('apps/web/src/app/api/billing/route.ts')).toContain('offeredPlans')
+    expect(read('apps/web/src/app/api/billing/route.ts')).toContain('billingPagePlans')
     expect(read('packages/shared/src/plans.ts')).not.toContain('sitePlans')
   })
 

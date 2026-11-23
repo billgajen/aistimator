@@ -265,11 +265,20 @@ write one table (`help_questions`) and nothing else.
   `application/x-ndjson`, one JSON object a line, as the answer is written:
   - `{ "t": "text", "v": "…" }` for each piece of an answer in the model's own words;
   - last, `{ "t": "done", "id": "<question id>" | null, "outcome": "answered" | "not_sure" | "not_offered" |
-    "broken" | "team" | "declined" | "failed", "text": "<the whole answer, as kept>", "actions": [{ "kind":
-    "open", "href": "/app/services", "label": "Open Services" } | { "kind": "team" | "feature" | "problem",
-    "label": "…" }], "rate": true }`.
+    "broken" | "team" | "declined" | "failed" | "clarify", "text": "<the whole answer, as kept>", "actions":
+    [{ "kind": "open", "href": "/app/services", "label": "Open Services" } | { "kind": "team" | "feature" |
+    "problem", "label": "…" } | { "kind": "ask", "label": "<a question to ask next>" }], "rate": true }`.
   - For `not_sure`, `team` and `declined` there are no pieces: `text` is our own sentence. `failed` is "I
     couldn't answer just now." (any failure, or more than 20 seconds) with the report form offered.
+  - **`clarify` (T-200): the question is asked back, not answered.** `text` is our one line ("Do you mean one of
+    these? If not, tell me a little more.") and `actions` are two or three `ask` buttons, each the heading of a
+    guide entry; pressing one posts its `label` as the next question. It happens for a question of one word
+    with no earlier turn in the conversation (decided from the guide, no model is asked; with fewer than two
+    entries that share a word with it, the model is asked as usual), and when the model's first line says
+    `clarify` and names at least two entries it was given (fewer: the entries the question's words match are
+    added; fewer than two even then: `not_sure`). There are no pieces, `id` is `null` and `rate` is `false`:
+    **no row is written to `help_questions`, so it does not count against the daily limit** and is not in the
+    owner's Questions tab. `clarify` is not a stored outcome (the table's CHECK is unchanged; no migration).
   - 400 `MISSING_QUESTION` / `TOO_LONG` (1,000 characters); 429 `DAILY_LIMIT` (60 a day per business, counted
     in the database; a count that cannot be read allows the question).
   - What the model is given: the help guide, the business's own state (plan, quotes used and allowed, its

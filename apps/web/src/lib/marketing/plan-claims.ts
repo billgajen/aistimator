@@ -335,10 +335,12 @@ export function planLines(plan: PlanDefinition): PlanLine[] {
 /**
  * The plans the public site shows: the Pricing page and Home's plan cards
  * (the owner's decision, 2026-11-16). A plan is left off until at least one
- * line of its own is live: a line the plan below it does not have. Today that
- * leaves Business off (team members and priority support are still to come;
- * since T-193 the room scan is on Pro as well) and shows Starter and Pro. It comes back by itself when one
- * of its own lines is marked live above.
+ * line of its own is live: a line the plan below it does not have.
+ *
+ * T-200: Business is no longer offered at all (`offered: false` in
+ * packages/shared/src/plans.ts), so it is not among the plans this reads: the
+ * site, sign-up, the billing page's offer and Stripe's portal show Starter and
+ * Pro. The rule above stays for any plan offered later.
  *
  * Only the public pages read this. What a plan includes, its price, sign-up
  * with a plan and the billing page are unchanged (packages/shared/src/plans.ts).

@@ -152,7 +152,7 @@ export function PushProvider({ userId, children }: { userId: string | null; chil
   }, [api])
 
   const value = useMemo<PushContextValue>(
-    () => ({ section: pushSection({ available: pushBuild, permission, prefs }), askOnHome, turnOn, setPref, signOut }),
+    () => ({ section: pushSection({ available: pushBuild, permission, prefs, platform: pushPlatform }), askOnHome, turnOn, setPref, signOut }),
     [permission, prefs, askOnHome, turnOn, setPref, signOut]
   )
   return <PushContext.Provider value={value}>{children}</PushContext.Provider>

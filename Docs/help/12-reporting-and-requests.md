@@ -10,7 +10,9 @@ Use "Ask {{product}}", the first thing in the Help panel. It is an AI assistant 
 3. Read the answer. A button under it, such as "Open Services", opens the page the answer is about.
 4. Under the answer, "Did this answer it?" takes "Yes" or "No". "No" offers "Send this to the {{product}} team".
 
-Your conversation stays in the panel until you sign out. "Start again" clears it. You can ask {{ask.dailyQuestions}} questions a day.
+If your question is one word, or could mean several things, the assistant does not guess. It asks "Do you mean one of these? If not, tell me a little more." and shows two or three questions. Press the one you mean, or type a fuller question.
+
+Your conversation stays in the panel until you sign out. "Start again" clears it. You can ask {{ask.dailyQuestions}} questions a day. A question the assistant asks back about does not count.
 
 ## What can the assistant do, and what can it not do?
 <!-- id: help-ask-limits; page: /app -->
@@ -21,6 +23,7 @@ It reads and answers. It does not change anything.
 - Asked from a quote's page, it can explain how that quote's price was worked out, line by line.
 - It never changes a price, a setting, a service or a quote, and it never sends anything to your customers. Its buttons only open a page or a form.
 - When it does not know, it says "I’m not sure about that." and offers "Send this to the {{product}} team".
+- When a question is one word or unclear, it asks which of two or three things you mean before it answers.
 - It does not advise on refunds, payment disputes, or legal and tax questions. It passes those to the team.
 - It answers in English.
 

@@ -32,3 +32,5 @@ scripts/hardcore-test/results/
 .vercel
 .claude/skills/design-taste-frontend/
 .checks/
+apps/mobile/build/
+scripts/android-check/

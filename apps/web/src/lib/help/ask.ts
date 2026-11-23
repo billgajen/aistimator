@@ -3,7 +3,10 @@
  * words and the checks on every answer are in packages/shared/src/help-ask.ts.
  *
  * It is an extra and it only reads: this file writes to one table
- * (`help_questions`) and nowhere else. If any part of it fails, the business
+ * (`help_questions`) and nowhere else. T-200: a one-word or unclear question
+ * is asked back ("Do you mean one of these?") with two or three of the
+ * guide's own questions to choose from; that turn is not written, so it does
+ * not count against the day's limit. If any part of it fails, the business
  * is told "I couldn't answer just now." and offered the report form; the
  * Help panel and the page behind it carry on.
  *
@@ -15,6 +18,9 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
+  ASK_CLARIFY,
+  ASK_CLARIFY_MAX,
+  ASK_CLARIFY_MIN,
   ASK_COPY,
   ASK_DAILY_LIMIT,
   ASK_HISTORY_TURNS,
@@ -24,10 +30,14 @@ import {
   askActions,
   buildAskPrompt,
   canBeRated,
+  clarifyAnswer,
   cleanQuestion,
   estimateDigest,
   finishAnswer,
   guideText,
+  isKeptAnswer,
+  isOneWord,
+  likelyEntries,
   parseAskHead,
   quoteIdOfPath,
   selectEntries,
@@ -43,6 +53,7 @@ import {
   type HelpEntry,
   type HelpGuide,
   type HelpState,
+  type KeptAskAnswer,
   type StoredAskOutcome,
 } from '@qolumns/shared'
 import { geminiModelFor } from '@/lib/ai/models'
@@ -224,15 +235,26 @@ export async function answerQuestion(request: AskRequest, deps: AskDeps, emit: (
     customers = quote?.customers ?? []
     question = cleanQuestion(request.question, customers)
     const given = selectEntries(guide, question)
-    prompt = buildAskPrompt({ guide: guideText(given, pageNamesFor(guide)), state, estimate: quote?.estimate ?? null, history, question, customers })
-    answer = await readAnswer((deps.model ?? realModel)(ASK_SYSTEM_PROMPT, prompt, controller.signal), given, customers, controller, emit)
+    // T-200: what the question most likely means in the guide, for asking back ("which of these do you mean?")
+    const likely = likelyEntries(guide, question, ASK_CLARIFY_MAX)
+    // One word, with nothing said before it, says what it is about and not what is wanted: it is asked back
+    // at once, from the guide, and the model is not asked. (With fewer than two things it could mean there
+    // is nothing to choose between, and the model answers as for any question.)
+    const askedBack = history.length === 0 && isOneWord(question) ? clarifyAnswer(likely) : null
+    if (askedBack) {
+      answer = askedBack
+    } else {
+      prompt = buildAskPrompt({ guide: guideText(given, pageNamesFor(guide)), state, estimate: quote?.estimate ?? null, history, question, customers })
+      answer = await readAnswer((deps.model ?? realModel)(ASK_SYSTEM_PROMPT, prompt, controller.signal), given, likely, customers, controller, emit)
+    }
   } catch (error) {
     console.error(`[Ask] no answer (${controller.signal.aborted ? 'TookTooLong' : error instanceof Error ? error.name : 'error'})`)
     answer = { outcome: 'failed', text: ASK_COPY.failed, entries: [], pages: [] }
   } finally {
     clearTimeout(timer)
   }
-  const id = await keepQuestion(deps.admin, request, { question, page, quoteId, answer })
+  // T-200: a question asked back is not kept: no row, so it cannot count against the day's limit
+  const id = isKeptAnswer(answer) ? await keepQuestion(deps.admin, request, { question, page, quoteId, answer }) : null
   console.log(`[Ask] ${id ?? 'not kept'}: ${answer.outcome}`)
   return { id, answer, prompt }
 }
@@ -242,7 +264,25 @@ export async function answerQuestion(request: AskRequest, deps: AskDeps, emit: (
  * answer it is; nothing is passed on before it is read. For "not sure", the
  * hand-off and the refusal the rest is not read at all: the words are ours.
  */
-async function readAnswer(pieces: AsyncIterable<string>, given: readonly HelpEntry[], customers: readonly CustomerDetails[], controller: AbortController, emit: (piece: string) => void): Promise<AskAnswer> {
+async function readAnswer(
+  pieces: AsyncIterable<string>,
+  given: readonly HelpEntry[],
+  likely: readonly HelpEntry[],
+  customers: readonly CustomerDetails[],
+  controller: AbortController,
+  emit: (piece: string) => void
+): Promise<AskAnswer> {
+  /**
+   * T-200: the model said the question could mean several things. The choices are guide entries: the ones it
+   * named (only ids it was given). When it named fewer than two, the entries the question's own words match
+   * are added. With fewer than two even then there is nothing to choose between: "not sure"
+   * (`finishAnswer`), never a guess.
+   */
+  const askBack = (named: AskHead): AskAnswer => {
+    const byId = new Map(given.map((entry) => [entry.id, entry]))
+    const chosen = named.entries.map((id) => byId.get(id)).filter((entry): entry is HelpEntry => Boolean(entry))
+    return clarifyAnswer(chosen.length >= ASK_CLARIFY_MIN ? chosen : [...chosen, ...likely]) ?? finishAnswer(named, '')
+  }
   let head: AskHead | null = null
   let headDone = false
   let first = ''
@@ -256,6 +296,7 @@ async function readAnswer(pieces: AsyncIterable<string>, given: readonly HelpEnt
       headDone = true
       head = parseAskHead(first.slice(0, at), given)
       if (!head) return finishAnswer(null, '')
+      if (head.outcome === ASK_CLARIFY) return askBack(head)
       if (FIXED_ANSWERS[head.outcome]) return finishAnswer(head, '')
       const rest = first.slice(at + 1).replace(/^\s+/, '')
       if (rest) {
@@ -270,6 +311,7 @@ async function readAnswer(pieces: AsyncIterable<string>, given: readonly HelpEnt
   if (controller.signal.aborted) throw new Error('TookTooLong')
   // an answer that was one line only: a head with nothing after it
   if (!headDone) head = parseAskHead(first, given)
+  if (head?.outcome === ASK_CLARIFY) return askBack(head)
   return finishAnswer(head, body, customers)
 }
 
@@ -277,7 +319,7 @@ async function readAnswer(pieces: AsyncIterable<string>, given: readonly HelpEnt
 async function keepQuestion(
   admin: Admin,
   request: AskRequest,
-  kept: { question: string; page: string | null; quoteId: string | null; answer: AskAnswer }
+  kept: { question: string; page: string | null; quoteId: string | null; answer: KeptAskAnswer }
 ): Promise<string | null> {
   try {
     let model: string | null = null

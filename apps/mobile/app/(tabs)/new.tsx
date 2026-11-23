@@ -10,7 +10,7 @@
  * signal: the quote waits and sends by itself (src/lib/outbox.ts).
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, BackHandler, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { fieldExample, getRegion, mergeScanAnswers, roomScanView, scanAnswers, scanDifferenceLine, unitDisplayLabel, type AppBootstrapResponse } from '@qolumns/shared'
@@ -30,7 +30,7 @@ import { pricingStages } from '../../src/lib/pricing-stages'
 import { onsiteGate } from '../../src/lib/onsite-gate'
 import { currentUserId } from '../../src/lib/supabase'
 import { PricingStages } from '../../src/components/PricingStages'
-import { BottomBar, Button, EmptyState, ErrorText, Field, fieldLabel, Icon, Label, Muted, Notice, ProgressBar, Rows, Screen, Title, TopBar } from '../../src/components/ui'
+import { BottomBar, Button, EmptyState, ErrorText, Field, fieldLabel, Icon, KeyboardSpace, Label, Muted, Notice, ProgressBar, Rows, Screen, Title, TopBar } from '../../src/components/ui'
 import { colors, fonts, radius, scale, space, touch, type } from '../../src/theme'
 
 const STEPS = ['service', 'photos', 'questions', 'details'] as const
@@ -62,6 +62,21 @@ export default function NewQuoteTab() {
   const router = useRouter()
   const [boot, setBoot] = useState<Pick<AppBootstrapResponse, 'onsiteQuotes' | 'onsiteNotInPlan'> | null>(null)
   const [settled, setSettled] = useState(false)
+
+  // T-200: Android's back button, while this tab is in front. In the form it is the form's own "Back"
+  // (the step before; from the first step, the Quotes tab). Anywhere else on this tab it goes to the
+  // Quotes tab. It never closes the app from here, and the unfinished quote stays saved as it is after
+  // every change. (An iPhone has no such button: nothing is listening there.)
+  useFocusEffect(
+    useCallback(() => {
+      const listening = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (stepBack.current) stepBack.current()
+        else router.navigate('/')
+        return true
+      })
+      return () => listening.remove()
+    }, [router])
+  )
 
   // asked each time the tab is opened, so a change of plan shows without restarting the app
   useFocusEffect(
@@ -460,7 +475,8 @@ function NewQuote() {
         </Text>
         <ProgressBar fraction={(position + 1) / stepsShown.length} label={`Step ${position + 1} of ${stepsShown.length}`} />
       </TopBar>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <StepBack onBack={back} />
+      <KeyboardSpace>
         <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xl }} keyboardShouldPersistTaps="handled">
           {draft.problem?.kind === 'refused' ? <Notice tone="danger">{draft.problem.message}</Notice> : null}
           {loadError && position === 0 ? (
@@ -704,7 +720,7 @@ function NewQuote() {
           ) : null}
           {position > 0 ? <Button title="Back" variant="quiet" onPress={back} /> : null}
         </BottomBar>
-      </KeyboardAvoidingView>
+      </KeyboardSpace>
     </Screen>
   )
 }
@@ -747,6 +763,22 @@ function Question({ field, value, onChange }: { field: AppField; value: RawAnswe
       multiline={kind === 'long'}
     />
   )
+}
+
+/**
+ * T-200: what Android's back button does while the form is on screen: the form's own "Back". The tab
+ * (which listens for the button) and the form are two components, so the form leaves its "Back" here.
+ */
+const stepBack: { current: (() => void) | null } = { current: null }
+
+function StepBack({ onBack }: { onBack: () => void }) {
+  useEffect(() => {
+    stepBack.current = onBack
+    return () => {
+      stepBack.current = null
+    }
+  })
+  return null
 }
 
 /** The top of this tab, for the screens that are not a step of the form */

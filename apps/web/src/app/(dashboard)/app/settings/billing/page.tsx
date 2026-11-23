@@ -402,7 +402,12 @@ function BillingPageContent() {
           </div>
         </div>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* T-200: two plans are on offer (Starter and Pro), shown as a centred pair. A business still on a
+            plan that is no longer offered (Business) has its own as a third card, marked "Current Plan". */}
+        <div
+          data-testid="plan-cards"
+          className={`mt-6 grid gap-4 ${(data?.availablePlans.length ?? 0) > 2 ? 'sm:grid-cols-2 lg:grid-cols-3' : 'mx-auto max-w-3xl sm:grid-cols-2'}`}
+        >
           {data?.availablePlans.map((plan) => (
             <PlanCard
               key={plan.id}
@@ -496,7 +501,7 @@ function PlanCard({
 
       {/* T-171: the plan's lines come from the same list the public Pricing page reads
           (lib/marketing/plan-claims.ts), so the two pages cannot disagree: a line that is not live yet says
-          "Coming later" here too. Every plan on offer can be chosen here, Business included. */}
+          "Coming later" here too. Every plan on offer can be chosen here (since T-200: Starter and Pro). */}
       <ul className="mt-6 space-y-3" data-testid="plan-lines">
         {lines.map((line) => (
           <PlanLineItem key={line.label} label={line.label} live={line.live} />

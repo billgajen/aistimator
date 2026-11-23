@@ -13,7 +13,7 @@
 // 4. (browser) one yellow call to action per screen, with dark text and a
 //    thin dark edge; no two neighbouring sections share a layout; each plan
 //    card has a button; the closing band has one button and one quiet link;
-// 5. (browser) login: the estimate document beside the form at desktop width,
+// 5. (browser) login: the form alone, centred (T-200; an estimate document sat beside it),
 //    the email field autofills, a skip link, tap-sized footer links;
 // 6. (browser) "needs you" is the strong yellow with its marker in the
 //    dashboard, and the billing page offers no trial;
@@ -484,14 +484,13 @@ if (!process.env.PLAYWRIGHT_DIR) {
     const l = await (await contextFor(null, { width, height })).newPage()
     await l.goto(`${cfg.appUrl}/login`)
     await l.waitForLoadState('networkidle').catch(() => {})
+    // T-200 (the owner's decision): the example estimate beside the log-in form is gone. The form alone, centred.
     const doc = l.locator('[data-testid=login-document]')
-    if (width >= 1024) {
-      const box = await doc.boundingBox()
-      const form = await l.locator('form').boundingBox()
-      check(`${width}: login shows the estimate document beside the form`, (await doc.isVisible()) && box !== null && form !== null && box.x > form.x + form.width && (await doc.locator('[data-testid=estimate-total]').innerText()).includes('$'), box && { x: Math.round(box.x), width: Math.round(box.width) })
-    } else {
-      check(`${width}: on a phone login is the form alone`, !(await doc.isVisible()))
-    }
+    const loginForm = await l.locator('form').boundingBox()
+    // against the page's own width (a scrollbar, where the browser draws one, is not part of it)
+    const pageWidth = await l.evaluate(() => document.documentElement.clientWidth)
+    const offCentre = loginForm ? Math.abs(loginForm.x + loginForm.width / 2 - pageWidth / 2) : null
+    check(`${width}: login is the form alone, centred (no estimate document beside it)`, (await doc.count()) === 0 && (await l.locator('[data-testid=estimate-total]').count()) === 0 && offCentre !== null && offCentre <= 2, { offCentre })
     check(`${width}: the email field autofills (autocomplete="email")`, (await l.getAttribute('input[type=email]', 'autocomplete')) === 'email' && (await l.getAttribute('input[type=password]', 'autocomplete')) === 'current-password')
     check(`${width}: login does not scroll sideways`, (await l.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1)
     await shot(l, `login-${width}`)

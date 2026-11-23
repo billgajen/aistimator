@@ -52,7 +52,7 @@ Plan facts and "is it live" are filled in when the guide is built (`apps/web/src
 | `{{freeStart.plan}}` | the plan a new business works like while it still has free quotes left |
 | `{{plans}}` | every plan a business can choose: its price by month and by year, its quotes a month, what it includes, and what is coming soon |
 | `{{plan.starter.name}}` `{{plan.starter.monthly}}` `{{plan.starter.yearly}}` `{{plan.starter.quotes}}` | one plan's name, prices and quotes a month (also `pro`, `business`) |
-| `{{whatsapp.plans}}` `{{onsite.plans}}` `{{roomScan.plans}}` `{{badge.plans}}` `{{ownAddress.plans}}` | the plans that include it ("Pro and Business"). `onsite` is starting a quote in the phone app: the app itself is open to every business, on any plan or none, so there is no token for it |
+| `{{whatsapp.plans}}` `{{onsite.plans}}` `{{roomScan.plans}}` `{{badge.plans}}` `{{ownAddress.plans}}` | the plans on offer that include it ("Pro"; since T-200 Business is not offered, so it is never named). `onsite` is starting a quote in the phone app: the app itself is open to every business, on any plan or none, so there is no token for it |
 | `{{ownAddress.example}}` | what a business's own address looks like: "yourname." and our domain |
 | `{{ownAddress.holdDays}}` | how many days an old address is held after the team changes it |
 | `{{soon}}` | "Coming soon" |

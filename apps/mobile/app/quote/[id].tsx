@@ -47,7 +47,7 @@ import { rememberAreaName } from '../../src/lib/area-names'
 import { viewerAddress } from '../../src/lib/model-viewer'
 import { ROOM_MODEL_CONTENT_TYPE } from '../../src/lib/outbox'
 import { currentUserId } from '../../src/lib/supabase'
-import { Body, BottomBar, Button, Card, ErrorText, Field, Icon, Label, LinkRow, MoneyRow, Muted, Notice, Pill, Rows, Screen, Skeleton, Title } from '../../src/components/ui'
+import { Body, BottomBar, Button, Card, ErrorText, Field, Icon, KeyboardSpace, Label, LinkRow, MoneyRow, Muted, Notice, Pill, Rows, Screen, Skeleton, Title } from '../../src/components/ui'
 import { colors, fonts, icon, radius, scale, space, tabular, touch, type } from '../../src/theme'
 
 /** How often the screen asks again while the price is worked out (first price takes 20 to 60 seconds) */
@@ -316,6 +316,7 @@ export default function QuoteDetail() {
   const hasRequest = Boolean(request && (request.description || request.answers.length > 0 || request.address || request.postcode))
   const pricing = isPricing(quote.status)
   const sentToCustomer = action === 'share'
+  const scanHere = roomScanAvailability()
   function viewPhoto(index: number) {
     setViewerPhotos(photos.map((p) => ({ id: p.id, url: p.fullUrl ?? p.url })))
     router.push(`/photo?index=${index}`)
@@ -323,6 +324,8 @@ export default function QuoteDetail() {
 
   return (
     <Screen>
+      {/* T-200: an answer, a note or the final invoice being typed stays above the keyboard (ui.tsx, KeyboardSpace) */}
+      <KeyboardSpace>
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xl }} keyboardShouldPersistTaps="handled">
         {offline ? <Notice>No signal. This page may be out of date.</Notice> : null}
 
@@ -448,8 +451,10 @@ export default function QuoteDetail() {
               const id = quote.roomScan?.rooms[i]?.modelId
               return Boolean(id && quote.roomScan?.modelUrls?.[id])
             }}
-            onModel={viewModel}
-            {...(quote.roomScan.canScanAgain && roomScanAvailability() === 'ready' && { onScanAgain: (i: number) => void scanArea(i), onAddArea: () => void scanArea() })}
+            // T-200: on Android the scan is read-only: its summary and sizes, with no 3D button (the model has not
+            // been seen to open there), and no "Scan again" or "Add an area" (there is no scanner)
+            {...(scanHere !== 'not_ios' && { onModel: viewModel })}
+            {...(quote.roomScan.canScanAgain && scanHere === 'ready' && { onScanAgain: (i: number) => void scanArea(i), onAddArea: () => void scanArea() })}
             busy={busy}
           />
         ) : null}
@@ -634,6 +639,7 @@ export default function QuoteDetail() {
           <Button title={QUOTE_TURN_COPY.pageButtons.priceRequest} onPress={priceRequest} busy={busy} />
         </BottomBar>
       ) : null}
+      </KeyboardSpace>
     </Screen>
   )
 }

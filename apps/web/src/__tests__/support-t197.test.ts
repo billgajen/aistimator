@@ -42,6 +42,8 @@ import {
   shippedRecipients,
   supportContextLines,
   supportDailyEmail,
+  supportNeedsYouLine,
+  SUPPORT_NOTHING_NEW,
   supportFixedEmail,
   supportReplyEmail,
   ticketWithBusinesses,
@@ -755,10 +757,48 @@ describe('the emails', () => {
       inboxUrl: 'https://qolumns.test/admin/support',
       environment: 'production',
     })!
-    expect(email.subject).toBe('Qolumns support: 7 new items')
+    // T-200: the subject says what needs the owner (it read "7 new items")
+    expect(email.subject).toBe('Qolumns support: 4 problem reports and 3 feature requests need you')
+    expect(email.text.split('\n')[0]).toBe('4 problem reports and 3 feature requests need you')
+    expect(email.html).toContain('4 problem reports and 3 feature requests need you')
     for (const part of ['Fault: 2', 'Billing: 1', 'Not sorted yet: 1', 'Feature requests: 3', 'Problem 3 (High; 3 businesses)']) expect(email.text).toContain(part)
     expect(email.text).not.toContain('Problem 4')
     expect(email.html).toContain('href="https://qolumns.test/admin/support"')
+  })
+
+  it('T-200: the summary’s subject says what needs the owner, and never "0 new items"', () => {
+    const line = supportNeedsYouLine
+    expect(line({ problems: 2, featureRequests: 0, unanswered: 0 })).toBe('2 problem reports need you')
+    expect(line({ problems: 1, featureRequests: 0, unanswered: 0 })).toBe('1 problem report needs you')
+    expect(line({ problems: 0, featureRequests: 1, unanswered: 0 })).toBe('1 feature request needs you')
+    expect(line({ problems: 0, featureRequests: 0, unanswered: 3 })).toBe('3 questions the assistant could not answer need you')
+    expect(line({ problems: 1, featureRequests: 1, unanswered: 0 })).toBe('1 problem report and 1 feature request need you')
+    expect(line({ problems: 2, featureRequests: 1, unanswered: 3 })).toBe('2 problem reports, 1 feature request and 3 questions the assistant could not answer need you')
+    // nothing needs the owner: said in words, whatever was passed
+    for (const nothing of [{ problems: 0, featureRequests: 0, unanswered: 0 }, { problems: -2, featureRequests: Number.NaN, unanswered: 0 }]) expect(line(nothing)).toBe('Nothing new today')
+    expect(SUPPORT_NOTHING_NEW).toBe('Nothing new today')
+    // the case that was sent as "0 new items": no problem, no request, one question the assistant could not answer
+    const onlyQuestions = supportDailyEmail({ problems: {}, featureRequests: 0, top: [], inboxUrl: 'https://qolumns.test/admin/support', environment: 'production', questions: { asked: 4, unanswered: 1 } })!
+    expect(onlyQuestions.subject).toBe('Qolumns support: 1 question the assistant could not answer needs you')
+    expect(onlyQuestions.text.split('\n')[0]).toBe('1 question the assistant could not answer needs you')
+    // every mix of counts: nought is never written in the subject, the heading or the first line
+    for (const problems of [0, 1, 5]) {
+      for (const featureRequests of [0, 1, 4]) {
+        for (const unanswered of [0, 1, 3]) {
+          const email = supportDailyEmail({ problems: problems ? { fault: problems } : {}, featureRequests, top: [], inboxUrl: 'x', questions: { asked: unanswered + 2, unanswered } })
+          if (problems + featureRequests + unanswered === 0) {
+            // nothing new: no email is sent at all (T-197), and the day is not used up
+            expect(email).toBeNull()
+            continue
+          }
+          const heading = /<h1[^>]*>([^<]*)<\/h1>/.exec(email!.html)?.[1] ?? email!.html
+          for (const said of [email!.subject, email!.text.split('\n')[0]!, heading]) {
+            expect(said, said).not.toMatch(/\b0 |new items?\b/)
+            expect(said, said).toMatch(/needs? you/)
+          }
+        }
+      }
+    }
   })
 
   it('a high-severity problem uses the owner’s alert, with its own words and the inbox’s address', () => {

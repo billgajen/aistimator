@@ -4,6 +4,9 @@
 //   Local:       npx tsx scripts/create-review-account.mts
 //   Production:  npx tsx scripts/create-review-account.mts --prod
 //   New password for the account that exists:   add --new-password
+//   A second reviewer's account (T-199, Google Play):   add --email-name=review --one-service
+//     --email-name=<name>   the sign-in is <name>@<APP_DOMAIN> instead of the App Store one
+//     --one-service         the first service only, and the two sample quotes that are for it
 //
 // What it makes:
 //   - a user with a random password, its email already confirmed. Creating the user makes its business, as
@@ -35,6 +38,9 @@ import { reviewAccountQuotes, REVIEW_ACCOUNT, reviewLabel } from '../packages/sh
 const PROJECT_REF = 'ygsuzeveesgrafgpkrev'
 const prod = process.argv.includes('--prod')
 const newPassword = process.argv.includes('--new-password')
+const oneService = process.argv.includes('--one-service')
+const emailName = process.argv.find((a) => a.startsWith('--email-name='))?.slice('--email-name='.length) ?? REVIEW_ACCOUNT.emailLocalPart
+if (!/^[a-z0-9][a-z0-9-]{1,30}$/.test(emailName)) throw new Error('--email-name takes lower case letters, digits and hyphens only')
 
 async function target(): Promise<{ url: string; key: string; label: string }> {
   if (!prod) {
@@ -58,7 +64,7 @@ async function call(method: string, path: string, body?: unknown, prefer = 'retu
 }
 const rest = (method: string, path: string, body?: unknown, prefer?: string) => call(method, `/rest/v1/${path}`, body, prefer) as Promise<Array<Record<string, unknown>> | null>
 
-const email = `${REVIEW_ACCOUNT.emailLocalPart}@${APP_DOMAIN}`
+const email = `${emailName}@${APP_DOMAIN}`
 const password = `${randomBytes(9).toString('base64url')}-${randomBytes(9).toString('base64url')}`
 console.log(`App Store review account on ${t.label}`)
 
@@ -71,6 +77,7 @@ if (existing) {
     process.exit(0)
   }
   await call('PUT', `/auth/v1/admin/users/${existing.id}`, { password })
+  await checkSignIn()
   printOnce(email, password)
   process.exit(0)
 }
@@ -102,7 +109,7 @@ await rest('PATCH', `tenants?id=eq.${tenantId}`, {
 const picks = [
   { pack: paintingPackUS, name: 'Interior Painting' },
   { pack: garageDoorsPackUS, name: 'Garage Door Spring Replacement' },
-]
+].slice(0, oneService ? 1 : 2)
 const made: Array<{ id: string; body: ServiceCreateBody }> = []
 for (const { pack, name } of picks) {
   const svc = pack.services.find((s) => s.name === name)
@@ -121,7 +128,7 @@ await rest('POST', 'subscriptions?on_conflict=tenant_id', { tenant_id: tenantId,
 console.log(`  free test plan ${REVIEW_ACCOUNT.planId}`)
 
 // 5. Three sample quotes, priced from the services' own prices at the sample sizes
-for (const sample of reviewAccountQuotes(new Date())) {
+for (const sample of reviewAccountQuotes(new Date()).filter((q) => q.service < made.length)) {
   const { id: serviceId, body } = made[sample.service]!
   const rules = body.pricingRules ?? {}
   const result = samplePrice(
@@ -162,10 +169,17 @@ for (const sample of reviewAccountQuotes(new Date())) {
   console.log(`  quote for ${sample.customer.name}: ${sample.status}, $${total.toFixed(2)}`)
 }
 
+await checkSignIn()
 printOnce(email, password)
 
+// The reviewer's first step: the email and the new password sign in
+async function checkSignIn() {
+  await call('POST', '/auth/v1/token?grant_type=password', { email, password })
+  console.log('  sign-in checked: the email and the password work')
+}
+
 function printOnce(address: string, secret: string) {
-  console.log('\n  Sign-in for App Store Connect (shown once, not saved anywhere):')
+  console.log('\n  Sign-in for the store reviewer (shown once, not saved anywhere):')
   console.log(`    email     ${address}`)
   console.log(`    password  ${secret}`)
 }

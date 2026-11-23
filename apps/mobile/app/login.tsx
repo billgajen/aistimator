@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Image, KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native'
+import { Image, StyleSheet, View } from 'react-native'
 import { PRODUCT_NAME } from '@qolumns/shared'
 import { supabase } from '../src/lib/supabase'
-import { Button, ErrorText, Field, Muted, Screen } from '../src/components/ui'
+import { Button, ErrorText, Field, KeyboardSpace, Muted, Screen } from '../src/components/ui'
 import { space } from '../src/theme'
 import { WORDMARK_SIZE } from '../src/lib/wordmark'
 import WORDMARK from '../assets/wordmark.png'
@@ -40,7 +40,8 @@ export default function Login() {
 
   return (
     <Screen>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.wrap}>
+      {/* T-200: the fields stay above the keyboard on Android too (ui.tsx, KeyboardSpace) */}
+      <KeyboardSpace style={styles.wrap}>
         <Image source={WORDMARK} style={styles.brand} accessible accessibilityRole="header" accessibilityLabel={PRODUCT_NAME} resizeMode="contain" />
         <Muted>Quote on site. Sign in with the email and password you use on the web.</Muted>
         <View style={{ height: space.xl }} />
@@ -49,7 +50,7 @@ export default function Login() {
         {error ? <ErrorText>{error}</ErrorText> : null}
         <Button title="Sign in" onPress={signIn} busy={busy} disabled={!email || !password} />
         <Muted style={{ marginTop: space.lg }}>Forgotten your password? Reset it on the web sign-in page, then sign in here.</Muted>
-      </KeyboardAvoidingView>
+      </KeyboardSpace>
     </Screen>
   )
 }

@@ -63,6 +63,37 @@ and that adds the entitlement. `src/lib/notifications.ts` is the only file that 
 function in it returns first when `pushBuild` is false. The App Store build also needs the Expo project id
 (`npx eas init` writes `extra.eas.projectId`); without it the app behaves as the dev build does.
 
+## Android (T-200)
+
+The same app, built for Google Play as `com.qolumns.app`. What differs from the iPhone:
+
+- **No room scan.** `roomScanAvailability()` answers `not_ios`, and every scan control hangs on it: no scan card
+  on a new quote, no "Scan again" or "Add an area". A quote scanned on an iPhone shows its sizes and floor plan,
+  read-only, with no "View in 3D" (the model has not been seen to open on Android). The scanner's native code is
+  not in the Android build (`modules/room-scan/expo-module.config.json` names Apple only).
+- **The keyboard.** Expo SDK 58 draws edge to edge on Android, and Android no longer makes such a window smaller
+  when the keyboard opens. `KeyboardSpace` (`src/components/ui.tsx`) pads for the keyboard on both phones; use it
+  on any screen with a text field at the bottom. Never `behavior={Platform.OS === 'ios' ? … : undefined}`.
+- **The back button.** In "New quote" it is the form's own "Back" (the step before; from the first step, the
+  Quotes tab) and never closes the app; elsewhere it is the navigation's own.
+- **Notifications** need Firebase's file in the build (`google-services.json`, or the EAS file variable
+  `GOOGLE_SERVICES_JSON`). `app.config.js` uses it when it is there and sets `extra.pushAndroid`; without it the
+  app builds and runs, never asks for the permission, and Account says "Not in this version of the app yet".
+- **Light only.** `userInterfaceStyle: "light"` does nothing on Android without `expo-system-ui`, which is why
+  that package is installed.
+- **Permissions:** camera, notifications, vibrate, internet, network state, what push delivery needs, and
+  (Android 12 and older only) writing to storage, which Android 9 and older need before they will open the
+  camera. Everything else Expo's packages add is taken out by name (`android.blockedPermissions` in `app.json`):
+  microphone, reading storage, fingerprint, launcher badges, install referrer. Libraries add permissions when the
+  build merges manifests, so the place to check is the built bundle, not the generated project.
+- **Icon:** `assets/adaptive-icon.png` is the icon at 72%, so the mark sits inside the circle Android cuts;
+  `assets/notification-icon.png` is the mark alone in white, which Android draws in the brand colour.
+
+The store build: `npx eas-cli@latest build -p android --profile production` (an app bundle, signed with a key
+Expo keeps; `eas.json`). The two server addresses are in `eas.json`; the Supabase anon key is an EAS environment
+variable, so it is not in the repository. Nothing here has run on an Android phone or emulator: the build
+machine has neither (OWNER-TODO, T-200, has the list to go through on a phone).
+
 ## Run it
 
 ```bash

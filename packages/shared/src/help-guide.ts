@@ -208,22 +208,27 @@ const wordsOf = (text: string): string[] => (text.toLowerCase().match(/[a-z][a-z
  * word that few entries use ("logo") is worth more than one that most use
  * ("customer").
  */
-export function selectEntries(guide: HelpGuide, question: string, budgetChars: number = HELP_GUIDE_BUDGET_CHARS): HelpEntry[] {
-  const size = (entry: HelpEntry) => entryText(entry).length + 2
-  const total = guide.entries.reduce((sum, entry) => sum + size(entry), 0)
-  if (total <= budgetChars) return [...guide.entries]
+/** How well each entry's words match a question (0 = not at all), in the guide's own order */
+function scoreEntries(guide: HelpGuide, question: string): Array<{ entry: HelpEntry; index: number; score: number }> {
   const wanted = new Set(wordsOf(question))
   const words = guide.entries.map((entry) => ({ question: new Set(wordsOf(entry.question)), body: new Set(wordsOf(entry.body)) }))
   // in how many entries each word appears
   const used = new Map<string, number>()
   for (const entry of words) for (const word of new Set([...entry.question, ...entry.body])) used.set(word, (used.get(word) ?? 0) + 1)
   const weight = (word: string) => Math.log(1 + guide.entries.length / (used.get(word) ?? 1))
-  const scored = guide.entries.map((entry, index) => {
+  return guide.entries.map((entry, index) => {
     let score = 0
     for (const word of words[index]!.question) if (wanted.has(word)) score += 3 * weight(word)
     for (const word of words[index]!.body) if (wanted.has(word)) score += weight(word)
     return { entry, index, score }
   })
+}
+
+export function selectEntries(guide: HelpGuide, question: string, budgetChars: number = HELP_GUIDE_BUDGET_CHARS): HelpEntry[] {
+  const size = (entry: HelpEntry) => entryText(entry).length + 2
+  const total = guide.entries.reduce((sum, entry) => sum + size(entry), 0)
+  if (total <= budgetChars) return [...guide.entries]
+  const scored = scoreEntries(guide, question)
   scored.sort((a, b) => b.score - a.score || a.index - b.index)
   const chosen: typeof scored = []
   let spent = 0
@@ -234,4 +239,18 @@ export function selectEntries(guide: HelpGuide, question: string, budgetChars: n
     spent += cost
   }
   return chosen.sort((a, b) => a.index - b.index).map((item) => item.entry)
+}
+
+/**
+ * T-200: the entries a short or unclear question most likely means, best
+ * first: the same count of shared words as `selectEntries`, and only entries
+ * that share a word with it at all. Used to ask "which of these do you
+ * mean?", so each one is a question the guide answers.
+ */
+export function likelyEntries(guide: HelpGuide, question: string, max = 3): HelpEntry[] {
+  return scoreEntries(guide, question)
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .slice(0, Math.max(0, max))
+    .map((item) => item.entry)
 }

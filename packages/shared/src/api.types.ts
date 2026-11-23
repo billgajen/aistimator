@@ -725,7 +725,7 @@ export interface AppBootstrapResponse {
   /** T-193: `unitSystem` is the business's units (absent from an app that cached the form before T-193) */
   region: { code: string; locale: string; postalCodeLabel: string; unitSystem?: 'imperial' | 'metric' }
   /**
-   * T-194: does the business's plan include room scan (Pro and Business)? Absent from a server before
+   * T-194: does the business's plan include room scan? Absent from a server before
    * T-194: the app then offers the scan, as it did, and the server decides.
    */
   roomScan?: boolean

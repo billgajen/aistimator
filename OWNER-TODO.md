@@ -3114,6 +3114,12 @@ web. The app changes reach a phone in the next build.
 - It makes "Harbor Lane Painting" (US): two services from the trade packs, a free test plan (Pro, no Stripe
   customer: never billed, not revenue), and three sample quotes from invented customers (one waiting for you,
   one sent and opened, one accepted). No model is asked, the worker is not used, nothing is emailed.
+- **Google Play's reviewer has its own account (made on production 2026-11-23):** `review@qolumns.com`, also
+  "Harbor Lane Painting" (`tnt_933df4745c2265d16be0ebb3`), on Pro as a free test account, with one service
+  (Interior Painting) and two sample quotes (one waiting for you, one accepted). Made with
+  `npx tsx scripts/create-review-account.mts --prod --email-name=review --one-service`. The password was shown
+  once and is saved nowhere; for a new one add `--new-password` to that same command. The App Store account
+  above (`app-review@`) has still not been made.
 - It was run on the local database only. Not on production.
 
 ### App Store: privacy answers ("App Privacy" in App Store Connect)
@@ -3515,6 +3521,8 @@ Each of these is how the product behaves today. The guide describes it as it is.
 - **Analytics:** "Total Quotes" includes setup tests; "Conversion Rate" leaves declined quotes out; "Quotes
   Viewed" drops opened-then-declined; "Paid" is always zero; there is no date range; there is no way to stop
   sharing benchmarks.
+- **Fixed in T-200:** saving "Quote Template" no longer switches customer acceptance back on (the first item of
+  the next line is history).
 - **Settings and billing:** saving "Quote Template" switches "Allow customers to accept quotes directly" back
   on (the guide warns of this; remove the warning when it is fixed). "Default Terms & Conditions" is saved but
   printed nowhere. The Quote Template tick boxes change only the PDF. "County/State" service area is never
@@ -3709,3 +3717,125 @@ cd apps/mobile && DEVELOPER_DIR=$HOME/Downloads/Xcode.app/Contents/Developer GEM
 - **The app on a real phone.** I saw the "On-site quotes are part of Pro" screen in the iPhone simulator against
   the local stack (`.checks/t199/app-onsite-part-of-pro.png`).
 - **The billing webhook bringing the card back after an upgrade** is a unit test, not a real Stripe upgrade.
+
+---
+
+## T-200 — Android app for Google Play (internal testing), plus small fixes
+
+**Built, not deployed.** Part B needs the **web** and the **worker** deployed (the worker because the daily
+support email is sent by it). No migration. The Android app talks to the live site as it is today.
+
+### The Android bundle
+
+- **File:** `apps/mobile/build/qolumns-android-1.aab` (git-ignored). Package `com.qolumns.app`, version 0.1.0,
+  version code 1, target Android 16 (API 36, what Google Play asks of a new app since 31 Aug 2026).
+- **Upload it by hand:** Play Console → your app → Testing → Internal testing → Create new release → upload the
+  file. When it offers **Play App Signing**, accept: Google then holds the app's signing key, and the key this
+  bundle is signed with is only the "upload key".
+- **The upload key is kept by Expo** (project `@billiom/qolumns`), made when the build ran. You never handle it.
+  To keep your own copy: `cd apps/mobile && npx eas-cli@latest credentials` → Android → production → Download.
+- **The next build:** `cd apps/mobile && npx eas-cli@latest build -p android --profile production`. The version
+  code goes up by one by itself (Expo keeps the number; `versionCode` in `app.json` is only the starting point).
+  Play refuses a version code it has already seen.
+- `eas submit` was not run and nothing was sent to Google.
+
+### What I set up on Expo (you chose the billiom account)
+
+- **The project** `@billiom/qolumns`. Its id is in `app.json` (`extra.eas.projectId`) and `owner` is `billiom`.
+- **One environment variable** in its "production" environment: `EXPO_PUBLIC_SUPABASE_ANON_KEY` (the public
+  anon key the site already sends to every browser), so the key is not in the repository. The two server
+  addresses are in `eas.json`.
+- **Cost:** Expo asked for no payment and I added no card or plan. I did not look at which plan the billiom
+  account is on. A free Expo account has a monthly allowance of builds and waits longer in the queue; when the
+  allowance runs out Expo refuses to build rather than charge. One build was cancelled while still queued (it
+  would have been version code 2).
+- **This also gave the iPhone app its project id.** The App Store build (not the dev build on your phone) will now
+  try to register for notifications, which is the step T-196 was waiting for. Nothing changes on your phone today.
+
+### Android notifications
+
+Off in this bundle, quietly: the app never asks for the permission, and Account → Notifications says "Not in
+this version of the app yet". The code is ready (the "quotes" channel in the brand colour, the Android 13
+permission asked at the same moment as on iPhone, the status-bar icon). To switch them on:
+
+- [ ] **Create a Firebase project** at console.firebase.google.com (free; Google Analytics is not needed).
+- [ ] **Add an Android app** to it with the package name `com.qolumns.app`, exactly. Skip the SHA-1 box.
+- [ ] **Download `google-services.json`** and put it at `apps/mobile/google-services.json`.
+- [ ] **Nothing to edit in `app.json`.** `app.config.js` sets `android.googleServicesFile` itself when the file is
+  there. (A fixed line in `app.json` would break every build made before the file exists.)
+- [ ] **Get the file to the build.** Either commit it (Google says it holds identifiers, not secrets), or keep it
+  out of git and give it to Expo instead:
+  `cd apps/mobile && npx eas-cli@latest env:create --environment production --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json --visibility sensitive`
+  If you choose the second, add `google-services.json` to `apps/mobile/.gitignore`.
+- [ ] **Give Expo the sending key (FCM V1).** Firebase console → Project settings → Service accounts → "Generate
+  new private key". That JSON **is** a secret: never commit it. Then `cd apps/mobile && npx eas-cli@latest
+  credentials` → Android → production → Google Service Account → "Manage your Google Service Account Key for Push
+  Notifications (FCM V1)" → upload the JSON. Delete it from Downloads afterwards.
+- [ ] **Build again** (the command above) and upload the new bundle.
+- [ ] **Test** as in T-196's list: the question on the Quotes tab, three switches, a request, an acceptance, a
+  customer's question, a tap opens the quote, a switch turned off, and the phone's own setting turned off.
+- `eas init` is done (see above); it is not a step for you any more.
+
+### Go through this on an Android phone (nothing here has run on Android)
+
+This Mac has no Android SDK, no Java and no emulator, and I did not install any. So the Android side is checked
+by reading the code, by unit tests, and by generating the Android project and reading its manifest. Install the
+internal-testing build and check:
+
+1. **The icon** on the home screen (round, squircle): the "Qo" mark is whole. **The splash**: the wordmark on the
+   light background.
+2. **Sign in.** Tap "Password": both fields and "Sign in" stay above the keyboard.
+3. **Quotes tab.** The tab bar clears the navigation bar; the raised "New quote" button is whole. Try it with
+   gesture navigation and with the three buttons (Settings → System → Navigation mode).
+4. **A quote.** Photos open full screen and swipe. Answer a question and type a note: the field stays above the
+   keyboard. On an accepted quote, type a final invoice: the same.
+5. **A quote scanned on your iPhone.** Its "Room scan" card shows the sizes and the floor plan. There is no "View
+   in 3D", "Scan again" or "Add an area".
+6. **New quote.** Take a photo (Android asks for the camera once) and choose one from the gallery (Android's own
+   picker, no permission question). No "Room scan" card on the questions step. Press the phone's **back**: it goes
+   back one step; from the first step it goes to Quotes; the quote is still there as "Carry on". Do not press
+   "Price this job" unless you mean to send a real request to the live site.
+7. **Starter test business** (Texas Painters Test is on Starter): "New quote" shows "On-site quotes are part of
+   Pro" with one "OK".
+8. **Dark mode** on the phone: the app stays light and every word can be read.
+9. **A link:** `qolumns://quote/<a quote id>` opens that quote (from a note, or
+   `adb shell am start -a android.intent.action.VIEW -d "qolumns://quote/<id>"`).
+10. **Account → Notifications** says "Not in this version of the app yet".
+
+Tell me what looks wrong and I will fix it against what you saw.
+
+### Differences from the iPhone app, by decision
+
+- **No room scan**, and no 3D button on a scanned quote. The 3D viewer is a web page and may well open on Android;
+  I hid the button because I could not see it open. Say if you want it tried.
+- **No pinch-to-zoom** on a photo or on the enlarged floor plan (that zoom is the iPhone's own). They open full
+  screen at the screen's width.
+- **Android's storage permission** is declared for Android 12 and older only, because Android 9 and older will
+  not open the camera without it. The Play Console may list it. Microphone, reading storage, "draw over other
+  apps", "run at start-up", fingerprint, launcher badges and the install referrer are removed. What the bundle
+  declares: camera, notifications, vibrate, internet, network state, wake lock and Google's push receive
+  permission (the last two are for notifications), and that storage one.
+
+### Part B: what changed for businesses, and three decisions to confirm
+
+- **Business is no longer offered.** Pricing and the billing page show Starter and Pro, centred. A business
+  already on Business keeps it and sees it on its billing page as "Current Plan". Lines that named the plans
+  with a feature now say "Pro".
+- **Saving "Quote Template" keeps customer acceptance as the business set it.**
+- **The daily support email's subject says what needs you**, for example "Qolumns support: 2 problem reports and
+  1 feature request need you". **Decision:** on a day with nothing new, no email is sent at all (T-197's rule),
+  so "Nothing new today" is written but never sent. Say if you want an email on quiet days.
+- **Ask Qolumns asks back** for a one-word or unclear question: "Do you mean one of these? If not, tell me a
+  little more." with two or three buttons. It is not counted against the day's limit. **Decision:** an ask-back
+  is not stored, so it does not appear in Admin → Support → Questions (storing it needs a migration).
+- **The log-in page is the form alone.** **Differs from the ticket:** the sign-up page never had the sample
+  estimate card (T-165 put it on log-in only), so there was nothing to keep there. Say if you want it added.
+
+### Still to do, yours
+
+- [ ] Upload the bundle to internal testing and go through the list above.
+- [ ] Deploy the web and the worker for Part B when you are ready (no migration).
+- [ ] The Firebase steps, when you want Android notifications.
+- [ ] When the Android app is public, tell me: the help guide still says "There is no Android app"
+  (`Docs/help/08-mobile-app-room-scan.md`), which is right while it is in internal testing only.
+- [ ] `brand/*.ai` (four Illustrator files) are still not committed. Say if they belong in the repository.

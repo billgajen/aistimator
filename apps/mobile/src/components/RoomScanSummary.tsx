@@ -18,7 +18,8 @@
  * A scan is a measurement, so its figures sit on butter (system.md).
  */
 import { useState } from 'react'
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native'
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SvgXml } from 'react-native-svg'
 import { OPENING_WORDS, formatScanArea, formatScanLength, formatScanSize, roomsCoveredWords, type RoomScanView, type ScanRoomView } from '@qolumns/shared'
 import { colors, fonts, radius, scale, space, tabular, touch, type } from '../theme'
@@ -72,6 +73,9 @@ function Plan({ svg, width }: { svg: string; width: number }) {
   const ratio = ratioOf(svg)
   const label = /aria-label="([^"]*)"/.exec(svg)?.[1] ?? 'Floor plan'
   const bigWidth = screen.width - space.lg * 2
+  // T-200: on Android the larger plan is drawn behind the navigation bar too, so "Close" is kept clear of it
+  const insets = useSafeAreaInsets()
+  const clear = Platform.OS === 'android' ? { paddingBottom: space.xl + insets.bottom } : null
   return (
     <>
       <Pressable style={styles.plan} accessibilityRole="imagebutton" accessibilityLabel={`${label}. Open it larger`} onPress={() => setLarge(true)}>
@@ -81,7 +85,7 @@ function Plan({ svg, width }: { svg: string; width: number }) {
         </Text>
       </Pressable>
       <Modal visible={large} animationType="fade" presentationStyle="fullScreen" onRequestClose={() => setLarge(false)}>
-        <View style={styles.planScreen}>
+        <View style={[styles.planScreen, clear]}>
           <ScrollView maximumZoomScale={4} minimumZoomScale={1} contentContainerStyle={styles.planZoom} centerContent>
             <View accessible accessibilityRole="image" accessibilityLabel={label}>
               <SvgXml xml={svg} width={bigWidth} height={Math.round(bigWidth * ratio)} />

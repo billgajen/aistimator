@@ -43,8 +43,8 @@ Yes. Sending your quote link in a WhatsApp chat works today, on every plan, with
 
 If you use the WhatsApp Business app, the same section has three ready texts under "For the WhatsApp Business app": "Greeting message", "Away message" and "Quick reply". Each shows where it goes in WhatsApp Business's own settings. Press "Copy", then paste it there.
 
-{{#soon whatsapp}}Quotes worked out inside the WhatsApp chat itself, on your own business number, are a different thing. That is {{soon}}, as part of the {{whatsapp.plans}} plans, and is not open to businesses yet. The link "Connect your WhatsApp number for full in-chat quoting (advanced)" at the bottom of the section is for that. Today the customer taps your link in the chat and finishes on your request page.{{/soon}}
-{{#live whatsapp}}Quotes worked out inside the WhatsApp chat itself, on your own business number, are a different thing. They are part of the {{whatsapp.plans}} plans, and a new business has them while it still has free quotes left. To set that up, press "Connect your WhatsApp number for full in-chat quoting (advanced)" at the bottom of the section. It opens the WhatsApp page.{{/live}}
+{{#soon whatsapp}}Quotes worked out inside the WhatsApp chat itself, on your own business number, are a different thing. That is {{soon}}, as part of {{whatsapp.plans}}, and is not open to businesses yet. The link "Connect your WhatsApp number for full in-chat quoting (advanced)" at the bottom of the section is for that. Today the customer taps your link in the chat and finishes on your request page.{{/soon}}
+{{#live whatsapp}}Quotes worked out inside the WhatsApp chat itself, on your own business number, are a different thing. They are part of {{whatsapp.plans}}, and a new business has them while it still has free quotes left. To set that up, press "Connect your WhatsApp number for full in-chat quoting (advanced)" at the bottom of the section. It opens the WhatsApp page.{{/live}}
 
 ## Can I change my quote link?
 <!-- id: link-change-name; page: /app/quote-link -->

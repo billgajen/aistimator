@@ -48,3 +48,7 @@ scripts/hardcore-test/results/
 
 # The browser tools the checks use (pnpm check:setup, T-183)
 .checks/
+
+# T-200: the Android bundle downloaded from the build service, and pictures from trying it on an emulator
+apps/mobile/build/
+scripts/android-check/

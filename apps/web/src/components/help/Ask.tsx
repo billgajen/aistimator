@@ -97,7 +97,7 @@ export function AskBox({ pathname, turns, busy, onAsk, onResume }: { pathname: s
                   type="button"
                   onClick={() => onAsk(suggestion.question)}
                   disabled={busy}
-                  className="flex min-h-[44px] w-full items-center rounded-lg border border-field bg-white px-3 py-2 text-left text-sm text-text-primary transition-colors hover:bg-white hover:border-primary"
+                  className={QUESTION_BUTTON}
                   data-testid="ask-suggestion"
                 >
                   {suggestion.question}
@@ -117,14 +117,21 @@ export function AskBox({ pathname, turns, busy, onAsk, onResume }: { pathname: s
 }
 
 const ACTION = 'inline-flex min-h-[44px] items-center justify-center rounded-lg border border-field bg-white px-4 text-sm font-semibold text-text-primary transition-colors hover:bg-surface'
+/** A question to ask with one press: the three to start from, and (T-200) the choices under a question asked back */
+const QUESTION_BUTTON = 'flex min-h-[44px] w-full items-center rounded-lg border border-field bg-white px-3 py-2 text-left text-sm text-text-primary transition-colors hover:bg-white hover:border-primary'
 
 function Turn({
   turn,
+  busy,
+  onAsk,
   onOpen,
   onAction,
   onRate,
 }: {
   turn: AskTurnView
+  busy: boolean
+  /** T-200: a choice under a question that was asked back is asked as the next question */
+  onAsk: (question: string) => void
   /** A page button was pressed: the panel closes and the page opens */
   onOpen: () => void
   onAction: (kind: 'team' | 'feature' | 'problem', turn: AskTurnView) => Promise<boolean> | void
@@ -134,7 +141,10 @@ function Turn({
   const [sendFailed, setSendFailed] = useState(false)
   const waiting = turn.outcome === null
   // "No" offers the team, when the answer did not already
-  const actions: AskAction[] = turn.rating === 'no' && !turn.actions.some((a) => a.kind === 'team') ? [...turn.actions, { kind: 'team', label: C.actions.team }] : turn.actions
+  const all: AskAction[] = turn.rating === 'no' && !turn.actions.some((a) => a.kind === 'team') ? [...turn.actions, { kind: 'team', label: C.actions.team }] : turn.actions
+  // T-200: the choices of a question asked back are a list of their own, one to a row
+  const choices = all.filter((a) => a.kind === 'ask')
+  const actions = all.filter((a): a is Exclude<AskAction, { kind: 'ask' }> => a.kind !== 'ask')
 
   const press = async (kind: 'team' | 'feature' | 'problem') => {
     if (kind !== 'team') return void onAction(kind, turn)
@@ -154,6 +164,18 @@ function Turn({
       <div className="mr-4 rounded-2xl rounded-bl-md border border-border bg-white px-3.5 py-3 text-sm text-text-primary" data-testid="ask-answer" aria-live="polite" aria-busy={waiting}>
         <span className="sr-only">{C.title}: </span>
         {turn.text ? <p className="whitespace-pre-wrap break-words">{turn.text}</p> : <p className="text-text-secondary">{C.thinking}</p>}
+
+        {!waiting && choices.length > 0 && (
+          <ul className="mt-3 space-y-1.5" data-testid="ask-choices">
+            {choices.map((choice) => (
+              <li key={choice.label}>
+                <button type="button" onClick={() => onAsk(choice.label)} disabled={busy} className={QUESTION_BUTTON} data-testid="ask-choice">
+                  {choice.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {!waiting && actions.length > 0 && !turn.sent && (
           <div className="mt-3 flex flex-wrap gap-2" data-testid="ask-actions">
@@ -237,7 +259,7 @@ export function AskThread({
       </p>
       <ol className="flex-1 space-y-5">
         {turns.map((turn) => (
-          <Turn key={turn.key} turn={turn} onOpen={onOpen} onAction={onAction} onRate={onRate} />
+          <Turn key={turn.key} turn={turn} busy={busy} onAsk={onAsk} onOpen={onOpen} onAction={onAction} onRate={onRate} />
         ))}
       </ol>
       <div className="mt-5 border-t border-border pt-4">

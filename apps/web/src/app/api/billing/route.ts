@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { toPlanInfo } from '@/lib/plans-view'
-import { getPlan, offeredPlans, freeAllowance, freeQuotesLeftLine, isFreeTestAccount, subscriptionLive, usageLevel } from '@qolumns/shared'
+import { billingPagePlans, getPlan, freeAllowance, freeQuotesLeftLine, isFreeTestAccount, subscriptionLive, usageLevel } from '@qolumns/shared'
 import { usedForAllowance } from '@/lib/plan-limits'
 import { NextResponse } from 'next/server'
 import type { BillingResponse, PlanInfo, SubscriptionInfo, BillingUsage } from '@qolumns/shared'
@@ -133,7 +133,9 @@ export async function GET() {
       per,
     }
 
-    const availablePlans: PlanInfo[] = offeredPlans().map((p) => toPlanInfo(p))
+    // T-200: the plans on offer, and after them the business's own plan when it is one that is no longer
+    // offered (Business): it keeps the plan and sees it here as its current one; nobody else is shown it.
+    const availablePlans: PlanInfo[] = billingPagePlans(currentPlan).map((p) => toPlanInfo(p))
 
     const response: BillingResponse = {
       subscription: subscriptionInfo,

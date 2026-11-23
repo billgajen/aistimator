@@ -1,10 +1,7 @@
 import type { Metadata } from 'next'
-import { DEMO_BUSINESS_NAME, DEMO_LOGO_PATH, DEMO_PRIMARY_COLOR, PRODUCT_NAME } from '@qolumns/shared'
-import { HERO, HERO_DEMO } from '@/lib/marketing/home-copy'
-import { marketingExample } from '@/lib/marketing/examples'
+import { PRODUCT_NAME } from '@qolumns/shared'
+import { HERO } from '@/lib/marketing/home-copy'
 import { Wordmark } from '@/components/brand/Wordmark'
-import { EstimateSheet } from '@/components/quote/EstimateSheet'
-import { LoginAside } from '@/components/auth/LoginAside'
 
 // Force dynamic rendering for auth pages
 export const dynamic = 'force-dynamic'
@@ -13,10 +10,14 @@ export const metadata: Metadata = {
   title: `${PRODUCT_NAME} - Auth`,
 }
 
+/**
+ * The account pages (log-in, sign-up, forgot and new password): the form
+ * alone, centred, at every width. T-200 (the owner's decision): the example
+ * estimate that sat beside the log-in form at desktop width (T-165) is gone.
+ */
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
-  const example = marketingExample(HERO_DEMO.trade)
   return (
-    <div className="flex min-h-screen items-center justify-center gap-16 bg-background p-4 xl:gap-24">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         {/* Brand mark */}
         <div className="mb-8 text-center">
@@ -31,23 +32,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           {children}
         </div>
       </div>
-      {/* T-165: on /login at desktop width, the estimate document a customer gets */}
-      <LoginAside>
-        <EstimateSheet
-          confirmed
-          data={{
-            businessName: DEMO_BUSINESS_NAME,
-            logoUrl: DEMO_LOGO_PATH,
-            customerName: example.customerName,
-            reference: 'EST-2026-0142',
-            lines: example.lines,
-            total: example.total,
-            currency: 'USD',
-            locale: 'en-US',
-            primaryColor: DEMO_PRIMARY_COLOR,
-          }}
-        />
-      </LoginAside>
     </div>
   )
 }

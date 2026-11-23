@@ -336,7 +336,10 @@ describe('the owner’s daily summary', () => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined)
     expect(await supportDaily(supabase, ENV, NOW, send)).toBe('sent')
     expect(sent).toHaveLength(1)
-    expect(sent[0]).toMatchObject({ to: 'owner@qolumns.test', subject: 'Qolumns support (development): 3 new items' })
+    expect(sent[0]).toMatchObject({ to: 'owner@qolumns.test', subject: 'Qolumns support (development): 2 problem reports and 1 feature request need you' })
+    // T-200: the text opens with the same line, and no count of nought is written anywhere
+    expect(sent[0]!.textBody!.split('\n')[0]).toBe('2 problem reports and 1 feature request need you')
+    expect(`${sent[0]!.subject}\n${sent[0]!.textBody}`).not.toMatch(/\b0 (new|problem|feature|question)|new items?\b/)
     for (const part of ['Fault: 1', 'Not sorted yet: 1', 'Feature requests: 1', '1. Send again does nothing (High; 1 business)']) expect(sent[0]!.textBody).toContain(part)
     expect(sent[0]!.textBody).not.toContain('Old')
   })

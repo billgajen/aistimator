@@ -202,3 +202,17 @@ what `pnpm check:failed` reads. The exit code is 0 only when everything passed.
 - The mobile app on a device. `verify-t182` drives its API client and queue; since T-196 its screens are looked
   at in an iPhone simulator by hand (the recipe is in the project memory), which no level runs.
 - Anything on production. Both levels run on this machine only.
+
+## T-200: the Android app has no script; Part B has one
+
+- **`verify-t200` (quick, no model, no browser):** Business is not offered (Pricing's two cards, the billing
+  page's plans, Checkout's refusal, and a holder who still sees its plan); saving "Quote Template" keeps customer
+  acceptance as set; a one-word question to the assistant is asked back and not counted; the log-in page is the
+  form alone. `verify-t165` checks the log-in page in a browser at each width; `verify-t171` (full level) checks
+  the billing page's centred pair.
+- **The Android app is not checked on this machine.** There is no Android SDK, Java or emulator here. Its unit
+  tests are `apps/mobile/src/__tests__/android-t200.test.ts`. To read what an Android build will contain without
+  building it: `cd apps/mobile && npx expo prebuild -p android --no-install`, read
+  `android/app/src/main/AndroidManifest.xml`, then delete `android/` and undo the two `scripts` lines prebuild
+  rewrites in `package.json`. `npx expo export --platform android` proves the JavaScript bundles for Android.
+- **A fixture that needs three plan cards no longer exists:** since T-200 two plans are offered.

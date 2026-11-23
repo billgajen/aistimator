@@ -1,5 +1,6 @@
 import { CONTACT_REQUIREMENTS, type ContactRequirement } from '@/lib/contact-rules'
 import { getPack } from '@/lib/vertical-packs'
+import { mergeTemplate } from '@/lib/tenant-template'
 import { createClient } from '@/lib/supabase/server'
 import { getRegion, isRegionCode, isUnitSystem } from '@qolumns/shared'
 import { type NextRequest, NextResponse } from 'next/server'
@@ -319,32 +320,9 @@ export async function PUT(request: NextRequest) {
         .eq('id', profile.tenant_id)
         .single()
 
-      const currentTemplate = (currentTenant?.template_json as TenantTemplate) || {
-        showLineItems: true,
-        includeAssumptions: true,
-        includeExclusions: true,
-        validityDays: 30,
-      }
-
-      // Merge and validate
-      const mergedTemplate: TenantTemplate = {
-        showLineItems:
-          templateJson.showLineItems !== undefined
-            ? Boolean(templateJson.showLineItems)
-            : currentTemplate.showLineItems,
-        includeAssumptions:
-          templateJson.includeAssumptions !== undefined
-            ? Boolean(templateJson.includeAssumptions)
-            : currentTemplate.includeAssumptions,
-        includeExclusions:
-          templateJson.includeExclusions !== undefined
-            ? Boolean(templateJson.includeExclusions)
-            : currentTemplate.includeExclusions,
-        validityDays:
-          templateJson.validityDays !== undefined
-            ? Math.max(1, Math.min(365, Number(templateJson.validityDays) || 30))
-            : currentTemplate.validityDays,
-      }
+      // T-200: only what this save sends is changed. Everything else in the template is kept, so
+      // "Allow customers to accept quotes directly" (set on the Branding tab) is not lost (lib/tenant-template.ts).
+      const mergedTemplate: TenantTemplate = mergeTemplate(currentTenant?.template_json as Partial<TenantTemplate> | null, templateJson)
 
       updates.template_json = mergedTemplate
     }

@@ -119,8 +119,9 @@ what was found for each, is `Docs/design/ai-capabilities.md` section 7). A line 
 after the live ones with a hollow mark and "Coming later": text messages, WhatsApp quoting, the on-site app,
 LiDAR, team members, priority support. The page's own taglines and lead say only what is live, and "Most
 popular" is "Recommended". **The public pages show a plan only once one of its own lines is live** (`sitePlans()`,
-the owner's decision): today Starter and Pro, as a centred pair, on Pricing and in Home's plan cards. Business is
-defined and sold as before; it is only not shown.
+the owner's decision): today Starter and Pro, as a centred pair, on Pricing and in Home's plan cards. **Since
+T-200 Business is not offered at all** (`offered: false`): no page, sign-up link, checkout or help answer offers
+it, and "which plans include this" lines name Pro alone. A business already on Business keeps it.
 
 **Customer pages (T-171).**
 - *The request form* (`components/embed/EstimateWidget.tsx`, steps in `components/embed/steps/`): edge to edge
@@ -158,7 +159,11 @@ upload, and the upload waits at most 15 seconds for it.
 
 **Billing (T-171):** a plan's lines on `/app/settings/billing` are `planLines()` from
 `lib/marketing/plan-claims.ts`, the list the public Pricing page reads, so a line that is not live says "Coming
-later" on both. Every plan on offer can be chosen there, Business included.
+later" on both. Every plan on offer can be chosen there. **T-200:** the plans on offer are Starter and Pro, shown
+as a centred pair (`mx-auto max-w-3xl sm:grid-cols-2`). A business on a plan that is no longer offered (Business)
+still sees its plan named at the top of the page, and its own card as a third one marked "Current Plan"
+(`billingPagePlans()` in `packages/shared/src/plans.ts`); it changes plan in Stripe's portal, which lists Starter
+and Pro.
 
 **Login, sign-up, header and footer (T-171):** fields are 44 px tall with a visible edge; "Sign up" and "Log in"
 are underlined semibold links 24 px tall; header and footer links are at least 24 px tall on a computer.
@@ -324,8 +329,16 @@ are still here. Nothing you typed has been lost." and shows **Try again**, which
 Over" is shown only when there is nothing to send again.
 
 Sign-in and sign-up (T-160) show the home page's headline under the product name (`HERO.headline` in
-`lib/marketing/home-copy.ts`), so they always match the home page. T-165: at desktop width the login page shows a real estimate
-document (`EstimateSheet`) beside the form; sign-up keeps one column. The email field has `autocomplete="email"`.
+`lib/marketing/home-copy.ts`), so they always match the home page. **T-200: every account page is the form alone,
+centred, at every width.** The example estimate (`EstimateSheet`) that T-165 put beside the log-in form at desktop
+width is gone (`components/auth/LoginAside.tsx` is deleted); sign-up never had it. The email field has
+`autocomplete="email"`.
+
+**Ask Qolumns asks back (T-200).** A question of one word, or one the assistant finds could mean several things,
+is not answered with a guess: the answer is our line "Do you mean one of these? If not, tell me a little more."
+and, under it, two or three buttons, one to a row (`data-testid="ask-choice"`), each the heading of a help-guide
+entry. Pressing one asks it as the next question. That turn has no "Did this answer it?", is not kept, and does not
+count against the day's limit.
 
 Services (T-169): each service is a row that stacks on a phone, so Edit, Disable and Delete are always on screen
 (the table cut its last columns off at 390 px, and the page scrolled sideways). Delete sits apart from the other
@@ -363,8 +376,9 @@ The free start, the "Pro" tag and a business's own address (T-199, AD-085, AD-08
 - **The app:** the "New quote" tab shows "On-site quotes are part of Pro", one sentence and "OK" for a business
   without on-site quotes, and mounts no form. The Account tab shows the main link, and "Also works: …" under it
   when that is the address. No price, link or buying words anywhere in the app.
-- **Pricing and Features:** "Mobile app: every plan" and "On-site quotes in the app: Pro and Business" (`appPlanLines`),
-  and "Your own address: yourname.qolumns.com" on Pro and Business, with "Coming soon" until the address is on.
+- **Pricing and Features:** "Mobile app: every plan" and "On-site quotes in the app: Pro" (`appPlanLines`; it read
+  "Pro and Business" until T-200), and "Your own address: yourname.qolumns.com" on Pro, with "Coming soon" until
+  the address is on.
 
 Quote link page (T-149 + T-152; "Share" until T-160): quote link · QR code · where to put it · **Use it on WhatsApp** ("Send on WhatsApp" via
 wa.me with the link; greeting, away and quick-reply texts for the WhatsApp Business app with where to paste them;

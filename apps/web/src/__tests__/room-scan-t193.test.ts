@@ -316,8 +316,10 @@ describe('T-193: room scan is a Pro feature (the owner’s decision)', () => {
     expect(offeredPlans().map((p) => [p.id, p.monthlyPrice.USD, p.annualPrice?.USD, p.quoteLimit])).toEqual([
       ['plan_us_starter', 4900, 49000, 50],
       ['plan_us_pro', 9900, 99000, 200],
-      ['plan_us_business', 19900, 199000, 600],
     ])
+    // T-200: Business is not offered; its price and limit are unchanged for a business that holds it
+    const business = getPlan('plan_us_business')!
+    expect([business.monthlyPrice.USD, business.annualPrice?.USD, business.quoteLimit]).toEqual([19900, 199000, 600])
   })
 
   it('Features says which plan has it, from the plan definitions', () => {

@@ -5,10 +5,10 @@
  *    page says "trial" or "14-day".
  * 2. The home page: its sections in order, one idea each; the hero demo's
  *    timeline; the screens are built from the product's own parts.
- * 3. Login shows the estimate document; the email field can be autofilled; a
+ * 3. Login is the form alone (T-200; it showed an estimate document); the email field can be autofilled; a
  *    skip link; footer links are tap-sized on a phone.
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { offeredPlans, PLANS, freeOfferLabel, FREE_ALLOWANCE } from '@qolumns/shared'
@@ -200,11 +200,18 @@ describe('T-165: the home page', () => {
 })
 
 describe('T-165: login and small fixes', () => {
-  it('login shows a real estimate document beside the form at desktop width, and only there', () => {
-    expect(code('app/(auth)/layout.tsx')).toContain('<EstimateSheet')
-    const aside = code('components/auth/LoginAside.tsx')
-    expect(aside).toContain("usePathname() !== '/login') return null")
-    expect(aside).toContain('hidden w-full max-w-sm shrink-0 lg:block')
+  it('T-200: log-in is the form alone, centred (the example estimate beside it is gone, at every width)', () => {
+    const layout = code('app/(auth)/layout.tsx')
+    expect(layout).not.toMatch(/EstimateSheet|LoginAside|login-document|marketingExample/)
+    expect(existsSync(join(WEB, 'components/auth/LoginAside.tsx'))).toBe(false)
+    // one column, in the middle of the screen both ways, with nothing beside it to make room for
+    expect(layout).toContain('<div className="flex min-h-screen items-center justify-center bg-background p-4">')
+    expect(layout).toContain('<div className="w-full max-w-md">')
+    expect(layout).not.toMatch(/gap-16|xl:gap-24|lg:block/)
+    // the log-in page itself is its heading and its form
+    const login = code('app/(auth)/login/page.tsx')
+    expect(login).toContain('Log in to your account')
+    expect(login).not.toMatch(/EstimateSheet|MiniEstimate/)
   })
 
   it('the email and password fields can be autofilled', () => {
