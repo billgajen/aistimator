@@ -69,8 +69,18 @@ The same app, built for Google Play as `com.qolumns.app`. What differs from the 
 
 - **No room scan.** `roomScanAvailability()` answers `not_ios`, and every scan control hangs on it: no scan card
   on a new quote, no "Scan again" or "Add an area". A quote scanned on an iPhone shows its sizes and floor plan,
-  read-only, with no "View in 3D" (the model has not been seen to open on Android). The scanner's native code is
-  not in the Android build (`modules/room-scan/expo-module.config.json` names Apple only).
+  read-only. The scanner's native code is not in the Android build (`modules/room-scan/expo-module.config.json`
+  names Apple only).
+- **"View in 3D" (T-201)** is there on Android too. The viewer is the web's page (`/room-model`); an iPhone shows
+  it in Safari's in-app browser, Android opens it in the phone's own browser (`openPage` falls back to
+  `Linking.openURL`). The button is given to the scan card only when `canOpenPage()` says the phone can open a web
+  address, so a phone with no browser shows no button. Seen drawing a model in Chrome's engine with an Android
+  phone profile; not seen on an Android phone.
+- **Tablets, Chromebooks, headsets (T-201).** The app is portrait-only on a phone, and Google Play reads that as
+  "needs a portrait screen" and hides the app from everything else. `plugins/with-optional-hardware.js` declares
+  a portrait screen, a back camera and autofocus as `required="false"` in the manifest. Check the built bundle's
+  manifest for the three `uses-feature` lines after any change to the plugin. A device with no camera goes to
+  the gallery when "Take a photo" is pressed.
 - **The keyboard.** Expo SDK 58 draws edge to edge on Android, and Android no longer makes such a window smaller
   when the keyboard opens. `KeyboardSpace` (`src/components/ui.tsx`) pads for the keyboard on both phones; use it
   on any screen with a text field at the bottom. Never `behavior={Platform.OS === 'ios' ? … : undefined}`.

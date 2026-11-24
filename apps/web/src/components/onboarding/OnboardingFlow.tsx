@@ -16,6 +16,8 @@ import { useRouter } from 'next/navigation'
 import type { ServiceDraftConfig, AddonConfig, MultiplierConfig, RegionCode } from '@qolumns/shared'
 import { getRegion, currencySymbol as symbolFor } from '@qolumns/shared'
 import { describePricingRules } from '@/lib/pricing-describe'
+import type { LeftOut } from '@/lib/pricing-left-out'
+import { LeftOutNote } from '@/components/services/LeftOutNote'
 import { listPacks, getPack } from '@/lib/vertical-packs'
 import { isUnpriced, servicePayload, type DraftService } from '@/lib/onboarding-service'
 import { TradeStep } from './TradeStep'
@@ -82,6 +84,8 @@ export function OnboardingFlow({
     addons: AddonConfig[]
     multipliers: MultiplierConfig[]
     ambiguities: string[]
+    /** T-201: what did not fit in one service, by name */
+    leftOut?: LeftOut
   } | null>(null)
 
   // Basics
@@ -626,6 +630,8 @@ export function OnboardingFlow({
                   ))}
                 </div>
               </div>
+
+              <LeftOutNote leftOut={compileResult.leftOut} />
 
               {compileResult.ambiguities.length > 0 && (
                 <div className="rounded-lg border border-tertiary-line bg-tertiary-light p-4">

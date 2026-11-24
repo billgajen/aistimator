@@ -3,6 +3,7 @@ import { getRegion, canDownloadQuotePdf, customerRoomScanView, resolveRegionCont
 import { NextResponse } from 'next/server'
 import { generatePdf, isDocRaptorConfigured } from '@/lib/docraptor'
 import { generateQuotePdfHtml, type QuotePdfData } from '@/lib/pdf-template'
+import { customerTerms } from '@/lib/quote-terms'
 import { uploadToR2, generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import type {
   QuotePricing,
@@ -70,7 +71,8 @@ export async function POST(
           region,
           unit_system,
           branding_json,
-          template_json
+          template_json,
+          default_terms_text
         ),
         services!service_id ( name ),
         quote_requests!quote_request_id ( job_answers )
@@ -130,6 +132,7 @@ export async function POST(
       unit_system?: string | null
       branding_json: TenantBranding | null
       template_json: TenantTemplate | null
+      default_terms_text?: string | null
     }
 
     const branding: TenantBranding = {
@@ -190,6 +193,8 @@ export async function POST(
       serviceName: (quote.services as { name?: string } | null)?.name,
       // T-193: the room scan's sizes and floor plans, in the business's units
       ...pdfRoomScan(quote, tenant),
+      // T-201: the business's "Default Terms & Conditions", when it has any
+      terms: customerTerms(tenant.default_terms_text),
     }
 
     // Generate HTML

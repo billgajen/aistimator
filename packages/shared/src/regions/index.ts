@@ -7,7 +7,7 @@ import type { RegionCode, RegionDefinition, ReferenceObject, UnitSystem } from '
 import { US_REGION } from './us'
 import { GB_REGION } from './gb'
 
-export type { RegionCode, RegionDefinition, ReferenceObject, RegionCopy, UnitSystem } from './types'
+export type { RegionCode, RegionDefinition, ReferenceObject, RegionCopy, RegionAreas, UnitSystem } from './types'
 export { US_REGION } from './us'
 export { GB_REGION } from './gb'
 

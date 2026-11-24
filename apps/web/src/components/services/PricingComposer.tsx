@@ -11,12 +11,16 @@
 import { useState } from 'react'
 import type { ServiceDraftConfig, AddonConfig, MultiplierConfig } from '@qolumns/shared'
 import { describePricingRules, type DescribablePricing } from '@/lib/pricing-describe'
+import type { LeftOut } from '@/lib/pricing-left-out'
+import { LeftOutNote } from '@/components/services/LeftOutNote'
 
 export interface CompileResult {
   updatedConfig: ServiceDraftConfig
   addons: AddonConfig[]
   multipliers: MultiplierConfig[]
   ambiguities: string[]
+  /** T-201: what did not fit in one service (ten price lines, ten questions), by name. Absent when all fitted. */
+  leftOut?: LeftOut
 }
 
 interface PricingComposerProps {
@@ -28,9 +32,10 @@ interface PricingComposerProps {
   onApply: (result: CompileResult) => void
 }
 
-const PLACEHOLDER = `Describe how you charge, in your own words — or paste your price list. For example:
+/** The example in the box, in the business's own currency (T-201: it was typed in pounds for everyone) */
+const placeholder = (c: string) => `Describe how you charge, in your own words — or paste your price list. For example:
 
-"£120 call-out fee which covers the first hour. £12 per square metre for walls, £15 for ceilings. Add 20% if ceilings are above 2.6m. Rush jobs within 48 hours are an extra £75. Minimum job £150."`
+"${c}120 call-out fee which covers the first hour. ${c}12 per square metre for walls, ${c}15 for ceilings. Add 20% if ceilings are above 2.6m. Rush jobs within 48 hours are an extra ${c}75. Minimum job ${c}150."`
 
 export function PricingComposer({
   serviceName,
@@ -137,7 +142,7 @@ export function PricingComposer({
             ))}
           </div>
           <p className="mt-3 text-xs text-text-muted">
-            Describe changes below (e.g. &quot;raise the base fee to £150&quot;) — anything you
+            Describe changes below (e.g. &quot;raise the base fee to {currencySymbol}150&quot;) — anything you
             don&apos;t mention stays as it is.
           </p>
         </details>
@@ -146,7 +151,7 @@ export function PricingComposer({
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder={PLACEHOLDER}
+        placeholder={placeholder(currencySymbol)}
         rows={6}
         className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
         disabled={compiling}
@@ -204,6 +209,9 @@ export function PricingComposer({
               </div>
             )}
           </div>
+
+          {/* T-201: what did not fit in one service, by name, before anything is applied */}
+          <LeftOutNote leftOut={result.leftOut} />
 
           {/* Questions the AI needs answered instead of guessing */}
           {result.ambiguities.length > 0 && (

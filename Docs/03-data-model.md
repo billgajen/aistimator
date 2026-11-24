@@ -36,6 +36,14 @@ Used for embed security.
 - active
 - document_type_default (enum)
 - created_at
+- draft_config (jsonb): the service's draft, which is where its questions live (`suggestedFields`). T-201: a
+  service made by hand in the editor now gets one too, marked `"source": "manual"`, so its questions are saved;
+  a draft with no `source` came from an AI draft, a template or an import (the ones marked "AI Draft"). No
+  migration: existing rows are read as they are.
+- T-201, a question's keys: `suggestedFields[].fieldId` (the customer's answer) and `.mapsToSignal` (the fact it
+  gives) are set once and kept when the label changes. Price lines (`quantitySource.fieldId` / `.signalKey`,
+  `triggerSignal`, `when.fieldId`, formulas) and adjustments (`multipliers[].when.fieldId`) refer to those keys,
+  never to the label (`apps/web/src/lib/service-questions.ts`). Existing services keep the keys they have.
 
 ### service_pricing_rules
 - id
@@ -182,11 +190,21 @@ gives Pro's features: the free start. A row that is not live gives none, and end
 - period_yyyymm
 - estimates_created
 - estimates_sent
+- plan_estimates_created (T-201, migration 50): of `estimates_created`, the quotes counted against a monthly limit
+  (a plan's). The rest were free quotes
 - created_at
 
 T-180 (migration 44, AD-063): never read-then-written. `claim_plan_quote(tenant, period, limit, per)` checks the
 limit and adds one in a single step, one business at a time; `release_plan_quote` gives a claim back;
 `increment_usage_counter` adds one to a counter with no limit (estimates sent). Service role only.
+
+T-201 (migration 50): **the free quotes a business has used are the quotes priced on the free start, not every
+quote ever**: `estimates_created - plan_estimates_created`, every month together (`freeQuotesUsed`,
+`packages/shared/src/plans.ts`; `claim_plan_quote` counts the same way for `per = 'total'`). A claim against a
+monthly limit (`per = 'month'`) adds one to both columns. So a business whose plan ends still has the free
+quotes it never used. `release_plan_quote(tenant, period, per)` is told which kind of claim it gives back. The
+migration fills the new column once, for businesses that have a `subscriptions` row: a month's quotes made on or
+after the day that row was created are taken as the plan's.
 
 ### stripe_events (T-180, migration 44)
 - id (Stripe's event id), type, received_at, processed_at (null until its handler finished)
@@ -221,6 +239,20 @@ limit and adds one in a single step, one business at a time; `release_plan_quote
 - `time_zone`: the business's time zone as an IANA name (`Europe/London`). Null until the dashboard or the app
   first reports it, then kept (never overwritten by a later report). "This month" on Home starts at the business's
   midnight; until the column is set, the region's zone is used (`RegionDefinition.timeZone`).
+
+### tenants: sharing rates in the benchmarks (T-115, migration 21; T-201, migration 50)
+- `benchmarks_opt_in` (boolean): the business's per-unit and hourly rates are in the anonymous benchmarks, and it
+  sees them in return. Since migration 50 the column's default is **true**: a business created from then on starts
+  with it on, and Settings → Business has the switch. Migration 50 changes no existing row: a business that never
+  pressed "Share & See Benchmarks" stays off, and so do the demo business and the store reviewers' accounts,
+  which their scripts set to false.
+
+### tenants: the reminder to the customer (T-201, migration 50)
+- `customer_reminder_enabled` (boolean, not null, default **true**): the one automatic reminder a customer gets
+  when an estimate has waited three days with no answer. Settings → "Reminder to the customer" writes it
+  (`PUT /api/tenant` `customerReminder`). The daily job (`/api/cron/lifecycle`) reads it inside its question
+  "which quotes are due?" (`lib/quote-reminders.ts`): a quote of a business with it off is never returned. Off
+  covers every quote not yet reminded (`quotes.reminder_sent_at` is null), including ones already sent.
 
 ### support_reports (T-197, migration 47)
 - id (uuid), tenant_id, user_id (who sent it; kept as null when the user is removed)

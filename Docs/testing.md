@@ -216,3 +216,22 @@ what `pnpm check:failed` reads. The exit code is 0 only when everything passed.
   `android/app/src/main/AndroidManifest.xml`, then delete `android/` and undo the two `scripts` lines prebuild
   rewrites in `package.json`. `npx expo export --platform android` proves the JavaScript bundles for Android.
 - **A fixture that needs three plan cards no longer exists:** since T-200 two plans are offered.
+
+## T-201: one script, five sections
+
+- **`verify-t201` (quick, no model, a browser for one section):** `scripts/hardcore-test/verify-t201.mts` runs the
+  sections in `scripts/hardcore-test/t201/`, which share `harness.mts` (a business, a service priced from the form
+  alone, a customer request, rows changed by hand). One section can be run alone:
+  `npx tsx scripts/hardcore-test/verify-t201.mts services` (also `reminder`, `estimates`, `home`, `billing`). A
+  section that stops early is one failed check and the others still run.
+- **The reminder switch has no email to read here** (no email provider on this machine, so the daily job skips
+  its reminder step). The `reminder` section asks the job's own question, `dueReminders`, of the real database
+  for two businesses, one with the switch off.
+- **A purchase pricing saved requests** goes through Stripe's webhook: `verify-t180` (full level, the Stripe
+  sandbox) holds it; the `billing` section runs the same pricing run without Stripe.
+- **Trying a deploy script against a copy at the migration before** (the lesson of migration 44): copy the local
+  database (`pg_dump | psql` into a new database made from `template0`), undo the new migration in the copy, run
+  the script with `MIGRATION_TEST_API` pointed at a small stand-in that runs each query on the copy, then run it
+  a second time. Done for migration 50.
+- **The Android bundle's manifest:** `unzip -p apps/mobile/build/<file>.aab base/manifest/AndroidManifest.xml |
+  strings | grep -i -A2 'uses-feature\|hardware'` shows the "not required" lines of T-201.

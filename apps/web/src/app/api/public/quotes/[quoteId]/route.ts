@@ -1,11 +1,12 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { quoteTokenFilter } from '@/lib/tokens'
-import { businessIsAsked, isMadeByBusiness, isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange, canCustomerDecide, displaySectionsForCustomer, alsoAskedOf, alsoAskedWithStates, addedSections, roomScanOfAnswers, customerRoomScanView } from '@qolumns/shared'
+import { businessIsAsked, isMadeByBusiness, isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange, customerRangeAllowed, customerSeesNoFigure, reviewModeOf, canCustomerDecide, displaySectionsForCustomer, alsoAskedOf, alsoAskedWithStates, addedSections, roomScanOfAnswers, customerRoomScanView } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import { hasCustomBranding } from '@/lib/plan-features'
 import { customerReadLines } from '@/lib/customer-read'
+import { customerTerms } from '@/lib/quote-terms'
 import { pricingForCustomerView } from '@/lib/quote-sections-service'
 import type {
   QuoteViewResponse,
@@ -57,11 +58,14 @@ export async function GET(
           currency,
           unit_system,
           template_json,
-          branding_json
+          branding_json,
+          default_terms_text
         ),
         services!service_id (
           id,
-          name
+          name,
+          auto_send,
+          hold_until_approved
         ),
         quote_requests!quote_request_id (
           id,
@@ -138,6 +142,7 @@ export async function GET(
       currency?: string | null
       unit_system?: string | null
       template_json: Record<string, unknown> | null
+      default_terms_text?: string | null
       branding_json: {
         logoAssetId?: string | null
         primaryColor?: string
@@ -240,10 +245,19 @@ export async function GET(
     const storedRange = (pricing as { range?: { low?: number; high?: number } }).range
     const measuredLow = storedRange?.low ?? pricing.estimate?.rangeLow
     const measuredHigh = storedRange?.high ?? pricing.estimate?.rangeHigh
-    const hasMeasuredRange = measuredLow !== undefined && measuredHigh !== undefined && measuredHigh > measuredLow
-    // T-146: while the business reviews, show the instant range only if the
-    // engine measured one — never a made-up ±12% around a flat price.
-    const showRange = customerStatus === 'awaiting_clarification' || hasMeasuredRange
+    // T-201: a quote waiting for the business that the customer was not shown
+    // ("Hold until I approve", or one a check held) gives the customer no
+    // figure at all: no price, no low and no high, here or in the PDF. Until
+    // T-201 it showed the engine's measured range (T-146), which is a price by
+    // another name. A range is now shown only while the customer is confirming
+    // a detail, and not even then for a service that holds until approved.
+    const serviceRow = quote.services as { auto_send?: boolean | null; hold_until_approved?: boolean | null } | null
+    const showRange = customerRangeAllowed({ status: customerStatus, mode: reviewModeOf(serviceRow ?? {}) })
+    // No figure of any kind: also none hidden in a note or a sentence the pipeline wrote, and no PDF
+    // (a PDF carries every price). Both the held quote and the detail still to confirm on a holding service.
+    const noFigures = customerSeesNoFigure({ status: customerStatus, shownEarly }) || (isProvisional && !showRange)
+    // (the PDF route refuses these too; a range is not a PDF's worth of prices either)
+    if (isProvisional) delete actions.pdfUrl
     if (isProvisional && (pricing.total || 0) > 0 && showRange) {
       const total = pricing.total || 0
       // Prefer the engine's measured range; fall back to ±12%, rounded to 10s
@@ -347,7 +361,7 @@ export async function GET(
             taxAmount: 0,
             total: 0,
             breakdown: [],
-            notes: pricing.notes || [],
+            notes: noFigures ? [] : pricing.notes || [],
           }
         : {
             currency: pricing.currency || regionCtx.currency,
@@ -364,18 +378,21 @@ export async function GET(
             // T-146: no `estimate` (grade/label/description) — business-only
           },
       breakdown: isProvisional ? [] : pricing.breakdown || [],
-      notes: {
-        scopeSummary: content.scopeSummary,
-        assumptions: content.assumptions,
-        exclusions: content.exclusions,
-        notes: content.notes,
-        validityDays: content.validityDays,
-      },
+      // T-201: nothing the pipeline wrote is sent while the customer may see no figure (a sentence can name one)
+      notes: noFigures
+        ? { validityDays: content.validityDays }
+        : {
+            scopeSummary: content.scopeSummary,
+            assumptions: content.assumptions,
+            exclusions: content.exclusions,
+            notes: content.notes,
+            validityDays: content.validityDays,
+          },
       validUntil,
       assets,
       actions,
       // Include cross-service pricing if available (quotes made before T-179)
-      ...(content.crossServicePricing && content.crossServicePricing.length > 0 && {
+      ...(!noFigures && content.crossServicePricing && content.crossServicePricing.length > 0 && {
         crossServicePricing: content.crossServicePricing,
       }),
       // T-179: one request, several services. Only once the customer can see
@@ -387,7 +404,7 @@ export async function GET(
         canChangeSections: canCustomerDecide(quote.status) || shownEarly,
       }),
       // Include AI-recommended additional work if available
-      ...(content.signalRecommendations && content.signalRecommendations.length > 0 && {
+      ...(!noFigures && content.signalRecommendations && content.signalRecommendations.length > 0 && {
         signalRecommendations: content.signalRecommendations,
       }),
       // Accept quote toggle — defaults to true for backward compatibility.
@@ -395,6 +412,9 @@ export async function GET(
       // (T-147) while an estimate shown early awaits the business's approval.
       acceptQuoteEnabled: !isProvisional && !shownEarly && tenant.template_json?.acceptQuoteEnabled !== false,
       ...(questionPending && { questionPending: true }),
+      // T-201: the business's "Default Terms & Conditions" (Settings), printed below the price. Only when
+      // filled in, and only on a page that shows a price (a held quote shows no document at all).
+      ...(!isProvisional && customerTerms(tenant.default_terms_text) && { terms: customerTerms(tenant.default_terms_text)! }),
       // T-193: what the room scan measured, the plans and the models (asked for when the customer opens one)
       ...(customerScan && !isQuoteProcessing(quote.status) && { roomScan: customerScan }),
     }

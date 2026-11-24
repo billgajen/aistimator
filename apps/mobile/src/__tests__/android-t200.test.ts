@@ -190,12 +190,13 @@ describe('T-200: room scan is not on Android', () => {
     expect(outside).not.toMatch(/Room scan|scanBlocked|Scan an|Scan again|LiDAR/)
   })
 
-  it('a quote scanned on an iPhone shows its sizes on Android, read-only: no 3D button, no "Scan again", no "Add an area"', () => {
+  it('a quote scanned on an iPhone shows its sizes on Android, read-only: no "Scan again", no "Add an area" (the 3D button: T-201)', () => {
     const screen = read('app/quote/[id].tsx')
     expect(screen).toContain('const scanHere = roomScanAvailability()')
     // the summary itself is shown whatever the phone
     expect(screen).toContain('quote.roomScan && quote.roomScan.rooms.length > 0 ? (')
-    expect(screen).toContain("{...(scanHere !== 'not_ios' && { onModel: viewModel })}")
+    // T-201 switched "View in 3D" on for Android, where the phone can open the viewer (android-t201.test.ts)
+    expect(screen).toContain('{...(modelOpens && { onModel: viewModel })}')
     expect(screen).toContain("quote.roomScan.canScanAgain && scanHere === 'ready' && { onScanAgain")
     // the summary draws a button only for an action it is given
     const summary = read('src/components/RoomScanSummary.tsx')

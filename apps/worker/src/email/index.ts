@@ -5,7 +5,7 @@
  */
 
 import { formatMoney, reviewEmailSubject, reviewHoldLine, TEST_REQUEST_BANNER } from '@qolumns/shared'
-import type { ApprovalDetail } from '@qolumns/shared'
+import type { ApprovalDetail, CustomerEmailBrand } from '@qolumns/shared'
 import { sendEmail, type PostmarkConfig } from './postmark'
 import {
   customerQuoteEmail,
@@ -34,6 +34,8 @@ export interface QuoteEmailData {
     /** T-157: the business's address by the shared rule (also the customer email's reply-to) */
     ownerEmail: string
     primaryColor?: string
+    /** T-201: the business's logo and whether "Powered by" shows, in the customer's email */
+    brand?: CustomerEmailBrand
   }
   service: {
     name: string
@@ -112,6 +114,7 @@ export async function sendQuoteEmails(
     validUntil,
     scopeSummary: data.content?.scopeSummary,
     primaryColor: data.business.primaryColor,
+    brand: data.business.brand,
   }
 
   const customerHtml = customerQuoteEmail(customerEmailData)
@@ -267,6 +270,8 @@ export interface EstimateShownEmailData {
   locale?: string
   scopeSummary?: string
   primaryColor?: string
+  /** T-201: the business's logo and whether "Powered by" shows */
+  brand?: CustomerEmailBrand
 }
 
 /**
@@ -292,6 +297,7 @@ export async function sendEstimateShownEmail(
     currency: data.currency,
     scopeSummary: data.scopeSummary,
     primaryColor: data.primaryColor,
+    brand: data.brand,
     awaitingConfirmation: true,
   })
   const result = await sendEmail(

@@ -1782,25 +1782,12 @@ function SuccessState({
     )
   }
 
-  // Quote under business review — show the range so the customer isn't left with nothing
-  if (liveStatus === 'pending_review' && rangeDisplay) {
-    return (
-      <div className="text-center py-12 px-6" data-testid="finished-held">
-        <h3 className="font-display text-xl font-bold text-text-primary mb-2">Your estimate is being prepared</h3>
-        <p className="figure text-2xl font-medium text-text-primary mb-2">{rangeDisplay}</p>
-        <p className="text-sm text-text-secondary mb-6">
-          {businessName} will review and send it shortly.
-        </p>
-        {shownBelow ? null : (
-          <a href={quoteUrl} {...sameTab} className={linkClass} data-testid="finished-link">
-            View your estimate
-          </a>
-        )}
-      </div>
-    )
-  }
+  // T-201: a quote held for the business shows no figure at all. Until T-201 a
+  // range the customer had been shown while confirming a detail stayed on the
+  // screen here ("being prepared", with a low and a high); the public quote API
+  // no longer sends one for a held quote, and this screen no longer keeps one.
 
-  // Failed, held for the business (no range to show) or unusually slow —
+  // Failed, held for the business (no figure to show) or unusually slow —
   // the request is safe; email is the channel now
   if (liveStatus === 'failed' || liveStatus === 'pending_review' || timedOut) {
     return (

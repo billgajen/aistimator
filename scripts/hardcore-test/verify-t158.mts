@@ -301,7 +301,8 @@ reads('revised', revised.id, { label: 'Waiting for customer', detail: 'Updated q
 reads('awaiting clarification', clarifying.id, { label: 'Waiting for customer', detail: 'Waiting for their answers', button: null })
 reads('sent automatically', qAuto.id, { label: 'Waiting for customer', detail: 'Sent today, not opened yet', button: null })
 reads('accepted', qAccept.id, { label: 'Customer accepted', detail: /^Accepted on \S+ \S+$/, button: 'Contact customer' })
-reads('paid', paid.id, { label: 'Paid', detail: /^Paid on \S+ \S+$/, button: null })
+// T-201: nothing says "Paid" until payments exist (PAYMENTS_LIVE), so a quote stored as paid reads as accepted
+reads('stored as paid', paid.id, { label: 'Customer accepted', detail: /^Accepted on \S+ \S+$/, button: 'Contact customer' })
 reads('declined', qDecline.id, { label: 'Customer declined', detail: /^Declined on \S+ \S+$/, button: null })
 reads('expired', expired.id, { label: 'Expired', detail: /^Expired on \S+ \S+$/, button: 'Send again' })
 reads('still being priced', working.id, { label: 'Working out the price', detail: 'Received today', button: null })
@@ -434,9 +435,9 @@ if (!process.env.PLAYWRIGHT_DIR) {
   await openTab('accepted')
   const rAccepted = await rowsOn()
   seen.push(...rAccepted)
-  check('list, Accepted: "Customer accepted" with "Contact customer"; "Paid" with no button',
+  check('list, Accepted: "Customer accepted" with "Contact customer"; a quote stored as paid reads the same (T-201)',
     rAccepted.length === 2 && rAccepted.find((r) => r.id === qAccept.id)?.label === 'Customer accepted' && nextOf(rAccepted, qAccept.id) === 'Contact customer' &&
-      rAccepted.find((r) => r.id === paid.id)?.label === 'Paid' && nextOf(rAccepted, paid.id) === null,
+      rAccepted.find((r) => r.id === paid.id)?.label === 'Customer accepted' && nextOf(rAccepted, paid.id) === 'Contact customer',
     rAccepted.map((r) => [r.label, r.detail, r.next]))
   const menuAccepted = await menuOf(qAccept.id)
   check('list, More on an accepted quote: no "Send again"', JSON.stringify(menuAccepted) === JSON.stringify(['Open quote', 'Copy link', 'Download PDF', 'Pricing trace']), menuAccepted)
@@ -582,7 +583,8 @@ if (!process.env.PLAYWRIGHT_DIR) {
 
   const pFailed = await quotePage(ctxA, failed.id)
   const boxFailed = await boxOf(pFailed)
-  check('page, could not be priced: contact the customer', boxFailed.label === 'Could not be priced' && boxFailed.sentence === 'We could not work out a price for this request. Contact Noor and quote it yourself.' && JSON.stringify(boxFailed.buttons) === JSON.stringify(['Email Noor', 'Call Noor']), boxFailed)
+  // T-201: "Try again" is there too (the same action as the app's "Price this request")
+  check('page, could not be priced: contact the customer, or try again', boxFailed.label === 'Could not be priced' && boxFailed.sentence === 'We could not work out a price for this request. Contact Noor and quote it yourself.' && JSON.stringify(boxFailed.buttons) === JSON.stringify(['Email Noor', 'Call Noor', 'Try again']), boxFailed)
   await pFailed.close()
 
   const pNoEmail = await quotePage(ctxA, sentOldNoEmail.id)
@@ -592,7 +594,8 @@ if (!process.env.PLAYWRIGHT_DIR) {
 
   const pPaid = await quotePage(ctxA, paid.id)
   const tPaid = await trackerOf(pPaid)
-  check('page, paid: step four keeps "Accepted" and adds "Paid <date>"', tPaid[3]!.label === 'Accepted' && /^Paid /.test(tPaid[3]!.lines[1] ?? ''), tPaid[3])
+  // T-201: no "Paid" line until payments exist
+  check('page, stored as paid: step four is "Accepted" with its date, and nothing says "Paid"', tPaid[3]!.label === 'Accepted' && tPaid[3]!.lines.length >= 1 && !tPaid[3]!.lines.some((line: string) => /paid/i.test(line)), tPaid[3])
   await pPaid.close()
 
   // tenant isolation on the page: the rival cannot open this business's quote

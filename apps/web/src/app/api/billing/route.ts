@@ -59,7 +59,7 @@ export async function GET() {
     // Usage counters, every month (T-152: the free allowance counts all of them)
     const { data: usageRows } = await supabase
       .from('usage_counters')
-      .select('period_yyyymm, estimates_created, estimates_sent')
+      .select('period_yyyymm, estimates_created, estimates_sent, plan_estimates_created')
       .eq('tenant_id', tenantId)
     const usageCounter = (usageRows ?? []).find((r) => r.period_yyyymm === currentPeriod) ?? null
 

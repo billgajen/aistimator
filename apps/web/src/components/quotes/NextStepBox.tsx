@@ -27,6 +27,7 @@ export function NextStepBox({
   onPrice,
   resending,
   onSendAgain,
+  onTryAgain,
   note,
 }: {
   turn: QuoteTurn
@@ -41,6 +42,8 @@ export function NextStepBox({
   onPrice: () => void
   resending: boolean
   onSendAgain: () => void
+  /** T-201: given only for a request that could not be priced; `pricing` and `priceResult` are its state too */
+  onTryAgain?: () => void
   /** T-169: a quieter line under the sentence (what the customer sees while the quote waits) */
   note?: string | null
 }) {
@@ -100,6 +103,19 @@ export function NextStepBox({
             <a href={`tel:${phone.replace(/[^\d+]/g, '')}`} className={email ? SECONDARY : PRIMARY} data-testid="next-step-call">
               {B.call(firstName)}
             </a>
+          )}
+          {/* T-201: a request that could not be priced can be priced again (the same route as "Price this request") */}
+          {onTryAgain && (
+            <>
+              <button type="button" onClick={onTryAgain} disabled={pricing} className={email || phone ? SECONDARY : PRIMARY} data-testid="try-again">
+                {pricing ? B.tryingAgain : B.tryAgain}
+              </button>
+              {priceResult && (
+                <span className="text-xs text-text-muted" role="status" data-testid="try-again-note">
+                  {priceResult}
+                </span>
+              )}
+            </>
           )}
         </div>
       )}

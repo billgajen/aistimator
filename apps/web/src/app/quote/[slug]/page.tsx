@@ -2,8 +2,10 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
-import { resolveQuoteLink, supabaseQuoteLinkStore, markFirstVisit } from '@/lib/quote-link'
+import { resolveQuoteLink, supabaseQuoteLinkStore, markFirstVisit, countsAsFirstVisit, OWN_VISIT_PARAM } from '@/lib/quote-link'
+import { currentTenant } from '@/lib/current-tenant'
 import { EstimateWidget } from '@/components/embed/EstimateWidget'
+import { OwnVisitMark } from '@/components/share/OwnVisitMark'
 import { verifyTestToken } from '@/lib/test-quote-token'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +19,17 @@ export const dynamic = 'force-dynamic'
  */
 interface QuotePageProps {
   params: { slug: string }
-  searchParams?: { test?: string }
+  searchParams?: { test?: string; own?: string }
+}
+
+/** The business the visitor is signed in to, or null (most visitors are customers, signed in to nothing) */
+async function signedInBusiness(): Promise<string | null> {
+  try {
+    const auth = await currentTenant()
+    return auth.ok ? auth.tenantId : null
+  } catch {
+    return null
+  }
 }
 
 async function resolve(slug: string) {
@@ -52,13 +64,31 @@ export default async function QuoteLinkPage({ params, searchParams }: QuotePageP
   const testToken =
     searchParams?.test && verifyTestToken(searchParams.test, result.tenant.id).ok ? searchParams.test : undefined
 
-  // Home checklist: "Share your quote link" is ticked by the first real visit
-  // (the owner's own test doesn't count)
-  if (!testToken && !result.tenant.quoteLinkFirstVisitAt) {
+  // Home checklist: "Share your quote link" is ticked by the first real visit.
+  // The owner's own test doesn't count, and (T-201) neither does the business
+  // opening its own link: from the dashboard's "Open" button, or signed in.
+  // Who is signed in is only looked up while the step is still unticked.
+  const ownMark = searchParams?.[OWN_VISIT_PARAM] === '1'
+  const unticked = !testToken && !ownMark && !result.tenant.quoteLinkFirstVisitAt
+  const signedInTenantId = unticked ? await signedInBusiness() : null
+  if (
+    countsAsFirstVisit({
+      alreadyVisited: Boolean(result.tenant.quoteLinkFirstVisitAt),
+      isSetupTest: Boolean(testToken),
+      ownMark,
+      signedInTenantId,
+      tenantId: result.tenant.id,
+    })
+  ) {
     await markFirstVisit(createAdminClient(), result.tenant.id).catch((error: unknown) => {
       console.error('[QuoteLink] first-visit flag failed:', error instanceof Error ? error.message : error)
     })
   }
 
-  return <EstimateWidget tenantKey={result.tenantKey} hosted testToken={testToken} />
+  return (
+    <>
+      {ownMark && <OwnVisitMark />}
+      <EstimateWidget tenantKey={result.tenantKey} hosted testToken={testToken} />
+    </>
+  )
 }

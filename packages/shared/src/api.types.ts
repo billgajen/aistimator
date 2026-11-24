@@ -249,6 +249,12 @@ export interface QuoteViewResponse {
   questionPending?: boolean
   /** T-193: "Measured on site": each scanned room's floor and wall area, its floor plan and its 3D model */
   roomScan?: CustomerRoomScanView
+  /**
+   * T-201: the business's "Default Terms & Conditions" (Settings), printed
+   * below the price. Absent when the business has none, and while the
+   * customer is shown no price.
+   */
+  terms?: string
 }
 
 export interface AcceptQuoteRequest {
@@ -387,12 +393,18 @@ export interface QuotesListResponse {
 // Analytics API Types
 // ============================================================================
 
+/** T-201: setup tests are in none of these (apps/web/src/lib/analytics-metrics.ts has the rules) */
 export interface AnalyticsMetrics {
   totalQuotes: number
+  /** T-201: every quote that reached the customer, declined ones included: what the rate divides by */
+  quotesSent: number
+  /** Every quote the customer opened, whatever happened next */
   quotesViewed: number
   quotesAccepted: number
+  /** Not shown anywhere until payments exist (PAYMENTS_LIVE) */
   quotesPaid: number
-  conversionRate: number // percentage (0-100)
+  /** accepted ÷ sent, a percentage (0-100) */
+  conversionRate: number
 }
 
 export interface UsageData {

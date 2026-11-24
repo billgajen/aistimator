@@ -55,6 +55,7 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/with-optional-hardware",
       [
         "expo-secure-store",
         {

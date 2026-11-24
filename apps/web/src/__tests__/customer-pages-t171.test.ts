@@ -121,7 +121,8 @@ describe('T-171: the customer quote page', () => {
 
   it('no status pill', () => {
     expect(page).not.toMatch(/StatusBadge|statusConfig|'Under review'|label: 'Viewed'/)
-    expect(page).toContain('`Reviewed and confirmed by ${business.name}.`')
+    // T-201: the line under the price is worded by one shared function (three cases, not two)
+    expect(page).toContain('customerEstimateNote({ reviewed: isReviewedQuote, confirmationPending, businessName: business.name })')
   })
 
   it('every word on the price panel is the on-colour at full strength, and the panel carries none of our yellows', () => {

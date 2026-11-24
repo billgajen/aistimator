@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { normalizeFieldOption } from '@/lib/field-options'
+import { priceLinesProblem } from '@/lib/service-questions'
 import { type NextRequest, NextResponse } from 'next/server'
 import type {
   ServiceMediaConfig,
@@ -172,6 +173,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
 
+    // T-201: a fixed line ticked "Only include when condition is met" with no question could never
+    // be charged, so it is not saved; the answer says which line and what is missing
+    const linesProblem = priceLinesProblem(pricingRules?.workSteps ?? workSteps)
+    if (linesProblem) {
+      return NextResponse.json({ error: { code: 'INVALID_INPUT', message: linesProblem } }, { status: 400 })
+    }
+
     // Build update object
     const updates: Record<string, unknown> = {}
     if (name !== undefined) {
@@ -278,9 +286,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
 
-    // Sync widget_configs when draftConfig has suggestedFields
-    if (draftConfig?.suggestedFields && draftConfig.suggestedFields.length > 0) {
-      const widgetFields = draftConfig.suggestedFields.map((f) => ({
+    // Sync widget_configs with the service's questions. T-201: whenever the draft is sent, not only
+    // when it holds questions, so removing the last question takes it off the customer's form too
+    // (a service with no form settings yet and no questions still gets no row).
+    if (draftConfig !== undefined) {
+      const widgetFields = (draftConfig?.suggestedFields ?? []).map((f) => ({
         fieldId: f.fieldId,
         label: f.label,
         type: f.type === 'dropdown' ? 'select' : f.type === 'boolean' ? 'boolean' : f.type,
@@ -318,7 +328,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         if (widgetError) {
           console.error('[API] Failed to update widget config:', widgetError)
         }
-      } else {
+      } else if (widgetFields.length > 0) {
         // Insert new widget config
         const { error: widgetError } = await supabase.from('widget_configs').insert({
           tenant_id: profile.tenant_id,

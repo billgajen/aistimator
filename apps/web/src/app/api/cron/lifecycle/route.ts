@@ -4,12 +4,14 @@ import { NextResponse } from 'next/server'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { sendEmail, isPostmarkConfigured } from '@/lib/postmark'
 import { generateQuoteReminderEmailHtml } from '@/lib/email-templates'
+import { customerEmailBrand } from '@/lib/customer-email-brand'
 import type { QuotePricing, TenantBranding } from '@qolumns/shared'
-import { DEMO_RETENTION_HOURS } from '@qolumns/shared'
+import { CUSTOMER_REMINDER_DAYS, DEMO_RETENTION_HOURS } from '@qolumns/shared'
 import { cleanUpDemoRequests } from '@/lib/demo/demo-cleanup'
 import { deleteFromR2, isR2Configured } from '@/lib/r2'
 import { businessReplyTo } from '@/lib/business-email'
 import { checkWhatsAppTokens } from '@/lib/whatsapp-renewal'
+import { dueReminders } from '@/lib/quote-reminders'
 
 /**
  * GET /api/cron/lifecycle — Vercel Cron (daily, see vercel.json)
@@ -17,7 +19,10 @@ import { checkWhatsAppTokens } from '@/lib/whatsapp-renewal'
  * 1. Expire: quotes still awaiting a decision whose link has expired are
  *    flipped to 'expired' so dashboards and analytics reflect reality.
  * 2. Remind: one follow-up email per quote, REMINDER_AFTER_DAYS (default 3)
- *    days after sending, if the customer has neither accepted nor declined.
+ *    days after sending, if the customer has neither accepted nor declined,
+ *    and (T-201) only for a business that has the reminder on in Settings
+ *    (tenants.customer_reminder_enabled, on by default). Off means no reminder
+ *    for any quote not yet reminded, including ones already sent.
  *    The reminder carries a new link (we never store the raw token). T-157:
  *    the link in the original email keeps working too (the database trigger
  *    keeps each replaced token in quotes.link_token_hashes).
@@ -33,8 +38,6 @@ import { checkWhatsAppTokens } from '@/lib/whatsapp-renewal'
 export const maxDuration = 60
 
 const AWAITING_DECISION = ['sent', 'viewed', 'feedback_received', 'revised']
-const REMINDER_STATUSES = ['sent', 'viewed']
-const REMINDER_BATCH_SIZE = 50
 
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET
@@ -75,27 +78,13 @@ export async function GET(request: Request) {
   if (!isPostmarkConfigured()) {
     console.warn('[Lifecycle] Postmark not configured — skipping reminder pass')
   } else {
-    const reminderDays = parseInt(process.env.REMINDER_AFTER_DAYS || '3', 10)
+    const reminderDays = parseInt(process.env.REMINDER_AFTER_DAYS || String(CUSTOMER_REMINDER_DAYS), 10)
     const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - (Number.isFinite(reminderDays) ? reminderDays : 3))
+    cutoff.setDate(cutoff.getDate() - (Number.isFinite(reminderDays) ? reminderDays : CUSTOMER_REMINDER_DAYS))
 
-    const { data: candidates, error: candidatesError } = await supabase
-      .from('quotes')
-      .select(`
-        id, customer_json, pricing_json, sent_at,
-        tenants!tenant_id ( id, name, region, currency, branding_json ),
-        services!service_id ( id, name )
-      `)
-      .in('status', REMINDER_STATUSES)
-      // T-153: a demo quote is never reminded
-      .eq('is_demo', false)
-      .is('reminder_sent_at', null)
-      .is('accepted_at', null)
-      .is('declined_at', null)
-      .not('sent_at', 'is', null)
-      .lt('sent_at', cutoff.toISOString())
-      .gt('token_expires_at', nowIso)
-      .limit(REMINDER_BATCH_SIZE)
+    // T-201: which quotes are due is one question to the database (lib/quote-reminders.ts), and it
+    // leaves out every business that has switched the reminder off
+    const { data: candidates, error: candidatesError } = await dueReminders(supabase, { nowIso, cutoffIso: cutoff.toISOString() })
 
     if (candidatesError) {
       console.error('[Lifecycle] Reminder candidate query failed:', candidatesError)
@@ -164,6 +153,8 @@ export async function GET(request: Request) {
           totalFormatted,
           quoteViewUrl: `${appUrl}/q/${row.id}?token=${token}`,
           primaryColor: tenant?.branding_json?.primaryColor,
+          // T-201: the business's logo, and "Powered by" by the estimate page's own rule
+          brand: await customerEmailBrand(supabase, tenant?.id, tenant?.branding_json),
         })
 
         const result = await sendEmail({

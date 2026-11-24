@@ -24,7 +24,8 @@
  *   - when a question goes unanswered for a day, or an answer cannot be used
  *     twice in a row: it drops the request silently rather than nag.
  */
-import type { WhatsAppIntakeData, WhatsAppIntakeState } from '@qolumns/shared'
+import { withinServiceArea } from '@qolumns/shared'
+import type { RegionAreas, WhatsAppIntakeData, WhatsAppIntakeState } from '@qolumns/shared'
 
 /** After the business answers a customer itself, the assistant leaves that chat alone for this long */
 export const OWNER_PAUSE_MS = 24 * 60 * 60 * 1000
@@ -117,11 +118,18 @@ export function emailIn(text: string): string | null {
   return found ?? null
 }
 
-/** Is this job inside the places the business works? (the same prefix rule as the request form) */
-export function inServiceArea(postcode: string, mode: string | null | undefined, values: string[] | null | undefined): boolean {
-  if (mode !== 'postcode_allowlist') return true
-  const code = postcode.toUpperCase().trim()
-  return (values ?? []).some((prefix) => code.startsWith(String(prefix).toUpperCase().trim()))
+/**
+ * Is this job inside the places the business works? The same rule as the request form
+ * (T-201: `withinServiceArea`, @qolumns/shared), which also checks "County/State" areas: the
+ * customer's own words are the address, and the region says which state a ZIP code is in.
+ */
+export function inServiceArea(
+  postcode: string,
+  mode: string | null | undefined,
+  values: string[] | null | undefined,
+  place: { address?: string | null; areas?: RegionAreas | null } = {}
+): boolean {
+  return withinServiceArea({ mode, values, postcode, address: place.address, areas: place.areas })
 }
 
 export interface Wording {

@@ -21,7 +21,8 @@ These do not use up a free quote:
 
 - a test request you send yourself during setup;
 - a request a customer started but did not finish;
-- a request that was saved without a price because you had none left.
+- a request that was saved without a price because you had none left;
+- a quote priced while you were on a plan. So if your plan ends, the free quotes you never used are still there.
 
 The "Billing" tab shows how many you have used, under "Free quotes used". When you are nearly out, {{product}} emails you once and shows a line on the "Billing" tab.
 
@@ -65,7 +66,7 @@ Each customer request that gets a price counts as one quote. It is counted when 
 - A request with several services still counts once.
 - Pricing the same request again, after an edit or an answer, does not count again.
 - Test requests from setup, unfinished requests and requests saved without a price do not count.
-- A saved request counts when you price it with "Price this request".
+- A saved request counts when it is priced: by itself when you pick a plan, or when you press "Price this request".
 
 On a plan, the count is for the calendar month. It starts again on the first day of each month, not on the day your plan renews. The "Billing" tab shows it under "Quotes this month".
 
@@ -81,11 +82,17 @@ Nothing is lost. A new request is saved with its photos and answers, but it is n
 - The "Billing" tab says "Free quotes used" or "Limit reached", with how many requests are waiting.
 - Quotes you have already sent still open for your customers.
 
-Saved requests are not priced by themselves when you get more quotes. You price each one:
+When you pick a plan, or move to a bigger one, the saved requests are priced for you:
 
-1. Open "Settings", then "Billing", and pick a plan (or a bigger one). On a plan you can also wait for the new month.
-2. Open "Quotes" and open the saved request.
-3. Press "Price this request". It is priced, and it counts as one quote.
+- It starts within a minute or so of your payment. The oldest request is priced first.
+- Each one counts as one quote on the new plan. It stops when the plan has no quotes left for the month.
+- Each estimate then goes on as any other: it is sent to the customer, or it waits for your approval, as that service is set.
+- Only requests from the last 30 days are priced this way, and at most 20 at a time.
+
+Any saved request that is left, you price yourself. So do you when the new month gives your plan more quotes: nothing is priced by itself then.
+
+1. Open "Quotes" and open the saved request.
+2. Press "Price this request". It is priced, and it counts as one quote.
 
 ## How do I pick a plan?
 <!-- id: billing-choose-plan; page: /app/settings/billing -->
@@ -148,7 +155,7 @@ To fix it:
 1. Press "Update your card" in the notice at the top of the page, or open "Settings", "Billing", "Manage billing".
 2. Change your card on Stripe's page.
 
-If the payment still cannot be taken, your plan ends. New requests are then saved for you but not priced until you pick a plan again.
+If the payment still cannot be taken, your plan ends. New requests then use any free quotes you never used. After that they are saved for you but not priced until you pick a plan again.
 
 ## How do I cancel my plan?
 <!-- id: billing-cancel; page: /app/settings/billing -->
@@ -163,8 +170,9 @@ After you cancel, the "Billing" tab says your plan "ends on" a date and "works a
 
 When the plan has ended:
 
-- The tab shows "No plan". New requests are saved for you but not priced until you pick a plan.
-- Your free quotes do not come back. Every quote you have ever priced counts against them.
+- The tab shows "No plan".
+- Free quotes you never used are still yours. Only the quotes you priced before you had a plan count against your {{free.quotes}}; quotes priced on the plan do not. If you had used them all, new requests are saved without a price.
+- The other features you had while you were new and on free quotes do not come back: they were for a business that had never had a plan.
 - Your services, prices, settings and quotes stay. Quotes you have sent still open for your customers.
 - Anything that only your plan included stops. Nothing you made is deleted, and it works again when you pick a plan that includes it.
 - You can pick a plan again with "Select Plan".

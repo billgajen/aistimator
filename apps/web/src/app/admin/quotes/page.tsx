@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { PAYMENTS_LIVE } from '@qolumns/shared'
 
 interface QuoteItem {
   quoteId: string
@@ -156,7 +157,8 @@ export default function AdminQuotesPage() {
           <option value="sent">Sent</option>
           <option value="viewed">Viewed</option>
           <option value="accepted">Accepted</option>
-          <option value="paid">Paid</option>
+          {/* T-201: no "Paid" until payments exist */}
+          {PAYMENTS_LIVE && <option value="paid">Paid</option>}
           <option value="failed">Failed</option>
           <option value="expired">Expired</option>
         </select>

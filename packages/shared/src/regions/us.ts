@@ -1,4 +1,5 @@
 import type { RegionDefinition } from './types'
+import { US_AREAS } from './us-areas'
 
 const IN = 0.0254
 const FT = 0.3048
@@ -44,6 +45,7 @@ export const US_REGION: RegionDefinition = {
     { id: 'person_height', label: 'adult person height', dimension: 'height', metres: 1.7 },
     { id: 'window_casement', label: 'typical double-hung window height (48 in)', dimension: 'height', metres: round(48 * IN) },
   ],
+  areas: US_AREAS,
 }
 
 function round(value: number, places = 3): number {

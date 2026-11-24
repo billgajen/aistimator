@@ -39,7 +39,7 @@ Do one of these:
 
 Each step is ticked only by one particular action. If a step stays open, that action has not happened yet.
 
-- "Add a service": you need at least one service that is switched on. On "Services", press "Enable" beside a disabled service, or add one.
+- "Add a service": you need at least one service that is switched on. On "Services", press "Enable" beside a disabled service, or add one. A service added with "Add from a template" starts switched off: check its prices, then press "Enable".
 - "Check your prices": a service added with "Add from a template" does not tick it until you save. On "Services", press "Edit", go to "Test & Publish" with "Next", and press "Save Changes".
 - "Share your quote link": copying the website code does not tick it, and your own test in setup does not either. Press "Copy" under "Your quote link" on "Home".
 - "First real request received": only a request a customer sends in ticks it. Tests from setup and unfinished requests do not.
@@ -53,31 +53,34 @@ The price is built only from the service's own price list, so a low price means 
 2. Under "Price Breakdown", check there are lines and that each amount is yours. With no lines and a "Base Fee" of 0 there is nothing to charge.
 3. Open each "Per Unit" or "Per Hour" line and check "Multiply by" points at the right question. A line whose quantity comes to 0 is left off the estimate.
 4. On "Customer Questions", tick "Required" on every question a line multiplies by, so a customer cannot skip it.
-5. Check any line ticked "Only include when condition is met". It is left off when the condition is not met, and a fixed line with no "Question" chosen is never charged.
+5. Check any line ticked "Only include when condition is met". It is left off when the condition is not met. A "Fixed Amount" line ticked with no "Question" chosen cannot be saved: "Test & Publish" lists it under "Fix Before Publishing".
 6. Go to "Test & Publish", fill in "Sample Values" as that customer answered and press "Calculate Preview". Then press "Save Changes".
 
 ## Why does the form not ask the questions I set?
 <!-- id: problems-questions-not-asked; page: /app/services -->
 
-There are four causes you can check on "Services".
+There are two causes you can check on "Services".
 
 1. The changes were not saved. Questions are saved only when you reach "Test & Publish" and press "Save Changes". Closing the window before that loses them.
-2. The service has no "AI Draft" badge beside its name. Questions are only saved for a service that was started from a description, a template or an import. Add the service again with "Add Service" and fill in "Description" on "Basic Info", then press "Disable" or "Delete" on the old one.
-3. The service is "Inactive". The form does not offer it. Press "Enable".
-4. You removed every question and the form still asks the old ones. Removing the last question does not clear the form. Keep at least one question on the service.
+2. The service is "Inactive". The form does not offer it. Press "Enable". A service added with "Add from a template" starts "Inactive".
+
+Questions are saved for every service, however it was made. Removing a question, even the last one, takes it off the form when you save.
 
 A question shows only when the customer picks the service it belongs to. A question for every service is added on "Quote link" under "Advanced · extra questions on the form".
 
 ## Why is "Save Changes" or "Create Service" greyed out?
 <!-- id: problems-service-wont-save; page: /app/services -->
 
-The last step shows "Fix Before Publishing" with a list. Each item names a price line that has no usable quantity.
+The last step shows "Fix Before Publishing" with a list. Each item names a price line that could not be charged as it is.
 
 1. Read the list under "Fix Before Publishing" on "Test & Publish".
 2. Press "Back" to "Pricing Setup" and open the line it names under "Price Breakdown".
 3. If it says the line "needs a quantity link", choose a question or a fixed quantity under "Multiply by".
-4. If it says the line "links to a question that doesn't exist", the question was removed or its "Label" was changed. Choose the question again under "Multiply by". Do the same for any row under "Adjustments" that used it.
-5. Press "Next" to "Test & Publish". When it shows "Ready to Publish", press "Save Changes".
+4. If it says the line "links to a question that doesn't exist", the question was removed. Choose another question under "Multiply by". Changing a question's "Label" does not cause this: a renamed question stays linked.
+5. If it says the line is set to "Only include when condition is met", but no question is chosen, choose the "Question" under "When to include this item", or untick the box.
+6. Press "Next" to "Test & Publish". When it shows "Ready to Publish", press "Save Changes".
+
+The same box can also say that an adjustment or a line uses a question this service no longer has. That does not stop the save, but the adjustment or line is not applied until you choose its question again on "Pricing Setup".
 
 The button is also greyed out when "Service Name" on "Basic Info" is empty.
 
@@ -104,7 +107,7 @@ Find the request in Quotes and read its status. The status tells you where the e
 ## An estimate is stuck on "Working out the price", or says "Could not be priced". What now?
 <!-- id: problems-estimate-stuck-or-failed; page: /app/quotes/[quoteId] -->
 
-"Working out the price" usually lasts a minute or two. "Could not be priced" means no price could be worked out, and there is no button to try again.
+"Working out the price" usually lasts a minute or two. "Could not be priced" means no price could be worked out.
 
 For "Working out the price":
 
@@ -113,9 +116,10 @@ For "Working out the price":
 
 For "Could not be priced":
 
-1. Open the quote. No estimate was sent. The customer was told you have their request and will be in touch.
-2. Read "What the customer sent" and look at their photos.
-3. Press the "Email" or "Call" button under "Next step" and give them a price yourself.
+1. Open the quote on the website. No estimate was sent. The customer was told you have their request and will be in touch.
+2. Under "Next step", press "Try again". The price is worked out again from the same answers and photos. It does not use another quote from your plan, and you can try one request up to five times.
+3. If it still cannot be priced, read "What the customer sent" and look at their photos.
+4. Press the "Email" or "Call" button under "Next step" and give them a price yourself.
 
 ## The form does not show on my website. What should I check?
 <!-- id: problems-form-not-showing; page: /app/quote-link -->
@@ -154,8 +158,9 @@ The request arrived after your plan limit was reached: your {{free.quotes}} free
 
 1. Open the quote. "Next step" explains what happened.
 2. Press "Upgrade plan" and choose a plan on the billing page.
-3. Come back to the quote and press "Price this request". The page says pricing has started.
-4. When the price is ready, the estimate goes on as any other: it is sent, or it waits for your approval, as that service is set.
+3. Wait a minute or so. When you pick a plan, requests saved in the last 30 days are priced for you, oldest first, as far as the plan's quotes for the month go.
+4. If the request still says "Saved, not priced yet", press "Price this request". The page says pricing has started.
+5. When the price is ready, the estimate goes on as any other: it is sent, or it waits for your approval, as that service is set.
 
 If you press "Price this request" before your plan has room, a message says the limit is reached and nothing changes.
 
@@ -220,10 +225,10 @@ Open "Settings", then the "Billing" tab, and read what it says under "Current Pl
 
 - "Free quotes used": you have used your {{free.quotes}} free quotes. They do not start again each month. Pick a plan. The features of {{freeStart.plan}} that you had while free quotes were left have stopped too, until you pick a plan that includes them.
 - "Limit reached": you have used this month's quotes on your plan. Move to a bigger plan, or wait for the first day of next month.
-- "Your … plan has ended": the plan was cancelled, or a failed payment could not be taken. Pick a plan again.
+- "Your … plan has ended": the plan was cancelled, or a failed payment could not be taken, and any free quotes you had never used are now used too. Pick a plan again.
 - "Your account is paused": press "Email us" in the notice at the top of the page.
 
-Saved requests are not priced by themselves afterwards:
+When you pick a plan, or a bigger one, requests saved in the last 30 days are priced for you, oldest first, as far as the plan's quotes for the month go. Nothing is priced by itself when a new month starts, or when a paused account is restored. For a saved request that is left:
 
 1. Open "Quotes" and open a saved request.
 2. Press "Price this request".
@@ -237,14 +242,15 @@ Change your card. Your plan keeps working while the payment is tried again over 
 1. Press "Update your card" in the notice at the top of any dashboard page. If that does not open, go to "Settings", "Billing", and press "Manage billing".
 2. Change your card on Stripe's page.
 
-The notice goes away once the payment has gone through. If the payment still cannot be taken, your plan ends, and new requests are saved without a price until you pick a plan again.
+The notice goes away once the payment has gone through. If the payment still cannot be taken, your plan ends. New requests then use any free quotes you never used, and after that they are saved without a price until you pick a plan again.
 
 ## My logo does not show. Why?
 <!-- id: problems-logo-missing; page: /app/settings/branding -->
 
 Check where you are looking, and the file you uploaded.
 
-- Emails to your customers do not carry your logo. They carry your business name and your colour. Your logo shows on your request form, the quote page and the PDF.
+- Your logo shows on your request form, the quote page, the PDF and the emails to your customers. An email sent before you added the logo does not have it.
+- Some email programs hide pictures until the reader allows them. The reader then sees your business name where the logo would be.
 - The file must be a PNG, JPG or WebP of 2MB or less. Any other file is refused, with "Logo must be a PNG, JPG or WebP image" or "Logo must be 2MB or smaller" at the top of the tab.
 
 To put it right:
@@ -256,10 +262,13 @@ To put it right:
 ## A customer says the form told them "Location is outside service area". Why?
 <!-- id: problems-outside-service-area; page: /app/settings; section: Service Area -->
 
-Your "Service Area" is set to "Postcode/ZIP allowlist", and the code the customer typed does not start with any code on your list. Their request was not sent.
+Your "Service Area" limits where you take jobs, and the code the customer typed is outside it. Their request was not sent.
+
+- With "Postcode/ZIP allowlist", the customer's code does not start with any code on your list.
+- With "County/State", the customer's ZIP code is in a state that is not on your list.
 
 1. Open "Settings" and go to "Service Area".
-2. Add the customer's code, or the first part of it, to "Allowed Postcodes/ZIP Codes". To take requests from anywhere, choose "No restrictions".
+2. Add the customer's code, or the first part of it, to "Allowed Postcodes/ZIP Codes". With "County/State", add the customer's state on its own line. To take requests from anywhere, choose "No restrictions".
 3. Press "Save Service Area".
 4. Ask the customer to send the form again.
 

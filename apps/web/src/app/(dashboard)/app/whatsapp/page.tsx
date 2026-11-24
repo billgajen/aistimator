@@ -24,6 +24,9 @@ interface Loaded {
 
 /**
  * The WhatsApp page (T-175).
+ * - T-201: not connected, and connecting is not open to this business yet
+ *   (lib/whatsapp-open.ts): "Coming soon", and the way to the quote link.
+ *   Nothing below is shown.
  * - Not connected: one main button, "Connect WhatsApp" (Meta's Embedded
  *   Signup), and under it "Connect manually" (T-112, for a business with its
  *   own Meta app). T-177: one short line warns against connecting a personal
@@ -102,6 +105,37 @@ export default function WhatsAppSettingsPage() {
   }
   const { config } = data
   const access: WhatsAppAccessView = data.access ?? { allowed: true, why: null, line: null }
+
+  // T-201: not connected, and connecting is not open to this business yet (Meta has not reviewed
+  // the app): "Coming soon" and the way to share the quote link, not a button that cannot work.
+  // Asked before the plan: nobody can use it on any plan today. A connected business is not asked.
+  if (!config && data.connect.open === false) {
+    const S = data.connect.soon
+    return (
+      <div className="space-y-6">
+        {header}
+        {justDisconnected && (
+          <p className="rounded-xl border border-border bg-surface p-4 text-sm text-text-secondary" role="status" data-testid="disconnected-note">
+            WhatsApp is disconnected. {PRODUCT_NAME} no longer has access to that number.
+          </p>
+        )}
+        <section className="rounded-xl bg-surface p-6 shadow-warm" data-testid="whatsapp-coming-soon">
+          <h2 className="flex flex-wrap items-center gap-3 text-lg font-medium text-text-primary">
+            {S?.title}
+            {/* words in a shape, never colour alone, never yellow (the same mark as the site's) */}
+            <span className="inline-block whitespace-nowrap rounded-full border border-field bg-white px-2 py-0.5 text-xs font-semibold text-text-secondary" data-testid="coming-soon">
+              {S?.mark}
+            </span>
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm text-text-secondary">{S?.text}</p>
+          <p className="mt-2 max-w-2xl text-sm text-text-primary">{S?.meanwhile}</p>
+          <Link href="/app/quote-link" className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">
+            {S?.link}
+          </Link>
+        </section>
+      </div>
+    )
+  }
 
   // T-177: the plan does not include WhatsApp. One line, the way to the plans, and no way to connect.
   // A number connected earlier is kept, silent; it can still be disconnected.

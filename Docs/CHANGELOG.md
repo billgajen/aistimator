@@ -15,6 +15,250 @@
 
 ## Issues & Resolutions
 
+### 2026-11-24: T-201 — Android fixes, the reminder switch, and the oddities found in T-198 (AD-089 to AD-092)
+
+**Built, not deployed.** Needs **migration 50** (`bash scripts/deploy-migration-50.sh`, first), then the **web**
+and the **worker**. The Android bundle (version code 2) is uploaded to Play by the owner, by hand.
+
+The ticket's 35 items, by number. "Root cause" is given where there was one.
+
+#### Part A: Android
+
+- **1. A portrait screen is not required.** The app stays portrait-only on a phone, and Google Play read that as
+  "needs a portrait screen", hiding the app from tablets, Chromebooks and headsets. A config plugin
+  (`apps/mobile/plugins/with-optional-hardware.js`) declares `android.hardware.screen.portrait` with
+  `required="false"`. **Added beyond the ticket, for the same reason:** `android.hardware.camera` and
+  `android.hardware.camera.autofocus` are declared the same way (the camera permission implies both, and a
+  Chromebook often has a front camera only), and "Take a photo" on a device with no camera goes to the gallery.
+  Read in the generated manifest and in the built bundle.
+- **2. "View in 3D" on Android.** T-200 hid it because it had not been seen to open. The viewer is the web's own
+  page (`/room-model`, three.js). An iPhone shows it in Safari's in-app browser; Android has no such module, so
+  `openPage` hands the address to the phone's own browser (`Linking.openURL`, already the fallback). The button
+  is given to the scan card only when `canOpenPage()` says something on the phone opens a web address
+  (`Linking.canOpenURL`; the `<queries>` entry it needs is in Expo's manifest template and was read in the
+  bundle). **What was seen:** the viewer page drawing a model in Chromium with a Pixel 7 profile (touch, Android
+  user agent, WebGL), from a sample model made for the check. **Not seen:** an Android phone, and a model from a
+  real scan in that profile (those open in the same viewer in the dashboard).
+- **3. The bundle:** `apps/mobile/build/qolumns-android-2.aab`, version code 2 (Expo's own count went from 1 to
+  2), same project and upload key.
+
+#### Part B: the reminder to the customer, on or off
+
+- **4.** Settings → "Reminder to the customer": one tick box, on unless switched off, saved at once.
+  `tenants.customer_reminder_enabled` (migration 50, true for everyone).
+  - **The reminder is sent by the web app's daily job** (`/api/cron/lifecycle`, Vercel Cron), not by the worker
+    as the ticket says. The job's question, "which quotes are due?", moved to `lib/quote-reminders.ts`
+    (`dueReminders`), and the switch is part of that question (an inner join on the business): a business with
+    it off is never returned, so its quotes cannot fill the batch of 50 and hold back everyone else's.
+  - **Off** covers every quote not yet reminded, including ones already sent. **Back on:** a quote still waiting
+    and not expired is reminded at the next daily run.
+  - **The wording differs from the ticket.** The reminder goes to a customer who has neither accepted nor
+    declined, opened or not (that is today's behaviour, and the ticket says to keep it). So the switch says
+    "if they haven't answered the estimate after 3 days", not "haven't opened".
+
+#### Part C: the oddities
+
+Services
+- **5. Questions are saved for every service.** Root cause: questions live in `draft_config.suggestedFields`,
+  and the editor sent `draftConfig: null` for a service with no AI draft, so they were dropped. A hand-made
+  service now has a draft of its own (`source: 'manual'`). Also: `PATCH /api/services/:id` syncs the form's
+  questions whenever `draftConfig` is sent, so removing the last question takes it off the customer's form.
+- **6. Renaming a Label no longer breaks price lines (AD-089).**
+- **7. "Regenerate" asks first**, naming what is replaced with counts (scope lists, photo settings, questions,
+  price lines, add-ons) and what stays. Cancel changes nothing. "Clear" still does not ask (not in the ticket).
+- **8. "Describe your pricing" says what was left out.** The compile route returns `leftOut` (the names of
+  lines, questions and add-ons past the limits, and a count of adjustments); the review shows them before
+  Apply. Limits unchanged (10 / 10 / 10 / 8). Only what our code cuts is named: a line the model itself leaves
+  out cannot be known.
+- **9. Amount boxes show the business's own currency symbol** (`AmountSymbol`, from the shared helper), in the
+  editor and in the composer's example text.
+- **10. A fixed line set to "Only include when…" with no question cannot be saved:** the line says "Needs a
+  question", Save is disabled, and `POST`/`PATCH /api/services` answer 400 naming the line. An AI draft that
+  holds such a line returns it as an add-on of the same name and price, so setup never meets the 400.
+- **12. "Add" from a template adds the service switched off**, opens it at Pricing Setup with a note that the
+  example prices must be checked, and Services shows the note until "Enable". Setup still creates its services
+  switched on (it has its own "Check your prices" step).
+
+Setup
+- **11. Opening your own quote link does not tick "Share your quote link".** Root cause: the first visit to
+  `/quote/<slug>` ticked it, whoever it was. Now a visitor signed in to that business, and a visit carrying
+  `?own=1` (the two "Open" buttons add it), do not count. What counts: Copy, a ready-made text, or a customer's
+  first visit.
+- **13. All services off no longer sends Home back to setup.** Root cause: Home asked only for active services
+  and read "none active" as "none". Setup is for a business with no service at all; with all off, Home shows
+  "All your services are off, so customers can't get an estimate." and a link to Services.
+- **14. Change password** in Settings (`POST /api/auth/change-password`): the current password is checked on the
+  server with a throwaway client, so the session is untouched; rate-limited like log-in; sign-up's rules.
+
+Quote link and estimates
+- **15. "Preview on a demo page" is gone.** `/demo?tenantKey=` still opens by its address; nothing links to it.
+- **16. The Advanced tip** now names the real place (Services → "Customer Questions" → "Adjustments" on "Pricing
+  Setup") and no longer gives the "use the Field ID" advice, which never worked for a question added there.
+- **17. An estimate sent automatically no longer says the business "will review and confirm it".** Root cause:
+  the page had two cases. `customerEstimateNote` (shared `quote-turn.ts`) has three; only an estimate waiting
+  for approval says it.
+- **18. "Hold until I approve" shows no figure (AD-090).**
+- **19. "Try again"** on a request that could not be priced (`POST /api/quotes/:id/process` takes a `failed`
+  quote). It claims nothing against the plan: a request is counted when it arrives and is not given back when
+  pricing fails. Five tries a request, then 429 `RETRY_LIMIT`.
+- **20. Pricing trace:** "Extracted Signals" (raw data) is "What Qolumns understood", one readable line an item
+  (`lib/trace-understood.ts`). Still under More.
+- **27. "Default Terms & Conditions" are printed** on the customer's estimate page (after the notes) and in the
+  PDF (before the footer), only when filled in. Read live from Settings, so a change shows on older estimate
+  pages; a PDF already made keeps the terms it was made with. Not printed while a price is withheld.
+- **28. The Quote Template tick boxes say "PDF only".** The smaller change: making them apply to the page would
+  touch combined sections, the minimum note and the takeoff, and would change what existing customers see.
+
+WhatsApp
+- **21. "Coming soon" where connecting is not live.** It is not live today (`PLAN_CHANNEL_LINES.whatsapp.live`
+  is false: Meta has not reviewed the app). A business that is not connected sees a "Coming soon" card and no
+  connect button ("Connect manually" is hidden too). A connected business is unchanged. Connecting stays open
+  for the businesses named in `WHATSAPP_CONNECT_OPEN` (ids, or `all`), which Meta's reviewer needs.
+
+Analytics
+- **22–24.** One rule (`lib/analytics-metrics.ts`): setup tests are out of every figure; "Quotes Viewed" counts
+  every quote that was opened; "Conversion Rate" is accepted ÷ sent, with declined and expired counted as sent.
+- **25. "Paid" is hidden** behind one switch, `PAYMENTS_LIVE = false` (shared `quote-status.ts`): the funnel's
+  row, the admin filter, and the status wording (a `paid` quote reads as accepted). No data is deleted.
+- **26. A switch for sharing in benchmarks** (Settings → "Market benchmarks"), with one sentence on what is
+  shared. It uses the existing `benchmarks_opt_in`. **Decision:** migration 50 makes it on for a business that
+  signs up from now on and changes no existing row; a blanket update would have put the demo business and the
+  two store reviewers' accounts into the pool.
+
+Settings and billing
+- **29. "County/State" is checked.** Root cause: the mode was saved and never read. One rule
+  (`packages/shared/src/service-area.ts`), used by the form's server and the WhatsApp assistant. The state comes
+  from the ZIP's first three digits (US region data, `regions/us-areas.ts`). **Only a certain "outside" is
+  refused:** no ZIP, a ZIP that cannot be placed, or an entry with no state lets the customer through. A county
+  entry ("Harris County, TX") admits its whole state: a ZIP cannot place a county without a dataset we do not
+  have. GB has no table, so nothing is refused there in this mode.
+- **30. Branding names the plans on offer:** `noBadgeLine()` in `access.ts` ("Only Pro removes…").
+- **31. The badge during a payment retry: already right since T-199** (the badge asks the one access rule, where
+  `past_due` is live). No product change; pinned by tests.
+- **32. Requests saved at the plan limit are priced when a plan is bought (AD-091).**
+- **33. After a plan ends, the free quotes count only quotes priced as free ones (AD-091).**
+- **34. Customer emails carry the business's logo and follow the badge rule (AD-092).**
+
+Home
+- **35. "Accepted this month" and the panel's Accepted step are the same number:** every estimate accepted this
+  month, customer requests and on-site. When on-site ones are in it, the step says "includes N made on site".
+
+#### AD-089: a question's keys are set once; its label is free
+- **What broke:** the question editor rebuilt `fieldId` from the label on every keystroke and the page rebuilt
+  `mapsToSignal` the same way, so renaming a label cut the question loose from the price lines, adjustments and
+  conditions that named it. And any edit on Customer Questions replaced the whole `expectedSignals` list, wiping
+  what a template had set (units, envelopes, room-scan fill).
+- **Now:** `syncQuestions()` (`lib/service-questions.ts`). A question keeps its keys if it was saved with the
+  service, if a line, adjustment, condition or formula uses it, or if its key did not come from its label. Only
+  a new, unused question follows its label, and no two share a key. Facts no question wrote are left alone.
+- **No migration:** existing services keep the keys they have. The engine and its inputs are unchanged; the
+  worker never linked by label.
+- **Held by:** every template service in every pack, with every question renamed, keeps the same keys, facts
+  and sample amounts (unit); Interior Painting priced by the worker, both questions renamed, the same request
+  priced again, same total line for line (verify).
+
+#### AD-090: a held estimate carries no figure in anything a customer can receive
+- **What it was:** T-146 sent the engine's low and high for a quote held for approval, on purpose.
+- **Now:** two shared rules, `customerSeesNoFigure` and `customerRangeAllowed` (`review-mode.ts`). For a held
+  quote the public API sends no price, no range, no pipeline notes, no cross-service prices and no PDF link; the
+  public PDF route answers 404 while the price is withheld; the form's "being prepared" screen with a range is
+  gone. The dashboard's range note says the customer sees no figure until approval.
+- **It also covers** a quote the checker held and one the business made itself. A service on "Hold" shows no
+  range even while the customer confirms a detail; other services keep the range there.
+
+#### AD-091: the free quotes are their own count; saved requests are priced when a plan is bought, within bounds
+- **Free quotes (item 33).** Root cause: the free allowance summed every month's `estimates_created`, so a
+  business whose plan ended had no free quotes left however few it had used. New column
+  `usage_counters.plan_estimates_created`: free used = `estimates_created − plan_estimates_created`
+  (`freeQuotesUsed`, shared `plans.ts`). `claim_plan_quote` counts that way; `release_plan_quote` takes a third,
+  optional value saying which kind of claim it gives back (the web app that is live today calls it with two,
+  which still works). The column is filled once: for a business with a subscription row, a month's quotes made
+  on or after that row was created are taken as the plan's.
+- **A business whose plan ended** gets its unused free quotes for pricing, not the free start's Pro features
+  (T-199's rule, unchanged).
+- **Saved requests (item 32).** `lib/held-requests.ts`; "Price this request" uses the same steps. The Stripe
+  webhook runs it on `checkout.session.completed` and on a subscription update that starts or changes a plan.
+  Bounds: oldest first; the last 30 days only; at most 20 a run; it stops at the first request the plan has no
+  room for; never as paid overage; never uncounted; never a test; never a suspended business. A request is
+  taken with one conditional write, so a repeated event prices and counts it once. Each becomes an ordinary
+  queued job, so the service's review setting decides what the customer receives.
+- **Not automatic:** a month rolling over, a suspension lifted, a plan set by `set-test-plan.sh`. Those keep
+  "Price this request".
+- The three emails that mention saved requests now say what happens.
+
+#### AD-092: a customer email's logo and badge come from one place, by the page's own rule
+- **What it was:** customer emails always said "Powered by" and never carried the logo.
+- **Now:** the HTML is in `packages/shared/src/customer-email.ts`, used by the worker's quote and estimate
+  emails and the web's quote, updated-quote and reminder emails. The badge is decided by the rule the estimate
+  page uses (`hasCustomBranding`; the worker reads the same access rule through a small loader).
+- **The logo** is `GET /api/public/logo/:assetId`: an email is opened days later, so it cannot carry the
+  picture's signed address (good for an hour). The route sends the reader on to the picture only when the asset
+  is a business's logo today; anything else is 404.
+- **Differs from the ticket's words:** on the free start the badge is off, not on. That is what the estimate
+  page has done since T-199 (the free start works like Pro), and the ticket asks for the page's rule.
+- Not touched: three customer templates in the worker that nothing sends (revised, clarification, feedback).
+
+#### Constraints
+- Never derive a saved or used question's `fieldId` or `mapsToSignal` from its label, and never rebuild
+  `expected_signals` wholesale from the questions.
+- A non-null `draft_config` no longer means "AI draft": use `isAiDraft` / `isHandMade`.
+- Services are created switched on unless the caller sends `active: false`. A new template must not hold a
+  fixed optional line with no condition (a unit test holds it).
+- A held quote must never carry a figure in a customer-facing answer: use the two shared rules.
+- A retry of a failed request must never call `claimPlanQuote`. `?own=1` on the quote link is reserved.
+- The line under the price on the estimate page is worded only by `customerEstimateNote`.
+- "Setup not finished" means no service row at all, never "none active".
+- Nothing may say "Paid" except behind `PAYMENTS_LIVE`. "Coming soon" on the WhatsApp page comes from the plan
+  line's `live` flag.
+- Home's Accepted and the panel's Accepted step must stay the same number.
+- `benchmarks_opt_in` defaults to true: a script that makes a demo or review account must keep setting it false.
+- A service-area refusal needs certainty; never refuse on a guess.
+- The run after a purchase stays bounded and never uses overage.
+- A fixture that means "free quotes used" sets `estimates_created` only. A GB business moved to the US would
+  have its old monthly-allowance quotes read as plan quotes (left alone).
+- The reminder's switch belongs in the database question (`dueReminders`), never in a check after the batch.
+- After a change to `plugins/with-optional-hardware.js`, read the three `uses-feature` lines in the built bundle.
+
+#### Not built (v2 backlog, OWNER-TODO items 14 to 16)
+Marking a job won or lost; a date range on Analytics; changing the account email.
+
+#### The owner's decisions after the report (24 Nov)
+- Benchmarks: existing businesses are left as they are. The reminder stays as built (one reminder for an
+  estimate not answered, opened or not; the wording "haven't answered"). "Try again" in the phone app goes into
+  the next ticket. `WHATSAPP_CONNECT_OPEN` is set by the owner when the Meta review is submitted.
+- `brand/*.ai` is in `.gitignore` (it was already in `.vercelignore`). `brand/qolumns-letter.png`, changed on the
+  owner's Mac, is **not committed**: neither the site nor the app reads that file. Their icons (`favicon.ico`,
+  `icon.png`, `apple-icon.png`, the app's `assets/icon.png`) are copies made from the earlier drawing in T-190,
+  so the new drawing shows nowhere until those copies are made again.
+
+#### Checks
+- Unit: web 1,865, worker 808, app 193 (12 new for Android), all passing; typecheck and lint clean.
+- **`pnpm check:quick`, once: 28 of 30 (22 scripts, 1,895 checks) in 5 min 2 s.** `verify-t201` passed 159 of
+  159. Two older scripts failed on expectations this ticket changed, not on the product: `verify-t158` still
+  expected "Paid" in the list and on the quote page, and no "Try again" on a request that could not be priced;
+  `verify-t160` expected Home's "Open" link without `?own=1`. Both corrected.
+- **`pnpm check:failed`: 4 of 4 (t158 116 of 116, t160 96 of 96) in 1 min 1 s.**
+- **`pnpm check:full`, first run: not finished.** It was stopped part-way by the machine running low on memory
+  (the coding tool ends background commands when that happens), not by a failing check.
+- **`pnpm check:full`, run again alone (the owner asked): 43 of 45 (37 scripts, 3,084 checks) in 34 min 58 s.**
+  The whole standard set passed with the real model, 29 of 29, among them `verify-t201` 159 of 159, and
+  `verify-t162`, `t197` and `t198`, which had failed beside others in the first run. `verify-t196` (item 35)
+  passed 61 of 61. Two failed:
+  - **`verify-t179` did not start**: it loads `apps/web/src/lib/pdf-template.ts` with tsx, outside Next, and
+    item 27 had added an import by the `@/` path there, which only Next and the unit tests resolve. Now a
+    relative import, and a unit test keeps `@/` out of the four files that script loads.
+  - **`verify-t180`, 110 of 111**: it expected three plan cards saying "plus tax"; since T-200 two plans are on
+    offer (T-200 ran no full level). The expectation is now two.
+- **`pnpm check:failed`: t179 99 of 99; t180 110 of 111** in 11 min 50 s. A different check: Stripe's portal
+  review page still said "Loading" where its amounts go when the script read it after its fixed five seconds.
+  The script now waits for that word to go (up to 30 s more). The product was not involved.
+- **`pnpm check:failed` again: t180 111 of 111 in 9 min 55 s**, with item 32 through Stripe's sandbox ("the
+  purchase prices the lead held at 10 of 10 by itself: sent for pricing, and counted as the 11th of 50").
+  **So every script of the full level has passed**, t180 on its third try for the two reasons above.
+- The migration's deploy script was run against a copy of the local database put back to migration 49, then a
+  second time: the Before check worked at 49, the After check matched what the script says to expect, and the
+  second run changed nothing.
+
 ### 2026-11-23: T-200 — The Android app for Google Play (internal testing), plus small fixes (AD-087, AD-088)
 
 **Built, not deployed.** Part B needs the **web** and the **worker** deployed (the worker sends the daily support

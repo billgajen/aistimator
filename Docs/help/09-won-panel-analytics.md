@@ -16,17 +16,17 @@ Before your first accepted estimate, Home shows "Last 30 days" at the bottom ins
 ## What do "Requests", "Estimates sent", "Opened" and "Accepted" count?
 <!-- id: analytics-won-steps; page: /app; flags: app -->
 
-Each step counts what happened this calendar month, from the 1st until now, for requests your customers sent themselves.
+Each step counts what happened this calendar month, from the 1st until now. The first three count requests your customers sent themselves.
 
 - "Requests": requests that arrived this month.
 - "Estimates sent": estimates sent to a customer this month.
 - "Opened": estimates a customer opened for the first time this month.
-- "Accepted": estimates a customer accepted this month. This is the number of jobs in "Won this month:".
+- "Accepted": every estimate accepted this month. It is the same number as "Accepted" under "Where your quotes stand".
 
 Under each step after the first, a small line gives its share of the step before, such as a percentage "of requests", "of sent" or "of opened". Each thing is counted in the month it happened, so an estimate sent last month and accepted this month counts under "Accepted" this month. Test requests from setup never count.
 
 {{#soon app}}Every number here comes from requests your customers sent. Estimates you make yourself on site need the phone app, which is {{soon}}.{{/soon}}
-{{#live app}}Estimates you made yourself on site, in the phone app, are not in the four steps or the main figure. When one was accepted this month, it is a separate line under them that ends "you made on site."{{/live}}
+{{#live app}}Estimates you made yourself on site, in the phone app, are not in "Requests", "Estimates sent", "Opened" or the main figure. One that was accepted this month is counted in "Accepted", and the step then says how many, such as "includes 1 made on site", in place of its share. It also has its own line under the steps that ends "you made on site." So "Accepted" is the jobs in "Won this month:" plus the estimates in that line.{{/live}}
 
 ## How does a quote become "accepted", or "won"?
 <!-- id: analytics-how-accepted; page: /app/quotes?tab=accepted -->
@@ -47,7 +47,7 @@ They count your quotes by whose turn it is. Press one to open that tab of "Quote
 
 - "Needs you": quotes waiting for you right now. These wait for your approval, have a customer's question, or could not be priced.
 - "Waiting for customer": quotes that are with the customer right now. They were sent or opened and not answered yet, or the customer was asked for more details.
-- "Accepted", marked "this month": quotes accepted since the 1st of this month.
+- "Accepted", marked "this month": every estimate accepted since the 1st of this month. The "Accepted" step in "Won through {{product}}" shows the same number.
 
 Test requests from setup are left out. A business with no quotes yet sees one line instead: "No quotes yet. When a customer sends a request, you will see here whose turn it is."
 
@@ -56,15 +56,17 @@ Test requests from setup are left out. A business with no quotes yet sees one li
 
 The four figures at the top count all your quotes since you started, not one month.
 
-- "Total Quotes": every quote in your account, whatever its status. This includes quotes still waiting for you and the test request from setup.
-- "Quotes Viewed": quotes the customer opened that are now opened and waiting, accepted or paid. A quote that was opened and then declined or expired is not in this figure.
+- "Total Quotes": every quote in your account, whatever its status. This includes quotes still waiting for you.
+- "Quotes Viewed": every quote a customer opened, whatever happened next. A quote that was opened and then declined or expired still counts.
 - "Quotes Accepted": quotes the customer accepted.
-- "Conversion Rate": "Quotes Accepted" as a share of the quotes that were sent and are now waiting, opened, accepted or expired. Declined quotes are left out of this sum.
+- "Conversion Rate": "Quotes Accepted" as a share of every quote that was sent to a customer. Declined and expired quotes count as sent.
+
+The test request from setup is left out of all four.
 
 Lower down:
 
 - "Monthly Usage" shows the estimates created this month against your plan's limit, with "Estimates Created" and "Estimates Sent". Before you pick a plan it is headed "Free quotes" and counts in total, not per month.
-- "Quote Funnel" shows "Created", "Viewed", "Accepted" and "Paid", each with its count and its share of "Total Quotes". Nothing in {{product}} marks a quote as paid today, so "Paid" stays at zero.
+- "Quote Funnel" shows "Created", "Viewed" and "Accepted", each with its count and its share of "Total Quotes".
 
 ## What period do the numbers cover, and can I pick my own dates?
 <!-- id: analytics-date-ranges; page: /app/analytics -->
@@ -118,6 +120,12 @@ They are three sections lower down the Analytics page. None of them changes a pr
 
 - "Pricing Insights" are suggestions drawn from how your quotes did over the last 90 days. The section shows only when there is a suggestion. "Adjust pricing →" opens "Services", where you make the change yourself.
 - "Quote Outcomes by Service" is a table with, for each service, "Sent", "Accepted", "Acceptance" and "Median edit before send", which is how much you usually changed the price before sending.
-- "Market Benchmarks" compares your rates with what similar businesses charge, without naming anyone. Press "Share & See Benchmarks" to join: your own rates go into the same anonymous pool. Figures show only once at least three other businesses with similar services and your currency are sharing. Until then the section says "Not enough comparable businesses yet".
+- "Market Benchmarks" compares your rates with what similar businesses charge, without naming anyone. You see it while you share your own rates into the same anonymous pool. Figures show only once at least three other businesses with similar services and your currency are sharing. Until then the section says "Not enough comparable businesses yet".
 
-The Analytics page has no button to stop sharing your rates once you have joined. Write to {{support.email}} if you want to stop.
+## How do I stop or start sharing my rates in "Market Benchmarks"?
+<!-- id: analytics-benchmark-sharing; page: /app/settings; section: Market benchmarks -->
+
+There is a switch in "Settings", under "Market benchmarks": "Share my rates, without my name, in market benchmarks". It is on for a new business. It saves as soon as you change it.
+
+- On: the rates of your services (per room, per hour and so on) are added, without your name, to the typical range that similar businesses see on "Analytics", and you see theirs. Your customers, your quotes and your business name are never shared.
+- Off: your rates are in nobody's benchmark, and "Market Benchmarks" on "Analytics" shows you no figures. It shows a "Share & See Benchmarks" button, which switches sharing on again.

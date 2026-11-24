@@ -16,8 +16,9 @@ export const metadata: Metadata = {
 
 /**
  * T-153: /demo — try it as a customer, with an example business.
- * With ?tenantKey= (the dashboard's Quote link page links here) the developer view
- * opens instead, unchanged.
+ * With ?tenantKey= the developer view opens instead, unchanged. Nothing in the
+ * dashboard links to it since T-201 (the business opens its own quote link);
+ * the address still works for whoever is putting the code on a website.
  */
 export default async function DemoPage({ searchParams }: { searchParams: { tenantKey?: string } }) {
   if (searchParams.tenantKey) return <DeveloperDemo />

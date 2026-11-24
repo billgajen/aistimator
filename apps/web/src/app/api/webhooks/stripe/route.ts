@@ -3,11 +3,15 @@ import type Stripe from 'stripe'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getStripeClient } from '@/lib/stripe'
 import { invoiceSubscriptionId, syncSubscriptionFromStripe } from '@/lib/billing-sync'
+import { priceHeldRequestsForPlan } from '@/lib/held-requests'
+import { subscriptionLive } from '@qolumns/shared'
 import { isHandledStripeEvent } from '@/lib/stripe-events'
 import { handleReversal } from '@/lib/billing-reversals'
 import { sendMetaEvent } from '@/lib/meta-capi'
 
 export const dynamic = 'force-dynamic'
+// T-201: a purchase also sends the requests saved without a price for pricing (at most 20, one after another)
+export const maxDuration = 60
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -94,6 +98,10 @@ async function handle(admin: Admin, stripe: Stripe, event: Stripe.Event): Promis
       const tenantId = session.client_reference_id || session.metadata?.tenant_id || null
       const result = await syncSubscriptionFromStripe(admin, stripe, subscriptionId, { tenantId })
       if (!result.ok) throw new Error(`checkout not stored: ${result.why}`)
+      // T-201: a plan was bought. The requests saved without a price are priced now, as the
+      // free-quotes email says (lib/held-requests.ts has the bounds). This event is the purchase
+      // itself, so it runs even when the return from Checkout stored the plan first.
+      if (subscriptionLive(result.status)) await priceHeldRequestsForPlan(admin, result.tenantId)
       // T-144: server-side Subscribe for the ad funnel (no-op unless Meta is configured)
       await sendMetaEvent({
         eventName: session.amount_total === 0 ? 'StartTrial' : 'Subscribe',
@@ -109,6 +117,9 @@ async function handle(admin: Admin, stripe: Stripe, event: Stripe.Event): Promis
       const result = await syncSubscriptionFromStripe(admin, stripe, event.data.object.id)
       // 'write_failed' and 'not_found' are worth a retry; the others are final answers
       if (!result.ok && (result.why === 'write_failed' || result.why === 'not_found')) throw new Error(`subscription not stored: ${result.why}`)
+      // T-201: a plan that has just begun, or a change to another plan (the portal): its room is used
+      // for the requests saved without a price. The same facts arriving again do nothing.
+      if (result.ok && result.planStarted) await priceHeldRequestsForPlan(admin, result.tenantId)
       return
     }
 

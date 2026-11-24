@@ -19,6 +19,7 @@ import { markQuoteFailed } from '@/lib/failed-quote'
 import { validateServiceMatch } from '@/lib/ai/service-matcher'
 import type { MatchService } from '@/lib/ai/service-matcher'
 import { DESCRIPTION_FIELD, decideServiceMatch, requestHasOwnContent } from '@/lib/service-match'
+import { getRegion, withinServiceArea } from '@qolumns/shared'
 import type { ServiceSuggestion } from '@qolumns/shared'
 import type { createAdminClient } from '@/lib/supabase/server'
 
@@ -95,7 +96,7 @@ export async function createQuoteSubmission(
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
     .select(
-      'id, name, currency, tax_enabled, tax_label, tax_rate, service_area_mode, service_area_values'
+      'id, name, region, currency, tax_enabled, tax_label, tax_rate, service_area_mode, service_area_values'
     )
     .eq('id', tenantId)
     .single()
@@ -196,21 +197,21 @@ export async function createQuoteSubmission(
   }
 
   // 5. Validate service area if configured
-  if (tenant.service_area_mode !== 'none' && input.job?.postcodeOrZip) {
-    const postcode = input.job.postcodeOrZip.toUpperCase().trim()
-    const allowedValues = (tenant.service_area_values as string[]) || []
-
-    if (tenant.service_area_mode === 'postcode_allowlist') {
-      // Check if postcode starts with any allowed prefix
-      const isAllowed = allowedValues.some((prefix) => postcode.startsWith(prefix.toUpperCase()))
-      if (!isAllowed) {
-        return respond(
-          { error: { code: 'OUTSIDE_SERVICE_AREA', message: 'Location is outside service area' } },
-          { status: 400 }
-        )
-      }
-    }
-    // county_state mode would need additional lookup - skip for now
+  // T-201: one rule for both kinds of area (@qolumns/shared, service-area.ts). "County/State" was
+  // saved and never checked until then. A request is refused only when it is certainly outside;
+  // no postal code and no address, or a place the rule cannot tell, is never refused.
+  const outsideArea = !withinServiceArea({
+    mode: tenant.service_area_mode as string,
+    values: tenant.service_area_values as string[] | null,
+    postcode: input.job?.postcodeOrZip,
+    address: input.job?.address,
+    areas: getRegion((tenant as { region?: string | null }).region).areas,
+  })
+  if (outsideArea) {
+    return respond(
+      { error: { code: 'OUTSIDE_SERVICE_AREA', message: 'Location is outside service area' } },
+      { status: 400 }
+    )
   }
 
   // 6. Validate required form fields from widget config.

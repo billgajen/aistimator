@@ -122,6 +122,12 @@ Code for every item is already built; these are the steps that unlock it.
   13. **The app before the App Store (T-182 follow-up; the TestFlight ticket).** Icon and splash, the three brand
      fonts, the EAS settings, the encryption declaration, and the plan-limit wording (Apple does not allow an app to
      point at a purchase outside it). The list is in the T-182 section.
+  14. **Marking a job won or lost yourself (T-201, not built).** Today a job counts as won only when the customer
+     accepts the estimate. A business that wins the job by phone has no way to say so, and none to say it lost.
+  15. **A date range on Analytics (T-201, not built).** The figures are for all time, and the won panel for this
+     month.
+  16. **Changing the account's email address (T-201, not built).** Settings has "Change password" since T-201;
+     the sign-in email can only be changed by us.
 - [x] **Disagreement path decided 2026-11-09:** both. The reviewer gets the scope answers and a 30 s cap (CHANGELOG 2026-11-09).
 
 ## T-139 — Identification signals (nameplate reading)
@@ -3499,39 +3505,63 @@ worker, then the web.
 
 ### Found while writing the guide (not changed in this ticket)
 
-Each of these is how the product behaves today. The guide describes it as it is. Say which you want fixed.
+**Almost all of these were fixed in T-201 (24 November 2026).** Each line says what happened to it; the number is
+the item in the T-201 ticket. What is still open is at the end.
 
-- **Services:** questions are saved only for a service that was started from a description, a template or an
-  import (one made with an empty "Description" loses its questions on save). Changing a question's "Label"
-  breaks the price lines that use it. "Regenerate" on "Scope & Photos" overwrites questions, price lines and
-  add-ons. "Describe your pricing" silently keeps at most 10 lines and 10 questions. The amount boxes show "$"
-  whatever the currency. A fixed line ticked "Only include when…" with no question shows in the preview but is
-  never charged.
-- **Setup and templates:** there is no test estimate after setup, and opening your own quote link ticks "Share
-  your quote link". "Add" from a template switches the service on at once with example prices. Switching every
-  service off sends Home back to setup. There is no change-password in Settings.
-- **Quote link and estimates:** "Preview on a demo page" opens a developer page ("Widget Demo", "Tenant Key").
-  The Advanced tip says "Go to Pricing Rules", which is not a page. An estimate sent automatically still tells
-  the customer the business "will review and confirm it". "Hold until I approve" promises no price but shows a
-  low and high figure. A request that could not be priced has no "try again". "Pricing trace" is under "More"
-  only, after sending, and shows raw data under "Extracted Signals". There is no way to mark a job won or lost,
-  and nothing ever sets "Paid".
-- **Follow-up:** one automatic reminder goes to the customer after three days, with no switch to turn it off;
-  the public site no longer mentions it. The WhatsApp page shows "Connect WhatsApp" with no "Coming soon" mark.
-- **Analytics:** "Total Quotes" includes setup tests; "Conversion Rate" leaves declined quotes out; "Quotes
-  Viewed" drops opened-then-declined; "Paid" is always zero; there is no date range; there is no way to stop
-  sharing benchmarks.
-- **Fixed in T-200:** saving "Quote Template" no longer switches customer acceptance back on (the first item of
-  the next line is history).
-- **Settings and billing:** saving "Quote Template" switches "Allow customers to accept quotes directly" back
-  on (the guide warns of this; remove the warning when it is fixed). "Default Terms & Conditions" is saved but
-  printed nowhere. The Quote Template tick boxes change only the PDF. "County/State" service area is never
-  checked. The Branding page says "Growth and Pro" remove the badge (old plan names). The badge comes back
-  during a payment retry. Requests saved without a price are not priced by themselves after a plan is bought,
-  though the free-quotes email says they are. After a plan ends, the free allowance counts every quote ever
-  priced. Customer emails always say "Powered by" and never carry the logo.
-- **Home:** the "Accepted this month" card counts every accepted estimate; the panel's Accepted step counts
-  customer requests only.
+- **Services**
+  - [x] Questions were saved only for a service started from a description, a template or an import. **Fixed
+    (5):** saved for every service.
+  - [x] Changing a question's "Label" broke the price lines that used it. **Fixed (6).**
+  - [x] "Regenerate" overwrote questions, price lines and add-ons without asking. **Fixed (7):** it asks first
+    and names what is replaced.
+  - [x] "Describe your pricing" silently kept at most 10 lines and 10 questions. **Fixed (8):** it says what was
+    left out.
+  - [x] The amount boxes showed "$" whatever the currency. **Fixed (9).**
+  - [x] A fixed line ticked "Only include when…" with no question was never charged. **Fixed (10):** it cannot
+    be saved.
+- **Setup and templates**
+  - [x] Opening your own quote link ticked "Share your quote link". **Fixed (11).**
+  - [x] "Add" from a template switched the service on at once with example prices. **Fixed (12):** added
+    switched off, with a note.
+  - [x] Switching every service off sent Home back to setup. **Fixed (13).**
+  - [x] There was no change-password in Settings. **Fixed (14).**
+  - [ ] There is no test estimate after setup. **Still so** (not in T-201).
+- **Quote link and estimates**
+  - [x] "Preview on a demo page" opened a developer page. **Removed (15).**
+  - [x] The Advanced tip said "Go to Pricing Rules", which is not a page. **Fixed (16).**
+  - [x] An estimate sent automatically told the customer the business "will review and confirm it". **Fixed (17).**
+  - [x] "Hold until I approve" promised no price but showed a low and high figure. **Fixed (18).**
+  - [x] A request that could not be priced had no "try again". **Fixed (19).**
+  - [x] "Pricing trace" showed raw data under "Extracted Signals". **Fixed (20):** "What Qolumns understood", in
+    readable lines. It is still under "More" only, as you asked.
+  - [ ] There is no way to mark a job won or lost. **Backlog** (item 14 at the top of this file).
+  - [x] Nothing ever sets "Paid". **"Paid" is hidden (25)** until payments exist.
+- **Follow-up**
+  - [x] One automatic reminder after three days, with no switch. **Fixed (4):** a switch in Settings.
+  - [x] The WhatsApp page showed "Connect WhatsApp" with no "Coming soon" mark. **Fixed (21).**
+- **Analytics**
+  - [x] "Total Quotes" included setup tests. **Fixed (22).**
+  - [x] "Conversion Rate" left declined quotes out. **Fixed (23).**
+  - [x] "Quotes Viewed" dropped opened-then-declined. **Fixed (24).**
+  - [x] "Paid" was always zero. **Hidden (25).**
+  - [ ] There is no date range. **Backlog** (item 15).
+  - [x] There was no way to stop sharing benchmarks. **Fixed (26):** a switch in Settings.
+- **Settings and billing**
+  - [x] Saving "Quote Template" switched customer acceptance back on. **Fixed in T-200.**
+  - [x] "Default Terms & Conditions" was saved but printed nowhere. **Fixed (27).**
+  - [x] The Quote Template tick boxes changed only the PDF. **They now say "PDF only" (28).**
+  - [x] "County/State" service area was never checked. **Fixed (29),** for US businesses, by state.
+  - [x] The Branding page said "Growth and Pro" remove the badge. **Fixed (30).**
+  - [x] The badge came back during a payment retry. **Already right since T-199 (31);** now held by tests.
+  - [x] Requests saved without a price were not priced after a plan was bought. **Fixed (32).**
+  - [x] After a plan ends, the free allowance counted every quote ever priced. **Fixed (33).**
+  - [x] Customer emails always said "Powered by" and never carried the logo. **Fixed (34).**
+- **Home**
+  - [x] "Accepted this month" and the panel's Accepted step counted different things. **Fixed (35).**
+
+**Still open after T-201** (the T-201 section at the end of this file has the detail): no test estimate after
+setup; "Clear" on "Scope & Photos" does not ask; marking a job won or lost, a date range on Analytics and
+changing the account email are in the backlog.
 
 ### The app on your iPhone
 
@@ -3806,8 +3836,8 @@ Tell me what looks wrong and I will fix it against what you saw.
 
 ### Differences from the iPhone app, by decision
 
-- **No room scan**, and no 3D button on a scanned quote. The 3D viewer is a web page and may well open on Android;
-  I hid the button because I could not see it open. Say if you want it tried.
+- **No room scan.** (The 3D button was hidden in this first bundle. **T-201 switched it on:** bundle 2 opens the
+  3D page in the phone's browser. See the T-201 section.)
 - **No pinch-to-zoom** on a photo or on the enlarged floor plan (that zoom is the iPhone's own). They open full
   screen at the screen's width.
 - **Android's storage permission** is declared for Android 12 and older only, because Android 9 and older will
@@ -3838,4 +3868,107 @@ Tell me what looks wrong and I will fix it against what you saw.
 - [ ] The Firebase steps, when you want Android notifications.
 - [ ] When the Android app is public, tell me: the help guide still says "There is no Android app"
   (`Docs/help/08-mobile-app-room-scan.md`), which is right while it is in internal testing only.
-- [ ] `brand/*.ai` (four Illustrator files) are still not committed. Say if they belong in the repository.
+- [x] ~~`brand/*.ai` (four Illustrator files) are still not committed.~~ Decided 24 Nov: they stay on your
+  Mac; `brand/*.ai` is in `.gitignore`.
+
+## T-201 — Android fixes, the reminder switch, and the oddities found in T-198
+
+**Built, not deployed.** It sits on top of T-197 to T-200. To put it live: **migration 50 first**
+(`bash scripts/deploy-migration-50.sh`), then the **worker**, then the **web**. The migration is safe under the
+code that is live today.
+
+### The Android bundle
+
+- **File:** `apps/mobile/build/qolumns-android-2.aab` (git-ignored). Version 0.1.0, **version code 2**, same Expo
+  project (`@billiom/qolumns`) and upload key as the first.
+- **Upload it by hand** to Play's internal testing, as before. `eas submit` was not run; nothing was sent to Google.
+- **What is new in it:**
+  - Play should stop leaving out tablets, Chromebooks and headsets: the manifest says a portrait screen is not
+    required. I also said the same for the back camera and autofocus (the camera permission implies both, and a
+    Chromebook often has a front camera only). On a device with no camera, "Take a photo" opens the gallery.
+    Say if you want the camera lines taken out again.
+  - **"View in 3D" on Android.** It opens the 3D page in the phone's browser (the iPhone shows it inside the
+    app). The button shows only if the phone can open a web address.
+- **What I saw and did not see:** the 3D page drawing a model in Chrome's engine set up as a Pixel 7 (picture in
+  `scripts/android-check/android-3d-viewer.png`, git-ignored), from a sample model. **Not** on an Android phone,
+  and not with a model from a real scan in that set-up.
+- [ ] **On your Android phone:** open a quote scanned on your iPhone, press "View in 3D". The browser should open
+  and draw the room; turn it with a finger. If it does not, tell me what you see and I will hide the button again.
+- [ ] In Play Console, after uploading: the device catalogue should now list tablets and Chromebooks.
+
+### The reminder switch (item 4)
+
+- **Settings → "Reminder to the customer"**, on for everyone. Untick it and no reminder is sent for that
+  business, including for estimates already sent.
+- **Two things differ from the ticket:**
+  - The reminder is sent by the **web app's daily job** (Vercel Cron), not the worker. Nothing to do; it only
+    means the switch needs the web deploy, not the worker's.
+  - Today's reminder goes to a customer who has **not accepted or declined**, whether or not they opened the
+    estimate. So the switch reads "…if they haven't answered the estimate after 3 days", not "haven't opened".
+    **Decided 24 Nov: kept as built** (one reminder for an estimate not answered, opened or not), with the
+    wording "haven't answered".
+
+### Decisions for you (say which you want changed)
+
+- **Benchmarks (26):** the switch is on for a business that signs up from now on. **Existing businesses stay as
+  they are** (off unless they pressed "Share & See Benchmarks"). Switching everyone on would put the demo
+  business and the two store reviewers' accounts into the figures. **Decided 24 Nov: existing businesses are
+  left as they are.**
+- **"Powered by" in emails on the free start (34):** it is **off**, the same as the estimate page since T-199
+  (the free start works like Pro). The ticket's words said "stays for the free start". If you want the badge on
+  the free start, it has to change for the page and the emails together.
+- **Held estimates (18):** the "no figure" rule also covers an estimate the checker held and one you made
+  yourself, and a service on "Hold" shows no range while the customer is confirming a detail.
+- **County/State (29):** a customer is refused only when their ZIP is certainly in another state. "Harris
+  County, TX" lets in all of Texas: a ZIP cannot tell us the county without a dataset we do not have. UK
+  businesses are not checked in this mode.
+- **Saved requests after a purchase (32):** priced by themselves, oldest first, only from the last 30 days, at
+  most 20, and never past the plan's quotes. Older ones keep "Price this request". Nothing is priced by itself
+  when a month rolls over or for a plan set with `set-test-plan.sh`.
+- **"Try again" (19):** five tries a request. The phone app still shows only "Contact" for a request that could
+  not be priced. **Decided 24 Nov: "Try again" in the phone app goes into the next ticket** (the server side is
+  ready).
+- **Quote Template tick boxes (28):** they say "PDF only" (the smaller change). Making them apply to the
+  estimate page is a ticket of its own.
+- **Terms (27):** read from Settings each time, so changing them changes what older estimate pages show.
+- **Template "Add" (12):** the "check the example prices" note lasts for that visit to Services; the row reads
+  "Inactive" either way. Setup still switches its services on.
+- **WhatsApp (21):** connecting is **not live** today, so a business that is not connected sees "Coming soon"
+  and no button. Bluum is connected and sees no change.
+
+### What you must do
+
+- [ ] **When you submit the Meta review (your decision, 24 Nov: no change before then):** set
+  `WHATSAPP_CONNECT_OPEN` in Vercel (production) to the ids of the businesses
+  that must be able to connect: Bluum (`tnt_…`, in case it ever disconnects) and the business Meta's reviewer
+  signs in to, separated by commas. Without it the reviewer sees "Coming soon" instead of "Connect WhatsApp".
+  `all` opens it for everyone (the same as going live).
+- [ ] Deploy when ready: migration 50, worker, web.
+- [ ] Upload the bundle and try "View in 3D" (above).
+- [ ] Read the privacy page: it does not mention benchmark sharing, which is now on for new businesses.
+
+### Not proven here
+
+- ~~A purchase pricing saved requests through Stripe.~~ Seen in Stripe's sandbox (`verify-t180`, 111 of 111).
+- ~~The full check level did not finish.~~ Run again alone on 24 Nov: 43 of 45 in 34 min 58 s, then the two
+  that failed were fixed and passed (`verify-t179` 99 of 99, `verify-t180` 111 of 111 on its third try). Neither
+  fault was in what a business sees: one was an import path only that script trips on, the other the script's
+  own expectations (three plan cards, where T-200 left two; and Stripe's page read while it still said
+  "Loading"). Detail in the CHANGELOG.
+- **The logo in a real mail client.** No email is sent from this Mac. The logo is 48 px high; Gmail and Outlook
+  fetch pictures through their own servers, which follow the redirect the logo address gives, but I have not
+  seen it.
+- **The reminder email itself** with the switch on (no email provider here): the check asks the daily job's own
+  question of the database, with the switch on and off.
+- **Android:** nothing ran on a phone or an emulator.
+
+### Left from the T-198 list
+
+- "Clear" on "Scope & Photos" still empties without asking (only "Regenerate" was in the ticket).
+- There is still no test estimate after setup.
+- "Pricing trace" is still under "More" only, after sending (as the ticket asked).
+- A business typing its own Pro address into a browser still ticks "Share your quote link" (no sign-in reaches
+  that address).
+- The payment-failed email's line "new requests are then saved" is slightly off when free quotes remain.
+- Not built, in the product backlog at the top of this file (items 14 to 16): marking a job won or lost, a date
+  range on Analytics, changing the account email.

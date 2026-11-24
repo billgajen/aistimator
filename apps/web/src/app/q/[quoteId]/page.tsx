@@ -10,8 +10,9 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { brandStyleVars } from '@/lib/color'
 import { timingLabel } from '@/lib/acceptance'
+import { TERMS_HEADING } from '@/lib/quote-terms'
 import type { QuoteViewResponse, QuoteStatus } from '@qolumns/shared'
-import { formatMoney, formatDate, isQuoteProcessing, canCustomerDecide, customerDecisionWords, splitLabelMath, PRODUCT_NAME, splitMinimum, withoutMinimumNote, crossServiceLine, SLOW_PREPARING_MS, slowPreparingLine, failedRequestTitle, failedRequestLine, willConfirmLine, addedForCustomer } from '@qolumns/shared'
+import { formatMoney, formatDate, isQuoteProcessing, canCustomerDecide, customerDecisionWords, customerEstimateNote, splitLabelMath, PRODUCT_NAME, splitMinimum, withoutMinimumNote, crossServiceLine, SLOW_PREPARING_MS, slowPreparingLine, failedRequestTitle, failedRequestLine, willConfirmLine, addedForCustomer } from '@qolumns/shared'
 
 interface QuotePageProps {
   params: { quoteId: string }
@@ -415,9 +416,13 @@ export default function QuotePage({ params }: QuotePageProps) {
     )
   }
 
-  // T-109 range-first: provisional quotes show an estimated range, not exact pricing
-  if (quote.provisional) {
-    const { rangeLow, rangeHigh, reason } = quote.provisional
+  // T-109 range-first: a quote whose details the customer still has to confirm shows an estimated
+  // range, not exact pricing. T-201: a range is only ever sent for that case (a quote held for the
+  // business shows the holding screen above, with no figure), and a service set to "Hold until I
+  // approve" sends none even here: the customer is asked to confirm the details, with no figure.
+  if (quote.provisional || status === 'awaiting_clarification') {
+    const range = quote.provisional ?? null
+    const reason = range?.reason ?? 'awaiting_clarification'
     return (
       <div className="min-h-screen bg-background py-8 px-4 sm:py-14" style={brandVars}>
         <div className="max-w-2xl mx-auto animate-fade-in-up">
@@ -436,11 +441,17 @@ export default function QuotePage({ params }: QuotePageProps) {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-on-primary mb-3">
                 {reason === 'pending_review' ? 'Your estimate is being prepared' : `Estimate for ${customer.name}`}
               </p>
-              <p className="figure text-4xl sm:text-5xl font-medium tracking-tight">
-                <Money amount={rangeLow} currency={pricing.currency} locale={locale} />
-                <span className="text-on-primary mx-2 font-light" aria-hidden="true">—</span>
-                <Money amount={rangeHigh} currency={pricing.currency} locale={locale} />
-              </p>
+              {range ? (
+                <p className="figure text-4xl sm:text-5xl font-medium tracking-tight" data-testid="provisional-range">
+                  <Money amount={range.rangeLow} currency={pricing.currency} locale={locale} />
+                  <span className="text-on-primary mx-2 font-light" aria-hidden="true">—</span>
+                  <Money amount={range.rangeHigh} currency={pricing.currency} locale={locale} />
+                </p>
+              ) : (
+                <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight" data-testid="confirm-no-figure">
+                  A couple of details to confirm
+                </h1>
+              )}
 
               <div className="tape-rule-light mt-8" />
 
@@ -505,9 +516,8 @@ export default function QuotePage({ params }: QuotePageProps) {
                   <Money amount={pricing.total} currency={pricing.currency} locale={locale} emphasize />
                 </p>
                 <p className="mt-4 text-[13px] leading-snug text-on-primary max-w-sm">
-                  {isReviewedQuote
-                    ? `Reviewed and confirmed by ${business.name}.`
-                    : `This is an estimate based on your photos and details. ${business.name} will review and confirm it.`}
+                  {/* T-201: only an estimate that waits for the business says the business will review it */}
+                  {customerEstimateNote({ reviewed: isReviewedQuote, confirmationPending, businessName: business.name })}
                 </p>
               </div>
             </div>
@@ -821,6 +831,15 @@ export default function QuotePage({ params }: QuotePageProps) {
                 <div className="border-l-2 pl-4">
                   <p className="text-[13px] leading-relaxed text-text-secondary">{notes.notes}</p>
                 </div>
+              </section>
+            )}
+
+            {/* T-201: the business's own terms (Settings → "Default Terms & Conditions"), below the price
+                and the notes. Its words exactly, with its line breaks; nothing when it has none. */}
+            {quote.terms && (
+              <section className="mt-8" data-testid="quote-terms">
+                <SectionLabel>{TERMS_HEADING}</SectionLabel>
+                <p className="whitespace-pre-line break-words text-[13px] leading-relaxed text-text-secondary">{quote.terms}</p>
               </section>
             )}
           </div>

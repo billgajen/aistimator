@@ -507,7 +507,14 @@ const switchPlan = (b: Business, productName: string, interval: 'month' | 'year'
     await page.waitForTimeout(600)
     await page.locator('[data-testid="continue-button"]').click()
     await page.waitForTimeout(5000)
-    const review = (await lines(page)).join(' | ')
+    // Stripe's review page can still say "Loading" in place of its amounts after those five seconds
+    // (seen 24 Nov 2026); wait for it, up to half a minute more
+    let reviewLines = await lines(page)
+    for (let i = 0; i < 30 && reviewLines.includes('Loading'); i++) {
+      await page.waitForTimeout(1000)
+      reviewLines = await lines(page)
+    }
+    const review = reviewLines.join(' | ')
     await page.locator('[data-testid="confirm"]').click()
     await page.waitForTimeout(9000)
     return { offered: text.filter((l, i) => /^per\s+(month|year)$/.test(text[i + 2] ?? '')), review }
@@ -622,14 +629,21 @@ try {
   stripeCustomers.add(customerId)
   const stripeSubscription = await stripe.subscriptions.retrieve(String(starterRow?.stripe_subscription_id))
   check('Stripe\'s subscription is a Managed Payments one, with no trial, tied to this business', (stripeSubscription as unknown as { managed_payments?: { enabled?: boolean } }).managed_payments?.enabled === true && stripeSubscription.trial_end === null && stripeSubscription.metadata.tenant_id === free.tenantId)
-  const priceHeld = await call('POST', `${app}/api/quotes/${freeHeld[0]!.id}/process`, { headers: free.cookie })
-  check('the lead held at 10 of 10 can now be priced, and counts as the 11th of 50', priceHeld.ok && (await usedTotal(free.tenantId)) === 11, { status: priceHeld.status, used: await usedTotal(free.tenantId) })
+  // T-201: the return from Checkout stores the plan and prices nothing by itself (the business is not kept waiting)
+  check('the lead held at 10 of 10 is still held after the return from Checkout: it is the purchase event that prices it', (await heldQuotes(free.tenantId)).length === 1 && (await usedTotal(free.tenantId)) === 10, { held: (await heldQuotes(free.tenantId)).length, used: await usedTotal(free.tenantId) })
   const second = await call('POST', `${app}/api/billing/checkout`, { headers: free.cookie, body: { planId: 'plan_us_pro', interval: 'monthly' } })
   check('a second Checkout is refused (409 ALREADY_SUBSCRIBED): one business, one subscription', second.status === 409 && second.json?.error?.code === 'ALREADY_SUBSCRIBED', second.json)
 
   // The webhook now arrives (late). It stores the same thing.
   const firstDelivery = await deliverUntil(free.tenantId, (row) => row?.status === 'active' && delivered.size > 0)
   check('the webhook events for the purchase are accepted (200 each)', firstDelivery.events.includes('checkout.session.completed') && firstDelivery.refused === 0, firstDelivery.events)
+  // T-201: the free-quotes email says a saved request "is priced when you pick a plan". The purchase event does it.
+  const heldAfterPurchase = (await sb.select('quotes', `id=eq.${freeHeld[0]!.id}&select=status,content_json`)) as Row[]
+  check('T-201: the purchase prices the lead held at 10 of 10 by itself: sent for pricing, and counted as the 11th of 50', heldAfterPurchase[0]?.status === 'queued' && (heldAfterPurchase[0]?.content_json as Row | null)?.limitHold !== true && (await heldQuotes(free.tenantId)).length === 0 && (await usedTotal(free.tenantId)) === 11, { status: heldAfterPurchase[0]?.status, used: await usedTotal(free.tenantId) })
+  const onPlanShare = ((await sb.select('usage_counters', `tenant_id=eq.${free.tenantId}&select=estimates_created,plan_estimates_created`)) as Row[]).reduce((sum, r) => sum + Number(r.plan_estimates_created), 0)
+  check('T-201: …counted against the plan, not as an 11th free quote', onPlanShare === 1, onPlanShare)
+  const priceHeld = await call('POST', `${app}/api/quotes/${freeHeld[0]!.id}/process`, { headers: free.cookie })
+  check('T-201: …and "Price this request" cannot price it a second time (400 NOT_HELD), nor count it twice', priceHeld.status === 400 && priceHeld.json?.error?.code === 'NOT_HELD' && (await usedTotal(free.tenantId)) === 11, { status: priceHeld.status, used: await usedTotal(free.tenantId) })
   const rowAfterWebhook = await subscriptionRow(free.tenantId)
   check('…and store the same plan the return had already stored', rowAfterWebhook?.plan_id === 'plan_us_starter' && rowAfterWebhook.status === 'active' && rowAfterWebhook.billing_interval === 'monthly' && rowAfterWebhook.stripe_subscription_id === starterRow?.stripe_subscription_id)
 
@@ -689,7 +703,8 @@ try {
   await cancelPage.getByTestId('cancel-note').waitFor({ timeout: 30_000 }).catch(() => undefined)
   const cancelNote = (await cancelPage.getByTestId('cancel-note').innerText().catch(() => '')).replace(/\s+/g, ' ')
   check('…the billing page says when it ends and that it works until then', /Your Pro plan ends on [A-Z][a-z]+ \d{1,2}, \d{4}\. It works as normal until then\./.test(cancelNote), cancelNote)
-  check('…and each plan card says "plus tax" beside its price', (await cancelPage.getByTestId('plus-tax').count()) === 3 && (await cancelPage.getByTestId('plus-tax').allInnerTexts()).every((text) => text.trim() === 'plus tax'))
+  // T-200: two plans are on offer (Starter and Pro), so two cards
+  check('…and each plan card says "plus tax" beside its price', (await cancelPage.getByTestId('plus-tax').count()) === 2 &&(await cancelPage.getByTestId('plus-tax').allInnerTexts()).every((text) => text.trim() === 'plus tax'))
   await cancelPage.screenshot({ path: path.join(outDir, 'billing-cancelled.png'), fullPage: true })
   await cancelPage.context().close()
   check('every webhook event of the journey was accepted', [firstDelivery, upgraded, yearly, down, cancelled].every((d) => d.refused === 0))

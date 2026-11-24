@@ -146,6 +146,8 @@ export const SCRIPTS = [
   { id: 't198', server: 'standard', model: 'real', browser: true, minutes: 25 },
   // T-200 (Part B): plans on offer, the Quote Template save, the assistant asking back, the log-in page
   { id: 't200', server: 'standard', model: 'none' },
+  // T-201: the reminder switch, the service editor (a browser for Regenerate), estimates, Home and Settings, billing
+  { id: 't201', server: 'standard', model: 'none', browser: true, minutes: 20 },
 ]
 
 /** Lint, typecheck and unit tests: every level runs these first */

@@ -361,8 +361,9 @@ check('the estimate made on site is its own quieter line, never added in', onSit
 check('last month is said when it has data', textOf(homeA, 'won-last-month') === 'Last month: $1,250 from 1 job', textOf(homeA, 'won-last-month'))
 check('the accepted setup test ($77,777) is in no figure', !homeA.includes('77,777') && !homeA.includes('78,'))
 const stepCounts = [...homeA.matchAll(/data-testid="won-step" data-step="(\w+)"[\s\S]*?data-testid="won-step-count">(?:<!--.*?-->)?(\d+)/g)].map((m) => `${m[1]}:${m[2]}`)
-// customer requests this month: Megan, Jordan and Sam (3); the on-site quote is in none of the steps
-check('four steps in a row: Requests, Estimates sent, Opened, Accepted, counted from customer requests only', stepCounts.length === 4 && stepCounts[0] === 'requests:3' && stepCounts[3] === 'accepted:2' && stepCounts.map((s) => s.split(':')[0]).join() === 'requests,sent,opened,accepted', stepCounts)
+// customer requests this month: Megan, Jordan and Sam (3); the on-site quote is in none of the first three steps.
+// T-201: Accepted counts every accepted estimate this month, as Home's "Accepted" count does: 2 customers + 1 on site
+check('four steps in a row: Requests, Estimates sent, Opened from customer requests; Accepted counts every accepted estimate (T-201)', stepCounts.length === 4 && stepCounts[0] === 'requests:3' && stepCounts[3] === 'accepted:3' && (textOf(homeA, 'won-step-note') ?? '').includes('includes 1 made on site') && stepCounts.map((s) => s.split(':')[0]).join() === 'requests,sent,opened,accepted', stepCounts)
 check('once the panel shows, the four stat cards are gone: a number has one home', !homeA.includes('data-testid="home-numbers"'))
 const bootA = await appClient.bootstrap()
 check('the app’s home line is the same sentence, with the on-site line, from the bootstrap route', bootA.won?.headline === headline && bootA.won?.onSite === onSiteLine, bootA.won)

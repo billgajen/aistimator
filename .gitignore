@@ -52,3 +52,6 @@ scripts/hardcore-test/results/
 # T-200: the Android bundle downloaded from the build service, and pictures from trying it on an emulator
 apps/mobile/build/
 scripts/android-check/
+
+# The owner's Illustrator source files for the logo (kept on the owner's Mac; the site and app use the PNG and SVG copies)
+brand/*.ai

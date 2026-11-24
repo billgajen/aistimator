@@ -9,6 +9,7 @@ import {
   generateCustomerEmailHtml,
 } from '@/lib/postmark'
 import { businessReplyTo } from '@/lib/business-email'
+import { customerEmailBrand } from '@/lib/customer-email-brand'
 import type { QuotePricing, QuoteStatus, TenantBranding } from '@qolumns/shared'
 
 /**
@@ -183,6 +184,7 @@ export async function POST(
       sectionsHtml: sectionsEmailHtml(pricing, service.name, locale),
       validUntil,
       primaryColor: branding.primaryColor,
+      brand: await customerEmailBrand(supabase, profile.tenant_id, tenant.branding_json),
     })
 
     // Send email

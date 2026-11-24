@@ -12,6 +12,8 @@ export interface ServiceCreateBody {
   /** T-147: hide the estimate until approved (default false = show, then confirm) */
   holdUntilApproved?: boolean
   name: string
+  /** T-201: `false` creates the service switched off (a template's service, until its prices are checked). Default on. */
+  active?: boolean
   description?: string | null
   /** T-189: accepted from older callers and ignored: every quote has the one style */
   documentTypeDefault?: unknown
@@ -49,7 +51,7 @@ export function serviceInsertRow(tenantId: string, body: ServiceCreateBody, now 
     tenant_id: tenantId,
     name: body.name.trim(),
     description: body.description || null,
-    active: true,
+    active: body.active !== false,
     // T-189: there is one document style. The column keeps the database's own default and is not read.
     auto_send: body.autoSend === true,
     hold_until_approved: body.holdUntilApproved === true && body.autoSend !== true,

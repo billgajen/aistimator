@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { checkPlanLimit } from '@/lib/plan-limits'
 import { getPlan } from '@qolumns/shared'
 import type { AnalyticsResponse, AnalyticsMetrics, UsageData } from '@qolumns/shared'
+import { analyticsMetrics, type AnalyticsQuoteRow } from '@/lib/analytics-metrics'
 
 /**
  * GET /api/analytics
@@ -48,7 +49,7 @@ export async function GET() {
     // Fetch quote counts by status
     const { data: quotes, error: quotesError } = await supabase
       .from('quotes')
-      .select('status')
+      .select('status, is_test, sent_at, viewed_at, accepted_at')
       .eq('tenant_id', tenantId)
 
     if (quotesError) {
@@ -59,31 +60,8 @@ export async function GET() {
       )
     }
 
-    // Calculate metrics
-    const totalQuotes = quotes?.length || 0
-    const quotesViewed = quotes?.filter((q) =>
-      ['viewed', 'accepted', 'paid'].includes(q.status)
-    ).length || 0
-    const quotesAccepted = quotes?.filter((q) =>
-      ['accepted', 'paid'].includes(q.status)
-    ).length || 0
-    const quotesPaid = quotes?.filter((q) => q.status === 'paid').length || 0
-
-    // Calculate conversion rate (accepted / total sent)
-    const quotesSent = quotes?.filter((q) =>
-      ['sent', 'viewed', 'accepted', 'paid', 'expired'].includes(q.status)
-    ).length || 0
-    const conversionRate = quotesSent > 0
-      ? Math.round((quotesAccepted / quotesSent) * 100)
-      : 0
-
-    const metrics: AnalyticsMetrics = {
-      totalQuotes,
-      quotesViewed,
-      quotesAccepted,
-      quotesPaid,
-      conversionRate,
-    }
+    // T-201: setup tests left out; opened counts every opened quote; the rate is accepted ÷ sent
+    const metrics: AnalyticsMetrics = analyticsMetrics(quotes as AnalyticsQuoteRow[] | null)
 
     // Fetch usage counter for current month
     const { data: usageCounter } = await supabase

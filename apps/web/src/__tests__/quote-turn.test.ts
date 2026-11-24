@@ -112,7 +112,8 @@ describe('labels', () => {
     expect(turnOf({ status: 'feedback_received' }).label).toBe('Customer asked a question')
     expect(turnOf({ status: 'failed' }).label).toBe('Could not be priced')
     expect(turnOf({ status: 'accepted' }).label).toBe('Customer accepted')
-    expect(turnOf({ status: 'paid' }).label).toBe('Paid')
+    // T-201: nothing says "Paid" until payments exist; a paid quote reads as the accepted quote it is
+    expect(turnOf({ status: 'paid' }).label).toBe('Customer accepted')
     expect(turnOf({ status: 'declined' }).label).toBe('Customer declined')
     expect(turnOf({ status: 'expired' }).label).toBe('Expired')
     expect(turnOf({ status: 'queued' }).label).toBe('Working out the price')
@@ -163,7 +164,7 @@ describe('detail lines', () => {
     expect(turnOf({ status: 'feedback_received' }).detail).toBe('Waiting for your answer')
     expect(turnOf({ status: 'failed', createdAt: daysAgo(0) }).detail).toBe('Received today')
     expect(turnOf({ status: 'accepted', acceptedAt: daysAgo(1) }).detail).toBe('Accepted on 12 Nov')
-    expect(turnOf({ status: 'paid', paidAt: daysAgo(0) }).detail).toBe('Paid on 13 Nov')
+    expect(turnOf({ status: 'paid', acceptedAt: daysAgo(1), paidAt: daysAgo(0) }).detail).toBe('Accepted on 12 Nov')
     expect(turnOf({ status: 'declined', declinedAt: daysAgo(1) }).detail).toBe('Declined on 12 Nov')
     expect(turnOf({ status: 'expired', expiresAt: daysAgo(3) }).detail).toBe('Expired on 10 Nov')
     expect(turnOf({ status: 'generating', createdAt: daysAgo(0) }).detail).toBe('Received today')
@@ -229,9 +230,10 @@ describe('next step', () => {
     expect(accepted).toMatchObject({ action: 'contact', buttonLabel: 'Contact customer' })
     expect(accepted.sentence).toBe('Morgan accepted on 12 Nov. Contact them to book the job.')
 
-    const paid = turnOf({ status: 'paid', paidAt: daysAgo(0) })
-    expect(paid.action).toBeNull()
-    expect(paid.sentence).toBe('Morgan paid on 13 Nov. Nothing for you to do.')
+    // T-201: until payments exist, a paid quote is worded as accepted
+    const paid = turnOf({ status: 'paid', acceptedAt: daysAgo(1), paidAt: daysAgo(0) })
+    expect(paid.action).toBe('contact')
+    expect(paid.sentence).toBe('Morgan accepted on 12 Nov. Contact them to book the job.')
 
     const declined = turnOf({ status: 'declined', declinedAt: daysAgo(1) })
     expect(declined.action).toBeNull()
@@ -329,7 +331,8 @@ describe('tracker', () => {
     const accepted = quoteTracker({ ...base, status: 'accepted', approvedAt: daysAgo(2), sentAt: daysAgo(2), viewedAt: daysAgo(1), acceptedAt: daysAgo(1) }, opts)
     expect(accepted[3]).toMatchObject({ label: 'Customer accepted', done: true, date: '12 Nov', note: null, ended: false })
     const paid = quoteTracker({ ...base, status: 'paid', approvedAt: daysAgo(2), sentAt: daysAgo(2), viewedAt: daysAgo(1), acceptedAt: daysAgo(1), paidAt: daysAgo(0) }, opts)
-    expect(paid[3]).toMatchObject({ label: 'Customer accepted', date: '12 Nov', note: 'Paid 13 Nov' })
+    // T-201: no "Paid 13 Nov" line until payments exist
+    expect(paid[3]).toMatchObject({ label: 'Customer accepted', date: '12 Nov', note: null })
   })
 
   it('declined or expired is the final step', () => {

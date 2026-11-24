@@ -5,6 +5,10 @@ import { fromMeta, readSignupMessage, signupLoginOptions, type SignupMessage } f
 import type { ConnectionView } from '@/lib/whatsapp-state'
 
 export interface ConnectSettings {
+  /** T-201: connecting is open to this business today (false: the page says "Coming soon"). Absent means open. */
+  open?: boolean
+  /** T-201: the words for "Coming soon" (lib/whatsapp-open.ts) */
+  soon?: { mark: string; title: string; text: string; meanwhile: string; link: string }
   available: boolean
   appId: string | null
   configId: string | null

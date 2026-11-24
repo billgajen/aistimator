@@ -23,7 +23,7 @@
  *     then this screen asks nothing.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
+import { Image, Linking, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as Clipboard from 'expo-clipboard'
 import { ANSWER_NOTE_MAX, allAnswered, roomScanView, type RoomScanRoom, certaintySentence, chosenChoice, customerFirstName, formatMoney, isTypedAnswer, lineLabelParts, noteToSend, parseMoneyInput, questionChoices, questionTextBox, QUOTE_TURN_COPY, type AppQuoteLine, type AppQuoteSection, type AppQuoteView } from '@qolumns/shared'
@@ -41,7 +41,7 @@ import { storyOfQuote, TONE_STYLE } from '../../src/lib/status'
 import { PricingStages } from '../../src/components/PricingStages'
 import { EstimateReport } from '../../src/components/EstimateReport'
 import { RoomScanCard, RoomScanSummary, SCAN_TIP } from '../../src/components/RoomScanSummary'
-import { openPage, removeModelFile, roomScanAvailability, scanRoom } from '../../modules/room-scan'
+import { canOpenPage, openPage, removeModelFile, roomScanAvailability, scanRoom } from '../../modules/room-scan'
 import { loadAreaNames, putPhoto, saveAreaNames } from '../../src/lib/device-files'
 import { rememberAreaName } from '../../src/lib/area-names'
 import { viewerAddress } from '../../src/lib/model-viewer'
@@ -76,6 +76,17 @@ export default function QuoteDetail() {
   // T-194: an area just scanned again (`index`) or added, named before it is sent
   const [pending, setPending] = useState<{ index?: number; geometry: RoomScanRoom; model?: { uri: string; sizeBytes: number } } | null>(null)
   const [areaNames, setAreaNames] = useState<string[]>([])
+  // T-201: "View in 3D" shows where the viewer can open. On Android that is the phone's browser, so the
+  // phone is asked first; until it has answered (and if it says no) the button is not there.
+  const [modelOpens, setModelOpens] = useState(Platform.OS === 'ios')
+  useEffect(() => {
+    if (Platform.OS === 'ios') return
+    let live = true
+    void canOpenPage(config.apiUrl).then((can) => live && setModelOpens(can))
+    return () => {
+      live = false
+    }
+  }, [])
   useEffect(() => {
     const owner = currentUserId()
     if (owner) void loadAreaNames(owner).then(setAreaNames)
@@ -453,7 +464,7 @@ export default function QuoteDetail() {
             }}
             // T-200: on Android the scan is read-only: its summary and sizes, with no 3D button (the model has not
             // been seen to open there), and no "Scan again" or "Add an area" (there is no scanner)
-            {...(scanHere !== 'not_ios' && { onModel: viewModel })}
+            {...(modelOpens && { onModel: viewModel })}
             {...(quote.roomScan.canScanAgain && scanHere === 'ready' && { onScanAgain: (i: number) => void scanArea(i), onAddArea: () => void scanArea() })}
             busy={busy}
           />

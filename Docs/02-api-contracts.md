@@ -168,6 +168,36 @@ routes, one webhook and one admin route. Plan numbers come from `packages/shared
   room, **403** `ACCOUNT_PAUSED` when the business is suspended. A lead priced here is now counted.
 - `GET /api/whatsapp/config` `access.why` can also be `suspended`.
 
+T-201 (billing, the service area, customer emails):
+
+- **Held leads are priced when a plan is bought.** `POST /api/webhooks/stripe`: after `checkout.session.completed`
+  stores a live plan, and after a `customer.subscription.updated` that starts a plan or changes it to another
+  (`SyncResult.planStarted`), the business's held leads are sent for pricing (`lib/held-requests.ts`): oldest
+  first, only those from the last 30 days, at most 20, each claimed against the plan (never as metered overage,
+  never when the count could not be written), stopping at the first the plan has no room for. Each is then an
+  ordinary queued request: the worker prices it and the service's review setting decides what the customer is
+  sent. `POST /api/billing/confirm` (the return from Checkout) stores the plan and prices nothing. The route's
+  answers are unchanged.
+- `POST /api/quotes/:quoteId/process` takes the same steps for one lead. New: **400** `NOT_HELD` with "This
+  request is already being priced" when the lead was taken a moment before (the write is conditional on its
+  still being held, so two calls price it once and count it once).
+- **The free allowance counts free quotes only.** `GET /api/billing` `usage.estimatesCreated` with
+  `usage.per: "total"` is the number of quotes priced on the free start (`freeQuotesUsed`), not every quote
+  ever priced; a business whose plan ended has the free quotes it never used. With `per: "month"` it is the
+  month's count, as before.
+- `POST /api/public/quotes` (and the WhatsApp assistant): **400** `OUTSIDE_SERVICE_AREA` now also for a
+  "County/State" area, when the customer's ZIP code is in a state that is not on the business's list
+  (`serviceAreaVerdict`, `packages/shared/src/service-area.ts`). Not checked, so never refused: no postal code,
+  a code the region's table cannot place, an entry with no state. `PUT /api/tenant` keeps
+  `serviceAreaValues` as written when `serviceAreaMode` is `county_state` (postal codes are still upper-cased).
+- **`GET /api/public/logo/:assetId`** (public, read-only, no cookie): **302** to the picture (a signed address,
+  good for an hour; the answer may be reused for 10 minutes) when the asset is the logo a business has set today
+  (`tenants.branding_json.logoAssetId`); **404** for anything else, a customer's photo and a replaced or removed
+  logo included. It is the address a customer email's logo points at.
+- Emails to a customer (the worker's quote and estimate emails; the web app's quote, updated-quote and reminder
+  emails) carry the business's logo when it has one, and "Powered by" only when the estimate page would show
+  "Prepared with" (`canUse(access, 'no_badge')`).
+
 ## T-189: templates, sign-up source, alerts
 
 - **A service from a template** uses `POST /api/services` with the body setup sends (`servicePayload`); there
@@ -391,6 +421,34 @@ are `{ "error": { "code", "message" } }`; the message is written for the person 
   Body: one sentence (customer name, service name or total). Data: `{ quoteId, event }`. Never the customer's
   message, address, phone or email. A failed send is logged with the quote id and counts, and never changes any
   route's answer. Settings: `EXPO_ACCESS_TOKEN` (optional, web and worker).
+
+## T-201: change password, Analytics, the benchmarks switch, the WhatsApp page
+- `GET /api/tenant` returns `tenant.customerReminder` (boolean; true unless the business switched the reminder to
+  its customers off). `PUT /api/tenant` accepts `customerReminder`: only `true` or `false` (**400**
+  `INVALID_INPUT` for anything else; nothing is written). The reminder is sent by `GET /api/cron/lifecycle`
+  (Vercel Cron, daily), which leaves out every quote of a business with it off.
+- `POST /api/auth/change-password` `{ "currentPassword", "newPassword", "confirmPassword" }`. Signed-in only
+  (**401** `UNAUTHORIZED` otherwise). Limited like log-in (by address and by the account's email) before anything
+  is checked. **400** `VALIDATION_ERROR` when the current password is missing, the new one breaks sign-up's rules
+  (8 characters at least, 72 bytes at most), the two new ones differ, or the new one equals the current one.
+  **400** `WRONG_PASSWORD` ("Your current password is not right.") when the current password does not log in:
+  it is checked on the server, with a client that keeps no session, before anything changes. `{ "ok": true }`
+  when changed; the caller's session keeps working. The email address is not changed by any route.
+- `GET /api/analytics` → `metrics` leaves setup tests (`is_test`) out of every figure. `quotesSent` is new: every
+  quote that reached the customer, declined and expired ones included. `quotesViewed` is every quote that was
+  opened (a `viewed_at`, or a status that implies it), whatever happened next. `conversionRate` is
+  `quotesAccepted ÷ quotesSent`. `quotesPaid` is still answered; no page shows it while `PAYMENTS_LIVE`
+  (`packages/shared/src/quote-status.ts`) is false. The rules: `apps/web/src/lib/analytics-metrics.ts`.
+- `GET /api/tenant` and `PUT /api/tenant` → `tenant.benchmarksOptIn: boolean` (`PUT` already took
+  `benchmarksOptIn`). It is `tenants.benchmarks_opt_in`: on for a business created after migration 50.
+  `GET /api/learning/benchmarks` is unchanged: a business that is off gets `{ optedIn: false, benchmarks: [] }`
+  and is in nobody's figures.
+- `GET /api/whatsapp/config` → `connect.open: boolean` and `connect.soon: { mark, title, text, meanwhile, link }`.
+  `open` is false while quotes inside WhatsApp are not live (the plan line's `live`,
+  `apps/web/src/lib/marketing/plan-claims.ts`), unless `WHATSAPP_CONNECT_OPEN` names the business (a
+  comma-separated list of business ids, or `all`) or, outside production, Meta is stood in for
+  (`WHATSAPP_GRAPH_BASE_URL`). A business that is not connected and not open sees "Coming soon" on its WhatsApp
+  page. The connect routes themselves are unchanged.
 
 ## Account routes (T-173)
 The browser does not call Supabase's auth directly. All answer `{ "ok": true }` or the standard error envelope.
@@ -761,6 +819,24 @@ T-189 (AD-070): `documentTypeDefault` is stored and returned but read by nothing
 create or update that sends it is accepted and the value ignored. `POST /api/services/ai-draft` no longer reads
 `documentType`.
 
+T-201, the service editor:
+
+- `POST /api/services` takes an optional `active: false`, which creates the service switched off. "Add from a
+  template" sends it (`templatePayload`); every other caller leaves it out and the service is created on.
+- `POST /api/services` and `PATCH /api/services/:id` answer **400** `INVALID_INPUT` when a price line is a fixed
+  amount with `optional: true` and no `triggerSignal`, no `when.fieldId` and no `quantitySource` (ticked "Only
+  include when condition is met" with no question: the engine could never charge it). The message names the
+  line. Nothing is written. A request with no price lines (for example `{ "active": false }`) is not checked.
+- `draftConfig` may carry `"source": "manual"`: the editor's own draft for a service made by hand, kept so its
+  questions are saved. `PATCH` now syncs the form's questions whenever `draftConfig` is sent, including an empty
+  list or `null` (removing the last question takes it off the customer's form).
+- `POST /api/services/ai-draft/compile` adds `leftOut` to its answer when the description held more than one
+  service keeps: `{ "lines": ["…"], "questions": ["…"], "addons": ["…"], "adjustments": 0 }`, the names of what
+  was cut (ten price lines, ten questions, ten add-ons, eight adjustments; the limits are unchanged). The field
+  is absent when everything fitted.
+- A draft from any of the `ai-draft` routes no longer holds a fixed line marked optional with nothing to decide
+  when it applies: it comes back as an add-on of the same name and price.
+
 PUT /api/services/:serviceId/pricing
 
 Pricing config for a service.
@@ -1039,3 +1115,14 @@ Request: `{ "answers": [{ "questionId", "answer" }], "quoteToken?": "…" }`
 The business confirms on site: answers merge as confirmed form answers and the quote reprices deterministically (same path as the customer's clarify). `quoteToken` is forwarded to the worker only when it matches the stored hash (needed to email the customer their link). Measurement examples are recorded (T-123).
 400 `INVALID_STATUS` unless `awaiting_clarification`; 404 for another tenant's quote.
 
+
+T-201 (the quote link and estimates):
+- `GET /api/public/quotes/:id` (the customer's page):
+  - **No figure while the price is withheld.** `provisional` (the low and high) is sent only while `status` is `awaiting_clarification`, and not then for a service set to "Hold until I approve". It is never sent while `status` is `pending_review` (this replaces the T-146 line above, "`provisional` while `pending_review`: only when the engine measured a range", and the T-186 line that gave `provisional.reason: "pending_review"` for a quote the business made). A quote that waits for the business and was not shown early (`review_hold` `held` or `check`, or a quote the business made that is asking the business) answers with `pricing.total: 0`, empty `breakdown`, no `provisional`, no `estimateRange`, `pricing.notes: []`, `notes: { validityDays }` only (no `scopeSummary`, `assumptions`, `exclusions` or `notes`: a sentence can name a figure), no `crossServicePricing`, no `signalRecommendations`, no `actions.pdfUrl` and no `terms`. The rules are `customerSeesNoFigure` and `customerRangeAllowed` (`packages/shared/src/review-mode.ts`).
+  - `actions.pdfUrl` is left out whenever exact prices are withheld (`awaiting_clarification` too).
+  - `terms?: string`: the business's "Default Terms & Conditions" (`tenants.default_terms_text`), trimmed, at most 6,000 characters. Absent when the business has none and while the price is withheld. Read when the page is asked for; it is not copied onto the quote.
+  - `review` is unchanged, but the page's line under the price now has three cases (`customerEstimateNote`, shared): approved → "Reviewed and confirmed by {business}."; `confirmationPending` → "This is an estimate based on your photos and details. {business} will review and confirm it."; sent automatically → "This is an estimate based on your photos and details."
+- `GET /api/public/quotes/:id/pdf`: **404** `PDF_NOT_FOUND` while the price is withheld (`pending_review` not shown early, or `awaiting_clarification`), whether or not a PDF exists.
+- `POST /api/quotes/:id/pdf` (dashboard): the PDF prints the business's terms after the price and the notes, under "Terms and conditions", when it has any.
+- `POST /api/quotes/:id/process` also prices again a request that could not be priced (`status: "failed"`): 200 `{ "queued": true, "retried": true }`. **Nothing is claimed on the plan** (the request was counted when it arrived, and that count is not given back when pricing fails). **429** `RETRY_LIMIT` after five tries of one request by the business (`content_json.businessRetries`), **403** `ACCOUNT_PAUSED` for a suspended business, **502** `QUEUE_FAILED` when the worker cannot be reached (the quote stays failed). A quote that is neither failed nor held by the plan limit is still 400 `NOT_HELD`. The admin's `/api/admin/quotes/:id/retry` is unchanged and has no limit.
+- `GET /quote/:slug`: the first view sets `tenants.quote_link_first_visit_at` only when it is not the business's own: not with `?own=1` (the mark the dashboard's "Open" buttons add; the page removes it from the address bar), and not by a visitor signed in to that business. `?test=` (the setup test) never counted. A business's own address forwards the query, so the mark works there too.

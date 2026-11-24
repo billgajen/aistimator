@@ -13,7 +13,7 @@ The "Services" page lists your services. Each row shows the name, "Active" or "I
 Press "Add Service" and go through five steps. Nothing is saved until you press "Create Service" on the last step.
 
 1. Open "Services" and press "Add Service" (on an empty page, "Add your first service").
-2. On "Basic Info", type the "Service Name" and a "Description" of the job. Do not leave "Description" empty: {{product}} drafts the service from it, and the questions you add later are only saved for a service that has this draft.
+2. On "Basic Info", type the "Service Name" and a "Description" of the job. {{product}} drafts the service from the description. If you leave "Description" empty there is no draft, and you fill in the next steps yourself.
 3. Under "When a customer asks for an estimate", choose whether you check each estimate first. Press "Next". {{product}} writes the draft and fills in the next steps.
 4. On "Scope & Photos", check what the job includes and excludes and how many photos to ask for.
 5. On "Customer Questions", check the questions the customer will be asked.
@@ -63,7 +63,7 @@ Yes. On "Pricing Setup", the box "Describe your pricing" turns your own words, o
 
 To change prices later, open "Your current pricing in plain English" in the same box and describe only the change. Anything you do not mention stays as it is. You can still change every amount by hand in the boxes below, under "Or fine-tune manually".
 
-It keeps up to ten price lines and ten questions for one service, so split a long price list across services.
+It keeps up to ten price lines and ten questions for one service. If your description has more, the result shows "Not everything fitted in one service" and names each price line and question that was left out, before you apply anything. Put those in a second service, or describe fewer in this one.
 
 A service marked "AI Draft" also shows an "AI Refinement" box at the top of these steps. "Chat" takes a change typed in a sentence and applies it at once. "Upload Doc" reads prices from a PDF, a picture or a Word file. Check the result on "Pricing Setup" before you save.
 
@@ -82,9 +82,9 @@ Each service has its own questions, on the "Customer Questions" step. The custom
 8. Use the arrows to move a question up or down, and the bin to remove it.
 9. Go to "Test & Publish" and press "Save Changes".
 
-Only a "Number" question can set the quantity of a price line. If you change the "Label" of a question that a price line or an adjustment uses, choose that question again on "Pricing Setup".
+Only a "Number" question can set the quantity of a price line. You can change a question's "Label" at any time: the price lines, adjustments and conditions that use the question stay linked to it. If you remove a question, choose another one for anything that used it on "Pricing Setup".
 
-Questions are saved only for a service marked "AI Draft" in the list. A question for every service, such as how the customer heard of you, is added on "Quote link" under "Advanced · extra questions on the form".
+Questions are saved for every service, however it was made. A question for every service, such as how the customer heard of you, is added on "Quote link" under "Advanced · extra questions on the form".
 
 ## What kinds of price can I set?
 <!-- id: services-price-kinds; page: /app/services -->
@@ -96,6 +96,8 @@ A service's price list is on the "Pricing Setup" step. It has five parts.
 - "Adjustments": raise or lower the price by a percentage when the customer gives a certain answer.
 - "Add-ons": optional extras, each with its own price.
 - "Minimum Charge": the least you charge for a job. If the lines come to less, the price is raised to your minimum, and the estimate says so on a line of its own, with your amount. The lines themselves do not change.
+
+Every amount box shows your business's own currency symbol.
 
 Tax is not set here. It is under "Tax Settings" on the "Settings" page, and it is added on top of the price.
 
@@ -141,7 +143,7 @@ To charge a line only on some jobs:
 2. Under "When to include this item", choose the "Question".
 3. Choose the "Condition": "Has any value", "Equals", "Greater than", "At least", "Less than" or "At most". Type the "Value" where it asks for one.
 
-Always choose a "Question". A fixed line that is ticked with no question is never charged.
+Always choose a "Question". A "Fixed Amount" line that is ticked with no question could never be charged, so it cannot be saved: the line shows "Needs a question", and "Test & Publish" lists it under "Fix Before Publishing" until you choose a question or untick the box.
 
 To raise or lower the whole price by a percentage:
 
@@ -175,7 +177,10 @@ They are on the "Scope & Photos" step. They tell the customer what the job cover
 - "Maximum Photos Allowed": the most photos a customer can add.
 - "Photo Guidance for Customers": your words on what to photograph.
 
-On a service marked "AI Draft" this step also has two links. "Regenerate" writes a new draft over the scope, the photo settings, the questions, the price lines and the add-ons in the window. "Clear" empties the scope, the photo settings, the questions and the price lines. If you press one by mistake, close the window with the X without saving.
+On a service marked "AI Draft" this step also has two links.
+
+- "Regenerate" writes a new draft from the service name and description. It asks first: it lists what it will replace (the scope lists, the photo settings, your questions, your price lines and your add-ons, with how many of each you have) and you press "Replace with a new draft" or "Cancel". "Cancel" leaves everything as it was. Your base fee, minimum charge and adjustments are not replaced.
+- "Clear" empties the scope, the photo settings, the questions and the price lines at once, without asking. If you press it by mistake, close the window with the X without saving.
 
 ## How do I test a service's prices?
 <!-- id: services-test; page: /app/services -->

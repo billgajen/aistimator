@@ -20,6 +20,14 @@ export function isQuoteProcessing(status: string | null | undefined): boolean {
 // What the business can do with a quote (T-157)
 // ---------------------------------------------------------------------------
 
+/**
+ * T-201: Qolumns takes no payment for a job today, so nothing ever marks a
+ * quote as paid. Until it does, no page, list or filter says "Paid": a quote
+ * that carries the status reads as accepted, which it also is. The status and
+ * `paid_at` stay in the data; set this to true when payments exist.
+ */
+export const PAYMENTS_LIVE: boolean = false
+
 /** Send again: re-send the quote email */
 export const QUOTE_SEND_AGAIN_STATUSES: readonly QuoteStatus[] = ['sent', 'viewed', 'revised', 'expired']
 

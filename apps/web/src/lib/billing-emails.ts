@@ -44,7 +44,7 @@ export function freeQuotesLeftEmail(input: { businessName: string; used: number;
       heading: line.split('. ')[0] + '.',
       paragraphs: [
         `You have used <strong>${input.used} of your ${input.limit}</strong> free quotes. Pick a plan to keep pricing every request.`,
-        `After your free quotes, a new request is still saved and the customer is told you will send their estimate. Nothing is lost. It is priced as soon as you pick a plan.`,
+        `After your free quotes, a new request is still saved and the customer is told you will send their estimate. Nothing is lost. When you pick a plan, the requests saved in the last 30 days are priced for you, as far as the plan's monthly number goes.`,
       ],
       buttonHref: input.billingUrl,
       buttonLabel: 'Pick a plan',

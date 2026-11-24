@@ -21,7 +21,7 @@ You sign up with your business name, an email address and a password. No card is
 ## What happens in the first-run setup?
 <!-- id: start-first-setup; page: /app/onboarding -->
 
-Setup takes you from your trade to your first services in a few short screens. Until your business has a service that is switched on, opening "Home" brings you back to setup.
+Setup takes you from your trade to your first services in a few short screens. Until your business has a service, opening "Home" brings you back to setup. Once you have one, "Home" stays "Home", even if you switch every service off.
 
 1. "What kind of work do you do?" Check "Where is your business?", pick the closest trade, and press "Continue". Each trade is a template: a ready-made set of services, questions and prices.
 2. "Here's what we found" lists the services. Untick any you do not offer, then press "Looks right — continue".
@@ -70,6 +70,8 @@ A new business that has never had a plan and still has free quotes left sees one
 {{#soon ownAddress}}A card for choosing your own address for your quote page is {{soon}}. It is not on "Home" today.{{/soon}}
 {{#live ownAddress}}If you can choose your own address for your quote page and have not chosen one yet, the card "Choose your own address" comes next. "Later" hides it on "Home". It stays on the "Quote link" page.{{/live}}
 
+If every one of your services is switched off, a notice comes first: "All your services are off, so customers can’t get an estimate." Press "Go to Services" and switch one on.
+
 Then, from top to bottom:
 
 1. "Waiting for you": quotes to approve, customer questions and requests that could not be priced. A quote to approve has an "Approve & send" button right there. This part is hidden when nothing is waiting.
@@ -89,9 +91,9 @@ Test requests from setup are left out of every count on this page.
 
 "Get set up" on "Home" has four steps. Each one is ticked only by something you or a customer really did. The heading shows how many are done, such as "2 of 4 done", and the list goes away when all four are ticked.
 
-1. "Add a service" is ticked when you have at least one service that is switched on. Pressing it opens "Services".
+1. "Add a service" is ticked when you have at least one service, switched on or off. Pressing it opens "Services".
 2. "Check your prices" is ticked when you finish setup after pressing "These are my prices", or when you save a service on "Services" with "Create Service" or "Save Changes". Pressing it opens "Services".
-3. "Share your quote link" is ticked the first time you press "Copy" on your quote link (on "Home", on the "Quote link" page or at the end of setup), or copy one of the ready-made texts under "Where to put it", or the first time anyone opens your quote page. Your own test from setup does not count. Copying the website code does not tick it either. Pressing it opens "Quote link".
+3. "Share your quote link" is ticked the first time you press "Copy" on your quote link (on "Home", on the "Quote link" page or at the end of setup), or copy one of the ready-made texts under "Where to put it", or the first time a customer opens your quote page. Opening your own link does not count: not with the "Open" button, and not while you are signed in. Your own test from setup does not count. Copying the website code does not tick it either. Pressing it opens "Quote link".
 4. "First real request received" is ticked when a customer sends you a request. A test from setup does not count, and an unfinished request does not count. Pressing it opens "Quotes".
 
 Nothing is switched off while a step is unticked. The list is only a guide.
@@ -103,7 +105,7 @@ It shows three counts, by whose turn it is. Pressing a count opens that tab in "
 
 1. "Needs you": quotes waiting for you, such as one to approve, a customer's question, or a request that could not be priced. When the count is above zero it is marked in yellow.
 2. "Waiting for customer": quotes where the next move is the customer's, such as a quote you sent that has not been accepted yet.
-3. "Accepted": quotes customers accepted this month.
+3. "Accepted", marked "this month": every estimate accepted since the 1st of this month. The "Accepted" step in "Won through {{product}}" shows the same number.
 
 Before your first quote it says "No quotes yet. When a customer sends a request, you will see here whose turn it is." Test requests are not counted.
 
@@ -164,4 +166,4 @@ Ask for a reset link from the log-in page. The link works once, for one hour.
 3. Open the email and press "Choose a new password". On the page that opens, "Reset your password", press "Choose a new password" again.
 4. Type your "New password" (at least 8 characters) and press "Save the new password". You are logged in and land on "Home".
 
-The new password must be one you have not used on this account before. There is no change-password box in "Settings": if you are signed in and want a new password, press "Sign out" first, then follow these steps.
+The new password must be one you have not used on this account before. If you are signed in and know your current password, you do not need a reset link: use "Change password" in "Settings".

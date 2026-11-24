@@ -20,8 +20,8 @@ type Experience = 'form' | 'conversational'
 
 /**
  * Developer view of the widget (was the whole /demo page). T-153: /demo shows
- * the public example business; this view opens only with ?tenantKey=, which
- * the dashboard's Quote link page links to.
+ * the public example business; this view opens only with ?tenantKey=. The
+ * dashboard's Quote link page linked to it until T-201; nothing does now.
  *
  * Mirrors the dashboard's two-axis configuration: Placement (inline |
  * floating) × Experience (form | chat). Every mode renders the hosted embed

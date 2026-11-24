@@ -13,7 +13,7 @@
  * read) and with the service-role client on public pages.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { NO_ACCESS, businessAccess, canUse, type BusinessAccess, type Capability } from '@qolumns/shared'
+import { NO_ACCESS, businessAccess, canUse, freeQuotesUsed, type BusinessAccess, type Capability, type UsageRow } from '@qolumns/shared'
 
 type Db = Pick<SupabaseClient, 'from'>
 
@@ -21,15 +21,15 @@ export async function loadAccess(db: Db, tenantId: string): Promise<BusinessAcce
   try {
     const [subscription, usage, tenant] = await Promise.all([
       db.from('subscriptions').select('plan_id, status').eq('tenant_id', tenantId).maybeSingle(),
-      db.from('usage_counters').select('estimates_created').eq('tenant_id', tenantId),
+      db.from('usage_counters').select('estimates_created, plan_estimates_created').eq('tenant_id', tenantId),
       db.from('tenants').select('region').eq('id', tenantId).maybeSingle(),
     ])
     if (subscription.error || usage.error || tenant.error || !tenant.data) return NO_ACCESS
-    const rows = (usage.data ?? []) as Array<{ estimates_created: number | null }>
     return businessAccess({
       subscription: subscription.data as { plan_id?: string | null; status?: string | null } | null,
       region: (tenant.data as { region?: string | null }).region,
-      quotesUsed: rows.reduce((sum, row) => sum + (row.estimates_created ?? 0), 0),
+      // T-201: the free quotes used, by the same count as the quote limit
+      quotesUsed: freeQuotesUsed((usage.data ?? []) as UsageRow[]),
     })
   } catch {
     return NO_ACCESS

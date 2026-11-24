@@ -136,7 +136,7 @@ describe('T-153: demo requests count toward nothing and email no one', () => {
 
   it('no unfinished lead, no reminder, no calibration, no benchmark, not in the admin tenant list', () => {
     expect(read('apps/web/src/app/api/public/leads/route.ts')).toMatch(/is_demo\) return NextResponse\.json\(\{ skipped: true \}\)/)
-    expect(read('apps/web/src/app/api/cron/lifecycle/route.ts')).toContain(".eq('is_demo', false)")
+    expect(read('apps/web/src/lib/quote-reminders.ts')).toContain(".eq('is_demo', false)")
     expect(read('apps/web/src/lib/measurement-memory.ts')).toContain('if (quote.is_demo) return')
     expect(read('apps/web/src/app/api/learning/benchmarks/route.ts')).toContain(".eq('is_demo', false)")
     expect(read('apps/web/src/app/api/admin/tenants/route.ts')).toContain(".eq('is_demo', false)")
@@ -256,7 +256,8 @@ describe('T-153: the /demo page and links', () => {
     expect(page).toMatch(/if \(searchParams\.tenantKey\) return <DeveloperDemo \/>/)
     expect(page).toContain('Try it as a customer')
     expect(page).toContain('example business with example prices')
-    expect(read('apps/web/src/components/share/EmbedCodeCard.tsx')).toContain('/demo?tenantKey=')
+    // T-201: the dashboard no longer links to the developer view (it read "Widget Demo", "Tenant Key")
+    expect(read('apps/web/src/components/share/EmbedCodeCard.tsx')).not.toContain('href={`/demo')
   })
 
   it('one widget: the demo passes options to EstimateWidget, no second implementation', () => {

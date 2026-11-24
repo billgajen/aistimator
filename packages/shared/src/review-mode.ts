@@ -98,6 +98,27 @@ export function isShownEarly(quote: {
 }
 
 /**
+ * T-201: is every figure withheld from the customer? A quote that waits for
+ * the business and was not shown early ("Hold until I approve", a quote the
+ * business made itself, or one a check held): no price, no low and no high,
+ * on the page, in the public API's answer and in the PDF, until it is approved.
+ */
+export function customerSeesNoFigure(quote: { status: string; shownEarly: boolean }): boolean {
+  return quote.status === 'pending_review' && !quote.shownEarly
+}
+
+/**
+ * T-201: may the customer see an estimated range in place of the price? Only
+ * while they are confirming a detail (`awaiting_clarification`), and never for
+ * a service set to "Hold until I approve": that service promises no price
+ * until the business approves, and a range is a price by another name.
+ * (Until T-201 a held quote with a measured range showed it.)
+ */
+export function customerRangeAllowed(quote: { status: string; mode: ReviewMode }): boolean {
+  return quote.status === 'awaiting_clarification' && quote.mode !== 'hold_until_approved'
+}
+
+/**
  * The price range a customer may see on an unreviewed estimate: only one the
  * engine measured for uncertain quantities, returned without its grade or
  * label. A flat price has none, and none is ever invented around it.

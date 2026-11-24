@@ -11,7 +11,7 @@
  */
 
 import type { QuoteStatus } from './database.types'
-import { canCopyQuoteLink, canSendQuoteAgain } from './quote-status'
+import { PAYMENTS_LIVE, canCopyQuoteLink, canSendQuoteAgain } from './quote-status'
 
 // ---------------------------------------------------------------------------
 // Groups
@@ -135,6 +135,9 @@ export const QUOTE_TURN_COPY = {
     editQuote: 'Edit quote',
     priceRequest: 'Price this request',
     pricingRequest: 'Starting…',
+    /** T-201: on a request that could not be priced: run the pricing again (it is not counted twice) */
+    tryAgain: 'Try again',
+    tryingAgain: 'Starting…',
     giveAnswers: 'Answer and reprice',
     givingAnswers: 'Working out the price…',
     upgradePlan: 'Upgrade plan',
@@ -573,6 +576,11 @@ export function quoteTurn(input: QuoteTurnInput, opts: QuoteTurnOptions = {}): Q
     }
 
     case 'paid': {
+      // T-201: until payments exist, a paid quote reads as the accepted quote it is
+      if (!PAYMENTS_LIVE) {
+        const accepted = onDate(input.acceptedAt)
+        return turn(group, 'good', L.accepted, accepted ? `Accepted${accepted}` : '', `${Name} accepted${accepted}. Contact them to book the job.`, 'contact')
+      }
       const on = onDate(input.paidAt)
       return turn(group, 'good', L.paid, on ? `Paid${on}` : '', `${Name} paid${on}. Nothing for you to do.`, null)
     }
@@ -651,7 +659,8 @@ export function quoteTracker(input: QuoteTrackerInput, opts: QuoteTurnOptions = 
 
   let fourth: QuoteTrackerStep
   if (input.status === 'accepted' || input.status === 'paid') {
-    const paid = input.status === 'paid' ? date(input.paidAt) : null
+    // T-201: "Paid 14 Nov" is said only once payments exist
+    const paid = PAYMENTS_LIVE && input.status === 'paid' ? date(input.paidAt) : null
     fourth = step('decided', T.accepted, true, input.acceptedAt, { note: paid ? T.paid(paid) : null })
   } else if (input.status === 'declined') {
     fourth = step('decided', T.declined, true, input.declinedAt, { ended: true })
@@ -804,6 +813,19 @@ export interface CustomerDecisionWords {
  * business approved is a "quote"; one that went out automatically stays an
  * "estimate" (AD-034: those are the only two words the customer sees).
  */
+/**
+ * T-201: the line under the price on the customer's page. Three cases:
+ *   - the business approved it: "Reviewed and confirmed by …"
+ *   - shown early, waiting for the business's approval (T-147): "… will review and confirm it"
+ *   - sent automatically, with no review to come: an estimate, and nothing is promised
+ * Before T-201 the third case also said the business "will review and confirm it".
+ */
+export function customerEstimateNote(input: { reviewed: boolean; confirmationPending: boolean; businessName: string }): string {
+  if (input.reviewed) return `Reviewed and confirmed by ${input.businessName}.`
+  const estimate = 'This is an estimate based on your photos and details.'
+  return input.confirmationPending ? `${estimate} ${input.businessName} will review and confirm it.` : estimate
+}
+
 export function customerDecisionWords(reviewed: boolean): CustomerDecisionWords {
   const noun = reviewed ? 'quote' : 'estimate'
   const Noun = reviewed ? 'Quote' : 'Estimate'

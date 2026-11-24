@@ -586,10 +586,15 @@ export function FormFieldsBuilder() {
                   <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
                 <div className="ml-3">
-                  <h3 className="text-sm font-medium text-tertiary">Use with Pricing Multipliers</h3>
+                  {/* T-201: this sent the business to a page that does not exist ("Pricing Rules") to type a
+                      Field ID into a multiplier. An adjustment is chosen from the service's own questions. */}
+                  <h3 className="text-sm font-medium text-tertiary">To change a price by an answer</h3>
                   <p className="mt-1 text-sm text-tertiary">
-                    Go to Pricing Rules to create multipliers that adjust prices based on customer answers.
-                    Use the Field ID (e.g., &quot;{config.fields[0]?.fieldId}&quot;) when setting up multiplier conditions.
+                    A question added here is asked, and its answer is kept with the request. To raise or lower a
+                    price by an answer, ask the question on the service itself. Open{' '}
+                    <a href="/app/services" className="font-semibold underline underline-offset-2" data-testid="advanced-tip-services">Services</a>,
+                    press &quot;Edit&quot; beside the service, add the question on &quot;Customer Questions&quot;, then use it under
+                    &quot;Adjustments&quot; on &quot;Pricing Setup&quot;.
                   </p>
                 </div>
               </div>

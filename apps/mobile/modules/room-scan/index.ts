@@ -65,11 +65,26 @@ export async function scanRoom(): Promise<ScannedRoom> {
 
 /**
  * T-194: opens a page (the web's 3D viewer) in Safari's in-app browser, over the app. Without the native
- * module (Expo Go) the phone's own browser opens it instead.
+ * module (Expo Go, and every Android phone: T-201) the phone's own browser opens it instead.
  */
 export async function openPage(url: string): Promise<void> {
   if (native?.openPage) return native.openPage(url)
   await Linking.openURL(url)
+}
+
+/**
+ * T-201: whether this phone can open the 3D viewer. An iPhone always can (Safari's in-app browser, or
+ * Safari itself). Android has no in-app browser here, so the viewer opens in the phone's own browser, and
+ * the phone is asked whether anything on it opens a web address: where nothing does, "View in 3D" is not
+ * shown at all.
+ */
+export async function canOpenPage(url: string): Promise<boolean> {
+  if (Platform.OS === 'ios') return true
+  try {
+    return await Linking.canOpenURL(url)
+  } catch {
+    return false
+  }
 }
 
 /** T-193: deletes a model file from the phone (never throws) */

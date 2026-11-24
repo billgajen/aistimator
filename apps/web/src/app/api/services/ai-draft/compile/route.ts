@@ -5,7 +5,8 @@ import type {
   AddonConfig,
   MultiplierConfig,
 } from '@qolumns/shared'
-import { validateAndNormalizeDraftBulk, carryOverSignalSpecs, callGemini, parseGeminiJson } from '../shared'
+import { validateAndNormalizeDraftBulk, carryOverSignalSpecs, callGemini, parseGeminiJson, normalizeWorkSteps, normalizeSuggestedFields } from '../shared'
+import { COMPILE_KEEPS, leftOutOf } from '@/lib/pricing-left-out'
 import { resolveRegionContext, regionPromptBlock } from '@qolumns/shared'
 
 // Vercel function budget: this route runs the full AI pipeline synchronously
@@ -119,10 +120,14 @@ interface CompileAIResponse {
   ambiguities?: string[]
 }
 
+/** T-201: every add-on the compiler wrote that is usable, before the limit (so what is cut can be named) */
+function usableAddons(addons: CompileAIResponse['addons']): NonNullable<CompileAIResponse['addons']> {
+  return (addons || []).filter((a) => a.label && a.label.trim().length > 0 && typeof a.price === 'number' && a.price >= 0)
+}
+
 function normalizeAddons(addons: CompileAIResponse['addons']): AddonConfig[] {
-  return (addons || [])
-    .filter((a) => a.label && a.label.trim().length > 0 && typeof a.price === 'number' && a.price >= 0)
-    .slice(0, 10)
+  return usableAddons(addons)
+    .slice(0, COMPILE_KEEPS.addons)
     .map((a, index) => ({
       id: `addon_${Date.now()}_${index}`,
       label: a.label!.trim(),
@@ -131,18 +136,22 @@ function normalizeAddons(addons: CompileAIResponse['addons']): AddonConfig[] {
     }))
 }
 
+/** T-201: every adjustment the compiler wrote that is usable, before the limit */
+function usableMultipliers(multipliers: CompileAIResponse['multipliers']): NonNullable<CompileAIResponse['multipliers']> {
+  return (multipliers || []).filter(
+    (m) =>
+      // T-125: subtotal-conditioned multipliers need no fieldId
+      (m.when?.fieldId || m.when?.subject === 'subtotal') &&
+      typeof m.multiplier === 'number' &&
+      m.multiplier > 0 &&
+      m.multiplier < 10
+  )
+}
+
 function normalizeMultipliers(multipliers: CompileAIResponse['multipliers']): MultiplierConfig[] {
   const validOps = ['equals', 'contains', 'gt', 'lt', 'gte', 'lte']
-  return (multipliers || [])
-    .filter(
-      (m) =>
-        // T-125: subtotal-conditioned multipliers need no fieldId
-        (m.when?.fieldId || m.when?.subject === 'subtotal') &&
-        typeof m.multiplier === 'number' &&
-        m.multiplier > 0 &&
-        m.multiplier < 10
-    )
-    .slice(0, 8)
+  return usableMultipliers(multipliers)
+    .slice(0, COMPILE_KEEPS.adjustments)
     .map((m) => ({
       when: {
         subject: m.when!.subject === 'subtotal' ? ('subtotal' as const) : undefined,
@@ -321,8 +330,18 @@ Compile this into the pricing configuration. Remember: never invent numbers — 
       expectedSignals: carryOverSignalSpecs(body.currentConfig?.expectedSignals, normalized.expectedSignals),
     }
 
+    // T-201: a service keeps ten lines and ten questions. What the compiler wrote past that is named
+    // in the result, so the review can say what was left out (the limits themselves are unchanged).
+    const leftOut = leftOutOf({
+      lines: normalizeWorkSteps(merged.pricing?.workSteps || []).map((s) => s.name),
+      questions: normalizeSuggestedFields(merged.suggestedFields || []).map((f) => f.label),
+      addons: usableAddons(responseAddons).map((a) => a.label!.trim()),
+      adjustments: usableMultipliers(responseMultipliers).length,
+    })
+
     return NextResponse.json({
       updatedConfig,
+      ...(leftOut && { leftOut }),
       addons: normalizeAddons(responseAddons),
       multipliers: normalizeMultipliers(responseMultipliers),
       ambiguities: (result.ambiguities || []).filter((a) => a && a.trim().length > 0).slice(0, 8),

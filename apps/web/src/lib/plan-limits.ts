@@ -4,7 +4,8 @@ import { sendEmail, isPostmarkConfigured } from './postmark'
 import { generateLimitReachedEmailHtml } from './email-templates'
 import { freeQuotesLeftEmail } from './billing-emails'
 import { getStripeClient, reportOverageMeterEvent, formatPrice } from './stripe'
-import { getPlan, freeAllowance, freeQuotesLeftLine, noSubscriptionLimit, subscriptionLive } from '@qolumns/shared'
+import { getPlan, freeAllowance, freeQuotesLeftLine, freeQuotesUsed, noSubscriptionLimit, subscriptionLive } from '@qolumns/shared'
+import type { UsageRow } from '@qolumns/shared'
 import { businessEmailFor } from './business-email'
 
 /** Legacy (GB) monthly allowance for tenants without a subscription — kept for callers/tests. */
@@ -68,17 +69,19 @@ export function evaluateLimit(
 }
 
 /**
- * T-152: priced quotes counted against an allowance — this month's row, or
- * every month's rows summed for an allowance that never resets. Pure.
+ * T-152: priced quotes counted against an allowance — this month's row, or,
+ * for the free quotes that never reset, the quotes priced as free ones in
+ * every month together (T-201: `freeQuotesUsed`; a quote priced on a plan is
+ * not one of them). Pure.
  * (Tests and unfinished requests never increment these counters.)
  */
 export function usedForAllowance(
-  rows: Array<{ period_yyyymm: string; estimates_created: number | null }> | null | undefined,
+  rows: UsageRow[] | null | undefined,
   per: 'month' | 'total',
   period: string
 ): number {
   const list = rows ?? []
-  if (per === 'total') return list.reduce((sum, r) => sum + (r.estimates_created ?? 0), 0)
+  if (per === 'total') return freeQuotesUsed(list)
   return list.find((r) => r.period_yyyymm === period)?.estimates_created ?? 0
 }
 
@@ -103,7 +106,7 @@ export async function checkPlanLimit(
         .single(),
       supabase
         .from('usage_counters')
-        .select('period_yyyymm, estimates_created')
+        .select('period_yyyymm, estimates_created, plan_estimates_created')
         .eq('tenant_id', tenantId),
       supabase.from('tenants').select('region, suspended_at').eq('id', tenantId).single(),
     ])
@@ -120,11 +123,7 @@ export async function checkPlanLimit(
     const allowance = plan ? null : freeAllowance((tenant as { region?: string } | null)?.region)
     const limit = plan ? plan.quoteLimit : allowance!.quotes
     const per = allowance?.per ?? 'month'
-    const used = usedForAllowance(
-      usageRows as Array<{ period_yyyymm: string; estimates_created: number | null }> | null,
-      per,
-      period
-    )
+    const used = usedForAllowance(usageRows as UsageRow[] | null, per, period)
 
     const status = evaluateLimit(
       used,
@@ -189,7 +188,12 @@ export interface PlanClaim {
  * is logged. A billing fault must never cost a customer's request (T-101).
  * Needs the service-role client.
  */
-export async function claimPlanQuote(supabase: SupabaseClient, tenantId: string): Promise<PlanClaim> {
+export async function claimPlanQuote(
+  supabase: SupabaseClient,
+  tenantId: string,
+  /** T-201: `overage: false` never counts past the limit as metered overage (requests priced by themselves after a purchase) */
+  options: { overage?: boolean } = {}
+): Promise<PlanClaim> {
   const period = getCurrentPeriod()
   const status = await checkPlanLimit(supabase, tenantId)
   const claim = async (limit: number) =>
@@ -209,7 +213,7 @@ export async function claimPlanQuote(supabase: SupabaseClient, tenantId: string)
       return { claimed: false, reason: 'suspended', counted: false, overage: false, status: { ...status, used, allowed: false, overageAvailable: false, suspended: true }, period }
     }
     // Over the limit. A plan with metered overage counts it anyway and bills it (T-102).
-    if (status.overageAvailable) {
+    if (status.overageAvailable && options.overage !== false) {
       const extra = await claim(0)
       const extraRow = read(extra.data)
       if (extra.error || !extraRow?.claimed) throw new Error(extra.error?.code ?? 'overage claim refused')
@@ -226,7 +230,8 @@ export async function claimPlanQuote(supabase: SupabaseClient, tenantId: string)
 export async function releasePlanQuote(supabase: SupabaseClient, tenantId: string, claim: PlanClaim): Promise<void> {
   if (!claim.claimed || !claim.counted) return
   try {
-    const { error } = await supabase.rpc('release_plan_quote', { p_tenant_id: tenantId, p_period: claim.period })
+    // T-201: the kind of claim goes back with it, so the plan's share of the month stays exact
+    const { error } = await supabase.rpc('release_plan_quote', { p_tenant_id: tenantId, p_period: claim.period, p_per: claim.status.per })
     if (error) console.error('[PlanLimits] Could not give a claim back:', error.code ?? error.message)
   } catch (error) {
     console.error('[PlanLimits] Could not give a claim back:', error instanceof Error ? error.message : 'unknown')

@@ -17,6 +17,7 @@ import {
   generateCustomerEmailHtml,
 } from '@/lib/postmark'
 import { generateRevisedQuoteEmailHtml } from '@/lib/email-templates'
+import { customerEmailBrand } from '@/lib/customer-email-brand'
 import { businessReplyTo } from '@/lib/business-email'
 import { notifyEstimateReady } from '@/lib/whatsapp-notify'
 import { assetIdsOf, quotePhotos } from '@/lib/quote-photos'
@@ -672,6 +673,7 @@ export async function PATCH(
           total: formatTotal(pricing, locale),
           sectionsHtml: sectionsEmailHtml(pricing, service.name, locale),
           primaryColor: tenant.branding_json?.primaryColor,
+          brand: await customerEmailBrand(supabase, auth.tenantId, tenant.branding_json),
         }),
         tag: 'quote-approved',
         replyTo,
@@ -689,6 +691,7 @@ export async function PATCH(
         total: formatTotal(pricing, resolveRegionContext(tenant).locale),
         sectionsHtml: sectionsEmailHtml(pricing, service.name, resolveRegionContext(tenant).locale),
         primaryColor: branding.primaryColor,
+        brand: await customerEmailBrand(supabase, auth.tenantId, tenant.branding_json),
       })
 
       const emailResult = await sendEmail({

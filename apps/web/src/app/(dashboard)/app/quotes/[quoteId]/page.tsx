@@ -12,6 +12,7 @@ import { MinimumNote } from '@/components/quote/MinimumNote'
 import { QuoteTracker } from '@/components/quotes/QuoteTracker'
 import { TurnBadge } from '@/components/quotes/TurnBadge'
 import { approvedWithoutEmailMessage, copyLinkFallbackMessage } from '@/lib/quote-action-copy'
+import { RETRY_COPY, canBusinessRetry } from '@/lib/quote-retry-rules'
 import Link from 'next/link'
 import { FinalInvoiceCard } from '@/components/analytics/FinalInvoiceCard'
 import { UnderstoodPanel } from '@/components/quotes/UnderstoodPanel'
@@ -166,6 +167,32 @@ export default function QuoteDetailPage({
       } else {
         setPriceResult(json?.error?.message || 'Could not price this lead')
       }
+    } finally {
+      setPricingHeld(false)
+    }
+  }
+
+  // T-201: a request that could not be priced is priced again (the same route; it is not counted twice).
+  // The page then looks again until the price, or the failure, is there.
+  const handleTryAgain = async () => {
+    setPricingHeld(true)
+    setPriceResult(null)
+    try {
+      const response = await fetch(`/api/quotes/${quoteId}/process`, { method: 'POST' })
+      const json = await response.json().catch(() => null)
+      if (!response.ok) {
+        setPriceResult(json?.error?.message || RETRY_COPY.notStarted)
+        return
+      }
+      setPriceResult(RETRY_COPY.started)
+      for (let tries = 0; tries < REPRICE_LOOKS; tries++) {
+        const fresh = await fetchQuote()
+        if (fresh && !isQuoteProcessing(fresh)) break
+        await new Promise((resolve) => setTimeout(resolve, REPRICE_LOOK_MS))
+      }
+      setPriceResult(null)
+    } catch {
+      setPriceResult(RETRY_COPY.notStarted)
     } finally {
       setPricingHeld(false)
     }
@@ -412,6 +439,7 @@ export default function QuoteDetailPage({
         pricing={pricingHeld}
         priceResult={priceResult}
         onPrice={handlePriceHeldLead}
+        {...(canBusinessRetry({ status: quote.status, content_json: content }) && { onTryAgain: handleTryAgain })}
         resending={resending}
         onSendAgain={handleResend}
         note={
@@ -621,6 +649,7 @@ export default function QuoteDetailPage({
             currency={pricing.currency}
             gate={quote.quality_gate_json as { action?: string; reason?: string } | null}
             awaitingApproval={awaitingApproval}
+            shownToCustomer={(quote as { review_hold?: string | null }).review_hold === 'shown'}
           />
         )}
       </section>
@@ -882,6 +911,7 @@ function EstimateGradePanel({
   currency,
   gate,
   awaitingApproval,
+  shownToCustomer,
 }: {
   estimate: NonNullable<QuotePricing['estimate']>
   /** Whether any line of the quote was measured from the photos; undefined when no line's source is known */
@@ -889,6 +919,8 @@ function EstimateGradePanel({
   currency: string
   gate: { action?: string; reason?: string } | null | undefined
   awaitingApproval: boolean
+  /** T-201: the customer already sees this as an estimate (its range with it); false for a quote held until approved */
+  shownToCustomer: boolean
 }) {
   // Butter is for measurement: a grade is one (system.md, Colour)
   const tone =
@@ -910,7 +942,8 @@ function EstimateGradePanel({
           {estimate.rangeLow !== undefined && estimate.rangeHigh !== undefined && estimate.rangeHigh > estimate.rangeLow && (
             <p className="mt-1 text-xs text-text-muted">
               Range {formatCurrency(estimate.rangeLow, currency)} – {formatCurrency(estimate.rangeHigh, currency)}
-              {awaitingApproval ? ' (the customer sees this range until you approve)' : ''}
+              {/* T-201: only an estimate the customer was shown carries the range; a held quote shows them no figure */}
+              {awaitingApproval ? (shownToCustomer ? ' (the customer sees this range until you approve)' : ' (the customer sees no figure until you approve)') : ''}
             </p>
           )}
           {gate?.action === 'require_review' && gate.reason && (

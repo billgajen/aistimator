@@ -103,10 +103,15 @@ export function measuredLines(service: Pick<SampleService, 'workSteps' | 'expect
 const unitOf = (step: WorkStepConfig): string => step.unitLabel || (step.costType === 'per_hour' ? 'hours' : 'units')
 const count = (n: number): string => n.toLocaleString('en-US', { maximumFractionDigits: 2 })
 
-/** Whether an optional step's condition is met by the sample values (as the page has always decided it) */
-function triggered(step: WorkStepConfig, values: SampleValues): boolean {
+/**
+ * Whether an optional step's condition is met by the sample values (as the page has always decided it).
+ * T-201: a condition names its question by the question's fact key, and the sample values are kept under
+ * the question's answer key. The two differ for most questions, so the sample is read under either.
+ */
+function triggered(step: WorkStepConfig, values: SampleValues, fields: readonly SuggestedField[] = []): boolean {
   if (!step.optional || !step.triggerSignal) return true
-  const value = values[step.triggerSignal]
+  const asked = fields.find((f) => f.mapsToSignal === step.triggerSignal)
+  const value = values[step.triggerSignal] ?? (asked ? values[asked.fieldId] : undefined)
   if (!step.triggerCondition) return Boolean(value)
   const { operator, value: wanted } = step.triggerCondition
   switch (operator) {
@@ -143,7 +148,7 @@ export function samplePrice(service: SampleService, values: SampleValues, symbol
   }
 
   for (const step of service.workSteps) {
-    if (!triggered(step, values)) continue
+    if (!triggered(step, values, service.suggestedFields)) continue
     const name = step.name || 'Unnamed'
 
     if (step.costType !== 'per_unit' && step.costType !== 'per_hour') {

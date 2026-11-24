@@ -50,10 +50,11 @@ Use "Add from a template" on the "Services" page. You add one service at a time.
 1. Open "Services" and press "Add from a template". If you have no services yet, the link reads "Or add one from a template".
 2. Find the service under its trade. Each one shows a starting price and a short description.
 3. Press "Add" beside it.
-4. The service is added to your list and opens at "Pricing Setup". Check every price there and change them to yours.
+4. The service is added to your list, switched off, and opens at "Pricing Setup" with a note that these are the template's example prices. Check every price there and change them to yours.
 5. Press "Next" to reach "Test & Publish", then press "Save Changes".
+6. Back on "Services", press "Enable" beside the service.
 
-The service is switched on from the moment you press "Add", with the template's typical prices. Check the prices straight away, or press "Disable" beside it on "Services" until you have.
+A service added from a template starts "Inactive". Your website form and quote link do not offer it until you press "Enable", so no customer is quoted the template's example prices. A note at the top of "Services" reminds you until you switch it on.
 
 ## Are a template's prices my prices?
 <!-- id: templates-prices; page: /app/services -->
@@ -61,7 +62,7 @@ The service is switched on from the moment you press "Add", with the template's 
 No. They are typical starting prices, and you must check them. Your estimates charge whatever numbers are in the service, so change them to what you charge.
 
 - In setup, "Check your prices" shows every number with the note "These are typical starting prices. Change them to yours." Setup does not go on until you press "These are my prices".
-- In "Add from a template", the screen says "The prices are a starting point: the service opens for you to check them." The price shown beside each service in the list is the template's starting price.
+- In "Add from a template", the screen says "A service you add starts switched off." The service opens for you to check its prices, and you press "Enable" on "Services" when they are yours. The price shown beside each service in the list is the template's starting price.
 
 Pressing "These are my prices" and finishing setup, or saving a service on "Services", ticks "Check your prices" on "Home". Adding a template's service does not tick it until you save the service.
 
@@ -72,7 +73,7 @@ Yes. Setup takes one trade, but "Add from a template" on "Services" lists every 
 
 1. Open "Services" and press "Add from a template".
 2. Scroll to the other trade and press "Add" beside each service you want, one at a time.
-3. Check the prices of each one as it opens, then save it.
+3. Check the prices of each one as it opens, save it, then press "Enable" beside it on "Services".
 
 For example, a heating and cooling business that takes on water heaters can add "Water Heater Replacement" this way. The services you already have are not changed.
 

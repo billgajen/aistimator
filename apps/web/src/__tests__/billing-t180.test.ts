@@ -442,7 +442,9 @@ describe('T-180: a quote is claimed and counted in one step (AD-063)', () => {
   })
 
   it('the three places a quote is made all claim, and none of them adds one on its own', () => {
-    for (const file of ['apps/web/src/lib/quote-intake.ts', 'apps/web/src/lib/messaging/intake-engine.ts', 'apps/web/src/app/api/quotes/[quoteId]/process/route.ts']) {
+    // T-201: "Price this request" and the run after a purchase share one set of steps (lib/held-requests.ts)
+    expect(read('apps/web/src/app/api/quotes/[quoteId]/process/route.ts')).toMatch(/await priceHeldRequest\(/)
+    for (const file of ['apps/web/src/lib/quote-intake.ts', 'apps/web/src/lib/messaging/intake-engine.ts', 'apps/web/src/lib/held-requests.ts']) {
       const src = read(file)
       expect(src, file).toMatch(/await claimPlanQuote\(/)
       expect(src, file).toMatch(/await releasePlanQuote\(/)

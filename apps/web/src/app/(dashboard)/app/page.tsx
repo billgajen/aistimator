@@ -3,7 +3,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { headers } from 'next/headers'
 import { QUOTE_TURN_COPY, agoWords, businessIsAsked, formatMoney, freeQuotesLeftLine, freeStartLine, getRegion, isMadeByBusiness, monthStart, quoteActivityLine, quoteTurn, wonLines, wonSummary } from '@qolumns/shared'
 import { applyGroupFilter, businessAskedQuoteIds, groupFilter, questionCountOf, requestSourceOf } from '@/lib/business-asked'
-import { buildChecklist } from '@/lib/setup-checklist'
+import { SERVICES_OFF_NOTICE, buildChecklist, serviceState } from '@/lib/setup-checklist'
 import {
   buildHomeActivity,
   changeWords,
@@ -130,7 +130,8 @@ export default async function DashboardPage() {
 
   // Every query below is scoped to this tenant (RLS + explicit filter)
   const [servicesResult, waitingResult, recentResult, realRequestResult, waitingCountResult, anyQuoteResult, questionsResult, everWon] = await Promise.all([
-    supabase.from('services').select('id').eq('tenant_id', profile.tenant_id).eq('active', true).limit(1),
+    // T-201: every service, on or off. Setup is over once one exists; switched off is not "none".
+    supabase.from('services').select('id, active').eq('tenant_id', profile.tenant_id),
     // a. waiting for the owner, newest first (T-158: also customer questions
     // and requests that could not be priced)
     applyGroupFilter(
@@ -193,7 +194,9 @@ export default async function DashboardPage() {
     everAccepted(supabase, profile.tenant_id),
   ])
 
-  const hasService = (servicesResult.data?.length ?? 0) > 0
+  // T-201: a business that switched every service off still has services: it stays on Home, with a notice
+  const services = serviceState((servicesResult.data ?? []) as Array<{ active?: boolean | null }>)
+  const hasService = services.any
 
   // T-150: keep the plan chosen before signup, and take a business with no
   // services straight to setup (unless it chose to set up by hand)
@@ -325,6 +328,19 @@ export default async function DashboardPage() {
 
       {/* T-199: a business that can choose its own address and has not: asked here until chosen or put off */}
       {address && <HomeAddressCard view={address} />}
+
+      {/* T-201: every service is switched off, so no customer can get an estimate: said first, with the way back */}
+      {services.allOff && (
+        <div className="mb-8 flex flex-col gap-3 rounded-2xl border border-danger/30 bg-danger-light p-5 sm:flex-row sm:items-center sm:justify-between" data-testid="services-off-notice">
+          <p className="text-sm font-semibold text-danger">{SERVICES_OFF_NOTICE.text}</p>
+          <Link
+            href="/app/services"
+            className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-lg bg-danger px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90"
+          >
+            {SERVICES_OFF_NOTICE.link}
+          </Link>
+        </div>
+      )}
 
       {/* a. T-152: the work waiting for the owner comes first */}
       <WaitingForYou quotes={waiting} />

@@ -1,7 +1,12 @@
 'use client'
 
 import { CustomerContactSettings } from '@/components/settings/CustomerContactSettings'
+import { BenchmarkSharing } from '@/components/settings/BenchmarkSharing'
+import { ChangePassword } from '@/components/settings/ChangePassword'
+import { CustomerReminderSetting } from '@/components/settings/CustomerReminderSetting'
+import { PDF_ONLY_LINE, PdfOnlyTag } from '@/components/dashboard/PdfOnlyTag'
 import { contactRequirementOf } from '@/lib/contact-rules'
+import { areaInputHint, formatAreaInput, parseAreaInput } from '@/lib/service-area-input'
 import { useState, useEffect, useCallback } from 'react'
 import type { ServiceAreaMode, RegionCode, UnitSystem } from '@qolumns/shared'
 import { DATA_DELETION_PATH, getRegion, listRegions } from '@qolumns/shared'
@@ -27,7 +32,7 @@ const SERVICE_AREA_MODES: { value: ServiceAreaMode; label: string; description: 
   {
     value: 'county_state',
     label: 'County/State',
-    description: 'Only accept quotes from specific counties or states',
+    description: 'Only accept quotes from specific states, or counties with their state',
   },
 ]
 
@@ -109,7 +114,7 @@ export default function SettingsPage() {
       setTaxLabel(tenant.taxLabel || '')
       setTaxRatePercent(((tenant.taxRate || 0) * 100).toString())
       setServiceAreaMode(tenant.serviceAreaMode)
-      setServiceAreaInput((tenant.serviceAreaValues || []).join(', '))
+      setServiceAreaInput(formatAreaInput(tenant.serviceAreaValues, tenant.serviceAreaMode))
 
       // Quote Template fields
       const template = tenant.templateJson || {
@@ -156,10 +161,8 @@ export default function SettingsPage() {
           taxRate: parseFloat(taxRatePercent) / 100 || 0,
         }
       } else if (section === 'serviceArea') {
-        const values = serviceAreaInput
-          .split(/[,\n]/)
-          .map((v) => v.trim())
-          .filter((v) => v.length > 0)
+        // T-201: a "County/State" entry may hold a comma ("Harris County, TX"), so those are one to a line
+        const values = parseAreaInput(serviceAreaInput, serviceAreaMode)
         updates = {
           serviceAreaMode,
           serviceAreaValues: values,
@@ -448,13 +451,13 @@ export default function SettingsPage() {
                 placeholder={
                   serviceAreaMode === 'postcode_allowlist'
                     ? 'Enter postcodes separated by commas or one per line\ne.g., SW1A, W1, EC1, 10001, 90210'
-                    : 'Enter counties or states separated by commas or one per line\ne.g., California, Texas, New York'
+                    : 'One per line\ne.g.\nTexas\nHarris County, TX'
                 }
                 rows={4}
                 className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
               />
               <p className="mt-1 text-xs text-text-muted">
-                Separate multiple values with commas or put each on a new line
+                {areaInputHint(serviceAreaMode)}
               </p>
             </div>
           )}
@@ -473,8 +476,9 @@ export default function SettingsPage() {
         {/* Quote Template Settings */}
         <div className="rounded-xl bg-surface p-6 shadow-warm">
           <h2 className="text-lg font-medium text-text-primary">Quote Template</h2>
-          <p className="mt-1 text-sm text-text-muted">
-            Configure the default appearance and content of your quotes
+          {/* T-201: says which settings reach the customer's page and which only the PDF */}
+          <p className="mt-1 text-sm text-text-muted" data-testid="quote-template-intro">
+            {PDF_ONLY_LINE}
           </p>
 
           <div className="mt-6 space-y-4">
@@ -487,7 +491,8 @@ export default function SettingsPage() {
               />
               <div>
                 <span className="text-sm font-medium text-text-secondary">Show line items</span>
-                <p className="text-xs text-text-muted">Display itemized pricing breakdown on quotes</p>
+                <PdfOnlyTag />
+                <p className="text-xs text-text-muted">Print the price lines on the PDF</p>
               </div>
             </label>
 
@@ -500,8 +505,9 @@ export default function SettingsPage() {
               />
               <div>
                 <span className="text-sm font-medium text-text-secondary">Include assumptions</span>
+                <PdfOnlyTag />
                 <p className="text-xs text-text-muted">
-                  Show assumptions section on quotes (e.g., &quot;Clear access to work area&quot;)
+                  Print the assumptions on the PDF (e.g., &quot;Clear access to work area&quot;)
                 </p>
               </div>
             </label>
@@ -515,8 +521,9 @@ export default function SettingsPage() {
               />
               <div>
                 <span className="text-sm font-medium text-text-secondary">Include exclusions</span>
+                <PdfOnlyTag />
                 <p className="text-xs text-text-muted">
-                  Show exclusions section on quotes (e.g., &quot;Materials not included&quot;)
+                  Print the exclusions on the PDF (e.g., &quot;Materials not included&quot;)
                 </p>
               </div>
             </label>
@@ -548,12 +555,13 @@ export default function SettingsPage() {
             <textarea
               value={defaultTermsText}
               onChange={(e) => setDefaultTermsText(e.target.value)}
-              placeholder="Enter your default terms and conditions text that will appear on all quotes..."
+              placeholder="Your terms and conditions, as your customer should read them"
               rows={4}
               className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
             />
             <p className="mt-1 text-xs text-text-muted">
-              This text will appear at the bottom of all quotes
+              {/* T-201: it is printed now (it was saved and shown nowhere) */}
+              Printed on your customer’s estimate page and on the PDF, below the price. Leave it empty to print nothing.
             </p>
           </div>
 
@@ -574,6 +582,15 @@ export default function SettingsPage() {
             initial={contactRequirementOf((settings as { contactRequirement?: string }).contactRequirement)}
           />
         )}
+
+        {/* T-201: the one automatic reminder to a customer, on or off */}
+        {settings && <CustomerReminderSetting initial={(settings as { customerReminder?: boolean }).customerReminder !== false} />}
+
+        {/* T-201: sharing rates, without a name, in the benchmarks on Analytics */}
+        {settings && <BenchmarkSharing initial={(settings as { benchmarksOptIn?: boolean }).benchmarksOptIn === true} />}
+
+        {/* T-201: change the password (the email address is not changed here) */}
+        <ChangePassword />
 
         {/* Account Info (read-only) */}
         <div className="rounded-xl bg-background p-6">

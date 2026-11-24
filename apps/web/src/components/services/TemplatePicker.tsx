@@ -8,7 +8,7 @@ import { templateGroups, templatePayload } from '@/lib/service-templates'
  * T-189: "Add from a template" on the services page. The same trade templates
  * setup offers, with each service's starting price. Picking one adds it as a
  * new service and hands it back, so the page can open it for the business to
- * check its prices. One the business already has is marked and cannot be
+ * check its prices. T-201: it is added switched off, and the picker says so. One the business already has is marked and cannot be
  * picked.
  */
 export function TemplatePicker({
@@ -68,7 +68,7 @@ export function TemplatePicker({
 
         <div className="p-6">
           <p className="text-sm text-text-secondary">
-            Each template comes with its questions, photos to ask for and typical prices. The prices are a starting point: the service opens for you to check them.
+            Each template comes with its questions, photos to ask for and example prices. A service you add starts switched off. It opens for you to check its prices; when they are yours, press &quot;Enable&quot; on &quot;Services&quot;.
           </p>
           {error && <p className="mt-4 rounded-lg border border-danger-line bg-danger-light p-3 text-sm text-danger" role="alert">{error}</p>}
           {groups.length === 0 && <p className="mt-6 text-sm text-text-secondary">There are no templates for your region yet.</p>}

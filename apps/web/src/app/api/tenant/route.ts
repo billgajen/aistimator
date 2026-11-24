@@ -2,7 +2,7 @@ import { CONTACT_REQUIREMENTS, type ContactRequirement } from '@/lib/contact-rul
 import { getPack } from '@/lib/vertical-packs'
 import { mergeTemplate } from '@/lib/tenant-template'
 import { createClient } from '@/lib/supabase/server'
-import { getRegion, isRegionCode, isUnitSystem } from '@qolumns/shared'
+import { customerReminderOn, getRegion, isRegionCode, isUnitSystem } from '@qolumns/shared'
 import { type NextRequest, NextResponse } from 'next/server'
 import type { ServiceAreaMode, TenantTemplate } from '@qolumns/shared'
 
@@ -70,9 +70,13 @@ export async function GET() {
         serviceAreaMode: tenant.service_area_mode,
         serviceAreaValues: tenant.service_area_values || [],
         notificationEmail: tenant.notification_email,
+        // T-201: the one automatic reminder to a customer, on unless switched off
+        customerReminder: customerReminderOn(tenant.customer_reminder_enabled),
         defaultTermsText: tenant.default_terms_text,
         // T-151: which contact details customers must give
         contactRequirement: tenant.contact_requirement ?? 'email',
+        // T-201: sharing rates, without a name, in "Market Benchmarks" (Settings has the switch)
+        benchmarksOptIn: tenant.benchmarks_opt_in === true,
         templateJson: tenant.template_json || {
           showLineItems: true,
           includeAssumptions: true,
@@ -145,6 +149,7 @@ export async function PUT(request: NextRequest) {
       defaultTermsText,
       templateJson,
       benchmarksOptIn,
+      customerReminder,
       trade,
       tradeOther,
       contactRequirement,
@@ -171,6 +176,7 @@ export async function PUT(request: NextRequest) {
       defaultTermsText?: string | null
       templateJson?: Partial<TenantTemplate>
       benchmarksOptIn?: boolean
+      customerReminder?: boolean
     }
 
     // Build update object
@@ -239,6 +245,17 @@ export async function PUT(request: NextRequest) {
       updates.benchmarks_opt_in = Boolean(benchmarksOptIn)
     }
 
+    // T-201: the reminder switch. Only a plain true or false is taken.
+    if (customerReminder !== undefined) {
+      if (typeof customerReminder !== 'boolean') {
+        return NextResponse.json(
+          { error: { code: 'INVALID_INPUT', message: 'The reminder setting must be on or off' } },
+          { status: 400 }
+        )
+      }
+      updates.customer_reminder_enabled = customerReminder
+    }
+
     if (serviceAreaMode !== undefined) {
       const validModes: ServiceAreaMode[] = ['none', 'postcode_allowlist', 'county_state']
       if (!validModes.includes(serviceAreaMode)) {
@@ -257,10 +274,12 @@ export async function PUT(request: NextRequest) {
           { status: 400 }
         )
       }
-      // Filter empty strings and trim values
+      // Filter empty strings and trim values. Postal codes are kept in capitals; T-201: a state or a
+      // county is kept as the business wrote it ("Harris County, TX"; the rule itself ignores case).
+      const asWritten = serviceAreaMode === 'county_state'
       updates.service_area_values = serviceAreaValues
         .filter((v) => typeof v === 'string' && v.trim().length > 0)
-        .map((v) => v.trim().toUpperCase())
+        .map((v) => (asWritten ? v.trim() : v.trim().toUpperCase()))
     }
 
     if (notificationEmail !== undefined) {
@@ -364,9 +383,13 @@ export async function PUT(request: NextRequest) {
         serviceAreaMode: tenant.service_area_mode,
         serviceAreaValues: tenant.service_area_values || [],
         notificationEmail: tenant.notification_email,
+        // T-201: the one automatic reminder to a customer, on unless switched off
+        customerReminder: customerReminderOn(tenant.customer_reminder_enabled),
         defaultTermsText: tenant.default_terms_text,
         // T-151: which contact details customers must give
         contactRequirement: tenant.contact_requirement ?? 'email',
+        // T-201: sharing rates, without a name, in "Market Benchmarks" (Settings has the switch)
+        benchmarksOptIn: tenant.benchmarks_opt_in === true,
         templateJson: tenant.template_json || {
           showLineItems: true,
           includeAssumptions: true,

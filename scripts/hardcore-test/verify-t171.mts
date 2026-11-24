@@ -318,7 +318,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
       }
     })
     let q = await quotePage()
-    check(`${width} quote: no status pill ("Viewed", "Under review"); the line under the price says where it stands`, q.pills === 0 && /will review and confirm it|Reviewed and confirmed by/.test(q.all), q.pills)
+    check(`${width} quote: no status pill ("Viewed", "Under review"); the line under the price says where it stands`, q.pills === 0 && /will review and confirm it|Reviewed and confirmed by|This is an estimate based on your photos and details\./.test(q.all), q.pills)
     check(`${width} quote: what was read is in the customer's terms, and only that: ${JSON.stringify(q.read)}`, q.read.length >= 1 && q.read.some((l) => /^From your tank's rating label: 50 gal/.test(l)) && q.read.every((l) => !/[$£€]\s?\d/.test(l) && !ENGINE_WORDS.test(l) && findConfidenceLanguage(l).length === 0), q.read)
     check(`${width} quote: "Measurement & takeoff" carries no amount, no rate and no engine word`, /Measurement & takeoff/i.test(q.readBlock) && !/[$£€]\s?\d|×|\/gal|Fixed quantity|Selected for/.test(q.readBlock), q.readBlock.slice(0, 200))
     const lineLabels = row.pricing_json.breakdown.map((l) => l.label.split(/[:(]/)[0]!.trim()).filter((l) => l.length > 3 && !/minimum/i.test(l))

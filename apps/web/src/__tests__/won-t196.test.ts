@@ -98,12 +98,14 @@ describe('T-196: the split by who made the request', () => {
     expect(lines.lastMonth).toBe('Last month: $9,800 from 1 job')
   })
 
-  it('four steps with the share that moved on; on-site estimates are in none of them', () => {
+  it('four steps with the share that moved on; on-site estimates are in none of the first three', () => {
+    // T-201: Accepted counts every accepted estimate this month (2 customers + 2 on site), the number
+    // Home's "Accepted" count shows; with on-site estimates in it, it says so in place of a share
     expect(summary?.customer?.steps).toEqual([
       { key: 'requests', label: 'Requests', count: 7, share: null },
       { key: 'sent', label: 'Estimates sent', count: 5, share: '71%' },
       { key: 'opened', label: 'Opened', count: 4, share: '80%' },
-      { key: 'accepted', label: 'Accepted', count: 2, share: '50%' },
+      { key: 'accepted', label: 'Accepted', count: 4, share: null, note: 'includes 2 made on site' },
     ])
   })
 

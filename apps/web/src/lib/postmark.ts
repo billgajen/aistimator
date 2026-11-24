@@ -3,8 +3,8 @@
  *
  * Used for resending quote emails from the dashboard.
  */
-import { EMAIL_FONT, PRODUCT_NAME, brandColourForEmail, emailFromHeader, emailHeadStyle, redactEmails, textColourOnCardForEmail, textOnColourForEmail } from '@qolumns/shared'
-import type { EmailSender } from '@qolumns/shared'
+import { EMAIL_FONT, brandColourForEmail, businessLogoBlock, emailFromHeader, emailHeadStyle, poweredByRow, redactEmails, textColourOnCardForEmail, textOnColourForEmail } from '@qolumns/shared'
+import type { CustomerEmailBrand, EmailSender } from '@qolumns/shared'
 
 const POSTMARK_API_URL = 'https://api.postmarkapp.com/email'
 
@@ -138,6 +138,8 @@ export function generateCustomerEmailHtml(data: {
   primaryColor?: string
   /** T-179: the services of a combined quote, as rows (lib/sections-email.ts); nothing for a single-service quote */
   sectionsHtml?: string
+  /** T-201: the business's logo and whether "Powered by" shows (lib/customer-email-brand.ts) */
+  brand?: CustomerEmailBrand
 }): string {
   const primaryColor = brandColourForEmail(data.primaryColor)
 
@@ -161,6 +163,7 @@ ${emailHeadStyle()}
         <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px;">
+              ${businessLogoBlock(data.brand?.logoUrl, data.businessName)}
               <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: ${textColourOnCardForEmail(primaryColor)};">
                 ${escapeHtml(data.businessName)}
               </h1>
@@ -207,13 +210,7 @@ ${emailHeadStyle()}
             </td>
           </tr>
         </table>
-        <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
-          <tr>
-            <td style="text-align: center; color: #626C66; font-size: 12px;">
-              Powered by ${PRODUCT_NAME}
-            </td>
-          </tr>
-        </table>
+        ${poweredByRow(data.brand?.showPoweredBy)}
       </td>
     </tr>
   </table>

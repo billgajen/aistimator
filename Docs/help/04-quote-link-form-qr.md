@@ -191,12 +191,11 @@ The email also gives them your quote link, in case adding code is not possible o
 ## How do I check what the form looks like?
 <!-- id: link-preview; page: /app/quote-link -->
 
-There are two ways.
+Press "Open" beside your quote link, on "Quote link" or on "Home". This is your real request page, as your customers see it.
 
-- Press "Open" beside your quote link. This is your real request page, as your customers see it.
-- Under "Add it to your website", press "Preview on a demo page". A page called "Widget Demo" opens in a new tab. Choose a "Placement" and an "Experience" there and press "Load Widget" to see your form as it would sit on a website.
+It shows your real form. A request you send from it is a real request, and it shows in Quotes like any other.
 
-Both show your real form. A request you send from either one is a real request, and it shows in Quotes like any other.
+Opening your own link this way does not tick "Share your quote link" on "Home".
 
 ## How do I get a QR code for my quote link?
 <!-- id: link-qr-code; page: /app/quote-link -->
@@ -254,12 +253,14 @@ Yes. The "Advanced" section at the bottom of the Quote link page holds extra que
 
 The question then shows on the form's "About the job" step.
 
+A question added here is asked and its answer is kept with the request, but it does not change a price. To raise or lower a price by an answer, ask the question on the service itself: open "Services", press "Edit" beside the service, add the question on "Customer Questions", then use it under "Adjustments" on "Pricing Setup".
+
 ## What counts as "Share your quote link" on Home?
 <!-- id: link-shared-step; page: /app -->
 
 The setup step "Share your quote link" on Home is ticked the first time either of these happens:
 
 - You copy your link. That means "Copy" beside your quote link (on Home or on the Quote link page), or "Copy" on any of the ready-made texts on the Quote link page.
-- Your request page is opened for the first time. Pressing "Open" yourself counts.
+- A customer opens your request page for the first time.
 
-Copying the website code with "Copy code" does not tick it. A test request you make during setup does not tick it either.
+Opening your own link does not tick it: not with the "Open" button beside your link, and not while you are signed in. Copying the website code with "Copy code" does not tick it. A test request you make during setup does not tick it either.

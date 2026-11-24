@@ -81,6 +81,8 @@ export interface Tenant {
   template_json: TenantTemplate
   notification_email: string | null
   default_terms_text: string | null
+  /** T-201: the one automatic reminder to a customer (migration 50); absent or true = on */
+  customer_reminder_enabled?: boolean
   /** T-149: public quote page address /quote/{slug} (migration 32) */
   slug: string
   /** T-149: set when the business changed its slug (allowed once) */
@@ -278,6 +280,12 @@ export interface ExpectedSignalConfig {
  * AI draft configuration - complete starter blueprint
  */
 export interface ServiceDraftConfig {
+  /**
+   * T-201: 'manual' marks a draft the service editor wrote for a service made
+   * by hand, so that its questions are saved. Absent on a draft that came from
+   * an AI draft, a template or an import (the ones marked "AI Draft").
+   */
+  source?: 'manual'
   scope: {
     included: string[]
     excluded: string[]
@@ -1022,6 +1030,8 @@ export interface UsageCounter {
   period_yyyymm: string
   estimates_created: number
   estimates_sent: number
+  /** T-201: of estimates_created, the quotes counted against a monthly limit (a plan); the rest were free quotes */
+  plan_estimates_created?: number
   created_at: string
   updated_at: string
 }

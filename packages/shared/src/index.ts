@@ -32,6 +32,8 @@ export * from './formula'
 
 // Re-export region layer, units and locale formatting (T-133, AD-025)
 export * from './regions'
+// T-201: the one service-area rule (postcode list, county/state)
+export * from './service-area'
 export * from './units'
 export * from './format'
 export * from './checker'
@@ -47,6 +49,8 @@ export * from './brand'
 export * from './product-logo'
 export * from './colour-contrast'
 export * from './email-style'
+// T-201: the business's logo and the "Powered by" line in emails to a customer
+export * from './customer-email'
 export * from './review-account'
 export * from './demo'
 // T-156: approve from the review email
@@ -80,6 +84,7 @@ export * from './field-hint'
 export * from './support'
 export * from './support-sort'
 export * from './support-emails'
+export * from './customer-reminder'
 // T-198: the help guide and the assistant that answers from it
 export * from './help-guide'
 export * from './help-ask'

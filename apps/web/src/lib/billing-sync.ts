@@ -73,6 +73,19 @@ export function subscriptionFacts(subscription: Stripe.Subscription, env: Record
   }
 }
 
+/**
+ * T-201: has a plan just begun? True when the row is live now and, before this write, there was
+ * no row, a row that was not live, or a different plan. The same facts stored twice say no the
+ * second time. Pure.
+ */
+export function planJustStarted(
+  before: { plan_id?: string | null; status?: string | null } | null | undefined,
+  after: { plan_id?: string | null; status?: string | null }
+): boolean {
+  if (!subscriptionLive(after.status)) return false
+  return !before || !subscriptionLive(before.status) || before.plan_id !== after.plan_id
+}
+
 /** The row as it is before the sync (only what the decision needs) */
 export interface StoredSubscription {
   tenant_id: string
@@ -128,7 +141,7 @@ export function decideSync(facts: SubscriptionFacts, existing: StoredSubscriptio
 }
 
 export type SyncResult =
-  | { ok: true; tenantId: string; status: StoredSubscriptionStatus; planId: string }
+  | { ok: true; tenantId: string; status: StoredSubscriptionStatus; planId: string; /** T-201: a plan is live now that was not the plan held a moment ago */ planStarted: boolean }
   | { ok: false; why: 'not_found' | 'no_tenant' | 'older_subscription' | 'unknown_plan' | 'never_had_a_plan' | 'write_failed' }
 
 /**
@@ -194,7 +207,13 @@ export async function syncSubscriptionFromStripe(
   if (gives(decision.row as { plan_id?: string | null; status?: string | null }) && !gives(existing)) await offerAddressAgain(admin as Parameters<typeof offerAddressAgain>[0], tenantId)
 
   if (decision.paymentFailed) await notifyPaymentFailedOnce(admin, tenantId)
-  return { ok: true, tenantId, status: facts.status, planId: decision.row.plan_id as string }
+  return {
+    ok: true,
+    tenantId,
+    status: facts.status,
+    planId: decision.row.plan_id as string,
+    planStarted: planJustStarted(existing, decision.row as { plan_id?: string | null; status?: string | null }),
+  }
 }
 
 /**

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { serviceInsertRow, pricingRulesRow, widgetConfigRow, type ServiceCreateBody } from '@/lib/service-rows'
+import { priceLinesProblem } from '@/lib/service-questions'
 import { type NextRequest, NextResponse } from 'next/server'
 
 /**
@@ -124,6 +125,13 @@ export async function POST(request: NextRequest) {
         { error: { code: 'INVALID_INPUT', message: 'Service name is required' } },
         { status: 400 }
       )
+    }
+
+    // T-201: a fixed line ticked "Only include when condition is met" with no question could never
+    // be charged, so the service is not created with one; the answer says which line
+    const linesProblem = priceLinesProblem(pricingRules?.workSteps ?? workSteps)
+    if (linesProblem) {
+      return NextResponse.json({ error: { code: 'INVALID_INPUT', message: linesProblem } }, { status: 400 })
     }
 
     // Create service (rows built by lib/service-rows, shared with the demo seed)

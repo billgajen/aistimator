@@ -142,7 +142,7 @@ At the very bottom, "Report a problem with this estimate" sends {{product}} a re
 ## What does my customer see on their estimate page?
 <!-- id: estimates-customer-page; page: /app/quotes/[quoteId] -->
 
-They see one page with your business name, your logo if you added one, and the price in large figures. It says "Your estimate" until you have approved it and "Your quote" after. A quote also says it was reviewed and confirmed by your business. An estimate that was sent automatically stays "Your estimate".
+They see one page with your business name, your logo if you added one, and the price in large figures. It says "Your estimate" until you have approved it and "Your quote" after. A quote also says it was reviewed and confirmed by your business. An estimate that waits for your approval says your business will review and confirm it. An estimate that was sent automatically stays "Your estimate" and says only that it is an estimate based on their photos and details. It does not say you will review it.
 
 Below the price:
 
@@ -152,6 +152,7 @@ Below the price:
 - "Optional extras": extras with their prices, if the estimate has any.
 - "Assumptions" and "Not included": what the price assumes and what it leaves out.
 - "A note from" your business, if you wrote one.
+- "Terms and conditions": your own terms, if you filled in "Default Terms & Conditions" on "Settings". Nothing shows when that box is empty.
 - "Your photos": the photos they sent.
 
 At the bottom they can:
@@ -160,9 +161,9 @@ At the bottom they can:
 - Press "Ask a question" to send you a message. The same box is for asking for a change.
 - Decline, with a small link under the buttons.
 
-On an estimate you have not approved, when a quantity is not certain, a low and a high price show on a scale under the total. The customer never sees the grade letter.
+On an estimate the customer can see that you have not approved, when a quantity is not certain, a low and a high price show on a scale under the total. The customer never sees the grade letter.
 
-While an estimate waits for your approval, the customer cannot accept. With "Show the estimate, then I confirm it" they see the price and a line saying they can accept once you confirm. They can also ask a question. With "Hold until I approve" they see "Your estimate is being prepared" and not the price. If a quantity was not certain, they see a low and a high figure in its place until you approve.
+While an estimate waits for your approval, the customer cannot accept. With "Show the estimate, then I confirm it" they see the price and a line saying they can accept once you confirm. They can also ask a question. With "Hold until I approve" they see "Your estimate is being prepared" and no figure at all until you approve: no price, no low or high figure and no PDF. The same is true of an estimate that an automatic check held for you.
 
 ## What happens when a customer asks a question or asks for a change?
 <!-- id: estimates-customer-question; page: /app/quotes/[quoteId] -->
@@ -239,20 +240,28 @@ The page shows:
 - "Calculation Steps": each step in order, marked "Base Fee", "Work Step", "Add-on", "Multiplier" or "Tax". Each shows what was added, the sum behind it, the answers it used, and the running total. If your minimum charge was used, a line says so.
 - "Summary": the totals for each kind of step, tax and the final total.
 - "Customer wording": shown only when words customers should not see were found in the estimate's wording, with what was rewritten or removed.
-- "Extracted Signals": the raw details read from the photos and the form. This part is technical.
+- "What {{product}} understood": each detail read from the photos, the form and the customer's words, one to a line. A line gives the detail, its value, where it came from, such as "Measured from the photos" or "From the form", and the note kept with it.
 
 For a shorter view, the quote's own page shows each line under "Pricing" and what was read under "What {{product}} understood".
 
 ## What does "Could not be priced" mean, and can I try again?
 <!-- id: estimates-failed; page: /app/quotes/[quoteId] -->
 
-It means no price could be worked out for that request, so no estimate was sent. There is no "try again" button. You quote this one yourself.
+It means no price could be worked out for that request, so no estimate was sent. You can try again, or quote this one yourself.
 
 - The customer was told that you have their request and will be in touch. They were not shown an error.
 - You get one email about it, with how to reach them.
 - The request stays in "Needs you" with the status "Could not be priced".
 
-What to do:
+To try again:
+
+1. Open the quote on the website.
+2. Under "Next step", press "Try again". The price is worked out again from the same answers and photos, and the page updates when it is done.
+3. If it works, the estimate carries on as any other does. If it still cannot be priced, the page says so again.
+
+Trying again does not use another quote from your plan. The request was counted once, when it arrived. You can try one request up to five times.
+
+To quote it yourself:
 
 1. Open the quote. The box "What the customer sent" has their answers, and their photos are on the page.
 2. Under "Next step", press the "Email" or "Call" button to reach them.

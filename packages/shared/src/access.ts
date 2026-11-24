@@ -50,7 +50,10 @@ export interface AccessFacts {
   /** The business's subscriptions row, or null when it has never had one */
   subscription: { plan_id?: string | null; status?: string | null } | null | undefined
   region: string | null | undefined
-  /** Priced quotes counted so far, every month together; null when that could not be read */
+  /**
+   * The free quotes used so far: quotes priced on the free start, every month together
+   * (T-201: `freeQuotesUsed`, plans.ts); null when that could not be read
+   */
   quotesUsed: number | null
 }
 
@@ -126,6 +129,18 @@ export function planNamesFor(capability: Capability, plans?: PlanDefinition[]): 
 // ---------------------------------------------------------------------------
 // The words
 // ---------------------------------------------------------------------------
+
+/**
+ * T-201: Settings → Branding, under the preview: which plan removes the
+ * "Prepared with" badge. The names come from the plans on offer, so the line
+ * is right whatever the plans are called ("Only Pro removes…").
+ */
+export function noBadgeLine(plans?: PlanDefinition[]): string {
+  const withIt = plansWith('no_badge', plans)
+  const badge = `“Prepared with ${PRODUCT_NAME}” badge`
+  if (withIt.length === 0) return `Every estimate carries the ${badge}.`
+  return `Only ${planNamesFor('no_badge', plans)} ${withIt.length === 1 ? 'removes' : 'remove'} the ${badge}. Your estimates then carry only your brand.`
+}
 
 /** Home, on the free start: "You're trying everything in Pro. 7 free quotes left." */
 export function freeStartLine(access: BusinessAccess): string | null {

@@ -37,6 +37,27 @@ export interface ServiceBenchmark {
 /** Minimum distinct OTHER tenants before a benchmark is shown (k-anonymity) */
 export const MIN_BENCHMARK_TENANTS = 3
 
+/**
+ * T-201: the switch in Settings → Business ("Market benchmarks"), and the line
+ * Analytics shows about it. `tenants.benchmarks_opt_in` holds it: on for a new
+ * business; off means none of its rates are in anyone's benchmark and (the
+ * T-115 rule) it sees none.
+ */
+export const BENCHMARK_SHARING_COPY = {
+  title: 'Market benchmarks',
+  label: 'Share my rates, without my name, in market benchmarks',
+  /** The one sentence on what is shared */
+  whatIsShared:
+    'When this is on, the rates of your services (per room, per hour and so on) are added, without your name, to the typical range that similar businesses see on Analytics, and you see theirs.',
+  savedOn: 'Saved. Your rates are shared without your name.',
+  savedOff: 'Saved. Your rates are no longer shared, and Analytics shows you no benchmarks.',
+  failed: 'Could not save. Please try again.',
+  /** On Analytics, under the benchmarks: where the switch is */
+  onLine: 'Your rates are shared without your name.',
+  offLine: 'You can stop sharing at any time in Settings.',
+  settingsLink: 'Change this in Settings',
+} as const
+
 const STOPWORDS = new Set([
   'the', 'and', 'of', 'for', 'a', 'an', 'to', 'in', 'on', 'with',
   'service', 'services', 'standard', 'full', 'basic', 'general',

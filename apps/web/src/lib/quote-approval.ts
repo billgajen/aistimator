@@ -32,6 +32,7 @@ import type { createClient, createAdminClient } from '@/lib/supabase/server'
 import { notifyEstimateReady } from '@/lib/whatsapp-notify'
 import { generateQuoteToken, getTokenExpiry } from '@/lib/tokens'
 import { sendEmail, isPostmarkConfigured, generateCustomerEmailHtml } from '@/lib/postmark'
+import { customerEmailBrand } from '@/lib/customer-email-brand'
 import { businessReplyTo } from '@/lib/business-email'
 
 /** A signed-in user's client (dashboard, app) or the service role (email link, T-156) */
@@ -204,6 +205,7 @@ export async function approveQuote(opts: {
     sectionsHtml: sectionsEmailHtml(pricing, service.name, locale),
     validUntil: expiry.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' }),
     primaryColor: tenant.branding_json?.primaryColor,
+    brand: await customerEmailBrand(supabase, tenantId, tenant.branding_json),
   })
   const emailResult = await sendEmail({
     from: { kind: 'customer', businessName: tenant.name },

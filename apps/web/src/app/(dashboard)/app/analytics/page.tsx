@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { PageHeader } from '@/components/dashboard/EmptyState'
+import { BENCHMARK_SHARING_COPY, PAYMENTS_LIVE } from '@qolumns/shared'
 import type { AnalyticsResponse, ServiceCalibration, ServiceBenchmark } from '@qolumns/shared'
 import { AccuracyPanel } from '@/components/analytics/AccuracyPanel'
 
@@ -271,7 +272,7 @@ export default function AnalyticsPage() {
               <p className="text-sm text-text-secondary">
                 See what similar businesses charge per room, square metre or hour — anonymized
                 across businesses in your currency. To see benchmarks, you share your own rates
-                into the same anonymous pool (nothing identifies your business).
+                into the same anonymous pool (nothing identifies your business). {BENCHMARK_SHARING_COPY.offLine}
               </p>
               <button
                 type="button"
@@ -287,7 +288,17 @@ export default function AnalyticsPage() {
               Not enough comparable businesses yet — benchmarks appear once at least 3 other
               businesses with similar services and your currency are sharing rates.
             </p>
-          ) : (
+          ) : null}
+          {/* T-201: sharing is a switch in Settings; said here while it is on */}
+          {benchmarks.optedIn && (
+            <p className="mt-2 text-xs text-text-muted" data-testid="benchmark-sharing-line">
+              {BENCHMARK_SHARING_COPY.onLine}{' '}
+              <Link href="/app/settings" className="font-semibold text-primary hover:underline">
+                {BENCHMARK_SHARING_COPY.settingsLink}
+              </Link>
+            </p>
+          )}
+          {!benchmarks.optedIn || benchmarks.benchmarks.length === 0 ? null : (
             <div className="mt-4 space-y-3">
               {benchmarks.benchmarks.map((b, i) => {
                 const inRange = b.yourRate >= b.p25 && b.yourRate <= b.p75
@@ -399,11 +410,14 @@ export default function AnalyticsPage() {
             count={data?.metrics.quotesAccepted || 0}
             total={data?.metrics.totalQuotes || 1}
           />
-          <FunnelRow
-            label="Paid"
-            count={data?.metrics.quotesPaid || 0}
-            total={data?.metrics.totalQuotes || 1}
-          />
+          {/* T-201: no "Paid" until payments exist; the figure stays in the answer */}
+          {PAYMENTS_LIVE && (
+            <FunnelRow
+              label="Paid"
+              count={data?.metrics.quotesPaid || 0}
+              total={data?.metrics.totalQuotes || 1}
+            />
+          )}
         </div>
       </div>
     </div>

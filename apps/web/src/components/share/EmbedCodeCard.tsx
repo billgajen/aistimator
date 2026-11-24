@@ -73,14 +73,8 @@ export function EmbedCodeCard({
         >
           Send to my web person
         </a>
-        <a
-          href={`/demo?tenantKey=${encodeURIComponent(tenantKey)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-text-secondary underline underline-offset-2 hover:text-text-primary"
-        >
-          Preview on a demo page
-        </a>
+        {/* T-201: "Preview on a demo page" is gone. It opened a developer page ("Widget Demo", "Tenant Key").
+            The business sees its form by opening its quote link, at the top of this page. */}
       </div>
     </section>
   )

@@ -7,6 +7,7 @@ import type { ServiceDraftConfig } from '@qolumns/shared'
 import { geminiThinkingConfig, geminiUrlFor } from '@/lib/ai/models'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { extractFormulaIdentifiers, normalizeUnit, regionPromptBlock, resolveRegionContext } from '@qolumns/shared'
+import { linesNeverCharged } from '@/lib/service-questions'
 
 /**
  * Validate and normalize an AI-generated draft config
@@ -44,8 +45,7 @@ export function validateAndNormalizeDraft(
     // ?? not || — a stated £0 minimum is valid, and an absent one must NOT
     // invent a price (core rule 1: never invent numbers the owner didn't state)
     minimumCharge: Math.max(0, draft.pricing?.minimumCharge ?? 0),
-    workSteps: truncateArray(normalizeWorkSteps(draft.pricing?.workSteps || []), 5),
-    addOns: truncateArray(normalizeAddons(draft.pricing?.addOns || []), 6),
+    ...settledPricing(draft, 5, 6),
     siteVisit: {
       alwaysRecommend: draft.pricing?.siteVisit?.alwaysRecommend || false,
       confidenceBelowPct: Math.max(0, Math.min(100, draft.pricing?.siteVisit?.confidenceBelowPct || 60)),
@@ -86,8 +86,7 @@ export function validateAndNormalizeDraftBulk(
     ...normalized,
     pricing: {
       ...normalized.pricing,
-      workSteps: truncateArray(normalizeWorkSteps(draft.pricing?.workSteps || []), 10),
-      addOns: truncateArray(normalizeAddons(draft.pricing?.addOns || []), 10),
+      ...settledPricing(draft, 10, 10),
     },
     suggestedFields: truncateArray(
       normalizeSuggestedFields(draft.suggestedFields || []),
@@ -98,6 +97,28 @@ export function validateAndNormalizeDraftBulk(
 
 export function truncateArray<T>(arr: T[], max: number): T[] {
   return arr.slice(0, max)
+}
+
+/**
+ * A draft's price lines and add-ons, within their limits.
+ *
+ * T-201: a fixed line a model marks optional with nothing to decide when it
+ * applies could never be charged, and a service holding one can no longer be
+ * saved (lib/service-questions). It is what an add-on is: an extra with its
+ * own price, added when the customer asks for it. So it becomes one, at the
+ * price the draft gave it, instead of a line that is never charged.
+ */
+function settledPricing(draft: Partial<ServiceDraftConfig>, maxSteps: number, maxAddOns: number): Pick<ServiceDraftConfig['pricing'], 'workSteps' | 'addOns'> {
+  const steps = normalizeWorkSteps(draft.pricing?.workSteps || [])
+  const loose = linesNeverCharged(steps)
+  const addOns = normalizeAddons(draft.pricing?.addOns || [])
+  for (const step of loose) {
+    if (!addOns.some((a) => a.name.trim().toLowerCase() === step.name.trim().toLowerCase())) addOns.push({ name: step.name, price: step.defaultCost, description: step.description })
+  }
+  return {
+    workSteps: truncateArray(steps.filter((step) => !loose.includes(step)), maxSteps),
+    addOns: truncateArray(addOns, maxAddOns),
+  }
 }
 
 interface WorkStepInput {

@@ -7,8 +7,12 @@
  * request held, quote accepted, quote declined, WhatsApp renewal) carry no "Powered by" line:
  * they are from the product itself. The two that go to a customer (updated quote, reminder)
  * keep theirs. A unit test holds both (app-t184.test.ts).
+ *
+ * T-201: the two customer emails carry the business's logo when it has one, and their "Powered by"
+ * line follows the plan by the same rule as the estimate page (`brand`: lib/customer-email-brand.ts).
  */
-import { EMAIL_COLOR, EMAIL_FONT, PRODUCT_NAME, brandColourForEmail, emailHeadStyle, productLogoRow, textColourOnCardForEmail, textOnColourForEmail } from '@qolumns/shared'
+import { EMAIL_COLOR, EMAIL_FONT, PRODUCT_NAME, brandColourForEmail, businessLogoBlock, emailHeadStyle, poweredByRow, productLogoRow, textColourOnCardForEmail, textOnColourForEmail } from '@qolumns/shared'
+import type { CustomerEmailBrand } from '@qolumns/shared'
 
 function escapeHtml(text: string): string {
   const htmlEntities: Record<string, string> = {
@@ -33,6 +37,8 @@ export function generateRevisedQuoteEmailHtml(data: {
   primaryColor?: string
   /** T-179: the services of a combined quote, as rows (lib/sections-email.ts); nothing for a single-service quote */
   sectionsHtml?: string
+  /** T-201: the business's logo and whether "Powered by" shows (lib/customer-email-brand.ts) */
+  brand?: CustomerEmailBrand
 }): string {
   const primaryColor = brandColourForEmail(data.primaryColor)
 
@@ -52,6 +58,7 @@ ${emailHeadStyle()}
         <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px;">
+              ${businessLogoBlock(data.brand?.logoUrl, data.businessName)}
               <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: ${textColourOnCardForEmail(primaryColor)};">
                 ${escapeHtml(data.businessName)}
               </h1>
@@ -96,13 +103,7 @@ ${emailHeadStyle()}
             </td>
           </tr>
         </table>
-        <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
-          <tr>
-            <td style="text-align: center; color: #626C66; font-size: 12px;">
-              Powered by ${PRODUCT_NAME}
-            </td>
-          </tr>
-        </table>
+        ${poweredByRow(data.brand?.showPoweredBy)}
       </td>
     </tr>
   </table>
@@ -211,8 +212,9 @@ export function generateLimitReachedEmailHtml(data: {
        <strong>${escapeHtml(data.overagePriceLabel)} each</strong> on your next invoice. Upgrade
        to a bigger plan if you expect this regularly; it usually works out cheaper.`
     : `<strong>New requests are still saved as leads</strong> in your dashboard, but they are not priced
-       automatically — customers are told you'll send their estimate shortly. Upgrade your plan to price
-       them instantly (held leads can be priced with one click after upgrading)${
+       automatically — customers are told you'll send their estimate shortly. Upgrade your plan and the
+       requests saved in the last 30 days are priced for you, oldest first, as far as the plan's monthly
+       number goes (any others can be priced with one click)${
          data.per === 'total' ? '.' : ', or wait until your limit resets at the start of next month.'
        }`
   return generateLimitReachedEmailBody(data, consequence)
@@ -232,7 +234,7 @@ export function generateLeadHeldEmailHtml(data: {
 }): string {
   const consequence = `<strong>${escapeHtml(data.customerName)}</strong> asked for an estimate for
      <strong>${escapeHtml(data.serviceName)}</strong>. It is saved as a lead but was not priced because
-     ${data.per === 'total' ? 'your free quotes are used up' : "your plan's monthly limit is reached"}. Upgrade to price it instantly, or reply to the customer
+     ${data.per === 'total' ? 'your free quotes are used up' : "your plan's monthly limit is reached"}. Upgrade and it is priced for you, or reply to the customer
      yourself: <a href="${escapeHtml(data.quoteUrl)}">open the lead</a>.`
   return generateLimitReachedEmailBody(data, consequence)
 }
@@ -471,6 +473,8 @@ export function generateQuoteReminderEmailHtml(data: {
   totalFormatted: string
   quoteViewUrl: string
   primaryColor?: string
+  /** T-201: the business's logo and whether "Powered by" shows (lib/customer-email-brand.ts) */
+  brand?: CustomerEmailBrand
 }): string {
   const primaryColor = brandColourForEmail(data.primaryColor)
 
@@ -490,6 +494,7 @@ ${emailHeadStyle()}
         <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px;">
+              ${businessLogoBlock(data.brand?.logoUrl, data.businessName)}
               <h1 style="margin: 0 0 8px; font-size: 20px; font-weight: 700; color: #1B2823;">
                 Your quote is still ready, ${escapeHtml(data.customerName)}
               </h1>
@@ -517,13 +522,7 @@ ${emailHeadStyle()}
             </td>
           </tr>
         </table>
-        <table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
-          <tr>
-            <td style="text-align: center; color: #626C66; font-size: 12px;">
-              Powered by ${PRODUCT_NAME}
-            </td>
-          </tr>
-        </table>
+        ${poweredByRow(data.brand?.showPoweredBy)}
       </td>
     </tr>
   </table>

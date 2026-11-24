@@ -94,6 +94,24 @@ export function supabaseQuoteLinkStore(supabase: Admin): QuoteLinkStore {
   }
 }
 
+/**
+ * T-201: does this visit tick "Share your quote link" on Home? Only a visit
+ * that is not the business's own: not its setup test, not opened from the
+ * dashboard, and not by someone signed in to this business. (Before T-201 the
+ * business opening its own link ticked the step.) Pure.
+ */
+export function countsAsFirstVisit(visit: {
+  alreadyVisited: boolean
+  isSetupTest: boolean
+  ownMark: boolean
+  /** the business the visitor is signed in to, if any */
+  signedInTenantId: string | null
+  tenantId: string
+}): boolean {
+  if (visit.alreadyVisited || visit.isSetupTest || visit.ownMark) return false
+  return visit.signedInTenantId !== visit.tenantId
+}
+
 /** Record the first visit to a tenant's quote page (once; later visits are no-ops). */
 export async function markFirstVisit(supabase: Admin, tenantId: string): Promise<void> {
   await supabase
@@ -103,4 +121,4 @@ export async function markFirstVisit(supabase: Admin, tenantId: string): Promise
     .is('quote_link_first_visit_at', null)
 }
 
-export { quoteLinkUrl } from '@/lib/quote-link-url'
+export { quoteLinkUrl, ownVisitUrl, OWN_VISIT_PARAM } from '@/lib/quote-link-url'

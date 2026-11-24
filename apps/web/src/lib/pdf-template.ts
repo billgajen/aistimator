@@ -6,6 +6,8 @@
  */
 
 import { formatMoney, lineLabelNow, splitMinimum, minimumChargeNote, displaySections, roomsCoveredWords } from '@qolumns/shared'
+// a relative path: verify-t179 loads this file outside Next, where "@/" does not resolve
+import { TERMS_HEADING, termsParagraphs } from './quote-terms'
 import type {
   CustomerRoomScanView,
   QuotePricing,
@@ -35,6 +37,8 @@ export interface QuotePdfData {
   serviceName?: string
   /** T-193: what the room scan measured: each room's floor and wall area and its floor plan (no 3D model in a PDF) */
   roomScan?: CustomerRoomScanView
+  /** T-201: the business's "Default Terms & Conditions" (lib/quote-terms.ts), printed after the price and the notes; null or absent prints nothing */
+  terms?: string | null
 }
 
 function formatCurrency(amount: number, currency: string, locale: string): string {
@@ -255,6 +259,21 @@ export function generateQuotePdfHtml(data: QuotePdfData): string {
         <p style="margin: 0; color: #374151; line-height: 1.6;">
           ${escapeHtml(content.notes)}
         </p>
+      </div>
+    `)
+  }
+
+  // T-201: the business's own terms, after the price and the notes. Its words, with its line breaks.
+  if (data.terms) {
+    const paragraphs = termsParagraphs(data.terms)
+      .map((lines) => `<p style="margin: 0 0 8px 0; font-size: 12px; color: #374151; line-height: 1.6;">${lines.map(escapeHtml).join('<br />')}</p>`)
+      .join('')
+    sections.push(`
+      <div data-role="terms" style="margin-bottom: 24px;">
+        <h2 style="font-size: 14px; font-weight: 600; color: ${primaryColor}; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">
+          ${TERMS_HEADING}
+        </h2>
+        ${paragraphs}
       </div>
     `)
   }

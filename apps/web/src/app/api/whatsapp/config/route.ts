@@ -5,6 +5,7 @@ import { disconnect, embeddedSignupAvailable, loadConnection, manualNeedsSecret,
 import { GRAPH_API_VERSION } from '@/lib/whatsapp-graph'
 import { EMBEDDED_SIGNUP_VERSION } from '@/lib/whatsapp-signup'
 import { accessRefusal, accessView, whatsappAccess, whatsappAccessWithTag } from '@/lib/whatsapp-access'
+import { WHATSAPP_SOON_COPY, whatsappConnectOpen } from '@/lib/whatsapp-open'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,6 +39,9 @@ export async function GET() {
     config,
     access,
     connect: {
+      // T-201: is connecting open to this business today? When it is not, the page says "Coming soon"
+      open: whatsappConnectOpen(auth.tenantId),
+      soon: WHATSAPP_SOON_COPY,
       available: embeddedSignupAvailable(),
       appId: process.env.NEXT_PUBLIC_WHATSAPP_APP_ID || null,
       configId: process.env.NEXT_PUBLIC_WHATSAPP_CONFIG_ID || null,

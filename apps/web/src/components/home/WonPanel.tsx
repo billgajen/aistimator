@@ -69,6 +69,12 @@ export function WonPanel({ summary, lines }: { summary: WonSummary; lines: WonLi
                         <Figures text={WON_COPY.shareOf(step.share, steps[i - 1]!.key)} />
                       </span>
                     )}
+                    {/* T-201: Accepted counts on-site estimates too; when some are in it, that is said here */}
+                    {step.note && (
+                      <span className="mt-0.5 block text-xs text-text-secondary" data-testid="won-step-note">
+                        <Figures text={step.note} />
+                      </span>
+                    )}
                   </span>
                 </li>
               ))}

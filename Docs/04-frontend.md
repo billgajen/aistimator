@@ -315,6 +315,25 @@ whose turn it is.") and in 6 ("Nothing has happened yet. New requests, opens and
 four numbers without a change line. Setup tests are in none of the counts. On a phone everything is one column in
 this order; the three counts stack and the four numbers sit two by two.
 
+**T-201: Home, Settings, Analytics, WhatsApp.**
+- Home goes to setup only when the business has no service at all. With services that are all switched off it
+  shows a notice first ("All your services are off, so customers can’t get an estimate." with "Go to Services",
+  `serviceState` and `SERVICES_OFF_NOTICE` in `lib/setup-checklist.ts`), and "Add a service" stays ticked.
+- The panel's "Accepted" step counts every accepted estimate of the month, on-site ones too: the number Home's
+  "Accepted" count ("this month") shows. With on-site estimates in it the step says "includes 2 made on site" in
+  place of its share (`won.ts`). The headline and the first three steps are still customer requests alone.
+- Settings → Business has two more cards, each its own component: "Market benchmarks" (one switch, saved at once,
+  `components/settings/BenchmarkSharing.tsx`; the words are `BENCHMARK_SHARING_COPY`) and "Change password"
+  (current, new, new again; `components/settings/ChangePassword.tsx`, posting to `/api/auth/change-password`).
+- Analytics: the four figures follow `lib/analytics-metrics.ts` (setup tests out; opened counts every opened
+  quote; the rate is accepted ÷ sent). The funnel has no "Paid" row, and no list, filter or quote page says "Paid"
+  while `PAYMENTS_LIVE` is false: a quote with that status reads as accepted. Under "Market Benchmarks" a line
+  says sharing is on, with a link to Settings.
+- The WhatsApp page, for a business that is not connected and cannot connect yet (`connect.open === false`):
+  one card, "Quotes inside WhatsApp" with the "Coming soon" mark, what is coming, and "Open Quote link". No
+  connect button and no manual form. A connected business sees its page as before.
+- Settings → Branding names the plan that removes the badge from the plans on offer (`noBadgeLine`, access.ts).
+
 **Account pages (T-173).** Log-in, sign-up, "Forgot your password?" (`/forgot-password`) and "Choose a new
 password" (`/reset-password`) post to `/api/auth/*`; none calls Supabase from the browser. They share their field,
 label and link classes and the error and note boxes (`components/auth/auth-form.tsx`). Sign-up runs the invisible
@@ -570,3 +589,33 @@ names `widget.js` and `iframe-loader.js` are unchanged.
 ## Globalization
 - Currency and tax label displayed based on tenant settings.
 - Avoid UK specific language in UI. Use generic tax label field.
+## T-201: the service editor (Services)
+
+- **Questions are saved for every service.** A service made by hand (no description, so no draft) gets a draft
+  of its own to hold them (`draft_config.source = "manual"`). The "AI Draft" mark and its tools ("AI
+  Refinement", "Regenerate", "Clear") show only for a draft that is not made by hand.
+- **A question's label is only wording.** The question editor never writes keys; the page gives each question
+  its keys once (`lib/service-questions.ts`, `syncQuestions`) and keeps them when the label changes. Editing a
+  question no longer replaces the service's whole list of facts: one a template or a draft wrote is left as it
+  is. "Test & Publish" also says when an adjustment or a condition uses a question the service no longer has.
+- **"Regenerate" asks first** (`regenerate-confirm`): what it replaces, with counts, and what it keeps.
+  "Cancel" only closes the question.
+- **"Describe your pricing"** shows "Not everything fitted in one service" with the names of what was left out
+  (`LeftOutNote`), in the editor and in setup, before "Apply". Its example text is in the business's currency.
+- **Amount boxes** show the business's currency symbol (`AmountSymbol`), in the page and in the price line
+  editor.
+- **A fixed line ticked "Only include when condition is met" with no question** shows "Needs a question", is
+  listed under "Fix Before Publishing", and keeps "Save Changes" / "Create Service" disabled.
+- **"Add from a template"** adds the service switched off. The picker says so, the service opens at its prices
+  with a note, and "Services" shows a note until the business presses "Enable" (the note is for this visit to
+  the page; the row reads "Inactive" either way). Services made in setup are created on, as before: setup has
+  its own "Check your prices" step.
+
+## T-201: the quote link and estimates
+
+- **Quote link page** (`/app/quote-link`): "Preview on a demo page" is gone (the developer page `/demo?tenantKey=` still opens by its address; nothing links to it). The "Open" buttons there and on Home open the link with `?own=1` (`ownVisitUrl`, `lib/quote-link-url.ts`), so the business's own visit does not tick "Share your quote link"; `components/share/OwnVisitMark` takes the mark off the address bar. The Advanced tip now reads "To change a price by an answer" and points at Services → "Customer Questions" → "Adjustments" on "Pricing Setup".
+- **Customer's page** (`/q/:id`): the line under the price comes from `customerEstimateNote` (shared): three cases, and only an estimate waiting for approval says the business will review it. A held quote shows the holding screen and no figure; while a detail is being confirmed on a service that holds, the page shows "A couple of details to confirm" with no range. "Terms and conditions" (`quote.terms`) prints after the notes, with the business's line breaks.
+- **Request form** (`EstimateWidget`): the "being prepared" screen with a low and a high (`finished-held`) is removed; a held quote shows "We have your request".
+- **Dashboard quote page**: "Try again" in the Next step box on a request that could not be priced, while tries are left (`canBusinessRetry`, `lib/quote-retry-rules.ts`); it calls `POST /api/quotes/:id/process` and looks again until the price is there. The grade panel's range note says "(the customer sees no figure until you approve)" for a held quote.
+- **Pricing trace** (`/app/quotes/:id/trace`): "Extracted Signals" (the stored record as JSON) is now "What Qolumns understood", built by `lib/trace-understood.ts`: one line per item (name, value, where it came from, the note kept with it), then what was noted about the job.
+- **Settings and Branding**: the three Quote Template tick boxes carry a "PDF only" tag (`components/dashboard/PdfOnlyTag`); "Default Terms & Conditions" says where it is printed.

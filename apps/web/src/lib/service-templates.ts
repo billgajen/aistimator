@@ -89,12 +89,15 @@ export function templateGroups(region: RegionCode, ownedNames: readonly string[]
 /**
  * The request that adds a template's service: the same body setup sends
  * (`servicePayload`), so a service added here is the one setup would have
- * made. Null for a key that names no template, or one the business has.
+ * made, except that it starts switched off (T-201). Null for a key that names
+ * no template, or one the business has.
  */
-export function templatePayload(region: RegionCode, key: string, ownedNames: readonly string[]): ReturnType<typeof servicePayload> | null {
+export function templatePayload(region: RegionCode, key: string, ownedNames: readonly string[]): (ReturnType<typeof servicePayload> & { active: false }) | null {
   const [packId, at] = [key.slice(0, key.lastIndexOf(':')), Number(key.slice(key.lastIndexOf(':') + 1))]
   const pack = listPacks(region).find((p) => p.id === packId && p.region === region)
   const svc = pack?.services[at]
   if (!svc || ownedNames.map(sameName).includes(sameName(svc.name))) return null
-  return servicePayload(draftOf(svc))
+  // T-201: added switched off. Its prices are the template's examples, so no customer is quoted from
+  // them until the business has checked them and pressed "Enable".
+  return { ...servicePayload(draftOf(svc)), active: false }
 }

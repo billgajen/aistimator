@@ -2,7 +2,9 @@
  * T-152: the Home setup checklist — pure, so every tick is testable.
  *
  * Each step ticks only on a real action by the business or its customers:
- * 1. Add a service        — an active service exists
+ * 1. Add a service        — a service exists, switched on or off (T-201: switching
+ *                           every service off is not "no services"; Home says so
+ *                           in a notice and never goes back to setup)
  * 2. Check your prices    — the business confirmed them (setup's "These are my
  *                           prices", or saving a service on Services)
  * 3. Share your quote link — the link was copied or the page had its first visit
@@ -28,6 +30,23 @@ export interface ChecklistStep {
   completed: boolean
   href: string
 }
+
+/**
+ * T-201: what Home needs to know about a business's services. `any` decides
+ * whether setup is over (a service exists, on or off); `allOff` is the notice:
+ * there are services and none is switched on.
+ */
+export function serviceState(services: ReadonlyArray<{ active?: boolean | null }> | null | undefined): { any: boolean; allOff: boolean } {
+  const list = services ?? []
+  const any = list.length > 0
+  return { any, allOff: any && !list.some((service) => service.active === true) }
+}
+
+/** T-201: Home's notice when every service is switched off */
+export const SERVICES_OFF_NOTICE = {
+  text: 'All your services are off, so customers can’t get an estimate.',
+  link: 'Go to Services',
+} as const
 
 export function buildChecklist(input: ChecklistInput): { steps: ChecklistStep[]; done: number; complete: boolean } {
   const steps: ChecklistStep[] = [

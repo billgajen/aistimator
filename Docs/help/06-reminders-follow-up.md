@@ -14,10 +14,11 @@ On Home, "Latest activity" also lists the newest things that happened, such as a
 ## Does {{product}} remind my customer about a quote?
 <!-- id: followup-automatic-reminder; page: /app/quotes -->
 
-Yes, once. {{product}} emails the customer one reminder when a quote has been waiting for three days with no answer. You do not have to do anything.
+Yes, once, unless you switch it off. {{product}} emails the customer one reminder when a quote has been waiting for three days with no answer. You do not have to do anything.
 
 The reminder goes to the customer, never to you. It is sent only when all of these are true:
 
+- the reminder is on in "Settings" (it is on unless you switched it off);
 - the quote was sent at least three days ago, and its status is still "Waiting for customer" (sent, or opened but not answered);
 - the customer has not accepted or declined it;
 - the customer gave an email address;
@@ -26,7 +27,22 @@ The reminder goes to the customer, never to you. It is sent only when all of the
 
 {{product}} checks once a day, so the reminder goes out on the first check after the three days are up. The email's subject is "Reminder: your quote from" and your business name, and it has a "View your quote" button. If the customer replies to it, the reply comes to you.
 
-No reminder is sent for a quote where the customer asked a question, or where you sent an updated quote. There is no second reminder. There is no setting to switch the reminder off or to change the three days.
+No reminder is sent for a quote where the customer asked a question, or where you sent an updated quote. There is no second reminder. You can switch the reminder off in "Settings"; there is no setting to change the three days.
+
+## How do I switch the reminder to my customers off?
+<!-- id: followup-reminder-switch; page: /app/settings; section: Reminder to the customer -->
+
+Untick the reminder in "Settings". It is on until you do.
+
+1. Open "Settings" in the menu.
+2. Find "Reminder to the customer".
+3. Untick "Send one reminder to the customer if they haven’t answered the estimate after 3 days". It saves at once and says "Saved. No reminders will be sent."
+
+With it off, {{product}} sends no reminder for any quote that has not had one yet, including quotes you sent before you switched it off. A reminder that already went out is not taken back.
+
+Tick it again to switch it back on. A quote that is still waiting, has not expired and was never reminded gets its reminder at the next daily check.
+
+"Answered" means accepted or declined. A customer who opened the quote and did nothing is reminded too.
 
 ## How do I chase a quote myself?
 <!-- id: followup-send-again; page: /app/quotes/[quoteId] -->

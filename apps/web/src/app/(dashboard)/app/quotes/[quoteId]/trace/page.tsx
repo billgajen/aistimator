@@ -4,6 +4,7 @@ import { WordingRepairCard } from '@/components/quotes/WordingRepairCard'
 import { useEffect, useState } from 'react'
 import { formatMoney, minimumChargeNote, MINIMUM_ENTRY_LABEL } from '@qolumns/shared'
 import Link from 'next/link'
+import { TRACE_UNDERSTOOD_COPY, understoodTrace, understoodTraceEmpty } from '@/lib/trace-understood'
 import type { Quote, PricingTrace, PricingTraceStep } from '@qolumns/shared'
 
 interface QuoteWithService extends Quote {
@@ -157,6 +158,8 @@ export default function PricingTracePage({
   // T-165: the minimum charge the engine applied, as the one sentence (null when it did not apply)
   const minimumStep = trace?.trace.find((step) => step.type === 'minimum' && step.amount > 0)
   const minimumNote = minimumStep ? minimumChargeNote(formatCurrency(minimumStep.runningTotal)) : null
+  // T-201: what was read for this quote, as lines (not the stored record)
+  const understood = understoodTrace(quote.signals_json, quote.service?.expected_signals)
 
   return (
     <div className="space-y-6">
@@ -340,20 +343,45 @@ export default function PricingTracePage({
       {/* T-148: banned customer words found in the generated wording */}
       {trace?.wordingRepair && <WordingRepairCard record={trace.wordingRepair} />}
 
-      {/* Extracted Signals */}
+      {/* T-201: "What Qolumns understood", as lines a business can read (it was "Extracted Signals": the
+          stored record printed as it is kept). lib/trace-understood.ts words it; nothing is added. */}
       {quote.signals_json && (
-        <div className="rounded-xl border border-border bg-surface">
+        <div className="rounded-xl border border-border bg-surface" data-testid="trace-understood">
           <div className="border-b border-border px-6 py-4">
-            <h2 className="text-lg font-medium text-text-primary">Extracted Signals</h2>
-            <p className="text-sm text-text-muted">
-              Data extracted from photos and form inputs
-            </p>
+            <h2 className="text-lg font-medium text-text-primary">{TRACE_UNDERSTOOD_COPY.title}</h2>
+            <p className="text-sm text-text-muted">{TRACE_UNDERSTOOD_COPY.intro}</p>
           </div>
-          <div className="px-6 py-4">
-            <pre className="overflow-x-auto rounded-xl bg-background p-4 text-sm text-text-primary">
-              {JSON.stringify(quote.signals_json, null, 2)}
-            </pre>
-          </div>
+          {understoodTraceEmpty(understood) ? (
+            <p className="px-6 py-4 text-sm text-text-secondary">{TRACE_UNDERSTOOD_COPY.nothing}</p>
+          ) : (
+            <div className="px-6 py-4">
+              {understood.lines.length > 0 && (
+                <dl className="divide-y divide-border">
+                  {understood.lines.map((line, index) => (
+                    <div key={`${line.name}-${index}`} className="py-3 first:pt-0 last:pb-0" data-testid="trace-understood-line">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                        <dt className="text-sm font-medium text-text-primary">{line.name}</dt>
+                        <dd className="figure text-sm text-text-primary">{line.value}</dd>
+                      </div>
+                      <p className="mt-0.5 text-sm text-text-secondary">
+                        {line.from}
+                        {line.range ? `. ${line.range}` : ''}
+                        {line.unsure ? `. ${TRACE_UNDERSTOOD_COPY.unsure}` : ''}
+                      </p>
+                      {line.note && <p className="mt-0.5 break-words text-sm text-text-muted">{line.note}</p>}
+                    </div>
+                  ))}
+                </dl>
+              )}
+              {understood.notes.length > 0 && (
+                <ul className={`space-y-1 text-sm text-text-secondary ${understood.lines.length > 0 ? 'mt-4 border-t border-border pt-4' : ''}`}>
+                  {understood.notes.map((note) => (
+                    <li key={note}>{note}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

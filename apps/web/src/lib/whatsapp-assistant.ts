@@ -229,7 +229,7 @@ async function continueRequest(input: AssistantInput, state: WhatsAppIntakeState
     case 'awaiting_address': {
       const postcode = extractPostalCode(text, getRegion(business.region))
       if (!postcode) return again(say.locationAgain(w))
-      if (!inServiceArea(postcode, business.serviceAreaMode, business.serviceAreaValues)) {
+      if (!inServiceArea(postcode, business.serviceAreaMode, business.serviceAreaValues, { address: text, areas: getRegion(business.region).areas })) {
         return { replies: [say.outsideArea(w)], keepText: true, newState: 'idle', newData: keepOnly(data) }
       }
       next = { ...next, jobAddress: text.slice(0, 300), jobPostcode: postcode }

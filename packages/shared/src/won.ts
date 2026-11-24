@@ -8,7 +8,11 @@
  *   - customer requests (website form, quote link, QR code, WhatsApp): the
  *     headline and the four steps;
  *   - estimates the business made on site: one quieter line, never added to
- *     the headline or the steps.
+ *     the headline or to the first three steps.
+ *
+ * T-201: the last step, Accepted, counts every accepted estimate of the month,
+ * customer requests and on-site together: the same number as Home's
+ * "Accepted" count ("this month"), under the same word.
  *
  * Every number is counted by when it happened (a request by when it arrived,
  * an acceptance by when it was accepted), the way Home has always counted
@@ -95,6 +99,8 @@ export interface WonStep {
   count: number
   /** The share of the step before that moved on to this one ("71%"), when it can be said */
   share: string | null
+  /** T-201: said in place of the share when the count holds estimates made on site ("includes 2 made on site") */
+  note?: string | null
 }
 
 export interface WonSummary {
@@ -166,7 +172,7 @@ export function wonSummary(rows: WonRow[] | null | undefined, input: WonInput): 
 
   const C = WON_COPY
   const showCustomer = steps.requests > 0 || input.everAccepted.fromCustomers > 0
-  const anyStep = steps.requests + steps.sent + steps.opened + theirs.now.jobs > 0
+  const anyStep = steps.requests + steps.sent + steps.opened + theirs.now.jobs + mine.now.jobs > 0
   const customer: WonSummary['customer'] = showCustomer
     ? {
         ...theirs.now,
@@ -175,7 +181,15 @@ export function wonSummary(rows: WonRow[] | null | undefined, input: WonInput): 
               { key: 'requests', label: C.steps.requests, count: steps.requests, share: null },
               { key: 'sent', label: C.steps.sent, count: steps.sent, share: shareMoved(steps.requests, steps.sent) },
               { key: 'opened', label: C.steps.opened, count: steps.opened, share: shareMoved(steps.sent, steps.opened) },
-              { key: 'accepted', label: C.steps.accepted, count: theirs.now.jobs, share: shareMoved(steps.opened, theirs.now.jobs) },
+              // T-201: every accepted estimate this month, the number Home's "Accepted" count shows. The three
+              // steps before it are customer requests, so a share is said only when no on-site estimate is in it.
+              {
+                key: 'accepted',
+                label: C.steps.accepted,
+                count: theirs.now.jobs + mine.now.jobs,
+                share: mine.now.jobs > 0 ? null : shareMoved(steps.opened, theirs.now.jobs),
+                ...(mine.now.jobs > 0 ? { note: C.includesOnSite(mine.now.jobs) } : {}),
+              },
             ]
           : null,
         lastMonth: theirs.last.jobs > 0 ? theirs.last : null,
@@ -208,6 +222,8 @@ export const WON_COPY = {
   onSite: (money: string, jobs: number, alone: boolean) =>
     `${alone ? '' : 'Plus '}${money} from ${jobs} ${jobs === 1 ? 'estimate' : 'estimates'} you made on site.`,
   lastMonth: (money: string, jobs: number, noun: 'job' | 'estimate') => `Last month: ${money} from ${jobs} ${jobs === 1 ? noun : `${noun}s`}`,
+  /** T-201: under the Accepted step when estimates made on site are in its count */
+  includesOnSite: (jobs: number) => `includes ${jobs} made on site`,
   /** T-198: under a step, what its share is a share of: "67% of requests", "100% of sent", "100% of opened" */
   shareOf: (share: string, before: 'requests' | 'sent' | 'opened' | 'accepted') => `${share} of ${{ requests: 'requests', sent: 'sent', opened: 'opened', accepted: 'accepted' }[before]}`,
 } as const

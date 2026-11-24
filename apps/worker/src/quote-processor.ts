@@ -71,6 +71,7 @@ import type { PricingRules, PricingResult } from './pricing'
 import type { CrossServicePricing } from '@qolumns/shared'
 import { createSentenceRewriter } from './ai/wording-repair'
 import { sendQuoteEmails, sendReviewRequestEmail, sendEstimateShownEmail, isEmailConfigured } from './email'
+import { customerEmailBrand } from './customer-email-brand'
 import { issueApprovalLink } from './approval-link'
 import { loadBusinessEmail } from './business-email'
 import { notifyPhones } from './push'
@@ -2582,6 +2583,8 @@ export async function processQuote(
   // T-153: a demo request sends no email to anyone (not even the from-address
   // fallback the business email uses when there's no owner)
   const emailOn = quoteData.quote.is_demo !== true && isEmailConfigured(env.POSTMARK_API_TOKEN, env.POSTMARK_FROM_EMAIL)
+  // T-201: a customer's email carries the business's logo, and "Powered by" by the estimate page's own rule
+  const emailBrand = emailOn ? await customerEmailBrand(supabase, env.APP_URL, tenant.id, tenant.branding_json) : undefined
   // T-196: the business's phones hear of a customer's new request here, where its email is sent: once per
   // request (a reprice claims nothing), never for a quote the business made itself, a setup test or the
   // demo, and never the customer's details. It never throws and does not depend on the email.
@@ -2610,6 +2613,7 @@ export async function processQuote(
             locale: regionCtx.locale,
             scopeSummary: content.scopeSummary,
             primaryColor: tenant.branding_json?.primaryColor,
+            brand: emailBrand,
           }
         )
         if (!result.success) console.error('[Processor] Estimate email failed:', result.error)
@@ -2702,6 +2706,7 @@ export async function processQuote(
               name: tenant.name,
               ownerEmail: businessOwnerEmail,
               primaryColor: tenant.branding_json?.primaryColor,
+              brand: emailBrand,
             },
             service: {
               name: service.name,

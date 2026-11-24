@@ -338,7 +338,9 @@ function NewQuote() {
     setStepError(null)
     const permission = await ImagePicker.requestCameraPermissionsAsync()
     if (!permission.granted) return choosePhotos(angleId)
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.9, exif: false })
+    // T-201: a device with no camera (a Chromebook, a headset) goes to the gallery, as a refusal does
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.9, exif: false }).catch(() => null)
+    if (!result) return choosePhotos(angleId)
     if (!result.canceled) await addPicked(result.assets.slice(0, 1), angleId)
   }
 

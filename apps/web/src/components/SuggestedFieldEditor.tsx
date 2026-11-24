@@ -10,6 +10,10 @@ type SuggestedField = ServiceDraftConfig['suggestedFields'][0]
  *
  * Allows editing of suggested form fields for the widget.
  * These fields collect critical information for accurate pricing.
+ *
+ * T-201: this editor never writes a question's keys (`fieldId`,
+ * `mapsToSignal`). It hands back labels, types and order; whoever holds the
+ * service gives each question its keys once and keeps them.
  */
 
 interface SuggestedFieldEditorProps {
@@ -26,13 +30,6 @@ const FIELD_TYPES: { value: SuggestedField['type']; label: string }[] = [
   { value: 'checkbox', label: 'Checkboxes' },
   { value: 'boolean', label: 'Yes/No Toggle' },
 ]
-
-function generateFieldId(label: string): string {
-  return label
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_|_$/g, '')
-}
 
 export function SuggestedFieldEditor({
   fields,
@@ -228,12 +225,9 @@ export function SuggestedFieldEditor({
                       <input
                         type="text"
                         value={field.label}
-                        onChange={(e) => {
-                          updateField(index, {
-                            label: e.target.value,
-                            fieldId: generateFieldId(e.target.value),
-                          })
-                        }}
+                        // T-201: the label is only wording. The question's keys are set by the page
+                        // (lib/service-questions) and do not change when the wording does.
+                        onChange={(e) => updateField(index, { label: e.target.value })}
                         placeholder="e.g., Number of Rooms"
                         className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                       />

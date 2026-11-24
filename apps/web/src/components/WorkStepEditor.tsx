@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { AmountSymbol, amountBoxPadding } from '@/components/services/AmountSymbol'
+import { linesNeverCharged } from '@/lib/service-questions'
 import { SCAN_FILL_CHOICES, stepScanMeasure, stepTakesScan, withStepScanMeasure, type WorkStepConfig, type ExpectedSignalConfig, type SuggestedField, type ScanMeasure, type UnitSystem } from '@qolumns/shared'
 
 /**
@@ -27,6 +29,8 @@ interface WorkStepEditorProps {
   onExpectedSignalsChange?: (signals: ExpectedSignalConfig[]) => void
   /** T-194: the business's units, for a scanned area or length the signal has no unit for */
   unitSystem?: UnitSystem
+  /** T-201: the business's own currency symbol, for the amount box and the line's summary */
+  currencySymbol?: string
 }
 
 const COST_TYPES: { value: WorkStepConfig['costType']; label: string; description: string }[] = [
@@ -121,6 +125,7 @@ export function WorkStepEditor({
   suggestedFields = [],
   onExpectedSignalsChange,
   unitSystem = 'metric',
+  currencySymbol = '$',
 }: WorkStepEditorProps) {
   // Build a map from signal key to question label for display
   const signalToLabel = new Map<string, string>()
@@ -255,6 +260,8 @@ export function WorkStepEditor({
           {workSteps.map((step, index) => {
             const suggestion = autoLinkSuggestions[step.id]
             const hasQuantityIssue = (step.costType === 'per_unit' || step.costType === 'per_hour') && !step.quantitySource
+            // T-201: ticked "Only include when…" with no question and no quantity: the engine never charges it
+            const neverCharged = linesNeverCharged([step]).length > 0
 
             return (
               <div
@@ -264,6 +271,7 @@ export function WorkStepEditor({
                 {/* Step Header */}
                 <div
                   className="flex cursor-pointer items-center justify-between px-4 py-3"
+                  data-testid="step-header"
                   onClick={() =>
                     setExpandedStep(expandedStep === step.id ? null : step.id)
                   }
@@ -302,10 +310,10 @@ export function WorkStepEditor({
                         {step.name || <span className="italic text-text-muted">Unnamed Item</span>}
                       </p>
                       <p className="text-sm text-text-muted">
-                        {step.costType === 'fixed' && `$${step.defaultCost.toFixed(2)}`}
+                        {step.costType === 'fixed' && `${currencySymbol}${step.defaultCost.toFixed(2)}`}
                         {step.costType === 'per_unit' && (
                           <>
-                            ${step.defaultCost.toFixed(2)} × {' '}
+                            {currencySymbol}{step.defaultCost.toFixed(2)} × {' '}
                             {step.quantitySource?.type === 'form_field' && step.quantitySource.fieldId ? (
                               <span className="text-primary">
                                 {suggestedFields.find(f => f.fieldId === step.quantitySource?.fieldId)?.label || 'question'}
@@ -321,7 +329,7 @@ export function WorkStepEditor({
                         )}
                         {step.costType === 'per_hour' && (
                           <>
-                            ${step.defaultCost.toFixed(2)}/hr × {' '}
+                            {currencySymbol}{step.defaultCost.toFixed(2)}/hr × {' '}
                             {step.quantitySource?.type === 'form_field' && step.quantitySource.fieldId ? (
                               <span className="text-primary">
                                 {suggestedFields.find(f => f.fieldId === step.quantitySource?.fieldId)?.label || 'hours'}
@@ -341,6 +349,11 @@ export function WorkStepEditor({
                     {hasQuantityIssue && (
                       <span className="rounded-full bg-tertiary-light px-2 py-0.5 text-xs text-tertiary">
                         Needs link
+                      </span>
+                    )}
+                    {neverCharged && (
+                      <span className="rounded-full bg-danger-light px-2 py-0.5 text-xs text-danger">
+                        Needs a question
                       </span>
                     )}
                     <button
@@ -506,7 +519,7 @@ export function WorkStepEditor({
                           {step.costType === 'fixed' ? 'Amount' : step.costType === 'per_hour' ? 'Hourly Rate' : 'Price Per Unit'}
                         </label>
                         <div className="relative">
-                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-text-muted">$</span>
+                          <AmountSymbol symbol={currencySymbol} />
                           <input
                             type="number"
                             min={0}
@@ -517,7 +530,7 @@ export function WorkStepEditor({
                                 defaultCost: parseFloat(e.target.value) || 0,
                               })
                             }
-                            className="w-full rounded-xl border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2"
+                            className={`w-full rounded-xl border border-border py-2 ${amountBoxPadding(currencySymbol)} pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2`}
                           />
                         </div>
                       </div>
@@ -625,7 +638,7 @@ export function WorkStepEditor({
                           className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                         />
                         <p className="mt-1 text-xs text-text-muted">
-                          Shown on the quote (e.g., &quot;3 bedrooms × $25&quot;)
+                          Shown on the quote (e.g., &quot;3 bedrooms × {currencySymbol}25&quot;)
                         </p>
                       </div>
                     )}
@@ -663,7 +676,11 @@ export function WorkStepEditor({
                                   triggerSignal: e.target.value || undefined,
                                 })
                               }
-                              className="w-full rounded-xl border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
+                              className={`w-full rounded-xl border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 ${
+                                neverCharged ? 'border-danger bg-danger-light' : 'border-border'
+                              }`}
+                              aria-invalid={neverCharged || undefined}
+                              data-testid="step-condition-question"
                             >
                               <option value="">Select question...</option>
                               {expectedSignals.map((sig) => (
@@ -719,6 +736,12 @@ export function WorkStepEditor({
                             </div>
                           )}
                         </div>
+                        {/* T-201: with no question this line could never be charged, so it cannot be saved like this */}
+                        {neverCharged && (
+                          <p className="mt-2 text-sm text-danger" role="alert" data-testid="step-needs-question">
+                            Choose a question. Without one this line is never charged, and the service cannot be saved.
+                          </p>
+                        )}
                       </div>
                     )}
 

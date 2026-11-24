@@ -51,7 +51,8 @@ describe('T-185: the progress steps are named, and one of them is current', () =
     const steps = quoteSteps({ status: 'paid', total: 300, createdAt: '2026-11-16T09:00:00Z', approvedAt: '2026-11-16T10:00:00Z', sentAt: '2026-11-16T10:00:00Z', viewedAt: '2026-11-17T08:00:00Z', acceptedAt: '2026-11-18T08:00:00Z', paidAt: '2026-11-19T08:00:00Z' }, NOW)
     expect(names(steps)).toEqual(['Received:done', 'Approve and send:done', 'Opened:done', 'Accepted:done'])
     expect(steps.every((s) => s.date)).toBe(true)
-    expect(steps[3]!.note).toMatch(/^Paid /)
+    // T-201: nothing says "Paid" until payments exist
+    expect(steps[3]!.note ?? null).toBeNull()
   })
 
   it('a quote sent with nobody approving it says so under the step, not as its name', () => {

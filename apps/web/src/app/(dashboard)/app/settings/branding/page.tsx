@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { readableTextOn } from '@/lib/color'
 import { LogoUpload } from '@/components/settings/LogoUpload'
+import { PDF_ONLY_LINE, PdfOnlyTag } from '@/components/dashboard/PdfOnlyTag'
 import type { TenantBranding, TenantTemplate } from '@qolumns/shared'
-import { DEFAULT_PRIMARY_COLOR, getRegion, PRODUCT_NAME } from '@qolumns/shared'
+import { DEFAULT_PRIMARY_COLOR, getRegion, noBadgeLine, PRODUCT_NAME } from '@qolumns/shared'
 
 /**
  * Curated brand colours — trade-friendly, all tested against white and ink
@@ -348,7 +349,8 @@ export default function BrandingPage() {
           {/* Template toggles */}
           <div className="rounded-xl bg-surface p-6 shadow-warm">
             <h2 className="text-lg font-medium text-text-primary">Quote Template</h2>
-            <p className="mt-1 text-sm text-text-muted">Choose which sections to show on quotes</p>
+            {/* T-201: says that the three tick boxes change the PDF and not the customer's page */}
+            <p className="mt-1 text-sm text-text-muted">{PDF_ONLY_LINE}</p>
 
             <div className="mt-4 space-y-4">
               <label className="flex items-center gap-3">
@@ -360,7 +362,8 @@ export default function BrandingPage() {
                 />
                 <div>
                   <span className="text-sm font-medium text-text-secondary">Show line items</span>
-                  <p className="text-xs text-text-muted">Display itemized breakdown of costs</p>
+                  <PdfOnlyTag />
+                  <p className="text-xs text-text-muted">Print the price lines on the PDF</p>
                 </div>
               </label>
 
@@ -375,7 +378,8 @@ export default function BrandingPage() {
                 />
                 <div>
                   <span className="text-sm font-medium text-text-secondary">Include assumptions</span>
-                  <p className="text-xs text-text-muted">Show what the quote assumes to be true</p>
+                  <PdfOnlyTag />
+                  <p className="text-xs text-text-muted">Print what the quote assumes to be true on the PDF</p>
                 </div>
               </label>
 
@@ -390,7 +394,8 @@ export default function BrandingPage() {
                 />
                 <div>
                   <span className="text-sm font-medium text-text-secondary">Include exclusions</span>
-                  <p className="text-xs text-text-muted">Show what is not included in the quote</p>
+                  <PdfOnlyTag />
+                  <p className="text-xs text-text-muted">Print what is not included on the PDF</p>
                 </div>
               </label>
 
@@ -452,7 +457,9 @@ export default function BrandingPage() {
         {/* Preview Column */}
         <div className="lg:sticky lg:top-6 lg:self-start">
           <div className="rounded-xl bg-surface p-6 shadow-warm">
-            <h2 className="mb-4 text-lg font-medium text-text-primary">Preview</h2>
+            <h2 className="text-lg font-medium text-text-primary">Preview</h2>
+            {/* T-201: the sketch follows the tick boxes, which only the PDF does */}
+            <p className="mb-4 mt-1 text-sm text-text-muted">A sketch of your quote. It follows the three tick boxes the way the PDF does.</p>
 
             {/* Quote Preview */}
             <div
@@ -582,9 +589,9 @@ export default function BrandingPage() {
                 Prepared with {PRODUCT_NAME}
               </p>
             </div>
-            <p className="mt-3 text-xs text-text-muted">
-              On Growth and Pro plans the &quot;Prepared with {PRODUCT_NAME}&quot; badge is removed
-              automatically — quotes carry only your brand.
+            {/* T-201: the plan names come from the plans on offer (the line named a plan that no longer exists) */}
+            <p className="mt-3 text-xs text-text-muted" data-testid="badge-plans-line">
+              {noBadgeLine()}
             </p>
           </div>
         </div>

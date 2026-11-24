@@ -234,7 +234,8 @@ describe('T-189 item 3: add a service from a template after setup', () => {
     const pack = listPacks('US').filter((p) => p.region === 'US')[0]!
     const svc = pack.services[0]!
     const payload = templatePayload('US', `${pack.id}:0`, [])
-    expect(payload).toEqual(servicePayload({ name: svc.name, description: svc.description, draft: svc.draft, addons: svc.addons || [], multipliers: svc.multipliers || [] }))
+    // T-201: the same body, except that the service starts switched off until its example prices are checked
+    expect(payload).toEqual({ ...servicePayload({ name: svc.name, description: svc.description, draft: svc.draft, addons: svc.addons || [], multipliers: svc.multipliers || [] }), active: false })
     expect(payload!.workSteps).toBe(svc.draft.pricing.workSteps)
   })
 

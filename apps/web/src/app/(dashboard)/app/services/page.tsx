@@ -13,13 +13,14 @@ import { AIDraftRefinementPanel } from '@/components/services/AIDraftRefinementP
 import { PricingComposer } from '@/components/services/PricingComposer'
 import { draftAddonsToConfig } from '@/lib/draft-addons'
 import { measuredLines, sampleNote, samplePrice, type SampleResult } from '@/lib/sample-price'
+import { AmountSymbol, amountBoxPadding } from '@/components/services/AmountSymbol'
+import { REGENERATE_KEEPS, draftToSave, handMadeDraft, isAiDraft, isHandMade, lineNeedsQuestion, linesNeverCharged, looseReferences, regenerateReplaces, syncQuestions } from '@/lib/service-questions'
 import type {
   Service,
   ServiceMediaConfig,
   ServiceDraftConfig,
   WorkStepConfig,
   ExpectedSignalConfig,
-  SuggestedField,
   AddonConfig,
   MultiplierConfig,
   PricingRules,
@@ -94,179 +95,6 @@ const defaultFormData: ServiceFormData = {
 
 function generateAddonId(): string {
   return `addon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-}
-
-/**
- * Derive a canonical signal key from a field label and type
- *
- * This ensures form fields and AI use the SAME signal keys - no matching needed.
- *
- * Examples:
- * - "How many papers?" (number) → paper_count
- * - "Number of Leaks" (number) → leak_count
- * - "Approximate Age of Roof" (number) → roof_age
- * - "Is the leak causing interior damage?" (boolean) → has_interior_damage
- * - "Type of Roofing Material" (dropdown) → roofing_material_type
- * - "Number of Papers" (number) → paper_count
- */
-function deriveSignalKey(label: string, fieldType: string): string {
-  // Normalize label: lowercase, remove punctuation
-  let normalized = label.toLowerCase()
-    .replace(/[?!.,'"]/g, '')
-    .trim()
-
-  // Remove common question prefixes/fillers
-  const prefixPatterns = [
-    /^how many\s+/i,
-    /^number of\s+/i,
-    /^what is the\s+/i,
-    /^what is your\s+/i,
-    /^what are the\s+/i,
-    /^what\s+/i,
-    /^how\s+/i,
-    /^is the\s+/i,
-    /^is there\s+/i,
-    /^do you have\s+/i,
-    /^does the\s+/i,
-    /^are there\s+/i,
-    /^please enter\s+/i,
-    /^please provide\s+/i,
-    /^approximate\s+/i,
-    /^estimated\s+/i,
-    /^total\s+/i,
-  ]
-
-  for (const pattern of prefixPatterns) {
-    normalized = normalized.replace(pattern, '')
-  }
-
-  // Split into words and filter stop words
-  const words = normalized.split(/\s+/)
-  const stopWords = new Set([
-    'the', 'a', 'an', 'of', 'is', 'are', 'your', 'do', 'you', 'have',
-    'need', 'needed', 'required', 'for', 'to', 'in', 'on', 'at', 'by',
-    'this', 'that', 'these', 'those', 'any', 'some'
-  ])
-
-  const meaningfulWords = words
-    .filter(w => !stopWords.has(w) && w.length > 1)
-    .slice(0, 3) // Take up to 3 meaningful words
-
-  if (meaningfulWords.length === 0) {
-    // Fallback: just use the first word
-    const firstWord = words[0] || 'field'
-    return firstWord.replace(/s$/, '') // singularize
-  }
-
-  // Singularize common plurals in the core concept
-  const singularize = (word: string): string => {
-    if (word.endsWith('ies')) return word.slice(0, -3) + 'y'
-    if (word.endsWith('es') && !word.endsWith('ss')) return word.slice(0, -2)
-    if (word.endsWith('s') && !word.endsWith('ss')) return word.slice(0, -1)
-    return word
-  }
-
-  // Build the core concept (first 2 words usually)
-  const coreWords = meaningfulWords.slice(0, 2).map(singularize)
-  const core = coreWords.join('_')
-
-  // Add appropriate suffix based on field type
-  switch (fieldType) {
-    case 'number': {
-      // Check if it already has a numeric suffix
-      const numericSuffixes = ['count', 'quantity', 'number', 'total', 'amount', 'age', 'area', 'sqft', 'size']
-      const hasNumericSuffix = numericSuffixes.some(s => core.endsWith(s) || core.includes(`_${s}`))
-
-      // Check for specific patterns
-      if (core.includes('age') || normalized.includes('age')) {
-        return core.includes('age') ? core : `${core}_age`
-      }
-      if (core.includes('area') || core.includes('sqft') || normalized.includes('sqft') || normalized.includes('square')) {
-        return core.includes('area') ? core : `${core}_area`
-      }
-
-      // Default: add _count for numbers
-      return hasNumericSuffix ? core : `${core}_count`
-    }
-
-    case 'dropdown':
-    case 'radio': {
-      // Check if it already has a type-like suffix
-      const typeSuffixes = ['type', 'kind', 'style', 'category', 'material', 'condition', 'status']
-      const hasTypeSuffix = typeSuffixes.some(s => core.endsWith(s) || core.includes(`_${s}`))
-
-      // Check for specific patterns
-      if (normalized.includes('condition')) {
-        return core.includes('condition') ? core : `${core}_condition`
-      }
-      if (normalized.includes('material')) {
-        return core.includes('material') ? core : `${core}_material`
-      }
-
-      // Default: add _type for dropdowns
-      return hasTypeSuffix ? core : `${core}_type`
-    }
-
-    case 'checkbox': {
-      // For checkboxes, check what makes sense
-      const boolPrefixes = ['is', 'has', 'can', 'does', 'will', 'should']
-      const startsWithBool = boolPrefixes.some(p => core.startsWith(p) || core.startsWith(`${p}_`))
-
-      return startsWithBool ? core : `has_${core}`
-    }
-
-    case 'boolean': {
-      // For yes/no toggles
-      const boolPrefixes = ['is', 'has', 'can', 'does', 'will', 'should']
-      const startsWithBool = boolPrefixes.some(p => core.startsWith(p) || core.startsWith(`${p}_`))
-
-      // Check for specific patterns
-      if (normalized.includes('damage') || normalized.includes('damaged')) {
-        return core.includes('has_') ? core : `has_${core.replace('damage', 'damage')}`
-      }
-      if (normalized.includes('required') || normalized.includes('needed')) {
-        return `${core.replace('_required', '').replace('_needed', '')}_required`
-      }
-
-      return startsWithBool ? core : `has_${core}`
-    }
-
-    case 'text':
-    case 'textarea':
-    default:
-      // For text fields, just use the core concept
-      return core.endsWith('description') ? core : (core.length > 0 ? core : 'description')
-  }
-}
-
-/**
- * Convert a form field to an expected signal
- * This auto-generates signal configuration from customer questions
- *
- * Uses deriveSignalKey() to ensure canonical, consistent signal keys
- * that both form and AI will use - eliminating the need for synonym matching.
- */
-function fieldToSignal(field: SuggestedField): ExpectedSignalConfig {
-  // Derive canonical signal key from label and type
-  const signalKey = deriveSignalKey(field.label, field.type)
-
-  // Map field type to signal type
-  const typeMap: Record<SuggestedField['type'], ExpectedSignalConfig['type']> = {
-    'number': 'number',
-    'boolean': 'boolean',
-    'dropdown': 'enum',
-    'radio': 'enum',
-    'checkbox': 'enum',
-    'text': 'string',
-    'textarea': 'string',
-  }
-
-  return {
-    signalKey,
-    type: typeMap[field.type] || 'string',
-    description: field.label,
-    possibleValues: field.options,
-  }
 }
 
 /**
@@ -359,6 +187,12 @@ export default function ServicesPage() {
   const [aiDraft, setAiDraft] = useState<ServiceDraftConfig | null>(null)
   const [generatingDraft, setGeneratingDraft] = useState(false)
   const [draftError, setDraftError] = useState<string | null>(null)
+  // T-201: "Regenerate" asks first, and says what it will replace
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false)
+  // T-201: the keys of the questions the open service was saved with. They never change (lib/service-questions).
+  const savedFieldIds = useRef<Set<string>>(new Set())
+  // T-201: a service just added from a template. It is switched off until its example prices are checked.
+  const [addedOff, setAddedOff] = useState<{ id: string; name: string } | null>(null)
 
   // Tenant currency for the pricing composer (verification finding: £ tenants saw $)
   const [currencySymbol, setCurrencySymbol] = useState('$')
@@ -414,6 +248,8 @@ export default function ServicesPage() {
     setNameError(null)
     setAiDraft(null)
     setDraftError(null)
+    setConfirmRegenerate(false)
+    savedFieldIds.current = new Set()
     setShowModal(true)
   }
 
@@ -444,8 +280,11 @@ export default function ServicesPage() {
     })
     setActiveStep('basic')
     setNameError(null)
-    setAiDraft(service.draft_config || null)
+    // T-201: a draft the editor wrote for a hand-made service only holds its questions; it is not an "AI Draft"
+    setAiDraft(isAiDraft(service.draft_config) ? service.draft_config : null)
     setDraftError(null)
+    setConfirmRegenerate(false)
+    savedFieldIds.current = new Set((service.draft_config?.suggestedFields || []).map((f) => f.fieldId).filter(Boolean))
     setShowModal(true)
   }
 
@@ -457,6 +296,7 @@ export default function ServicesPage() {
     setNameError(null)
     setAiDraft(null)
     setDraftError(null)
+    setConfirmRegenerate(false)
   }
 
   /**
@@ -644,9 +484,15 @@ export default function ServicesPage() {
     }
   })
 
+  // T-201, hard error: a line ticked "Only include when condition is met" with no question can never be charged
+  linesNeverCharged(formData.workSteps).forEach((step) => validationErrors.push(lineNeedsQuestion(step)))
+
+  // T-201, warning: an adjustment or a condition that points at a question the service no longer has
+  validationWarnings.push(...looseReferences(formData))
+
   // Warning: No pricing items
   if (formData.workSteps.length === 0 && formData.baseFee === 0) {
-    validationWarnings.push('No pricing configured - quotes will be $0')
+    validationWarnings.push(`No pricing configured - quotes will be ${currencySymbol}0`)
   }
 
   // Warning: Service name implies repair but no repair work steps configured
@@ -680,6 +526,9 @@ export default function ServicesPage() {
         multipliers: formData.multipliers,
         workSteps: formData.workSteps,
       }
+      // T-201: a service made by hand keeps its questions too. They live in the draft, and it had
+      // none, so they were lost on save; now the editor writes it one (lib/service-questions).
+      const draftConfig = draftToSave(aiDraft ?? (isHandMade(editingService?.draft_config) ? editingService?.draft_config : null), formData)
 
       if (editingService) {
         // Update existing service
@@ -698,9 +547,7 @@ export default function ServicesPage() {
             workSteps: formData.workSteps,
             expectedSignals: formData.expectedSignals,
             pricingRules,
-            draftConfig: aiDraft
-              ? { ...aiDraft, suggestedFields: formData.suggestedFields }
-              : null,
+            draftConfig,
           }),
         })
         const data = await res.json()
@@ -726,9 +573,7 @@ export default function ServicesPage() {
             workSteps: formData.workSteps,
             expectedSignals: formData.expectedSignals,
             pricingRules,
-            draftConfig: aiDraft
-              ? { ...aiDraft, suggestedFields: formData.suggestedFields }
-              : null,
+            draftConfig,
           }),
         })
         const data = await res.json()
@@ -762,6 +607,7 @@ export default function ServicesPage() {
       if (!res.ok) throw new Error(data.error?.message || 'Failed to update service')
 
       setServices((prev) => prev.map((s) => (s.id === service.id ? data.service : s)))
+      if (data.service?.active) setAddedOff((note) => (note?.id === service.id ? null : note))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update service')
     }
@@ -778,6 +624,7 @@ export default function ServicesPage() {
       if (!res.ok) throw new Error(data.error?.message || 'Failed to delete service')
 
       setServices((prev) => prev.filter((s) => s.id !== service.id))
+      setAddedOff((note) => (note?.id === service.id ? null : note))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete service')
     }
@@ -859,6 +706,37 @@ export default function ServicesPage() {
         </div>
       )}
 
+      {/* T-201: a service added from a template is off until its example prices are checked */}
+      {addedOff && !showModal && (
+        <div className="mb-4 rounded-lg border border-border-strong bg-background p-4" role="status" data-testid="template-added-note">
+          <p className="text-sm font-semibold text-text-primary">&quot;{addedOff.name}&quot; was added and is switched off.</p>
+          <p className="mt-1 text-sm text-text-secondary">
+            Its prices are examples, not yours. Check them, save, then press &quot;Enable&quot; beside it. Customers cannot ask for it until you do.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                const service = services.find((s) => s.id === addedOff.id)
+                if (!service) return
+                openEditModal(service)
+                setActiveStep('pricing')
+              }}
+              className="inline-flex min-h-[44px] items-center rounded-lg border border-field bg-background px-4 text-sm font-semibold text-text-primary transition-colors hover:bg-surface"
+            >
+              Check its prices
+            </button>
+            <button
+              type="button"
+              onClick={() => setAddedOff(null)}
+              className="inline-flex min-h-[44px] items-center rounded-lg px-3 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary"
+            >
+              Hide this note
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Loading state */}
       {loading ? (
         <div className="flex min-h-[400px] items-center justify-center">
@@ -920,7 +798,7 @@ export default function ServicesPage() {
               <div className={`min-w-0 ${!service.active ? 'opacity-60' : ''}`}>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold text-text-primary">{service.name}</span>
-                  {service.draft_config && <AIDraftBadge compact />}
+                  {isAiDraft(service.draft_config) && <AIDraftBadge compact />}
                 </div>
                 {service.description && <p className="mt-0.5 truncate text-sm text-text-muted">{service.description}</p>}
               </div>
@@ -984,6 +862,8 @@ export default function ServicesPage() {
               </div>
               <button
                 onClick={closeModal}
+                aria-label="Close"
+                data-testid="service-modal-close"
                 className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-surface hover:text-text-primary"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1043,7 +923,7 @@ export default function ServicesPage() {
               </nav>
             </div>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} data-testid="service-form">
               <div className="p-6">
                 {/* AI Refinement Panel — shown on steps 2-4 when AI draft exists */}
                 {aiDraft && activeStep !== 'basic' && activeStep !== 'test' && (
@@ -1167,11 +1047,12 @@ export default function ServicesPage() {
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={generateAIDraft}
-                            disabled={generatingDraft}
+                            onClick={() => setConfirmRegenerate(true)}
+                            disabled={generatingDraft || confirmRegenerate}
                             className="text-sm text-tertiary hover:text-text-primary"
+                            data-testid="regenerate"
                           >
-                            Regenerate
+                            {generatingDraft ? 'Writing a new draft…' : 'Regenerate'}
                           </button>
                           <button
                             type="button"
@@ -1183,6 +1064,42 @@ export default function ServicesPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* T-201: Regenerate asks first and names what it replaces. "Cancel" changes nothing. */}
+                    {aiDraft && confirmRegenerate && (
+                      <div className="rounded-lg border border-border-strong bg-background p-4" role="alertdialog" aria-labelledby="regenerate-title" data-testid="regenerate-confirm">
+                        <h3 id="regenerate-title" className="text-sm font-bold text-text-primary">Replace this service&apos;s setup with a new draft?</h3>
+                        <p className="mt-1 text-sm text-text-secondary">A new draft is written from the service name and description. It replaces:</p>
+                        <ul className="mt-2 list-inside list-disc space-y-0.5 text-sm text-text-primary">
+                          {regenerateReplaces(formData).map((line) => (
+                            <li key={line}>{line}</li>
+                          ))}
+                        </ul>
+                        <p className="mt-2 text-sm text-text-secondary">{REGENERATE_KEEPS} Nothing is saved until you press &quot;{editingService ? 'Save Changes' : 'Create Service'}&quot;.</p>
+                        <div className="mt-3 flex flex-wrap gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmRegenerate(false)
+                              void generateAIDraft()
+                            }}
+                            className="inline-flex min-h-[44px] items-center rounded-lg bg-primary px-4 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+                            data-testid="regenerate-yes"
+                          >
+                            Replace with a new draft
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmRegenerate(false)}
+                            className="inline-flex min-h-[44px] items-center rounded-lg border border-field bg-background px-4 text-sm font-semibold text-text-primary transition-colors hover:bg-surface"
+                            data-testid="regenerate-cancel"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {draftError && <p className="rounded-lg border border-danger/30 bg-danger-light p-3 text-sm text-danger" role="alert">{draftError}</p>}
 
                     <div>
                       <label className="mb-1 block text-sm font-medium text-text-secondary">
@@ -1295,6 +1212,12 @@ export default function ServicesPage() {
                 {/* Pricing Setup Step */}
                 {activeStep === 'pricing' && (
                   <div className="space-y-6">
+                    {/* T-201: a template's service, just added and still off */}
+                    {editingService && addedOff?.id === editingService.id && !editingService.active && (
+                      <p className="rounded-lg border border-border-strong bg-background p-3 text-sm text-text-primary" data-testid="template-prices-note">
+                        These are the template&apos;s example prices. Change them to yours and save. The service stays switched off until you press &quot;Enable&quot; on &quot;Services&quot;.
+                      </p>
+                    )}
                     {/* AI Draft Badge */}
                     {aiDraft && (
                       <div className="flex items-center justify-between rounded-lg border bg-tertiary-light p-3">
@@ -1320,6 +1243,7 @@ export default function ServicesPage() {
                         multipliers: formData.multipliers,
                         suggestedFields: formData.suggestedFields,
                         expectedSignals: formData.expectedSignals,
+                        // T-201: a service made by hand is sent too, so "anything you don't mention stays" holds for it
                         currentConfig: aiDraft
                           ? {
                               ...aiDraft,
@@ -1332,7 +1256,7 @@ export default function ServicesPage() {
                               expectedSignals: formData.expectedSignals,
                               suggestedFields: formData.suggestedFields,
                             }
-                          : undefined,
+                          : handMadeDraft(formData),
                       }}
                       onApply={(result) => {
                         applyDraftToForm(result.updatedConfig)
@@ -1356,14 +1280,14 @@ export default function ServicesPage() {
                         <div>
                           <label className="mb-1 block text-sm text-text-secondary">Base Fee</label>
                           <div className="relative">
-                            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-text-muted">$</span>
+                            <AmountSymbol symbol={currencySymbol} />
                             <input
                               type="number"
                               min="0"
                               step="0.01"
                               value={formData.baseFee}
                               onChange={(e) => setFormData({ ...formData, baseFee: parseFloat(e.target.value) || 0 })}
-                              className="w-full rounded-lg border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2"
+                              className={`w-full rounded-lg border border-border py-2 ${amountBoxPadding(currencySymbol)} pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2`}
                             />
                           </div>
                           <p className="mt-1 text-xs text-text-muted">Starting price for all quotes</p>
@@ -1371,14 +1295,14 @@ export default function ServicesPage() {
                         <div>
                           <label className="mb-1 block text-sm text-text-secondary">Minimum Charge</label>
                           <div className="relative">
-                            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-text-muted">$</span>
+                            <AmountSymbol symbol={currencySymbol} />
                             <input
                               type="number"
                               min="0"
                               step="0.01"
                               value={formData.minimumCharge}
                               onChange={(e) => setFormData({ ...formData, minimumCharge: parseFloat(e.target.value) || 0 })}
-                              className="w-full rounded-lg border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2"
+                              className={`w-full rounded-lg border border-border py-2 ${amountBoxPadding(currencySymbol)} pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2`}
                             />
                           </div>
                           <p className="mt-1 text-xs text-text-muted">Minimum quote amount</p>
@@ -1399,6 +1323,7 @@ export default function ServicesPage() {
                         suggestedFields={formData.suggestedFields}
                         onExpectedSignalsChange={(signals) => setFormData({ ...formData, expectedSignals: signals })}
                         unitSystem={getRegion(region).unitSystem}
+                        currencySymbol={currencySymbol}
                       />
                     </div>
 
@@ -1569,7 +1494,7 @@ export default function ServicesPage() {
                                 className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
                               />
                               <div className="relative w-28">
-                                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-text-muted">$</span>
+                                <AmountSymbol symbol={currencySymbol} />
                                 <input
                                   type="number"
                                   min="0"
@@ -1580,7 +1505,7 @@ export default function ServicesPage() {
                                     newAddons[index] = { ...addon, price: parseFloat(e.target.value) || 0 }
                                     setFormData({ ...formData, addons: newAddons })
                                   }}
-                                  className="w-full rounded-lg border border-border py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2"
+                                  className={`w-full rounded-lg border border-border py-2 ${amountBoxPadding(currencySymbol)} pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2`}
                                 />
                               </div>
                               <button
@@ -1623,22 +1548,19 @@ export default function ServicesPage() {
                       <SuggestedFieldEditor
                         fields={formData.suggestedFields}
                         onChange={(fields) => {
-                          // Auto-generate expected signals from form fields
-                          const autoSignals = fields
-                            .filter(f => f.label.trim()) // Only fields with labels
-                            .map(fieldToSignal)
-
-                          // Also set mapsToSignal on each field to match
-                          const fieldsWithMapping = fields.map(f => ({
-                            ...f,
-                            mapsToSignal: f.label.trim() ? fieldToSignal(f).signalKey : undefined,
-                          }))
-
-                          setFormData(prev => ({
-                            ...prev,
-                            suggestedFields: fieldsWithMapping,
-                            expectedSignals: autoSignals,
-                          }))
+                          // T-201: a question keeps its keys when its label changes, and the facts no
+                          // question wrote are left alone (lib/service-questions)
+                          setFormData(prev => {
+                            const synced = syncQuestions({
+                              fields,
+                              previousFields: prev.suggestedFields,
+                              previousSignals: prev.expectedSignals,
+                              savedFieldIds: savedFieldIds.current,
+                              workSteps: prev.workSteps,
+                              multipliers: prev.multipliers,
+                            })
+                            return { ...prev, suggestedFields: synced.fields, expectedSignals: synced.signals }
+                          })
                         }}
                       />
                     </div>
@@ -1991,7 +1913,8 @@ export default function ServicesPage() {
         onServicesCreated={fetchServices}
       />
 
-      {/* T-189: a trade template's service, added after setup. It opens at its prices, which are a starting point. */}
+      {/* T-189: a trade template's service, added after setup. It opens at its prices, which are a starting point.
+          T-201: it is added switched off, and the page says so until the business switches it on. */}
       <TemplatePicker
         open={showTemplates}
         region={region}
@@ -2000,6 +1923,8 @@ export default function ServicesPage() {
         onClose={() => setShowTemplates(false)}
         onAdded={(service) => {
           setShowTemplates(false)
+          // T-201: it was added switched off; the note stays until it is switched on
+          setAddedOff({ id: service.id, name: service.name })
           fetchServices()
           openEditModal(service)
           setActiveStep('pricing')

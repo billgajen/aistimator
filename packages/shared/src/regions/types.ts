@@ -46,6 +46,20 @@ export interface RegionCopy {
   requestNoun: string
 }
 
+/**
+ * T-201: the named areas of a region (the states of the US), and which one a
+ * postal code is in. Data only; the rule that reads it is service-area.ts.
+ */
+export interface RegionAreas {
+  /** what one area is called, mid-sentence: "state" */
+  noun: string
+  areas: Array<{ code: string; name: string }>
+  /** how many leading characters of a postal code name its area */
+  prefixLength: number
+  /** [first prefix, last prefix, area code], as numbers; the first range that holds a prefix wins */
+  prefixRanges: Array<[number, number, string]>
+}
+
 export interface RegionDefinition {
   code: RegionCode
   name: string
@@ -64,4 +78,6 @@ export interface RegionDefinition {
   copy: RegionCopy
   /** Reference object sizes for anchored measurement (metres) */
   referenceObjects: ReferenceObject[]
+  /** T-201: named areas a postal code can be placed in (US: states). Absent where no such table exists. */
+  areas?: RegionAreas
 }

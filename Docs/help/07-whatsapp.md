@@ -67,14 +67,22 @@ Sending your quote link in a WhatsApp chat works on every plan, and without a pl
 ## What does the "WhatsApp" page in my dashboard show?
 <!-- id: whatsapp-page-today; page: /app/whatsapp; flags: whatsapp -->
 
+{{#soon whatsapp}}
+Quotes inside a chat are {{soon}}, and the page says so: "Quotes inside WhatsApp", marked "{{soon}}". Connecting a number is not open to businesses yet, so the page has no button to connect one.
+
+- It says what is coming, and that until then you can send your quote link in your WhatsApp chats.
+- "Open Quote link" takes you to the "Quote link" page, where "Use it on WhatsApp" has a ready-made message to send.
+- While you are on your free quotes, a small "{{freeStart.plan}}" tag sits beside the page's title, "WhatsApp".
+{{/soon}}
+{{#live whatsapp}}
 It depends on what your business can use.
 
 - On a plan without it, and on no plan once your free quotes are used up, the page shows one line saying which plans WhatsApp quoting is part of, and a "See plans" button that opens your billing page.
 - On {{whatsapp.plans}}, and for a new business while it still has free quotes left, the page shows "Connect your WhatsApp number", a "Connect WhatsApp" button, and under it "Connect manually", for a business that has its own Meta app.
 - While you are on your free quotes, a small "{{freeStart.plan}}" tag sits beside the page's title, "WhatsApp".
 
-{{#soon whatsapp}}Quotes inside a chat are {{soon}}. The page is there already, but connecting a number is not open to businesses yet. Until it is, use "Use it on WhatsApp" on the "Quote link" page.{{/soon}}
-{{#live whatsapp}}Once a number is connected, the page shows "Connected" with your number, "What happens next", "Try it" for a test message, and "Disconnect".{{/live}}
+Once a number is connected, the page shows "Connected" with your number, "What happens next", "Try it" for a test message, and "Disconnect".
+{{/live}}
 
 ## How do I connect my WhatsApp number?
 <!-- id: whatsapp-connect; page: /app/whatsapp; flags: whatsapp -->

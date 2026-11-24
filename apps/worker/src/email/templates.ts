@@ -4,8 +4,8 @@
  * HTML email templates for quote notifications.
  * Uses inline styles for maximum email client compatibility.
  */
-import { APPROVAL_COPY, EMAIL_COLOR, EMAIL_FONT, PRODUCT_NAME, brandColourForEmail, emailHeadStyle, productLogoRow, textColourOnCardForEmail, textOnColourForEmail } from '@qolumns/shared'
-import type { ApprovalDetail } from '@qolumns/shared'
+import { APPROVAL_COPY, EMAIL_COLOR, EMAIL_FONT, brandColourForEmail, businessLogoBlock, emailHeadStyle, poweredByRow, productLogoRow, textColourOnCardForEmail, textOnColourForEmail } from '@qolumns/shared'
+import type { ApprovalDetail, CustomerEmailBrand } from '@qolumns/shared'
 
 export interface CustomerEmailData {
   customerName: string
@@ -19,6 +19,8 @@ export interface CustomerEmailData {
   primaryColor?: string
   /** T-147: an estimate shown before the business approved it; the business will confirm */
   awaitingConfirmation?: boolean
+  /** T-201: the business's logo and whether "Powered by" shows (customer-email-brand.ts) */
+  brand?: CustomerEmailBrand
 }
 
 export interface BusinessEmailData {
@@ -43,21 +45,14 @@ export interface BusinessEmailData {
 /**
  * Base email wrapper with consistent styling
  */
-function emailWrapper(content: string, _primaryColor?: string, options: { fromProduct?: boolean; toBusiness?: boolean } = {}): string {
+function emailWrapper(content: string, _primaryColor?: string, options: { fromProduct?: boolean; toBusiness?: boolean; brand?: CustomerEmailBrand } = {}): string {
   // T-183 marked this row; T-190 fills it: every email the product sends to the business has the product's logo
   // at the top (productLogoRow, @qolumns/shared). Emails to a customer carry the business's brand, not ours.
   const productHeader = options.fromProduct || options.toBusiness ? productLogoRow() : ''
   // T-185: no email to the business carries "Powered by" (it is from the product); the line is for the
-  // business's emails to its customers.
-  const footer = options.fromProduct || options.toBusiness
-    ? ''
-    : `<table role="presentation" style="max-width: 600px; margin: 20px auto 0;">
-          <tr>
-            <td style="text-align: center; color: #626C66; font-size: 12px;">
-              Powered by ${PRODUCT_NAME}
-            </td>
-          </tr>
-        </table>`
+  // business's emails to its customers. T-201: there it follows the plan, by the estimate page's own
+  // rule (`brand.showPoweredBy`, customer-email-brand.ts; the HTML is @qolumns/shared's).
+  const footer = options.fromProduct || options.toBusiness ? '' : poweredByRow(options.brand?.showPoweredBy)
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -111,6 +106,7 @@ export function customerQuoteEmail(data: CustomerEmailData): string {
     : ''
 
   const content = `
+    ${businessLogoBlock(data.brand?.logoUrl, data.businessName)}
     <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: ${textColourOnCardForEmail(primaryColor)};">
       ${escapeHtml(data.businessName)}
     </h1>
@@ -157,7 +153,7 @@ export function customerQuoteEmail(data: CustomerEmailData): string {
     </p>
   `
 
-  return emailWrapper(content, primaryColor)
+  return emailWrapper(content, primaryColor, { brand: data.brand })
 }
 
 /**

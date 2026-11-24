@@ -195,6 +195,25 @@ export function freeAllowance(region: string | null | undefined): FreeAllowance 
   return FREE_ALLOWANCE[region ?? 'GB'] ?? FREE_ALLOWANCE.GB!
 }
 
+/** A month's row of the usage counter, as the allowance reads it */
+export interface UsageRow {
+  period_yyyymm?: string | null
+  estimates_created?: number | null
+  /** T-201: of estimates_created, the quotes counted against a monthly limit (a plan) */
+  plan_estimates_created?: number | null
+}
+
+/**
+ * T-201: the free quotes a business has used: the quotes priced while it was
+ * on the free start, every month together. A quote priced on a plan is not one
+ * of them, so a business whose plan ends still has the free quotes it never
+ * used. (Until T-201 every quote ever priced was counted.) The database's
+ * `claim_plan_quote` counts the same way (migration 50). Pure.
+ */
+export function freeQuotesUsed(rows: readonly UsageRow[] | null | undefined): number {
+  return (rows ?? []).reduce((sum, row) => sum + Math.max(0, (row.estimates_created ?? 0) - (row.plan_estimates_created ?? 0)), 0)
+}
+
 /** Kept for callers: the free allowance's number of quotes. */
 export const NO_SUBSCRIPTION_LIMIT: Record<string, number> = Object.fromEntries(
   Object.entries(FREE_ALLOWANCE).map(([region, a]) => [region, a.quotes])
