@@ -4055,3 +4055,74 @@ Built 25 November 2026, after your OK on the icons.
 - No email was sent from this Mac: the payment-failed sentence is checked from real rows, and through Stripe's
   sandbox in the full run.
 
+## T-203 — A busy AI provider is waited for, overflowed, then the job is put back
+
+Built 25 November 2026. **Not deployed.** Worker only; no migration; nothing a business or customer sees changed.
+
+### What you must do
+
+- [ ] **Deploy the worker:** `(cd apps/worker && npx wrangler deploy --env production)`. This also raises the
+  queue's `max_retries` from 3 to 13 (it is in `wrangler.toml`; the deploy applies it). T-201 and T-202 are not
+  needed first: this ticket changes the worker only.
+- [ ] **Check the Gemini tier** in Google AI Studio (aistudio.google.com → the API key's project → rate limits).
+  The retries make a burst survivable; the tier decides how big a burst is survivable without them. At 250
+  requests in one moment the worker makes roughly 1,000 to 1,500 calls within the first minute (3 to 6 a
+  request, more with photos). Look at requests per minute and tokens per minute for the two models in
+  `packages/shared/src/ai-models.json`, and raise the tier if they are below that.
+- [ ] **Overflow is OFF for every task until you do these three steps.** Nothing could be proven here: there is
+  no Anthropic key on this Mac, and the Claude adapter has never been run against the real API.
+  1. Put the key in `apps/worker/.dev.vars` as a line `ANTHROPIC_API_KEY=…` (that file is git-ignored).
+  2. Run the proof: `npx tsx scripts/load-test/overflow-proof.mts`. About 16 calls per model, 5 to 8 minutes,
+     my estimate $0.50 to $1.50, nearly all on the overflow model. It prints, per task, "pass: may be switched
+     on" with the exact line, or "fail: keep none, because …". Send me the output, or switch on what passed:
+     either the task's `overflow` line in `packages/shared/src/ai-models.json` (then deploy the worker), or the
+     setting it prints, for example `AI_OVERFLOW_WORDING`, as a worker variable (no code deploy).
+  3. Give the worker the key: `(cd apps/worker && npx wrangler secret put ANTHROPIC_API_KEY --env production)`.
+     With no key overflow stays off whatever the registry says; the retries work either way.
+- [ ] **The overflow model is your choice.** The candidate is named once, in `ai-models.json`
+  (`overflowCandidate`): the current Opus. It costs about five times the main model per token and thinks before
+  every answer, so it may be slow against the pipeline's 15 to 30 second caps; the proof will show that as a
+  fallback. A smaller model is cheaper and faster; say which you want proven and I will change that one line
+  (a Haiku would also need a small change to the adapter, which sends a field that model refuses).
+
+### What changed
+
+- **A busy answer from the AI provider no longer costs a request its photos.** Before this, most calls that met
+  a busy provider carried on with a fallback, so a request could be priced and sent without its photos having
+  been read, silently. Now the call waits about 2, 5 and 10 seconds and asks again; if a task has an overflow
+  model, the call goes there next; and if every provider is busy the whole request is put back to wait (60 s,
+  90 s, then 120 s) without using up one of its three real tries.
+- **Bounds:** at most 10 puts-back and 15 minutes from arrival. After that the quote is marked failed as today:
+  the business is emailed and you get the "A quote could not be priced" alert.
+- **You are told when it happens:** a new alert, "The AI providers were busy", at most once an hour, with five
+  counts and nothing else. It fires when a five-minute window has 20 busy retries or 5 overflow calls. It is
+  news, not a fault.
+- **Per quote:** the stored timings (the trace) now say how many busy retries and overflow calls it used.
+- **The customer's waiting page was already right** (after 60 seconds: "This is taking longer than usual. We'll
+  email you as soon as it's ready."), so I left it.
+
+### The load test
+
+- `npx tsx scripts/load-test/run.mts --url <web app address> --n 25`. It refuses production (the live address,
+  the hosting address, production's database) and has no flag to force it.
+- **One run of 25 on this Mac, with the real model:** 25 of 25 priced, none failed. Send to priced: median 12 s,
+  95th 36 s, slowest 73 s (a photo-measured one). AI cost $0.31 in all, about 1.2 cents a quote. **The provider
+  gave no busy answer at 25**, so the run did not exercise the new waiting on real busy answers; that part is
+  proven with stand-in providers only. The full table is in the CHANGELOG.
+- **250 is designed for, not tested.** One thing only a real run can show: how fast Cloudflare starts enough
+  consumers. It runs up to 250 side by side, but adds them as batches finish, so the first requests of a burst
+  set the pace for the rest. A 250 run needs an environment that is not production and not this Mac.
+  Three things there would stop a run from one machine, all found by reading the limits, not by trying: the
+  per-address limit (5 requests a minute where Upstash is set), the upload limit (20 a minute per address), and
+  an environment that prices directly instead of through the queue.
+
+### Not proven here
+
+- **Overflow on the real second provider** (no key). The path is proven with stand-in providers only.
+- **250 at once**, and the real queue: this Mac's 25 were priced directly by the local worker, side by side, because the local queue simulator prices one request at a time. So there is no queue wait in the report.
+- **The alert email itself** (no email provider here): the check is run against the real local database with a
+  stand-in for sending.
+- **The two page timers** noted in the CHANGELOG (the quote page stops checking by itself after about 10
+  minutes, the form after about 5; a request put back can now take up to 15). The message on screen stays
+  right and the email still arrives. Say if you want the pages to keep checking for 16 minutes.
+

@@ -38,6 +38,7 @@ coverage/
 # Hardcore test assets (personal photos — never commit)
 test-assets/
 scripts/hardcore-test/results/
+scripts/load-test/results/
 
 # Turborepo (if added later)
 .turbo/

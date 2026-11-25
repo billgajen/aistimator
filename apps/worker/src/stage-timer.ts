@@ -14,6 +14,26 @@ export interface StageTimings {
   measurementPassesMs?: number[]
   /** True when the clarification reprice ran with no AI calls */
   repriceOnly?: boolean
+  /**
+   * T-203: how often a model was busy while this quote was priced, over every
+   * run of its job. `busyRetries` = waits made for a busy provider;
+   * `overflowCalls` = calls sent to an overflow model. Always present (0 when
+   * there were none), so a run can be read without guessing.
+   */
+  busyRetries: number
+  overflowCalls: number
+  /** Times the job was put back because a model was busy on every provider (only when > 0) */
+  busyRequeues?: number
+  /** What the last run alone used, when earlier runs were put back (the queue check counts by window) */
+  lastRun?: { busyRetries: number; overflowCalls: number }
+  /** When these timings were written */
+  finishedAt: string
+}
+
+/** T-203: where the busy counts come from (the run's log, and what earlier runs of the job met) */
+export interface BusySource {
+  log: { busyRetries: number; overflowCalls: number }
+  before?: { requeues: number; busyRetries: number; overflowCalls: number }
 }
 
 export class StageTimer {
@@ -22,6 +42,8 @@ export class StageTimer {
   private passes: number[] = []
   queueWaitMs?: number
   repriceOnly?: boolean
+  /** T-203: set by the processor */
+  busy?: BusySource
 
   /** Time an async stage. Repeated names accumulate. */
   async time<T>(stage: string, fn: () => Promise<T>): Promise<T> {
@@ -48,6 +70,13 @@ export class StageTimer {
       stages: { ...this.stages },
       ...(this.passes.length > 0 && { measurementPassesMs: this.passes }),
       ...(this.repriceOnly && { repriceOnly: true }),
+      busyRetries: (this.busy?.before?.busyRetries ?? 0) + (this.busy?.log.busyRetries ?? 0),
+      overflowCalls: (this.busy?.before?.overflowCalls ?? 0) + (this.busy?.log.overflowCalls ?? 0),
+      ...(this.busy?.before && this.busy.before.requeues > 0 && {
+        busyRequeues: this.busy.before.requeues,
+        lastRun: { busyRetries: this.busy.log.busyRetries, overflowCalls: this.busy.log.overflowCalls },
+      }),
+      finishedAt: new Date().toISOString(),
     }
   }
 }

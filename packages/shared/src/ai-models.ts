@@ -98,7 +98,7 @@ export function modelCapabilities(model: string): ModelCapabilities {
   }
 }
 
-type TaskEntry = ModelRoute & { thinkingLevel?: string }
+type TaskEntry = ModelRoute & { thinkingLevel?: string; overflow?: 'none' | ModelRoute | string }
 
 const TASKS = registry.tasks as Record<AiTask, TaskEntry>
 const DEFAULTS: Record<AiTask, ModelRoute> = Object.fromEntries(
@@ -143,6 +143,46 @@ export function resolveModelRoute(task: AiTask, env: EnvLike = {}): ModelRoute {
     if (parsed) return parsed
   }
   return fallback
+}
+
+/** The registry's word, and the env override's, for "this task has no overflow" */
+export const OVERFLOW_OFF = 'none'
+
+/**
+ * T-203: the second provider a task's call is sent to when its own model is
+ * still busy after the in-place retries, or null when the task has none.
+ *
+ * Registry: `tasks.<task>.overflow` is "none" or `{ provider, model }`.
+ * `AI_OVERFLOW_<TASK>` overrides it per deployment: "none" switches it off,
+ * "model" or "provider:model" names another. An overflow that is the task's
+ * own route is no overflow (the same busy provider would be asked again).
+ */
+export function resolveOverflowRoute(task: AiTask, env: EnvLike = {}): ModelRoute | null {
+  const primary = resolveModelRoute(task, env)
+  const override = env[`AI_OVERFLOW_${task.toUpperCase()}`]?.trim()
+  let route: ModelRoute | null = null
+  if (override) {
+    if (override.toLowerCase() === OVERFLOW_OFF) return null
+    // a bare model name with no known prefix is read as the OTHER provider: an overflow on the same one is pointless
+    route = parseModelSpec(override, primary.provider === 'gemini' ? 'anthropic' : 'gemini')
+  }
+  if (!route) {
+    const entry = TASKS[task].overflow
+    if (!entry || entry === OVERFLOW_OFF) return null
+    route = typeof entry === 'string' ? parseModelSpec(entry, primary.provider === 'gemini' ? 'anthropic' : 'gemini') : isProvider(entry.provider) && entry.model ? { provider: entry.provider, model: entry.model } : null
+  }
+  if (!route) return null
+  return route.provider === primary.provider && route.model === primary.model ? null : route
+}
+
+/**
+ * T-203: the model the overflow proof (scripts/load-test/overflow-proof.mts)
+ * runs for a task whose overflow is still "none". Registry data, like every
+ * model name; null when the registry names none.
+ */
+export function overflowCandidate(): ModelRoute | null {
+  const entry = (registry as { overflowCandidate?: Partial<ModelRoute> }).overflowCandidate
+  return entry && typeof entry.provider === 'string' && isProvider(entry.provider) && typeof entry.model === 'string' && entry.model ? { provider: entry.provider, model: entry.model } : null
 }
 
 /**

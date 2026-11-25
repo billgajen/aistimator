@@ -25,11 +25,12 @@ ENVIRONMENT = "development"
 queue = "quote-jobs-local"
 binding = "QUOTE_JOBS"
 
+# max_retries: see the note at the production queue below (T-203).
 [[queues.consumers]]
 queue = "quote-jobs-local"
 max_batch_size = 1
 max_batch_timeout = 1
-max_retries = 3
+max_retries = 13
 
 # Production secrets (set via wrangler secret put):
 # - SUPABASE_URL
@@ -42,6 +43,13 @@ max_retries = 3
 # - UPSTASH_REDIS_TOKEN  (Upstash's "REST token")
 #
 # - GEMINI_API_KEY
+# - ANTHROPIC_API_KEY (T-203: the overflow provider. A call still busy on Gemini after its
+#   retries goes to the task's overflow model, when the task has one in ai-models.json or in
+#   AI_OVERFLOW_<TASK>. Not set = overflow is off; the retries still happen.
+#   `npx wrangler secret put ANTHROPIC_API_KEY --env production`)
+# - AI_OVERFLOW_EXTRACTION_PASS, AI_OVERFLOW_WORDING, AI_OVERFLOW_IDENTIFICATION,
+#   AI_OVERFLOW_ADJUDICATION (optional, T-203: "none" switches a task's overflow off,
+#   "provider:model" names another; the defaults are in packages/shared/src/ai-models.json)
 # - POSTMARK_API_TOKEN
 # - POSTMARK_FROM_EMAIL
 # - APP_URL (production: https://qolumns.com, T-174)
@@ -62,6 +70,8 @@ max_retries = 3
 #   services (T-179). `npx wrangler dev --var SECTION_AI_BASE_URL:http://127.0.0.1:8796/note`
 # - AI_STAND_IN  "off" makes the worker ask no model and use its built-in defaults, for the
 #   quick checks (T-183, Docs/testing.md). `npx wrangler dev --var AI_STAND_IN:off`
+# - AI_GEMINI_BASE_URL, AI_ANTHROPIC_BASE_URL  stand-ins for the two AI providers, and
+#   AI_BUSY_WAITS_MS ("20,50,100") shorter waits between busy retries (T-203, verify-t203)
 # - EXPO_PUSH_BASE_URL  a stand-in for Expo's push service, to read what would be sent to a
 #   phone (T-196). `npx wrangler dev --var EXPO_PUSH_BASE_URL:http://127.0.0.1:8792/push`
 #
@@ -91,7 +101,10 @@ bucket_name = "aistimator-assets"
 # below runs the pipeline. ONE quote per invocation: a photo-measured quote can
 # take ~2.5 min, so a batch of 10 processed in series would exceed the
 # consumer's wall-time limit. Parallelism comes from consumer concurrency.
-# max_retries must be >= MAX_RETRIES in src/index.ts.
+# max_retries must be >= MAX_DELIVERY_RETRIES in src/queue-consumer.ts: the 3 real tries
+# after the first (MAX_RETRIES) plus the 10 times a job may be put back because an AI
+# provider was busy (MAX_BUSY_REQUEUES, T-203). 3 + 10 = 13. If it is lower, the queue
+# dead-letters a message before the code has marked its quote failed.
 # One-time setup: npx wrangler queues create quote-jobs && npx wrangler queues create quote-jobs-dlq
 [[env.production.queues.producers]]
 queue = "quote-jobs"
@@ -101,7 +114,7 @@ binding = "QUOTE_JOBS"
 queue = "quote-jobs"
 max_batch_size = 1
 max_batch_timeout = 1
-max_retries = 3
+max_retries = 13
 dead_letter_queue = "quote-jobs-dlq"
 
 # Staging environment

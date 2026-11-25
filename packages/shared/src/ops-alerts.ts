@@ -13,6 +13,9 @@
  *   - requests have been waiting too long    (`queue_backed_up`)
  *   - a business reported a problem sorted
  *     as high severity (T-197)               (`support_high`)
+ *   - the AI providers were busy often, or
+ *     calls overflowed to the second one
+ *     (T-203; counts only)                   (`ai_busy`)
  *
  * At most one email per kind per hour. The count of what was held back in
  * between is said in the next one. The email carries ids and counts only:
@@ -25,7 +28,7 @@
 import { PRODUCT_NAME } from './brand'
 import { EMAIL_FONT, emailHeadStyle } from './email-style'
 
-export type OpsAlertKind = 'quote_failed' | 'worker_error' | 'queue_backed_up' | 'support_high'
+export type OpsAlertKind = 'quote_failed' | 'worker_error' | 'queue_backed_up' | 'support_high' | 'ai_busy'
 
 /** One email per kind in this many seconds */
 export const OPS_ALERT_EVERY_SECONDS = 3600
@@ -33,6 +36,14 @@ export const OPS_ALERT_EVERY_SECONDS = 3600
 export const QUEUE_WAIT_MINUTES = 10
 /** Requests older than this are left out of the queue check: an old stuck one is not news every hour */
 export const QUEUE_LOOK_BACK_HOURS = 24
+/** T-203: the queue check runs this often, and counts busy answers over the same stretch */
+export const AI_BUSY_WINDOW_MINUTES = 5
+/** T-203: this many busy retries in one window raises the `ai_busy` alert */
+export const AI_BUSY_ALERT_RETRIES = 20
+/** T-203: so does this many calls sent to an overflow model */
+export const AI_BUSY_ALERT_OVERFLOW = 5
+/** T-203: quotes that arrived longer ago than this are not read for the count (a job lives 15 minutes at most) */
+export const AI_BUSY_LOOK_BACK_MINUTES = 30
 
 export interface OpsAlert {
   kind: OpsAlertKind
@@ -55,6 +66,12 @@ const WORDS: Record<OpsAlertKind, { subject: string; what: string; look: string;
     subject: 'Requests are waiting to be priced',
     what: `One or more requests have been waiting more than ${QUEUE_WAIT_MINUTES} minutes for a price.`,
     look: 'Check the worker and its queue. Requests waiting can be retried from the admin area.',
+  },
+  // T-203: counts only. It is news, not a fault: requests were still priced unless a quote_failed alert says otherwise.
+  ai_busy: {
+    subject: 'The AI providers were busy',
+    what: `In the last ${AI_BUSY_WINDOW_MINUTES} minutes the worker met many busy answers from an AI provider, or sent calls to the overflow provider. Requests are retried and put back by themselves; this is only so you know it is happening.`,
+    look: 'If it keeps happening, check the rate limit tier of the main provider, and that the overflow provider’s key is set in the worker.',
   },
   // T-197: a business reported a problem the AI sorted as high severity
   support_high: {
@@ -173,4 +190,64 @@ export async function raiseOpsAlert(alert: OpsAlert, deps: OpsAlertDeps): Promis
 export function stillWaiting(previous: unknown, current: readonly string[]): string[] {
   const before = new Set(Array.isArray(previous) ? previous.filter((id): id is string => typeof id === 'string') : [])
   return current.filter((id) => before.has(id))
+}
+
+/** T-203: what one quote's stored notes say about busy models (see the worker's stage-timer.ts and busy-state.ts) */
+export interface BusyRow {
+  /** `pricing_trace_json.timings` of a quote that was priced */
+  timings?: { busyRetries?: unknown; overflowCalls?: unknown; busyRequeues?: unknown; lastRun?: { busyRetries?: unknown; overflowCalls?: unknown } | null; finishedAt?: unknown } | null
+  /** `content_json.busy` of a quote that was put back and is not priced yet */
+  busy?: { requeues?: unknown; lastAt?: unknown; lastRun?: { busyRetries?: unknown; overflowCalls?: unknown } | null } | null
+}
+
+export interface BusyCount {
+  busyRetries: number
+  overflowCalls: number
+  /** Quotes put back in the window because a model was busy on every provider */
+  requeued: number
+  /** Quotes that met any of it */
+  quotes: number
+}
+
+const wholeNumber = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0)
+const within = (at: unknown, from: number, to: number): boolean => {
+  if (typeof at !== 'string') return false
+  const time = Date.parse(at)
+  return !Number.isNaN(time) && time > from && time <= to
+}
+
+/**
+ * T-203: busy retries and overflow calls that happened between `from` and
+ * `to`. Each run of a quote is counted once, in the window it ended in: a
+ * priced quote by its last run (its totals when it was never put back), a
+ * quote still waiting by the run that put it back.
+ */
+export function countBusy(rows: readonly BusyRow[], from: number, to: number): BusyCount {
+  const count: BusyCount = { busyRetries: 0, overflowCalls: 0, requeued: 0, quotes: 0 }
+  for (const row of rows) {
+    let retries = 0
+    let overflow = 0
+    let requeued = 0
+    if (row.timings && within(row.timings.finishedAt, from, to)) {
+      const run = row.timings.lastRun ?? row.timings
+      retries += wholeNumber(run.busyRetries)
+      overflow += wholeNumber(run.overflowCalls)
+    }
+    if (row.busy && within(row.busy.lastAt, from, to)) {
+      retries += wholeNumber(row.busy.lastRun?.busyRetries)
+      overflow += wholeNumber(row.busy.lastRun?.overflowCalls)
+      requeued = 1
+    }
+    if (retries + overflow + requeued === 0) continue
+    count.busyRetries += retries
+    count.overflowCalls += overflow
+    count.requeued += requeued
+    count.quotes += 1
+  }
+  return count
+}
+
+/** T-203: does a window's count pass a threshold? */
+export function busyAlertDue(count: BusyCount): boolean {
+  return count.busyRetries >= AI_BUSY_ALERT_RETRIES || count.overflowCalls >= AI_BUSY_ALERT_OVERFLOW
 }

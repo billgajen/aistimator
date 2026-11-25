@@ -15,6 +15,205 @@
 
 ## Issues & Resolutions
 
+### 2026-11-25: T-203 — A busy AI provider is waited for, overflowed, then the job is put back (AD-095, AD-096)
+
+**Built, not deployed.** Worker only: `(cd apps/worker && npx wrangler deploy --env production)`. No migration,
+and nothing a business or a customer sees changed (so Docs/help is untouched). **Designed for 250 requests at one moment; not load-tested at
+250.** One run of 25 was made on the local stack (below). No price logic changed, and AI still never sets a
+price: the same call is asked again, of the same model or of the overflow one, and its answer goes through the
+same checks as before.
+
+#### What was wrong (found while reading the code, wider than the ticket said)
+- A provider's "busy" answer (HTTP 429 or 503) was treated like any other error. The ticket describes one
+  outcome of that: the call throws and the whole job starts again a minute later.
+- **The commoner outcome was quieter and worse.** Most AI calls catch every error and carry on with their
+  fallback: the photo read answers "no reading" (`extractSignalsFromImages` even had a branch named "rate
+  limited"), the wording falls back to the template, the checker is skipped. So a request that met a busy
+  provider was usually **priced and sent without its photos having been read**, and nobody was told. With many
+  requests at one moment, busy answers are the normal case, so this would have been the normal result.
+
+#### 1. The one call is retried in place (AD-095)
+- `apps/worker/src/ai/busy.ts`, new: `BusyRetryClient` wraps every client `createAiClient` makes (the quote
+  pipeline's four tasks and the support inbox's). A busy answer waits about 2 s, 5 s, then 10 s
+  (`BUSY_WAITS_MS`), each 25% shorter to 25% longer at random so jobs refused together do not come back
+  together, and asks the same call again. Everything the job has done so far is kept.
+- **Busy** is HTTP 429 or 503 (529 from Anthropic), `RESOURCE_EXHAUSTED`, or an "overloaded" answer
+  (`isBusyAnswer`). The provider clients now throw `AiProviderError` (the same message as before, plus the
+  status, whether it was busy, and the wait the provider asked for). **Any other error is thrown untouched**, at
+  once, as before.
+- **Retry-After is honoured**: the header (seconds or a date), and Google's `retryDelay` in a quota error's
+  body, which is the same request. The wait is never shorter than the provider asked, plus up to a second of
+  spread. A provider that asks for more than 15 s (`RETRY_AFTER_MAX_MS`) is not waited for: the call goes
+  straight to step 2.
+- **The T-172 caps still win.** The retry runs inside `withAiTimeout`: when a call's cap runs out during a wait
+  the caller gets its timeout and its fallback, as before. A cancelled call (the measurement's early stop) stops
+  waiting.
+- **No throttle.** There is no token bucket and no shared counter, and the worker's limiter is untouched and
+  stays off (AD-060).
+
+#### 2. Overflow to a second provider (AD-095)
+- `packages/shared/src/ai-models.json`: every task has an `overflow` entry, `"none"` or `{ provider, model }`.
+  `AI_OVERFLOW_<TASK>` overrides it per deployment (`"none"`, `"model"` or `"provider:model"`):
+  `resolveOverflowRoute`. No model name is in code.
+- A call still busy after its three retries is sent once to the task's overflow model. The overflow client makes
+  one try (the SDK's own retries are off for it) with a two-minute limit, and its tokens are metered at its own
+  model's price, so `aiUsage` shows what overflow cost.
+- **With no `ANTHROPIC_API_KEY` in the worker, overflow is off** and step 1 still works (one line in the log per
+  task, not per call).
+- **An overflow model that fails in a way of its own leaves the call "busy".** Its fault must never give a worse
+  result than having no overflow at all; the error's name and status are logged.
+- **Every task's overflow is `"none"` today. None could be proven here:** there is no Anthropic key on this
+  machine, and the Claude adapter has never been run against the real API (T-135 said so). The proof is ready:
+  `npx tsx scripts/load-test/overflow-proof.mts` runs each pipeline task's fixed inputs (photos included) on its
+  own model and on the candidate (`overflowCandidate` in the registry) and prints, per task, pass or fail and
+  the line that switches it on. `Docs/testing.md` lists the inputs and where each tolerance comes from.
+- **Likely trouble on the adapter's first live run** (not changed, because nothing here can show it):
+  1. It sends no effort, so the candidate thinks at its default on every call, and the pipeline's caps are 15 to
+     30 s. A slow answer shows in the proof as a fallback. The fix would be to map the registry's
+     `thinkingLevel` to the request's effort.
+  2. It sends `fallbacks: "default"` for every model; a model that does not accept that field would fail every
+     call.
+  3. The structured-output schemas of measurement, identification and adjudication have never met the real API.
+  4. Photos in a type the provider does not take are left out silently.
+
+#### 3. Busy is not a failure (AD-096)
+- **Nothing is saved from a run in which a model could not be reached.** A call that is busy on its own model
+  and on the overflow one rejects with `AiBusyError`, and the task is marked in the run's `AiBusyLog`. Callers
+  handle the rejection as they handle any failed call (their fallbacks). The processor then stops at its next
+  checkpoint (`busy.throwIfExhausted()`: after the photo stage, before the "we need to ask" save, before the
+  final save), before any write, email, phone notification or usage count. Once a task is marked, its later
+  calls in the same run fail at once instead of waiting again.
+- **The job is put back, and that does not use up a real try** (`queue-consumer.ts`). Cloudflare counts every
+  delivery and the message cannot be changed, so the number of busy requeues is kept on the quote
+  (`content_json.busy`, `busy-state.ts`) and taken off the count of real tries. Waits: 60 s, 90 s, then 120 s.
+- **Bounded:** at most 10 busy requeues (`MAX_BUSY_REQUEUES`) and 15 minutes from the request's arrival
+  (`BUSY_MAX_MINUTES`; the last wait is cut short so no run starts after them). After that the quote is marked
+  failed exactly as today: the business is emailed and the owner gets the `quote_failed` alert.
+- **Real errors keep their 3 tries and today's waits** (30, 60, 120 s; 60 s for a provider's rate limit that
+  reaches the consumer as an ordinary error).
+- `wrangler.toml`: `max_retries` is **13** on both queues (3 real + 10 busy = `MAX_DELIVERY_RETRIES`), with the
+  note that it must be at least the code's total.
+- **The direct path** (`/process`: local development, and production only if `SYNC_QUOTE_PROCESSING` is ever
+  set to true) has no queue to put a job back on: there a busy run is marked failed, as any error is today.
+
+#### 4. Seeing it happen
+- `pricing_trace_json.timings` always carries `busyRetries` and `overflowCalls` (0 when there were none), over
+  every run of the job; `busyRequeues` and `lastRun` when the job was put back; and `finishedAt`.
+- The 5-minute queue check also runs `checkBusy` (`ops-alert.ts`): it adds up the last five minutes from what
+  each quote stored (`countBusy`: each run once, in the window it ended in) and raises a new alert kind,
+  `ai_busy`, when a window has 20 busy retries or 5 overflow calls. At most one email an hour, like every kind
+  (`claim_ops_alert`; the kind needs no migration, `ops_alerts.kind` is free text). The email carries five
+  counts and nothing else.
+
+#### 5. The customer's waiting page: left as it is
+- After 60 seconds both the quote page and the form's last screen already say "This is taking longer than usual.
+  We'll email you as soon as it's ready." (or, with no email given, to keep the page open or come back): T-178,
+  checked by `verify-t178`. Nothing shows an error while a request waits. Not changed.
+- One thing noticed, not changed: the quote page stops checking by itself after about 10 minutes and the form
+  after about 5, and a request put back for a busy provider can now take up to 15. The line on screen stays
+  right, the email still arrives, and a reload shows the estimate.
+
+#### 6 and 7. The load test, and one run of 25
+- `scripts/load-test/run.mts` (helpers in `lib.mts`): `npx tsx scripts/load-test/run.mts --url <web app> [--n 25]
+  [--keep]`. It sends N requests at one moment through the public route, across `ceil(N / 15)` test businesses
+  it makes itself, about half text only, about half with photos, a few on a photo-measured service, then reads
+  each quote's stored timings and cost. Report printed and written under `scripts/load-test/results/`
+  (git-ignored).
+- **It refuses production, with no flag to override:** `qolumns.com` and anything under it, any
+  `estimator-*.vercel.app`, production's Supabase project ref in either address, a local address paired with a
+  remote database, or a target whose own pages name production's database. All before anything is created.
+- **The run of 25** (25 Nov 2026, local stack, the real model, priced directly, 2 test businesses of 13 and 12):
+
+  | | |
+  |---|---|
+  | Priced | 25 of 25 (15 held for the business's review, 10 asking the customer a question) |
+  | Failed, still waiting, not taken in | 0, 0, 0 |
+  | Send to priced | median 12.1 s, 95th 36.3 s, slowest 72.6 s |
+  | Pricing itself | median 10.0 s, 95th 34.9 s, slowest 70.3 s |
+  | Queue wait | not measured (priced directly; see below) |
+  | Busy retries, overflow calls, put back | 0, 0, 0 |
+  | AI cost at registry prices | $0.3103 in all, $0.0124 a quote, 100 calls |
+  | Text only (13) | median 10.1 s, slowest 12.1 s; $0.0633; 39 wording calls |
+  | With photos (9) | median 28.2 s, slowest 28.2 s; $0.1188; 9 photo reads, 27 wording calls |
+  | Photo-measured (3) | median 36.3 s, slowest 72.6 s; $0.1281; 10 photo calls, 15 wording calls |
+
+  **What it shows and does not:** 25 at one moment were all priced, in about the time one takes. The provider
+  gave **no busy answer at all** at 25, so this run did not exercise the retry, the overflow or the put-back on
+  real busy answers; those are proven with the stand-in providers (`verify-t203`) and the unit tests only.
+- **Why the run priced directly and not through the local queue.** wrangler's local queue hands the consumer
+  one batch at a time and waits for it (read in miniflare's queue broker: `#flush` awaits the dispatch before
+  the next), and a batch here is one quote. Twenty-five requests through it are priced one after another, which
+  measures nothing about 25 at once. Priced directly, the 25 pipelines run side by side in the local worker and
+  all meet the provider together, which is the part this ticket changes. The price of that: the run has no
+  queue wait to report, and on the direct path a busy run cannot be put back.
+- **What a real 250 would still have to show, and this cannot.** Cloudflare runs up to 250 consumers of one
+  queue side by side (its published limit) and decides whether to add consumers after each finished batch, from
+  the backlog. So the first seconds of a burst are Cloudflare's to scale, not the worker's code. A `retry()`
+  does not count against that scaling (only an uncaught error does, and `handleQuoteJob` catches its own). A
+  consumer may run 15 minutes; `max_retries` may be up to 100 (ours is 13).
+
+#### AD-095: a busy provider is a wait and then a second provider, per call and per task
+**Decision:** the retry lives in one wrapper around the AI client, not in each caller and not at the job level.
+The overflow model is registry data per task, off until that task is proven on it.
+**Why:** the job-level retry threw away finished work and came back a minute later into the same crowd; a
+per-caller retry would have been a dozen copies. Per task, because a model that words a summary well may read a
+photo badly: each task is proven on its own inputs before it is switched on.
+**Rejected:** a throttle or token bucket in the worker (AD-060: the limiter stays off; it also needs a shared
+counter, which is one more thing to fail); overflow on by default (an unproven model answering a customer);
+letting the overflow model's own errors through to the callers' fallbacks (a quote priced without its photos
+because the second provider refused a schema).
+
+#### AD-096: busy is not a failure, and a run that met it saves nothing
+**Decision:** a run in which any call was busy on every provider is discarded at a checkpoint and the job is put
+back on a count of its own, bounded by 10 requeues and 15 minutes.
+**Why:** the callers' fallbacks exist for a model that answers badly, not for one that could not be asked. A
+quote sent without its photos read is worse than one that arrives a minute later. Checking the run's log at
+checkpoints, instead of re-throwing in each of the pipeline's catch blocks, means a caller added later cannot
+forget.
+**Rejected:** keeping the count in the message (a queue message cannot be changed; sending a new one and
+acknowledging the old is two steps that can half-happen); a new column (a migration for a counter that lives
+minutes); failing after 3 as real errors do (a busy quarter of an hour is not three faults).
+**Known edge:** a call under a T-172 cap that times out is on its fallback as before; if that abandoned call
+then finishes busy before the run's last checkpoint, the run is put back, and if after, the quote is saved with
+the fallback, as it would have been before this ticket. Both are within the rules above.
+
+#### Constraints
+- A new AI call in the pipeline must be made through `createAiClient(task, env, aiUsage, { busy })`, or it is
+  outside all of this (a unit test counts the four that exist).
+- Nothing may be written, sent or counted before the last `busy.throwIfExhausted()` that is not safe to repeat
+  (a unit test reads the order).
+- `max_retries` in `wrangler.toml` must stay at least `MAX_DELIVERY_RETRIES`.
+- A task's `overflow` is switched on only after `overflow-proof.mts` passes for it.
+- The stand-in addresses and short waits (`AI_GEMINI_BASE_URL`, `AI_ANTHROPIC_BASE_URL`, `AI_BUSY_WAITS_MS`)
+  are honoured only when `ENVIRONMENT` is "development".
+
+#### Checks
+- Unit: worker 866 (58 new in `busy-t203.test.ts`: busy then an answer, busy then overflow, busy on both, a
+  real error, the caps and cancelling, both providers' busy answers over a stubbed `fetch`, the registry, the
+  queue's bounds and counts, the timings, the window's count and the alert), web 1,956 (20 new for the load
+  test's pure parts), app 222. Lint and typecheck clean.
+- `verify-t203` (new, quick level, no model): 44 of 44.
+- **`pnpm check:quick`, once: 31 of 32 in 4 min 47 s**, then `pnpm check:failed`: the one that failed passed.
+  The one was `verify-t203` itself, 42 of 44: its alert part counted the made-up numbers its own earlier solo
+  run had left on its own quotes minutes before. The script now clears what an earlier run of itself left, and
+  compares against what it finds. The product was not involved.
+- **`pnpm check:full`, once, alone: 46 of 47 (39 scripts, 3,329 checks) in 32 min 51 s**, then
+  `pnpm check:failed` for the one: `verify-t180` 112 of 112 in 10 min 35 s. Its first run was 96 of 97 because
+  Stripe's own hosted portal page did not finish loading within the script's 30 s (`page.goto … billing.stripe.com
+  … Timeout`); that script starts no worker, so nothing of this ticket runs in it.
+- `verify-t197` needed its second try, alone (104 of 104; first 103 of 104: the support inbox's real model did
+  not point one duplicate report at the other). Its AI calls now go through the busy retry like every call; the
+  retry changes nothing unless a provider answers busy, and none did in this run's log. Noted, not chased: it
+  is a live-model result.
+- `verify-t203` at the full level: 44 of 44, beside the others.
+
+**Files:** `apps/worker/src/ai/{busy,factory,gemini,anthropic,client}.ts`,
+`apps/worker/src/{queue-consumer,busy-state,stage-timer,quote-processor,ops-alert,index}.ts`,
+`apps/worker/wrangler.toml`, `packages/shared/src/{ai-models.json,ai-models.ts,ops-alerts.ts}`,
+`scripts/load-test/{run,lib,overflow-proof}.mts`, `scripts/hardcore-test/verify-t203.mts`,
+`scripts/checks/manifest.mjs`, tests `apps/worker/src/__tests__/busy-t203.test.ts` and
+`apps/web/src/__tests__/load-test-t203.test.ts`, `.gitignore`, `.vercelignore`, docs.
+
 ### 2026-11-24: T-202 — "Try again" in the app, new icons, the test estimate, and the last T-198 fixes (AD-093, AD-094)
 
 **Built, not deployed.** Needs **migration 51** (`bash scripts/deploy-migration-51.sh`, first), then the **web**.

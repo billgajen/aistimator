@@ -1,62 +1,78 @@
 {
-  "_comment": "T-135 model registry: the ONLY place model names live. Override any task at runtime with AI_MODEL_<TASK> (e.g. AI_MODEL_ADJUDICATION=anthropic:claude-opus-5-5). Prices are USD per 1M tokens, copied from the providers' published pages on the asOf date; update them here, never in code. `thinkingLevel` on a task is sent only to models whose capabilities list it (override with AI_THINKING_<TASK>=low|medium|high|default). `models` holds per-model request capabilities; a model not listed keeps the legacy request shape (response schema, system prompt as a primed turn, temperature).",
+  "_comment": "T-135 model registry: the ONLY place model names live. Override any task at runtime with AI_MODEL_<TASK> (e.g. AI_MODEL_ADJUDICATION=anthropic:claude-opus-5-5). Prices are USD per 1M tokens, copied from the providers' published pages on the asOf date; update them here, never in code. `thinkingLevel` on a task is sent only to models whose capabilities list it (override with AI_THINKING_<TASK>=low|medium|high|default). `models` holds per-model request capabilities; a model not listed keeps the legacy request shape (response schema, system prompt as a primed turn, temperature). T-203: `overflow` on a task is the second provider a busy call is sent to after the in-place retries (apps/worker/src/ai/busy.ts): \"none\", or { provider, model }. Override per deployment with AI_OVERFLOW_<TASK> (\"none\", \"model\" or \"provider:model\"). A task's overflow is switched on only after scripts/load-test/overflow-proof.mts passes for it; `overflowCandidate` is the model that proof runs for a task still set to \"none\".",
   "tasks": {
     "extraction_pass": {
       "provider": "gemini",
-      "model": "gemini-3.8-flash"
+      "model": "gemini-3.8-flash",
+      "overflow": "none"
     },
     "adjudication": {
       "provider": "gemini",
-      "model": "gemini-3.1-pro-preview"
+      "model": "gemini-3.1-pro-preview",
+      "overflow": "none"
     },
     "compile": {
       "provider": "gemini",
-      "model": "gemini-3.8-flash"
+      "model": "gemini-3.8-flash",
+      "overflow": "none"
     },
     "wording": {
       "provider": "gemini",
       "model": "gemini-3.8-flash",
-      "thinkingLevel": "low"
+      "thinkingLevel": "low",
+      "overflow": "none"
     },
     "chat_widget": {
       "provider": "gemini",
       "model": "gemini-3.8-flash",
-      "thinkingLevel": "low"
+      "thinkingLevel": "low",
+      "overflow": "none"
     },
     "service_match": {
       "provider": "gemini",
       "model": "gemini-3.8-flash",
-      "thinkingLevel": "low"
+      "thinkingLevel": "low",
+      "overflow": "none"
     },
     "identification": {
       "provider": "gemini",
-      "model": "gemini-3.8-flash"
+      "model": "gemini-3.8-flash",
+      "overflow": "none"
     },
     "whatsapp_intent": {
       "provider": "gemini",
       "model": "gemini-3.8-flash",
-      "thinkingLevel": "low"
+      "thinkingLevel": "low",
+      "overflow": "none"
     },
     "support_sort": {
       "provider": "gemini",
       "model": "gemini-3.8-flash",
-      "thinkingLevel": "medium"
+      "thinkingLevel": "medium",
+      "overflow": "none"
     },
     "feature_match": {
       "provider": "gemini",
       "model": "gemini-3.8-flash",
-      "thinkingLevel": "low"
+      "thinkingLevel": "low",
+      "overflow": "none"
     },
     "support_reply": {
       "provider": "gemini",
       "model": "gemini-3.8-flash",
-      "thinkingLevel": "low"
+      "thinkingLevel": "low",
+      "overflow": "none"
     },
     "help_answer": {
       "provider": "gemini",
       "model": "gemini-3.8-flash",
-      "thinkingLevel": "low"
+      "thinkingLevel": "low",
+      "overflow": "none"
     }
+  },
+  "overflowCandidate": {
+    "provider": "anthropic",
+    "model": "claude-opus-5-5"
   },
   "harness": {
     "customer_sim": {

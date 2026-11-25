@@ -425,6 +425,11 @@ Every choice and every change of an address, and the hold on a changed one.
     the quote for review.
   - `quotes.content_json.error`, `failedAt`, `failedNotifiedAt` on a failed quote: why (for us only), when, and
     when the business was emailed about it. `failedNotifiedAt` is what keeps it to one email.
+  - `quotes.content_json.busy` (T-203; `requeues`, `busyRetries`, `overflowCalls`, `lastAt`, `lastRun`): only
+    while a request waits after being put back because an AI provider was busy on every provider. The queue
+    consumer reads it to tell busy requeues from real tries; pricing the quote writes its content over it.
+  - `quotes.pricing_trace_json.timings` (T-203 additions): `busyRetries` and `overflowCalls` (always, 0 when
+    none, over every run of the job), `busyRequeues` and `lastRun` (when it was put back), `finishedAt`.
   - `quotes.content_json.retryCode` (`hash`, `expiresAt`): the hash of the one-time code
     `scripts/retry-failed-quote.sh` writes; the retry route removes it as it uses it.
   - There is no `quotes.error_message` column. Code that wrote one had its whole update refused.

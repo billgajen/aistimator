@@ -7,9 +7,10 @@
  */
 
 import { createRateLimiter } from './rate-limiter'
-import { handleQuoteJob } from './queue-consumer'
+import { handleQuoteJob, MAX_RETRIES, type BusyState } from './queue-consumer'
+import { readBusyState, saveBusyState } from './busy-state'
 import { markQuoteFailed } from './failed-quote'
-import { checkQueue, sendOpsAlert } from './ops-alert'
+import { checkBusy, checkQueue, sendOpsAlert } from './ops-alert'
 import { priceSection } from './section-pricing'
 import type { PriceSectionInput } from './section-pricing'
 import type { RateLimiter } from './rate-limiter'
@@ -40,8 +41,14 @@ export interface Env {
   UPSTASH_REDIS_URL?: string
   UPSTASH_REDIS_TOKEN?: string
   GEMINI_API_KEY?: string
-  // T-135: Claude adapter (only needed when a task is routed to anthropic:*)
+  // T-135: Claude adapter (needed when a task is routed to anthropic:*).
+  // T-203: also the overflow provider's key. Without it overflow is off; busy retries still work.
   ANTHROPIC_API_KEY?: string
+  // T-203: per-task overflow override: "none", "model" or "provider:model" (defaults in ai-models.json)
+  AI_OVERFLOW_EXTRACTION_PASS?: string
+  AI_OVERFLOW_ADJUDICATION?: string
+  AI_OVERFLOW_WORDING?: string
+  AI_OVERFLOW_IDENTIFICATION?: string
   // T-135: per-task model overrides, e.g. AI_MODEL_ADJUDICATION="anthropic:<model-id>"
   AI_MODEL_EXTRACTION_PASS?: string
   AI_MODEL_ADJUDICATION?: string
@@ -84,6 +91,10 @@ export interface Env {
   SECTION_AI_BASE_URL?: string
   /** T-183, local checks only: 'off' = ask no model (ai/client.ts) */
   AI_STAND_IN?: string
+  /** T-203, local checks only (ignored unless ENVIRONMENT=development): provider stand-ins and shorter busy waits (ai/client.ts) */
+  AI_GEMINI_BASE_URL?: string
+  AI_ANTHROPIC_BASE_URL?: string
+  AI_BUSY_WAITS_MS?: string
 
   // Rate limit configuration (optional overrides)
   RATE_LIMIT_GLOBAL?: string
@@ -106,9 +117,9 @@ export interface QuoteJobMessage {
   quoteToken?: string
 }
 
-// Maximum retries before marking as failed. Must not exceed `max_retries` in
-// wrangler.toml, or the queue dead-letters the message before we mark it failed.
-const MAX_RETRIES = 3
+// The retry numbers are in queue-consumer.ts: MAX_RETRIES real tries, plus MAX_BUSY_REQUEUES
+// puts-back for a busy model (T-203). Their sum, MAX_DELIVERY_RETRIES, must not exceed
+// `max_retries` in wrangler.toml, or the queue dead-letters the message before we mark it failed.
 
 // Base delay for exponential backoff (seconds)
 const BASE_DELAY_SECONDS = 30
@@ -143,7 +154,8 @@ async function processQuoteJob(
   job: QuoteJobMessage,
   supabase: ReturnType<typeof getSupabaseClient>,
   env: Env,
-  queueWaitMs?: number
+  queueWaitMs?: number,
+  busyBefore?: BusyState
 ): Promise<{ success: boolean; error?: string }> {
   const { quoteId, quoteRequestId, quoteToken } = job
 
@@ -151,7 +163,7 @@ async function processQuoteJob(
   await updateQuoteStatus(supabase!, quoteId, 'generating')
 
   // Process the quote using the full pipeline
-  const result = await processQuote(quoteId, quoteRequestId, supabase!, env, quoteToken, { queueWaitMs })
+  const result = await processQuote(quoteId, quoteRequestId, supabase!, env, quoteToken, { queueWaitMs, busyBefore })
 
   return {
     success: result.success,
@@ -429,7 +441,12 @@ export default {
         // T-178: the rules for one job (limiter fails open, retries, failure) are in queue-consumer.ts
         await handleQuoteJob<QuoteJobMessage>(message as Message<QuoteJobMessage>, {
           limiter: rateLimiter,
-          process: (job, queueWaitMs) => processQuoteJob(job, supabase, env, queueWaitMs),
+          process: (job, queueWaitMs, busyBefore) => processQuoteJob(job, supabase, env, queueWaitMs, busyBefore),
+          // T-203: the count of busy requeues lives on the quote between deliveries
+          busy: {
+            read: (job) => readBusyState(supabase, job.quoteId),
+            save: (job, state) => saveBusyState(supabase, job.quoteId, state),
+          },
           markFailed: async (job, error) => {
             await markQuoteFailed(supabase, env, job.quoteId, error)
           },
@@ -457,6 +474,10 @@ export default {
       console.error(`[Worker] Queue check error: ${errorNameOf(error)}`)
       await workerError(env, 'the check of waiting requests', error)
     }
+    // T-203: the same check also counts the last five minutes' busy answers and overflow calls, and
+    // emails the owner (counts only, at most once an hour) when there were many. It never throws.
+    const busy = await checkBusy(supabase, env)
+    if (busy.count.quotes > 0) console.log(`[Alert] Busy check: ${busy.count.busyRetries} busy retries, ${busy.count.overflowCalls} overflow calls, ${busy.count.requeued} put back (${busy.alert})`)
     // T-197: the owner's daily support summary (at most one a day, and only when something is new).
     // It never throws; it is after the queue check so that it can never hold that up.
     await supportDaily(supabase, env)

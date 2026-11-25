@@ -11,6 +11,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { ModelRoute } from '@qolumns/shared'
 import type { AiClient, GenerationOptions, ImageInput, UsageSink } from './client'
 import { parseModelJson } from './client'
+import { AiProviderError, isBusyAnswer, parseRetryAfter } from './busy'
 
 type ClaudeImageType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 const CLAUDE_IMAGE_TYPES = new Set<string>(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
@@ -73,6 +74,25 @@ export interface AnthropicClientConfig {
   model: string
   maxTokens?: number
   usage?: UsageSink
+  /**
+   * T-203: how many times the SDK itself tries again (its default is 2). The
+   * overflow client sets 0: the busy retry (ai/busy.ts) owns the waiting, and
+   * a busy overflow model means "busy on both".
+   */
+  maxRetries?: number
+  /** T-203: the longest one request may take, ms (the SDK's default is 10 minutes) */
+  timeoutMs?: number
+  /** T-203, local checks only: a stand-in for the provider (factory.ts honours it only in development) */
+  baseUrl?: string
+}
+
+/** A header from the SDK's error, whichever shape this SDK version gives it */
+function headerOf(headers: unknown, name: string): string | undefined {
+  if (!headers || typeof headers !== 'object') return undefined
+  const get = (headers as { get?: unknown }).get
+  if (typeof get === 'function') return (get.call(headers, name) as string | null) ?? undefined
+  const value = (headers as Record<string, unknown>)[name]
+  return typeof value === 'string' ? value : undefined
 }
 
 export class AnthropicClient implements AiClient {
@@ -83,7 +103,12 @@ export class AnthropicClient implements AiClient {
   readonly route: ModelRoute
 
   constructor(config: AnthropicClientConfig) {
-    this.client = new Anthropic({ apiKey: config.apiKey })
+    this.client = new Anthropic({
+      apiKey: config.apiKey,
+      ...(config.maxRetries !== undefined && { maxRetries: config.maxRetries }),
+      ...(config.timeoutMs !== undefined && { timeout: config.timeoutMs }),
+      ...(config.baseUrl && { baseURL: config.baseUrl }),
+    })
     this.model = config.model
     this.maxTokens = config.maxTokens ?? 16000
     this.usage = config.usage
@@ -142,7 +167,14 @@ export class AnthropicClient implements AiClient {
       ...(schema
         ? { output_config: { format: { type: 'json_schema', schema: toClaudeJsonSchema(schema) } } }
         : {}),
-    }, options?.signal ? { signal: options.signal } : undefined)
+    }, options?.signal ? { signal: options.signal } : undefined).catch((error: unknown) => {
+      // T-203: a busy answer (rate limited or overloaded) is told apart for the busy retry
+      // (ai/busy.ts). Every other error is thrown exactly as the SDK gave it.
+      if (error instanceof Anthropic.APIError && isBusyAnswer(error.status, error.message)) {
+        throw new AiProviderError(`Claude API error: ${error.status ?? ''} ${error.message}`.trim(), error.status, true, parseRetryAfter(headerOf(error.headers, 'retry-after')))
+      }
+      throw error
+    })
 
     this.usage?.(response.usage.input_tokens ?? 0, response.usage.output_tokens ?? 0, Date.now() - startedAt)
 

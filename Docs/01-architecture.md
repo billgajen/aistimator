@@ -63,6 +63,11 @@
    - if the quote needs a customer answer, it stops at `awaiting_clarification` with the
      provisional range and saves a reprice snapshot (first-pass AI outputs in `signals_json._reprice`)
    - per-stage timings and AI calls per task are stored in `pricing_trace_json.timings` / `.aiUsage`
+   - T-203: every AI call waits for a busy provider (about 2, 5, 10 s, honouring Retry-After) and is then
+     sent to the task's overflow model if it has one (`ai/busy.ts`; the registry's `overflow`). A run in
+     which a call was busy on every provider saves nothing: it stops at a checkpoint and the job is put back
+     (60, 90, 120 s) without using a real try, at most 10 times and 15 minutes from arrival, then the quote
+     is marked failed as usual (AD-095, AD-096)
    - run rules engine using tenant pricing config to compute price and breakdown
    - generate wording (scope summary, notes)
    - generate hosted quote page data

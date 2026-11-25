@@ -7,10 +7,16 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
+  AI_BUSY_LOOK_BACK_MINUTES,
+  AI_BUSY_WINDOW_MINUTES,
   QUEUE_LOOK_BACK_HOURS,
   QUEUE_WAIT_MINUTES,
+  busyAlertDue,
+  countBusy,
   raiseOpsAlert,
   stillWaiting,
+  type BusyCount,
+  type BusyRow,
   type OpsAlert,
   type OpsAlertKind,
   type OpsAlertOutcome,
@@ -114,3 +120,51 @@ export async function checkQueue(
   )
   return { waiting: ids.length, stuck: stuck.length, alert }
 }
+
+/**
+ * T-203: the second half of the 5-minute check. It adds up the busy retries
+ * and overflow calls of the last window from what each quote stored (its
+ * timings, or its busy note while it waits), and emails the owner once when a
+ * threshold is passed (at most one `ai_busy` email an hour, like every kind).
+ * The email carries the counts and nothing else. It never throws: a count
+ * that cannot be read is "nothing to report".
+ */
+export async function checkBusy(
+  supabase: SupabaseClient,
+  env: OpsAlertEnv,
+  now: Date = new Date(),
+  send: Send = sendEmail
+): Promise<{ count: BusyCount; alert: OpsAlertOutcome | 'none' }> {
+  const none: BusyCount = { busyRetries: 0, overflowCalls: 0, requeued: 0, quotes: 0 }
+  try {
+    const after = new Date(now.getTime() - AI_BUSY_LOOK_BACK_MINUTES * 60_000).toISOString()
+    const { data, error } = await supabase
+      .from('quotes')
+      .select('timings:pricing_trace_json->timings, busy:content_json->busy')
+      .gt('created_at', after)
+      .order('created_at', { ascending: false })
+      .limit(2000)
+    if (error) return { count: none, alert: 'none' }
+    const count = countBusy((data ?? []) as BusyRow[], now.getTime() - AI_BUSY_WINDOW_MINUTES * 60_000, now.getTime())
+    if (!busyAlertDue(count)) return { count, alert: 'none' }
+    const alert = await sendOpsAlert(
+      supabase,
+      env,
+      {
+        kind: 'ai_busy',
+        details: {
+          'Busy retries': count.busyRetries,
+          'Calls sent to the overflow provider': count.overflowCalls,
+          'Requests put back to wait': count.requeued,
+          'Requests that met any of it': count.quotes,
+          'Minutes counted': AI_BUSY_WINDOW_MINUTES,
+        },
+      },
+      send
+    )
+    return { count, alert }
+  } catch {
+    return { count: none, alert: 'none' }
+  }
+}
+

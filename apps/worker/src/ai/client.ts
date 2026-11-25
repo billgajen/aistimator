@@ -63,6 +63,14 @@ export interface AiEnv {
   ENVIRONMENT?: string
   /** T-183, local checks only: 'off' makes the worker ask no model (see aiStandInOn) */
   AI_STAND_IN?: string
+  /**
+   * T-203, local checks only (ignored unless ENVIRONMENT is "development"):
+   * stand-ins for the two providers, and shorter waits between busy retries
+   * ("20,50,100", in ms), so a check does not sit through the real ones.
+   */
+  AI_GEMINI_BASE_URL?: string
+  AI_ANTHROPIC_BASE_URL?: string
+  AI_BUSY_WAITS_MS?: string
 }
 
 /**

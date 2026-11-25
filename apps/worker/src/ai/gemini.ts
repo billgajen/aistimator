@@ -10,6 +10,7 @@
 
 import type { AiClient, GenerationOptions, UsageSink } from './client'
 import { parseModelJson } from './client'
+import { AiProviderError, isBusyAnswer, parseRetryAfter, retryDelayFromBody } from './busy'
 import type { ModelRoute, ThinkingLevel } from '@qolumns/shared'
 import { resolveModelRoute, modelCapabilities, type ModelCapabilities } from '@qolumns/shared'
 
@@ -22,6 +23,8 @@ export interface GeminiConfig {
   thinkingLevel?: ThinkingLevel | null
   /** T-135: per-quote token accounting */
   usage?: UsageSink
+  /** T-203, local checks only: a stand-in for the provider (factory.ts honours it only in development) */
+  baseUrl?: string
 }
 
 export interface GeminiMessage {
@@ -56,9 +59,11 @@ export class GeminiClient implements AiClient {
   private thinkingLevel: ThinkingLevel | null
   private usage?: UsageSink
   private caps: ModelCapabilities
+  private baseUrl: string
   readonly route: ModelRoute
 
   constructor(config: GeminiConfig) {
+    this.baseUrl = config.baseUrl || GEMINI_API_BASE
     this.apiKey = config.apiKey
     this.model = config.model || resolveModelRoute('wording').model
     this.maxTokens = config.maxTokens || 4096
@@ -170,7 +175,7 @@ export class GeminiClient implements AiClient {
     },
     options?: GenerationOptions
   ): Promise<string> {
-    const url = `${GEMINI_API_BASE}/${this.model}:generateContent?key=${this.apiKey}`
+    const url = `${this.baseUrl}/${this.model}:generateContent?key=${this.apiKey}`
 
     const generationConfig: Record<string, unknown> = {
       maxOutputTokens: options?.maxOutputTokens ?? this.maxTokens,
@@ -203,7 +208,13 @@ export class GeminiClient implements AiClient {
 
     if (!response.ok) {
       const errorText = await response.text()
-      throw new Error(`Gemini API error: ${response.status} ${errorText}`)
+      // T-203: the same message as before, with what the busy retry needs (ai/busy.ts)
+      throw new AiProviderError(
+        `Gemini API error: ${response.status} ${errorText}`,
+        response.status,
+        isBusyAnswer(response.status, errorText),
+        parseRetryAfter(response.headers.get('retry-after')) ?? retryDelayFromBody(errorText)
+      )
     }
 
     const data: GeminiResponse = await response.json()

@@ -217,6 +217,37 @@ what `pnpm check:failed` reads. The exit code is 0 only when everything passed.
   rewrites in `package.json`. `npx expo export --platform android` proves the JavaScript bundles for Android.
 - **A fixture that needs three plan cards no longer exists:** since T-200 two plans are offered.
 
+## T-203: stand-in AI providers, the load test, the overflow proof
+
+- **`verify-t203` (quick, no model):** `scripts/hardcore-test/verify-t203.mts` starts one small HTTP server on
+  port 8791 that stands in for both AI providers (a request's path names its case, and each case has a script of
+  answers: 429, 503, 529, 400, or a real-shaped answer). The worker's own code runs in-process against it and
+  the local database: the clients `createAiClient` makes (busy then an answer, Retry-After, overflow, busy on
+  both, a real error, a busy photo read that its caller swallowed), `handleQuoteJob` with the real quote row
+  (the count kept on the quote, the two bounds, the quote marked failed), a request priced by the real worker
+  (the counts in its timings), `checkBusy` (the window's count and the hour limit, with a stand-in for sending),
+  and the load test's refusals.
+- **The stand-in addresses** are worker settings honoured only when `ENVIRONMENT` is "development":
+  `AI_GEMINI_BASE_URL`, `AI_ANTHROPIC_BASE_URL`, and `AI_BUSY_WAITS_MS` ("40,80,120") for shorter waits. The
+  script passes them to `createAiClient` itself; the worker the runner starts does not have them.
+- **The load test** (`scripts/load-test/run.mts`, not a check, never run by the runner):
+  `npx tsx scripts/load-test/run.mts --url http://localhost:3000 --n 25`. Start the worker with the real model
+  (no `AI_STAND_IN`). The web app decides the path: `next dev` prices each request directly (the POST waits and
+  there is no queue wait to report); with `SYNC_QUOTE_PROCESSING=false`, or a built app, requests go through the
+  worker's local queue. Photos come from `test-assets/hardcore/` (git-ignored, on the owner's Mac only). It
+  costs real model calls: about $0.31 for 25 (25 Nov 2026).
+- **The overflow proof** (`scripts/load-test/overflow-proof.mts`, needs `ANTHROPIC_API_KEY` in
+  `apps/worker/.dev.vars`): 11 fixed cases over the pipeline's four tasks, each run on the task's own model and
+  on the candidate, under the pipeline's own time cap. Where each input and tolerance comes from:
+  `extraction_pass`: a signals read of the demo's sample room (shape only) and a three-pass measurement of the
+  S01 photos (18 to 72 sqm, the GB painting pack's envelope, `scenarios.mjs`); `identification`: the demo's
+  water-heater label ("50 gal", "Natural gas", as verify-t153/t169/t171) and the two T-139 labels ("Medium";
+  nothing from the blurred one); `adjudication`: the S01 photos with three fixed junior takeoffs (the same
+  envelope); `wording`: verify-t172's spring fixture through wording and repair, verify-t148's three sentences
+  through the rewriter, and verify-t172's three checker cases. There is no fixed set for add-on detection, the
+  question gate, cross-service notes or recommendations, which share the `wording` client; the script says so.
+  `--task <name>`, `--case <id>`, `--primary-only`, `--repeats <n>`. Exit 0 all proven, 1 a failure, 2 no key.
+
 ## T-202: one script, two sections; the icons
 
 - **`verify-t202` (quick, no model, a browser):** `scripts/hardcore-test/verify-t202.mts` runs the sections in

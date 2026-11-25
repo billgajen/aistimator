@@ -28,6 +28,7 @@ pnpm-debug.log*
 coverage/
 test-assets/
 scripts/hardcore-test/results/
+scripts/load-test/results/
 .turbo/
 .vercel
 .claude/skills/design-taste-frontend/

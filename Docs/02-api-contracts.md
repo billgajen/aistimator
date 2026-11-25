@@ -214,6 +214,8 @@ T-201 (billing, the service area, customer emails):
   `claim_ops_alert(p_kind, p_every_seconds)` (migration 45, service role only), which returns `send` and
   `held_back`. Kinds: `quote_failed`, `worker_error`, `queue_backed_up`. The worker gains a `scheduled`
   handler (production: every 5 minutes) that reads waiting quotes and changes none.
+  T-203 adds the kind `ai_busy` (counts only: busy retries, overflow calls, requests put back), raised by the
+  same handler when a five-minute window has 20 busy retries or 5 overflow calls. No route and no new column.
 - **The public quote's price lines**: the customer's page words an added line from the line's `source`
   (`seen` / `words`), not from `recommendationReason`, which is still sent and no longer shown.
 

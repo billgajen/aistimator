@@ -57,6 +57,8 @@ import type { MainServiceContext } from './ai/service-detection'
 import type { WordingContext } from './ai/wording'
 import { withAiTimeout, aiCallTimeoutMs } from './ai/timeouts'
 import { createAiClient } from './ai/factory'
+import { AiBusyLog } from './ai/busy'
+import type { BusyState } from './queue-consumer'
 import type { AiClient } from './ai/client'
 import type { QuantityProvenance } from '@qolumns/shared'
 import type { QuestionField } from './agents/question-choices'
@@ -442,6 +444,8 @@ export async function processQuote(
   quoteToken?: string, // Plain text token for email links
   options: {
     queueWaitMs?: number
+    /** T-203: what earlier runs of this job met with busy models (the queue consumer reads it off the quote) */
+    busyBefore?: BusyState
     /** Only run the deterministic reprice; return `notRepriceable` instead of the full pipeline */
     repriceOnly?: boolean
     /**
@@ -457,6 +461,11 @@ export async function processQuote(
   console.log(`[Processor] Starting quote processing: ${quoteId}`)
   const timer = new StageTimer()
   timer.queueWaitMs = options.queueWaitMs
+  // T-203: one log of busy answers for this run, shared by every AI client it makes. The
+  // checkpoints below (the log's "throw if exhausted") stop the run before anything is saved or
+  // sent when a call ended busy on every provider; the queue puts the job back.
+  const busy = new AiBusyLog()
+  timer.busy = { log: busy, before: options.busyBefore }
 
   // 1. Load all quote data
   const quoteData = await timer.time('load', () => loadQuoteData(supabase, quoteId, options.section?.serviceId))
@@ -644,8 +653,8 @@ export async function processQuote(
   // tokens are metered for the per-quote AI cost estimate in the trace
   const aiUsage = new AiUsageMeter()
   // T-179: section mode makes no AI call at all (both clients off; every AI step below is gated on them)
-  const gemini = options.section ? null : createAiClient('extraction_pass', env, aiUsage) // vision: signals, measurement, inventory
-  const textAi = options.section ? null : createAiClient('wording', env, aiUsage) // text: wording, addons, gate, validator, cross-service
+  const gemini = options.section ? null : createAiClient('extraction_pass', env, aiUsage, { busy }) // vision: signals, measurement, inventory
+  const textAi = options.section ? null : createAiClient('wording', env, aiUsage, { busy }) // text: wording, addons, gate, validator, cross-service
 
   // Extract customer notes for context
   const notesAnswer = quoteRequest.job_answers?.find(
@@ -823,7 +832,7 @@ export async function processQuote(
       idTargets.length > 0 && images.length > 0
         ? timer.time('identification', () =>
             identifyFromLabels({
-              ai: createAiClient('identification', env, aiUsage),
+              ai: createAiClient('identification', env, aiUsage, { busy }),
               images,
               targets: idTargets,
               timeoutMs: Number(env.IDENTIFICATION_TIMEOUT_MS ?? DEFAULT_IDENTIFICATION_TIMEOUT_MS) || 0,
@@ -843,6 +852,8 @@ export async function processQuote(
         : Promise.resolve(null),
       runIdentification(),
     ])
+    // T-203: a photo read that found the model busy everywhere is not priced around
+    busy.throwIfExhausted()
     signals = extractionResult.signals
     structuredSignals = extractionResult.structuredSignals
 
@@ -896,7 +907,7 @@ export async function processQuote(
             )
             // T-135: senior model from the registry ('adjudication' route;
             // ADJUDICATION_MODEL / AI_MODEL_ADJUDICATION override, Claude pluggable)
-            const adjudicator = createAiClient('adjudication', env, aiUsage)
+            const adjudicator = createAiClient('adjudication', env, aiUsage, { busy })
             const target = targets.find((t) => t.signalKey === m.signalKey)!
             const adjudicated = await timer.time('adjudication', () => adjudicateMeasurement({
               adjudicator,
@@ -2293,6 +2304,8 @@ export async function processQuote(
       console.log(`[Processor] Quality gate: ${qualityGateResult.action}`)
 
       if (qualityGateResult.action === 'ask_clarification' && qualityGateResult.questions) {
+        // T-203: nothing is saved from a run in which a model was busy on every provider
+        busy.throwIfExhausted()
         // Set status to awaiting_clarification, store questions, return early
         const { error: clarifyError } = await supabase
           .from('quotes')
@@ -2456,6 +2469,11 @@ export async function processQuote(
   if (awaitingBusinessReview) {
     console.log(`[Processor] Held for business review (${shownEarly ? 'estimate shown to the customer' : 'hidden until approved'})`)
   }
+
+  // T-203: the last checkpoint. A call that ended busy on every provider left its caller
+  // on a fallback (no photo reading, template wording, no check): that result is not
+  // saved or sent. The job goes back on the queue (queue-consumer.ts).
+  busy.throwIfExhausted()
 
   // 5. Update quote record with signals and pricing trace
   const { error: updateError } = await supabase
