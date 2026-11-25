@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { PRODUCT_NAME, SUPPORT_EMAIL, freeOfferLabel, operatorLine } from '@qolumns/shared'
 import { Wordmark } from '@/components/brand/Wordmark'
-import { DATA_DELETION, FOOTER } from '@/lib/marketing/site-copy'
+import { DATA_DELETION, FOOTER, SUPPORT_PAGE } from '@/lib/marketing/site-copy'
 import { templateTrades, tradeHref } from '@/lib/marketing/trades'
 import { listPacks } from '@/lib/vertical-packs'
 
@@ -66,6 +66,7 @@ export function SiteFooter() {
               <p className={COLUMN_TITLE}>{FOOTER.columns.company}</p>
               <ul className="mt-3 text-sm sm:space-y-2">
                 <li><Link href="/login" className={FOOT_LINK}>{L.logIn}</Link></li>
+                <li><Link href={SUPPORT_PAGE.href} className={FOOT_LINK}>{SUPPORT_PAGE.label}</Link></li>
                 <li><a href={`mailto:${SUPPORT_EMAIL}`} className={FOOT_LINK}>{L.contact}</a></li>
               </ul>
             </div>

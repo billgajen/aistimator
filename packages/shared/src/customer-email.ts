@@ -120,6 +120,36 @@ export function customerPricePanel(input: { label: string; total: string; colour
  */
 export const ANSWER_CHANGE_FIELD = 'answer_to_customer'
 
+export interface AnswerToCustomer {
+  /** The business's answer, plain text */
+  answer: string
+  /** The customer's own question it answers, plain text ('' when it was not kept) */
+  question: string
+}
+
+/**
+ * T-205: the business's answer, read back from the changes of the revision it was sent with. Null
+ * when that revision carried none. Plain text, cleaned again on the way out: whoever shows it
+ * escapes it (the customer's page prints it as text).
+ */
+export function answerToCustomerOf(changes: unknown): AnswerToCustomer | null {
+  if (!Array.isArray(changes)) return null
+  for (const change of changes as Array<Record<string, unknown> | null>) {
+    if (!change || change.field !== ANSWER_CHANGE_FIELD) continue
+    const answer = cleanAnswerToCustomer(change.after)
+    if (!answer) continue
+    const asked = typeof change.before === 'string' ? change.before.replace(/\s+/g, ' ').trim() : ''
+    return { answer, question: asked.length > 240 ? `${asked.slice(0, 239)}…` : asked }
+  }
+  return null
+}
+
+/** "<Business>'s answer to your question": the heading over an answer, in an email and on the customer's page */
+export function answerHeading(businessName: string): string {
+  const name = businessName.trim()
+  return `${/s$/i.test(name) ? `${name}’` : `${name}’s`} answer to your question`
+}
+
 /** How long a business's answer to a customer's question may be, in an email (characters) */
 export const ANSWER_TO_CUSTOMER_MAX = 2000
 
@@ -151,9 +181,8 @@ export function businessAnswerHtml(input: { businessName: string; answer: string
   if (!answer) return ''
   const asked = (input.question ?? '').replace(/\s+/g, ' ').trim()
   const question = asked ? (asked.length > 240 ? `${asked.slice(0, 239)}…` : asked) : ''
-  const owner = /s$/i.test(input.businessName.trim()) ? `${input.businessName.trim()}’` : `${input.businessName.trim()}’s`
   return `<div data-role="business-answer" style="margin: 0 0 24px; padding: 16px; background-color: ${EMAIL_COLOR.surface}; border-left: 4px solid ${EMAIL_COLOR.juniper}; border-radius: 0 8px 8px 0;">
-      <p style="margin: 0 0 8px; font-weight: 600; color: ${EMAIL_COLOR.ink}; font-size: 14px;">${escapeHtml(owner)} answer to your question</p>
+      <p style="margin: 0 0 8px; font-weight: 600; color: ${EMAIL_COLOR.ink}; font-size: 14px;">${escapeHtml(answerHeading(input.businessName))}</p>
       ${question ? `<p data-role="your-question" style="margin: 0 0 8px; color: ${EMAIL_COLOR.muted}; font-size: 13px; line-height: 1.5;">You asked: “${escapeHtml(question)}”</p>` : ''}
       <p data-role="answer-text" style="margin: 0; color: ${EMAIL_COLOR.ink}; font-size: 15px; line-height: 1.5; white-space: pre-wrap;">${escapeHtml(answer)}</p>
     </div>`

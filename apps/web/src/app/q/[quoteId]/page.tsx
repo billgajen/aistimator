@@ -13,6 +13,7 @@ import { brandStyleVars } from '@/lib/color'
 import { timingLabel } from '@/lib/acceptance'
 import { TERMS_HEADING } from '@/lib/quote-terms'
 import type { QuoteViewResponse, QuoteStatus } from '@qolumns/shared'
+import { answerHeading } from '@qolumns/shared'
 import { formatMoney, formatDate, isQuoteProcessing, canCustomerDecide, customerDecisionWords, customerEstimateNote, splitLabelMath, PRODUCT_NAME, splitMinimum, withoutMinimumNote, crossServiceLine, SLOW_PREPARING_MS, slowPreparingLine, failedRequestTitle, failedRequestLine, willConfirmLine, addedForCustomer, startWaitingPoll, preparedForLine } from '@qolumns/shared'
 
 interface QuotePageProps {
@@ -501,6 +502,24 @@ export default function QuotePage({ params }: QuotePageProps) {
             version={quoteVersion}
             locale={locale}
           />
+
+          {/* T-205: the business's answer to the customer's question, above the price (the updated-quote
+              email shows the same). Plain text, printed as text. */}
+          {quote.businessAnswer && (
+            <section className="border-b border-border bg-surface px-6 py-6 sm:px-10" aria-labelledby="business-answer-title" data-testid="business-answer">
+              <h2 id="business-answer-title" className="text-xs font-semibold uppercase tracking-[0.14em] text-text-secondary">
+                {answerHeading(business.name)}
+              </h2>
+              {quote.businessAnswer.question && (
+                <p className="mt-2 text-sm leading-relaxed text-text-muted" data-testid="business-answer-question">
+                  You asked: “{quote.businessAnswer.question}”
+                </p>
+              )}
+              <p className="mt-2 whitespace-pre-wrap break-words text-[15px] leading-relaxed text-text-primary" data-testid="business-answer-text">
+                {quote.businessAnswer.answer}
+              </p>
+            </section>
+          )}
 
           {/* ============ The price instrument (signature) ============ */}
           <div className="px-6 sm:px-10 py-9 bg-primary text-on-primary">

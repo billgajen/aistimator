@@ -5,7 +5,7 @@
  * price, no "upgrade", no link to billing. An app may not point at a
  * purchase outside it.
  */
-import { DATA_DELETION_PATH, type AppAccountResponse } from '@qolumns/shared'
+import { DATA_DELETION_PATH, SUPPORT_PATH, type AppAccountResponse } from '@qolumns/shared'
 
 /** "Pro" or "Free quotes" */
 export function planLine(account: Pick<AppAccountResponse, 'planName'>): string {
@@ -35,6 +35,11 @@ export function usageFraction(account: Pick<AppAccountResponse, 'usage'>): numbe
  */
 export function deleteAccountUrl(webUrl: string): string {
   return `${webUrl.replace(/\/+$/, '')}${DATA_DELETION_PATH}`
+}
+
+/** T-205: the support page on the web (the App Store listing's support address) */
+export function supportUrl(webUrl: string): string {
+  return `${webUrl.replace(/\/+$/, '')}${SUPPORT_PATH}`
 }
 
 export function shortLink(url: string): string {

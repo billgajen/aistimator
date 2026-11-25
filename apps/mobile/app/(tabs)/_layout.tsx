@@ -26,6 +26,9 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.brand,
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: { fontFamily: fonts.semi, fontSize: 12 },
+        // T-205: the label under its icon on every screen size. On an iPad the bar puts a label beside
+        // its icon by itself, and the round centre button then sat on the first letter of "New quote".
+        tabBarLabelPosition: 'below-icon',
         tabBarAllowFontScaling: false,
         tabBarStyle: {
           height: 62 + insets.bottom,

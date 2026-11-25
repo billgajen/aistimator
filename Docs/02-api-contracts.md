@@ -1205,6 +1205,12 @@ T-201 (the quote link and estimates):
 - `GET /api/public/quotes/:id/pdf`: **404** `PDF_NOT_FOUND` while the price is withheld (`pending_review` not shown early, or `awaiting_clarification`), whether or not a PDF exists.
 - `POST /api/quotes/:id/pdf` (dashboard): the PDF prints the business's terms after the price and the notes, under "Terms and conditions", when it has any.
 
+T-205 (the business's answer on the customer's page):
+- `GET /api/public/quotes/{id}` may carry `businessAnswer: { answer, question }`: the business's answer to the
+  customer's question from the newest revision that had one (T-204's `answerToCustomer`), and the question it
+  answers. Plain text. Absent when no revision carried one, while the price is withheld, and on `?poll=1`.
+- `/support` is a public page (no sign-in): the App Store listing's Support URL.
+
 T-204 (the customer's PDF, and where a refused ZIP goes):
 - `GET /api/public/quotes/:id` → `actions.pdfUrl` is given whenever `customerCanDownloadPdf(status)` (shared `quote-status.ts`: `sent`, `viewed`, `feedback_received`, `revised`, `accepted`, `paid`, `expired`) and a PDF exists **or can be made** (the PDF service and storage are configured). It no longer needs a PDF the business made, and is never given for `pending_review`, shown early or not.
 - `GET /api/public/quotes/:id/pdf?token=…`: with no PDF for the quote's current price, **it makes one**, stores it and records it (`quotes.pdf_asset_id`), then answers as before with a redirect to the file (5 minutes; the file saves as `Quote-<id>.pdf`). `&format=json` answers `{ "downloadUrl", "fileName" }` instead (the page's button). **404** `PDF_NOT_FOUND` unless `customerCanDownloadPdf(status)`; **429** by address for every call and, only when a PDF has to be made, for the quote (`quote_pdf`: 10 a minute and 60 an hour by address; 3 a minute and 10 an hour of makes for one quote); a failed make is **503** with one plain line, never the PDF service's own words. Limits fail open.

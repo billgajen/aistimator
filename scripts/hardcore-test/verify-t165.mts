@@ -452,7 +452,8 @@ if (!process.env.PLAYWRIGHT_DIR) {
     const footLinks = await p.locator('footer a').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)))
     // T-187: four columns (four product links, six trades and "All trades", two company links, three legal
     // ones) and the support address: seventeen links
-    if (width < 500) check(`${width}: every footer link is 44 px tall`, footLinks.length === 17 && Math.min(...footLinks) >= 44, { count: footLinks.length, min: Math.min(...footLinks) })
+    // T-205: 18 with the "Support" link
+    if (width < 500) check(`${width}: every footer link is 44 px tall`, footLinks.length === 18 && Math.min(...footLinks) >= 44, { count: footLinks.length, min: Math.min(...footLinks) })
     // a fresh load, so Tab starts from the top of the page
     await p.goto(HOME, { waitUntil: 'domcontentloaded' })
     await p.locator('[data-testid=skip-link]').waitFor({ state: 'attached' })

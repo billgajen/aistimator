@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { quoteTokenFilter } from '@/lib/tokens'
+import { answerToCustomerOf, type AnswerToCustomer } from '@qolumns/shared'
 import { businessIsAsked, isMadeByBusiness, isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange, customerRangeAllowed, customerSeesNoFigure, reviewModeOf, canCustomerDecide, displaySectionsForCustomer, alsoAskedOf, alsoAskedWithStates, addedSections, roomScanOfAnswers, customerRoomScanView, customerCanDownloadPdf } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
@@ -308,6 +309,25 @@ export async function GET(
       questionPending = (count ?? 0) > 0
     }
 
+    // T-205: the business's answer to the customer's question, from the newest revision that carried
+    // one (T-204 keeps it in that revision's list of changes; the updated-quote email already shows
+    // it). Only on a quote that has been revised, and never while its price is withheld: an answer
+    // travels with the quote it was sent with.
+    let businessAnswer: AnswerToCustomer | null = null
+    if (!isProvisional && !isStatusPoll && (quote.version ?? 1) > 1) {
+      const { data: revisions } = await supabase
+        .from('quote_amendments')
+        .select('changes_json, created_at')
+        .eq('quote_id', quoteId)
+        .eq('tenant_id', quote.tenant_id)
+        .order('created_at', { ascending: false })
+        .limit(20)
+      for (const revision of (revisions ?? []) as Array<{ changes_json?: unknown }>) {
+        businessAnswer = answerToCustomerOf(revision.changes_json)
+        if (businessAnswer) break
+      }
+    }
+
     // T-133: locale + currency fallback come from the tenant's region
     const regionCtx = resolveRegionContext(tenant)
     const scanOfRequest = roomScanOfAnswers((requestOfQuote as { job_answers?: unknown } | null | undefined)?.job_answers)
@@ -416,6 +436,7 @@ export async function GET(
       // (T-147) while an estimate shown early awaits the business's approval.
       acceptQuoteEnabled: !isProvisional && !shownEarly && tenant.template_json?.acceptQuoteEnabled !== false,
       ...(questionPending && { questionPending: true }),
+      ...(businessAnswer && { businessAnswer }),
       // T-201: the business's "Default Terms & Conditions" (Settings), printed below the price. Only when
       // filled in, and only on a page that shows a price (a held quote shows no document at all).
       ...(!isProvisional && customerTerms(tenant.default_terms_text) && { terms: customerTerms(tenant.default_terms_text)! }),

@@ -15,6 +15,68 @@
 
 ## Issues & Resolutions
 
+### 2026-11-25: T-205 — App Store release prep: version 1.0.0, the support page, store pictures, and one T-204 leftover
+
+**Built, not deployed.** Web only (`npx vercel deploy --prod`). No worker, no migration, no pricing change. The
+app needs one production build for each store at 1.0.0 (OWNER-TODO).
+
+- **1. The app is version 1.0.0** for both stores (`apps/mobile/app.json`; the package says the same). Build
+  numbers are untouched: `eas.json` keeps `appVersionSource: "remote"` and `autoIncrement`, and nothing sets an
+  iOS build number. `supportsTablet` stays true.
+  - **The iPad check** (13-inch iPad Pro in the simulator, the dev build against the local stack, upright):
+    Quotes, a quote, New quote, Account, the QR code sheet and the sign-in screen. Two faults found and fixed:
+    - **Everything stretched from edge to edge**: rows and buttons a thousand points wide. `Screen`
+      (`src/components/ui.tsx`) now keeps every screen's content to one centred column, `layout.contentMaxWidth`
+      (720) wide. A phone is narrower than that, so nothing changes on a phone.
+    - **The round "New quote" button covered the first letter of its label.** On a wide screen the tab bar puts
+      a label beside its icon by itself; the raised centre button is drawn for a label underneath.
+      `tabBarLabelPosition: 'below-icon'` on every size.
+  - Nothing was cut off on any of the six screens after that.
+  - **Not seen:** the iPad on its side (it is supported: the iPad's orientations are all four, which Apple
+    requires of an iPad app that can share the screen; the simulator cannot be turned from this session), and a
+    real iPad. Seen and left: "On this phone" as a heading on an iPad.
+- **2. `/support`** (`apps/web/src/app/support/page.tsx`), in the plain-page style of `/data-deletion`: how to
+  write to us, "Ask Qolumns" in the dashboard's Help (a link to `/app`; there is no public Help page, the guide
+  is inside the dashboard), and links to the Privacy Policy, the Terms and "Delete your account". Open to
+  anyone. One address for all three places that use it: `SUPPORT_PATH` in shared `brand.ts`, the footer's
+  "Support" link (`SUPPORT_PAGE`), and the app's Account row "Support page" (`supportUrl`). "Help" in the app
+  still writes an email.
+- **3. The business's answer on the customer's quote page.** T-204 kept the answer in the list of changes of the
+  revision it was sent with and showed it in the email only. `answerToCustomerOf` (shared `customer-email.ts`)
+  reads it back; `GET /api/public/quotes/:id` sends `businessAnswer: { answer, question }` from the newest
+  revision that carried one; the page prints it above the price under the email's own heading (`answerHeading`).
+  - Only on a quote that has been revised and whose price the customer can see; never on a background status
+    check. A later revision sent without an answer leaves the earlier answer in place; a newer answer replaces it.
+  - Plain text, printed as text: characters a business types are shown as typed.
+- **4. `Docs/store/app-store/`** is committed as the owner made it: `header.png`, and five screens each in
+  `iphone-6.3/` and `ipad-13/` (and the five at the folder's top). No file was changed.
+- **5.** OWNER-TODO, "Later": iPhone Duo support before April 2027. Not built.
+
+#### Constraints
+- The support page's address is `SUPPORT_PATH`: the footer, the app and the store listing must not each type it.
+- A screen in the app is drawn inside `Screen`, or it stretches on an iPad (a unit test lists the six).
+- The customer's page shows an answer only through `answerToCustomerOf`, and only where a price is shown.
+
+#### Checks
+- Unit: web 2,147 (12 new in `release-t205`), app 240 (10 new), worker 926 (unchanged). Lint and typecheck clean.
+- Both app bundles build at 1.0.0: `npx expo export --platform ios` and `--platform android`. The resolved config
+  reads version 1.0.0, iPad support on, the iPad's four orientations, and no iOS build number.
+- `verify-t205` (new, quick level, no model, a browser): 30 of 30.
+- **`pnpm check:quick`, once: 31 of 34 (26 scripts, 2,264 checks) in 5 min 34 s.** Three failed, all on the new
+  footer link or on my own script, not on the product: a web unit test and `verify-t165` each counted the
+  footer's links (now one more, "Support"), and one check of `verify-t205` looked for the assistant's name in
+  the page without allowing for the empty comment React writes between a typed word and a value. All corrected.
+- **`pnpm check:failed`: 5 of 5 (t205 30 of 30, t165 148 of 148, the web unit suite) in 1 min 53 s.**
+- No `check:full` (the ticket: no pricing, worker or migration change).
+
+**Files:** `apps/mobile/{app.json,package.json}`, `apps/mobile/src/{theme.ts,components/ui.tsx,lib/account.ts}`,
+`apps/mobile/app/(tabs)/{_layout,account}.tsx`, `apps/web/src/app/support/page.tsx`,
+`apps/web/src/components/marketing/SiteFooter.tsx`, `apps/web/src/lib/marketing/site-copy.ts`,
+`apps/web/src/app/api/public/quotes/[quoteId]/route.ts`, `apps/web/src/app/q/[quoteId]/page.tsx`,
+`packages/shared/src/{brand,customer-email,api.types}.ts`, `scripts/hardcore-test/verify-t205.mts`,
+`scripts/checks/manifest.mjs`, tests `release-t205.test.ts` (web and app), `Docs/store/app-store/` (16 pictures,
+unchanged), Docs/help (four pages) and docs.
+
 ### 2026-11-25: T-204 — Fixes and improvements from the live test run, pricing first (AD-097 to AD-100)
 
 **Built, not deployed.** Needs the **worker** first, then the **web**. No migration. A **new app build** is

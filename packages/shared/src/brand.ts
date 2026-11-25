@@ -60,6 +60,12 @@ export const EMBED_NAMES = {
  */
 export const DATA_DELETION_PATH = '/data-deletion'
 
+/**
+ * T-205: the support page. It is the App Store's "Support URL", the website's footer links to it and
+ * so does the app's Account screen, so the three cannot point at different places.
+ */
+export const SUPPORT_PATH = '/support'
+
 /** The brand colour a new business starts with (migration 3 default). */
 export const DEFAULT_PRIMARY_COLOR = '#2563eb'
 

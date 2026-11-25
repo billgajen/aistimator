@@ -12,7 +12,7 @@ import { useFocusEffect, useRouter } from 'expo-router'
 import Constants from 'expo-constants'
 import { ADDRESS_COPY, PRODUCT_NAME, PUSH_COPY, SUPPORT_EMAIL, type AppAccountResponse } from '@qolumns/shared'
 import { useApi } from '../../src/lib/api-context'
-import { deleteAccountUrl, planLine, shortLink, usageFraction, usageLine } from '../../src/lib/account'
+import { deleteAccountUrl, planLine, shortLink, supportUrl, usageFraction, usageLine } from '../../src/lib/account'
 import { config } from '../../src/lib/config'
 import { rememberLink } from '../../src/lib/link-memory'
 import { currentUserId } from '../../src/lib/supabase'
@@ -195,6 +195,13 @@ export default function Account() {
             note={`Email ${supportEmail}`}
             icon="help-circle-outline"
             onPress={() => void Linking.openURL(`mailto:${supportEmail}?subject=${encodeURIComponent(`${PRODUCT_NAME} app`)}`).catch(() => setError(`Write to ${supportEmail} from your email.`))}
+          />
+          {/* T-205: the support page on the web (how to get help, the policies, account deletion) */}
+          <LinkRow
+            title="Support page"
+            note="Opens on the web"
+            icon="open-outline"
+            onPress={() => void Linking.openURL(supportUrl(config.apiUrl)).catch(() => setError(`Write to ${supportEmail} from your email.`))}
           />
           <LinkRow title="Sign out" icon="log-out-outline" onPress={signOut} />
           {/* T-191: Apple asks for a clear way to delete the account; it is closed on the web (data deletion page) */}

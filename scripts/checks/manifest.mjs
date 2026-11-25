@@ -156,6 +156,8 @@ export const SCRIPTS = [
   // T-204: four sections sharing T-201's harness (pricing; the customer's side; emails; the dashboard),
   // most of them with a browser
   { id: 't204', server: 'standard', model: 'none', browser: true, minutes: 30 },
+  // T-205: the support page and the business's answer on the customer's page (T-201's harness, a browser)
+  { id: 't205', server: 'standard', model: 'none', browser: true },
 ]
 
 /** Lint, typecheck and unit tests: every level runs these first */

@@ -36,6 +36,13 @@ export const colors = {
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 }
 
+/**
+ * T-205: the widest a screen's content gets. On a phone nothing changes (no phone is this wide).
+ * On an iPad the content is one readable column in the middle of the screen, instead of rows and
+ * buttons stretched a thousand points from edge to edge.
+ */
+export const layout = { contentMaxWidth: 720 }
+
 /** The web's one radius scale: 6 small controls, 8 buttons and fields, 12 cards, 16 panels */
 export const radius = { sm: 6, md: 8, lg: 12, xl: 16 }
 

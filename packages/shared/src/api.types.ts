@@ -247,6 +247,12 @@ export interface QuoteViewResponse {
    * second question; Accept and Decline stay available.
    */
   questionPending?: boolean
+  /**
+   * T-205: the business's answer to the customer's question, sent with a revised quote (T-204), and
+   * the question it answers. Plain text. Shown above the price as "<Business>'s answer to your
+   * question"; absent when no revision carried one, and while the price is withheld.
+   */
+  businessAnswer?: { answer: string; question: string }
   /** T-193: "Measured on site": each scanned room's floor and wall area, its floor plan and its 3D model */
   roomScan?: CustomerRoomScanView
   /**

@@ -202,7 +202,7 @@ While an estimate waits for your approval, the customer cannot accept. With "Sho
 The quote moves to "Needs you" with the status "Customer asked a question", and you are emailed. Their message is on the quote's page, in a box marked "Customer question".
 
 1. Open the quote and read the message. It is also in the email you were sent, whose subject names the customer: "Derek asked a question about their quote".
-2. To answer in writing with the estimate, press "Edit". The editor shows their question and an optional box, "Your answer to" with the customer's first name. Write your answer, make any change the estimate needs, and press "Save & Send". The customer's email shows your answer above the price, under your business name and "answer to your question", and the question is marked answered.
+2. To answer in writing with the estimate, press "Edit". The editor shows their question and an optional box, "Your answer to" with the customer's first name. Write your answer, make any change the estimate needs, and press "Save & Send". The customer's email and their estimate page both show your answer above the price, under your business name and "answer to your question", with the question they asked, and the question is marked answered.
 3. Or answer them yourself. Under "Next step" there is an "Email" button and, when you have their number, a "Call" button, each with the customer's first name. Then press "Mark as answered".
 
 Your answer is sent only with "Save & Send". A plain "Save" keeps your changes and sends nothing, and {{product}} never sends a reply on its own.

@@ -15,7 +15,7 @@ import { useEffect, useRef, useState, type ComponentProps, type ComponentRef, ty
 import { ActivityIndicator, Animated, KeyboardAvoidingView, Pressable, StyleSheet, Switch, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, fonts, icon, radius, scale, space, tabular, touch, type } from '../theme'
+import { colors, fonts, icon, layout, radius, scale, space, tabular, touch, type } from '../theme'
 import { tap, useReduceMotion } from '../lib/feel'
 import type { ToneStyle } from '../lib/status'
 
@@ -37,7 +37,12 @@ export function Icon({ name, size = icon.row, color = colors.ink, label }: { nam
 }
 
 export function Screen({ children }: { children: ReactNode }) {
-  return <View style={styles.screen}>{children}</View>
+  // T-205: one column, centred, never wider than `layout.contentMaxWidth` (an iPad; a phone is narrower)
+  return (
+    <View style={styles.screen}>
+      <View style={styles.screenColumn}>{children}</View>
+    </View>
+  )
 }
 
 /**
@@ -419,6 +424,7 @@ export function EmptyState({ icon: name, title, text, children }: { icon: IconNa
 
 export const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.paper },
+  screenColumn: { flex: 1, width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center' },
   keyboardSpace: { flex: 1 },
   topBar: { paddingHorizontal: space.lg, paddingBottom: space.md, backgroundColor: colors.paper, borderBottomWidth: 1, borderBottomColor: colors.line },
   topBarRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },

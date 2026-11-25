@@ -4214,3 +4214,50 @@ Built 25 November 2026. **Not deployed.** Worker first, then web. No migration. 
   Two things of mine can be cleared when you want the space: Xcode's build cache
   (`~/Library/Developer/Xcode/DerivedData`, about 5 GB) and old check results
   (`scripts/hardcore-test/results`, about 3 GB, 1,900 folders). I deleted nothing.
+
+## T-205 — App Store release prep (version 1.0.0, support page, store pictures)
+
+Built 25 November 2026. **Not deployed.** Web only; no worker, no migration.
+
+### What you must do
+
+- [ ] **Deploy the web** (`npx vercel deploy --prod` from the repo root), after T-204's worker and web if those
+  are not out yet. The support page and the answer on the customer's page are in it. Deploy it **before** you
+  submit the app: the App Store's reviewer opens the support address, and the app's "Support page" row opens it.
+- [ ] **In App Store Connect, set the Support URL to `https://qolumns.com/support`.** The Privacy Policy URL
+  stays `https://qolumns.com/privacy`.
+- [ ] **Make the two production builds at 1.0.0** (from `apps/mobile`):
+  - iPhone and iPad: `npx eas-cli@latest build -p ios --profile production`
+  - Android: `npx eas-cli@latest build -p android --profile production`
+  - The version a store shows is 1.0.0 for both. The build numbers are kept by EAS and go up by themselves
+    (Android's next is 4); nothing is typed for them.
+  - iOS needs the paid Apple Developer account signed in to EAS (the note under T-192 and T-202).
+- [ ] **Upload the pictures** from `Docs/store/app-store/`: `iphone-6.3/` for the 6.3-inch iPhone set, `ipad-13/`
+  for the 13-inch iPad set, and `header.png`. They are committed as you made them; I changed nothing in them.
+- [ ] **Turn one iPad on its side before you submit.** The app supports an iPad in both directions (Apple requires
+  that of an iPad app that can share the screen). I looked at it upright only: the simulator cannot be turned
+  from here.
+
+### What changed
+
+- **Version 1.0.0**, iPad support still on. On an iPad every screen is now one column in the middle (it used to
+  stretch from edge to edge), and a tab's label sits under its icon (the round "New quote" button was covering
+  the first letter of its label).
+- **`/support`** on the website: how to reach us, "Ask Qolumns" in the dashboard's Help, and links to the
+  Privacy Policy, the Terms and "Delete your account". The footer links to it, and so does the app's Account
+  screen ("Support page").
+- **Your answer to a customer's question** (T-204) now also shows on the customer's own quote page, above the
+  price, under "<Business>'s answer to your question", with the question they asked. As in the email.
+
+### Not proven here
+
+- **An iPad on its side**, and **a real iPad**: I saw the 13-inch iPad in the simulator, upright.
+- **The production builds themselves**: both bundles build here at 1.0.0 and the settings are checked by tests;
+  the store builds are made by EAS when you run the two commands.
+- One small thing seen and left: on an iPad the Quotes screen still says "On this phone" above a quote you
+  started and did not finish.
+
+### Later (not built)
+
+- **iPhone Duo support, before April 2027.** Build with the iOS 27.1 SDK, test the app in the Duo simulator
+  (both screens, folded and open), then make the Duo screenshots for the listing. Not started.

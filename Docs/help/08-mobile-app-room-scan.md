@@ -63,6 +63,12 @@ Trying again does not use another quote from your plan. You can try one request 
 {{#soon app}}The app is {{soon}}, so there is nothing to sign in to today. When it is live, you will sign in with the same email and password you use for your dashboard. There is no separate account.{{/soon}}
 {{#live app}}Sign in with the same email and password you use for your dashboard. There is no separate account. If you have forgotten your password, reset it on the web sign-in page first, then sign in to the app.{{/live}}
 
+## Does the phone app work on an iPad?
+<!-- id: app-ipad; page: /app; flags: app -->
+
+{{#soon app}}The app is {{soon}}. When it is live it will run on an iPad as well as an iPhone, with the same screens.{{/soon}}
+{{#live app}}Yes. The same app runs on an iPad. Its screens are the same as on an iPhone, kept to one column in the middle of the wider screen. Taking photos works with the iPad's camera.{{/live}}
+
 ## Will my phone tell me when a customer sends a request?
 <!-- id: app-notifications; page: /app/settings/notifications; flags: app -->
 

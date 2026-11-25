@@ -138,7 +138,7 @@ You get an email, and the quote moves to "Needs you" with the status "Customer a
 The email's subject names the customer, for example "Derek asked a question about their quote", and the question itself is in the email.
 
 1. Open the quote. The question is near the top, marked "Customer question".
-2. To answer and send the quote in one go, press "Edit". The editor shows the question and a box, "Your answer to" with the customer's first name. Write your answer, change the quote if you need to, and press "Save & Send". The customer's email shows your answer above the price, and the question is marked answered.
+2. To answer and send the quote in one go, press "Edit". The editor shows the question and a box, "Your answer to" with the customer's first name. Write your answer, change the quote if you need to, and press "Save & Send". The customer's email shows your answer above the price, and so does their estimate page whenever they open it. The question is marked answered.
 3. Or answer the customer yourself, by email or phone, and press "Mark as answered". Their details are on the quote's page.
 
 The quote then goes back to "Waiting for customer". The answer box is optional, and it is sent only with "Save & Send": a plain "Save" does not send it. The customer can still accept the quote while their question is open.

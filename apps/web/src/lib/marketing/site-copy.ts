@@ -4,7 +4,7 @@
  * components; the words "AI" and what it does now live only in the copy
  * files, where each claim names its row of Docs/design/ai-capabilities.md.
  */
-import { DATA_DELETION_PATH } from '@qolumns/shared'
+import { DATA_DELETION_PATH, SUPPORT_PATH } from '@qolumns/shared'
 import { says } from './ai-claims'
 
 /**
@@ -60,6 +60,12 @@ export const PRICING_AI_FAQ = {
  * "Data deletion instructions URL" (OWNER-TODO, T-181). The footer links to it.
  */
 export const DATA_DELETION = { href: DATA_DELETION_PATH, label: 'Delete your data' } as const
+
+/**
+ * T-205: the support page (how to get help, and where the Help guide, the Privacy Policy, the Terms
+ * and account deletion are). Its address is the App Store listing's "Support URL" (OWNER-TODO, T-205).
+ */
+export const SUPPORT_PAGE = { href: SUPPORT_PATH, label: 'Support' } as const
 
 /** Pricing page: the two plan lines that are shown, not only told (they link to the live demo) */
 export const PRICING_DEMO_LINKS = {
