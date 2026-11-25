@@ -8,7 +8,7 @@ import {
   sendEmail,
   isPostmarkConfigured,
 } from '@/lib/postmark'
-import { generateFeedbackNotificationEmailHtml } from '@/lib/email-templates'
+import { customerQuestionEmailWords, generateFeedbackNotificationEmailHtml } from '@/lib/email-templates'
 import { resolveBusinessEmail } from '@/lib/business-email'
 import { notifyPhones } from '@/lib/push'
 import type { SubmitFeedbackRequest, SubmitFeedbackResponse } from '@qolumns/shared'
@@ -60,7 +60,7 @@ export async function POST(
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
       .select(`
-        id, status, tenant_id, quote_token_hash, token_expires_at, is_demo,
+        id, status, tenant_id, quote_token_hash, token_expires_at, is_demo, is_test,
         customer_json, service_id, review_hold, pricing_json, content_json,
         tenants!tenant_id (
           id, name, branding_json
@@ -168,6 +168,10 @@ export async function POST(
       const dashboardUrl = `${appUrl}/app/quotes/${quoteId}`
       const branding = tenant.branding_json || { primaryColor: '#2563eb' }
 
+      // T-204: the subject says who asked and what ("Derek asked a question about their quote"),
+      // and the customer's words are in the email. A request made from the business's own test
+      // is marked "[Test]", as the review email is.
+      const isTest = (quote as { is_test?: boolean }).is_test === true
       const htmlBody = generateFeedbackNotificationEmailHtml({
         businessName: tenant.name,
         customerName: customer.name,
@@ -176,12 +180,13 @@ export async function POST(
         feedbackText: body.feedbackText?.trim(),
         dashboardUrl,
         primaryColor: branding.primaryColor,
+        isTest,
       })
 
       const emailResult = await sendEmail({
         from: { kind: 'business' },
         to: businessEmail,
-        subject: `Customer ${body.feedbackType === 'approval_request' ? 'review request' : 'feedback'} on quote: ${customer.name}`,
+        subject: customerQuestionEmailWords({ customerName: customer.name, feedbackType: body.feedbackType, isTest }).subject,
         htmlBody,
         tag: 'quote-feedback',
       })

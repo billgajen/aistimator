@@ -7,7 +7,7 @@
  * Plain wording, the product's name, one button. The link in each is made by
  * the server (lib/auth-flow.ts) and works once.
  */
-import { EMAIL_FONT, PRODUCT_NAME, emailHeadStyle, productLogoRow } from '@qolumns/shared'
+import { PRODUCT_NAME, emailShell, productLogoRow } from '@qolumns/shared'
 
 /**
  * How long a link in these emails works, in minutes. It is Supabase's
@@ -36,24 +36,11 @@ interface AuthEmail {
 function layout(parts: { title: string; paragraphs: string[]; button: { label: string; url: string }; after: string[] }): string {
   const paragraph = (text: string) => `<p style="margin: 0 0 16px; color: #4F5D57; font-size: 16px; line-height: 1.5;">${text}</p>`
   const small = (text: string) => `<p style="margin: 16px 0 0; color: #626C66; font-size: 14px; line-height: 1.5;">${text}</p>`
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(parts.title)}</title>
-${emailHeadStyle()}
-</head>
-<body style="margin: 0; padding: 0; font-family: ${EMAIL_FONT.body}; background-color: #FAF9F6;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td style="padding: 40px 20px;">
-        ${productLogoRow()}
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <tr>
-            <td style="padding: 40px;">
-              <h1 style="margin: 0 0 24px; font-size: 24px; font-weight: 700; color: #1B2823;">
+  // T-204: the page is the one every email uses (fixed 600 px card, phone padding): emailShell
+  return emailShell({
+    title: parts.title,
+    above: productLogoRow(),
+    content: `<h1 style="margin: 0 0 24px; font-size: 24px; font-weight: 700; color: #1B2823;">
                 ${escapeHtml(parts.title)}
               </h1>
               ${parts.paragraphs.map(paragraph).join('\n              ')}
@@ -63,16 +50,8 @@ ${emailHeadStyle()}
               ${parts.after.map(small).join('\n              ')}
               <p style="margin: 32px 0 0; color: #626C66; font-size: 12px;">
                 ${PRODUCT_NAME}
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `.trim()
+              </p>`,
+  })
 }
 
 /** Sign-up: confirm the address and finish creating the account */

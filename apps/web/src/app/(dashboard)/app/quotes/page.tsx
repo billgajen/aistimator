@@ -20,6 +20,8 @@ import {
 import Link from 'next/link'
 import { copyLinkFallbackMessage } from '@/lib/quote-action-copy'
 import { EmptyState, PageHeader } from '@/components/dashboard/EmptyState'
+import { useDashboardChanged } from '@/components/dashboard/LivePulse'
+import { mergeRefreshed, quietRefreshSize } from '@/lib/quote-list-refresh'
 import type { QuoteListCounts, QuoteListGroup, QuoteListItem, QuoteListTab, QuotesListResponse } from '@qolumns/shared'
 
 // One grid per row, so the last column has a fixed width: an `auto` column
@@ -137,6 +139,41 @@ function QuotesList() {
       setLoadingMore(false)
     }
   }, [search, tab])
+
+  // T-204: the list updates by itself. When the dashboard's pulse says something changed, the
+  // tab on screen is read again without the loading state: the same search, as many quotes as are
+  // listed now, so the scroll position, an open menu and the typed search all stay as they are.
+  // It waits while the page is already reading or an action is running, and a reply that a newer
+  // request overtook is dropped like any other.
+  const listed = useRef(0)
+  listed.current = quotes.length
+  const busyNow = useRef(false)
+  busyNow.current = loading || loadingMore || actionLoading !== null
+  const refreshQuietly = useCallback(async () => {
+    if (!ready || tab === null || busyNow.current) return
+    const mine = ++latestFetch.current
+    try {
+      const params = new URLSearchParams()
+      if (search) params.set('search', search)
+      params.set('group', tab === 'unfinished' ? 'all' : tab)
+      const ask = quietRefreshSize(listed.current)
+      params.set('limit', tab === 'unfinished' ? '1' : String(ask))
+      const response = await fetch(`/api/quotes?${params.toString()}`)
+      if (!response.ok) return
+      const list = (await response.json()) as QuotesListResponse
+      if (mine !== latestFetch.current || busyNow.current) return
+      if (tab !== 'unfinished') {
+        const coversAll = listed.current <= ask
+        setQuotes((shown) => mergeRefreshed(shown, list.items, coversAll))
+        // More pages than one request reads are on screen: the place "Load more" continues from stays
+        if (coversAll) setNextCursor(list.nextCursor)
+      }
+      if (list.counts) setCounts(list.counts)
+    } catch {
+      // a quiet refresh that fails changes nothing: the next change asks again
+    }
+  }, [ready, search, tab])
+  useDashboardChanged(refreshQuietly)
 
   useEffect(() => {
     if (!ready) return

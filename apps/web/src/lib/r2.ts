@@ -81,13 +81,16 @@ export async function generateUploadUrl(
  */
 export async function generateDownloadUrl(
   key: string,
-  expiresInSeconds: number = 3600
+  expiresInSeconds: number = 3600,
+  /** T-204: when given, the address answers as a file to save under this name (it does not open in the page) */
+  downloadAs?: string
 ): Promise<string> {
   const client = getR2Client()
 
   const command = new GetObjectCommand({
     Bucket: R2_BUCKET_NAME,
     Key: key,
+    ...(downloadAs && { ResponseContentDisposition: `attachment; filename="${downloadAs.replace(/[^\w.\- ]+/g, '_')}"` }),
   })
 
   return getSignedUrl(client, command, { expiresIn: expiresInSeconds })

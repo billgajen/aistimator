@@ -232,6 +232,12 @@ export async function measureQuantities(opts: {
    * remaining passes are cancelled (same threshold that routes adjudication).
    */
   earlyStopCov?: number
+  /**
+   * T-204: told when every pass failed (an error, a timeout, an unusable answer), so nothing was
+   * measured. The caller holds such a quote for the business. A pass that answered "not visible"
+   * is not a failure.
+   */
+  onAllPassesFailed?: (lastError: unknown) => void
 }): Promise<MeasuredQuantity[]> {
   const { gemini, images, targets } = opts
   const referenceTable =
@@ -276,9 +282,13 @@ Return one measurement entry per targetKey.`
   const earlyStopCov = opts.earlyStopCov ?? 0.15
   const controllers = Array.from({ length: passes }, () => new AbortController())
   const allPasses: PassMeasurement[][] = []
+  // T-204: how many passes failed outright, and the last failure (to say what kind it was)
+  let failedPasses = 0
+  let lastPassError: unknown
   await new Promise<void>((resolve) => {
     let settled = 0
     let stopped = false
+    failedPasses = 0
     for (let i = 0; i < passes; i++) {
       const t0 = Date.now()
       runPass(i, controllers[i]!.signal)
@@ -294,7 +304,11 @@ Return one measurement entry per targetKey.`
           }
         })
         .catch((error) => {
-          if (!stopped) console.error(`[Measurement] Pass ${i + 1} failed:`, error)
+          if (!stopped) {
+            console.error(`[Measurement] Pass ${i + 1} failed:`, error)
+            failedPasses += 1
+            lastPassError = error
+          }
         })
         .finally(() => {
           settled += 1
@@ -302,6 +316,9 @@ Return one measurement entry per targetKey.`
         })
     }
   })
+
+  // T-204: every pass failed, so the photos were not measured at all
+  if (allPasses.length === 0 && failedPasses > 0) opts.onAllPassesFailed?.(lastPassError)
 
   const results: MeasuredQuantity[] = []
   for (const target of targets) {

@@ -384,11 +384,16 @@ describe('T-203 item 2: the overflow model comes from the registry, per task', (
     }
   })
 
-  it('a task’s overflow is on in the registry only after its proof passed: today none is', () => {
+  it('a task’s overflow is on in the registry only after its proof passed: wording and identification (T-204)', () => {
     // When a task passes scripts/load-test/overflow-proof.mts, its entry changes and this list with it.
+    // T-204, the run of 25 Nov 2026: wording and identification passed; extraction_pass and adjudication
+    // gave a measurement outside the pack's envelope and stay off.
     const on = AI_TASKS.filter((task) => registry.tasks[task]!.overflow !== 'none')
-    expect(on).toEqual([])
-    for (const task of AI_TASKS) expect(resolveOverflowRoute(task), task).toBeNull()
+    expect([...on].sort()).toEqual(['identification', 'wording'])
+    for (const task of AI_TASKS) {
+      if (on.includes(task)) expect(resolveOverflowRoute(task), task).toEqual(candidate)
+      else expect(resolveOverflowRoute(task), task).toBeNull()
+    }
   })
 
   it('the candidate is another provider than the tasks’ own, and has a price', () => {

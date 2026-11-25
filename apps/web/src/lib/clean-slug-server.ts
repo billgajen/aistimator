@@ -15,6 +15,7 @@
  */
 import type { createAdminClient } from '@/lib/supabase/server'
 import { CLEAN_SLUG_OFFERS, cleanSlugCandidates, endsInGeneratedCharacters } from '@/lib/clean-slug'
+import { mainTrade } from '@/lib/trades'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -79,7 +80,8 @@ export async function cleanSlugOptions(admin: Admin, tenantId: string): Promise<
   const candidates = cleanSlugCandidates({
     name: row.name,
     slug: row.slug,
-    trade: row.trade,
+    // T-204: several trades can be stored; the link's suggestions use the first one picked
+    trade: mainTrade(row.trade),
     tradeOther: row.trade_other,
     serviceAreaValues: row.service_area_values,
     website: row.branding_json?.website,

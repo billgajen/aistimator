@@ -9,7 +9,7 @@
  * - "Conversion Rate": accepted ÷ sent, where "sent" is every quote that reached the customer,
  *   declined ones included (a declined quote was sent and not won).
  */
-import type { AnalyticsMetrics } from '@qolumns/shared'
+import { isSetupTest, quoteWasAccepted, quoteWasOpened, quoteWasSent, type AnalyticsMetrics } from '@qolumns/shared'
 
 export interface AnalyticsQuoteRow {
   status: string
@@ -19,17 +19,12 @@ export interface AnalyticsQuoteRow {
   accepted_at?: string | null
 }
 
-const ACCEPTED = new Set(['accepted', 'paid'])
-/** A quote in one of these was opened, even where an older row carries no `viewed_at` */
-const OPENED_BY_STATUS = new Set(['viewed', 'accepted', 'paid'])
-/** A quote in one of these reached the customer, even where an older row carries no `sent_at` */
-const SENT_BY_STATUS = new Set(['sent', 'viewed', 'feedback_received', 'revised', 'accepted', 'paid', 'declined', 'expired'])
-
 export function analyticsMetrics(rows: ReadonlyArray<AnalyticsQuoteRow> | null | undefined): AnalyticsMetrics {
-  const quotes = (rows ?? []).filter((q) => q.is_test !== true)
-  const opened = quotes.filter((q) => Boolean(q.viewed_at) || OPENED_BY_STATUS.has(q.status))
-  const accepted = quotes.filter((q) => ACCEPTED.has(q.status))
-  const sent = quotes.filter((q) => Boolean(q.sent_at) || SENT_BY_STATUS.has(q.status))
+  // T-204: the rules themselves are shared (quote-outcomes.ts), so "Quote Outcomes by Service" counts the same way
+  const quotes = (rows ?? []).filter((q) => !isSetupTest(q))
+  const opened = quotes.filter(quoteWasOpened)
+  const accepted = quotes.filter(quoteWasAccepted)
+  const sent = quotes.filter(quoteWasSent)
   return {
     totalQuotes: quotes.length,
     quotesSent: sent.length,

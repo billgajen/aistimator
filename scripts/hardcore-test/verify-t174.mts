@@ -377,7 +377,8 @@ async function local() {
     const p = await ctx.newPage()
     try {
       await p.goto(`${app}/app/onboarding`, { waitUntil: 'networkidle' })
-      await p.getByRole('radio', { name: /Garage doors/ }).click()
+      // T-204: more than one trade can be picked, so a trade is a tick box, not a radio button
+      await p.getByRole('checkbox', { name: /Garage doors/ }).click()
       await p.getByRole('button', { name: 'Continue' }).click()
       await p.getByRole('button', { name: 'Looks right — continue' }).click({ timeout: 30_000 })
       await p.getByRole('button', { name: 'These are my prices' }).click({ timeout: 30_000 })

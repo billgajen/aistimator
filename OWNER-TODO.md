@@ -4126,3 +4126,91 @@ Built 25 November 2026. **Not deployed.** Worker only; no migration; nothing a b
   minutes, the form after about 5; a request put back can now take up to 15). The message on screen stays
   right and the email still arrives. Say if you want the pages to keep checking for 16 minutes.
 
+
+## T-204 — Fixes and improvements from the live test run (pricing first)
+
+Built 25 November 2026. **Not deployed.** Worker first, then web. No migration. A new app build for item 26.
+
+### What you must do
+
+- [ ] **Deploy the worker, then the web:** `(cd apps/worker && npx wrangler deploy --env production)`, then
+  `npx vercel deploy --prod` from the repo root. In that order: the new "Test Your Pricing" asks the worker for
+  its price, and an older worker does not know the question. T-201, T-202 and T-203 go with it if they are not
+  deployed yet (migrations 50 and 51 first, as their sections say).
+- [ ] **Give the worker the second provider's key** (item 27): overflow is now switched on for two tasks
+  (wording and reading labels), and with no key it stays off:
+  `npx wrangler secret put ANTHROPIC_API_KEY --env production` (run it inside `apps/worker`).
+  Without it nothing breaks: the retries work, and a busy request is put back to wait, as in T-203.
+- [ ] **Build and install the app again** (item 26, and the final-invoice question in the app). Android:
+  a new bundle, version code 4. iPhone: sign in to Xcode → Settings → Accounts first (the note under T-202).
+- [ ] **Item 16, the inbox picture.** Every email goes out from **`quotes@qolumns.com`** (the setting
+  `POSTMARK_FROM_EMAIL`, on Vercel and as a worker secret; there is no other address in the code).
+  - To a customer the sender reads `"<Business> via Qolumns" <quotes@qolumns.com>`; to a business,
+    `"Qolumns" <quotes@qolumns.com>`. Replies go to the business's own address.
+  - To give it a picture, create a Google account **for that exact address** ("Use my current email address
+    instead" on Google's sign-up page) and set the Q logo as its photo. Gmail then shows it beside our emails.
+  - **Before you start:** Google sends a verification code to `quotes@qolumns.com`, and earlier notes say only
+    `hello@qolumns.com` is routed to an inbox (Cloudflare Email Routing). Add a route for `quotes@` to an inbox
+    you read first. I did not look at DNS or change anything.
+  - Other mail apps (Apple Mail, Outlook) do not use a Google account's photo. The standard that covers them
+    (BIMI) needs DMARC at "quarantine" or stricter and, for Gmail, a paid certificate. Not worth it yet.
+- [ ] **Item 16, DMARC (a recommendation; no DNS was changed).** Check first that no such record exists. Then
+  add one TXT record:
+  - **Name:** `_dmarc.qolumns.com`
+  - **Value:** `v=DMARC1; p=none; rua=mailto:hello@qolumns.com`
+  - "none" only asks for reports; it blocks nothing. After two or three weeks of clean reports, change `p=none`
+    to `p=quarantine`.
+- [ ] **Look at the test business's AC Tune-Up once it is deployed.** Its prices were right all along (see
+  below). Its "Test & Publish" will now show two flags: "Is your AC currently cooling?" and "When was the system
+  last serviced?" change no price line. Keep them if you want the answers; they cost nothing.
+
+### What was wrong with "Describe your pricing" (item 1)
+
+- **The compiler and the real quotes were right.** I read the AC Tune-Up service on Northgate (read-only): its
+  attic and weekend lines carry their conditions, "additional systems" is the count minus 1, and refrigerant is
+  "left empty = 0". The one real request there (2 systems, attic, weekend) was priced $323.
+- **"Test Your Pricing" was wrong.** It had its own copy of the pricing maths, which ignored a line's condition,
+  priced "each additional" at 1, and charged an empty optional number as 1. And the line editor did not show a
+  line's condition or its "minus 1", so the lines looked unlinked.
+- **Now** the test price is worked out by the worker's own pipeline, so the test and a customer's price cannot
+  differ; the editor shows and edits the links; and the compile result and "Test & Publish" carry the flags.
+
+### What changed that you will notice
+
+- "Test & Publish": answers for every kind of question, "From the customer's photos" (tank size, fuel, a size
+  to try), the tax, and "Not charged with these answers" with the answer that decides each line.
+- Quotes: "Add to this quote" beside something else the customer asked for; "Photos could not be read" on a
+  quote whose photos the AI could not read (such a quote is always held for you now, never sent by itself).
+- Customers: a wrong ZIP goes back to its field; "Quote prepared for" after approval; "Download PDF".
+- Emails: one width, a status line by the price, your optional answer to a customer's question, the Qolumns
+  logo on a light panel.
+- Dashboard: Home and Quotes refresh by themselves; the trace shows the quote as sent; the branding preview is
+  your own; one entry per person in "Unfinished"; "Download SVG".
+
+### Decisions I made that you may want to change
+
+- **"their quote", not "his quote"** in the question email's subject: the product does not know a customer's
+  pronoun.
+- **Compile speed is unchanged** (about 30 to 45 seconds). The faster settings dropped or misread a line on your
+  own example, so I kept the model. The steps are shown while it works.
+- **A text question is never flagged** as "does not change the price".
+- **The help guide's size allowance went from 160,000 to 190,000 characters**, because this ticket's entries
+  did not fit. Each "Ask Qolumns" question costs about a tenth more.
+- **A held "Photos could not be read" quote is hidden from the customer** until you approve it, whatever the
+  service's own setting.
+
+### Not proven here
+
+- **A photo reading failing inside the running worker** (item 29): proven step by step in unit tests, and the
+  note's display against the local servers. No check makes a real model fail on demand.
+- **The QR code's speed on a phone** (item 26), and **the PDF's file name header** against real storage (item 10).
+- **Overflow under real load:** the proof ran each task once on both providers; no busy answer has been met in
+  production yet.
+- **Emails in a real inbox in dark mode** (item 15): rendered and looked at here, not in Gmail or Apple Mail.
+
+### This Mac
+
+- The disk filled during this ticket (under 7 GB free at one point) and Docker stopped; it is running again.
+  Two things of mine can be cleared when you want the space: Xcode's build cache
+  (`~/Library/Developer/Xcode/DerivedData`, about 5 GB) and old check results
+  (`scripts/hardcore-test/results`, about 3 GB, 1,900 folders). I deleted nothing.

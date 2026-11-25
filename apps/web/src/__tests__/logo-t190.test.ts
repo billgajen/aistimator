@@ -113,7 +113,10 @@ describe('T-190: favicon, Apple touch icon and social image', () => {
 
 describe('T-190: the logo at the top of every email to the business', () => {
   it('is the PNG at a fixed address on the main domain, at a third of its pixels, with the name as alt text', () => {
-    expect(productLogoUrl()).toBe(`https://${APP_DOMAIN}/brand/qolumns-wordmark-email.png`)
+    // T-204: the wordmark on its own light panel, so it reads in an email program's dark mode.
+    // The earlier picture stays served: emails already sent point at it.
+    expect(productLogoUrl()).toBe(`https://${APP_DOMAIN}/brand/qolumns-wordmark-email-panel.png`)
+    expect(existsSync(join(WEB, 'public', 'brand', 'qolumns-wordmark-email.png'))).toBe(true)
     const file = pngSize(join(WEB, 'public', PRODUCT_LOGO_EMAIL.path))
     expect(file.width).toBe(PRODUCT_LOGO_EMAIL.width * 3)
     expect(Math.abs(file.height / 3 - PRODUCT_LOGO_EMAIL.height)).toBeLessThan(1)

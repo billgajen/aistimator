@@ -3,7 +3,7 @@
 import { AcceptanceCard } from '@/components/quotes/AcceptanceCard'
 import type { AcceptanceDetails } from '@/lib/acceptance'
 import { useEffect, useState, useCallback } from 'react'
-import { QUOTE_TURN_COPY, anyMeasuredFromPhotos, businessSources, certaintyLabel, certaintySentence, formatMoney, isQuoteProcessing, lineLabelNow, lineSourceCodes, quoteActions, quoteStory, customerFirstName, splitMinimum, addedSections, alsoAskedOf, alsoAskedWithStates, displaySections, sectionsAwaitingApproval } from '@qolumns/shared'
+import { PHOTOS_UNREAD_NOTE, photosUnreadOf, photosUnreadSentence, QUOTE_ALREADY_SENT_STATUSES, canEditQuote, QUOTE_TURN_COPY, anyMeasuredFromPhotos, businessSources, certaintyLabel, certaintySentence, formatMoney, isQuoteProcessing, lineLabelNow, lineSourceCodes, quoteActions, quoteStory, customerFirstName, splitMinimum, addedSections, alsoAskedOf, alsoAskedWithStates, displaySections, sectionsAwaitingApproval } from '@qolumns/shared'
 import { BusinessQuestions } from '@/components/quotes/BusinessQuestions'
 import { NextStepBox } from '@/components/quotes/NextStepBox'
 import { CustomerSent, ServiceSuggestionNote } from '@/components/quotes/CustomerSent'
@@ -536,6 +536,14 @@ export default function QuoteDetailPage({
         </div>
       )}
 
+      {/* T-204: the photos could not be read, so this quote was held and not sent. Said first: it is about the price itself. */}
+      {quote.status === 'pending_review' && photosUnreadOf(content) && (
+        <div className="mb-6 rounded-2xl border border-tertiary-line bg-tertiary-light p-4" role="note" data-testid="photos-unread">
+          <p className="text-xs font-semibold uppercase text-tertiary">{PHOTOS_UNREAD_NOTE}</p>
+          <p className="mt-1 text-sm text-text-primary">{photosUnreadSentence(photosUnreadOf(content)!)}</p>
+        </div>
+      )}
+
       {/* T-178: the request form's suggestion of another service, on a quote held for that reason */}
       {quote.status === 'pending_review' && <ServiceSuggestionNote suggestion={data.serviceSuggestion} chosenServiceName={data.service?.name ?? null} />}
 
@@ -544,6 +552,20 @@ export default function QuoteDetailPage({
         items={alsoAskedWithStates(alsoAskedOf(content), addedSections(pricing))}
         addedBy={Object.fromEntries(addedSections(pricing).map((sec) => [sec.serviceId, sec.addedBy]))}
         priceWaits={sectionsAwaitingApproval(pricing, quote.status).map((sec) => sec.serviceId)}
+        // T-204: "Add to this quote", while the quote can still be edited. A quote the customer already has becomes a revision.
+        adding={
+          canEditQuote(quote.status) && pricing && content
+            ? {
+                quoteId: quote.id,
+                version: quote.version,
+                pricing,
+                content,
+                alreadySent: (QUOTE_ALREADY_SENT_STATUSES as readonly string[]).includes(quote.status),
+                customerFirstName: customerFirstName(customer?.name),
+                onAdded: fetchQuote,
+              }
+            : undefined
+        }
       />
 
       {/* T-178: no estimate to read (it failed, or has no price yet): the customer's own answers, to quote it by hand */}
@@ -841,6 +863,7 @@ function QuoteEditorWrapper({
     version: number
     currency: string
     feedbackId?: string
+    pendingQuestion?: { text: string | null; customerFirstName: string | null }
     mainServiceId?: string
     onSave: () => Promise<void>
     onCancel: () => void
@@ -884,6 +907,11 @@ function QuoteEditorWrapper({
       version={quote.version}
       currency={pricing.currency}
       feedbackId={feedbackId}
+      pendingQuestion={
+        firstFeedback
+          ? { text: firstFeedback.feedback_text ?? null, customerFirstName: customerFirstName((quote.customer_json as { name?: string } | null)?.name) }
+          : undefined
+      }
       mainServiceId={quote.service_id}
       onSave={onSave}
       onCancel={onCancel}

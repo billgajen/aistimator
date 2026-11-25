@@ -64,6 +64,19 @@ export function canEditQuote(status: string | null | undefined): boolean {
   return status != null && status !== '' && !has(QUOTE_NOT_EDITABLE_STATUSES, status)
 }
 
+/**
+ * T-204: may the customer download the PDF from their own page? Once the quote
+ * has gone to them as final: sent (by the business's approval, or by a service
+ * that sends automatically), and for as long as its link shows it. Never while
+ * it waits for the business (`pending_review`, shown early or not: T-201 item
+ * 18, a PDF carries every price), while the customer is still confirming a
+ * detail, or while there is no document. The same statuses as the business's
+ * own Download PDF button.
+ */
+export function customerCanDownloadPdf(status: string | null | undefined): boolean {
+  return has(QUOTE_LINK_STATUSES, status)
+}
+
 /** Send again emails the customer, so it also needs an address to send to */
 export function canSendQuoteAgain(status: string | null | undefined, ctx: { hasEmail: boolean }): boolean {
   return has(QUOTE_SEND_AGAIN_STATUSES, status) && ctx.hasEmail

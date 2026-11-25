@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { currentTenant } from '@/lib/current-tenant'
-import { unfinishedFilter } from '@/lib/unfinished-leads'
+import { countUnfinished } from '@/lib/unfinished-leads'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,12 +12,9 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   const auth = await currentTenant()
   if (!auth.ok) return auth.response
-  const { count, error } = await unfinishedFilter(
-    auth.supabase.from('request_leads').select('id', { count: 'exact', head: true }),
-    auth.tenantId,
-    { newOnly: true }
-  )
-  if (error || count === null) {
+  // T-204: counted as the list shows them, one per person per service
+  const count = await countUnfinished(auth.supabase, auth.tenantId, { newOnly: true })
+  if (count === null) {
     return NextResponse.json({ error: { code: 'DB_ERROR', message: 'Failed to load' } }, { status: 500 })
   }
   return NextResponse.json({ count })

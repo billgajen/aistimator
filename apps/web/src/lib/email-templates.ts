@@ -10,9 +10,13 @@
  *
  * T-201: the two customer emails carry the business's logo when it has one, and their "Powered by"
  * line follows the plan by the same rule as the estimate page (`brand`: lib/customer-email-brand.ts).
+ *
+ * T-204: every email here is put in the one shared page (`emailShell`: a fixed 600 px card, less
+ * padding on a phone). The two customer emails say where the quote stands beside its price, and the
+ * updated-quote email can carry the business's answer to the customer's question.
  */
-import { EMAIL_COLOR, EMAIL_FONT, PRODUCT_NAME, brandColourForEmail, businessLogoBlock, emailHeadStyle, poweredByRow, productLogoRow, textColourOnCardForEmail, textOnColourForEmail } from '@qolumns/shared'
-import type { CustomerEmailBrand } from '@qolumns/shared'
+import { EMAIL_COLOR, PRODUCT_NAME, brandColourForEmail, businessAnswerHtml, businessLogoBlock, customerFirstName, customerPricePanel, customerStatusHtml, emailShell, poweredByRow, productLogoRow, textColourOnCardForEmail, textOnColourForEmail } from '@qolumns/shared'
+import type { CustomerEmailBrand, CustomerQuoteState } from '@qolumns/shared'
 
 function escapeHtml(text: string): string {
   const htmlEntities: Record<string, string> = {
@@ -39,26 +43,14 @@ export function generateRevisedQuoteEmailHtml(data: {
   sectionsHtml?: string
   /** T-201: the business's logo and whether "Powered by" shows (lib/customer-email-brand.ts) */
   brand?: CustomerEmailBrand
+  /** T-204: the business's answer to the customer's question, shown above the price (plain text; escaped here) */
+  answer?: { text: string; question?: string | null } | null
 }): string {
   const primaryColor = brandColourForEmail(data.primaryColor)
 
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Updated quote</title>
-${emailHeadStyle()}
-</head>
-<body style="margin: 0; padding: 0; font-family: ${EMAIL_FONT.body}; background-color: #FAF9F6;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td style="padding: 40px 20px;">
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <tr>
-            <td style="padding: 40px;">
-              ${businessLogoBlock(data.brand?.logoUrl, data.businessName)}
+  // The status beside the price is always 'confirmed': an updated quote is one the business
+  // edited and sent itself, and that is its review (T-146).
+  const content = `${businessLogoBlock(data.brand?.logoUrl, data.businessName)}
               <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: ${textColourOnCardForEmail(primaryColor)};">
                 ${escapeHtml(data.businessName)}
               </h1>
@@ -73,12 +65,8 @@ ${emailHeadStyle()}
                 Your quote has been updated. Please review the latest version:
               </p>
 
-              <div style="margin: 24px 0; padding: 24px; background-color: #EAEFF5; border-radius: 8px; text-align: center;">
-                <p style="margin: 0 0 4px; color: #626C66; font-size: 14px;">Updated total</p>
-                <p style="margin: 0; font-size: 36px; font-weight: 700; font-family: ${EMAIL_FONT.figure}; font-variant-numeric: tabular-nums; color: ${textColourOnCardForEmail(primaryColor)};">
-                  ${escapeHtml(data.total)}
-                </p>
-              </div>
+              ${businessAnswerHtml({ businessName: data.businessName, answer: data.answer?.text, question: data.answer?.question })}
+              ${customerPricePanel({ label: 'Updated total', total: data.total, colour: textColourOnCardForEmail(primaryColor), state: 'confirmed', businessName: data.businessName })}
 
               ${data.sectionsHtml ?? ''}
 
@@ -99,17 +87,36 @@ ${emailHeadStyle()}
               <p style="margin: 24px 0 0; color: #4F5D57; font-size: 14px;">
                 Best regards,<br>
                 <strong>${escapeHtml(data.businessName)}</strong>
-              </p>
-            </td>
-          </tr>
-        </table>
-        ${poweredByRow(data.brand?.showPoweredBy)}
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `.trim()
+              </p>`
+
+  return emailShell({ title: 'Updated quote', content, below: poweredByRow(data.brand?.showPoweredBy) })
+}
+
+/**
+ * T-204: the words of the email a business gets when a customer writes from the quote page.
+ * The subject says who and what, in the customer's first name: "Derek asked a question about
+ * their quote" ("their": the product does not know anyone's pronoun and never guesses one).
+ * A request made from the business's own test is marked "[Test]", as the review email is.
+ */
+export function customerQuestionEmailWords(input: { customerName: string; feedbackType: 'feedback' | 'approval_request'; isTest?: boolean }): {
+  subject: string
+  title: string
+  label: string
+  messageLabel: string
+  closing: string
+} {
+  const who = customerFirstName(input.customerName) ?? 'A customer'
+  const review = input.feedbackType === 'approval_request'
+  const title = review ? `${who} asked you to review their quote` : `${who} asked a question about their quote`
+  return {
+    subject: `${input.isTest ? '[Test] ' : ''}${title}`,
+    title,
+    label: review ? 'Review request' : 'Question',
+    messageLabel: review ? 'Their message' : 'Their question',
+    closing: review
+      ? 'Open the quote to look it over. If you change it, press Save & Send and the customer gets the updated quote.'
+      : 'Open the quote to answer. Edit it and press Save & Send, with your answer, and the customer gets both in one email. Or reply to them yourself and press "Mark as answered".',
+  }
 }
 
 /**
@@ -123,44 +130,27 @@ export function generateFeedbackNotificationEmailHtml(data: {
   feedbackText?: string
   dashboardUrl: string
   primaryColor?: string
+  isTest?: boolean
 }): string {
   const primaryColor: string = EMAIL_COLOR.juniper // T-191: an email to the business is the product's
-  const feedbackLabel = data.feedbackType === 'approval_request'
-    ? 'Review request'
-    : 'Feedback'
+  const words = customerQuestionEmailWords(data)
 
+  // T-204: the customer's own words are in the email, so the business can read the question without opening anything
   const feedbackSection = data.feedbackText
     ? `
-              <div style="margin: 24px 0; padding: 16px; background-color: #F2F0EA; border-left: 4px solid #CFC0A6; border-radius: 0 8px 8px 0;">
-                <p style="margin: 0 0 8px; font-weight: 600; color: #4F5D57; font-size: 14px;">Customer message:</p>
-                <p style="margin: 0; color: #4F5D57; font-size: 14px; line-height: 1.5; white-space: pre-wrap;">${escapeHtml(data.feedbackText)}</p>
+              <div data-role="customer-message" style="margin: 24px 0; padding: 16px; background-color: #F2F0EA; border-left: 4px solid #CFC0A6; border-radius: 0 8px 8px 0;">
+                <p style="margin: 0 0 8px; font-weight: 600; color: #4F5D57; font-size: 14px;">${escapeHtml(words.messageLabel)}</p>
+                <p style="margin: 0; color: #1B2823; font-size: 15px; line-height: 1.5; white-space: pre-wrap;">${escapeHtml(data.feedbackText)}</p>
               </div>
     `
     : ''
 
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Customer ${feedbackLabel.toLowerCase()}</title>
-${emailHeadStyle()}
-</head>
-<body style="margin: 0; padding: 0; font-family: ${EMAIL_FONT.body}; background-color: #FAF9F6;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td style="padding: 40px 20px;">
-        ${productLogoRow()}
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <tr>
-            <td style="padding: 40px;">
-              <div style="margin: 0 0 24px; padding: 8px 16px; display: inline-block; background-color: #F2F0EA; border-radius: 6px;">
-                <span style="font-weight: 600; font-size: 14px; color: #7F5710;">${feedbackLabel}</span>
+  const content = `<div style="margin: 0 0 24px; padding: 8px 16px; display: inline-block; background-color: #F2F0EA; border-radius: 6px;">
+                <span style="font-weight: 600; font-size: 14px; color: #7F5710;">${escapeHtml(words.label)}</span>
               </div>
 
-              <h1 style="margin: 0 0 8px; font-size: 20px; font-weight: 700; color: #1B2823;">
-                Customer ${feedbackLabel.toLowerCase()} on quote
+              <h1 data-role="heading" style="margin: 0 0 8px; font-size: 20px; font-weight: 700; color: #1B2823;">
+                ${escapeHtml(words.title)}
               </h1>
               <p style="margin: 0 0 24px; color: #626C66; font-size: 14px;">
                 ${escapeHtml(data.customerName)} &middot; ${escapeHtml(data.serviceName)}
@@ -171,25 +161,18 @@ ${emailHeadStyle()}
               <table role="presentation" style="width: 100%; margin: 32px 0;">
                 <tr>
                   <td style="text-align: center;">
-                    <a href="${escapeHtml(data.dashboardUrl)}" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: ${textOnColourForEmail(primaryColor)}; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
-                      View in dashboard
+                    <a href="${escapeHtml(data.dashboardUrl)}" data-role="dashboard" style="display: inline-block; padding: 16px 32px; background-color: ${primaryColor}; color: ${textOnColourForEmail(primaryColor)}; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
+                      Open the quote
                     </a>
                   </td>
                 </tr>
               </table>
 
               <p style="margin: 24px 0 0; color: #626C66; font-size: 13px; line-height: 1.5;">
-                You can review and respond to this ${feedbackLabel.toLowerCase()} from your dashboard.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `.trim()
+                ${escapeHtml(words.closing)}
+              </p>`
+
+  return emailShell({ title: words.title, content, above: productLogoRow() })
 }
 
 /**
@@ -243,24 +226,7 @@ function generateLimitReachedEmailBody(
   data: { businessName: string; used: number; limit: number; billingUrl: string; per?: 'month' | 'total' },
   consequenceHtml: string
 ): string {
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${data.per === 'total' ? 'Free quotes used' : 'Monthly quote limit reached'}</title>
-${emailHeadStyle()}
-</head>
-<body style="margin: 0; padding: 0; font-family: ${EMAIL_FONT.body}; background-color: #FAF9F6;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td style="padding: 40px 20px;">
-        ${productLogoRow()}
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <tr>
-            <td style="padding: 40px;">
-              <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: #A23D2F;">
+  const content = `<h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: #A23D2F;">
                 ${data.per === 'total' ? 'Your free quotes are used' : 'Monthly quote limit reached'}
               </h1>
               <p style="margin: 0 0 32px; color: #626C66; font-size: 14px;">
@@ -290,16 +256,9 @@ ${emailHeadStyle()}
 
               <p style="margin: 24px 0 0; color: #626C66; font-size: 14px; line-height: 1.5;">
                 Every missed instant quote is a lead your competitors can answer first.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `.trim()
+              </p>`
+
+  return emailShell({ title: data.per === 'total' ? 'Free quotes used' : 'Monthly quote limit reached', content, above: productLogoRow() })
 }
 
 /**
@@ -330,24 +289,7 @@ export function generateQuoteAcceptedEmailHtml(data: {
       </table>`
     : ''
 
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quote accepted</title>
-${emailHeadStyle()}
-</head>
-<body style="margin: 0; padding: 0; font-family: ${EMAIL_FONT.body}; background-color: #FAF9F6;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td style="padding: 40px 20px;">
-        ${productLogoRow()}
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <tr>
-            <td style="padding: 40px;">
-              <div style="margin: 0 0 24px; padding: 8px 16px; display: inline-block; background-color: #E0F0E4; border-radius: 6px;">
+  const content = `<div style="margin: 0 0 24px; padding: 8px 16px; display: inline-block; background-color: #E0F0E4; border-radius: 6px;">
                 <span style="font-weight: 600; font-size: 14px; color: #326B49;">Accepted</span>
               </div>
 
@@ -372,16 +314,9 @@ ${emailHeadStyle()}
                     </a>
                   </td>
                 </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `.trim()
+              </table>`
+
+  return emailShell({ title: 'Quote accepted', content, above: productLogoRow() })
 }
 
 /**
@@ -407,24 +342,7 @@ export function generateQuoteDeclinedEmailHtml(data: {
     `
     : ''
 
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quote declined</title>
-${emailHeadStyle()}
-</head>
-<body style="margin: 0; padding: 0; font-family: ${EMAIL_FONT.body}; background-color: #FAF9F6;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td style="padding: 40px 20px;">
-        ${productLogoRow()}
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <tr>
-            <td style="padding: 40px;">
-              <div style="margin: 0 0 24px; padding: 8px 16px; display: inline-block; background-color: #F8E3DD; border-radius: 6px;">
+  const content = `<div style="margin: 0 0 24px; padding: 8px 16px; display: inline-block; background-color: #F8E3DD; border-radius: 6px;">
                 <span style="font-weight: 600; font-size: 14px; color: #A23D2F;">Declined</span>
               </div>
 
@@ -449,16 +367,9 @@ ${emailHeadStyle()}
 
               <p style="margin: 24px 0 0; color: #626C66; font-size: 13px; line-height: 1.5;">
                 You can follow up with the customer or revise the quote from your dashboard.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `.trim()
+              </p>`
+
+  return emailShell({ title: 'Quote declined', content, above: productLogoRow() })
 }
 
 /**
@@ -475,32 +386,23 @@ export function generateQuoteReminderEmailHtml(data: {
   primaryColor?: string
   /** T-201: the business's logo and whether "Powered by" shows (lib/customer-email-brand.ts) */
   brand?: CustomerEmailBrand
+  /**
+   * T-204: where the quote stands, said under its price: 'confirmed' when the business approved it,
+   * 'estimate' when it went out automatically. Left out, the neutral 'estimate': a reminder never
+   * claims a review it cannot know of.
+   */
+  state?: CustomerQuoteState
 }): string {
   const primaryColor = brandColourForEmail(data.primaryColor)
 
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your quote from ${escapeHtml(data.businessName)}</title>
-${emailHeadStyle()}
-</head>
-<body style="margin: 0; padding: 0; font-family: ${EMAIL_FONT.body}; background-color: #FAF9F6;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td style="padding: 40px 20px;">
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <tr>
-            <td style="padding: 40px;">
-              ${businessLogoBlock(data.brand?.logoUrl, data.businessName)}
+  const content = `${businessLogoBlock(data.brand?.logoUrl, data.businessName)}
               <h1 style="margin: 0 0 8px; font-size: 20px; font-weight: 700; color: #1B2823;">
                 Your quote is still ready, ${escapeHtml(data.customerName)}
               </h1>
-              <p style="margin: 0 0 24px; color: #626C66; font-size: 14px;">
+              <p style="margin: 0 0 8px; color: #626C66; font-size: 14px;">
                 ${escapeHtml(data.businessName)} &middot; ${escapeHtml(data.serviceName)} &middot; ${escapeHtml(data.totalFormatted)}
               </p>
+              ${customerStatusHtml(data.state ?? 'estimate', data.businessName, { bare: true })}
 
               <p style="margin: 0 0 24px; color: #4F5D57; font-size: 14px; line-height: 1.6;">
                 Just a gentle reminder that your quote is waiting for you. You can review the full breakdown, ask questions, or accept it online.
@@ -518,17 +420,9 @@ ${emailHeadStyle()}
 
               <p style="margin: 24px 0 0; color: #626C66; font-size: 13px; line-height: 1.5;">
                 If you no longer need this quote, you can decline it from the same page — no hard feelings.
-              </p>
-            </td>
-          </tr>
-        </table>
-        ${poweredByRow(data.brand?.showPoweredBy)}
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `.trim()
+              </p>`
+
+  return emailShell({ title: `Your quote from ${data.businessName}`, content, below: poweredByRow(data.brand?.showPoweredBy) })
 }
 
 /**
@@ -546,24 +440,7 @@ export function generateWhatsAppRenewalEmailHtml(data: {
   whatsappUrl: string
 }): string {
   const when = data.daysLeft < 0 ? 'has run out' : data.daysLeft === 0 ? 'runs out today' : `runs out in ${data.daysLeft} day${data.daysLeft === 1 ? '' : 's'}`
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reconnect WhatsApp</title>
-${emailHeadStyle()}
-</head>
-<body style="margin: 0; padding: 0; font-family: ${EMAIL_FONT.body}; background-color: #FAF9F6;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td style="padding: 40px 20px;">
-        ${productLogoRow()}
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <tr>
-            <td style="padding: 40px;">
-              <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: #1B2823;">
+  const content = `<h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: #1B2823;">
                 Your WhatsApp connection ${when}
               </h1>
               <p style="margin: 0 0 32px; color: #626C66; font-size: 14px;">
@@ -582,14 +459,7 @@ ${emailHeadStyle()}
               </p>
               <a href="${data.whatsappUrl}" style="display: inline-block; padding: 12px 24px; background-color: #205E56; color: #FFFFFF; text-decoration: none; border-radius: 8px; font-weight: 600;">
                 Reconnect WhatsApp
-              </a>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `.trim()
+              </a>`
+
+  return emailShell({ title: 'Reconnect WhatsApp', content, above: productLogoRow() })
 }

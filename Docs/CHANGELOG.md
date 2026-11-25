@@ -15,6 +15,302 @@
 
 ## Issues & Resolutions
 
+### 2026-11-25: T-204 — Fixes and improvements from the live test run, pricing first (AD-097 to AD-100)
+
+**Built, not deployed.** Needs the **worker** first, then the **web**. No migration. A **new app build** is
+needed for item 26 (and the app's final-invoice question). Overflow is now on for two tasks, so the worker also
+needs `ANTHROPIC_API_KEY` (OWNER-TODO).
+
+The ticket's 29 items, by number. "Root cause" is given where there was one.
+
+#### Part A: pricing
+
+- **1. A line a business made conditional follows the customer's answers (AD-097).**
+  - **Root cause, and it was not the compiler.** The AC Tune-Up service on the test business was read from
+    production (read-only): "Describe your pricing" had written it correctly (the attic and weekend lines carry
+    `when`, "additional systems" is `max(0, system_count - 1)`, refrigerant is "left empty = 0"), and the one
+    real request (2 systems, attic, weekend) was priced $323, which is right. What showed every line as charged
+    was **"Test Your Pricing"**: the dashboard had its own copy of the pricing maths (`lib/sample-price.ts`)
+    that never read a line's `when`, priced every formula at 1, and ignored "left empty = 0". The line editor
+    did not show those links either: a formula line read "needs link" and a `when` line looked unconditioned.
+  - **The test price is now the worker's own pipeline** (item 2, AD-097). The four symptoms are gone because
+    there is no second implementation left to disagree.
+  - **The engine, one rule added and one fault fixed** (`rules-engine.ts`): an optional number question left
+    empty counts as 0, never 1 (`optionalNumberQuestions`, shared `pricing-links.ts`: a number question that is
+    neither required nor "needed for the price", and is not the "if you know it" box of a measured quantity),
+    in a line's quantity and inside a formula. And a number typed as the text "0" was read as "not a number"
+    and fell through to the placeholder 1: it is 0 now, as is an empty string and a negative number. A required
+    question with no answer keeps the placeholder and is still asked about (T-127).
+  - **The customer is still asked for a number that matters.** T-127 asks the customer for a quantity that was
+    priced at the placeholder ("how long is the fence?"). With the placeholder gone such a line is simply left
+    out, so the engine reports it (`unansweredOptional`) and the pipeline asks on the same terms as before; the
+    question comes before the "£0, needs review" hold, which would otherwise have caught the quote first. A
+    line marked "empty means none" (what the compiler writes for "only if needed") is never asked about. Found
+    by the full run: `verify-t148` relies on that question.
+  - **"Each additional X"** needed nothing new in the engine: it is the formula `max(0, answer - 1)`, which the
+    engine has had since T-125. The editor now offers it by name ("Each additional (the answer minus 1)") and
+    says it in words.
+  - **The compiler was still tightened**, because a model's answer varies: the prompt has a rule 4g (link every
+    condition to its question; "each additional"; "only if needed"), and after the model answers, code ties
+    what is loose where there is exactly one right answer (`linkPricing`): "each additional" on a plain count
+    becomes the count minus 1, an optional number is marked "left empty = 0", a loose line that names one
+    option of one choice question is included only for that option, and one that matches the only unread
+    yes/no question only when it is ticked. Anything with two possible answers is left alone and flagged.
+  - **The flags** (`pricingChecks`), on the compile review, in setup, and on "Test & Publish"; saving is always
+    allowed: a choice, tick or number question that no line, quantity, formula or adjustment reads ("This
+    question does not change the price"), and a line whose name or description says "if", "only", "per", "each
+    additional" or "weekend" (whole words) with no condition and no quantity source.
+    **Differs from the ticket:** a text question is never flagged (it is for the business to read); and on a
+    service with a photo-measured line the flag reads "No price line reads this question. Its answer is only
+    given to the photo measurement…", because there the answer does reach the measurement, so "does not change
+    the price" would not be true.
+  - **The same check on every template:** no template has a loose line. Three template questions change no
+    price line ("Which sides need painting?" on both Exterior Painting services, "Is there an outdoor water tap
+    we can use?" on Pressure Washing). They are left as they are and held in a unit test, so a new one is noticed.
+  - **The compile logic moved** from the route to `lib/pricing-compile.ts`, so the route, the tests and the live
+    check run the same code. The review (`pricing-describe.ts`) now says a condition and a formula in words.
+  - **Proof.** With the AC Tune-Up as compiled for the test business, by the engine: 129 (1 system), 263 (2
+    systems, one in attic), 323 (2 systems, attic, weekend), refrigerant no line when empty or "0", 319 with
+    2 lb. The same through "Test Your Pricing" and through real requests on the local stack (`verify-t204`).
+    Compiled afresh by the real model from the ticket's text (typo "Weekd" included), then priced: 3 of 3 runs
+    gave all four.
+- **2. "Test Your Pricing" is the real pipeline, and tries details that come from photos.**
+  `POST /api/services/preview-price` sends the service as the editor holds it (saved or not) to the worker's
+  new `POST /preview`, which runs `processQuote` in a preview mode (section mode with the data handed in: every
+  AI client off, no photos, it returns straight after the rules engine, nothing is written or counted). The
+  panel (`components/services/PricingTest.tsx`) has a box for every kind of question, and "From the customer's
+  photos": a detail a label gives and no question asks (tank size, fuel) as a choice of the service's own
+  values, and a size to try for a measured line (T-189's sample size is kept). It lists "Not charged with
+  these answers" with the answer that decides each line, and shows tax. Water Heater Replacement with "50 gal"
+  and "Natural gas" tried: $2,150, the template's figure, not $250.
+- **3. The name warning matches whole words and names the word it found** (`lib/service-name-warnings.ts`).
+  Root cause: `/repair|fix|replace/` as a bare substring, and a message that always said "Repair". It was the
+  only warning that reads a name.
+- **4. "Add to this quote"** on "Customer also asked for" (`components/quotes/AddToQuote.tsx`). It uses what
+  T-179 built: the editor's own pricing call for a section, then the ordinary save. A held quote takes the
+  section at once and still waits; a quote the customer already has asks first ("Add and send the update") and
+  becomes a revision with the "Updated quote" email. A service that needs an answer asks for it, filled in with
+  what the customer's note said. One quote, one total, nothing counted. Not offered once a quote is accepted.
+- **5. Steps while the compile works**, and the model is unchanged. "Reading your prices…", "Making
+  questions…", "Checking…" follow the clock (it is one request; the last step is our own code). The compile
+  was already one call. Faster settings were tried on the ticket's own text and **did not give the same
+  result**: default thinking 3 of 3 right, median 43 s; medium 4 of 4, median 37 s (inside the spread);
+  low 0 of 3 (it asks the business what "Weekd" means instead of pricing the weekend line), 10 s; the cheaper
+  `gemini-3.5-flash-lite` 2 of 3, 3 s. So the registry's `compile` entry stays as it was.
+
+#### Part B: the customer's side
+
+- **6. An out-of-area ZIP goes back to the ZIP field**, with the reason under it and the cursor in it. Nothing
+  typed is lost and "Start Over" is not reached for this case. The server's rule is unchanged.
+- **7. "Photos required" (0 to 8)** on "Scope & Photos". The setting was there, as "Minimum Photos Required",
+  low on the step; it is renamed, says what 0 means, and is kept inside 0 to 8 on save (`photosRequired`).
+  Root cause of a second fault found here: every compile turned a business's 0 back into 1 (`|| 1`), and capped
+  it at 5. Templates keep the number they set.
+- **8. The clarifying question is plain and speaks to the customer.** The sentence in the live example came
+  from the wording model's doubt note, not from the question writer. The wording model now also writes
+  `quantityConcernQuestion`; `plainCustomerQuestion` (quality-gate.ts) rejects report-style text, and a
+  rejected question falls back to one built from the business's own label ("You answered "3" to "How many
+  rooms…?" Is that right?"). "Could you provide more details about…" is gone.
+- **9. "Quote prepared for"** once approved, "Estimate prepared for" before (`preparedForLine`).
+- **10. "Download PDF" on the customer's page** (AD-099). `customerCanDownloadPdf` (shared): sent, viewed,
+  feedback_received, revised, accepted, paid, expired. Never while held, and an estimate shown before approval
+  has none even if a PDF is stored. The PDF is made on demand through the public, token-checked route
+  (`lib/quote-pdf.ts`), limited by address and by quote, failing open. **Fault fixed:** a revision saved in the
+  dashboard never cleared `pdf_asset_id`, so an old PDF outlived a new price.
+
+#### Part C: emails
+
+- **11. One shell, one width** (`packages/shared/src/email-shell.ts`). Root cause of the two widths: every
+  email wrote its own page, and each card had `max-width: 600px` with no width, so it shrank to its longest
+  line. Every email in both apps now goes through `emailShell`: `width="600"` and `width:100%; max-width:600px`.
+- **12. A status line in the price panel** of every customer email: "Waiting for <business> to confirm",
+  "Reviewed and confirmed by <business>", or, for a quote sent automatically, "Estimate based on your photos
+  and details" (no review is claimed where none happened).
+- **13. "Your answer to <first name> (optional)"** in the editor while a question is pending. Sent only with
+  "Save & Send"; the updated-quote email shows it above the price with the customer's own question; the
+  question is marked answered. **No migration:** it is kept as an entry of the revision's `changes_json`.
+- **14. The question email:** subject "<First name> asked a question about their quote", message in the body.
+  **Differs from the ticket:** "their", not "his". The product does not know a customer's pronoun.
+- **15. Dark mode and phones:** the wordmark is a new picture on a white panel
+  (`qolumns-wordmark-email-panel.png`; the old file stays for emails already sent), pages declare
+  `color-scheme: light only`, and under 480 px the padding drops so content uses the width.
+- **16.** In OWNER-TODO: the sending address and a DMARC record recommendation. No DNS was changed.
+
+#### Part D: the dashboard
+
+- **17. Home and Quotes update by themselves** (AD-100): `GET /api/quotes/pulse` every 5 s while the tab is
+  visible; a refresh only when its stamp changes. Short polling, not realtime: no migration, no publication.
+- **18. Pricing trace:** "The quote as sent" lists every line as first priced, "Changed by you (was …)" or
+  "Added by you", added services, and the quote's own totals. Root causes of the two labels: the page read
+  `quote.service` where the API returns `service` beside it ("Unknown Service"), and put "v" before a value
+  that is already "v1".
+- **19. Branding preview** shows the business's own currency, tax name and rate (or none), a sample from its
+  first priced service, and the badge only when its estimates carry it.
+- **20. A switched-off service stands out:** "Inactive" and the switched-off notes are in the warning colour
+  (no pale tint), and "Test & Publish" on an inactive service has "Save Changes" and "Save and switch on".
+- **21. Unfinished requests:** one entry per person per service within 24 hours, keeping the furthest step
+  (`collapseLeads`); the form reuses the open row. No migration.
+- **22. Analytics:** one definition of sent, opened and accepted (`packages/shared/src/quote-outcomes.ts`).
+  "Quote Outcomes by Service" left tests in, did not count declined and expired as sent, and counted every edit
+  separately. **No path was found that counted a revised quote as two quotes**; the edits were the doubling.
+- **23. Final invoice:** under half or over double the quote asks "Is this the full amount you charged for the
+  job?". **Fault fixed:** the quote's GET did not return the saved amount, so it vanished on reload.
+- **24. Several trades in setup** (up to four), comma-separated in `tenants.trade`; no migration.
+- **25. "Download SVG"** beside "Download PNG", same code, same share tick.
+
+#### Part E: the phone app
+
+- **26. The QR code draws in the first frame** from the link the Account tab just read (also saved on the
+  phone), and refreshes quietly. It used to wait for a full account read (four to six database round trips and
+  the logo's signed address). **Not timed on a device.**
+
+#### Part F: follow-ups from T-203
+
+- **27. Overflow: on for `wording` and `identification`, off for the rest.** The candidate is now
+  `claude-sonnet-5-5`, and the Claude adapter sends a task's `thinkingLevel` as `output_config.effort`. The
+  proof ran once (25 Nov, both providers, about $0.19 in all):
+
+  | Task | Result | Slowest case | Cost on the overflow model |
+  |---|---|---|---|
+  | wording (and the checker and the rewrite, same client) | **pass**, on | 5.6 s (caps 15 to 30 s) | $0.0511 |
+  | identification | **pass**, on | 2.9 s | $0.0161 |
+  | extraction_pass | **fail**, off | 27.0 s | $0.0604 |
+  | adjudication | **not proven**, off | 9.9 s | $0.0202 |
+
+  Extraction read the signals correctly but measured the test house front at 74.9 sq m against the allowed 18
+  to 72. Adjudication gave 85 sq m against the same range; the task's own model did not answer within its 30 s
+  either. The other eight tasks have no fixed test set and stay off.
+- **28. Waiting pages check for 16 minutes** (`packages/shared/src/waiting-poll.ts`): every 3 s for 3 minutes,
+  then every 12 s. A put-back request can take 15. The wording and the email are unchanged.
+- **29. A quote whose photos could not be read is held, never sent (AD-098).** See the table below.
+
+#### Item 29: every fallback found, and what it does now
+
+"Held" means: `pending_review`, hidden from the customer until approved, no clarification round, with
+`content_json.photosUnread` and the note "Photos could not be read" on the dashboard's quote page, the approval
+page and the "Review and approve" email. A provider that is only busy is T-203's case and is unchanged.
+
+| Step | What fails | It still falls back to | Now |
+|---|---|---|---|
+| Reading the photos (`extractSignalsFromImages`) | any error | signals as if there were no photos | **held**; the error text no longer goes into the quote's notes |
+| Reading the photos (`extractStructuredSignals`, `extractSignals`) | an unusable answer on both tries | built-in defaults | **held** |
+| Loading the photos | none could be opened | signals as if there were no photos | **held** |
+| No model to read them | a missing key | signals as if there were no photos | **held** (not the local checks' stand-in) |
+| Measurement | the ensemble throws, or every pass fails | no measured size; the customer is asked | **held** |
+| Measurement | some passes fail | the passes that answered | unchanged (the photos were read) |
+| Senior review of a measurement | timeout, error, bad value | the passes' own figure | unchanged (the photos were read) |
+| Label reading | error or timeout | nothing identified; the customer is asked | **held** |
+| Label reading | nothing legible | the customer is asked | unchanged (that is an answer) |
+| Counting items in the photos | error | no items | **held** |
+| Extras the photos call for | error or 20 s timeout | no extras from photos | **held** |
+| Extras from the customer's words | error or timeout | no extras from the words | unchanged (not a photo) |
+| Wording | timeout or error | the template wording | unchanged |
+| The checker | timeout or error | the quote goes on unchecked | unchanged |
+| What else the customer asked for | error | keyword matching | unchanged |
+| The rewrite of a banned word | timeout or error | the sentence is removed; held if nothing is left | unchanged |
+
+**Found on the way:** the photo-reading failure text ("AI image analysis failed: …") went into the quote's
+notes, which the customer reads. It is no longer written anywhere a customer can see.
+
+#### AD-097: there is one pricing implementation; a test price is the pipeline in preview mode
+**Decision:** the dashboard never adds up a price. "Test & Publish" asks the worker, which runs the same
+`processQuote` as a request, in a mode that reads no photo, asks no model and writes nothing.
+**Why:** the copy on the page had drifted from the engine in three ways and told a business its conditional
+lines were always charged. A second implementation will drift again.
+**Rejected:** fixing the copy (three fixes today, a fourth tomorrow); importing the engine into the web app (it
+would price without the pipeline's own step that turns answers into facts); a saved-service-only preview (the
+step is before "Save").
+**Kept:** `samplePrice` in `lib/sample-price.ts` is still used by a script and older tests for sample sizes. The
+page no longer calls it. It is not a source of a price shown to anyone.
+
+#### AD-098: a photo reading that failed holds the quote
+**Decision:** each photo step reports a failure to one log for the run (`PhotoReadLog`); a run with any is held
+for the business before the question gate, and says why.
+**Why:** a fallback exists so that a failed step does not lose the request, not so that a price worked out
+without the photos reaches a customer as if it had them. T-203 closed this for a busy provider; the same holds
+for an error, a timeout and an unusable answer.
+**Rejected:** retrying the reading (T-172's caps exist because a reading that hangs must not hold the job);
+asking the customer instead (a question does not tell the business its photos went unread).
+
+#### AD-099: a customer's PDF follows one rule and is made on demand
+`customerCanDownloadPdf` decides it, from the status. Anything that changes a quote's price or wording clears
+`pdf_asset_id`. PDFs are made only through `makeQuotePdf`.
+
+#### AD-100: the dashboard asks "has anything changed?", not "send me everything"
+One small signed-in request every 5 s per visible tab returns a stamp and the menu's count, no quote data. Chosen
+over realtime because it needs no migration, no publication and no second connection.
+
+#### Constraints
+- Never add up a price in the web app. A price shown to a business or a customer comes from the worker.
+- A new way for a photo step to fail must call `photoRead.missed(...)`; nothing about a failed reading may be
+  written into `pricing.notes` or any text a customer reads.
+- "An optional number left empty is 0" is `optionalNumberQuestions`: the engine, the compile and the editor all
+  ask it, and the measured quantity's "if you know it" box is never one.
+- A line left out for an empty optional number must stay askable: the engine reports it in
+  `unansweredOptional`, and the gate asks before its "£0" hold. Only `missingMeansZero` on the line means "never
+  ask".
+- `pricingChecks` never blocks a save. A template must not hold a line it would flag (a unit test holds it).
+- Every email goes through `emailShell`; a status line never says "reviewed" without `approved_at`.
+- An answer to a customer is plain text until `businessAnswerHtml` escapes it.
+- Count unfinished requests only through `countUnfinished` / `collapseLeads`. `tenants.trade` may hold several
+  ids: read it with `tradeIds` / `mainTrade`. "Sent" is defined only in `quote-outcomes.ts`.
+- Waiting pages use `WAITING_POLL`; its total must stay above `BUSY_MAX_MINUTES`.
+- The help guide's allowance (`HELP_GUIDE_BUDGET_CHARS`) was raised from 160,000 to 190,000 characters: this
+  ticket's entries took the guide to about 172,000. Each Help question costs about a tenth more.
+- A task's `overflow` is switched on only after `overflow-proof.mts` passes for it (unchanged from T-203).
+
+#### Not done, and why
+- **Item 29, end to end:** no check makes a real photo reading fail inside the running worker (at the quick
+  level no model is asked; at the full level the real model answers). The steps' reports and the processor's
+  decision are unit tests; the note's display is in `verify-t204`.
+- **Item 26** was not timed on a phone, and **item 10's** "save as" header was not tried against real storage.
+- **Item 13:** the customer's estimate page does not show the business's answer; the email does.
+- **Item 15:** a business's own dark, see-through logo can still be lost on a dark background.
+- **Item 24:** "Something else" cannot be combined with a trade.
+- **Existing services** pick up "left empty = 0" at once (it is the engine's rule). The flags show the next
+  time a service is opened; nothing was changed in any business's data.
+
+#### Checks
+- Unit: worker 926 (22 + 12 new of mine in `pricing-t204` and `photos-unread-t204`, 11 + 15 from the emails and
+  customer parts), web 2,135 (47 new in `pricing-t204`, 56 emails, 31 customer, 45 dashboard), app 232 (10 new).
+  Lint and typecheck clean.
+- `verify-t204` (new, quick level, no model, a browser; four sections): 176 of 176.
+- **`pnpm check:quick`, once: 30 of 33 (25 scripts, 2,138 checks) in 7 min 26 s.** Three older scripts failed on
+  expectations this ticket changed, not on the product: `verify-t160` gave every test person the same phone
+  number, and two unfinished requests with one number are now one entry (item 21); `verify-t165` counted the
+  minimum's sentence on the trace page, which now also shows the quote as sent (item 18); `verify-t183` named
+  the old logo file (item 15). All three corrected.
+- **`pnpm check:failed`: 5 of 5 (t160 96 of 96, t165 148 of 148, t183 50 of 50) in 1 min 58 s.**
+- **`pnpm check:full`, once, alone: 44 of 48 (40 scripts, 3,462 checks) in 34 min 15 s.** `verify-t204` passed
+  176 of 176 beside the others, with the real model. Four failed:
+  - **`verify-t148`, 17 of 19: a real fault of this ticket**, the one described under item 1 ("the customer is
+    still asked"). Fixed in the engine, the gate and the processor.
+  - `verify-t198`, 67 of 68: one of the Help assistant's 31 answers took 20.1 s and timed out.
+  - `verify-t176`, 81 of 82: a WhatsApp test message's 24-hour window read as closed straight after the
+    customer's message arrived. This ticket changed no WhatsApp code.
+  - `verify-t180`, 67 of 68: Stripe's own hosted portal page did not show its button within 30 s (the same
+    cause as in T-203's run).
+- **`pnpm check:failed`: t198 68 of 68, t176 82 of 82, t180 112 of 112; t148 still 17 of 19** (17 min 13 s):
+  the first fix stopped at the £0 hold, which runs before the question. **Again, after the second fix: t148 29
+  of 29** (2 min 19 s). So every script of the full level has passed, t148 on its third try for the reason above.
+- `verify-t197` needed its second try, alone (104 of 104), as in T-203's run: a live-model result.
+- **After the last fix (worker only), not the whole full level again:** the three unit suites, lint and
+  typecheck, `verify-t148` at the full level, and `verify-t204` (176 of 176) were run. The fix only changes what
+  happens when an optional number question is left empty on a line with no "empty means none" mark.
+- The overflow proof, once: `scripts/load-test/overflow-proof.mts` (item 27's table). The live compile:
+  `scripts/hardcore-test/t204/compile-live.mts` (item 5's figures; 13 compiles in all).
+
+**Files:** worker `src/pricing/rules-engine.ts`, `src/{quote-processor,preview-pricing,section-pricing,index}.ts`,
+`src/agents/quality-gate.ts`, `src/ai/{photo-read,signals,measurement,identification,anthropic,factory,wording,schemas}.ts`,
+`src/email/*`; shared `pricing-links.ts`, `answer-compare.ts`, `photos-unread.ts`, `email-shell.ts`,
+`waiting-poll.ts`, `quote-outcomes.ts`, `approval-detail.ts`, `ai-models.json`, `help-guide.ts`; web
+`lib/{pricing-compile,pricing-preview,pricing-describe,service-name-warnings,photos-required,quote-pdf,trace-as-sent,branding-preview,dashboard-pulse,unfinished-leads,trades}.ts`,
+`components/services/{PricingTest,PricingComposer,PricingFlagsNote}.tsx`, `components/WorkStepEditor.tsx`,
+`components/quotes/{AddToQuote,CustomerAlsoAsked}.tsx`, `components/dashboard/LivePulse.tsx`, the services,
+quote, trace, branding and customer pages, `api/services/preview-price`, `api/quotes/pulse`, the public PDF
+route; app `app/link.tsx`, `src/lib/link-memory.ts`; `scripts/hardcore-test/{verify-t204.mts,t204/*}`,
+`scripts/checks/manifest.mjs`; tests `*-t204.test.ts` in all three apps; Docs/help (nine pages) and docs.
+
 ### 2026-11-25: T-203 — A busy AI provider is waited for, overflowed, then the job is put back (AD-095, AD-096)
 
 **Built, not deployed.** Worker only: `(cd apps/worker && npx wrangler deploy --env production)`. No migration,

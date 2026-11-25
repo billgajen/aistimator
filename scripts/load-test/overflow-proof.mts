@@ -114,7 +114,7 @@ function clientFor(task: AiTask, route: ModelRoute, meter: AiUsageMeter, overflo
   if (!apiKey) return null
   const usage = usageSinkFor(meter, task, route)
   if (route.provider === 'anthropic') {
-    return new AnthropicClient({ apiKey, model: route.model, usage, ...(overflow && { maxRetries: 0, timeoutMs: OVERFLOW_TIMEOUT_MS }) } as ConstructorParameters<typeof AnthropicClient>[0])
+    return new AnthropicClient({ apiKey, model: route.model, usage, effort: resolveThinkingLevel(task, route.model, routeEnv), ...(overflow && { maxRetries: 0, timeoutMs: OVERFLOW_TIMEOUT_MS }) } as ConstructorParameters<typeof AnthropicClient>[0])
   }
   return new GeminiClient({ apiKey, model: route.model, thinkingLevel: resolveThinkingLevel(task, route.model, routeEnv), usage })
 }

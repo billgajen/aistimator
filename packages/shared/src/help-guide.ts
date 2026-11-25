@@ -189,8 +189,12 @@ export function guideText(entries: readonly HelpEntry[], pageNames: Readonly<Rec
   return out.join('\n\n')
 }
 
-/** About 40,000 tokens: the whole guide fits well inside it today */
-export const HELP_GUIDE_BUDGET_CHARS = 160_000
+/**
+ * About 47,000 tokens: the whole guide fits inside it today. T-204 raised it from 160,000: that
+ * ticket's entries took the guide from about 157,000 characters to about 172,000. Past the budget
+ * the assistant is given only the entries that match the question (`selectEntries`).
+ */
+export const HELP_GUIDE_BUDGET_CHARS = 190_000
 
 const SMALL_WORDS = new Set(
   'the and for you your how what why when where can does did not are was with this that have has from into out get got one all any its our use using about there here will would should could them they then than but too very just also more most much many some such only own same over under after before again once each both few other which who whom whose been being were had having doing done make made need want'.split(

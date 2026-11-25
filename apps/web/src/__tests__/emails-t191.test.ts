@@ -22,6 +22,10 @@ const EMAIL_FILES = [
   'packages/shared/src/failed-request.ts',
   'packages/shared/src/ops-alerts.ts',
   'packages/shared/src/product-logo.ts',
+  // T-204: the one page every email is put in, and the customer emails' shared blocks
+  'packages/shared/src/email-shell.ts',
+  'packages/shared/src/customer-email.ts',
+  'packages/shared/src/support-emails.ts',
 ]
 const TOKEN_NAMES: Record<keyof typeof EMAIL_COLOR, string | null> = {
   paper: 'background', card: null, surface: 'surface', mist: 'mist', mint: 'mint', ink: 'ink', textSecondary: 'text-secondary', muted: 'text-muted',

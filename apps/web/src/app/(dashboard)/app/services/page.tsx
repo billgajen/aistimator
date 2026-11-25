@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, type KeyboardEvent } from 'react'
-import { currencySymbol as sharedCurrencySymbol, getRegion, reviewModeOf, minimumChargeNote } from '@qolumns/shared'
+import { currencySymbol as sharedCurrencySymbol, getRegion, reviewModeOf, pricingChecks } from '@qolumns/shared'
 import type { ReviewMode } from '@qolumns/shared'
 import { PageHeader } from '@/components/dashboard/EmptyState'
 import { AIDraftBadge } from '@/components/AIDraftBadge'
@@ -12,7 +12,10 @@ import { TemplatePicker } from '@/components/services/TemplatePicker'
 import { AIDraftRefinementPanel } from '@/components/services/AIDraftRefinementPanel'
 import { PricingComposer } from '@/components/services/PricingComposer'
 import { draftAddonsToConfig } from '@/lib/draft-addons'
-import { measuredLines, sampleNote, samplePrice, type SampleResult } from '@/lib/sample-price'
+import { PricingTest } from '@/components/services/PricingTest'
+import { PricingFlagsNote } from '@/components/services/PricingFlagsNote'
+import { nameWarnings } from '@/lib/service-name-warnings'
+import { MAX_PHOTOS_REQUIRED, photosRequired } from '@/lib/photos-required'
 import { AmountSymbol, amountBoxPadding } from '@/components/services/AmountSymbol'
 import { CLEARED_MEDIA, CLEAR_KEEPS, REGENERATE_KEEPS, clearEmpties, clearLoosens, draftToSave, handMadeDraft, isAiDraft, isHandMade, lineNeedsQuestion, linesNeverCharged, looseReferences, regenerateReplaces, syncQuestions } from '@/lib/service-questions'
 import type {
@@ -182,6 +185,8 @@ export default function ServicesPage() {
   const [activeStep, setActiveStep] = useState<WizardStep>('basic')
   const [nameError, setNameError] = useState<string | null>(null)
   const submitIntentRef = useRef(false)
+  // T-204: the second button on "Test & Publish" for a service that is switched off
+  const switchOnRef = useRef(false)
 
   // AI Draft state
   const [aiDraft, setAiDraft] = useState<ServiceDraftConfig | null>(null)
@@ -217,8 +222,8 @@ export default function ServicesPage() {
   const [showBulkUpload, setShowBulkUpload] = useState(false)
 
   // Quote Simulator state
-  const [simulatorValues, setSimulatorValues] = useState<Record<string, string | number | boolean>>({})
-  const [simulatorResult, setSimulatorResult] = useState<SampleResult | null>(null)
+  // T-204: the test price comes from the worker's own pipeline (components/services/PricingTest)
+  const [pricingTested, setPricingTested] = useState(false)
 
   const fetchServices = useCallback(async () => {
     try {
@@ -293,6 +298,7 @@ export default function ServicesPage() {
   }
 
   const closeModal = () => {
+    setPricingTested(false)
     setShowModal(false)
     setEditingService(null)
     setFormData(defaultFormData)
@@ -416,19 +422,34 @@ export default function ServicesPage() {
   }
 
   /**
-   * The sample price on "Test & Publish" (T-189: the maths lives in lib/sample-price,
-   * where a line measured from photos is never priced at a quantity of 1)
+   * The service as saving writes it. "Test & Publish" sends the same thing to be priced (T-204), so
+   * what the business tests is what it saves.
    */
-  const sampleService = {
-    baseFee: formData.baseFee,
-    minimumCharge: formData.minimumCharge,
-    workSteps: formData.workSteps,
-    multipliers: formData.multipliers,
-    suggestedFields: formData.suggestedFields,
-    expectedSignals: formData.expectedSignals,
+  const serviceBody = () => {
+    // T-201: a service made by hand keeps its questions too. They live in the draft, and it had
+    // none, so they were lost on save; now the editor writes it one (lib/service-questions).
+    const draftConfig = draftToSave(aiDraft ?? (isHandMade(editingService?.draft_config) ? editingService?.draft_config : null), formData)
+    return {
+      name: formData.name,
+      description: formData.description || null,
+      autoSend: formData.reviewMode === 'auto_send',
+      holdUntilApproved: formData.reviewMode === 'hold_until_approved',
+      scopeIncludes: formData.scopeIncludes,
+      scopeExcludes: formData.scopeExcludes,
+      defaultAssumptions: formData.defaultAssumptions,
+      mediaConfig: { ...formData.mediaConfig, minPhotos: photosRequired(formData.mediaConfig.minPhotos) },
+      workSteps: formData.workSteps,
+      expectedSignals: formData.expectedSignals,
+      pricingRules: {
+        baseFee: formData.baseFee,
+        minimumCharge: formData.minimumCharge,
+        addons: formData.addons,
+        multipliers: formData.multipliers,
+        workSteps: formData.workSteps,
+      },
+      draftConfig,
+    }
   }
-  const runSimulator = () => setSimulatorResult(samplePrice(sampleService, simulatorValues, currencySymbol))
-  const measured = measuredLines(sampleService, simulatorValues)
 
   const goToNextStep = async () => {
     // Validate before moving forward
@@ -498,16 +519,13 @@ export default function ServicesPage() {
     validationWarnings.push(`No pricing configured - quotes will be ${currencySymbol}0`)
   }
 
-  // Warning: Service name implies repair but no repair work steps configured
-  const nameImpliesRepair = /repair|fix|replace/i.test(formData.name)
-  const hasRepairStep = formData.workSteps.some(s =>
-    /repair|fix|replace/i.test(s.name || '')
-  )
-  if (nameImpliesRepair && !hasRepairStep && formData.workSteps.length > 0) {
-    validationWarnings.push(
-      `Service name includes "Repair" but no repair work steps configured. Customers expect repair pricing.`
-    )
-  }
+  // T-204: a name that promises a kind of work no price line covers. Whole words only, and the
+  // warning names the word it found ("Replacement" is not "Repair").
+  validationWarnings.push(...nameWarnings(formData.name, formData.workSteps))
+
+  // T-204: flags that stay visible and never block saving: a question that changes no price
+  // line, and a line whose words say it depends on something but which nothing decides
+  const pricingFlags = pricingChecks({ workSteps: formData.workSteps, fields: formData.suggestedFields, multipliers: formData.multipliers })
 
   const canPublish = validationErrors.length === 0
 
@@ -520,38 +538,17 @@ export default function ServicesPage() {
     if (!formData.name.trim()) return
 
     setSaving(true)
+    const switchOn = switchOnRef.current
+    switchOnRef.current = false
     try {
-      // Build pricing rules object
-      const pricingRules = {
-        baseFee: formData.baseFee,
-        minimumCharge: formData.minimumCharge,
-        addons: formData.addons,
-        multipliers: formData.multipliers,
-        workSteps: formData.workSteps,
-      }
-      // T-201: a service made by hand keeps its questions too. They live in the draft, and it had
-      // none, so they were lost on save; now the editor writes it one (lib/service-questions).
-      const draftConfig = draftToSave(aiDraft ?? (isHandMade(editingService?.draft_config) ? editingService?.draft_config : null), formData)
+      const body = serviceBody()
 
       if (editingService) {
-        // Update existing service
+        // Update existing service (T-204: "Save and switch on" also makes it active)
         const res = await fetch(`/api/services/${editingService.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: formData.name,
-            description: formData.description || null,
-            autoSend: formData.reviewMode === 'auto_send',
-            holdUntilApproved: formData.reviewMode === 'hold_until_approved',
-            scopeIncludes: formData.scopeIncludes,
-            scopeExcludes: formData.scopeExcludes,
-            defaultAssumptions: formData.defaultAssumptions,
-            mediaConfig: formData.mediaConfig,
-            workSteps: formData.workSteps,
-            expectedSignals: formData.expectedSignals,
-            pricingRules,
-            draftConfig,
-          }),
+          body: JSON.stringify(switchOn ? { ...body, active: true } : body),
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error?.message || 'Failed to update service')
@@ -559,25 +556,13 @@ export default function ServicesPage() {
         setServices((prev) =>
           prev.map((s) => (s.id === editingService.id ? data.service : s))
         )
+        if (data.service?.active) setAddedOff((note) => (note?.id === editingService.id ? null : note))
       } else {
         // Create new service
         const res = await fetch('/api/services', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: formData.name,
-            description: formData.description || null,
-            autoSend: formData.reviewMode === 'auto_send',
-            holdUntilApproved: formData.reviewMode === 'hold_until_approved',
-            scopeIncludes: formData.scopeIncludes,
-            scopeExcludes: formData.scopeExcludes,
-            defaultAssumptions: formData.defaultAssumptions,
-            mediaConfig: formData.mediaConfig,
-            workSteps: formData.workSteps,
-            expectedSignals: formData.expectedSignals,
-            pricingRules,
-            draftConfig,
-          }),
+          body: JSON.stringify(body),
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error?.message || 'Failed to create service')
@@ -711,8 +696,8 @@ export default function ServicesPage() {
 
       {/* T-201: a service added from a template is off until its example prices are checked */}
       {addedOff && !showModal && (
-        <div className="mb-4 rounded-lg border border-border-strong bg-background p-4" role="status" data-testid="template-added-note">
-          <p className="text-sm font-semibold text-text-primary">&quot;{addedOff.name}&quot; was added and is switched off.</p>
+        <div className="mb-4 rounded-lg border border-tertiary-line border-l-4 border-l-tertiary bg-background p-4" role="status" data-testid="template-added-note">
+          <p className="text-sm font-semibold text-tertiary">&quot;{addedOff.name}&quot; was added and is switched off.</p>
           <p className="mt-1 text-sm text-text-secondary">
             Its prices are examples, not yours. Check them, save, then press &quot;Enable&quot; beside it. Customers cannot ask for it until you do.
           </p>
@@ -809,8 +794,9 @@ export default function ServicesPage() {
                 <span>
                   <span
                     className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                      service.active ? 'bg-secondary-light text-secondary' : 'border border-border text-text-muted'
+                      service.active ? 'bg-secondary-light text-secondary' : 'border border-tertiary-line bg-background text-tertiary'
                     }`}
+                    data-testid="service-state"
                   >
                     {service.active ? 'Active' : 'Inactive'}
                   </span>
@@ -1179,30 +1165,42 @@ export default function ServicesPage() {
 
                     <hr className="my-4" />
 
-                    <h3 className="text-base font-medium text-text-primary">Photo Requirements</h3>
+                    <h3 className="text-base font-medium text-text-primary">Photos</h3>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-text-secondary">
-                          Minimum Photos Required
+                        <label htmlFor="photos-required" className="mb-1 block text-sm font-medium text-text-secondary">
+                          Photos required
                         </label>
                         <input
+                          id="photos-required"
+                          data-testid="photos-required"
                           type="number"
                           min={0}
-                          max={20}
+                          max={MAX_PHOTOS_REQUIRED}
                           value={formData.mediaConfig.minPhotos}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            // T-204: 0 to 8, and never more than the most a customer may add
+                            const required = photosRequired(e.target.value, 0)
                             setFormData({
                               ...formData,
                               mediaConfig: {
                                 ...formData.mediaConfig,
-                                minPhotos: parseInt(e.target.value) || 0,
+                                minPhotos: required,
+                                maxPhotos: Math.max(formData.mediaConfig.maxPhotos, required, 1),
                               },
                             })
-                          }
+                          }}
                           onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                          aria-describedby="photos-required-hint"
                           className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
                         />
+                        <p id="photos-required-hint" className="mt-1 text-xs text-text-muted">
+                          {formData.mediaConfig.minPhotos > 0
+                            ? `A customer must add at least ${formData.mediaConfig.minPhotos} photo${formData.mediaConfig.minPhotos > 1 ? 's' : ''} before they can send a request.`
+                            : 'Photos are optional: a customer can send a request without any.'}{' '}
+                          0 to {MAX_PHOTOS_REQUIRED}.
+                        </p>
                       </div>
 
                       <div>
@@ -1219,7 +1217,7 @@ export default function ServicesPage() {
                               ...formData,
                               mediaConfig: {
                                 ...formData.mediaConfig,
-                                maxPhotos: parseInt(e.target.value) || 8,
+                                maxPhotos: Math.max(parseInt(e.target.value) || 8, formData.mediaConfig.minPhotos, 1),
                               },
                             })
                           }
@@ -1257,8 +1255,8 @@ export default function ServicesPage() {
                   <div className="space-y-6">
                     {/* T-201: a template's service, just added and still off */}
                     {editingService && addedOff?.id === editingService.id && !editingService.active && (
-                      <p className="rounded-lg border border-border-strong bg-background p-3 text-sm text-text-primary" data-testid="template-prices-note">
-                        These are the template&apos;s example prices. Change them to yours and save. The service stays switched off until you press &quot;Enable&quot; on &quot;Services&quot;.
+                      <p className="rounded-lg border border-tertiary-line border-l-4 border-l-tertiary bg-background p-3 text-sm text-text-primary" data-testid="template-prices-note">
+                        These are the template&apos;s example prices. Change them to yours. The service stays <span className="font-semibold text-tertiary">switched off</span> until you press &quot;Save and switch on&quot; on the last step, or &quot;Enable&quot; on &quot;Services&quot;.
                       </p>
                     )}
                     {/* AI Draft Badge */}
@@ -1613,196 +1611,13 @@ export default function ServicesPage() {
                 {/* Test & Publish Step */}
                 {activeStep === 'test' && (
                   <div className="space-y-6">
-                    <div>
-                      <h3 className="text-base font-medium text-text-primary">Test Your Pricing</h3>
-                      <p className="mb-3 text-sm text-text-muted">
-                        Enter sample values to see how your pricing works before publishing.
-                      </p>
-                    </div>
-
-                    {/* Sample Input Section */}
-                    <div className="rounded-lg border border-border p-4">
-                      <h4 className="mb-3 text-sm font-medium text-text-primary">Sample Values</h4>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {formData.suggestedFields.filter(f => f.type === 'number').map((field) => (
-                          <div key={field.fieldId}>
-                            <label className="mb-1 block text-sm text-text-secondary">
-                              {field.label}
-                            </label>
-                            <input
-                              type="number"
-                              min={0}
-                              value={simulatorValues[field.fieldId] as number || ''}
-                              onChange={(e) => {
-                                setSimulatorValues(prev => ({
-                                  ...prev,
-                                  [field.fieldId]: parseFloat(e.target.value) || 0,
-                                }))
-                                setSimulatorResult(null)
-                              }}
-                              placeholder="0"
-                              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
-                            />
-                          </div>
-                        ))}
-                        {formData.suggestedFields.filter(f => f.type === 'dropdown' || f.type === 'radio').map((field) => (
-                          <div key={field.fieldId}>
-                            <label className="mb-1 block text-sm text-text-secondary">
-                              {field.label}
-                            </label>
-                            <select
-                              value={simulatorValues[field.fieldId] as string || ''}
-                              onChange={(e) => {
-                                setSimulatorValues(prev => ({
-                                  ...prev,
-                                  [field.fieldId]: e.target.value,
-                                }))
-                                setSimulatorResult(null)
-                              }}
-                              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
-                            >
-                              <option value="">Select...</option>
-                              {field.options?.map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                              ))}
-                            </select>
-                          </div>
-                        ))}
-                        {formData.suggestedFields.filter(f => f.type === 'boolean').map((field) => (
-                          <div key={field.fieldId} className="flex items-center pt-6">
-                            <label className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={Boolean(simulatorValues[field.fieldId])}
-                                onChange={(e) => {
-                                  setSimulatorValues(prev => ({
-                                    ...prev,
-                                    [field.fieldId]: e.target.checked,
-                                  }))
-                                  setSimulatorResult(null)
-                                }}
-                                className="h-4 w-4 rounded-sm border-border text-primary"
-                              />
-                              <span className="text-sm text-text-secondary">{field.label}</span>
-                            </label>
-                          </div>
-                        ))}
-                        {/* T-189: a line measured from the customer's photos has no size here. Its own box
-                            offers a sample size from the service's own range, or takes one to try. */}
-                        {measured.map((line) => (
-                          <div key={line.key} data-testid="sample-size">
-                            <label htmlFor={line.key} className="mb-1 block text-sm text-text-secondary">
-                              {line.name} ({line.unit})
-                            </label>
-                            <input
-                              id={line.key}
-                              type="number"
-                              min={0}
-                              value={(simulatorValues[line.key] as number) || ''}
-                              onChange={(e) => {
-                                setSimulatorValues(prev => ({ ...prev, [line.key]: parseFloat(e.target.value) || 0 }))
-                                setSimulatorResult(null)
-                              }}
-                              placeholder={line.suggested !== null ? String(line.suggested) : 'Size to try'}
-                              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2"
-                            />
-                            <p className="mt-1 text-xs text-text-muted">
-                              {line.suggested !== null
-                                ? `Measured from the customer's photos. The sample uses ${line.suggested.toLocaleString('en-US')} ${line.unit} unless you type another size.`
-                                : "Measured from the customer's photos. Type a size to see a sample price."}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                      {formData.suggestedFields.length === 0 && measured.length === 0 && (
-                        <p className="text-sm text-text-muted">
-                          No customer questions defined. Go back to add questions that affect pricing.
-                        </p>
-                      )}
-                      <button
-                        type="button"
-                        onClick={runSimulator}
-                        className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
-                      >
-                        Calculate Preview
-                      </button>
-                    </div>
-
-                    {/* Preview Results */}
-                    {simulatorResult && (
-                      <div className="rounded-lg border border-border bg-background p-4">
-                        <h4 className="mb-3 text-sm font-medium text-text-primary">Preview Breakdown</h4>
-                        <div className="space-y-2">
-                          {simulatorResult.lineItems.map((item, index) => (
-                            <div key={index} className="flex items-center justify-between text-sm">
-                              <div className="flex items-center gap-2">
-                                <span className="text-text-primary">{item.name}</span>
-                                {item.quantitySource === 'form_field' && (
-                                  <span className="rounded-sm bg-primary-light px-1.5 py-0.5 text-xs text-primary">form</span>
-                                )}
-                                {item.quantitySource === 'constant' && (
-                                  <span className="rounded-sm bg-secondary-light px-1.5 py-0.5 text-xs text-secondary">fixed</span>
-                                )}
-                                {item.quantitySource === 'photos' && (
-                                  <span className="rounded-sm border border-border px-1.5 py-0.5 text-xs text-text-secondary">{item.sample ? 'sample size' : 'from photos'}</span>
-                                )}
-                                {item.quantitySource === 'missing' && (
-                                  <span className="rounded-sm bg-danger-light px-1.5 py-0.5 text-xs text-danger">no source</span>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                {item.amount !== null ? (
-                                  <>
-                                    <span className="font-medium text-text-primary">{currencySymbol}{item.amount.toFixed(2)}</span>
-                                    <span className="ml-2 text-text-muted">({item.calculation})</span>
-                                  </>
-                                ) : (
-                                  <span className="text-text-secondary" data-testid="sample-rate">{item.calculation}, priced from the customer&apos;s photos</span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                          {simulatorResult.lineItems.length === 0 && (
-                            <p className="text-sm text-text-muted">No pricing items configured.</p>
-                          )}
-                          <div className="mt-2 border-t border-border pt-2">
-                            {simulatorResult.minimumCharge !== null && (
-                              <p className="mb-1 text-sm text-text-secondary" data-testid="minimum-note">
-                                {minimumChargeNote(currencySymbol + simulatorResult.minimumCharge.toFixed(2))}
-                              </p>
-                            )}
-                            {simulatorResult.unmeasured.length > 0 ? (
-                              <div className="flex items-center justify-between font-medium" data-testid="sample-total">
-                                <span className="text-text-primary">Total</span>
-                                <span className="text-text-primary">
-                                  {simulatorResult.subtotal > 0 ? `${currencySymbol}${simulatorResult.subtotal.toFixed(2)} + the lines priced from photos` : 'Priced from the photos'}
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-between font-medium" data-testid="sample-total">
-                                <span className="text-text-primary">{simulatorResult.sampled.length > 0 ? 'Sample total' : 'Total'}</span>
-                                <span className="text-lg text-text-primary">{currencySymbol}{simulatorResult.subtotal.toFixed(2)}</span>
-                              </div>
-                            )}
-                            {sampleNote(simulatorResult) && (
-                              <p className="mt-2 text-sm text-text-secondary" data-testid="sample-note">{sampleNote(simulatorResult)}</p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Warnings */}
-                        {simulatorResult.warnings.length > 0 && (
-                          <div className="mt-4 rounded-lg bg-tertiary-light p-3">
-                            <h5 className="mb-1 text-sm font-medium text-tertiary">Warnings</h5>
-                            <ul className="space-y-1">
-                              {simulatorResult.warnings.map((warning, index) => (
-                                <li key={index} className="text-sm text-tertiary">• {warning}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {/* T-204: priced by the worker's own pipeline, so the test is what a customer gets */}
+                    <PricingTest
+                      service={{ ...serviceBody(), suggestedFields: formData.suggestedFields }}
+                      serviceId={editingService?.id}
+                      currencySymbol={currencySymbol}
+                      onTested={setPricingTested}
+                    />
 
                     {/* Validation Summary */}
                     <div className={`rounded-lg border p-4 ${validationErrors.length > 0 ? 'border-danger/20 bg-danger-light' : 'border-border'}`}>
@@ -1841,6 +1656,17 @@ export default function ServicesPage() {
                         </div>
                       )}
 
+                      {/* T-204: flags. They stay visible and never block saving. */}
+                      {pricingFlags.length > 0 && (
+                        <div className="mb-4">
+                          <PricingFlagsNote
+                            flags={pricingFlags}
+                            title="Worth a look before you publish"
+                            hint={'You can still save. Link a line to a question on "Pricing Setup", or describe the price again.'}
+                          />
+                        </div>
+                      )}
+
                       {/* Success checks */}
                       {validationErrors.length === 0 && (
                         <div className="space-y-2">
@@ -1860,7 +1686,7 @@ export default function ServicesPage() {
                             </div>
                           )}
 
-                          {simulatorResult && (
+                          {pricingTested && (
                             <div className="flex items-center gap-2 text-sm text-secondary">
                               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -1872,7 +1698,7 @@ export default function ServicesPage() {
                       )}
 
                       {/* Test reminder if not run */}
-                      {!simulatorResult && validationErrors.length === 0 && (
+                      {!pricingTested && validationErrors.length === 0 && (
                         <div className="mt-3 flex items-center gap-2 text-sm text-text-muted">
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1911,15 +1737,42 @@ export default function ServicesPage() {
                 </div>
                 <div>
                   {isLastStep ? (
+                    editingService && !editingService.active ? (
+                      // T-204: a service that is switched off can be saved as it is, or saved and switched on
+                      <div className="flex flex-wrap items-center justify-end gap-3">
+                        <span className="text-sm font-semibold text-tertiary" data-testid="save-off-note">This service is switched off.</span>
+                        <button
+                          type="submit"
+                          disabled={saving || !formData.name.trim() || !canPublish}
+                          onClick={() => { submitIntentRef.current = true; switchOnRef.current = false }}
+                          className="rounded-lg border border-field bg-background px-5 py-2.5 text-sm font-semibold text-text-primary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                          title={!canPublish ? 'Fix validation errors before publishing' : undefined}
+                          data-testid="save-keep-off"
+                        >
+                          {saving ? 'Saving...' : 'Save Changes'}
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={saving || !formData.name.trim() || !canPublish}
+                          onClick={() => { submitIntentRef.current = true; switchOnRef.current = true }}
+                          className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+                          title={!canPublish ? 'Fix validation errors before publishing' : undefined}
+                          data-testid="save-switch-on"
+                        >
+                          {saving ? 'Saving...' : 'Save and switch on'}
+                        </button>
+                      </div>
+                    ) : (
                     <button
                       type="submit"
                       disabled={saving || !formData.name.trim() || !canPublish}
-                      onClick={() => { submitIntentRef.current = true }}
+                      onClick={() => { submitIntentRef.current = true; switchOnRef.current = false }}
                       className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
                       title={!canPublish ? 'Fix validation errors before publishing' : undefined}
                     >
                       {saving ? 'Saving...' : editingService ? 'Save Changes' : 'Create Service'}
                     </button>
+                    )
                   ) : (
                     <button
                       type="button"

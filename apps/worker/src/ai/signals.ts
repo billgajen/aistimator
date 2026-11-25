@@ -6,6 +6,7 @@
  * Uses structured output (JSON schema) for reliable parsing.
  */
 
+import type { PhotoFailure } from '@qolumns/shared'
 import { GeminiClient } from './gemini'
 import type { AiClient } from './client'
 import { EXTRACTED_SIGNALS_SCHEMA } from './schemas'
@@ -235,6 +236,11 @@ export interface ExtractedSignals {
  * The measurement model is the key signal that tells AI what to measure
  */
 export interface SignalExtractionContext {
+  /**
+   * T-204: told when the reading came back unusable and built-in defaults were returned in its
+   * place (the caller holds such a quote for the business; it used to be priced and sent).
+   */
+  onUnread?: (why: PhotoFailure) => void
   serviceName: string
   serviceDescription?: string
   scopeIncludes?: string[]
@@ -526,6 +532,7 @@ export async function extractSignals(
     console.error(`[Signals] Raw response not logged (${String(response).length} chars): it can repeat the customer's words`)
 
     // Return a default low-confidence result
+    context.onUnread?.('bad_answer')
     return getDefaultSignals('Failed to parse AI response')
   }
 }
@@ -647,6 +654,7 @@ export async function extractStructuredSignals(
       return { legacy: legacySignals, structured }
     } catch (fallbackError) {
       console.error('[Signals] Fallback also failed:', fallbackError)
+      context.onUnread?.(fallbackError instanceof Error && /timed out|timeout/i.test(fallbackError.message) ? 'timeout' : fallbackError instanceof SyntaxError ? 'bad_answer' : 'error')
       return { legacy: getSignalsWithoutImages(), structured: getDefaultSignalsV2('Failed to parse AI response') }
     }
   }

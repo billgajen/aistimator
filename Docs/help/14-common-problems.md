@@ -54,7 +54,7 @@ The price is built only from the service's own price list, so a low price means 
 3. Open each "Per Unit" or "Per Hour" line and check "Multiply by" points at the right question. A line whose quantity comes to 0 is left off the estimate.
 4. On "Customer Questions", tick "Required" on every question a line multiplies by, so a customer cannot skip it.
 5. Check any line ticked "Only include when condition is met". It is left off when the condition is not met. A "Fixed Amount" line ticked with no "Question" chosen cannot be saved: "Test & Publish" lists it under "Fix Before Publishing".
-6. Go to "Test & Publish", fill in "Sample Values" as that customer answered and press "Calculate Preview". Then press "Save Changes".
+6. Go to "Test & Publish", fill in "The customer's answers" as that customer answered and press "Calculate Preview". Then press "Save Changes".
 
 ## Why does the form not ask the questions I set?
 <!-- id: problems-questions-not-asked; page: /app/services -->
@@ -81,6 +81,8 @@ The last step shows "Fix Before Publishing" with a list. Each item names a price
 6. Press "Next" to "Test & Publish". When it shows "Ready to Publish", press "Save Changes".
 
 The same box can also say that an adjustment or a line uses a question this service no longer has. That does not stop the save, but the adjustment or line is not applied until you choose its question again on "Pricing Setup".
+
+"Worth a look before you publish" does not stop the save either. It lists a question that changes no price line, and a line whose name says it depends on something ("if", "only", "per", "each additional", "weekend") while nothing decides it, so it is charged on every quote. Link the line to its question on "Pricing Setup", or leave it if that is what you meant.
 
 The button is also greyed out when "Service Name" on "Basic Info" is empty.
 
@@ -136,6 +138,17 @@ Most often part of the code was left out, or the website did not accept code in 
 If your website cannot take code at all, add a button or a menu link that goes to your quote link. It opens the same form.
 
 If the form shows but lists no services under "What do you need?", open "Services" and make sure at least one service is marked "Active".
+
+## The test on "Test & Publish" charges a line it should not. What do I check?
+<!-- id: problems-test-charges-line; page: /app/services -->
+
+The test price is worked out the same way as a real request, so a line it charges is a line a customer would be charged. Check what decides that line.
+
+1. On "Test & Publish", read "Not charged with these answers" and "Worth a look before you publish".
+2. If the line is listed under "Worth a look" as charged on every quote, nothing decides it. Press "Back" to "Pricing Setup", open the line, tick "Only include when condition is met" and choose its question and answer.
+3. If the line is a "Per Unit" line that should count "each additional" one, choose the question under "Each additional (the answer minus 1)" in "Multiply by".
+4. If the line multiplies by a question the customer may leave empty, leave the box empty in the test: it counts as 0 and the line is left off.
+5. Press "Next" to "Test & Publish" and press "Calculate Preview" again.
 
 ## The price on an estimate looks wrong. How do I check it and put it right?
 <!-- id: problems-price-looks-wrong; page: /app/quotes/[quoteId] -->
@@ -259,10 +272,10 @@ To put it right:
 2. Look under "Logo". If your logo is not shown there, press "Click to upload your logo" and choose a file of the right kind and size.
 3. Check it in "Preview" on the right. A logo is saved as soon as it has uploaded.
 
-## A customer says the form told them "Location is outside service area". Why?
+## A customer says the form told them my business doesn't cover their ZIP code or postcode. Why?
 <!-- id: problems-outside-service-area; page: /app/settings; section: Service Area -->
 
-Your "Service Area" limits where you take jobs, and the code the customer typed is outside it. Their request was not sent.
+Your "Service Area" limits where you take jobs, and the code the customer typed is outside it. Their request was not sent. The form took them back to the ZIP code or postcode box and kept everything else they had entered, so a customer who mistyped the code can correct it there and send again.
 
 - With "Postcode/ZIP allowlist", the customer's code does not start with any code on your list.
 - With "County/State", the customer's ZIP code is in a state that is not on your list.
@@ -270,7 +283,7 @@ Your "Service Area" limits where you take jobs, and the code the customer typed 
 1. Open "Settings" and go to "Service Area".
 2. Add the customer's code, or the first part of it, to "Allowed Postcodes/ZIP Codes". With "County/State", add the customer's state on its own line. To take requests from anywhere, choose "No restrictions".
 3. Press "Save Service Area".
-4. Ask the customer to send the form again.
+4. Ask the customer to send the form again. If they still have it open, their answers and photos are still there: they press "Get my estimate" again.
 
 ## What does {{product}} not do?
 <!-- id: problems-not-offered; page: /app -->

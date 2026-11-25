@@ -3,7 +3,7 @@
  * lib/request-updated.ts). It is about the SAME quote, never a second one:
  * each service as a section with its subtotal, then the one total.
  */
-import { EMAIL_FONT, displaySections, emailHeadStyle, formatMoney, productLogoRow, sectionsAwaitingApproval } from '@qolumns/shared'
+import { displaySections, emailShell, formatMoney, productLogoRow, sectionsAwaitingApproval } from '@qolumns/shared'
 import type { CombinedPricing } from '@qolumns/shared'
 
 const escape = (text: string) =>
@@ -50,15 +50,11 @@ export function requestUpdatedEmail(input: RequestUpdatedInput): { subject: stri
       : ''
   const button = (href: string, label: string, role: string) =>
     `<table role="presentation" style="width:100%;margin:20px 0 4px;"><tr><td style="text-align:center;"><a href="${escape(href)}" data-role="${role}" style="display:inline-block;padding:14px 28px;background-color:#205E56;color:#FFFFFF;text-decoration:none;font-weight:600;font-size:15px;border-radius:8px;">${label}</a></td></tr></table>`
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Request updated</title>${emailHeadStyle()}
-</head>
-<body style="margin:0;padding:0;font-family:${EMAIL_FONT.body};background-color:#FAF9F6;">
-  <table role="presentation" style="width:100%;border-collapse:collapse;"><tr><td style="padding:40px 20px;">
-    ${productLogoRow()}
-    <table role="presentation" style="max-width:600px;margin:0 auto;background-color:#FFFFFF;border-radius:8px;"><tr><td style="padding:40px;">
-      <p style="margin:0;font-size:14px;color:#626C66;">Request updated</p>
+  // T-204: the page is the one every email uses (fixed 600 px card, phone padding): emailShell
+  const html = emailShell({
+    title: 'Request updated',
+    above: productLogoRow(),
+    content: `<p style="margin:0;font-size:14px;color:#626C66;">Request updated</p>
       <h1 style="margin:8px 0 0;font-size:24px;font-weight:700;color:#1B2823;">${escape(name)}</h1>
       <p style="margin:12px 0 0;font-size:15px;color:#1B2823;" data-role="what-changed">
         ${escape(name)} ${escape(what)} the quote you already have for them. It is still one quote, with one total.
@@ -72,10 +68,7 @@ export function requestUpdatedEmail(input: RequestUpdatedInput): { subject: stri
         ${next}
       </p>
       ${input.awaitingApproval && input.approveUrl ? button(input.approveUrl, 'Approve &amp; send', 'approve') : ''}
-      ${input.awaitingApproval && input.approveUrl ? `<p style="margin:12px 0 0;text-align:center;font-size:14px;"><a href="${escape(input.dashboardUrl)}" data-role="dashboard" style="color:#205E56;text-decoration:underline;">Open in dashboard to edit</a></p>` : button(input.dashboardUrl, input.awaitingApproval ? 'Review and approve' : 'Open the quote', 'dashboard')}
-    </td></tr></table>
-  </td></tr></table>
-</body>
-</html>`
+      ${input.awaitingApproval && input.approveUrl ? `<p style="margin:12px 0 0;text-align:center;font-size:14px;"><a href="${escape(input.dashboardUrl)}" data-role="dashboard" style="color:#205E56;text-decoration:underline;">Open in dashboard to edit</a></p>` : button(input.dashboardUrl, input.awaitingApproval ? 'Review and approve' : 'Open the quote', 'dashboard')}`,
+  })
   return { subject, html }
 }

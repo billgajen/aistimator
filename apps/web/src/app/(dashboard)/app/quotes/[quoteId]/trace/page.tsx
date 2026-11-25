@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { formatMoney, minimumChargeNote, MINIMUM_ENTRY_LABEL } from '@qolumns/shared'
 import Link from 'next/link'
 import { TRACE_UNDERSTOOD_COPY, understoodTrace, understoodTraceEmpty } from '@/lib/trace-understood'
+import { TRACE_AS_SENT_COPY, configVersionLabel, quoteAsSent } from '@/lib/trace-as-sent'
 import type { Quote, PricingTrace, PricingTraceStep } from '@qolumns/shared'
 
 interface QuoteWithService extends Quote {
@@ -32,6 +33,8 @@ export default function PricingTracePage({
   // opened. It reads it the way the quote page beside it does.
   const { quoteId } = params
   const [quote, setQuote] = useState<QuoteWithService | null>(null)
+  // T-204: the quote's price before its first edit (null when it was never edited)
+  const [firstPricing, setFirstPricing] = useState<unknown>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -39,14 +42,17 @@ export default function PricingTracePage({
     async function fetchQuote() {
       try {
         setLoading(true)
-        const res = await fetch(`/api/quotes/${quoteId}`)
+        const res = await fetch(`/api/quotes/${quoteId}?trace=1`)
         const data = await res.json()
 
         if (!res.ok) {
           throw new Error(data.error?.message || 'Failed to fetch quote')
         }
 
-        setQuote(data.quote)
+        // T-204: the service comes beside the quote, not inside it. Reading `quote.service` was why
+        // this page never showed the service's name.
+        setQuote({ ...data.quote, service: data.service ?? null })
+        setFirstPricing(data.firstPricing ?? null)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch quote')
       } finally {
@@ -160,6 +166,11 @@ export default function PricingTracePage({
   const minimumNote = minimumStep ? minimumChargeNote(formatCurrency(minimumStep.runningTotal)) : null
   // T-201: what was read for this quote, as lines (not the stored record)
   const understood = understoodTrace(quote.signals_json, quote.service?.expected_signals)
+  // T-204: the quote as it stands today, against its first price
+  const sent = quoteAsSent(quote.pricing_json, firstPricing as Parameters<typeof quoteAsSent>[1])
+  const C = TRACE_AS_SENT_COPY
+  const serviceName = quote.service?.name || null
+  const version = configVersionLabel(trace?.configVersion)
 
   return (
     <div className="space-y-6">
@@ -177,7 +188,8 @@ export default function PricingTracePage({
           </Link>
           <h1 className="text-2xl font-semibold text-text-primary">Pricing Trace</h1>
           <p className="mt-1 text-sm text-text-muted">
-            Quote for {quote.customer_json.name} - {quote.service?.name || 'Unknown Service'}
+            Quote for {quote.customer_json.name}
+            {serviceName ? ` - ${serviceName}` : ''}
           </p>
         </div>
         <div className="text-right">
@@ -197,7 +209,7 @@ export default function PricingTracePage({
           </div>
           <div>
             <p className="text-sm text-text-muted">Service</p>
-            <p className="font-medium text-text-primary">{quote.service?.name || 'N/A'}</p>
+            <p className="font-medium text-text-primary" data-testid="trace-service">{serviceName || '-'}</p>
           </div>
           <div>
             <p className="text-sm text-text-muted">Status</p>
@@ -210,14 +222,97 @@ export default function PricingTracePage({
         </div>
       </div>
 
+      {/* T-204: the quote as sent. The engine's steps below are how the FIRST price was reached; a line
+          added or changed with "Edit" is not among them, so the quote itself is printed first. */}
+      <div className="rounded-xl border border-border bg-surface" data-testid="trace-as-sent">
+        <div className="border-b border-border px-6 py-4">
+          <h2 className="text-lg font-medium text-text-primary">{quote.sent_at ? C.titleSent : C.titleNotSent}</h2>
+          <p className="text-sm text-text-muted">{C.intro}</p>
+        </div>
+        <div className="divide-y divide-border">
+          {sent.lines.map((line, index) => (
+            <div key={`${line.label}-${index}`} className="flex items-start justify-between gap-4 px-6 py-3" data-testid="trace-sent-line" data-mark={line.mark}>
+              <div>
+                <p className="font-medium text-text-primary">{line.label}</p>
+                {line.mark !== 'first' && (
+                  <p className="mt-0.5 text-xs font-medium text-tertiary">
+                    {C.marks[line.mark]}
+                    {line.mark === 'changed' && line.was !== undefined ? ` (${C.was(formatCurrency(line.was))})` : ''}
+                  </p>
+                )}
+              </div>
+              <p className="figure shrink-0 font-medium text-text-primary">{formatCurrency(line.amount)}</p>
+            </div>
+          ))}
+          {sent.minimumCharge !== null && (
+            <p className="px-6 py-3 text-sm text-tertiary">{minimumChargeNote(formatCurrency(sent.minimumCharge))}</p>
+          )}
+          {sent.sections.map((section) => (
+            <div key={section.serviceName} className="px-6 py-3" data-testid="trace-sent-section">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-medium text-text-primary">{section.serviceName}</p>
+                  <p className="mt-0.5 text-xs font-medium text-tertiary">{C.sectionBy[section.addedBy]}</p>
+                </div>
+                <p className="figure shrink-0 font-medium text-text-primary">{formatCurrency(section.subtotal)}</p>
+              </div>
+              <ul className="mt-2 space-y-1">
+                {section.lines.map((line, index) => (
+                  <li key={`${line.label}-${index}`} className="flex items-start justify-between gap-4 text-sm text-text-secondary">
+                    <span>{line.label}</span>
+                    <span className="figure shrink-0">{formatCurrency(line.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+              {section.minimumCharge !== null && <p className="mt-1 text-sm text-tertiary">{minimumChargeNote(formatCurrency(section.minimumCharge))}</p>}
+            </div>
+          ))}
+          {sent.removed.length > 0 && (
+            <div className="px-6 py-3" data-testid="trace-sent-removed">
+              <p className="text-xs font-medium text-text-muted">{C.removedTitle}</p>
+              <ul className="mt-1 space-y-1">
+                {sent.removed.map((line, index) => (
+                  <li key={`${line.label}-${index}`} className="flex items-start justify-between gap-4 text-sm text-text-muted">
+                    <span>{line.label}</span>
+                    <span className="figure shrink-0">{formatCurrency(line.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+        <div className="space-y-2 border-t border-border bg-background px-6 py-4 text-sm">
+          <div className="flex justify-between">
+            <span className="text-text-secondary">Subtotal:</span>
+            <span className="figure font-medium">{formatCurrency(sent.subtotal)}</span>
+          </div>
+          {sent.taxAmount > 0 && (
+            <div className="flex justify-between">
+              <span className="text-text-secondary">
+                {sent.taxLabel || 'Tax'}
+                {sent.taxRate !== null ? ` (${sent.taxRate}%)` : ''}:
+              </span>
+              <span className="figure font-medium">{formatCurrency(sent.taxAmount)}</span>
+            </div>
+          )}
+          <div className="flex justify-between border-t border-border pt-2">
+            <span className="font-medium text-text-primary">Total:</span>
+            <span className="figure font-bold text-text-primary" data-testid="trace-sent-total">{formatCurrency(sent.total)}</span>
+          </div>
+        </div>
+      </div>
+
       {/* Pricing Trace */}
       {trace ? (
         <div className="rounded-xl border border-border bg-surface">
           <div className="border-b border-border px-6 py-4">
-            <h2 className="text-lg font-medium text-text-primary">Calculation Steps</h2>
-            <p className="text-sm text-text-muted">
+            <h2 className="text-lg font-medium text-text-primary">{sent.edited ? C.stepsTitleEdited : C.stepsTitle}</h2>
+            {sent.edited && sent.firstTotal !== null && (
+              <p className="text-sm text-text-secondary" data-testid="trace-edited-note">{C.edited(formatCurrency(sent.firstTotal))}</p>
+            )}
+            <p className="text-sm text-text-muted" data-testid="trace-calculated">
               Calculated at {formatDate(trace.calculatedAt)}
-              {trace.configVersion && ` - Config v${trace.configVersion}`}
+              {version && ` - Config ${version}`}
             </p>
           </div>
 
@@ -319,7 +414,7 @@ export default function PricingTracePage({
                   </div>
                 )}
                 <div className="flex justify-between border-t border-border pt-2 md:col-span-4">
-                  <span className="font-medium text-text-primary">Total:</span>
+                  <span className="font-medium text-text-primary">{sent.edited ? C.firstTotal : 'Total:'}</span>
                   <span className="font-bold text-text-primary">{formatCurrency(trace.summary.total)}</span>
                 </div>
               </div>

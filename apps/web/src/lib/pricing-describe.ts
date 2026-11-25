@@ -6,6 +6,7 @@
  * pricing engine will execute.
  */
 
+import { linkWordsOf } from '@qolumns/shared'
 import type {
   WorkStepConfig,
   AddonConfig,
@@ -85,12 +86,25 @@ function describeWorkStep(
       line += ` — quantity estimated by AI from photos (${signalLabel(qs.signalKey, pricing.expectedSignals)})`
     } else if (qs?.type === 'constant') {
       line += ` — fixed quantity of ${qs.value ?? 1}`
+    } else if (qs?.type === 'derived' && qs.formula) {
+      // T-204: a formula is said in words ("each additional …" is the answer minus 1)
+      line += ` — ${(linkWordsOf(step, pricing.suggestedFields).quantity ?? '').replace(/^Quantity:? ?/, 'quantity: ')}`
     } else {
       line += ` — no quantity source configured (defaults to 1)`
     }
+    if (qs?.type === 'form_field' && qs.missingMeansZero) line += ' (left empty counts as 0)'
+  } else if (step.costType === 'percent') {
+    line = `${step.name}: ${step.defaultCost}% of ${step.percentOf === 'subtotal' || !step.percentOf ? 'the price so far' : 'the lines it names'}`
+  } else if (step.costType === 'credit') {
+    line = `${step.name}: ${money(step.defaultCost, symbol)} taken off`
   } else {
     line = `${step.name}: ${money(step.defaultCost, symbol)} (fixed)`
   }
+
+  // T-204: a condition on a customer's answer is said in words. It was never shown, so a
+  // conditional line read as if it were always charged.
+  const condition = linkWordsOf(step, pricing.suggestedFields).condition
+  if (condition) line += `. ${condition}`
 
   if (step.optional && step.triggerSignal) {
     const signalName = signalLabel(step.triggerSignal, pricing.expectedSignals)

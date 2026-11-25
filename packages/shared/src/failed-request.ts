@@ -7,7 +7,7 @@
  */
 import { PRODUCT_NAME } from './brand'
 import { productLogoRow } from './product-logo'
-import { EMAIL_FONT, emailHeadStyle } from './email-style'
+import { emailShell } from './email-shell'
 
 /** After this long on "Preparing your estimate" the customer is told it is slow */
 export const SLOW_PREPARING_MS = 60_000
@@ -46,15 +46,11 @@ export function failedRequestEmail(input: FailedRequestEmailInput): { subject: s
   const name = input.customerName.trim() || 'A customer'
   const contact = [input.customerEmail, input.customerPhone].filter((v): v is string => Boolean(v && v.trim()))
   const subject = `${input.isTest ? '[TEST] ' : ''}${name} asked for an estimate: please reply to them yourself`
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>A request needs you</title>${emailHeadStyle()}
-</head>
-<body style="margin:0;padding:0;font-family:${EMAIL_FONT.body};background-color:#FAF9F6;">
-  <table role="presentation" style="width:100%;border-collapse:collapse;"><tr><td style="padding:40px 20px;">
-    ${productLogoRow()}
-    <table role="presentation" style="max-width:600px;margin:0 auto;background-color:#FFFFFF;border-radius:8px;"><tr><td style="padding:40px;">
-      <p style="margin:0;font-size:14px;color:#626C66;">A request needs you</p>
+  // T-204: the page is the one every email uses (fixed 600 px card, phone padding): emailShell
+  const html = emailShell({
+    title: 'A request needs you',
+    above: productLogoRow(),
+    content: `<p style="margin:0;font-size:14px;color:#626C66;">A request needs you</p>
       <h1 style="margin:8px 0 0;font-size:24px;font-weight:700;color:#1B2823;">${escape(name)}</h1>
       <p style="margin:4px 0 0;font-size:15px;color:#4F5D57;">${escape(input.serviceName)}</p>
       <p style="margin:20px 0 0;font-size:15px;color:#1B2823;" data-role="what-happened">
@@ -70,10 +66,7 @@ export function failedRequestEmail(input: FailedRequestEmailInput): { subject: s
               .map((line) => `<p style="margin:6px 0 0;color:#4F5D57;font-size:14px;">${escape(line.trim())}</p>`)
               .join('')}</div>`
           : ''
-      }
-    </td></tr></table>
-  </td></tr></table>
-</body>
-</html>`
+      }`,
+  })
   return { subject, html }
 }

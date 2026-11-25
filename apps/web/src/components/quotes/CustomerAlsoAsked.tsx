@@ -1,4 +1,5 @@
 import type { AlsoAsked } from '@qolumns/shared'
+import { AddToQuote, type AddToQuoteContext } from './AddToQuote'
 
 const STATE: Record<AlsoAsked['state'], { label: string; tone: string }> = {
   // the status colours of the design system (system.md, Status colours); the words carry the meaning, not the colour
@@ -16,8 +17,11 @@ const STATE: Record<AlsoAsked['state'], { label: string; tone: string }> = {
  * `addedBy` tells apart a service the customer added from one the business
  * added in the editor. `priceWaits` lists the added services whose price the
  * customer does not see until the business approves (they hold until approved).
+ *
+ * T-204: `adding`, when the quote can still be edited, puts "Add to this
+ * quote" beside each of the business's services the customer has not added.
  */
-export function CustomerAlsoAsked({ items, addedBy, priceWaits }: { items: AlsoAsked[]; addedBy?: Record<string, 'customer' | 'business'>; priceWaits?: readonly string[] }) {
+export function CustomerAlsoAsked({ items, addedBy, priceWaits, adding }: { items: AlsoAsked[]; addedBy?: Record<string, 'customer' | 'business'>; priceWaits?: readonly string[]; adding?: AddToQuoteContext }) {
   if (items.length === 0) return null
   return (
     <section className="mb-6 rounded-2xl border border-border bg-white p-5 shadow-warm-md" aria-labelledby="also-asked-title" data-testid="customer-also-asked">
@@ -38,6 +42,7 @@ export function CustomerAlsoAsked({ items, addedBy, priceWaits }: { items: AlsoA
                     The customer sees no price for this part until you approve.
                   </p>
                 )}
+                {adding && item.state === 'offered' && item.serviceId && <AddToQuote item={item} context={adding} />}
                 {item.state === 'not_offered' && (
                   <p className="mt-1 text-sm text-text-secondary">No price was given. The customer was told you will confirm it with them separately.</p>
                 )}

@@ -5,7 +5,8 @@ import { readableTextOn } from '@/lib/color'
 import { LogoUpload } from '@/components/settings/LogoUpload'
 import { PDF_ONLY_LINE, PdfOnlyTag } from '@/components/dashboard/PdfOnlyTag'
 import type { TenantBranding, TenantTemplate } from '@qolumns/shared'
-import { DEFAULT_PRIMARY_COLOR, getRegion, noBadgeLine, PRODUCT_NAME } from '@qolumns/shared'
+import { DEFAULT_PRIMARY_COLOR, formatMoney, getRegion, noBadgeLine, PRODUCT_NAME } from '@qolumns/shared'
+import { NEUTRAL_SAMPLE, previewTotals, ratePercentText, type BrandingSample, type PreviewTax } from '@/lib/branding-preview'
 
 /**
  * Curated brand colours — trade-friendly, all tested against white and ink
@@ -39,41 +40,17 @@ const DEFAULT_TEMPLATE: TenantTemplate = {
   acceptQuoteEnabled: true,
 }
 
-// Mock quote data for preview
-const MOCK_QUOTE = {
-  id: 'qte_preview123',
-  serviceName: 'Kitchen Renovation',
-  customer: {
-    name: 'John Smith',
-    email: 'john@example.com',
-  },
-  pricing: {
-    breakdown: [
-      { label: 'Base fee', amount: 500 },
-      { label: 'Premium materials', amount: 250 },
-      { label: 'Extended warranty', amount: 100 },
-    ],
-    subtotal: 850,
-    taxLabel: 'VAT',
-    taxRate: 20,
-    taxAmount: 170,
-    total: 1020,
-  },
-  content: {
-    scopeSummary: 'Complete kitchen renovation including cabinet installation, countertop replacement, and new appliances.',
-    assumptions: [
-      'Access to property during normal business hours',
-      'Electrical and plumbing in good condition',
-      'Customer to clear work area before start',
-    ],
-    exclusions: [
-      'Structural modifications',
-      'Flooring replacement',
-      'Appliance disposal',
-    ],
-  },
-  createdAt: new Date().toISOString(),
+// T-204: the preview is the business's own look (lib/branding-preview.ts). Until the page has
+// loaded, and for a business with no priced service yet, the neutral sketch stands in.
+interface PreviewData {
+  currency: string
+  tax: PreviewTax
+  badgeShown: boolean
+  badgeLine: string
+  sample: BrandingSample
 }
+
+const SAMPLE_CUSTOMER = 'Your customer'
 
 /**
  * Branding Page
@@ -89,6 +66,7 @@ export default function BrandingPage() {
   // T-152: placeholders follow the business's region (no hardcoded number)
   const [region, setRegion] = useState<string | null>(null)
   const regionCopy = getRegion(region).copy
+  const [preview, setPreview] = useState<PreviewData | null>(null)
 
   // Branding state
   const [branding, setBranding] = useState<TenantBranding>(DEFAULT_BRANDING)
@@ -113,6 +91,7 @@ export default function BrandingPage() {
       setBranding(data.branding || DEFAULT_BRANDING)
       setTemplate(data.template || DEFAULT_TEMPLATE)
       setLogoUrl(data.logoUrl || null)
+      setPreview((data.preview as PreviewData | undefined) ?? null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch branding')
     } finally {
@@ -153,12 +132,13 @@ export default function BrandingPage() {
     }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount)
-  }
+  // T-204: the business's own currency, tax and sample (they were dollars, "VAT (20%)" and a kitchen)
+  const sample = preview?.sample ?? NEUTRAL_SAMPLE
+  const currency = preview?.currency || getRegion(region).currency
+  const formatCurrency = (amount: number) => formatMoney(amount, currency, getRegion(region).locale)
+  const totals = previewTotals(sample, preview?.tax ?? { enabled: false, label: '', ratePercent: 0 })
+  // Shown while loading only if nothing says otherwise: a business that hides the badge never sees it flash
+  const badgeShown = preview ? preview.badgeShown : false
 
   if (loading) {
     return (
@@ -459,12 +439,17 @@ export default function BrandingPage() {
           <div className="rounded-xl bg-surface p-6 shadow-warm">
             <h2 className="text-lg font-medium text-text-primary">Preview</h2>
             {/* T-201: the sketch follows the tick boxes, which only the PDF does */}
-            <p className="mb-4 mt-1 text-sm text-text-muted">A sketch of your quote. It follows the three tick boxes the way the PDF does.</p>
+            <p className="mb-4 mt-1 text-sm text-text-muted" data-testid="branding-preview-note">
+              {sample.own
+                ? `A sketch of your quote, with lines from your ${sample.serviceName} service at sample sizes. It follows the three tick boxes the way the PDF does.`
+                : 'A sketch of your quote. Once a service has prices, its own lines show here. It follows the three tick boxes the way the PDF does.'}
+            </p>
 
             {/* Quote Preview */}
             <div
               className="rounded-xl border border-border bg-surface p-6"
               style={{ '--primary-color': branding.primaryColor } as React.CSSProperties}
+              data-testid="branding-preview"
             >
               {/* Header */}
               <div className="mb-6 flex items-start justify-between border-b border-border pb-4">
@@ -482,26 +467,26 @@ export default function BrandingPage() {
                       {[branding.phone, branding.email, branding.website].filter(Boolean).join(' · ')}
                     </p>
                   )}
-                  <p className="text-sm text-text-muted">Quote #{MOCK_QUOTE.id.slice(-8)}</p>
+                  <p className="text-sm text-text-muted">Quote #12345678</p>
                 </div>
                 <div
                   className="rounded-full px-3 py-1 text-xs font-medium"
                   style={{ backgroundColor: branding.primaryColor, color: readableTextOn(branding.primaryColor) }}
                 >
-                  {MOCK_QUOTE.serviceName}
+                  {sample.serviceName}
                 </div>
               </div>
 
               {/* Customer */}
               <div className="mb-4">
                 <p className="text-sm text-text-muted">Prepared for:</p>
-                <p className="font-medium text-text-primary">{MOCK_QUOTE.customer.name}</p>
+                <p className="font-medium text-text-primary">{SAMPLE_CUSTOMER}</p>
               </div>
 
               {/* Scope */}
               <div className="mb-4">
                 <p className="text-sm font-medium text-text-secondary">Scope of work</p>
-                <p className="mt-1 text-sm text-text-secondary">{MOCK_QUOTE.content.scopeSummary}</p>
+                <p className="mt-1 text-sm text-text-secondary">{sample.scopeSummary}</p>
               </div>
 
               {/* Line Items */}
@@ -509,10 +494,10 @@ export default function BrandingPage() {
                 <div className="mb-4">
                   <p className="mb-2 text-sm font-medium text-text-secondary">Pricing breakdown</p>
                   <div className="space-y-1">
-                    {MOCK_QUOTE.pricing.breakdown.map((item, i) => (
-                      <div key={i} className="flex justify-between text-sm">
+                    {sample.lines.map((item, i) => (
+                      <div key={i} className="flex justify-between gap-4 text-sm" data-testid="branding-preview-line">
                         <span className="text-text-secondary">{item.label}</span>
-                        <span className="text-text-primary">{formatCurrency(item.amount)}</span>
+                        <span className="figure shrink-0 text-text-primary">{formatCurrency(item.amount)}</span>
                       </div>
                     ))}
                   </div>
@@ -520,11 +505,11 @@ export default function BrandingPage() {
               )}
 
               {/* Assumptions */}
-              {template.includeAssumptions && MOCK_QUOTE.content.assumptions && (
+              {template.includeAssumptions && sample.assumptions.length > 0 && (
                 <div className="mb-4">
                   <p className="mb-1 text-sm font-medium text-text-secondary">Assumptions</p>
                   <ul className="list-inside list-disc text-sm text-text-secondary">
-                    {MOCK_QUOTE.content.assumptions.map((item, i) => (
+                    {sample.assumptions.map((item, i) => (
                       <li key={i}>{item}</li>
                     ))}
                   </ul>
@@ -532,11 +517,11 @@ export default function BrandingPage() {
               )}
 
               {/* Exclusions */}
-              {template.includeExclusions && MOCK_QUOTE.content.exclusions && (
+              {template.includeExclusions && sample.exclusions.length > 0 && (
                 <div className="mb-4">
                   <p className="mb-1 text-sm font-medium text-text-secondary">Exclusions</p>
                   <ul className="list-inside list-disc text-sm text-text-secondary">
-                    {MOCK_QUOTE.content.exclusions.map((item, i) => (
+                    {sample.exclusions.map((item, i) => (
                       <li key={i}>{item}</li>
                     ))}
                   </ul>
@@ -547,18 +532,21 @@ export default function BrandingPage() {
               <div className="border-t border-border pt-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Subtotal</span>
-                  <span>{formatCurrency(MOCK_QUOTE.pricing.subtotal)}</span>
+                  <span className="figure">{formatCurrency(totals.subtotal)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-text-secondary">
-                    {MOCK_QUOTE.pricing.taxLabel} ({MOCK_QUOTE.pricing.taxRate}%)
-                  </span>
-                  <span>{formatCurrency(MOCK_QUOTE.pricing.taxAmount)}</span>
-                </div>
+                {/* T-204: the business's own tax name and rate; no line at all when it charges none */}
+                {totals.tax && (
+                  <div className="flex justify-between text-sm" data-testid="branding-preview-tax">
+                    <span className="text-text-secondary">
+                      {totals.tax.label} ({ratePercentText(totals.tax.ratePercent)}%)
+                    </span>
+                    <span className="figure">{formatCurrency(totals.tax.amount)}</span>
+                  </div>
+                )}
                 <div className="mt-2 flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span style={{ color: branding.primaryColor }}>
-                    {formatCurrency(MOCK_QUOTE.pricing.total)}
+                  <span className="figure" style={{ color: branding.primaryColor }}>
+                    {formatCurrency(totals.total)}
                   </span>
                 </div>
               </div>
@@ -585,13 +573,16 @@ export default function BrandingPage() {
                 </button>
               )}
 
-              <p className="mt-4 text-center text-[10px] text-text-muted">
-                Prepared with {PRODUCT_NAME}
-              </p>
+              {/* T-204: only when this business's estimates carry the badge today (the free start and Pro hide it) */}
+              {badgeShown && (
+                <p className="mt-4 text-center text-[10px] text-text-muted" data-testid="branding-preview-badge">
+                  Prepared with {PRODUCT_NAME}
+                </p>
+              )}
             </div>
             {/* T-201: the plan names come from the plans on offer (the line named a plan that no longer exists) */}
             <p className="mt-3 text-xs text-text-muted" data-testid="badge-plans-line">
-              {noBadgeLine()}
+              {preview?.badgeLine ?? noBadgeLine()}
             </p>
           </div>
         </div>

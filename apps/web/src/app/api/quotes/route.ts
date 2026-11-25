@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { QUOTE_LIST_GROUPS, businessIsAsked, defaultQuoteListGroup, isMadeByBusiness } from '@qolumns/shared'
 import { applyGroupFilter, businessAskedQuoteIds, groupFilter, questionCountOf, requestSourceOf } from '@/lib/business-asked'
-import { unfinishedFilter } from '@/lib/unfinished-leads'
+import { countUnfinished as countUnfinishedEntries } from '@/lib/unfinished-leads'
 import { assetIdsOf, firstPhotoUrls } from '@/lib/quote-photos'
 import type { QuoteGroup, QuoteListCounts, QuoteListGroup, QuoteListItem, QuotesListResponse, QuoteStatus } from '@qolumns/shared'
 
@@ -59,12 +59,10 @@ async function countTabs(supabase: Supabase, tenantId: string, search: string, b
     return count
   }
   const countUnfinished = async () => {
-    // T-160: the same rule as the Unfinished list (not finished, not marked done, last 30 days)
-    const { count, error } = await unfinishedFilter(
-      supabase.from('request_leads').select('id', { count: 'exact', head: true }),
-      tenantId
-    )
-    if (error || count === null) throw error ?? new Error('count failed')
+    // T-160: the same rule as the Unfinished list (not finished, not marked done, last 30 days);
+    // T-204: one per person per service, as the list shows them
+    const count = await countUnfinishedEntries(supabase, tenantId)
+    if (count === null) throw new Error('count failed')
     return count
   }
 

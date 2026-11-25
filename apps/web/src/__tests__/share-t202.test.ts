@@ -95,9 +95,12 @@ describe('T-202: Copy and Share tell the server; a visitor cannot', () => {
     expect(qr).toContain("body: JSON.stringify({ event: 'qr' })")
     expect(qr.indexOf('a.click()')).toBeGreaterThan(-1)
     expect(qr.indexOf("event: 'qr'")).toBeGreaterThan(qr.indexOf('a.click()'))
-    // drawing the code tells the server nothing: the only report is inside download()
+    // drawing the code tells the server nothing: the only report is where a file is saved
+    // (T-204: `save`, which "Download PNG" and "Download SVG" both go through)
     expect(qr.match(/share-event/g)).toHaveLength(1)
-    expect(qr.indexOf('share-event')).toBeGreaterThan(qr.indexOf('function download()'))
+    expect(qr.indexOf('share-event')).toBeGreaterThan(qr.indexOf('function save('))
+    expect(qr.indexOf('share-event')).toBeLessThan(qr.indexOf('function download()'))
+    expect(qr.slice(qr.indexOf('useEffect('), qr.indexOf('function save('))).not.toContain('fetch(')
   })
 
   it('the help assistant’s "link shared" follows the same rule as the checklist', () => {

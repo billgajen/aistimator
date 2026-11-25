@@ -5,7 +5,7 @@
  * truth the accuracy report compares every estimate against.
  */
 import { useState } from 'react'
-import { formatMoney, parseMoneyInput } from '@qolumns/shared'
+import { FINAL_INVOICE_ASK, finalInvoiceLooksOff, formatMoney, parseMoneyInput } from '@qolumns/shared'
 
 export function FinalInvoiceCard(props: {
   quoteId: string
@@ -22,15 +22,23 @@ export function FinalInvoiceCard(props: {
   )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // T-204: an amount under half or over double the quote is asked about first (the amount it was asked for)
+  const [asking, setAsking] = useState<number | null>(null)
 
   const parsed = parseMoneyInput(amount)
   const diff = saved && props.quotedTotal > 0 ? (saved.amount - props.quotedTotal) / props.quotedTotal : null
 
-  async function save() {
+  async function save(confirmed = false) {
     if (parsed === null) {
       setError('Enter the invoiced amount, e.g. 2450 or 2,450.00')
       return
     }
+    if (!confirmed && finalInvoiceLooksOff(parsed, props.quotedTotal)) {
+      setError(null)
+      setAsking(parsed)
+      return
+    }
+    setAsking(null)
     setBusy(true)
     setError(null)
     try {
@@ -71,7 +79,10 @@ export function FinalInvoiceCard(props: {
           <input
             inputMode="decimal"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => {
+              setAmount(e.target.value)
+              setAsking(null)
+            }}
             className="figure w-40 rounded-lg border border-border px-3 py-2"
             placeholder="0.00"
           />
@@ -88,13 +99,30 @@ export function FinalInvoiceCard(props: {
         </label>
         <button
           type="button"
-          onClick={save}
-          disabled={busy || parsed === null}
+          onClick={() => save()}
+          disabled={busy || parsed === null || asking !== null}
           className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
         >
           {busy ? 'Saving…' : saved ? 'Update' : 'Save'}
         </button>
       </div>
+      {asking !== null && (
+        <div className="mt-3 rounded-lg border border-tertiary-line bg-tertiary-light p-3" role="alertdialog" aria-labelledby="final-invoice-ask" data-testid="final-invoice-ask">
+          <p id="final-invoice-ask" className="text-sm font-semibold text-text-primary">{FINAL_INVOICE_ASK}</p>
+          <p className="mt-1 text-sm text-text-secondary">
+            <span className="figure">{formatMoney(asking, props.currency)}</span> is {asking < props.quotedTotal ? 'less than half' : 'more than double'} the quote of{' '}
+            <span className="figure">{formatMoney(props.quotedTotal, props.currency)}</span>.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={() => save(true)} disabled={busy} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" data-testid="final-invoice-yes">
+              Yes, save it
+            </button>
+            <button type="button" onClick={() => setAsking(null)} disabled={busy} className="rounded-lg border border-field bg-white px-4 py-2 text-sm font-semibold text-text-primary hover:bg-background disabled:opacity-50" data-testid="final-invoice-change">
+              Change the amount
+            </button>
+          </div>
+        </div>
+      )}
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
     </div>
   )

@@ -32,6 +32,8 @@ export interface DueReminder {
   customer_json: unknown
   pricing_json: unknown
   sent_at: string
+  /** T-204: set when the business approved the quote; the reminder says so under the price */
+  approved_at?: string | null
   tenants: unknown
   services: unknown
 }
@@ -47,7 +49,7 @@ export async function dueReminders(
     .from('quotes')
     .select(
       `
-        id, customer_json, pricing_json, sent_at,
+        id, customer_json, pricing_json, sent_at, approved_at,
         tenants!tenant_id!inner ( id, name, region, currency, branding_json, customer_reminder_enabled ),
         services!service_id ( id, name )
       `

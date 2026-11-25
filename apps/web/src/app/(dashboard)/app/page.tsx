@@ -18,7 +18,7 @@ import {
   type HomeQuoteRow,
   type NumberChange,
 } from '@/lib/home-numbers'
-import { unfinishedFilter } from '@/lib/unfinished-leads'
+import { countUnfinished } from '@/lib/unfinished-leads'
 import { appOriginFrom } from '@/lib/tenant-site'
 import { assetIdsOf, firstPhotoUrls } from '@/lib/quote-photos'
 import { Sparkline, TrendMark } from '@/components/home/Sparkline'
@@ -37,6 +37,7 @@ import { RememberTimeZone } from '@/components/home/RememberTimeZone'
 import { businessTimeZone, everAccepted, wonReadsFrom } from '@/lib/won'
 import { checkPlanLimit } from '@/lib/plan-limits'
 import { PageHeader } from '@/components/dashboard/EmptyState'
+import { RefreshOnChange } from '@/components/dashboard/LivePulse'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
@@ -95,11 +96,8 @@ export default async function DashboardPage() {
 
   // T-160: unfinished requests the business has not seen yet (the same rule
   // as the menu badge; opening the Unfinished list clears both)
-  const { count: unfinishedCount } = await unfinishedFilter(
-    supabase.from('request_leads').select('id', { count: 'exact', head: true }),
-    profile.tenant_id,
-    { newOnly: true }
-  )
+  // T-204: counted as the list shows them, one per person per service
+  const unfinishedCount = await countUnfinished(supabase, profile.tenant_id, { newOnly: true })
 
   const tenantRow = tenant as {
     slug?: string | null
@@ -322,6 +320,8 @@ export default async function DashboardPage() {
 
   return (
     <div>
+      {/* T-204: Home reads itself again when a request arrives or an estimate is opened, accepted or declined */}
+      <RefreshOnChange />
       <PageHeader title={tenant?.name || 'Home'} />
 
       {/* T-199: on the free start, one quiet line: what is being tried, and how many free quotes are left */}

@@ -51,6 +51,13 @@ export interface QuoteContent {
   quantityConcernFieldId?: string
   /** T-188: what the evidence points to for the doubted answer (a figure, or one of its options); empty when it cannot say */
   quantityConcernSuggestedValue?: string
+  /**
+   * T-204: the same doubt as the one short question the customer is asked, in plain words and
+   * speaking to them ("You mentioned…, but picked…. How many…?"). The observation above addresses
+   * nobody (it is also the business's note); this is only ever shown to the customer, and only
+   * after the question gate's own check of it (agents/quality-gate.ts, `plainCustomerQuestion`).
+   */
+  quantityConcernQuestion?: string
 }
 
 /**
@@ -204,7 +211,8 @@ Write the quote content as a JSON object with this exact structure:
   "mismatchReason": "",
   "quantityConcern": "",
   "quantityConcernFieldId": "",
-  "quantityConcernSuggestedValue": ""
+  "quantityConcernSuggestedValue": "",
+  "quantityConcernQuestion": ""
 }
 
 ===== STATED QUANTITY SANITY CHECK (quantityConcern) =====
@@ -221,8 +229,17 @@ answer's fieldId (the value in square brackets), and
 "quantityConcernSuggestedValue" to the value the evidence points to for that
 answer, written the way the answer is written (a number alone for a number;
 the option's own words for a choice; empty when the evidence does not say).
+Also set "quantityConcernQuestion": the same doubt as the ONE short question
+the customer will be asked. Plain everyday words, spoken to them as "you", at
+most 30 words: first what they told us that does not fit, then the question
+whose answer settles it. Its shape: "You mentioned <what they wrote>, but
+picked <the answer they gave>. <A short question the right answer
+answers>?" Say "you mentioned", "you picked", "your photos show". Never write
+"the project description", "the form", "the customer", "specifies" or
+"indicates", and never name a field or a setting. Do not list answers to
+choose from: they are added separately.
 Do NOT bury the doubt only in notes — these fields are what let the system
-act on it. Leave all three as empty strings when the stated quantities look
+act on it. Leave all four as empty strings when the stated quantities look
 plausible or the photos cannot inform them.
 A photo shows part of a job, never all of it. How many photos were sent, or
 how many of something happen to be visible in them, is NOT evidence that a
@@ -485,6 +502,8 @@ function validateContent(content: Partial<QuoteContent>, context: WordingContext
     quantityConcern: typeof content.quantityConcern === 'string' && content.quantityConcern.trim() ? content.quantityConcern.trim() : undefined,
     quantityConcernFieldId: typeof content.quantityConcernFieldId === 'string' && content.quantityConcernFieldId.trim() ? content.quantityConcernFieldId.trim() : undefined,
     quantityConcernSuggestedValue: typeof content.quantityConcernSuggestedValue === 'string' && content.quantityConcernSuggestedValue.trim() ? content.quantityConcernSuggestedValue.trim() : undefined,
+    // T-204: the doubt as the customer is asked it (same AD-016 rule: listed, or it is lost)
+    quantityConcernQuestion: typeof content.quantityConcernQuestion === 'string' && content.quantityConcernQuestion.trim() ? content.quantityConcernQuestion.trim() : undefined,
   }
 }
 

@@ -1,12 +1,13 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { quoteTokenFilter } from '@/lib/tokens'
-import { businessIsAsked, isMadeByBusiness, isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange, customerRangeAllowed, customerSeesNoFigure, reviewModeOf, canCustomerDecide, displaySectionsForCustomer, alsoAskedOf, alsoAskedWithStates, addedSections, roomScanOfAnswers, customerRoomScanView } from '@qolumns/shared'
+import { businessIsAsked, isMadeByBusiness, isQuoteProcessing, resolveRegionContext, isShownEarly, customerEstimateRange, customerRangeAllowed, customerSeesNoFigure, reviewModeOf, canCustomerDecide, displaySectionsForCustomer, alsoAskedOf, alsoAskedWithStates, addedSections, roomScanOfAnswers, customerRoomScanView, customerCanDownloadPdf } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import { hasCustomBranding } from '@/lib/plan-features'
 import { customerReadLines } from '@/lib/customer-read'
 import { customerTerms } from '@/lib/quote-terms'
+import { quotePdfCanBeMade } from '@/lib/quote-pdf'
 import { pricingForCustomerView } from '@/lib/quote-sections-service'
 import type {
   QuoteViewResponse,
@@ -218,8 +219,11 @@ export async function GET(
       // payUrl would be added when Stripe is integrated
     }
 
-    // Add PDF download URL if PDF exists
-    if (quote.pdf_asset_id && awaitingParts.length === 0) {
+    // T-204: "Download PDF" once the quote has gone to the customer as final (customerCanDownloadPdf:
+    // never while it waits for the business, T-201 item 18). The customer no longer depends on the
+    // business having made the document: with none yet, the PDF's own address makes it on the first
+    // download. So the link is given when a PDF exists or one can be made here.
+    if (customerCanDownloadPdf(quote.status) && awaitingParts.length === 0 && (quote.pdf_asset_id || quotePdfCanBeMade())) {
       actions.pdfUrl = `${appUrl}/api/public/quotes/${quoteId}/pdf?token=${token}`
     }
 

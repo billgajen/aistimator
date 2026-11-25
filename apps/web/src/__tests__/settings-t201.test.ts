@@ -181,7 +181,8 @@ describe('T-201 item 30: the Branding page names the plan that removes the badge
 
   it('the page types no plan name: the old ones are gone', () => {
     const page = read('apps/web/src/app/(dashboard)/app/settings/branding/page.tsx')
-    expect(page).toContain('{noBadgeLine()}')
+    // T-204: the line is this business's own (the route sends it); the general one stands in while loading
+    expect(page).toContain('{preview?.badgeLine ?? noBadgeLine()}')
     expect(page).not.toMatch(/Growth|Starter|\bPro\b plans?/)
   })
 })

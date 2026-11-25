@@ -203,12 +203,14 @@ Opening the link does not tick "Share your quote link" on "Home".
 The "QR code" section shows a QR code for your quote link. Customers point their phone camera at it and land on your request page.
 
 1. Open "Quote link" and find "QR code".
-2. Press "Download PNG". A picture file is saved to your device.
+2. Press "Download PNG" for a picture file, or "Download SVG" for a vector file. The file is saved to your device.
 3. Print it, or send the file to your printer or sign maker. It works on a van, flyers, business cards or invoices.
 
-There is no print button on the page. You print the downloaded picture yourself.
+Which one to use: "Download PNG" is right for a screen, a document or an email. "Download SVG" is the same code as a vector, so it stays sharp at any size. A printer or a sign maker will usually ask for that one.
 
-Pressing "Download PNG" ticks "Share your quote link" on "Home". Looking at the QR code does not.
+There is no print button on the page. You print the downloaded file yourself.
+
+Pressing "Download PNG" or "Download SVG" ticks "Share your quote link" on "Home". Looking at the QR code does not.
 
 If you change your link, the page shows a code for the new link. A code you already printed still works, because the old link sends people to the new one.
 
@@ -223,6 +225,8 @@ They go through a few short steps. The form leaves out a step your setup does no
 4. "Photos & Documents": they add photos of the job. Whether photos are required depends on the service.
 5. "Last step": they give their postcode or ZIP code and can write more under "Anything else about the job?". Then they press "Get my estimate".
 
+If you limit where you take jobs and the code is outside your "Service Area", the form brings them back to the postcode or ZIP code box and says your business doesn't cover that code. Nothing else they entered is lost: they can correct the code and press "Get my estimate" again.
+
 If the service asks no questions, the customer must describe the job in the last step.
 
 With "AI chat (conversational)" the customer gives the same details in a chat instead of steps.
@@ -232,7 +236,7 @@ Once a customer has finished the contact step, their details are saved. If they 
 ## What does my customer see after they send the request?
 <!-- id: link-after-submit; page: /app/quote-link -->
 
-They see "Preparing your estimate". It usually takes a minute or two. What comes next depends on the service's setting for when estimates are sent.
+They see "Preparing your estimate". It usually takes a minute or two. After a minute the page says it is taking longer than usual. It keeps checking by itself for 16 minutes, less often after the first few, so the customer can leave it open or close it. What comes next depends on the service's setting for when estimates are sent.
 
 - If the estimate can be shown, a customer who used your quote link is taken straight to their estimate page. On your website form, they see the total and its lines, with a "View your estimate" button.
 - If a detail is needed to price the job, they see "One quick check" and are asked to confirm it.

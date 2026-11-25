@@ -41,7 +41,7 @@ A quote's own page shows the same status at the top, with a sentence under "Next
 "Unfinished" lists people who gave their contact details on your form but never sent the request. They are not quotes and have no price. A quick call or email often wins the job.
 
 1. Open "Quotes" and press the "Unfinished" tab, or press "Unfinished requests" in the menu.
-2. Each person shows their name, the service, how far they got and when they started. Someone you have not seen before has a "New" tag.
+2. Each person shows their name, the service, how far they got and when they started. Someone you have not seen before has a "New" tag. A person who started the same service more than once within 24 hours is one entry, showing the furthest they got.
 3. Press "Call" or "Email" to reach them. The button shows their number or address.
 4. Press "Done" when you have dealt with them. They will not show here again.
 
@@ -118,7 +118,7 @@ Use "Send again" to email it again, or "Copy link" to send it yourself.
 
 Both are at the top of the quote's page, and under "More" on its row in Quotes. Links the customer already has keep working after you send again or copy a new one.
 
-The estimate your customer gets is a web page. No PDF is made or emailed by itself.
+The estimate your customer gets is a web page. No PDF is emailed. Once the estimate has been sent to them, the customer can save one with "Download PDF" on their page, and you can with "Download PDF" under "More" on the quote's row.
 
 When an estimate has sat unopened for three days, "Send again" becomes the next step on its row. {{product}} also sends the customer one reminder email by itself, a few days after the estimate was sent, if they have not accepted or declined. An estimate you edited and sent again, or one with a question open, does not get a reminder.
 
@@ -135,14 +135,45 @@ A quote's page reads from top to bottom: what to do, what was understood, the pr
 - "Scope of work", "Assumptions", "Exclusions", "Notes", "Business notes" and "Customer".
 - "Version History", once the quote has been edited.
 
-If the customer asked for something else in their own words, a box "Customer also asked for" shows it and where it stands.
+If the customer asked for something else in their own words, a box "Customer also asked for" shows it and where it stands. Beside one of your own services that is not on the quote yet there is a button, "Add to this quote". The guide's entry "How do I add another service the customer asked for?" has the steps.
+
+If {{product}} could not read the customer's photos, a note at the top says "Photos could not be read". The guide's entry "What does 'Photos could not be read' mean?" explains it.
 
 At the very bottom, "Report a problem with this estimate" sends {{product}} a report about an estimate that looks wrong. It changes nothing on the estimate. The guide's page on reporting problems has the detail.
+
+## How do I add another service the customer asked for?
+<!-- id: estimates-add-also-asked; page: /app/quotes/[quoteId] -->
+
+Open the quote. If the customer's own words asked for another of your services, the box "Customer also asked for" lists it with "Not added yet" and a button, "Add to this quote". It prices that service from your own price list and adds it to the same quote: one quote, one total, and it counts as one quote on your plan.
+
+1. On "Quotes", open the quote.
+2. In "Customer also asked for", press "Add to this quote" beside the service.
+3. If that service needs an answer to be priced, the questions show there, filled in with anything the customer's note already said. Check them and press "Price it and add".
+4. On a quote the customer has not been sent, the service is added at once and the quote waits for you as before. Approve it when you are ready.
+5. On a quote the customer already has, you are asked first: adding the service emails them the updated quote with the new total. Press "Add and send the update", or "Cancel".
+
+The box then shows "Added by you". To take it off again, or to change its lines, press "Edit" on the quote. A quote can carry up to two added services. The button is not shown once a quote has been accepted, and never for something that is not one of your services.
+
+## What does "Photos could not be read" mean?
+<!-- id: estimates-photos-unread; page: /app/quotes/[quoteId] -->
+
+It means the customer sent photos and {{product}} could not read them: the reading failed, took too long, or came back unusable. The price was worked out without what the photos would have told it, so it may be wrong.
+
+Such an estimate is never sent by itself, whatever the service's setting. It waits for you, and the customer sees "Your estimate is being prepared" and no price.
+
+1. On "Quotes", open the quote. The note is at the top, and it is also in the "Review and approve" email.
+2. Look at the customer's photos on the same page, and check each line against them.
+3. Press "Edit" to change a line or a quantity if you need to.
+4. Press "Approve & send" when the price is right.
 
 ## What does my customer see on their estimate page?
 <!-- id: estimates-customer-page; page: /app/quotes/[quoteId] -->
 
 They see one page with your business name, your logo if you added one, and the price in large figures. It says "Your estimate" until you have approved it and "Your quote" after. A quote also says it was reviewed and confirmed by your business. An estimate that waits for your approval says your business will review and confirm it. An estimate that was sent automatically stays "Your estimate" and says only that it is an estimate based on their photos and details. It does not say you will review it.
+
+Under your business name the page says "Estimate prepared for" and the customer's name. Once you have approved it, that line reads "Quote prepared for".
+
+At the top right is "Download PDF", once the estimate has been sent to the customer: after you approve it, or straight away on a service that sends estimates automatically. The PDF is made the first time the button is pressed, which takes a few seconds, and it is made again after you change the estimate, so it always shows the current price. An estimate that is waiting for your approval has no "Download PDF", whether or not the customer can already see its price.
 
 Below the price:
 
@@ -170,10 +201,11 @@ While an estimate waits for your approval, the customer cannot accept. With "Sho
 
 The quote moves to "Needs you" with the status "Customer asked a question", and you are emailed. Their message is on the quote's page, in a box marked "Customer question".
 
-1. Open the quote and read the message.
-2. Answer them yourself. Under "Next step" there is an "Email" button and, when you have their number, a "Call" button, each with the customer's first name. {{product}} does not send your reply for you.
-3. If the answer changes the estimate, press "Edit", make the change and press "Save & Send".
-4. If nothing on the estimate changes, press "Mark as answered".
+1. Open the quote and read the message. It is also in the email you were sent, whose subject names the customer: "Derek asked a question about their quote".
+2. To answer in writing with the estimate, press "Edit". The editor shows their question and an optional box, "Your answer to" with the customer's first name. Write your answer, make any change the estimate needs, and press "Save & Send". The customer's email shows your answer above the price, under your business name and "answer to your question", and the question is marked answered.
+3. Or answer them yourself. Under "Next step" there is an "Email" button and, when you have their number, a "Call" button, each with the customer's first name. Then press "Mark as answered".
+
+Your answer is sent only with "Save & Send". A plain "Save" keeps your changes and sends nothing, and {{product}} never sends a reply on its own.
 
 The quote then goes back to "Waiting for customer". The customer can still accept or decline while their question is open. They cannot send a second message until you have dealt with the first.
 
@@ -208,6 +240,8 @@ You can record what you finally charged:
 2. Type the amount under "Invoiced amount".
 3. Add a "Note (optional)", for example why the job changed.
 4. Press "Save". To correct it later, change the amount and press "Update".
+
+If the amount is less than half the quote, or more than double it, you are asked "Is this the full amount you charged for the job?" before it is saved. Press "Yes, save it" if it is right, or "Change the amount" to correct it. This catches a deposit typed as the whole job, or a slipped digit.
 
 The page then shows what you invoiced against the quote, and the difference as a percentage. Analytics uses these figures to show how close your estimates are.
 
@@ -249,8 +283,9 @@ Every price comes from your own price list. The "Pricing Trace" page shows the s
 The page shows:
 
 - "Quote Summary": the customer, the service, the status and when it was created.
-- "Calculation Steps": each step in order, marked "Base Fee", "Work Step", "Add-on", "Multiplier" or "Tax". Each shows what was added, the sum behind it, the answers it used, and the running total. If your minimum charge was used, a line says so.
-- "Summary": the totals for each kind of step, tax and the final total.
+- "The quote as sent": every line on the quote today, each added service, the subtotal, tax and the total. A line you changed with "Edit" is marked "Changed by you" with what it was, and a line you added is marked "Added by you". A line you took off is listed under "Removed from the first price".
+- "Calculation steps": each step in order, marked "Base Fee", "Work Step", "Add-on", "Multiplier" or "Tax". Each shows what was added, the sum behind it, the answers it used, and the running total. If your minimum charge was used, a line says so. On a quote you changed with "Edit" this part is headed "How the first price was worked out": it shows the price before your changes.
+- "Summary": the totals for each kind of step, tax and the total. On a quote you edited this is the first price, marked "First price:". The quote's own total is the one under "The quote as sent" and at the top of the page.
 - "Customer wording": shown only when words customers should not see were found in the estimate's wording, with what was rewritten or removed.
 - "What {{product}} understood": each detail read from the photos, the form and the customer's words, one to a line. A line gives the detail, its value, where it came from, such as "Measured from the photos" or "From the form", and the note kept with it.
 

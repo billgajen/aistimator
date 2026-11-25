@@ -3,8 +3,8 @@
  *
  * Used for resending quote emails from the dashboard.
  */
-import { EMAIL_FONT, brandColourForEmail, businessLogoBlock, emailFromHeader, emailHeadStyle, poweredByRow, redactEmails, textColourOnCardForEmail, textOnColourForEmail } from '@qolumns/shared'
-import type { CustomerEmailBrand, EmailSender } from '@qolumns/shared'
+import { brandColourForEmail, businessAnswerHtml, businessLogoBlock, customerPricePanel, emailFromHeader, emailShell, poweredByRow, redactEmails, textColourOnCardForEmail, textOnColourForEmail } from '@qolumns/shared'
+import type { CustomerEmailBrand, CustomerQuoteState, EmailSender } from '@qolumns/shared'
 
 const POSTMARK_API_URL = 'https://api.postmarkapp.com/email'
 
@@ -140,6 +140,14 @@ export function generateCustomerEmailHtml(data: {
   sectionsHtml?: string
   /** T-201: the business's logo and whether "Powered by" shows (lib/customer-email-brand.ts) */
   brand?: CustomerEmailBrand
+  /**
+   * T-204: where the quote stands, said beside the price. This email is sent when the business
+   * approves a quote or edits and sends it, so left out it is 'confirmed'; "Send again" passes
+   * what is true of the quote (one that went out automatically was never reviewed).
+   */
+  state?: CustomerQuoteState
+  /** T-204: the business's answer to the customer's question, shown above the price (plain text; escaped here) */
+  answer?: { text: string; question?: string | null } | null
 }): string {
   const primaryColor = brandColourForEmail(data.primaryColor)
 
@@ -147,23 +155,7 @@ export function generateCustomerEmailHtml(data: {
     ? `<p style="margin: 0 0 24px; color: #626C66; font-size: 14px;">This quote is valid until <strong>${escapeHtml(data.validUntil)}</strong>.</p>`
     : ''
 
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your quote</title>
-${emailHeadStyle()}
-</head>
-<body style="margin: 0; padding: 0; font-family: ${EMAIL_FONT.body}; background-color: #FAF9F6;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td style="padding: 40px 20px;">
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <tr>
-            <td style="padding: 40px;">
-              ${businessLogoBlock(data.brand?.logoUrl, data.businessName)}
+  const content = `${businessLogoBlock(data.brand?.logoUrl, data.businessName)}
               <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: ${textColourOnCardForEmail(primaryColor)};">
                 ${escapeHtml(data.businessName)}
               </h1>
@@ -178,12 +170,8 @@ ${emailHeadStyle()}
                 Here's your quote:
               </p>
 
-              <div style="margin: 24px 0; padding: 24px; background-color: #EAEFF5; border-radius: 8px; text-align: center;">
-                <p style="margin: 0 0 4px; color: #626C66; font-size: 14px;">Quoted total</p>
-                <p style="margin: 0; font-size: 36px; font-weight: 700; font-family: ${EMAIL_FONT.figure}; font-variant-numeric: tabular-nums; color: ${textColourOnCardForEmail(primaryColor)};">
-                  ${escapeHtml(data.total)}
-                </p>
-              </div>
+              ${businessAnswerHtml({ businessName: data.businessName, answer: data.answer?.text, question: data.answer?.question })}
+              ${customerPricePanel({ label: 'Quoted total', total: data.total, colour: textColourOnCardForEmail(primaryColor), state: data.state ?? 'confirmed', businessName: data.businessName })}
 
               ${data.sectionsHtml ?? ''}
 
@@ -206,17 +194,10 @@ ${emailHeadStyle()}
               <p style="margin: 24px 0 0; color: #4F5D57; font-size: 14px;">
                 Best regards,<br>
                 <strong>${escapeHtml(data.businessName)}</strong>
-              </p>
-            </td>
-          </tr>
-        </table>
-        ${poweredByRow(data.brand?.showPoweredBy)}
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `.trim()
+              </p>`
+
+  // T-204: the page is the one every email uses (fixed 600 px card, phone padding): emailShell
+  return emailShell({ title: 'Your quote', content, below: poweredByRow(data.brand?.showPoweredBy) })
 }
 
 function escapeHtml(text: string): string {

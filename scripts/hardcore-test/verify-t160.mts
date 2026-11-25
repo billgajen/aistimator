@@ -86,7 +86,10 @@ const doorAnswers = [
   { fieldId: 'door_size', value: 'Single (8 or 9 ft wide, 7 ft tall)' },
   { fieldId: 'door_style', value: 'Steel, non-insulated' },
 ]
-const customerOf = (n: string) => ({ name: n, email: `${n.toLowerCase().replace(/[^a-z]+/g, '.')}@example.com`, phone: '(555) 201-1212' })
+// T-204: each person has a phone number of their own. Two unfinished requests with the same email or
+// the same phone within a day are now one entry (one person), so a shared number would join them.
+const phoneOf = (n: string) => `(555) 2${String([...n].reduce((sum, ch) => (sum * 31 + ch.charCodeAt(0)) % 1000, 7)).padStart(3, '0').slice(0, 2)}-${String([...n].reduce((sum, ch) => (sum * 17 + ch.charCodeAt(0)) % 10000, 3)).padStart(4, '0')}`
+const customerOf = (n: string) => ({ name: n, email: `${n.toLowerCase().replace(/[^a-z]+/g, '.')}@example.com`, phone: phoneOf(n) })
 
 async function submit(biz: Biz, serviceId: string, customer: { name: string; email?: string; phone?: string }) {
   // Locally the request waits for the whole pipeline, and an AI call there can

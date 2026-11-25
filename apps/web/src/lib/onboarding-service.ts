@@ -12,6 +12,37 @@ export interface DraftService {
   addons: AddonConfig[]
   multipliers: MultiplierConfig[]
   selected: boolean
+  /** T-204: the trade template it came from, by name (setup's list groups by it; never saved) */
+  trade?: string
+}
+
+interface PackLike {
+  name: string
+  services: ReadonlyArray<{ name: string; description: string; draft: ServiceDraftConfig; addons?: AddonConfig[]; multipliers?: MultiplierConfig[] }>
+}
+
+/**
+ * T-204: the services setup offers for the trades picked: each trade's own,
+ * in the order the trades were picked, all ticked. A service two trades both
+ * carry (the same name) is offered once, under the first.
+ */
+export function packServices(packs: readonly PackLike[]): DraftService[] {
+  const offered: DraftService[] = []
+  for (const pack of packs) {
+    for (const svc of pack.services) {
+      if (offered.some((o) => o.name.trim().toLowerCase() === svc.name.trim().toLowerCase())) continue
+      offered.push({
+        name: svc.name,
+        description: svc.description,
+        draft: svc.draft,
+        addons: svc.addons || [],
+        multipliers: svc.multipliers || [],
+        selected: true,
+        trade: pack.name,
+      })
+    }
+  }
+  return offered
 }
 
 export function isUnpriced(svc: Pick<DraftService, 'draft'>): boolean {

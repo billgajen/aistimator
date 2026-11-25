@@ -111,6 +111,23 @@ tax once, one accept. No migration: the shape is in `Docs/03-data-model.md`.
   `{ success, ready, section | questions }`. Reads only.
 - Usage: adding or removing a section counts nothing. One request is one quote.
 
+T-204 (the test price, the compile's flags, "Add to this quote"):
+- `POST /api/services/preview-price` (dashboard) `{ service, values, serviceId? }`: the price on "Test &
+  Publish". `service` is the body a save sends (saved or not); `values` are the sample answers by question id,
+  a size to try under `sample:<signalKey>`, and a detail the photos would give under `photo:<signalKey>`. An
+  empty value is no answer. → `{ price: { currency, lines[], subtotal, taxLabel?, taxRate?, taxAmount, total,
+  notes[], steps[], unmeasured[] }, sampled[] }`. 401 signed out; 502 / 503 `PREVIEW_UNAVAILABLE` when the
+  worker cannot be asked. Nothing is saved, no quote is made, nothing is counted.
+- Worker `POST /preview` (token required, like `/section`) `{ tenantId, service, rules, fields, answers }` →
+  `{ success, ...price }`. The pipeline in preview mode: no AI, no photos, read-only.
+- `POST /api/services/ai-draft/compile` also answers `linked[]` (`{ stepId, name, what }`: what code tied after
+  the model's answer) and `flags[]` (`{ kind: 'question_unused' | 'line_unlinked', message, … }`).
+- "Add to this quote" has no route of its own: `POST /api/quotes/{id}/sections/price`, then
+  `PATCH /api/quotes/{id}` with the section added and `sendToCustomer` true only when the customer already has
+  the quote.
+- `PATCH /api/services/{id}` may carry `active: true` with the rest of a save ("Save and switch on").
+  `mediaConfig.minPhotos` is kept within 0 to 8 on every save.
+
 ## Billing (T-180, AD-062, AD-063)
 Stripe is the seller (Managed Payments): it charges, adds the tax, sends the receipts. Our side is four signed-in
 routes, one webhook and one admin route. Plan numbers come from `packages/shared/src/plans.ts`; price ids from the
@@ -797,6 +814,7 @@ T-157 quote actions that always work (dashboard cookie or app Bearer unless mark
 	•	`PATCH /api/quotes/:quoteId`:
 		- `sendToCustomer: true` on a quote the customer already had (`sent`, `viewed`, `feedback_received`, `revised`) gives `revised`; it used to flip `revised` back to `sent`. A first send is still `sent`.
 		- with `sendToCustomer: true` every pending `quote_feedback` row of the quote becomes `resolved`, not only `feedbackId`. A plain save still resolves only `feedbackId`.
+		- T-204: `answerToCustomer` (optional plain text, cut at 2,000 characters) is the business's answer to the customer's pending question. It is used only with `sendToCustomer: true` and only while a `quote_feedback` row is `pending`; otherwise it is ignored. It is kept as one more entry of that save's `quote_amendments.changes_json` (`{ field: "answer_to_customer", path: <the question's id>, before: <the question>, after: <the answer>, type: "added" }`, no new column) and shown in the customer's email above the price.
 		- each `pricing_json.breakdown[].amount` is rounded to 2 decimals (`roundMoney`: half away from zero) and `subtotal` is the sum of the rounded lines. Tax and total as before. `breakdown` must be an array (400 `INVALID_REQUEST`).
 		- a line whose amount changed while its label is still exactly the engine's generated label loses that label's maths ("Exterior walls  £18 x 34.6(Sqm)" → "Exterior walls"). A label the business typed or changed is never rewritten.
 		- the minimum charge (T-165, `editedBreakdown`): a `breakdown` entry with `kind: "minimum"` asks to keep the quote's minimum. The server ignores its `amount` and `minimumCharge`: it takes the minimum stored on the quote and works the top-up out again from the lines sent, so lines + entry = the minimum. It stores no entry when the lines total the minimum or more, when none was sent (the business removed it), or when the stored quote carries none (a quote without a minimum never gets one). Only the marker counts in what is sent; an unmarked line is a line.
@@ -832,6 +850,14 @@ T-151 customer flow:
 		- `GET /api/leads/new-count` → `{ count }`: unfinished requests not seen yet (the menu badge; Home's banner is the same count).
 		- `POST /api/leads/seen` `{ asOf }` → `{ marked }`: marks the business's unseen requests started up to `asOf` as seen. A missing, invalid or future `asOf` means now.
 		- `POST /api/leads/:leadId/done` → `{ ok: true }`: sets `handled_at`; the request leaves the list and every count. Repeating it is fine. Another business's request, a finished one or an unknown id → 404 `NOT_FOUND`.
+	•	T-204 (the dashboard):
+		- `GET /api/quotes/pulse` (signed in) → `{ stamp, newUnfinished }`. `stamp` is eight hex characters that change when anything the dashboard shows for this business changes (a new quote, a status, a version, sent / opened / accepted / declined / edited times, unfinished requests, pending customer questions). The dashboard asks every 5 s while its tab is visible and reads its data again only when the stamp differs. It answers no quote, name or figure. Signed out → 401.
+		- Unfinished requests are one entry per person per service (same email or phone, the same service, started within 24 hours of each other; `collapseLeads`). `GET /api/leads`, `GET /api/leads/new-count`, the `unfinished` tab count of `GET /api/quotes` and Home's banner all count entries, not rows. An item's `leadId` is the row that got furthest, `createdAt` is when the person first started and `lastActiveAt` their latest activity. `POST /api/leads/:leadId/done` marks every row of that entry.
+		- `POST /api/public/leads`: when the same email or phone has an open request (not finished, not marked done) for that service from the last 24 hours, that row is used again: the same `leadId` comes back with a new `leadToken`, and the old token stops working. `PATCH /api/public/leads/:leadId`: answers, postcode and photos are saved only when `progress` is the furthest step reached so far.
+		- `GET /api/quotes/:quoteId?trace=1` adds `firstPricing`: the quote's `pricing_json` before the business first edited it, or `null` for a quote never edited (the pricing trace page). The plain read now carries `quote.final_invoice_amount`, `final_invoice_recorded_at` and `final_invoice_note`.
+		- `GET /api/tenant/branding` adds `preview: { currency, tax: { enabled, label, ratePercent }, badgeShown, badgeLine, sample: { serviceName, scopeSummary, assumptions, exclusions, lines: [{ label, amount }], own, taxExempt } }`: the business's own look for the Branding page's sketch.
+		- `PUT /api/tenant` takes `trades: string[]` (template pack ids, up to four, or `['other']` alone) as well as `trade`. They are stored in `tenants.trade`, comma-separated, in the order picked. An unknown id, `other` with a trade, or more than four → 400 `INVALID_INPUT`.
+		- `GET /api/learning/calibration` and `GET /api/analytics/accuracy` leave setup tests out. Calibration's `quotesSent` uses the same definition of "sent" as `GET /api/analytics` (declined, expired and questioned quotes included), and `amendedCount` counts quotes that were edited, not edits.
 		- `GET /api/quotes?group=…` `counts.unfinished` follows the same rule (not finished, not done, last 30 days).
 		- Signed out, all four answer 401.
 	•	`POST /api/public/quotes/:quoteId/accept` accepts `details: { timing: asap|two_weeks|flexible, timingNote?, address, phone }` (all but the note required when `details` is sent; 400 with `fields`). Saved as `quotes.acceptance_json` and included in the business's acceptance email. A request without `details` (a page opened before T-151) accepts as before.
@@ -1178,5 +1204,12 @@ T-201 (the quote link and estimates):
   - `review` is unchanged, but the page's line under the price now has three cases (`customerEstimateNote`, shared): approved → "Reviewed and confirmed by {business}."; `confirmationPending` → "This is an estimate based on your photos and details. {business} will review and confirm it."; sent automatically → "This is an estimate based on your photos and details."
 - `GET /api/public/quotes/:id/pdf`: **404** `PDF_NOT_FOUND` while the price is withheld (`pending_review` not shown early, or `awaiting_clarification`), whether or not a PDF exists.
 - `POST /api/quotes/:id/pdf` (dashboard): the PDF prints the business's terms after the price and the notes, under "Terms and conditions", when it has any.
+
+T-204 (the customer's PDF, and where a refused ZIP goes):
+- `GET /api/public/quotes/:id` → `actions.pdfUrl` is given whenever `customerCanDownloadPdf(status)` (shared `quote-status.ts`: `sent`, `viewed`, `feedback_received`, `revised`, `accepted`, `paid`, `expired`) and a PDF exists **or can be made** (the PDF service and storage are configured). It no longer needs a PDF the business made, and is never given for `pending_review`, shown early or not.
+- `GET /api/public/quotes/:id/pdf?token=…`: with no PDF for the quote's current price, **it makes one**, stores it and records it (`quotes.pdf_asset_id`), then answers as before with a redirect to the file (5 minutes; the file saves as `Quote-<id>.pdf`). `&format=json` answers `{ "downloadUrl", "fileName" }` instead (the page's button). **404** `PDF_NOT_FOUND` unless `customerCanDownloadPdf(status)`; **429** by address for every call and, only when a PDF has to be made, for the quote (`quote_pdf`: 10 a minute and 60 an hour by address; 3 a minute and 10 an hour of makes for one quote); a failed make is **503** with one plain line, never the PDF service's own words. Limits fail open.
+- `PATCH /api/quotes/:id` (the editor's save) now sets `pdf_asset_id` to null, as adding or removing a service did: the next download makes the PDF from what was saved.
+- `POST /api/public/quotes`: `400 OUTSIDE_SERVICE_AREA` is unchanged. The form no longer shows its message on an error screen: it returns to the last step and prints `outsideAreaLine()` (shared `service-area.ts`) under the ZIP or postcode field.
+- The waiting pages (`/q/:id` and the form's finished screen) call `GET /api/public/quotes/:id?poll=1` on the shared schedule `WAITING_POLL` (`packages/shared/src/waiting-poll.ts`): every 3 s for 3 minutes, then every 12 s, 16 minutes in all (125 calls at most; it was 150 over 10 minutes and 100 over 5).
 - `POST /api/quotes/:id/process` also prices again a request that could not be priced (`status: "failed"`): 200 `{ "queued": true, "retried": true }`. **Nothing is claimed on the plan** (the request was counted when it arrived, and that count is not given back when pricing fails). **429** `RETRY_LIMIT` after five tries of one request by the business (`content_json.businessRetries`), **403** `ACCOUNT_PAUSED` for a suspended business, **502** `QUEUE_FAILED` when the worker cannot be reached (the quote stays failed). A quote that is neither failed nor held by the plan limit is still 400 `NOT_HELD`. The admin's `/api/admin/quotes/:id/retry` is unchanged and has no limit.
 - (Replaced by T-202: a visit is no longer recorded at all, and `?own=1` is gone.) `GET /quote/:slug`: the first view sets `tenants.quote_link_first_visit_at` only when it is not the business's own: not with `?own=1` (the mark the dashboard's "Open" buttons add; the page removes it from the address bar), and not by a visitor signed in to that business. `?test=` (the setup test) never counted. A business's own address forwards the query, so the mark works there too.

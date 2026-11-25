@@ -217,6 +217,26 @@ what `pnpm check:failed` reads. The exit code is 0 only when everything passed.
   rewrites in `package.json`. `npx expo export --platform android` proves the JavaScript bundles for Android.
 - **A fixture that needs three plan cards no longer exists:** since T-200 two plans are offered.
 
+## T-204: one script, four sections; the live compile
+
+- **`verify-t204` (quick, no model, a browser):** `scripts/hardcore-test/verify-t204.mts` runs the sections in
+  `scripts/hardcore-test/t204/` with T-201's harness: `pricing` (the AC Tune-Up proof through "Test Your
+  Pricing" and through real requests, details from photos, the flags, "Photos required", "Save and switch on",
+  "Add to this quote", the "Photos could not be read" note), `customer`, `emails` and `dashboard`. One alone:
+  `npx tsx scripts/hardcore-test/verify-t204.mts pricing`.
+- **The AC Tune-Up fixture** (`scripts/hardcore-test/t204/ac-tune-up.ts`) is the service exactly as the compiler
+  wrote it for the test business, with the ticket's answers and prices. The worker's and the web's unit tests
+  and the verify section all price the same thing. A `.ts` file, so that vitest and tsx both load it.
+- **The live compile** asks the real model and is run by hand, not by the runner (its answer varies and it is
+  slow): `npx tsx --tsconfig apps/web/tsconfig.json scripts/hardcore-test/t204/compile-live.mts --repeats 3`.
+  It compiles the ticket's AC text, prices the four cases with the engine, and prints the time. `--thinking
+  low|medium|high` and `--model <id>` try another setting (that is how item 5's comparison was made).
+- **A script that loads web code with tsx** must not reach a file that imports by `@/` (plain tsx does not
+  resolve it): `service-templates.ts` does, `onboarding-service.ts` and the packs do not. Or pass
+  `--tsconfig apps/web/tsconfig.json`, as the live compile does.
+- **Item 29 has no end-to-end check:** no script makes a real photo reading fail inside the running worker.
+  Each step's report and the processor's decision are unit tests (`photos-unread-t204.test.ts`).
+
 ## T-203: stand-in AI providers, the load test, the overflow proof
 
 - **`verify-t203` (quick, no model):** `scripts/hardcore-test/verify-t203.mts` starts one small HTTP server on

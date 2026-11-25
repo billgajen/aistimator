@@ -102,6 +102,8 @@ export interface IdentificationOutcome {
   resolved: ResolvedIdentification[]
   /** Raw readings, kept for the trace (transcriptions are clipped downstream) */
   readings: IdentificationReading[]
+  /** T-204: the label reading itself failed (not "nothing legible"): the quote is held for the business */
+  failed?: 'timeout' | 'error'
 }
 
 /**
@@ -152,7 +154,7 @@ export async function identifyFromLabels(opts: {
     readings = Array.isArray(result?.readings) ? result.readings : []
   } catch (error) {
     console.error('[Identification] Label reading failed:', error instanceof Error ? error.message : error)
-    return { resolved: [], readings: [] }
+    return { resolved: [], readings: [], failed: error instanceof Error && /timed out|timeout/i.test(error.message) ? 'timeout' : 'error' }
   } finally {
     if (timer) clearTimeout(timer)
   }

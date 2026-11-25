@@ -3,7 +3,7 @@
 import { questionsSpread } from './step-count'
 import { makeSmallPhoto, smallPhotoDeclaration, uploadSmallPhoto } from '@/lib/small-photo-client'
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { addressHostFrom, onSameAddress, EMBED_NAMES, formatMoney, PRODUCT_NAME, splitMinimum, SLOW_PREPARING_MS, slowPreparingLine, failedRequestLine } from '@qolumns/shared'
+import { addressHostFrom, onSameAddress, EMBED_NAMES, formatMoney, PRODUCT_NAME, splitMinimum, SLOW_PREPARING_MS, slowPreparingLine, failedRequestLine, OUTSIDE_SERVICE_AREA_CODE, outsideAreaLine, outsideAreaChatLine, startWaitingPoll } from '@qolumns/shared'
 import { useSearchParams } from 'next/navigation'
 import { assessImageQuality } from '@/lib/image-quality'
 import { brandStyleVars } from '@/lib/color'
@@ -375,6 +375,10 @@ function ConversationalChat({
         const quoteData = await quoteRes.json()
         if (quoteRes.ok) {
           onComplete(quoteData)
+        } else if (quoteData.error?.code === OUTSIDE_SERVICE_AREA_CODE) {
+          // T-204: the conversation is kept; the customer gives the right ZIP or postcode and it is sent again
+          setMessages(prev => [...prev, { role: 'assistant', text: outsideAreaChatLine({ businessName: widgetData.tenantName, postalCodeLabel: widgetData.region?.postalCodeLabel }) }])
+          setSubmitting(false)
         } else {
           setMessages(prev => [...prev, { role: 'assistant', text: `I've gathered all the details but there was an issue submitting: ${quoteData.error?.message || 'Unknown error'}. Please try again.` }])
           setSubmitting(false)
@@ -516,6 +520,8 @@ export function EstimateWidget({ tenantKey, hosted = false, ownTest = false, dem
   const [customerEmail, setCustomerEmail] = useState(demo?.contact.email ?? '')
   const [customerPhone, setCustomerPhone] = useState(demo?.contact.phone ?? '')
   const [jobPostcode, setJobPostcode] = useState('')
+  // T-204: the business does not cover the ZIP or postcode given: said beside that field, on the step it is on
+  const [postcodeError, setPostcodeError] = useState<string | null>(null)
   const [jobDescription, setJobDescription] = useState('')
   const [jobQuantity, setJobQuantity] = useState<number | null>(null)
   const [fieldAnswers, setFieldAnswers] = useState<Record<string, string | number | boolean | string[]>>({})
@@ -611,6 +617,7 @@ export function EstimateWidget({ tenantKey, hosted = false, ownTest = false, dem
 
   async function handleSubmit() {
     setCanResend(false)
+    setPostcodeError(null)
     setStep('submitting')
 
     try {
@@ -661,6 +668,14 @@ export function EstimateWidget({ tenantKey, hosted = false, ownTest = false, dem
           setError('The demo is busy right now. Here is an example estimate instead.')
           setStep('error')
           demo.onBusy()
+          return
+        }
+        // T-204: outside the business's area. Straight back to the ZIP or postcode field with the reason
+        // beside it. Nothing typed is touched (contact, answers, photos, the description), and the
+        // customer is never told to start over: a mistyped ZIP is the usual cause.
+        if (data.error?.code === OUTSIDE_SERVICE_AREA_CODE) {
+          setPostcodeError(outsideAreaLine({ businessName: widgetData?.tenantName, postalCodeLabel: widgetData?.region?.postalCodeLabel, postcode: jobPostcode }))
+          setStep('job')
           return
         }
         // T-202: the day's test estimates are used up: say when the next one can be made, in this reader's own time
@@ -889,9 +904,13 @@ export function EstimateWidget({ tenantKey, hosted = false, ownTest = false, dem
           postalCodeLabel={widgetData.region?.postalCodeLabel || 'Postcode'}
           postalCodeExample={widgetData.region?.postalCodeExample || ''}
           postcode={jobPostcode}
+          postcodeError={postcodeError}
           description={jobDescription}
           descriptionRequired={descriptionRequired(serviceQuestions.length)}
-          onPostcodeChange={setJobPostcode}
+          onPostcodeChange={(value) => {
+            setJobPostcode(value)
+            setPostcodeError(null)
+          }}
           onDescriptionChange={setJobDescription}
           onBack={backFrom('job')}
           onSubmit={() => {
@@ -1642,25 +1661,18 @@ function SuccessState({
   // T-147: priced and visible to the customer, awaiting the business's confirmation
   const [estimateShown, setEstimateShown] = useState(false)
 
+  // T-204: the shared schedule (waiting-poll.ts): every few seconds at first, then less often, for 16
+  // minutes in all (it was every 3 seconds for 5 minutes). A request put back for a busy AI provider can
+  // take up to 15 (T-203). The screens and their words are unchanged; only how long the page looks.
   useEffect(() => {
     if (!token) return
     let cancelled = false
-    let polls = 0
-    // ~5 min — photo-measured quotes can take ~2.5 min on the queue
-    const maxPolls = 100
-
-    const interval = setInterval(async () => {
-      polls++
-      if (polls > maxPolls) {
-        clearInterval(interval)
-        if (!cancelled) setTimedOut(true)
-        return
-      }
-      try {
+    const stop = startWaitingPoll(
+      async () => {
         const res = await fetch(`/api/public/quotes/${quoteId}?token=${token}&poll=1`)
-        if (!res.ok) return
+        if (!res.ok) return false
         const data = await res.json()
-        if (cancelled) return
+        if (cancelled) return true
         if (data.provisional?.rangeLow) {
           setRange({
             low: data.provisional.rangeLow,
@@ -1668,31 +1680,32 @@ function SuccessState({
             currency: data.pricing?.currency || 'GBP',
           })
         }
-        if (['awaiting_clarification', 'pending_review', 'sent', 'viewed', 'failed'].includes(data.status)) {
-          // T-147: an estimate shown while the business reviews it is ready to view
-          const shown = data.status === 'pending_review' && data.review?.confirmationPending === true
-          if ((shown || data.status === 'sent' || data.status === 'viewed') && !data.provisional && typeof data.pricing?.total === 'number' && data.pricing.total > 0) {
-            const split = splitMinimum((data.pricing.breakdown ?? []) as Array<{ label: string; amount: number }>)
-            setEstimate({
-              total: data.pricing.total,
-              currency: data.pricing.currency || 'GBP',
-              lines: split.lines.map((l) => ({ label: l.label, amount: l.amount })),
-              minimumCharge: split.minimum?.minimumCharge ?? null,
-              reviewed: data.review?.state === 'quote',
-            })
-          }
-          setEstimateShown(shown)
-          setLiveStatus(data.status)
-          if (shown || ['sent', 'viewed', 'failed'].includes(data.status)) clearInterval(interval)
+        if (!['awaiting_clarification', 'pending_review', 'sent', 'viewed', 'failed'].includes(data.status)) return false
+        // T-147: an estimate shown while the business reviews it is ready to view
+        const shown = data.status === 'pending_review' && data.review?.confirmationPending === true
+        if ((shown || data.status === 'sent' || data.status === 'viewed') && !data.provisional && typeof data.pricing?.total === 'number' && data.pricing.total > 0) {
+          const split = splitMinimum((data.pricing.breakdown ?? []) as Array<{ label: string; amount: number }>)
+          setEstimate({
+            total: data.pricing.total,
+            currency: data.pricing.currency || 'GBP',
+            lines: split.lines.map((l) => ({ label: l.label, amount: l.amount })),
+            minimumCharge: split.minimum?.minimumCharge ?? null,
+            reviewed: data.review?.state === 'quote',
+          })
         }
-      } catch {
-        // Polling is best-effort; email remains the fallback channel
+        setEstimateShown(shown)
+        setLiveStatus(data.status)
+        // settled: nothing more will change on this screen
+        return shown || ['sent', 'viewed', 'failed'].includes(data.status)
+      },
+      () => {
+        if (!cancelled) setTimedOut(true)
       }
-    }, 3000)
+    )
 
     return () => {
       cancelled = true
-      clearInterval(interval)
+      stop()
     }
   }, [quoteId, token])
 

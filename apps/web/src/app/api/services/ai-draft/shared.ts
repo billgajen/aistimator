@@ -8,6 +8,7 @@ import { geminiThinkingConfig, geminiUrlFor } from '@/lib/ai/models'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { extractFormulaIdentifiers, normalizeUnit, regionPromptBlock, resolveRegionContext } from '@qolumns/shared'
 import { linesNeverCharged } from '@/lib/service-questions'
+import { photosRequired } from '@/lib/photos-required'
 
 /**
  * Validate and normalize an AI-generated draft config
@@ -24,7 +25,9 @@ export function validateAndNormalizeDraft(
 
   // Ensure media
   const media = {
-    minPhotos: Math.max(0, Math.min(5, draft.media?.minPhotos || 1)),
+    // T-204: ?? not ||, so a service whose photos are optional (0) is not given a required photo by a
+    // new draft; the range is the editor's own ("Photos required", 0 to 8)
+    minPhotos: photosRequired(draft.media?.minPhotos),
     maxPhotos: Math.max(1, Math.min(10, draft.media?.maxPhotos || 8)),
     photoGuidance: draft.media?.photoGuidance || 'Please upload clear photos of the area or items that need service.',
     requiredAngles: truncateArray(draft.media?.requiredAngles || [

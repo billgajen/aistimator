@@ -153,6 +153,9 @@ export const SCRIPTS = [
   // T-203 starts its own stand-in for the two AI providers (port 8791) and runs the worker's busy
   // retry, the queue rules and the busy alert in-process against it and the local database
   { id: 't203', server: 'standard', model: 'none' },
+  // T-204: four sections sharing T-201's harness (pricing; the customer's side; emails; the dashboard),
+  // most of them with a browser
+  { id: 't204', server: 'standard', model: 'none', browser: true, minutes: 30 },
 ]
 
 /** Lint, typecheck and unit tests: every level runs these first */

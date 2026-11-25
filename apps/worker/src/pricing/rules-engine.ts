@@ -25,7 +25,8 @@ import type {
   LabelField,
   LineSource,
 } from '@qolumns/shared'
-import { evaluateFormula } from '@qolumns/shared'
+import { evaluateFormula, compareAnswerValue, coerceToNumber, optionalNumberQuestions } from '@qolumns/shared'
+import type { LinkField } from '@qolumns/shared'
 import type { CertaintyReason } from '@qolumns/shared'
 import type { CrossServiceEstimate } from '../ai/cross-service'
 
@@ -140,6 +141,12 @@ export interface PricingResult {
     low: number
     high: number
   }
+  /**
+   * T-204: lines left out because an optional number question was left empty and nothing on the
+   * line says "empty means none". They count as 0 (never 1); the pipeline may still ask the customer
+   * for the number (T-127), as it did when such a line was priced at a placeholder of 1.
+   */
+  unansweredOptional?: Array<{ stepId: string; stepName: string; fieldId: string }>
   /** Notes about the calculation */
   notes: string[]
   /** Addons that were auto-recommended based on keywords/signals */
@@ -531,166 +538,8 @@ function shouldApplyMultiplier(
   return compareAnswerValue(answer.value, mult.when.operator || 'equals', mult.when.equals ?? mult.when.value)
 }
 
-/**
- * Compare a form answer against a configured condition value (T-126: shared
- * by multiplier conditions and work-step `when` conditions).
- */
-function compareAnswerValue(
-  answerValue: unknown,
-  operator: string,
-  compareValue: string | number | boolean | undefined
-): boolean {
-  const answer = { value: answerValue }
-  switch (operator) {
-    case 'equals':
-      // Type-aware comparison to handle form data types vs config value types
-      // E.g., checkbox submits true (boolean) but config may have "Yes" (string)
-
-      // ISSUE-7 FIX: Handle array fields - check if array CONTAINS the compare value
-      // This allows multipliers to work with multi-select form fields
-      if (Array.isArray(answer.value) && typeof compareValue === 'string') {
-        const compareValueLower = compareValue.toLowerCase()
-        const hasMatch = answer.value.some(v =>
-          typeof v === 'string' && v.toLowerCase() === compareValueLower
-        )
-        if (hasMatch) {
-          console.log(`[Pricing] Condition array match: answer contains "${compareValue}"`)
-        }
-        return hasMatch
-      }
-
-      // Handle boolean answer value → string compareValue
-      if (typeof answer.value === 'boolean') {
-        // Normalize compareValue to boolean for comparison
-        const compareAsBool =
-          compareValue === true ||
-          compareValue === 'true' ||
-          compareValue === 'True' ||
-          compareValue === 'TRUE' ||
-          compareValue === 'Yes' ||
-          compareValue === 'yes' ||
-          compareValue === 'YES' ||
-          compareValue === '1' ||
-          compareValue === 1
-        return answer.value === compareAsBool
-      }
-
-      // Handle string answer value that represents a boolean → boolean compareValue
-      // E.g., form sends "true" string but config has boolean true
-      if (typeof answer.value === 'string' && typeof compareValue === 'boolean') {
-        const answerAsBool =
-          answer.value === 'true' ||
-          answer.value === 'True' ||
-          answer.value === 'TRUE' ||
-          answer.value === 'Yes' ||
-          answer.value === 'yes' ||
-          answer.value === 'YES' ||
-          answer.value === '1'
-        return answerAsBool === compareValue
-      }
-
-      // Handle number answer value → string compareValue (or vice versa)
-      if (typeof answer.value === 'number' || typeof compareValue === 'number') {
-        const answerNum = Number(answer.value)
-        const compareNum = Number(compareValue)
-        // Only compare as numbers if both can be parsed as numbers
-        if (!isNaN(answerNum) && !isNaN(compareNum)) {
-          return answerNum === compareNum
-        }
-      }
-
-      // FIX-3: Handle string comparisons with format normalization
-      if (typeof answer.value === 'string' && typeof compareValue === 'string') {
-        // First try case-insensitive exact match
-        if (answer.value.toLowerCase() === compareValue.toLowerCase()) {
-          return true
-        }
-
-        // FIX-3: Normalize common format variations (underscores, parentheses, spaces)
-        const normalize = (s: string): string => s
-          .toLowerCase()
-          .replace(/_/g, ' ')           // underscores to spaces
-          .replace(/[()<>]/g, '')       // remove brackets and comparison symbols
-          .replace(/\s+/g, ' ')         // multiple spaces to single
-          .trim()
-
-        const normalizedAnswer = normalize(answer.value)
-        const normalizedCompare = normalize(compareValue)
-
-        if (normalizedAnswer === normalizedCompare) {
-          console.log(`[Pricing] Multiplier match via normalization: "${answer.value}" ≈ "${compareValue}"`)
-          return true
-        }
-
-        return false
-      }
-
-      // Fallback to strict equality
-      return answer.value === compareValue
-    case 'contains':
-      if (typeof answer.value === 'string' && typeof compareValue === 'string') {
-        return answer.value.toLowerCase().includes(compareValue.toLowerCase())
-      }
-      // ISSUE-4 FIX: Array contains with case-insensitive matching
-      if (Array.isArray(answer.value) && typeof compareValue === 'string') {
-        const compareValueLower = compareValue.toLowerCase()
-        return answer.value.some(v =>
-          typeof v === 'string' && v.toLowerCase() === compareValueLower
-        )
-      }
-      return false
-    // ISSUE-1 FIX: Numeric comparison operators now handle string values
-    // Form inputs often come as strings (e.g., "30" instead of 30)
-    case 'gt': {
-      const answerNum = coerceToNumber(answer.value)
-      const compareNum = coerceToNumber(compareValue)
-      if (answerNum === null || compareNum === null) return false
-      return answerNum > compareNum
-    }
-    case 'lt': {
-      const answerNum = coerceToNumber(answer.value)
-      const compareNum = coerceToNumber(compareValue)
-      if (answerNum === null || compareNum === null) return false
-      return answerNum < compareNum
-    }
-    case 'gte': {
-      const answerNum = coerceToNumber(answer.value)
-      const compareNum = coerceToNumber(compareValue)
-      if (answerNum === null || compareNum === null) return false
-      return answerNum >= compareNum
-    }
-    case 'lte': {
-      const answerNum = coerceToNumber(answer.value)
-      const compareNum = coerceToNumber(compareValue)
-      if (answerNum === null || compareNum === null) return false
-      return answerNum <= compareNum
-    }
-    default:
-      return false
-  }
-}
-
-/**
- * ISSUE-1 & ISSUE-2 FIX: Coerce a value to number with comma handling
- * Handles:
- * - Numbers (passthrough)
- * - String numbers ("30" → 30)
- * - Comma-formatted numbers ("2,400" → 2400)
- * - Empty/null/undefined → null
- */
-function coerceToNumber(value: unknown): number | null {
-  if (typeof value === 'number' && !isNaN(value)) {
-    return value
-  }
-  if (typeof value === 'string') {
-    // ISSUE-2 FIX: Strip commas from formatted numbers (e.g., "2,400" → "2400")
-    const cleaned = value.replace(/,/g, '').trim()
-    if (!cleaned) return null
-    const parsed = parseFloat(cleaned)
-    return isNaN(parsed) ? null : parsed
-  }
-  return null
-}
+// T-204: `compareAnswerValue` and `coerceToNumber` live in @qolumns/shared (answer-compare.ts), so the
+// dashboard reads a condition and a typed number exactly as this engine does.
 
 // Note: getComplexityMultiplier() was removed - automatic complexity multiplier is no longer applied.
 // If a business wants complexity-based pricing, they can configure it as a multiplier rule with trigger conditions.
@@ -1037,13 +886,17 @@ function resolveDerivedQuantity(
   structuredSignals: ExtractedSignal[] | undefined,
   legacySignals: ExtractedSignals,
   formAnswers: FormAnswer[],
-  zeroDefaultFields?: Set<string>
+  zeroDefaultFields?: Set<string>,
+  /** T-204: of those, the ones that are 0 only because the question is optional (no explicit "empty = none") */
+  askableZeroFields?: Set<string>
 ): {
   resolved: boolean
   quantity: number
   trusted: boolean
   error?: string
   signalsUsed: Array<{ key: string; value: string | number | boolean }>
+  /** T-204: an optional question counted as 0 that the customer may still be asked */
+  unansweredField?: string
 } {
   const signalsUsed: Array<{ key: string; value: string | number | boolean }> = []
   if (!formula) {
@@ -1051,6 +904,7 @@ function resolveDerivedQuantity(
   }
 
   let allTrusted = true
+  let unansweredField: string | undefined
   const result = evaluateFormula(formula, (name) => {
     const answer = formAnswers.find((a) => a.fieldId === name)
     if (answer?.value != null) {
@@ -1072,6 +926,7 @@ function resolveDerivedQuantity(
     // formula stays resolvable and T-127 asks no spurious catalogue question
     if (zeroDefaultFields?.has(name)) {
       signalsUsed.push({ key: name, value: 0 })
+      if (askableZeroFields?.has(name)) unansweredField ??= name
       return 0
     }
     return undefined
@@ -1080,7 +935,7 @@ function resolveDerivedQuantity(
   if (!result.ok) {
     return { resolved: false, quantity: 0, trusted: false, error: result.error, signalsUsed }
   }
-  return { resolved: true, quantity: Math.max(0, result.value), trusted: allTrusted, signalsUsed }
+  return { resolved: true, quantity: Math.max(0, result.value), trusted: allTrusted && !unansweredField, signalsUsed, ...(unansweredField && { unansweredField }) }
 }
 
 
@@ -1170,6 +1025,8 @@ interface WorkStepCostResult {
   quantity?: number
   /** The unit label (e.g., "Rooms", "Hrs") for display in breakdown. */
   unitLabel?: string
+  /** T-204: the optional number question whose empty answer made this quantity 0 (not an explicit "empty = none") */
+  unansweredField?: string
 }
 
 /**
@@ -1183,7 +1040,8 @@ function calculateWorkStepCost(
   structuredSignals: ExtractedSignal[] | undefined,
   legacySignals: ExtractedSignals,
   formAnswers: FormAnswer[],
-  zeroDefaultFields?: Set<string>
+  zeroDefaultFields?: Set<string>,
+  askableZeroFields?: Set<string>
 ): WorkStepCostResult {
   const signalsUsed: Array<{ key: string; value: string | number | boolean }> = []
   const unitLabel = step.unitLabel || 'units'
@@ -1202,6 +1060,7 @@ function calculateWorkStepCost(
       let quantity = 1
       let quantitySource: WorkStepCostResult['quantitySource'] = 'legacy_fallback'
       let quantityTrusted = false
+      let unansweredField: string | undefined
 
       // 1. EXPLICIT SOURCE (new, preferred - AD-005)
       if (step.quantitySource) {
@@ -1209,35 +1068,37 @@ function calculateWorkStepCost(
           case 'form_field': {
             // Get value from customer's form answer
             const formAnswer = formAnswers.find(a => a.fieldId === step.quantitySource!.fieldId)
-            if (formAnswer?.value != null && typeof formAnswer.value === 'number') {
-              quantity = formAnswer.value
+            // T-204: an empty box is "not answered", whatever the channel sent for it
+            const answered = formAnswer?.value != null && !(typeof formAnswer.value === 'string' && formAnswer.value.trim() === '')
+            // ISSUE-2: comma-separated numbers ("2,400") are read too
+            const typed = answered && (typeof formAnswer!.value === 'number' || typeof formAnswer!.value === 'string') ? coerceToNumber(formAnswer!.value) : null
+            if (typed !== null) {
+              // T-204: a typed "0" is 0 (as text it used to fall through to the placeholder 1), and a
+              // negative number is 0 too: an answer never becomes a quantity of 1 by itself
+              quantity = Math.max(0, typed)
               quantitySource = 'form_field'
               quantityTrusted = true  // Form = 100% trusted
               signalsUsed.push({ key: step.quantitySource.fieldId || 'form_field', value: quantity })
-            } else if (formAnswer?.value != null && typeof formAnswer.value === 'string') {
-              // ISSUE-2 FIX: Use coerceToNumber to handle comma-separated numbers (e.g., "2,400" → 2400)
-              const parsed = coerceToNumber(formAnswer.value)
-              if (parsed !== null && parsed > 0) {
-                quantity = parsed
-                quantitySource = 'form_field'
-                quantityTrusted = true
-                signalsUsed.push({ key: step.quantitySource.fieldId || 'form_field', value: quantity })
-              } else {
-                console.warn(`[Pricing] "${step.name}": Form field "${step.quantitySource.fieldId}" has non-numeric value: ${formAnswer.value}`)
-              }
-            } else if (step.quantitySource.missingMeansZero) {
+            } else if (answered) {
+              console.warn(`[Pricing] "${step.name}": Form field "${step.quantitySource.fieldId}" has a non-numeric value`)
+            } else if (step.quantitySource.missingMeansZero || (step.quantitySource.fieldId && zeroDefaultFields?.has(step.quantitySource.fieldId))) {
               // T-131 (R2-2): catalogue semantics — unanswered means "not
               // requested", a TRUSTED zero, not an untrusted ×1 placeholder.
               // The zero-cost skip drops the line; T-127 must not ask about it.
-              console.log(`[Pricing] "${step.name}": catalogue item not requested (field unanswered, missingMeansZero) - quantity 0`)
+              // T-204: the same for any optional number question left empty.
+              console.log(`[Pricing] "${step.name}": not requested (the question was left empty) - quantity 0`)
+              // An explicit "empty means none" is a trusted zero. A question that is merely optional is
+              // 0 as well, but the pipeline may still ask the customer for it (T-127).
+              const askable = !step.quantitySource.missingMeansZero && !!step.quantitySource.fieldId && !!askableZeroFields?.has(step.quantitySource.fieldId)
               return {
                 cost: 0,
                 calculation: 'Not requested (0)',
                 signalsUsed,
                 quantitySource: 'form_field',
-                quantityTrusted: true,
+                quantityTrusted: !askable,
                 quantity: 0,
                 unitLabel,
+                ...(askable && { unansweredField: step.quantitySource.fieldId }),
               }
             } else {
               console.warn(`[Pricing] "${step.name}": Form field "${step.quantitySource.fieldId}" not answered, using default quantity 1`)
@@ -1278,11 +1139,12 @@ function calculateWorkStepCost(
 
           case 'derived': {
             // T-125: deterministic formula over form fields / signals
-            const derived = resolveDerivedQuantity(step.quantitySource.formula, structuredSignals, legacySignals, formAnswers, zeroDefaultFields)
+            const derived = resolveDerivedQuantity(step.quantitySource.formula, structuredSignals, legacySignals, formAnswers, zeroDefaultFields, askableZeroFields)
             if (derived.resolved) {
               quantity = derived.quantity
               quantitySource = 'derived'
               quantityTrusted = derived.trusted
+              unansweredField = derived.unansweredField
               signalsUsed.push(...derived.signalsUsed)
             } else {
               quantitySource = 'derived_unresolved'
@@ -1367,6 +1229,7 @@ function calculateWorkStepCost(
         quantityTrusted,
         quantity,
         unitLabel: displayUnitLabel,
+        ...(unansweredField && { unansweredField }),
       }
     }
 
@@ -1374,17 +1237,25 @@ function calculateWorkStepCost(
       let hours = 1
       let quantitySource: WorkStepCostResult['quantitySource'] = 'legacy_fallback'
       let quantityTrusted = false
+      let unansweredField: string | undefined
 
       // 1. EXPLICIT SOURCE (AD-005)
       if (step.quantitySource) {
         switch (step.quantitySource.type) {
           case 'form_field': {
             const formAnswer = formAnswers.find(a => a.fieldId === step.quantitySource!.fieldId)
-            if (formAnswer?.value != null && typeof formAnswer.value === 'number') {
-              hours = formAnswer.value
+            // T-204: a typed number arrives as a string from some channels; read it as the per-unit branch does
+            const hoursAnswered = formAnswer?.value != null && !(typeof formAnswer.value === 'string' && formAnswer.value.trim() === '')
+            const typedHours = hoursAnswered ? coerceToNumber(formAnswer!.value) : null
+            if (typedHours !== null) {
+              hours = Math.max(0, typedHours)
               quantitySource = 'form_field'
               quantityTrusted = true
               signalsUsed.push({ key: step.quantitySource.fieldId || 'form_field', value: hours })
+            } else if (!hoursAnswered && (step.quantitySource.missingMeansZero || (step.quantitySource.fieldId && zeroDefaultFields?.has(step.quantitySource.fieldId)))) {
+              // T-204: an optional number left empty is 0 hours, never 1
+              const askable = !step.quantitySource.missingMeansZero && !!step.quantitySource.fieldId && !!askableZeroFields?.has(step.quantitySource.fieldId)
+              return { cost: 0, calculation: 'Not requested (0)', signalsUsed, quantitySource: 'form_field', quantityTrusted: !askable, quantity: 0, unitLabel: step.unitLabel || 'hours', ...(askable && { unansweredField: step.quantitySource.fieldId }) }
             }
             break
           }
@@ -1415,11 +1286,12 @@ function calculateWorkStepCost(
 
           case 'derived': {
             // T-125: deterministic formula over form fields / signals
-            const derived = resolveDerivedQuantity(step.quantitySource.formula, structuredSignals, legacySignals, formAnswers, zeroDefaultFields)
+            const derived = resolveDerivedQuantity(step.quantitySource.formula, structuredSignals, legacySignals, formAnswers, zeroDefaultFields, askableZeroFields)
             if (derived.resolved) {
               hours = derived.quantity
               quantitySource = 'derived'
               quantityTrusted = derived.trusted
+              unansweredField = derived.unansweredField
               signalsUsed.push(...derived.signalsUsed)
             } else {
               quantitySource = 'derived_unresolved'
@@ -1475,6 +1347,7 @@ function calculateWorkStepCost(
         quantityTrusted,
         quantity: hours,
         unitLabel: 'Hrs',
+        ...(unansweredField && { unansweredField }),
       }
     }
 
@@ -1582,6 +1455,17 @@ export function calculatePricingWithTrace(
       .filter((ws) => ws.quantitySource?.missingMeansZero && ws.quantitySource.fieldId)
       .map((ws) => ws.quantitySource!.fieldId!)
   )
+  // T-204: an optional number question left empty counts as 0, never 1, in a line's quantity and in
+  // a formula. The rule is the shared one (pricing-links.ts); it needs the form's questions, so it
+  // applies wherever the caller passes them (the quote pipeline always does).
+  // A question a line marks "empty means none" is a plain 0. One that is only optional is 0 too, and
+  // is also reported (`unansweredOptional`), so the pipeline can still ask the customer for it.
+  const askableZeroFields = new Set<string>()
+  for (const fieldId of optionalNumberQuestions(serviceContext?.fields as LinkField[] | undefined, rules.workSteps)) {
+    if (!zeroDefaultFields.has(fieldId)) askableZeroFields.add(fieldId)
+    zeroDefaultFields.add(fieldId)
+  }
+  const unansweredOptional: NonNullable<PricingResult['unansweredOptional']> = []
   if (rules.workSteps && rules.workSteps.length > 0) {
     const signalsArray = structuredSignals?.signals
 
@@ -1599,9 +1483,12 @@ export function calculatePricingWithTrace(
         continue
       }
 
-      const stepResult = calculateWorkStepCost(step, signalsArray, signals, answers, zeroDefaultFields)
+      const stepResult = calculateWorkStepCost(step, signalsArray, signals, answers, zeroDefaultFields, askableZeroFields)
       // T-157: the line amount, rounded where the line is created
       stepResult.cost = roundMoney(stepResult.cost)
+      if (stepResult.unansweredField && !unansweredOptional.some((u) => u.stepId === step.id)) {
+        unansweredOptional.push({ stepId: step.id, stepName: step.name, fieldId: stepResult.unansweredField })
+      }
 
       // ISSUE-3 FIX: Skip zero-cost line items (e.g., "0 sockets × £25 = £0")
       // This prevents unprofessional-looking quotes with $0 line items
@@ -1935,6 +1822,7 @@ export function calculatePricingWithTrace(
     range,
     notes,
     recommendedAddons: recommendedAddons.length > 0 ? recommendedAddons : undefined,
+    ...(unansweredOptional.length > 0 && { unansweredOptional }),
   }
 
   // ISSUE-2 FIX: Detect form fields that were provided but not used in pricing

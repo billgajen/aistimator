@@ -11,15 +11,19 @@
  * "Check your prices" (every path) → basics → create → a guided test quote.
  */
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ServiceDraftConfig, AddonConfig, MultiplierConfig, RegionCode } from '@qolumns/shared'
 import { getRegion, currencySymbol as symbolFor } from '@qolumns/shared'
 import { describePricingRules } from '@/lib/pricing-describe'
 import type { LeftOut } from '@/lib/pricing-left-out'
 import { LeftOutNote } from '@/components/services/LeftOutNote'
+import { PricingFlagsNote } from '@/components/services/PricingFlagsNote'
+import type { PricingFlag } from '@qolumns/shared'
 import { listPacks, getPack } from '@/lib/vertical-packs'
-import { isUnpriced, servicePayload, type DraftService } from '@/lib/onboarding-service'
+import { isUnpriced, packServices, servicePayload, type DraftService } from '@/lib/onboarding-service'
+import { OTHER_TRADE } from '@/lib/trades'
+import type { VerticalPack } from '@/lib/vertical-packs/types'
 import { TradeStep } from './TradeStep'
 import { CheckPricesStep } from './CheckPricesStep'
 import { TestQuoteStep } from './TestQuoteStep'
@@ -86,6 +90,8 @@ export function OnboardingFlow({
     ambiguities: string[]
     /** T-201: what did not fit in one service, by name */
     leftOut?: LeftOut
+    /** T-204: what is still loose in the compiled prices */
+    flags?: PricingFlag[]
   } | null>(null)
 
   // Basics
@@ -114,14 +120,16 @@ export function OnboardingFlow({
   }
 
   /** T-150: save the trade answer, then go to its template or to "tell us about it" */
-  const handleChooseTrade = async (trade: string, otherText: string) => {
+  const handleChooseTrade = async (trades: string[], otherText: string) => {
+    const isOther = trades[0] === OTHER_TRADE
     setSavingTrade(true)
     setError(null)
     try {
       const res = await fetch('/api/tenant', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trade, tradeOther: trade === 'other' ? otherText : null }),
+        // T-204: every trade picked, in the order picked
+        body: JSON.stringify({ trades, tradeOther: isOther ? otherText : null }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => null)
@@ -133,11 +141,11 @@ export function OnboardingFlow({
       return
     }
     setSavingTrade(false)
-    if (trade === 'other') {
+    if (isOther) {
       setFromTemplate(false)
       setStep('source')
     } else {
-      handleApplyPack(trade)
+      handleApplyPacks(trades)
     }
   }
 
@@ -147,21 +155,15 @@ export function OnboardingFlow({
     router.push('/app/services')
   }
 
-  /** T-113: apply a vertical pack — no network, no AI, instant */
-  const handleApplyPack = (packId: string) => {
-    const pack = getPack(packId)
-    if (!pack) return
+  /**
+   * T-113: apply a vertical pack — no network, no AI, instant.
+   * T-204: every picked trade's services are offered, trade by trade (`packServices`).
+   */
+  const handleApplyPacks = (packIds: string[]) => {
+    const offered = packServices(packIds.map((id) => getPack(id)).filter((pack): pack is VerticalPack => Boolean(pack)))
+    if (offered.length === 0) return
     setFromTemplate(true)
-    setServices(
-      pack.services.map((svc) => ({
-        name: svc.name,
-        description: svc.description,
-        draft: svc.draft,
-        addons: svc.addons || [],
-        multipliers: svc.multipliers || [],
-        selected: true,
-      }))
-    )
+    setServices(offered)
     setError(null)
     setStep('services')
   }
@@ -496,8 +498,12 @@ export function OnboardingFlow({
 
           <div className="mt-6 space-y-3">
             {services.map((svc, index) => (
+              <Fragment key={index}>
+              {/* T-204: with more than one trade picked, each trade's services sit under its name */}
+              {svc.trade && svc.trade !== services[index - 1]?.trade && new Set(services.map((s) => s.trade)).size > 1 && (
+                <h2 className="pt-2 text-sm font-semibold text-text-secondary first:pt-0" data-testid="setup-trade-heading">{svc.trade}</h2>
+              )}
               <label
-                key={index}
                 className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
                   svc.selected ? 'border-primary' : 'border-border opacity-60'
                 }`}
@@ -524,6 +530,7 @@ export function OnboardingFlow({
                   </div>
                 </div>
               </label>
+              </Fragment>
             ))}
           </div>
 
@@ -632,6 +639,13 @@ export function OnboardingFlow({
               </div>
 
               <LeftOutNote leftOut={compileResult.leftOut} />
+              {/* T-204: what is still loose in the compiled prices; it never blocks carrying on */}
+              <PricingFlagsNote
+                flags={compileResult.flags}
+                testId="compile-flags"
+                title="Worth a look"
+                hint="Say in your description what each one depends on and try again, or carry on and link them later on Services."
+              />
 
               {compileResult.ambiguities.length > 0 && (
                 <div className="rounded-lg border border-tertiary-line bg-tertiary-light p-4">

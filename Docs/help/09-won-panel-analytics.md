@@ -61,7 +61,7 @@ The four figures at the top count all your quotes since you started, not one mon
 - "Quotes Accepted": quotes the customer accepted.
 - "Conversion Rate": "Quotes Accepted" as a share of every quote that was sent to a customer. Declined and expired quotes count as sent.
 
-A test estimate is left out of all four, even one you approved and accepted yourself.
+A test estimate is left out of all four, even one you approved and accepted yourself. It is left out of "Estimate accuracy" and "Quote Outcomes by Service" too.
 
 Lower down:
 
@@ -94,6 +94,8 @@ Record it on the quote's page, under "Final invoice". This is what "Estimate acc
 3. Type the amount in "Invoiced amount". Add a "Note (optional)" if you like, such as why the job grew.
 4. Press "Save". To change it later, type the new amount and press "Update".
 
+An amount under half the quote's total, or over double it, is asked about first: "Is this the full amount you charged for the job?" Press "Yes, save it" to save it as typed, or "Change the amount" to correct it.
+
 The card then shows what you invoiced against the quote's total, and the difference as a percentage. "Final invoice" shows on a quote that was sent or opened and is waiting, and on one that is accepted, declined or expired. It does not show while a customer's question is open, or while an updated quote you sent is waiting for the customer. It does not change the quote, what the customer sees, or "Won this month:", which uses the accepted quote's total.
 
 ## How do I compare my estimates with my final invoices?
@@ -119,7 +121,7 @@ The page gives the target beside the tables: a median error under 10%, and at le
 They are three sections lower down the Analytics page. None of them changes a price by itself.
 
 - "Pricing Insights" are suggestions drawn from how your quotes did over the last 90 days. The section shows only when there is a suggestion. "Adjust pricing →" opens "Services", where you make the change yourself.
-- "Quote Outcomes by Service" is a table with, for each service, "Sent", "Accepted", "Acceptance" and "Median edit before send", which is how much you usually changed the price before sending.
+- "Quote Outcomes by Service" is a table with, for each service, "Sent", "Accepted", "Acceptance" and "Median edit before send", which is how much you usually changed the price before sending. It counts the way the figures at the top do: a quote you edited and sent again is still one quote, a declined or expired quote counts as sent, and a test estimate is left out. A quote you edited more than once counts as one change, from its first price to its last.
 - "Market Benchmarks" compares your rates with what similar businesses charge, without naming anyone. You see it while you share your own rates into the same anonymous pool. Figures show only once at least three other businesses with similar services and your currency are sharing. Until then the section says "Not enough comparable businesses yet".
 
 ## How do I stop or start sharing my rates in "Market Benchmarks"?

@@ -14,6 +14,8 @@ import { ADDRESS_COPY, PRODUCT_NAME, PUSH_COPY, SUPPORT_EMAIL, type AppAccountRe
 import { useApi } from '../../src/lib/api-context'
 import { deleteAccountUrl, planLine, shortLink, usageFraction, usageLine } from '../../src/lib/account'
 import { config } from '../../src/lib/config'
+import { rememberLink } from '../../src/lib/link-memory'
+import { currentUserId } from '../../src/lib/supabase'
 import { toApiError } from '../../src/lib/api'
 import { plainError } from '../../src/lib/errors'
 import { useOutbox, useOutboxState } from '../../src/lib/outbox-context'
@@ -38,8 +40,11 @@ export default function Account() {
       if (pulled) setRefreshing(true)
       setError(null)
       try {
-        setAccount(await api.account())
+        const read = await api.account()
+        setAccount(read)
         setLogoFailed(false)
+        // T-204: "Show the QR code" draws at once from this, with no second read
+        void rememberLink(currentUserId(), read)
       } catch (e) {
         setError(toApiError(e).offline ? 'No signal. This may be out of date.' : plainError(e, 'Your account could not be loaded. Pull down to try again.'))
       } finally {

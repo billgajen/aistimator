@@ -4,11 +4,16 @@ import { useState } from 'react'
 import type { RegionCode } from '@qolumns/shared'
 import { listRegions } from '@qolumns/shared'
 import type { VerticalPack } from '@/lib/vertical-packs/types'
+import { MAX_TRADES, OTHER_TRADE, toggleTrade, tradeIds } from '@/lib/trades'
 
 /**
  * T-150: setup's first question, "What kind of work do you do?" The region's
  * trade templates as large options, plus "Something else" with the
  * business's own words. Packs are data; nothing here knows any trade.
+ *
+ * T-204: more than one trade can be picked (a business that does heating and
+ * plumbing picks both). "Something else" stands alone: it leads to the
+ * website or the business's own words, not to a template.
  */
 export function TradeStep({
   businessName,
@@ -30,13 +35,16 @@ export function TradeStep({
   initialOther: string
   saving: boolean
   error: string | null
-  onChoose: (trade: string, otherText: string) => void
+  onChoose: (trades: string[], otherText: string) => void
   onSkip: () => void
 }) {
-  const [choice, setChoice] = useState<string | null>(
-    initialTrade && (initialTrade === 'other' || packs.some((p) => p.id === initialTrade)) ? initialTrade : null
+  // A previous answer, kept where it still fits this region's templates
+  const [choices, setChoices] = useState<string[]>(() =>
+    tradeIds(initialTrade).filter((id) => id === OTHER_TRADE || packs.some((p) => p.id === id))
   )
   const [other, setOther] = useState(initialOther)
+  const picked = (id: string) => choices.includes(id)
+  const packsPicked = choices.filter((id) => id !== OTHER_TRADE).length
 
   const option = (selected: boolean) =>
     `flex w-full items-start gap-4 rounded-2xl border-2 p-5 text-left transition-colors ${
@@ -47,7 +55,8 @@ export function TradeStep({
     <div>
       <h1 className="font-display text-3xl font-extrabold tracking-tight text-text-primary">What kind of work do you do?</h1>
       <p className="mt-2 text-text-secondary">
-        Pick the closest match for {businessName}. You can change everything afterwards.
+        Pick the closest match for {businessName}, or more than one if you do several kinds of work. You can change
+        everything afterwards.
       </p>
 
       <div className="mt-4 max-w-xs">
@@ -59,7 +68,7 @@ export function TradeStep({
           value={region}
           onChange={(e) => {
             onRegionChange(e.target.value)
-            setChoice(null)
+            setChoices([])
           }}
           className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
         >
@@ -71,15 +80,18 @@ export function TradeStep({
         </select>
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Your trade">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2" role="group" aria-label="Your trades">
         {packs.map((pack) => (
           <button
             key={pack.id}
             type="button"
-            role="radio"
-            aria-checked={choice === pack.id}
-            onClick={() => setChoice(pack.id)}
-            className={option(choice === pack.id)}
+            role="checkbox"
+            aria-checked={picked(pack.id)}
+            // the most trades one setup takes: the rest stay pickable once one is unticked
+            disabled={!picked(pack.id) && packsPicked >= MAX_TRADES}
+            onClick={() => setChoices((now) => toggleTrade(now, pack.id))}
+            className={`${option(picked(pack.id))} disabled:cursor-not-allowed disabled:opacity-50`}
+            data-testid="trade-option"
           >
             <span className="text-3xl leading-none" aria-hidden="true">{pack.icon}</span>
             <span className="min-w-0">
@@ -90,10 +102,11 @@ export function TradeStep({
         ))}
         <button
           type="button"
-          role="radio"
-          aria-checked={choice === 'other'}
-          onClick={() => setChoice('other')}
-          className={option(choice === 'other')}
+          role="checkbox"
+          aria-checked={picked(OTHER_TRADE)}
+          onClick={() => setChoices((now) => toggleTrade(now, OTHER_TRADE))}
+          className={option(picked(OTHER_TRADE))}
+          data-testid="trade-option-other"
         >
           <span className="text-3xl leading-none" aria-hidden="true">✳️</span>
           <span className="min-w-0">
@@ -103,7 +116,11 @@ export function TradeStep({
         </button>
       </div>
 
-      {choice === 'other' && (
+      {packsPicked >= MAX_TRADES && (
+        <p className="mt-3 text-sm text-text-secondary">That is the most one setup takes. You can add more services from a template afterwards.</p>
+      )}
+
+      {picked(OTHER_TRADE) && (
         <div className="mt-4">
           <label className="mb-1 block text-sm font-medium text-text-secondary" htmlFor="trade-other">
             What do you do? <span className="font-normal text-text-muted">(optional)</span>
@@ -125,8 +142,8 @@ export function TradeStep({
       <div className="mt-6 flex items-center justify-between">
         <button
           type="button"
-          onClick={() => choice && onChoose(choice, other)}
-          disabled={!choice || saving}
+          onClick={() => choices.length > 0 && onChoose(choices, other)}
+          disabled={choices.length === 0 || saving}
           className="inline-flex items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Continue'}

@@ -186,6 +186,14 @@ export function questionsFor(run: SectionRun, fields: readonly WidgetField[], ha
     add(field ? { ...fieldQuestion(field), type: 'number' } : { key, label: step.name, type: 'number' })
   }
 
+  // 3b. T-204: a line left out because its optional number question was left empty (it counts as 0,
+  // never a placeholder of 1): the same question as a placeholder asked
+  for (const unanswered of run.pricing.unansweredOptional ?? []) {
+    if (has(unanswered.fieldId)) continue
+    const field = byId.get(unanswered.fieldId)
+    add(field ? { ...fieldQuestion(field), type: 'number' } : { key: unanswered.fieldId, label: unanswered.stepName, type: 'number' })
+  }
+
   // 4. A per-unit price with no "how many"
   const model = run.rules.measurementModel
   if (model?.type === 'per_unit' && model.pricePerUnit > 0 && !has(SECTION_QUANTITY_KEY)) {

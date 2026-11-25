@@ -142,6 +142,22 @@ export function noBadgeLine(plans?: PlanDefinition[]): string {
   return `Only ${planNamesFor('no_badge', plans)} ${withIt.length === 1 ? 'removes' : 'remove'} the ${badge}. Your estimates then carry only your brand.`
 }
 
+/**
+ * T-204: the same place, for this business. The preview above it shows the
+ * badge only when the business's estimates carry one today, so the line says
+ * which case it is: a plan that removes it, the free start (which works like
+ * that plan until the free quotes run out), or neither.
+ */
+export function badgeLineFor(access: BusinessAccess, plans?: PlanDefinition[]): string {
+  if (!canUse(access, 'no_badge')) return noBadgeLine(plans)
+  const badge = `“Prepared with ${PRODUCT_NAME}” badge`
+  if (access.basis === 'free_start') {
+    const after = plansWith('no_badge', plans).length > 0 ? ` After that, only ${planNamesFor('no_badge', plans)} ${plansWith('no_badge', plans).length === 1 ? 'removes' : 'remove'} it.` : ''
+    return `While you have free quotes left, your estimates carry no ${badge}.${after}`
+  }
+  return `Your plan removes the ${badge}. Your estimates carry only your brand.`
+}
+
 /** Home, on the free start: "You're trying everything in Pro. 7 free quotes left." */
 export function freeStartLine(access: BusinessAccess): string | null {
   if (access.basis !== 'free_start' || !access.plan || access.freeLeft === null) return null

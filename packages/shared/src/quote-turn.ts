@@ -826,6 +826,26 @@ export function customerEstimateNote(input: { reviewed: boolean; confirmationPen
   return input.confirmationPending ? `${estimate} ${input.businessName} will review and confirm it.` : estimate
 }
 
+/**
+ * T-204: where a quote stands, as one short line beside its price in every
+ * email to the customer. The same three cases as `customerEstimateNote`:
+ *   - `confirmed`  the business approved it (or edited and sent it itself)
+ *   - `waiting`    shown early; the business has still to approve it (T-147)
+ *   - `estimate`   sent automatically, with no review to come: nothing is
+ *                  claimed about a review, because there was none
+ */
+export type CustomerQuoteState = 'confirmed' | 'waiting' | 'estimate'
+
+export function customerQuoteState(input: { reviewed: boolean; confirmationPending: boolean }): CustomerQuoteState {
+  return input.reviewed ? 'confirmed' : input.confirmationPending ? 'waiting' : 'estimate'
+}
+
+export function customerStatusLine(state: CustomerQuoteState, businessName: string): string {
+  if (state === 'confirmed') return `Reviewed and confirmed by ${businessName}`
+  if (state === 'waiting') return `Waiting for ${businessName} to confirm`
+  return 'Estimate based on your photos and details'
+}
+
 export function customerDecisionWords(reviewed: boolean): CustomerDecisionWords {
   const noun = reviewed ? 'quote' : 'estimate'
   const Noun = reviewed ? 'Quote' : 'Estimate'
@@ -839,6 +859,16 @@ export function customerDecisionWords(reviewed: boolean): CustomerDecisionWords 
     keep: `Keep the ${noun}`,
     declineButton: `Decline ${noun}`,
   }
+}
+
+/**
+ * T-204: the line under the business's name on the customer's page. Once the
+ * business has approved it, it is a quote; until then (and on one a service
+ * sent by itself, which nobody reviewed) it is an estimate. The same two words
+ * as the price panel and the buttons, so the page never says both.
+ */
+export function preparedForLine(reviewed: boolean, customerName: string): string {
+  return `${reviewed ? 'Quote' : 'Estimate'} prepared for ${customerName}`
 }
 
 /** Pricing trace exists once a quote has been priced and sent (the list's rule before T-158, unchanged) */

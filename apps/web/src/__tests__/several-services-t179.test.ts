@@ -245,7 +245,8 @@ describe('a part whose service holds until approved: no price for that part, the
     const view = read('apps/web/src/app/api/public/quotes/[quoteId]/route.ts')
     expect(view).toContain('pricingForCustomerView(')
     expect(view).toContain('displaySectionsForCustomer(pricing, awaitingParts')
-    expect(view).toContain('quote.pdf_asset_id && awaitingParts.length === 0')
+    // T-204: the link no longer needs a PDF the business made; a waiting part still means none
+    expect(view).toContain('customerCanDownloadPdf(quote.status) && awaitingParts.length === 0 && (quote.pdf_asset_id || quotePdfCanBeMade())')
     const sections = read('apps/web/src/app/api/public/quotes/[quoteId]/sections/route.ts')
     expect(sections).toContain('NextResponse.json({ ok: true, status: result.status })')
     expect(sections).not.toContain('alsoAsked: result.alsoAsked')

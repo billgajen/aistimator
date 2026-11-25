@@ -23,10 +23,10 @@
  *     then this screen asks nothing.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Image, Linking, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
+import { Alert, Image, Linking, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as Clipboard from 'expo-clipboard'
-import { ANSWER_NOTE_MAX, allAnswered, roomScanView, type RoomScanRoom, certaintySentence, chosenChoice, customerFirstName, formatMoney, isTypedAnswer, lineLabelParts, noteToSend, parseMoneyInput, questionChoices, questionTextBox, QUOTE_TURN_COPY, type AppQuoteLine, type AppQuoteSection, type AppQuoteView } from '@qolumns/shared'
+import { ANSWER_NOTE_MAX, allAnswered, roomScanView, type RoomScanRoom, certaintySentence, chosenChoice, customerFirstName, FINAL_INVOICE_ASK, finalInvoiceLooksOff, formatMoney, isTypedAnswer, lineLabelParts, noteToSend, parseMoneyInput, questionChoices, questionTextBox, QUOTE_TURN_COPY, type AppQuoteLine, type AppQuoteSection, type AppQuoteView } from '@qolumns/shared'
 import { useApi } from '../../src/lib/api-context'
 import { toApiError } from '../../src/lib/api'
 import { config } from '../../src/lib/config'
@@ -293,14 +293,30 @@ export default function QuoteDetail() {
     }
   }
 
-  const saveInvoice = () =>
+  const recordInvoice = (amount: number) =>
     run(async () => {
-      const amount = parseMoneyInput(invoice)
-      if (!quote || amount === null) return
+      if (!quote) return
       const saved = await api.recordFinalInvoice(quote.id, amount)
       setInvoiceSaved(saved.finalInvoiceAmount)
       setInvoice('')
     })
+
+  // T-204: an amount under half or over double the quote is asked about before it is saved
+  // (a deposit typed as the invoice, or a slipped digit). The business can still save it.
+  const saveInvoice = () => {
+    const amount = parseMoneyInput(invoice)
+    if (!quote || amount === null) return
+    const quoted = quote.pricing.total
+    if (!finalInvoiceLooksOff(amount, quoted)) return void recordInvoice(amount)
+    Alert.alert(
+      FINAL_INVOICE_ASK,
+      `${formatMoney(amount, quote.pricing.currency)} is ${amount < quoted ? 'less than half' : 'more than double'} the quote of ${formatMoney(quoted, quote.pricing.currency)}.`,
+      [
+        { text: 'Change the amount', style: 'cancel' },
+        { text: 'Yes, save it', onPress: () => void recordInvoice(amount) },
+      ]
+    )
+  }
 
   const open = (url: string) =>
     void Linking.openURL(url).catch(() => setError('That could not be opened on this phone.'))

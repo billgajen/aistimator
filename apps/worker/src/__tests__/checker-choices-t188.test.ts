@@ -231,7 +231,8 @@ describe('T-188: the gate asks with choices, in words for who answers', () => {
     const forBusiness = await evaluateQualityGate(gateInput({ audience: 'business', missingQuantitySignals: missing }), null)
     const forCustomer = await evaluateQualityGate(gateInput({ missingQuantitySignals: missing }), null)
     expect(forBusiness.questions![0]).toMatchObject({ targetSignalKey: 'wall_area', answerKind: 'number', question: 'What is "wall area" for this Service A job?' })
-    expect(forCustomer.questions![0]!.question).toBe('Could you provide more details about "wall area" for your Service A quote?')
+    // T-204: plain and short (it was 'Could you provide more details about "wall area" for your Service A quote?')
+    expect(forCustomer.questions![0]!.question).toBe('What is the wall area for this job?')
     expect(forBusiness.questions![0]!.options).toBeUndefined()
     // with a model: whatever options it offers are dropped
     const model = { generateWithSchema: async () => ({ questions: [{ targetSignalKey: 'wall_area', question: 'How much wall is there?', options: ['A little', 'A lot'] }] }) }

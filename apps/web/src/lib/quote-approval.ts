@@ -206,6 +206,8 @@ export async function approveQuote(opts: {
     validUntil: expiry.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' }),
     primaryColor: tenant.branding_json?.primaryColor,
     brand: await customerEmailBrand(supabase, tenantId, tenant.branding_json),
+    // T-204: the business has just approved it
+    state: 'confirmed',
   })
   const emailResult = await sendEmail({
     from: { kind: 'customer', businessName: tenant.name },

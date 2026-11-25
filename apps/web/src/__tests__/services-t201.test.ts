@@ -122,7 +122,10 @@ describe('T-201 item 5: a service made by hand keeps its questions', () => {
   it('the page saves through that rule in both "Create Service" and "Save Changes", and marks only AI drafts', () => {
     const page = code('app/(dashboard)/app/services/page.tsx')
     expect(page).toContain('const draftConfig = draftToSave(')
-    expect(page.match(/draftConfig,\n/g)?.length).toBe(2)
+    // T-204: one body (`serviceBody`) is built once and sent by both, and by the test price
+    expect(page.match(/draftConfig,\n/g)?.length).toBe(1)
+    expect(page).toContain('body: JSON.stringify(body),')
+    expect(page).toContain('body: JSON.stringify(switchOn ? { ...body, active: true } : body),')
     expect(page).not.toContain('? { ...aiDraft, suggestedFields: formData.suggestedFields }')
     expect(page).toContain('{isAiDraft(service.draft_config) && <AIDraftBadge compact />}')
     expect(page).toContain('setAiDraft(isAiDraft(service.draft_config) ? service.draft_config : null)')
@@ -345,7 +348,9 @@ describe('T-201 item 8: "Describe your pricing" says what it left out', () => {
   })
 
   it('the route names them from what the compiler wrote, and both reviews show them before "Apply"', () => {
-    const route = code('app/api/services/ai-draft/compile/route.ts')
+    // T-204: what is done to the compiler's answer moved to lib/pricing-compile.ts (the route calls it)
+    expect(code('app/api/services/ai-draft/compile/route.ts')).toContain('return NextResponse.json(finishCompile(responseText, body))')
+    const route = code('lib/pricing-compile.ts')
     expect(route).toContain('const leftOut = leftOutOf({')
     expect(route).toContain('...(leftOut && { leftOut }),')
     expect(route).toContain('.slice(0, COMPILE_KEEPS.addons)')

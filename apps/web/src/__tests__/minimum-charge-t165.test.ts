@@ -201,7 +201,12 @@ describe('T-165: the note every page shows', () => {
     expect(page).not.toMatch(/subtotal < formData\.minimumCharge/)
     // T-189: the preview's maths moved to lib/sample-price; the floor is the same shared rule
     expect(code('lib/sample-price.ts')).toContain('minimumTopUp(subtotal, service.minimumCharge) > 0')
-    expect(page).toContain('minimumChargeNote(currencySymbol + simulatorResult.minimumCharge.toFixed(2))')
+    // T-204: the preview is priced by the worker's own pipeline and drawn by PricingTest; the
+    // minimum is still read with the shared rule and said as the one note
+    const test = code('components/services/PricingTest.tsx')
+    expect(test).toContain('const { lines, minimum } = splitMinimum(price?.lines ?? [])')
+    expect(test).toContain('{minimumChargeNote(money(minimum.minimumCharge))}')
+    expect(test).not.toContain('Minimum Charge Adjustment')
   })
 
   it('the marketing examples never rely on a minimum: their lines add up to their total', () => {

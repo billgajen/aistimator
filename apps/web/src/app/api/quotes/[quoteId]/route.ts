@@ -31,7 +31,7 @@ import type {
   QuoteDetailResponse,
   AmendmentSummary,
 } from '@qolumns/shared'
-import { freeStartTag, roomScanOfAnswers, roomScanView } from '@qolumns/shared'
+import { ANSWER_CHANGE_FIELD, cleanAnswerToCustomer, freeStartTag, roomScanOfAnswers, roomScanView } from '@qolumns/shared'
 import { loadAccess } from '@/lib/access'
 import { CHECKER_SETTINGS_VERSION, QUESTIONS_OPEN_STATUS, askedQuestions, businessIsAsked, carrySources, isMadeByBusiness, serviceSuggestionOf, MAX_ADDED_SECTIONS, addedSections, alsoAskedOf, alsoAskedWithStates, editedSectionBreakdown, withSections } from '@qolumns/shared'
 import type { CombinedPricing, QuoteSection } from '@qolumns/shared'
@@ -82,16 +82,31 @@ async function getAuthContext(supabase: Awaited<ReturnType<typeof createClient>>
   return { userId: user.id, tenantId: profile.tenant_id }
 }
 
+/** T-204: what the quote's price was before the business first edited it; null for a quote never edited */
+async function firstPricingOf(supabase: Awaited<ReturnType<typeof createClient>>, tenantId: string, quoteId: string): Promise<unknown> {
+  const { data } = await supabase
+    .from('quote_amendments')
+    .select('before_pricing')
+    .eq('quote_id', quoteId)
+    .eq('tenant_id', tenantId)
+    .order('version', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  return (data as { before_pricing?: unknown } | null)?.before_pricing ?? null
+}
+
 /**
  * GET /api/quotes/[quoteId]
  * Get a single quote with all details including amendments and feedback
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ quoteId: string }> }
 ) {
   try {
     const { quoteId } = await params
+    // T-204: the pricing trace page also asks for the price before the first edit (?trace=1)
+    const forTrace = new URL(request.url).searchParams.get('trace') === '1'
     const supabase = await createClient()
     const auth = await getAuthContext(supabase)
     if ('error' in auth) return auth.error
@@ -242,7 +257,13 @@ export async function GET(
         review_hold: ((quote as { review_hold?: string | null }).review_hold ?? null) as 'shown' | 'held' | 'check' | null,
         is_test: (quote as { is_test?: boolean }).is_test === true,
         acceptance_json: ((quote as { acceptance_json?: unknown }).acceptance_json ?? null) as QuoteDetailResponse['quote']['acceptance_json'],
+        // T-204: the final invoice was saved and never sent back, so the card was empty after a reload
+        final_invoice_amount: (quote as { final_invoice_amount?: number | string | null }).final_invoice_amount ?? null,
+        final_invoice_recorded_at: (quote as { final_invoice_recorded_at?: string | null }).final_invoice_recorded_at ?? null,
+        final_invoice_note: (quote as { final_invoice_note?: string | null }).final_invoice_note ?? null,
       },
+      // T-204: the quote's price before its first edit, for the pricing trace only
+      ...(forTrace && { firstPricing: await firstPricingOf(supabase, auth.tenantId, quoteId) }),
       service: quote.service,
       amendments,
       feedback,
@@ -549,6 +570,29 @@ export async function PATCH(
     // Compute changes
     const changes = computeChanges(beforePricing, pricing, beforeContent, body.content_json)
 
+    // T-204: the business's answer to the customer's question. It counts only when the quote is
+    // being sent and a question is in fact pending: an answer to nothing is never emailed. The
+    // newest pending question is the one it answers; its words are quoted back in the email.
+    const typedAnswer = body.sendToCustomer ? cleanAnswerToCustomer(body.answerToCustomer) : ''
+    let answer: { text: string; question: string | null } | null = null
+    if (typedAnswer) {
+      const { data: pendingQuestions } = await supabase
+        .from('quote_feedback')
+        .select('id, feedback_text')
+        .eq('quote_id', quoteId)
+        .eq('tenant_id', auth.tenantId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+      const asked = (pendingQuestions as Array<{ id: string; feedback_text: string | null }> | null)?.[0]
+      if (asked) {
+        answer = { text: typedAnswer, question: asked.feedback_text }
+        // No column holds it (no migration): it is one more entry in this amendment's list of
+        // changes. The learning analysis reads only `pricing` and `content` entries, so it skips it.
+        changes.push({ field: ANSWER_CHANGE_FIELD, path: asked.id, before: asked.feedback_text, after: typedAnswer, type: 'added' })
+      }
+    }
+
     const newVersion = currentVersion + 1
     const now = new Date().toISOString()
 
@@ -565,6 +609,10 @@ export async function PATCH(
       last_amended_at: now,
       last_amended_by: auth.userId,
       status: newStatus,
+      // T-204: a PDF made before this edit shows the old lines, total and wording. Cleared, so the
+      // next download (the business's or the customer's) makes one from what was just saved.
+      // (Adding or removing a service already did this; a plain edit never had.)
+      pdf_asset_id: null,
     }
 
     if (body.business_notes !== undefined) {
@@ -677,6 +725,9 @@ export async function PATCH(
           sectionsHtml: sectionsEmailHtml(pricing, service.name, locale),
           primaryColor: tenant.branding_json?.primaryColor,
           brand: await customerEmailBrand(supabase, auth.tenantId, tenant.branding_json),
+          // T-204: editing then sending is the business's review; and its answer, if it gave one
+          state: 'confirmed',
+          answer,
         }),
         tag: 'quote-approved',
         replyTo,
@@ -695,6 +746,8 @@ export async function PATCH(
         sectionsHtml: sectionsEmailHtml(pricing, service.name, resolveRegionContext(tenant).locale),
         primaryColor: branding.primaryColor,
         brand: await customerEmailBrand(supabase, auth.tenantId, tenant.branding_json),
+        // T-204: "<Business>'s answer to your question", above the price
+        answer,
       })
 
       const emailResult = await sendEmail({

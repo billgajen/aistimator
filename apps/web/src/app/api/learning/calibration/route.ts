@@ -60,14 +60,15 @@ export async function GET() {
         .eq('active', true),
       supabase
         .from('quotes')
-        .select('service_id, status, pricing_json, created_at')
+        // T-204: tests are told apart and "sent" is read the way every Analytics figure reads it
+        .select('service_id, status, pricing_json, created_at, is_test, sent_at')
         .eq('tenant_id', profile.tenant_id)
         .gte('created_at', sinceIso)
         .order('created_at', { ascending: false })
         .limit(MAX_QUOTES),
       supabase
         .from('quote_amendments')
-        .select('before_pricing, after_pricing, created_at, quotes!quote_id ( service_id )')
+        .select('quote_id, before_pricing, after_pricing, created_at, quotes!quote_id ( service_id, is_test )')
         .eq('tenant_id', profile.tenant_id)
         .gte('created_at', sinceIso)
         .order('created_at', { ascending: false })
@@ -82,6 +83,8 @@ export async function GET() {
       serviceId: q.service_id,
       status: q.status,
       total: (q.pricing_json as QuotePricing | null)?.total ?? 0,
+      isTest: (q as { is_test?: boolean | null }).is_test === true,
+      sentAt: (q as { sent_at?: string | null }).sent_at ?? null,
     }))
 
     const amendmentInputs: CalibrationAmendmentInput[] = (amendments || [])
@@ -91,6 +94,10 @@ export async function GET() {
           serviceId: (quoteRef as { service_id?: string } | null)?.service_id ?? '',
           beforeTotal: (a.before_pricing as QuotePricing | null)?.total ?? 0,
           afterTotal: (a.after_pricing as QuotePricing | null)?.total ?? 0,
+          // T-204: a quote edited twice is one quote, and an edit to a test is in no figure
+          quoteId: (a as { quote_id?: string }).quote_id,
+          createdAt: a.created_at as string,
+          isTest: (quoteRef as { is_test?: boolean | null } | null)?.is_test === true,
         }
       })
       .filter((a) => a.serviceId !== '')

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { AmountSymbol, amountBoxPadding } from '@/components/services/AmountSymbol'
 import { linesNeverCharged } from '@/lib/service-questions'
+import { linkWordsOf, optionalNumberQuestions } from '@qolumns/shared'
 import { SCAN_FILL_CHOICES, stepScanMeasure, stepTakesScan, withStepScanMeasure, type WorkStepConfig, type ExpectedSignalConfig, type SuggestedField, type ScanMeasure, type UnitSystem } from '@qolumns/shared'
 
 /**
@@ -113,9 +114,20 @@ function getMultiplyByValue(step: WorkStepConfig): string {
       return `fixed:${step.quantitySource.value || 1}`
     case 'ai_signal':
       return `ai:${step.quantitySource.signalKey || ''}`
+    case 'derived': {
+      // T-204: "each additional …" is the answer minus 1; any other formula is shown as it is
+      const extra = eachAdditionalField(step)
+      return extra ? `extra:${extra}` : step.quantitySource.formula ? 'formula' : ''
+    }
     default:
       return ''
   }
+}
+
+/** T-204: the question a line counts "minus one" of (formula `max(0, question - 1)`), or null */
+function eachAdditionalField(step: WorkStepConfig): string | null {
+  if (step.quantitySource?.type !== 'derived' || !step.quantitySource.formula) return null
+  return /^\s*max\(\s*0\s*,\s*([A-Za-z_][A-Za-z0-9_]*)\s*-\s*1\s*\)\s*$/.exec(step.quantitySource.formula)?.[1] ?? null
 }
 
 export function WorkStepEditor({
@@ -149,6 +161,9 @@ export function WorkStepEditor({
     () => suggestedFields.filter(f => f.type === 'number'),
     [suggestedFields]
   )
+
+  // T-204: the optional number questions; one left empty counts as 0, never 1
+  const optionalNumbers = useMemo(() => optionalNumberQuestions(suggestedFields, workSteps), [suggestedFields, workSteps])
 
   // Update auto-link suggestions when step names change
   useEffect(() => {
@@ -211,9 +226,19 @@ export function WorkStepEditor({
     const rest = parts[1] || ''
 
     switch (type) {
+      case 'formula':
+        // the line's own formula stays as it is
+        break
+      case 'extra':
+        // T-204: "each additional": the answer minus 1, never below 0
+        updateStep(stepId, {
+          quantitySource: { type: 'derived', formula: `max(0, ${rest} - 1)` },
+        })
+        break
       case 'field':
         updateStep(stepId, {
-          quantitySource: { type: 'form_field', fieldId: rest },
+          // T-204: an optional number left empty counts as 0, never 1
+          quantitySource: { type: 'form_field', fieldId: rest, ...(optionalNumbers.has(rest) && { missingMeansZero: true }) },
         })
         break
       case 'fixed':
@@ -234,7 +259,7 @@ export function WorkStepEditor({
    */
   const acceptAutoLink = (stepId: string, question: SuggestedField) => {
     updateStep(stepId, {
-      quantitySource: { type: 'form_field', fieldId: question.fieldId },
+      quantitySource: { type: 'form_field', fieldId: question.fieldId, ...(optionalNumbers.has(question.fieldId) && { missingMeansZero: true }) },
     })
     setAutoLinkSuggestions(prev => ({ ...prev, [stepId]: null }))
   }
@@ -322,6 +347,9 @@ export function WorkStepEditor({
                               <span className="text-secondary">{step.quantitySource.value}</span>
                             ) : step.quantitySource?.type === 'ai_signal' ? (
                               <span className="text-tertiary">AI (legacy)</span>
+                            ) : step.quantitySource?.type === 'derived' && step.quantitySource.formula ? (
+                              // T-204: a formula is a link too ("each additional …" is the answer minus 1)
+                              <span className="text-primary">{(linkWordsOf(step, suggestedFields).quantity ?? '').replace(/^Quantity:? ?/, '')}</span>
                             ) : (
                               <span className="text-danger">needs link</span>
                             )}
@@ -341,7 +369,12 @@ export function WorkStepEditor({
                             )}
                           </>
                         )}
-                        {step.optional && <span className="text-text-muted"> (optional)</span>}
+                        {step.when?.fieldId ? (
+                          // T-204: the answer that decides this line, in words
+                          <span className="text-primary" data-testid="step-when-summary"> · {linkWordsOf(step, suggestedFields).condition}</span>
+                        ) : (
+                          step.optional && <span className="text-text-muted"> (optional)</span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -561,6 +594,22 @@ export function WorkStepEditor({
                               </optgroup>
                             )}
 
+                            {/* T-204: "each additional …": the answer minus 1, never below 0 */}
+                            {numberQuestions.length > 0 && (
+                              <optgroup label="Each additional (the answer minus 1)">
+                                {numberQuestions.map((field) => (
+                                  <option key={field.fieldId} value={`extra:${field.fieldId}`}>
+                                    {field.label}, minus 1
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {step.quantitySource?.type === 'derived' && !eachAdditionalField(step) && (
+                              <optgroup label="Worked out from the answers">
+                                <option value="formula">{step.quantitySource.formula}</option>
+                              </optgroup>
+                            )}
+
                             {/* Fixed Quantities */}
                             <optgroup label="Fixed Quantity">
                               <option value="fixed:1">Always 1</option>
@@ -585,6 +634,11 @@ export function WorkStepEditor({
                           {!step.quantitySource && (
                             <p className="mt-1 text-xs text-tertiary">
                               Required: Select what determines the quantity
+                            </p>
+                          )}
+                          {step.quantitySource?.type === 'form_field' && step.quantitySource.fieldId && (step.quantitySource.missingMeansZero || optionalNumbers.has(step.quantitySource.fieldId)) && (
+                            <p className="mt-1 text-xs text-text-muted" data-testid="step-empty-zero">
+                              This question is optional: left empty, it counts as 0 and the line is not charged.
                             </p>
                           )}
 
@@ -648,9 +702,10 @@ export function WorkStepEditor({
                       <label className="flex items-center gap-2">
                         <input
                           type="checkbox"
-                          checked={step.optional}
+                          checked={step.optional || Boolean(step.when?.fieldId)}
                           onChange={(e) =>
-                            updateStep(step.id, { optional: e.target.checked })
+                            // T-204: unticking also drops a condition on a customer's answer
+                            updateStep(step.id, e.target.checked ? { optional: true } : { optional: false, when: undefined })
                           }
                           className="h-4 w-4 rounded-sm border-border text-primary"
                         />
@@ -658,8 +713,87 @@ export function WorkStepEditor({
                       </label>
                     </div>
 
+                    {/* T-204: a condition on a customer's answer (what "Describe your pricing" writes for
+                        "add … if …"). It was not shown here, so such a line looked as if nothing decided it. */}
+                    {step.when?.fieldId && (
+                      <div className="rounded-xl bg-background p-3" data-testid="step-when">
+                        <p className="mb-2 text-sm font-medium text-text-secondary">Only include when</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="mb-1 block text-xs text-text-secondary">Question</label>
+                            <select
+                              value={step.when.fieldId}
+                              onChange={(e) => {
+                                const field = suggestedFields.find((f) => f.fieldId === e.target.value)
+                                if (!field) return
+                                updateStep(step.id, { when: { fieldId: field.fieldId, operator: 'equals', equals: field.type === 'boolean' ? true : field.options?.[0] ?? '' } })
+                              }}
+                              className="w-full rounded-xl border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
+                              data-testid="step-when-question"
+                            >
+                              {!suggestedFields.some((f) => f.fieldId === step.when!.fieldId) && <option value={step.when.fieldId}>(a question this service no longer has)</option>}
+                              {suggestedFields
+                                .filter((f) => f.type !== 'text' && f.type !== 'textarea')
+                                .map((field) => (
+                                  <option key={field.fieldId} value={field.fieldId}>
+                                    {field.label}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs text-text-secondary">Answer</label>
+                            {(() => {
+                              const field = suggestedFields.find((f) => f.fieldId === step.when!.fieldId)
+                              const wanted = step.when!.equals ?? step.when!.value
+                              const box = 'w-full rounded-xl border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2'
+                              if (field?.type === 'boolean') {
+                                return (
+                                  <select value={wanted === false || wanted === 'false' ? 'no' : 'yes'} onChange={(e) => updateStep(step.id, { when: { ...step.when!, operator: 'equals', equals: e.target.value === 'yes', value: undefined } })} className={box} data-testid="step-when-answer">
+                                    <option value="yes">Yes</option>
+                                    <option value="no">No</option>
+                                  </select>
+                                )
+                              }
+                              if (field?.options?.length) {
+                                const known = field.options.some((o) => o.toLowerCase() === String(wanted ?? '').toLowerCase())
+                                return (
+                                  <select value={known ? field.options.find((o) => o.toLowerCase() === String(wanted ?? '').toLowerCase()) : String(wanted ?? '')} onChange={(e) => updateStep(step.id, { when: { ...step.when!, equals: e.target.value, value: undefined } })} className={box} data-testid="step-when-answer">
+                                    {!known && <option value={String(wanted ?? '')}>{String(wanted ?? '')} (not one of the answers)</option>}
+                                    {field.options.map((option) => (
+                                      <option key={option} value={option}>
+                                        {option}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )
+                              }
+                              return (
+                                <div className="flex gap-2">
+                                  <select
+                                    value={step.when!.operator || 'equals'}
+                                    onChange={(e) => updateStep(step.id, { when: { ...step.when!, operator: e.target.value as 'equals' | 'contains' | 'gt' | 'lt' | 'gte' | 'lte' } })}
+                                    className="rounded-xl border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2"
+                                    aria-label="How the answer is compared"
+                                  >
+                                    <option value="equals">is</option>
+                                    <option value="gt">is more than</option>
+                                    <option value="gte">is at least</option>
+                                    <option value="lt">is less than</option>
+                                    <option value="lte">is at most</option>
+                                  </select>
+                                  <input type="text" value={String(wanted ?? '')} onChange={(e) => updateStep(step.id, { when: { ...step.when!, equals: e.target.value, value: undefined } })} className={box} data-testid="step-when-answer" />
+                                </div>
+                              )
+                            })()}
+                          </div>
+                        </div>
+                        <p className="mt-2 text-xs text-text-muted">This line is charged only when the customer gives that answer.</p>
+                      </div>
+                    )}
+
                     {/* Optional Step Trigger */}
-                    {step.optional && (
+                    {step.optional && !step.when?.fieldId && (
                       <div className="rounded-xl bg-background p-3">
                         <p className="mb-2 text-sm font-medium text-text-secondary">
                           When to include this item

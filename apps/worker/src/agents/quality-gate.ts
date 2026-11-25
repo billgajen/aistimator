@@ -45,7 +45,7 @@ export interface QualityGateInput {
    * fallback). askKey is the fieldId/identifier the clarify round should fill
    * (answers merge back as form answers via targetSignalKey).
    */
-  defaultedQuantitySteps?: Array<{ askKey: string; stepName: string }>
+  defaultedQuantitySteps?: Array<{ askKey: string; stepName: string; /** T-204: the line is left out (counted as 0), not priced at a placeholder of 1 */ leftOut?: boolean }>
   /**
    * T-139 (AD-029): questions about identified equipment, built by code
    * (one-tap confirmation of a label reading, or where to find the value).
@@ -62,6 +62,12 @@ export interface QualityGateInput {
     fieldId?: string
     /** T-188: what the evidence points to, in the wording layer's words; a number is read out of it for a choice */
     suggested?: string
+    /**
+     * T-204: the doubt as one short question to the customer, written by the wording layer in plain
+     * words ("You mentioned…, but picked…. How many…?"). Used only for a customer, and only when it
+     * passes `plainCustomerQuestion`; otherwise the question is built in code.
+     */
+    customerQuestion?: string
   }
   /**
    * T-188: who answers the questions. A quote the business made itself asks the business (T-186); every
@@ -83,6 +89,77 @@ export interface QualityGateInput {
    * missing its primary work and must not auto-send.
    */
   zeroCostSteps?: string[]
+}
+
+/**
+ * T-204: a question a customer is asked is plain and short, and speaks to them.
+ *
+ * The live test showed one that read like a report about the customer ("The
+ * project description specifies…, but the form answer selects…. Which is
+ * right?"). A model is now asked for the plain version, and this is the check
+ * in code that what it wrote is one: a question, short, and with none of the
+ * words a report uses about the person reading it. A text that fails is not
+ * repaired: the caller falls back to a question built from the business's own
+ * question label (below), so a customer never reads the report.
+ *
+ * Nothing here knows a trade or a business: the patterns are about how the
+ * sentence talks, never about what the job is.
+ */
+export const CUSTOMER_QUESTION_MAX_CHARS = 220
+
+const REPORT_STYLE: readonly RegExp[] = [
+  // the customer, their note or their form, spoken about instead of spoken to
+  /\bthe\s+(?:customer|client|user|requester)(?:'s|’s)?\b/i,
+  /\bthe\s+(?:project|job|customer|request)\s+(?:description|details|notes?)\b/i,
+  /\bthe\s+(?:description|form|submission|request)\s+(?:says|said|states?|stated|mentions?|mentioned|specif\w+|indicat\w+|select\w+|shows?|lists?|gives?)\b/i,
+  /\bform\s+(?:answers?|field|input|response)s?\b/i,
+  /\b(?:specif(?:y|ies|ied)|indicat(?:e|es|ed))\b/i,
+  // our own vocabulary
+  /\b(?:signal|signals|field\s*id|low confidence|confidence)\b/i,
+  // a key printed as it is stored (room_count)
+  /\b[a-z]+_[a-z_]+\b/,
+]
+
+/** The text as a customer may be asked it, or null when it is not a plain, short question */
+export function plainCustomerQuestion(text: string | null | undefined): string | null {
+  const question = (text ?? '').replace(/\s+/g, ' ').trim()
+  if (!question || question.length > CUSTOMER_QUESTION_MAX_CHARS) return null
+  if (!question.endsWith('?')) return null
+  if (REPORT_STYLE.some((pattern) => pattern.test(question))) return null
+  return question
+}
+
+/** A business's own question, as a question: its label, with a question mark when it has none */
+function labelAsQuestion(label: string): string {
+  const text = label.replace(/\s+/g, ' ').trim().replace(/[:.]+$/, '')
+  return text.endsWith('?') ? text : `${text}?`
+}
+
+const said = (value: unknown): string => {
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (Array.isArray(value)) return value.map((v) => String(v)).join(', ')
+  return String(value ?? '').trim()
+}
+
+/**
+ * The doubt about one of the customer's own answers, asked in code: what they
+ * answered, to which of the business's questions, and whether it is right.
+ * Null when the answer or the question's label is not known.
+ */
+export function doubtQuestionFromLabel(fieldId: string | undefined, context: Pick<ChoiceContext, 'fields' | 'answers'>): string | null {
+  if (!fieldId) return null
+  const label = context.fields.find((f) => f.fieldId === fieldId)?.label?.trim()
+  const answer = said(context.answers.find((a) => a.fieldId === fieldId)?.value)
+  if (!label || !answer || answer.length > 60) return null
+  return `You answered “${answer}” to “${labelAsQuestion(label)}” Is that right?`
+}
+
+/** A question about something nobody gave, when no model wrote one: the business's own question, else the key's words */
+function missingQuestionFromLabel(key: string, serviceName: string, audience: Audience, fields: ChoiceContext['fields']): string {
+  const label = fields.find((f) => f.fieldId === key)?.label?.trim()
+  if (label) return labelAsQuestion(label)
+  const words = key.replace(/_/g, ' ').trim()
+  return audience === 'business' ? `What is "${words}" for this ${serviceName} job?` : `What is the ${words} for this job?`
 }
 
 /** Schema for AI-generated clarification questions */
@@ -166,7 +243,9 @@ export async function evaluateQualityGate(
     .filter((d) => !missing.some((m) => m.key === d.askKey))
     .map((d) => ({
       key: d.askKey,
-      reason: `The quantity for "${d.stepName}" was not provided — the line is currently priced at a single-unit placeholder; ask the customer for the actual value`,
+      reason: d.leftOut
+        ? `The quantity for "${d.stepName}" was not provided — the line is left out of the price for now; ask the customer for the actual value`
+        : `The quantity for "${d.stepName}" was not provided — the line is currently priced at a single-unit placeholder; ask the customer for the actual value`,
     }))
   // R3-1: stated-but-doubted quantities — the concern is a plain sentence of its own, so it is asked
   // directly (the confirm-template would absurdly ask someone to confirm the number they themselves typed).
@@ -183,6 +262,7 @@ export async function evaluateQualityGate(
         reason: input.quantityConcern.reason,
         direct: true,
         built: concernAnswer,
+        customerQuestion: input.quantityConcern.customerQuestion,
       }]
     : []
   // T-139: identification questions arrive ready-made (deterministic)
@@ -255,14 +335,19 @@ function checkForCriticalIssues(input: QualityGateInput): string | null {
   // The old check required breakdown.length > 0 — but the worst failure mode
   // (every configured step failed to bind) produces an EMPTY breakdown, which
   // is exactly when the guard is needed (S09 sent a £0 piano-move quote).
-  if (pricing.total <= 0) {
+  // T-204: not when the price is only missing a number the customer is about to be asked for. An
+  // optional number question left empty counts as 0 (it used to be a placeholder of 1, which kept
+  // the total above £0 and let the question be asked). The question is asked first; after the
+  // answer the processor's own send-guard still holds a quote that comes to nothing.
+  const askedFirst = (input.defaultedQuantitySteps ?? []).some((d) => d.leftOut)
+  if (pricing.total <= 0 && !askedFirst) {
     return 'Pricing calculated to £0 or below — nothing could be priced from the configuration; needs review'
   }
 
   // T-126 send-guard: config defines work steps but none applied — the quote
   // is priced from base fee/addons/minimum only, which for a step-priced
   // service means the request's actual work went unpriced.
-  if ((input.workStepsConfigured ?? 0) > 0 && (input.workStepLinesPriced ?? 0) === 0) {
+  if ((input.workStepsConfigured ?? 0) > 0 && (input.workStepLinesPriced ?? 0) === 0 && !askedFirst) {
     return `None of the ${input.workStepsConfigured} configured work steps applied to this request — conditional charges may have failed to bind; needs review`
   }
 
@@ -354,10 +439,21 @@ async function generateClarificationQuestions(
     // the choices answer ("Keep <the line>?", "Which is right?"), never an open "What should we allow for?"
     if ((s as { direct?: boolean }).direct) {
       const built = (s as unknown as { built: BuiltAnswer }).built
+      // The doubt, then what the choices answer. T-204: a customer is asked it in plain words spoken
+      // to them. In order: the wording layer's own short question, when it is one; the observation
+      // followed by the choices' question, as before, when the observation does not read like a
+      // report; else a question built from the business's own label and the answer that was given.
+      const observed = `${s.reason.replace(/\s+$/, '')} ${built.ask}`
+      const forCustomer =
+        who.audience === 'customer'
+          ? plainCustomerQuestion((s as { customerQuestion?: string }).customerQuestion) ??
+            plainCustomerQuestion(observed) ??
+            doubtQuestionFromLabel(s.key, who.context)
+          : null
       confirmQuestions.push({
         id: `cq_${Date.now()}_d${confirmQuestions.length}`,
         targetSignalKey: s.key,
-        question: `${s.reason.replace(/\s+$/, '')} ${built.ask}`,
+        question: forCustomer ?? observed,
         ...(built.choices.length > 0 && { choices: built.choices }),
         ...(built.closed && { closed: true }),
         ...(built.answerKind && { answerKind: built.answerKind }),
@@ -387,7 +483,7 @@ async function generateClarificationQuestions(
 
   // T-188: a question about something nobody gave is answered with the options of the field it fills, or
   // with a number. A model's own suggested options are not used: they are not the business's.
-  const textQuestions = (await generateTextQuestions(needsAiQuestion, serviceName, gemini, who.audience)).map((asked) => {
+  const textQuestions = (await generateTextQuestions(needsAiQuestion, serviceName, gemini, who.audience, who.context.fields)).map((asked) => {
     const answer = missingChoices(asked.targetSignalKey, who.context, who.quantityKeys.has(asked.targetSignalKey))
     return {
       ...asked,
@@ -407,7 +503,8 @@ async function generateTextQuestions(
   signalsToAsk: Array<{ key: string; reason: string }>,
   serviceName: string,
   gemini: AiClient | null,
-  audience: Audience = 'customer'
+  audience: Audience = 'customer',
+  fields: ChoiceContext['fields'] = []
 ): Promise<ClarificationQuestion[]> {
   if (signalsToAsk.length === 0) return []
 
@@ -427,17 +524,18 @@ async function generateTextQuestions(
       const reader =
         audience === 'business'
           ? 'Speak to the business about the job ("How many…", "What is the…"). Never say "your quote", "your request" or "your photos", and never thank them'
-          : 'Questions should be simple and easy for a non-technical customer to answer'
-      const prompt = `Generate ${signalsToAsk.length} clear, friendly question(s) ${asked}.
+          : 'Speak to the customer as "you", in plain everyday words a person with no trade knowledge understands. When the note below says what they told us, say it back first ("You mentioned…", "You picked…"), then ask. Never write like a report about them: no "the customer", "the project description", "the form", "specifies" or "indicates", and never print a name with an underscore in it'
+      // T-204: short and plain. The notes below are ours (why the value is needed); they are never repeated to the reader.
+      const prompt = `Write ${signalsToAsk.length} short question(s) ${asked}.
 
-These signals need clarification:
+What is needed, and why (these notes are for you, not for the reader):
 ${signalDescriptions}
 
 Rules:
 1. ${reader}
 2. Do not offer answer options: the answers to choose from are added separately
-3. Each question should target exactly one signal
-4. Keep questions concise (1-2 sentences max)
+3. Each question asks for exactly one of the values above; set its targetSignalKey to that value's key, exactly as written in quotes
+4. At most 30 words each, ending with a question mark. No greeting, no thanks, no explanation of why it is asked
 
 Return a JSON object with a "questions" array.`
 
@@ -452,7 +550,12 @@ Return a JSON object with a "questions" array.`
       return result.questions.map((q, i) => ({
         id: `cq_${Date.now()}_${i}`,
         targetSignalKey: q.targetSignalKey,
-        question: q.question,
+        // T-204: a customer never reads a question that is not plain and short; the business's own
+        // question (its label) is asked in its place
+        question:
+          audience === 'customer'
+            ? plainCustomerQuestion(q.question) ?? missingQuestionFromLabel(q.targetSignalKey, serviceName, audience, fields)
+            : q.question,
       }))
     } catch (error) {
       console.error('[QualityGate] AI question generation failed:', error)
@@ -463,9 +566,7 @@ Return a JSON object with a "questions" array.`
   return signalsToAsk.map((s, i) => ({
     id: `cq_${Date.now()}_${i}`,
     targetSignalKey: s.key,
-    question:
-      audience === 'business'
-        ? `What is "${s.key.replace(/_/g, ' ')}" for this ${serviceName} job?`
-        : `Could you provide more details about "${s.key.replace(/_/g, ' ')}" for your ${serviceName} quote?`,
+    // T-204: the business's own question when there is one for this value; never "Could you provide more details about…"
+    question: missingQuestionFromLabel(s.key, serviceName, audience, fields),
   }))
 }

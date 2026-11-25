@@ -143,11 +143,14 @@ describe('T-189 item 1: the sample price', () => {
   })
 
   it('the page uses that one module, offers a size to try, and no longer says "AI signal"', () => {
-    const page = code('app/(dashboard)/app/services/page.tsx')
-    expect(page).toContain('setSimulatorResult(samplePrice(sampleService, simulatorValues, currencySymbol))')
+    // T-204: the test price moved to its own component and is worked out by the worker's pipeline;
+    // the sample size of a measured line and the sentence under the total are still this module's
+    const page = code('components/services/PricingTest.tsx')
+    expect(code('app/(dashboard)/app/services/page.tsx')).toContain('<PricingTest')
+    expect(page).toContain("import { measuredLines, sampleNote } from '@/lib/sample-price'")
     expect(page).toContain('measured.map((line) => (')
     expect(page).toContain("placeholder={line.suggested !== null ? String(line.suggested) : 'Size to try'}")
-    expect(page).toContain('{sampleNote(simulatorResult)}')
+    expect(page).toContain('sampleNote({ unmeasured: price.unmeasured.map((line) => line.name), sampled: sampledWords })')
     expect(page).not.toMatch(/uses AI signal|AI signals default to 1/)
     // no dollar sign typed into the preview: the business's own currency
     expect(page).not.toMatch(/\$\$\{|>\$\{(item|simulatorResult)/)

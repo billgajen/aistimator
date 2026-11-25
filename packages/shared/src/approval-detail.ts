@@ -19,6 +19,7 @@
  * detail is read here.
  */
 
+import { PHOTOS_UNREAD_NOTE, photosUnreadOf, photosUnreadSentence } from './photos-unread'
 import { checkerFindings } from './checker'
 import { formatMoney } from './format'
 import { minimumChargeNote, splitMinimum, type AppliedMinimum } from './minimum-charge'
@@ -36,7 +37,7 @@ import { isMadeByBusiness } from './quote-turn'
 import { serviceSuggestionOf, suggestedServiceReason } from './service-suggestion'
 
 export interface ApprovalWarning {
-  kind: 'service' | 'also_asked' | 'check'
+  kind: 'photos' | 'service' | 'also_asked' | 'check'
   title: string
   /** One or more plain sentences */
   lines: string[]
@@ -212,6 +213,9 @@ export function approvalDetail(input: ApprovalDetailInput): ApprovalDetail {
 
   // ---- Warnings, in the order the business should read them -----------------
   const warnings: ApprovalWarning[] = []
+  // T-204: first, because it is about the price itself: the photos could not be read
+  const unread = photosUnreadOf(content)
+  if (unread) warnings.push({ kind: 'photos', title: PHOTOS_UNREAD_NOTE, lines: [photosUnreadSentence(unread)] })
   const suggestion = serviceSuggestionOf(input.requestSource)
   if (suggestion) {
     warnings.push({

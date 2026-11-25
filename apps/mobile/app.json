@@ -11,7 +11,8 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Take photos of the job so it can be priced, and scan a room to measure it.",
-        "NSPhotoLibraryUsageDescription": "Choose photos of the job so it can be priced."
+        "NSPhotoLibraryUsageDescription": "Choose photos of the job so it can be priced.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

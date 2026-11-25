@@ -55,6 +55,7 @@ function providerClient(task: AiTask, route: ModelRoute, env: AiEnv, meter: AiUs
       model: route.model,
       maxTokens: options.maxTokens,
       usage,
+      effort: thinkingFor(task, route.model, env),
       ...(options.overflow && { maxRetries: 0, timeoutMs: OVERFLOW_TIMEOUT_MS }),
       ...(dev && env.AI_ANTHROPIC_BASE_URL && { baseUrl: env.AI_ANTHROPIC_BASE_URL }),
     })

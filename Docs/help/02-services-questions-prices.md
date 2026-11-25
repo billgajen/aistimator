@@ -57,9 +57,18 @@ Yes. On "Pricing Setup", the box "Describe your pricing" turns your own words, o
 1. Press "Edit" beside the service and go to "Pricing Setup".
 2. Under "Describe your pricing", write how you charge, with your amounts and rates.
 3. Press "Compile Pricing".
-4. Read "Here's what your pricing will do:". If it shows "A few things weren't clear", add the answers to your description and press "Compile Pricing" again.
-5. Press "Apply This Pricing" to use it, or "Discard" to drop it.
-6. Go to "Test & Publish" and press "Save Changes".
+4. Wait while it works: it shows "Reading your prices…", "Making questions…" and "Checking…", and usually takes about half a minute.
+5. Read "Here's what your pricing will do:". If it shows "A few things weren't clear", add the answers to your description and press "Compile Pricing" again.
+6. Press "Apply This Pricing" to use it, or "Discard" to drop it.
+7. Go to "Test & Publish", test it, and press "Save Changes".
+
+When you write that a price depends on something, the result links the line to the question it made for it, and the review says so in words:
+
+- "Add so much if the unit is in an attic" becomes a line that reads "Only include when", then the question and the answer.
+- "So much for the first system and so much for each additional one" becomes a line whose quantity is the customer's count minus 1, never below 0.
+- "So much per pound, only if needed" becomes a line whose quantity is an optional question. If the customer leaves it empty it counts as 0, never 1.
+
+If something is left loose, the review shows "Worth a look before you apply". It lists any question that changes no price line ("This question does not change the price") and any line whose name says "if", "only", "per", "each additional" or "weekend" but which nothing decides, so it would be charged on every quote. You can still apply and save. The same list stays on "Test & Publish" until you link the line, or remove the question, on "Pricing Setup".
 
 To change prices later, open "Your current pricing in plain English" in the same box and describe only the change. Anything you do not mention stays as it is. You can still change every amount by hand in the boxes below, under "Or fine-tune manually".
 
@@ -123,12 +132,13 @@ Use the arrows to change the order of the lines and the bin to remove one. A lin
 A "Per Unit" or "Per Hour" line gets its quantity from what you choose under "Multiply by".
 
 - From an answer: choose a question under "Customer Questions". Only "Number" questions are listed. The number the customer types is the quantity.
+- Each additional one: choose a question under "Each additional (the answer minus 1)". The quantity is the customer's number minus 1, and never below 0. Use it for "so much for the first, so much for each additional".
 - A set quantity: choose "Always 1" to "Always 5" under "Fixed Quantity".
 - From the customer's photos: {{product}} measures the size or the count from the photos. These lines come with a template, or from "Describe your pricing" when its review says "quantity estimated by AI from photos". In "Price Breakdown" a "Per Unit" line like this shows "AI (legacy)" in place of a question's name.
 
 When a line has no quantity yet and its name matches a "Number" question, the line offers to link them. Press "Yes, link it".
 
-If the customer can skip the question, there is no number to multiply by, so tick "Required" on it. A line that comes to nothing, for example a quantity of 0, is left off the estimate.
+If the customer can skip the question and leaves it empty, it counts as 0 and the line is left off the estimate. The line says so: "This question is optional: left empty, it counts as 0 and the line is not charged." Tick "Required" on the question if every customer must give a number. A line that comes to nothing, for example a quantity of 0, is left off the estimate.
 
 A line that uses a question or the photos also shows "When you scan on site, fill this from:". {{#soon app}}The phone app is {{soon}}.{{/soon}} {{#soon roomScan}}Its room scan is {{soon}} too, so today this setting changes nothing. Leave it on "Nothing (type it in)".{{/soon}}{{#live roomScan}}It is only for quotes you make in the phone app with a room scan: the scan fills in this quantity, and a number you type on site is used instead. Your customers' website form does not change.{{/live}}
 
@@ -144,6 +154,8 @@ To charge a line only on some jobs:
 3. Choose the "Condition": "Has any value", "Equals", "Greater than", "At least", "Less than" or "At most". Type the "Value" where it asks for one.
 
 Always choose a "Question". A "Fixed Amount" line that is ticked with no question could never be charged, so it cannot be saved: the line shows "Needs a question", and "Test & Publish" lists it under "Fix Before Publishing" until you choose a question or untick the box.
+
+A line made by "Describe your pricing" from words like "add so much if…" shows its condition as "Only include when", with a "Question" and an "Answer" you can change. It is charged only when the customer gives that answer. Untick "Only include when condition is met" to charge it on every quote.
 
 To raise or lower the whole price by a percentage:
 
@@ -173,7 +185,7 @@ An add-on is left off when its name matches something under "What's Typically Ex
 They are on the "Scope & Photos" step. They tell the customer what the job covers and how many photos to send.
 
 - "What's Typically Included", "What's Typically Excluded" and "Standard Assumptions": type an item and press Enter. Press the × on an item to remove it. {{product}} uses these lists when it writes the estimate: what the job covers, what you have assumed, and the "Not included" list. They do not change your price lines.
-- "Minimum Photos Required": the form will not accept a request with fewer photos. Set it to 0 to make photos optional.
+- "Photos required": how many photos a customer must add before they can send a request, from 0 to 8. Set it to 0 to make photos optional. A template's service starts at the number its template sets (1 for most); it stays there until you change it.
 - "Maximum Photos Allowed": the most photos a customer can add.
 - "Photo Guidance for Customers": your words on what to photograph.
 
@@ -186,15 +198,18 @@ On a service marked "AI Draft" this step also has two links.
 ## How do I test a service's prices?
 <!-- id: services-test; page: /app/services -->
 
-Use the last step, "Test & Publish". It works out a sample price on the screen from the prices in the window, saved or not. It sends nothing and it is not a real estimate.
+Use the last step, "Test & Publish". It works out the price a customer would get for the answers you type, from the prices in the window, saved or not. It is worked out the same way as a real request. It sends nothing, makes no estimate and counts nothing on your plan.
 
 1. Press "Edit" beside the service and press "Next" until "Test & Publish".
-2. Under "Sample Values", fill in answers as a customer might. There is a box for each "Number", "Dropdown", "Radio Buttons" and "Yes/No Toggle" question.
-3. A line that is measured from the customer's photos has its own box. Type a size to try, or leave it empty to use the sample size shown under it.
+2. Under "The customer's answers", fill in answers as a customer might. There is a box for each "Number", "Dropdown", "Radio Buttons", "Checkboxes" and "Yes/No Toggle" question. Leave a box empty to try it left empty.
+3. Under "From the customer's photos", pick what to try for anything the photos would give: a detail read from a label, such as a size or a fuel, or a size that is measured. For a measured line, type a size, or leave it empty to use the sample size shown under it.
 4. Press "Calculate Preview".
-5. Read "Preview Breakdown". It shows each line, how it was worked out, and the "Total" (or "Sample total" when a sample size was used).
+5. Read "Preview Breakdown". It shows each line and the "Total" (or "Sample total" when a sample size was used), with your tax when you charge it.
+6. Under "Not charged with these answers" it lists the lines that were left out, each with the answer that decides it. Change an answer and press "Calculate Preview" again to see the line come in.
 
-The preview leaves out add-ons and tax. Under it, "Ready to Publish" means the service can be saved. "Fix Before Publishing" lists what to put right on "Pricing Setup" first. A warning that starts "No pricing configured" means the service has no price lines and no base fee.
+The preview leaves out add-ons, which are added when a customer's own words or photos call for them. If it says "The test price is not available right now", wait a moment and press "Calculate Preview" again.
+
+Under the preview, "Ready to Publish" means the service can be saved. "Fix Before Publishing" lists what to put right on "Pricing Setup" first. "Worth a look before you publish" lists a question that changes no price line and a line whose name says it depends on something while nothing decides it; you can still save. A warning that starts "No pricing configured" means the service has no price lines and no base fee. A warning that starts "Service name includes" means the name promises a repair or a fix and no price line mentions one.
 
 ## What does "Check your prices" mean?
 <!-- id: services-check-prices; page: /app -->
@@ -229,6 +244,7 @@ You approve estimates on the "Quotes" page.
 Press "Disable" to stop offering a service and keep everything about it. Press "Delete" to remove it for good.
 
 - "Disable": the service shows "Inactive", and your website form and quote link stop offering it. It happens at once. Nothing is removed. Press "Enable" to offer it again.
+- You can also switch a service on from inside it: on "Test & Publish", a service that is switched off shows "This service is switched off." with two buttons. "Save Changes" saves it and leaves it off. "Save and switch on" saves it and offers it to customers at once.
 - "Delete": you are asked "Are you sure you want to delete" with the service's name. The service and its prices are removed and cannot be brought back.
 
 A service that already has estimates cannot be deleted. You see "Cannot delete service with existing quotes. Disable it instead." Press "Disable" for that service.

@@ -76,6 +76,6 @@ export function readRepriceInputs(quote: {
     structuredSignals: structuredClone(structuredSignals) as ExtractedSignalsV2,
     legacySignals: structuredClone(snapshot.legacySignals),
     // The customer has answered: a doubt about a stated quantity is resolved
-    content: { ...structuredClone(content), quantityConcern: undefined, quantityConcernFieldId: undefined, quantityConcernSuggestedValue: undefined },
+    content: { ...structuredClone(content), quantityConcern: undefined, quantityConcernFieldId: undefined, quantityConcernSuggestedValue: undefined, quantityConcernQuestion: undefined },
   }
 }

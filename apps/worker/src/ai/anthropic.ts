@@ -8,7 +8,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk'
-import type { ModelRoute } from '@qolumns/shared'
+import type { ModelRoute, ThinkingLevel } from '@qolumns/shared'
 import type { AiClient, GenerationOptions, ImageInput, UsageSink } from './client'
 import { parseModelJson } from './client'
 import { AiProviderError, isBusyAnswer, parseRetryAfter } from './busy'
@@ -84,6 +84,12 @@ export interface AnthropicClientConfig {
   timeoutMs?: number
   /** T-203, local checks only: a stand-in for the provider (factory.ts honours it only in development) */
   baseUrl?: string
+  /**
+   * T-204: how much the model thinks before it answers (`output_config.effort`).
+   * It is the task's `thinkingLevel` from the registry, sent only to a model whose
+   * registry entry lists it; with none, the provider's own default applies.
+   */
+  effort?: ThinkingLevel | null
 }
 
 /** A header from the SDK's error, whichever shape this SDK version gives it */
@@ -100,9 +106,11 @@ export class AnthropicClient implements AiClient {
   private model: string
   private maxTokens: number
   private usage?: UsageSink
+  private effort: ThinkingLevel | null
   readonly route: ModelRoute
 
   constructor(config: AnthropicClientConfig) {
+    this.effort = config.effort ?? null
     this.client = new Anthropic({
       apiKey: config.apiKey,
       ...(config.maxRetries !== undefined && { maxRetries: config.maxRetries }),
@@ -164,8 +172,13 @@ export class AnthropicClient implements AiClient {
       messages: [{ role: 'user', content }],
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
-      ...(schema
-        ? { output_config: { format: { type: 'json_schema', schema: toClaudeJsonSchema(schema) } } }
+      ...(schema || this.effort
+        ? {
+            output_config: {
+              ...(this.effort && { effort: this.effort }),
+              ...(schema && { format: { type: 'json_schema' as const, schema: toClaudeJsonSchema(schema) } }),
+            },
+          }
         : {}),
     }, options?.signal ? { signal: options.signal } : undefined).catch((error: unknown) => {
       // T-203: a busy answer (rate limited or overloaded) is told apart for the busy retry

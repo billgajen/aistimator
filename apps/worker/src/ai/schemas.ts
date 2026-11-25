@@ -198,6 +198,10 @@ export const QUOTE_CONTENT_SCHEMA: Record<string, unknown> = {
       type: 'string',
       description: 'When quantityConcern is set: the value the evidence points to for that answer, written the way the answer is written (a number alone, or the option\'s own words). Empty string when the evidence does not say.',
     },
+    quantityConcernQuestion: {
+      type: 'string',
+      description: 'When quantityConcern is set: the same doubt as ONE short plain question to the customer, spoken to them as "you" (at most 30 words): what they told us that does not fit, then the question whose answer settles it. No answer options. Empty string otherwise.',
+    },
   },
   required: ['scopeSummary', 'assumptions', 'exclusions', 'notes', 'validityDays', 'serviceMismatch', 'quantityConcern'],
 }

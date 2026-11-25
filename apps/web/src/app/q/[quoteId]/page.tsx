@@ -5,6 +5,7 @@ import { Money, SectionLabel } from '@/components/quote/document-parts'
 import { MinimumNote } from '@/components/quote/MinimumNote'
 import { MeasuredOnSite } from '@/components/room-scan/RoomScanCard'
 import { AlsoAskedCards } from '@/components/quote/AlsoAskedCards'
+import { PdfDownloadButton } from '@/components/quote/PdfDownloadButton'
 import type { AddResult, AnswerValue } from '@/components/quote/AlsoAskedCards'
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -12,7 +13,7 @@ import { brandStyleVars } from '@/lib/color'
 import { timingLabel } from '@/lib/acceptance'
 import { TERMS_HEADING } from '@/lib/quote-terms'
 import type { QuoteViewResponse, QuoteStatus } from '@qolumns/shared'
-import { formatMoney, formatDate, isQuoteProcessing, canCustomerDecide, customerDecisionWords, customerEstimateNote, splitLabelMath, PRODUCT_NAME, splitMinimum, withoutMinimumNote, crossServiceLine, SLOW_PREPARING_MS, slowPreparingLine, failedRequestTitle, failedRequestLine, willConfirmLine, addedForCustomer } from '@qolumns/shared'
+import { formatMoney, formatDate, isQuoteProcessing, canCustomerDecide, customerDecisionWords, customerEstimateNote, splitLabelMath, PRODUCT_NAME, splitMinimum, withoutMinimumNote, crossServiceLine, SLOW_PREPARING_MS, slowPreparingLine, failedRequestTitle, failedRequestLine, willConfirmLine, addedForCustomer, startWaitingPoll, preparedForLine } from '@qolumns/shared'
 
 interface QuotePageProps {
   params: { quoteId: string }
@@ -85,7 +86,7 @@ export default function QuotePage({ params }: QuotePageProps) {
   // Poll quietly (poll=1 doesn't count as a view); once the status moves on,
   // load it normally so the real view is recorded.
   const [slowPreparing, setSlowPreparing] = useState(false)
-  // the page has stopped checking (about 10 minutes): the tape stops moving
+  // the page has stopped checking (16 minutes, T-204): the tape stops moving
   const [stoppedChecking, setStoppedChecking] = useState(false)
   const processing = isQuoteProcessing(quote?.status)
   // T-178: after 60 seconds of "Preparing" the customer is told it is slow.
@@ -99,33 +100,29 @@ export default function QuotePage({ params }: QuotePageProps) {
     const timer = setTimeout(() => setSlowPreparing(true), SLOW_PREPARING_MS)
     return () => clearTimeout(timer)
   }, [processing])
+  // T-204: the schedule is the shared one (waiting-poll.ts): every few seconds at first, then less
+  // often, for 16 minutes in all. A request that met a busy AI provider can be put back for up to 15
+  // (T-203), and the page used to stop looking after about 10. What the customer reads is unchanged.
   useEffect(() => {
     if (!processing || !token) return
     let cancelled = false
-    let polls = 0
-    const maxPolls = 150 // ~10 min, then stop checking
-    const interval = setInterval(async () => {
-      polls++
-      if (polls > maxPolls) {
-        clearInterval(interval)
-        if (!cancelled) setStoppedChecking(true)
-        return
-      }
-      try {
+    const stop = startWaitingPoll(
+      async () => {
         const poll = await fetch(`/api/public/quotes/${quoteId}?token=${token}&poll=1`)
-        if (!poll.ok) return
+        if (!poll.ok) return false
         const polled = (await poll.json()) as QuoteViewResponse
-        if (cancelled || isQuoteProcessing(polled.status)) return
-        clearInterval(interval)
+        if (cancelled || isQuoteProcessing(polled.status)) return false
         const full = await fetch(`/api/public/quotes/${quoteId}?token=${token}`)
         if (!cancelled && full.ok) setQuote((await full.json()) as QuoteViewResponse)
-      } catch {
-        // best-effort; the next tick retries
+        return true
+      },
+      () => {
+        if (!cancelled) setStoppedChecking(true)
       }
-    }, 4000)
+    )
     return () => {
       cancelled = true
-      clearInterval(interval)
+      stop()
     }
   }, [processing, quoteId, token])
 
@@ -432,7 +429,6 @@ export default function QuotePage({ params }: QuotePageProps) {
               reference={reference}
               customerName={customer.name}
               validUntil={validUntil}
-              pdfUrl={actions.pdfUrl}
               locale={locale}
             />
 
@@ -500,7 +496,8 @@ export default function QuotePage({ params }: QuotePageProps) {
             reference={reference}
             customerName={customer.name}
             validUntil={validUntil}
-            pdfUrl={actions.pdfUrl}
+            pdf={actions.pdfUrl && token ? { quoteId, token } : null}
+            reviewed={isReviewedQuote}
             version={quoteVersion}
             locale={locale}
           />
@@ -1095,7 +1092,8 @@ function Letterhead({
   reference,
   customerName,
   validUntil,
-  pdfUrl,
+  pdf,
+  reviewed,
   version,
   locale,
 }: {
@@ -1110,7 +1108,10 @@ function Letterhead({
   reference?: string | null
   customerName: string
   validUntil?: string | null
-  pdfUrl?: string | null
+  /** T-204: "Download PDF", given only when the quote's answer offers one (`actions.pdfUrl`) */
+  pdf?: { quoteId: string; token: string } | null
+  /** T-204: the business has approved it, so it is a quote; otherwise an estimate */
+  reviewed?: boolean
   version?: number
   locale: string
 }) {
@@ -1137,22 +1138,11 @@ function Letterhead({
               {contactParts.join(' · ')}
             </p>
           )}
-          <p className="mt-1 text-xs text-text-muted">Estimate prepared for {customerName}</p>
+          {/* T-204: a quote once the business has approved it; an estimate until then (the same two words as the price panel) */}
+          <p className="mt-1 text-xs text-text-muted" data-testid="prepared-for">{preparedForLine(reviewed === true, customerName)}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {pdfUrl && (
-            <a
-              href={pdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-text-secondary bg-surface border border-border rounded-full hover:border-border-strong transition"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              PDF
-            </a>
-          )}
+          {pdf && <PdfDownloadButton quoteId={pdf.quoteId} token={pdf.token} />}
         </div>
       </div>
 

@@ -13,6 +13,8 @@ import { markQuoteFailed } from './failed-quote'
 import { checkBusy, checkQueue, sendOpsAlert } from './ops-alert'
 import { priceSection } from './section-pricing'
 import type { PriceSectionInput } from './section-pricing'
+import { previewPrice } from './preview-pricing'
+import type { PreviewInput } from './preview-pricing'
 import type { RateLimiter } from './rate-limiter'
 import { getSupabaseClient, updateQuoteStatus } from './supabase'
 import { processQuote } from './quote-processor'
@@ -290,6 +292,18 @@ export default {
     // Deterministic (the rules engine, no AI, no photos) and read-only, so the
     // web app waits for it, as it does for /reprice. It answers with the
     // section, or with the questions that still need an answer.
+    // T-204: the price on a service's "Test & Publish" step. The service is sent as the editor
+    // holds it; the same pipeline prices it from sample answers (no AI, no photos, read-only).
+    if (url.pathname === '/preview' && request.method === 'POST') {
+      const supabase = getSupabaseClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY)
+      if (!supabase) return jsonResponse({ error: 'Supabase not configured' }, 503)
+      const body = (await request.json().catch(() => null)) as PreviewInput | null
+      if (!body?.tenantId || !body.service?.name || !body.rules) return jsonResponse({ error: 'Missing required fields: tenantId, service, rules' }, 400)
+      const result = await previewPrice(supabase, env, { ...body, fields: Array.isArray(body.fields) ? body.fields : [], answers: Array.isArray(body.answers) ? body.answers : [] })
+      if (!result.ok) return jsonResponse({ success: false, reason: result.reason }, result.reason === 'failed' ? 500 : 409)
+      return jsonResponse({ success: true, ...result }, 200)
+    }
+
     if (url.pathname === '/section' && request.method === 'POST') {
       const supabase = getSupabaseClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY)
       if (!supabase) return jsonResponse({ error: 'Supabase not configured' }, 503)

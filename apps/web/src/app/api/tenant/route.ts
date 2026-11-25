@@ -1,5 +1,6 @@
 import { CONTACT_REQUIREMENTS, type ContactRequirement } from '@/lib/contact-rules'
 import { getPack } from '@/lib/vertical-packs'
+import { OTHER_TRADE, tradeIds, tradeValue, tradesProblem } from '@/lib/trades'
 import { mergeTemplate } from '@/lib/tenant-template'
 import { createClient } from '@/lib/supabase/server'
 import { customerReminderOn, getRegion, isRegionCode, isUnitSystem } from '@qolumns/shared'
@@ -318,17 +319,22 @@ export async function PUT(request: NextRequest) {
       updates.contact_requirement = contactRequirement
     }
 
-    // T-150: "What kind of work do you do?" — a known pack, or 'other' + free text
-    if (trade !== undefined) {
-      if (trade !== null && trade !== 'other' && !getPack(trade)) {
+    // T-150: "What kind of work do you do?" — a known pack, or 'other' + free text.
+    // T-204: more than one pack can be picked (`trades`, or a comma-separated `trade`); they are
+    // stored in the one column, in the order picked (lib/trades.ts).
+    const tradesSent = (body as { trades?: unknown }).trades
+    if (trade !== undefined || tradesSent !== undefined) {
+      const picked = tradeIds(Array.isArray(tradesSent) ? (tradesSent as string[]) : trade)
+      const problem = tradesProblem(picked, (id) => Boolean(getPack(id)))
+      if (problem) {
         return NextResponse.json(
-          { error: { code: 'INVALID_INPUT', message: 'Unknown trade' } },
+          { error: { code: 'INVALID_INPUT', message: problem } },
           { status: 400 }
         )
       }
-      updates.trade = trade
+      updates.trade = tradeValue(picked)
       const other = typeof tradeOther === 'string' ? tradeOther.trim().slice(0, 200) : ''
-      updates.trade_other = trade === 'other' && other ? other : null
+      updates.trade_other = picked[0] === OTHER_TRADE && other ? other : null
     }
 
     if (templateJson !== undefined) {

@@ -155,6 +155,8 @@ export async function GET(request: Request) {
           primaryColor: tenant?.branding_json?.primaryColor,
           // T-201: the business's logo, and "Powered by" by the estimate page's own rule
           brand: await customerEmailBrand(supabase, tenant?.id, tenant?.branding_json),
+          // T-204: said under the price. A quote that went out automatically was never reviewed.
+          state: row.approved_at ? 'confirmed' : 'estimate',
         })
 
         const result = await sendEmail({

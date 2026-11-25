@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
 import { verifyTurnstileToken, HUMAN_CHECK_FAILED_MESSAGE } from '@/lib/turnstile'
 import { checkContact, contactRequirementOf } from '@/lib/contact-rules'
-import { hashLeadToken, newLeadToken } from '@/lib/request-leads'
+import { hashLeadToken, newLeadToken, openLeadFor } from '@/lib/request-leads'
 import { decideTestRequest, publicSource } from '@/lib/test-estimates'
 import { currentTenant } from '@/lib/current-tenant'
 
@@ -29,6 +29,11 @@ const fail = (status: number, code: string, message: string, extra?: Record<stri
  * contact details. Same anti-abuse as submission (rate limit, Turnstile,
  * honeypot); no AI runs and nothing counts toward usage. A test request from
  * setup never creates one. Returns a token the widget uses for updates.
+ *
+ * T-204: one entry per person per service. When the same email or phone has an
+ * open request for this service from the last 24 hours (a reload, a second
+ * visit), that row is used again with a fresh token: no second row is made, and
+ * how far the person got before is kept.
  */
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as CreateLeadBody | null
@@ -76,6 +81,23 @@ export async function POST(request: Request) {
   if (!contact.ok) return fail(400, 'VALIDATION_ERROR', Object.values(contact.errors)[0] ?? 'Check your details', { fields: contact.errors })
 
   const token = newLeadToken()
+  const open = await openLeadFor(supabase, { tenantId, serviceId: service.id, email: contact.clean.email, phone: contact.clean.phone })
+  if (open) {
+    const { error: reuseError } = await supabase
+      .from('request_leads')
+      .update({
+        customer_name: contact.clean.name,
+        // the details given this time are the ones kept; one not given this time is never wiped
+        ...(contact.clean.email && { customer_email: contact.clean.email }),
+        ...(contact.clean.phone && { customer_phone: contact.clean.phone }),
+        lead_token_hash: hashLeadToken(token),
+      })
+      .eq('id', open.id)
+      .eq('tenant_id', tenantId)
+      .is('completed_at', null)
+    if (!reuseError) return NextResponse.json({ leadId: open.id, leadToken: token })
+    console.error('[Leads] reuse failed:', reuseError.code)
+  }
   const { data: lead, error } = await supabase
     .from('request_leads')
     .insert({

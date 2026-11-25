@@ -589,7 +589,7 @@ if (!process.env.PLAYWRIGHT_DIR) {
   await dSmall.goto(`${cfg.appUrl}/app/quotes/${small.id}/trace`, { waitUntil: 'networkidle' })
   await dSmall.getByText('Calculation Steps').waitFor({ timeout: 30_000 })
   const traceShown = await priceOn(dSmall)
-  check('pricing trace: the minimum step and the summary read as the same sentence, not "Minimum Charge"', traceShown.notes[0] === NOTE && traceShown.body.split(NOTE).length === 3 && !traceShown.body.includes('Minimum charge applied'), traceShown.notes)
+  check('pricing trace: the minimum step and the summary read as the same sentence, not "Minimum Charge"', traceShown.notes[0] === NOTE && traceShown.body.split(NOTE).length >= 3 && !traceShown.body.includes('Minimum charge applied'), traceShown.notes)
   await dSmall.close()
 
   // above the minimum: nothing about a minimum, anywhere

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { MinimumNote } from '@/components/quote/MinimumNote'
 import type { QuotePricing, QuoteContent, SignalRecommendation, CrossServicePricing } from '@qolumns/shared'
+import { ANSWER_TO_CUSTOMER_MAX } from '@qolumns/shared'
 import { useQuotePricing } from './useQuotePricing'
 import LineItemEditor from './LineItemEditor'
 import AddonsEditor from './AddonsEditor'
@@ -22,6 +23,12 @@ interface QuoteEditorProps {
   version: number
   currency: string
   feedbackId?: string
+  /**
+   * T-204: the customer's question that is waiting for an answer, when there is one. The editor
+   * then offers an optional "Your answer to <first name>" box; what is typed there goes out with
+   * the quote on "Save & Send", above the price.
+   */
+  pendingQuestion?: { text: string | null; customerFirstName: string | null }
   /** T-179: the quote's own service (it cannot be added as a section) */
   mainServiceId?: string
   onSave: () => Promise<void>
@@ -36,6 +43,7 @@ export default function QuoteEditor({
   version,
   currency,
   feedbackId,
+  pendingQuestion,
   mainServiceId,
   onSave,
   onCancel,
@@ -79,6 +87,8 @@ export default function QuoteEditor({
   const [exclusions, setExclusions] = useState<string[]>(initialContent.exclusions || [])
   const [notes, setNotes] = useState(initialContent.notes || '')
   const [businessNotes, setBusinessNotes] = useState(initialBusinessNotes || '')
+  // T-204: the business's answer to the customer's pending question (optional)
+  const [answerToCustomer, setAnswerToCustomer] = useState('')
   const [signalRecommendations, setSignalRecommendations] = useState<SignalRecommendation[]>(
     extendedContent.signalRecommendations || []
   )
@@ -120,6 +130,8 @@ export default function QuoteEditor({
           business_notes: businessNotes || undefined,
           sendToCustomer,
           feedbackId,
+          // T-204: only sent with the quote; the server ignores it on a plain save
+          ...(sendToCustomer && pendingQuestion && answerToCustomer.trim() && { answerToCustomer: answerToCustomer.trim() }),
         }),
       })
 
@@ -196,6 +208,34 @@ export default function QuoteEditor({
         <div className="mb-4 p-4 bg-danger-light border border-danger/20 rounded-lg text-sm text-danger">
           {saveError}
         </div>
+      )}
+
+      {/* T-204: the customer's question, and the business's answer to it (optional) */}
+      {pendingQuestion && (
+        <EditorSection>
+          <div data-testid="answer-to-customer">
+            {pendingQuestion.text && (
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase text-text-muted">
+                  {pendingQuestion.customerFirstName ? `${pendingQuestion.customerFirstName} asked` : 'The customer asked'}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-text-primary" data-testid="answer-question">{pendingQuestion.text}</p>
+              </div>
+            )}
+            <TextSectionEditor
+              label={`Your answer to ${pendingQuestion.customerFirstName ?? 'the customer'} (optional)`}
+              value={answerToCustomer}
+              onChange={(value) => setAnswerToCustomer(value.slice(0, ANSWER_TO_CUSTOMER_MAX))}
+              placeholder="Write your answer..."
+            />
+            <p className="mt-2 text-xs text-text-muted">
+              Sent with the quote when you press Save &amp; Send: the customer&rsquo;s email shows it above the price, and the question is marked answered. A plain Save does not send it.
+            </p>
+            {answerToCustomer.length >= ANSWER_TO_CUSTOMER_MAX && (
+              <p className="mt-1 text-xs text-text-secondary" role="status">That is the longest an answer can be ({ANSWER_TO_CUSTOMER_MAX.toLocaleString()} characters).</p>
+            )}
+          </div>
+        </EditorSection>
       )}
 
       {/* Business notes */}

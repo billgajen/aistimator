@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { QUOTE_TURN_COPY } from '@qolumns/shared'
 import { UNFINISHED_CHANGED_EVENT } from '@/lib/unfinished-leads'
 import { NEEDS_YOU_MARK } from '@/lib/status-tone'
 import { NeedsYouDot } from './NeedsYouDot'
+import { useDashboardChanged } from '@/components/dashboard/LivePulse'
 
 export interface UnfinishedLead {
   leadId: string
@@ -82,6 +83,37 @@ export function UnfinishedLeads({ onChange }: { onChange?: () => void }) {
       cancelled = true
     }
   }, [])
+
+  // T-204: the list updates by itself. The people already on screen keep their "New" tag for this
+  // visit; someone who appears now is new, and is marked seen like the first ones were.
+  const busyNow = useRef(false)
+  busyNow.current = busy !== null
+  const reloadQuietly = useCallback(async () => {
+    if (busyNow.current) return
+    try {
+      const res = await fetch('/api/leads?days=30')
+      if (!res.ok) return
+      const json = (await res.json()) as { items: UnfinishedLead[]; asOf: string }
+      if (busyNow.current) return
+      setItems((shown) => {
+        if (!shown) return json.items
+        const wasNew = new Set(shown.filter((lead) => lead.isNew).map((lead) => lead.leadId))
+        return json.items.map((lead) => (wasNew.has(lead.leadId) ? { ...lead, isNew: true } : lead))
+      })
+      if (json.items.some((lead) => lead.isNew)) {
+        await fetch('/api/leads/seen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ asOf: json.asOf }),
+        }).catch(() => undefined)
+        // the menu's badge; the page's own quiet refresh keeps the tab count right
+        announceChange()
+      }
+    } catch {
+      // a quiet reload that fails changes nothing
+    }
+  }, [])
+  useDashboardChanged(reloadQuietly)
 
   async function markDone(lead: UnfinishedLead) {
     setBusy(lead.leadId)

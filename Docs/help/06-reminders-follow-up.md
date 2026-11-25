@@ -75,12 +75,25 @@ If the customer gave no email address, the next step is "Contact customer" inste
 - "Review and approve:" a quote is waiting for your approval. The email has an "Approve & send" button, and a link, "Open in dashboard to edit".
 - "Quote accepted:" the customer accepted. The email includes when suits them, the job address and their phone number, when they gave them.
 - "Quote declined:" the customer declined.
-- "Customer feedback on quote:" the customer asked a question from their quote page.
+- A subject such as "Derek asked a question about their quote", with the customer's first name: the customer asked a question from their quote page. Their question is in the email.
 - "Request updated:" the customer added a service to their quote, or took one off.
 - A subject ending "asked for an estimate: please reply to them yourself": a request could not be priced.
 - "New lead waiting:" a request arrived after your plan's quotes were used up. It is saved but not priced.
 
 You are not emailed when a customer opens a quote, or when someone starts a request and does not finish it. Your dashboard shows both.
+
+## What do the emails to my customer say?
+<!-- id: followup-emails-to-customer; page: /app/quotes -->
+
+Each email to a customer carries your business name, your logo if you added one, the price and one button that opens their estimate. A line under the price says where the estimate stands:
+
+- "Waiting for" your business name "to confirm": the customer can already see the estimate, and you have not approved it yet.
+- "Reviewed and confirmed by" your business name: you approved it, or you edited it and sent it yourself.
+- "Estimate based on your photos and details": the service sends estimates automatically. Nobody reviewed it, so the email does not say anyone did.
+
+When you answer a customer's question with "Save & Send", that email also shows your answer above the price.
+
+Every email is the same width, and on a small screen it uses the width of the screen. The emails are light in colour. An email program set to dark mode may darken them itself; your logo and the text still show.
 
 ## How do I change where my notification emails go?
 <!-- id: followup-notification-email; page: /app/settings/notifications; section: Notifications -->
@@ -100,6 +113,7 @@ It is someone who gave their contact details in your request form and then stopp
 
 - Each one shows the person's name, the service, how far they got ("Gave contact details", "Answered the questions", "Added photos" or "Reached the last step") and when they started.
 - An unfinished request has no price and does not use one of your plan's quotes.
+- One person is one entry for each service. If the same email address or phone number starts the same service again within 24 hours, for example after reloading the form, they stay one entry, showing the furthest they got. The counts on "Home" and in the menu count entries the same way.
 - When new people are waiting, Home shows a line ending "started a request but didn't finish. A quick call often wins the job." with "See who", and "Unfinished requests" in the menu shows a count. Both clear once you open the list.
 - A request stays in the list for 30 days from when it was started, unless you mark it "Done".
 
@@ -121,8 +135,10 @@ If the person comes back and sends their request, it leaves this list by itself 
 
 You get an email, and the quote moves to "Needs you" with the status "Customer asked a question".
 
-1. Open the quote. The question is near the top, marked "Customer question".
-2. Answer the customer yourself, by email or phone. Their details are on the quote's page.
-3. Press "Mark as answered". The quote goes back to "Waiting for customer".
+The email's subject names the customer, for example "Derek asked a question about their quote", and the question itself is in the email.
 
-If the answer changes the price, press "Edit", change the quote and send it again instead. The customer can still accept the quote while their question is open.
+1. Open the quote. The question is near the top, marked "Customer question".
+2. To answer and send the quote in one go, press "Edit". The editor shows the question and a box, "Your answer to" with the customer's first name. Write your answer, change the quote if you need to, and press "Save & Send". The customer's email shows your answer above the price, and the question is marked answered.
+3. Or answer the customer yourself, by email or phone, and press "Mark as answered". Their details are on the quote's page.
+
+The quote then goes back to "Waiting for customer". The answer box is optional, and it is sent only with "Save & Send": a plain "Save" does not send it. The customer can still accept the quote while their question is open.

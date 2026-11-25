@@ -15,6 +15,8 @@ export async function GET() {
     .from('quotes')
     .select('pricing_json, final_invoice_amount, service:services(name)')
     .eq('tenant_id', auth.tenantId)
+    // T-204: a setup test is in no Analytics figure
+    .eq('is_test', false)
     .not('final_invoice_amount', 'is', null)
     .order('final_invoice_recorded_at', { ascending: false })
     .limit(2000)

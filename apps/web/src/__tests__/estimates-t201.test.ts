@@ -151,7 +151,8 @@ describe('T-201 item 18: "Hold until I approve" shows no figure until the busine
   it('the public PDF address refuses a held quote and one still being confirmed', () => {
     const route = read('apps/web/src/app/api/public/quotes/[quoteId]/pdf/route.ts')
     expect(route).toContain("quote.status === 'awaiting_clarification' || customerSeesNoFigure(")
-    expect(route).toContain('!quote.pdf_asset_id || priceWithheld ||')
+    // T-204: the address no longer needs a PDF the business made (it makes one), so the refusal is the rule alone
+    expect(route).toContain('!customerCanDownloadPdf(quote.status as string) || priceWithheld ||')
   })
 
   it('the request form keeps no range on the screen for a held quote', () => {
@@ -467,8 +468,10 @@ describe('T-201 item 27: "Default Terms & Conditions" are printed, when filled i
     const view = read('apps/web/src/app/api/public/quotes/[quoteId]/route.ts')
     expect(view).toContain('default_terms_text')
     expect(view).toContain('!isProvisional && customerTerms(tenant.default_terms_text)')
-    const pdfRoute = read('apps/web/src/app/api/quotes/[quoteId]/pdf/route.ts')
-    expect(pdfRoute).toContain('terms: customerTerms(tenant.default_terms_text)')
+    // T-204: the PDF is made in one place, for the business's download and the customer's
+    const pdfMaker = read('apps/web/src/lib/quote-pdf.ts')
+    expect(pdfMaker).toContain('terms: customerTerms(tenant.default_terms_text)')
+    expect(read('apps/web/src/app/api/quotes/[quoteId]/pdf/route.ts')).toContain('makeQuotePdf(supabase, quoteId, profile.tenant_id)')
   })
 
   it('the customer’s page prints them below the price and the notes, with the business’s line breaks', () => {

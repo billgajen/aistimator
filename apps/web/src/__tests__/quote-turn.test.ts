@@ -486,8 +486,9 @@ describe('list API', () => {
     // the list query and the quote counts filter by tenant directly; the
     // unfinished count goes through the shared rule (T-160), which does too
     expect(route.match(/\.eq\('tenant_id', tenantId\)/g)?.length).toBe(2)
-    expect(route).toMatch(/unfinishedFilter\(\s*supabase\.from\('request_leads'\)[^)]*\),\s*tenantId\s*\)/)
-    expect(route.match(/\.from\('(quotes|request_leads)'\)/g)?.length).toBe(3)
+    // T-204: that count is one per person per service (`countUnfinished`, lib/unfinished-leads.ts)
+    expect(route).toMatch(/countUnfinishedEntries\(supabase, tenantId\)/)
+    expect(route.match(/\.from\('(quotes|request_leads)'\)/g)?.length).toBe(2)
   })
 
   it('returns everything when no group is asked for (the mobile app’s call)', () => {

@@ -5,6 +5,7 @@
  */
 import type { ServiceMediaConfig, WorkStepConfig, ExpectedSignalConfig, ServiceDraftConfig, AddonConfig, MultiplierConfig } from '@qolumns/shared'
 import { normalizeFieldOption } from './field-options'
+import { photosRequired } from './photos-required'
 
 export interface ServiceCreateBody {
   /** T-146: send quotes without business review (default false) */
@@ -58,7 +59,8 @@ export function serviceInsertRow(tenantId: string, body: ServiceCreateBody, now 
     scope_includes: body.scopeIncludes || [],
     scope_excludes: body.scopeExcludes || [],
     default_assumptions: body.defaultAssumptions || [],
-    media_config: mediaConfig || { minPhotos: 1, maxPhotos: 8, photoGuidance: null },
+    // T-204: "Photos required" is 0 to 8 (0 = photos are optional), whatever was sent
+    media_config: mediaConfig ? { ...mediaConfig, minPhotos: photosRequired(mediaConfig.minPhotos) } : { minPhotos: 1, maxPhotos: 8, photoGuidance: null },
     work_steps: body.workSteps || [],
     expected_signals: body.expectedSignals || [],
     draft_config: draftConfig || null,

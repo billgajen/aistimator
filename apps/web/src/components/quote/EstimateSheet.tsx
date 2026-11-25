@@ -1,4 +1,4 @@
-import { formatMoney } from '@qolumns/shared'
+import { formatMoney, preparedForLine } from '@qolumns/shared'
 import { brandStyleVars } from '@/lib/color'
 import { Money, SectionLabel } from './document-parts'
 
@@ -76,7 +76,7 @@ export function EstimateSheet({
             ) : (
               <p className="truncate font-display text-xl font-bold tracking-tight text-text-primary">{data.businessName}</p>
             )}
-            <p className="mt-1 text-xs text-text-muted">Estimate prepared for {data.customerName}</p>
+            <p className="mt-1 text-xs text-text-muted">{preparedForLine(confirmed === true, data.customerName)}</p>
           </div>
         </div>
         <p className="figure mt-4 text-xs text-text-secondary">{data.reference}</p>

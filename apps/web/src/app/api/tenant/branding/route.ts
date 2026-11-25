@@ -2,7 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
 import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
 import type { TenantBranding, TenantTemplate } from '@qolumns/shared'
-import { DEFAULT_PRIMARY_COLOR } from '@qolumns/shared'
+import { DEFAULT_PRIMARY_COLOR, badgeLineFor, canUse, formatMoney, resolveRegionContext } from '@qolumns/shared'
+import { loadAccess } from '@/lib/access'
+import { brandingSample, type PreviewServiceRow, type PreviewTax } from '@/lib/branding-preview'
 
 const DEFAULT_BRANDING: TenantBranding = {
   logoAssetId: null,
@@ -56,7 +58,7 @@ export async function GET() {
     // Fetch tenant
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
-      .select('id, name, branding_json, template_json, region')
+      .select('id, name, branding_json, template_json, region, currency, unit_system, tax_enabled, tax_label, tax_rate')
       .eq('id', profile.tenant_id)
       .single()
 
@@ -92,6 +94,32 @@ export async function GET() {
       }
     }
 
+    // T-204: what the preview needs to show this business's own look: its currency, its tax (or
+    // none), a sample from one of its own services, and whether its estimates carry the badge today.
+    const row = tenant as { region?: string | null; currency?: string | null; unit_system?: string | null; tax_enabled?: boolean | null; tax_label?: string | null; tax_rate?: number | string | null }
+    const regionContext = resolveRegionContext(row)
+    const currency = row.currency || regionContext.currency
+    const tax: PreviewTax = {
+      enabled: row.tax_enabled === true && Number(row.tax_rate) > 0,
+      label: regionContext.taxLabel,
+      // stored as a fraction (0.0825); shown as a percentage
+      ratePercent: Math.round(Number(row.tax_rate || 0) * 100 * 1000) / 1000,
+    }
+    const [{ data: serviceRows }, access] = await Promise.all([
+      supabase
+        .from('services')
+        .select('name, description, active, scope_includes, scope_excludes, default_assumptions, work_steps, expected_signals, tax_exempt, service_pricing_rules ( rules_json )')
+        .eq('tenant_id', tenant.id)
+        .order('active', { ascending: false })
+        .order('created_at', { ascending: true })
+        .limit(20),
+      loadAccess(supabase, tenant.id),
+    ])
+    const services: PreviewServiceRow[] = ((serviceRows ?? []) as Array<PreviewServiceRow & { service_pricing_rules?: unknown }>).map((service) => {
+      const rules = Array.isArray(service.service_pricing_rules) ? service.service_pricing_rules[0] : service.service_pricing_rules
+      return { ...service, rules: (rules as { rules_json?: PreviewServiceRow['rules'] } | null | undefined)?.rules_json ?? null }
+    })
+
     return NextResponse.json({
       tenantId: tenant.id,
       tenantName: tenant.name,
@@ -100,6 +128,14 @@ export async function GET() {
       branding,
       template,
       logoUrl,
+      preview: {
+        currency,
+        tax,
+        // the same rule the estimate page and the emails use (lib/access.ts)
+        badgeShown: !canUse(access, 'no_badge'),
+        badgeLine: badgeLineFor(access),
+        sample: brandingSample(services, (amount) => formatMoney(amount, currency)),
+      },
     })
   } catch (error) {
     console.error('Branding GET error:', error)

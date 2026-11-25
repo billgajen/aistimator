@@ -6,7 +6,9 @@ import { cleanAnswers, cleanAssetIds, hashLeadToken, isLeadProgress, laterProgre
 /**
  * PATCH /api/public/leads/:leadId  { tenantKey, leadToken, progress, answers?, postcode?, assetIds? }
  * T-151: how far the customer got. Only the browser holding the lead's token
- * can update it, and only while it is unfinished. Progress never goes back.
+ * can update it, and only while it is unfinished. Progress never goes back,
+ * and (T-204) the answers and photos saved at the furthest step are kept when
+ * an earlier step reports in.
  */
 export async function PATCH(request: Request, { params }: { params: { leadId: string } }) {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
@@ -32,10 +34,15 @@ export async function PATCH(request: Request, { params }: { params: { leadId: st
     : { data: null }
   if (!lead) return NextResponse.json({ error: { code: 'NOT_FOUND', message: 'Request not found' } }, { status: 404 })
 
-  const updates: Record<string, unknown> = { progress: laterProgress(lead.progress as LeadProgress, body!.progress as LeadProgress) }
-  if (body!.answers !== undefined) updates.job_answers = cleanAnswers(body!.answers)
-  if (typeof body!.postcode === 'string') updates.job_postcode = body!.postcode.trim().slice(0, 20) || null
-  if (body!.assetIds !== undefined) updates.asset_ids = cleanAssetIds(body!.assetIds)
+  const furthest = laterProgress(lead.progress as LeadProgress, body!.progress as LeadProgress)
+  const updates: Record<string, unknown> = { progress: furthest }
+  // T-204: a request taken up again (a reload, a second visit) starts at the first step. What it
+  // sends from a step earlier than the furthest one reached does not replace what was saved there.
+  if (furthest === body!.progress) {
+    if (body!.answers !== undefined) updates.job_answers = cleanAnswers(body!.answers)
+    if (typeof body!.postcode === 'string') updates.job_postcode = body!.postcode.trim().slice(0, 20) || null
+    if (body!.assetIds !== undefined) updates.asset_ids = cleanAssetIds(body!.assetIds)
+  }
   const { error } = await supabase.from('request_leads').update(updates).eq('id', lead.id)
   if (error) return NextResponse.json({ error: { code: 'DB_ERROR', message: 'Could not save' } }, { status: 500 })
   return NextResponse.json({ ok: true })

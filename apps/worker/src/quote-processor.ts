@@ -58,6 +58,9 @@ import type { WordingContext } from './ai/wording'
 import { withAiTimeout, aiCallTimeoutMs } from './ai/timeouts'
 import { createAiClient } from './ai/factory'
 import { AiBusyLog } from './ai/busy'
+import { PhotoReadLog, failureKind } from './ai/photo-read'
+import { aiStandInOn } from './ai/client'
+import { photosUnreadReason } from '@qolumns/shared'
 import type { BusyState } from './queue-consumer'
 import type { AiClient } from './ai/client'
 import type { QuantityProvenance } from '@qolumns/shared'
@@ -126,7 +129,7 @@ interface ResolvedSignalType {
   source: SignalTypeSource
 }
 
-interface QuoteData {
+export interface QuoteData {
   quote: {
     id: string
     tenant_id: string
@@ -456,6 +459,15 @@ export async function processQuote(
      * counted. (Like the reprice path, it is deterministic.)
      */
     section?: { serviceId: string; answers: Array<{ fieldId: string; value: string | number | boolean | string[] }> }
+    /**
+     * T-204 preview mode: price a service AS GIVEN (the editor's unsaved form
+     * on "Test & Publish") from sample answers. It is section mode with the
+     * data handed in instead of loaded: the same pipeline as a real request,
+     * every AI client off, no photos, and it returns straight after the rules
+     * engine. Nothing is read for a quote, and nothing is written, sent or
+     * counted. See preview-pricing.ts.
+     */
+    preview?: { data: QuoteData }
   } = {}
 ): Promise<ProcessingResult> {
   console.log(`[Processor] Starting quote processing: ${quoteId}`)
@@ -466,18 +478,26 @@ export async function processQuote(
   // sent when a call ended busy on every provider; the queue puts the job back.
   const busy = new AiBusyLog()
   timer.busy = { log: busy, before: options.busyBefore }
+  // T-204 (item 29): what this run could not read from the customer's photos. A step that fails
+  // (error, timeout, unusable answer) still falls back as it always did, but the quote is then
+  // held for the business with "Photos could not be read" and is never sent by itself.
+  const photoRead = new PhotoReadLog()
 
   // 1. Load all quote data
-  const quoteData = await timer.time('load', () => loadQuoteData(supabase, quoteId, options.section?.serviceId))
+  const quoteData = options.preview
+    ? options.preview.data
+    : await timer.time('load', () => loadQuoteData(supabase, quoteId, options.section?.serviceId))
   if (!quoteData) {
     return { success: false, error: 'Failed to load quote data' }
   }
-  if (options.section) {
+  // T-204: a preview is a section run over data that was handed in
+  const section = options.section ?? (options.preview ? { serviceId: quoteData.service.id, answers: quoteData.quoteRequest.job_answers } : undefined)
+  if (section) {
     // T-179: the added service is priced from its own answers alone. The main
     // request's answers, note, quantity, photos and clarification round are
     // not its inputs.
-    const sectionAnswers = options.section.answers.filter((a) => a.fieldId !== SECTION_QUANTITY_KEY)
-    const quantity = Number(options.section.answers.find((a) => a.fieldId === SECTION_QUANTITY_KEY)?.value)
+    const sectionAnswers = section.answers.filter((a) => a.fieldId !== SECTION_QUANTITY_KEY)
+    const quantity = Number(section.answers.find((a) => a.fieldId === SECTION_QUANTITY_KEY)?.value)
     quoteData.quoteRequest = {
       ...quoteData.quoteRequest,
       job_answers: sectionAnswers as typeof quoteData.quoteRequest.job_answers,
@@ -653,8 +673,8 @@ export async function processQuote(
   // tokens are metered for the per-quote AI cost estimate in the trace
   const aiUsage = new AiUsageMeter()
   // T-179: section mode makes no AI call at all (both clients off; every AI step below is gated on them)
-  const gemini = options.section ? null : createAiClient('extraction_pass', env, aiUsage, { busy }) // vision: signals, measurement, inventory
-  const textAi = options.section ? null : createAiClient('wording', env, aiUsage, { busy }) // text: wording, addons, gate, validator, cross-service
+  const gemini = section ? null : createAiClient('extraction_pass', env, aiUsage, { busy }) // vision: signals, measurement, inventory
+  const textAi = section ? null : createAiClient('wording', env, aiUsage, { busy }) // text: wording, addons, gate, validator, cross-service
 
   // Extract customer notes for context
   const notesAnswer = quoteRequest.job_answers?.find(
@@ -820,6 +840,8 @@ export async function processQuote(
         ),
         passTimingsMs,
         earlyStopCov: covThreshold,
+        // T-204: every pass failed, so nothing was measured
+        onAllPassesFailed: (lastError) => photoRead.missed('measurement', failureKind(lastError)),
       })
       timer.setMeasurementPasses(passTimingsMs)
       return { measured, calibrationBySignal }
@@ -841,12 +863,14 @@ export async function processQuote(
         : Promise.resolve({ resolved: [], readings: [] })
 
     const [extractionResult, measurement, identification] = await Promise.all([
-      timer.time('signals', () => extractSignalsFromImages(gemini, images, signalContext)),
+      timer.time('signals', () => extractSignalsFromImages(gemini, images, { ...signalContext, onUnread: (why) => photoRead.missed('photos', why) })),
       targets.length > 0 && images.length > 0
         ? timer.time('measurement', runMeasurement).catch((measureError) => {
             // Measurement is an accuracy upgrade, never a blocker — the envelope
             // and clarification guards still protect the quote downstream
             console.error('[Processor] Measurement ensemble failed:', measureError)
+            // T-204: but a quote whose sizes could not be read is held for the business
+            photoRead.missed('measurement', failureKind(measureError))
             return null
           })
         : Promise.resolve(null),
@@ -854,6 +878,9 @@ export async function processQuote(
     ])
     // T-203: a photo read that found the model busy everywhere is not priced around
     busy.throwIfExhausted()
+    // T-204: the photos exist and none could be opened, or the label reading failed
+    if (images.length === 0) photoRead.missed('photos', 'not_loaded')
+    if (identification.failed) photoRead.missed('label', identification.failed)
     signals = extractionResult.signals
     structuredSignals = extractionResult.structuredSignals
 
@@ -970,6 +997,9 @@ export async function processQuote(
     }
   } else if (imageAssets.length > 0 && !gemini) {
     console.warn('[Processor] Gemini not configured, skipping signal extraction')
+    // T-204: photos were sent and there is no model to read them (a missing key). Not the local
+    // checks' stand-in, which asks no model on purpose.
+    if (!aiStandInOn(env)) photoRead.missed('photos', 'no_model')
     signals = getSignalsWithoutImages()
     structuredSignals = getSignalsWithoutImagesV2()
     signals.warnings.push('AI image analysis not available')
@@ -1228,7 +1258,9 @@ export async function processQuote(
       }
     } catch (error) {
       console.error('[Processor] Inventory detection failed:', error)
-      // Continue without inventory items
+      // Continue without inventory items. T-204: the items in the photos were not counted, so the
+      // quote is held for the business.
+      if (fetchedImages.length > 0) photoRead.missed('photos', failureKind(error))
     }
   }
 
@@ -1368,7 +1400,9 @@ export async function processQuote(
       }
     } catch (error) {
       console.error('[Processor] AI image addon detection failed:', error)
-      // Continue without AI addon detection
+      // Continue without AI addon detection. T-204: an extra the photos call for may be missing
+      // from the price, so the quote is held for the business.
+      photoRead.missed('extras', failureKind(error))
     }
   }
 
@@ -1509,7 +1543,7 @@ export async function processQuote(
   })
   pricing.breakdown = withLineSources(pricing.breakdown, takeoffEntries)
 
-  if (options.section) {
+  if (section) {
     // T-179: priced by the rules engine from the service's full rules. Stop
     // here: no wording, no checks, no writes, no emails, no usage.
     return {
@@ -2138,7 +2172,7 @@ export async function processQuote(
   // The wording model read the note as asking for that service and detection returned nothing.
   // Logged and kept on the trace (business-only); the quote itself is not changed. No customer
   // words are logged, only the ids.
-  if (!options.section) {
+  if (!section) {
     const missed = namedWithoutACard(content, quoteData.otherServices ?? [], content.alsoAsked ?? [])
     if (missed.length > 0) {
       pricingTrace.detectionMiss = { serviceIds: missed.map((s) => s.id) }
@@ -2212,7 +2246,7 @@ export async function processQuote(
   // they feed the clarification gate like missing AI-signal quantities do.
   // VOI bar: worth asking if a plausible quantity (up to ~10 units) would move
   // the total past max(£75, 10%).
-  const defaultedQuantitySteps: Array<{ askKey: string; stepName: string }> = []
+  const defaultedQuantitySteps: Array<{ askKey: string; stepName: string; leftOut?: boolean }> = []
   for (const traceStep of pricingTrace.trace) {
     if (traceStep.type !== 'work_step') continue
     if (traceStep.quantitySource !== 'legacy_fallback' && traceStep.quantitySource !== 'derived_unresolved') continue
@@ -2237,6 +2271,20 @@ export async function processQuote(
     })
     if (ask) defaultedQuantitySteps.push({ askKey, stepName: step.name })
   }
+  // T-204: an optional number question left empty counts as 0, never 1, so such a line is not in the
+  // trace at all. It is still asked about on the same terms as a placeholder was (T-127): worth asking
+  // if a plausible quantity would move the total. A line marked "empty means none" is never asked about.
+  for (const unanswered of pricing.unansweredOptional ?? []) {
+    if (defaultedQuantitySteps.some((d) => d.askKey === unanswered.fieldId)) continue
+    const step = rulesWithWorkSteps.workSteps?.find((ws) => ws.id === unanswered.stepId)
+    if (!step) continue
+    const { ask } = isQuestionWorthAsking({
+      priceAtLow: pricing.total,
+      priceAtHigh: pricing.total + step.defaultCost * 10,
+      bestTotal: pricing.total,
+    })
+    if (ask) defaultedQuantitySteps.push({ askKey: unanswered.fieldId, stepName: step.name, leftOut: true })
+  }
   if (defaultedQuantitySteps.length > 0) {
     console.log(
       `[Processor] Defaulted-quantity steps (priced at placeholder ×1): ${defaultedQuantitySteps
@@ -2247,11 +2295,21 @@ export async function processQuote(
 
   // T-148: wording the repair could not clean goes to the business, never to
   // a clarification round the customer would read it in
-  if (wordingUnresolved.length > 0) {
+  const wordingReason = wordingUnresolved.length > 0 ? `The estimate's wording uses a word customers should not see (${wordingUnresolved[0]}). Edit the wording, then approve.` : null
+  if (photoRead.failed) {
+    // T-204 (item 29): the photos could not be read. The price was worked out without them, so it
+    // goes to the business and nowhere else: no clarification round, no "shown early", no send.
     finalStatus = 'pending_review'
     qualityGateResult = {
       action: 'require_review',
-      reason: `The estimate's wording uses a word customers should not see (${wordingUnresolved[0]}). Edit the wording, then approve.`,
+      reason: photosUnreadReason(photoRead.record(), wordingReason),
+      evaluatedAt: new Date().toISOString(),
+    }
+  } else if (wordingReason) {
+    finalStatus = 'pending_review'
+    qualityGateResult = {
+      action: 'require_review',
+      reason: wordingReason,
       evaluatedAt: new Date().toISOString(),
     }
   } else if (structuredSignals && textAi) {
@@ -2276,6 +2334,8 @@ export async function processQuote(
                 reason: quantityConcern,
                 fieldId: quantityConcernFieldId,
                 suggested: (content.quantityConcernSuggestedValue || '').trim() || undefined,
+                // T-204: the same doubt as the customer is asked it, in plain words (checked by the gate before use)
+                customerQuestion: (content.quantityConcernQuestion || '').trim() || undefined,
               }
             : undefined,
           // T-188: who answers (a quote the business made asks the business), and what choices are built from
@@ -2523,6 +2583,8 @@ export async function processQuote(
         reference: content.reference,
         // T-179: what else the customer asked for (other services they can add; things not offered)
         ...(content.alsoAsked && content.alsoAsked.length > 0 && { alsoAsked: content.alsoAsked }),
+        // T-204: which photo reading failed (the quote is held; the business is told why)
+        ...(photoRead.failed && { photosUnread: photoRead.record() }),
         // Store signals for reference (not displayed to customer)
         _signals: {
           confidence: signals.confidence,
@@ -3073,18 +3135,21 @@ async function extractSignalsFromImages(
     // Check if it's a rate limit error
     if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('rate limit')) {
       console.warn('[Processor] Gemini rate limited, using fallback signals')
+      // T-204: said to the business on the held quote ("Photos could not be read"), never in the
+      // quote's own notes, which the customer reads
+      signalContext.onUnread?.('error')
       const signals = getSignalsWithoutImages()
-      signals.warnings.push('AI image analysis temporarily unavailable (rate limited)')
-      signals.observations.push(`${images.length} images were uploaded but could not be analyzed`)
       return {
         signals,
         structuredSignals: getSignalsWithoutImagesV2(),
       }
     }
 
-    // For other errors, use default signals
+    // For other errors, use default signals. T-204: the quote is held for the business and says
+    // why there; the provider's words never go into the quote's notes (the customer reads those,
+    // and an error message can repeat the request).
+    signalContext.onUnread?.(failureKind(error))
     const signals = getSignalsWithoutImages()
-    signals.warnings.push(`AI image analysis failed: ${errorMsg}`)
     return {
       signals,
       structuredSignals: getSignalsWithoutImagesV2(),

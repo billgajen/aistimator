@@ -13,6 +13,7 @@ import { HelpPanel, type HelpView } from '@/components/help/HelpPanel'
 import { clearConversation } from '@/components/help/ask-store'
 import { NeedsYouDot } from '@/components/quotes/NeedsYouDot'
 import { watchPageErrors } from '@/lib/help-context'
+import { useDashboardPulse } from '@/components/dashboard/LivePulse'
 
 /**
  * Dashboard shell — "the studio desk", panel edition.
@@ -41,6 +42,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     window.addEventListener(UNFINISHED_CHANGED_EVENT, loadNewUnfinished)
     return () => window.removeEventListener(UNFINISHED_CHANGED_EVENT, loadNewUnfinished)
   }, [loadNewUnfinished])
+  // T-204: the dashboard's pulse. It keeps this badge right between page changes, and tells the
+  // page on screen when something changed for the business (Home and Quotes read again).
+  useDashboardPulse(setNewUnfinished)
   const closeMenu = useCallback(() => setSidebarOpen(false), [])
 
   // T-197: the Help panel. It is an extra: its dot is read on its own, it loads nothing until it

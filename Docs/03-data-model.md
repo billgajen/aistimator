@@ -428,6 +428,13 @@ Every choice and every change of an address, and the hold on a changed one.
   - `quotes.content_json.busy` (T-203; `requeues`, `busyRetries`, `overflowCalls`, `lastAt`, `lastRun`): only
     while a request waits after being put back because an AI provider was busy on every provider. The queue
     consumer reads it to tell busy requeues from real tries; pricing the quote writes its content over it.
+  - `quotes.content_json.photosUnread` (T-204; `steps[]` of `{ step: 'photos' | 'measurement' | 'label' |
+    'extras', why: 'error' | 'timeout' | 'bad_answer' | 'not_loaded' | 'no_model' }`, `at`): a photo reading
+    failed, so the quote was held for the business (`pending_review`, `review_hold: 'check'`) and is never sent
+    by itself. Shown as "Photos could not be read". Never the provider's words.
+  - A price line's `quantitySource` `{ type: 'derived', formula: 'max(0, <question> - 1)' }` is "each
+    additional"; `missingMeansZero` on a `form_field` source, and any optional number question, means "left
+    empty = 0" (T-204, `packages/shared/src/pricing-links.ts`).
   - `quotes.pricing_trace_json.timings` (T-203 additions): `busyRetries` and `overflowCalls` (always, 0 when
     none, over every run of the job), `busyRequeues` and `lastRun` (when it was put back), `finishedAt`.
   - `quotes.content_json.retryCode` (`hash`, `expiresAt`): the hash of the one-time code

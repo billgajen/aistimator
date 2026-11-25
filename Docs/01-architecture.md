@@ -77,6 +77,11 @@
    If a question was asked, the clarify API calls `POST {worker}/reprice` (bearer token) and
    waits: a deterministic reprice from the snapshot plus the answers, with no AI calls and no
    photo reads (~0.1–0.3 s). Quotes without a snapshot (409) go through `/trigger` as before.
+   T-204: the dashboard's "Test Your Pricing" is the same pipeline in preview mode (`POST {worker}/preview`):
+   the service as the editor holds it, sample answers, no AI, no photos, nothing written. The web app never
+   adds up a price of its own (AD-097).
+   T-204: a photo reading that fails (error, timeout, unusable answer) no longer lets the quote go out: it is
+   held for the business with "Photos could not be read" (AD-098). A provider that is only busy is T-203.
 8) Customer views, accepts, and optionally pays deposit.
 
 ## Key architecture decisions

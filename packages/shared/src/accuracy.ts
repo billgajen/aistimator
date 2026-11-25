@@ -86,6 +86,21 @@ export function computeAccuracy(quotes: InvoicedQuote[]): AccuracyReport {
   }
 }
 
+/**
+ * T-204: a final invoice under half the quote, or over double it, is asked
+ * about before it is saved ("Is this the full amount you charged for the
+ * job?"). A deposit typed as the invoice, or a slipped digit, would otherwise
+ * go straight into the accuracy figures. The business can still save it: a job
+ * can truly cost that much more or less. With no quoted total there is nothing
+ * to compare, so nothing is asked.
+ */
+export const FINAL_INVOICE_ASK = 'Is this the full amount you charged for the job?'
+
+export function finalInvoiceLooksOff(amount: number, quotedTotal: number): boolean {
+  if (!Number.isFinite(amount) || !Number.isFinite(quotedTotal) || !(quotedTotal > 0)) return false
+  return amount < quotedTotal / 2 || amount > quotedTotal * 2
+}
+
 /** Parse a money amount typed by a person ("$1,234.50", "1234") → number or null. */
 export function parseMoneyInput(raw: unknown): number | null {
   if (typeof raw === 'number') return Number.isFinite(raw) && raw >= 0 ? Math.round(raw * 100) / 100 : null

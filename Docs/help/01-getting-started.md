@@ -23,8 +23,8 @@ You sign up with your business name, an email address and a password. No card is
 
 Setup takes you from your trade to your first services in a few short screens. Until your business has a service, opening "Home" brings you back to setup. Once you have one, "Home" stays "Home", even if you switch every service off.
 
-1. "What kind of work do you do?" Check "Where is your business?", pick the closest trade, and press "Continue". Each trade is a template: a ready-made set of services, questions and prices.
-2. "Here's what we found" lists the services. Untick any you do not offer, then press "Looks right — continue".
+1. "What kind of work do you do?" Check "Where is your business?", pick the closest trade, and press "Continue". Each trade is a template: a ready-made set of services, questions and prices. If you do several kinds of work, tick more than one, up to four.
+2. "Here's what we found" lists the services. With more than one trade picked, each trade's services sit under its name. Untick any you do not offer, then press "Looks right — continue".
 3. "Check your prices" shows every number your estimates will charge. Change any number to match what you charge, then press "These are my prices".
 4. "Last step — the basics": choose your "Currency", tick the box to add tax to estimates if you charge it (then fill in "Tax name" and "Rate (%)"), and fill in "Service area" and "Your logo" if you want to. Both are optional. Leave "Service area" blank to take requests from anywhere.
 5. Press the button that starts "Create" and ends "& finish". Your services are created.
@@ -44,6 +44,17 @@ Pick "Something else" on the first setup screen. {{product}} then reads your web
 5. Carry on with "Check your prices" and the rest of setup.
 
 If you would rather build your services by hand, press "Skip — set up manually instead" on the first screen. It opens "Services", and "Home" stops sending you to setup.
+
+## Can I pick more than one trade in setup?
+<!-- id: start-several-trades; page: /app/onboarding -->
+
+Yes. On "What kind of work do you do?" you can tick up to four trades, for example heating and plumbing.
+
+1. Tick each trade you do. Tick one again to untick it.
+2. Press "Continue". "Here's what we found" offers the services of every trade you ticked, each trade under its own name.
+3. Untick any service you do not offer, then press "Looks right — continue".
+
+"Something else" cannot be ticked together with a trade: it is for a business whose trade is not in the list. After setup you can add more services from any trade's template on "Services".
 
 ## How do I see what a customer sees?
 <!-- id: start-test-estimate; page: /app/onboarding -->
@@ -89,6 +100,17 @@ Then, from top to bottom:
 9. "Last 30 days": "Requests", "Estimates sent", "Accepted" and "Value accepted", each compared with the 30 days before. "See all numbers" opens "Analytics". These four numbers are hidden once "Won through {{product}}" shows.
 
 Test estimates, the ones you make with "Try it yourself", are left out of every count on this page. While you have had no real customer request, "Home" also shows a "Try it yourself" box.
+
+## Do I need to refresh the page to see a new request?
+<!-- id: start-updates-itself; page: /app -->
+
+No. "Home" and "Quotes" update by themselves, within a few seconds.
+
+- A new request, an estimate a customer opened, accepted or declined, and a customer's question all show without a reload. So does someone who starts a request and does not finish: the number beside "Unfinished requests" in the menu follows too.
+- The page checks only while its tab is on screen. When you come back to a tab that was in the background, it checks at once.
+- What you are doing stays as it is: your place on the page, an open "More" menu and a search you have typed.
+
+Other pages, such as a quote's own page, show what was true when you opened them. Open the page again to see a change.
 
 ## What is the "Get set up" list, and what ticks each step?
 <!-- id: start-get-set-up; page: /app -->

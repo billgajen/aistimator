@@ -67,6 +67,13 @@ export const RATE_LIMITS = {
   approval_photo: [{ seconds: MINUTE, perIp: 120, perKey: 120 }],
   // T-193: the address of a room's 3D model, asked for when a viewer is opened (the key is the quote or the link)
   room_model: [{ seconds: MINUTE, perIp: 30, perKey: 30 }],
+  // T-204: the customer's "Download PDF". The address is counted for every download; the key is the quote
+  // and is counted only when a document has to be made (each one is a call to the PDF service): a quote
+  // needs one per price, so a handful an hour is already a lot. A PDF already made is never refused for it.
+  quote_pdf: [
+    { seconds: MINUTE, perIp: 10, perKey: 3 },
+    { seconds: HOUR, perIp: 60, perKey: 10 },
+  ],
   // T-199: the live check as a business types its own address (signed in; the key is the business)
   address_check: [{ seconds: MINUTE, perIp: 120, perKey: 120 }],
   // The sign-up relay to Meta: a person signs up once

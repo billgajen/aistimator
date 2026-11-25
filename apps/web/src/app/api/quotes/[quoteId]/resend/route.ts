@@ -185,6 +185,8 @@ export async function POST(
       validUntil,
       primaryColor: branding.primaryColor,
       brand: await customerEmailBrand(supabase, profile.tenant_id, tenant.branding_json),
+      // T-204: said beside the price. A quote that went out automatically was never reviewed.
+      state: (quote as { approved_at?: string | null }).approved_at ? 'confirmed' : 'estimate',
     })
 
     // Send email

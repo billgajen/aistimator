@@ -8,11 +8,12 @@
  * business approves is rendered by code from the compiled config — never by AI.
  */
 
-import { useState } from 'react'
-import type { ServiceDraftConfig, AddonConfig, MultiplierConfig } from '@qolumns/shared'
+import { useEffect, useState } from 'react'
+import type { ServiceDraftConfig, AddonConfig, MultiplierConfig, PricingFlag, LinkRepair } from '@qolumns/shared'
 import { describePricingRules, type DescribablePricing } from '@/lib/pricing-describe'
 import type { LeftOut } from '@/lib/pricing-left-out'
 import { LeftOutNote } from '@/components/services/LeftOutNote'
+import { PricingFlagsNote } from '@/components/services/PricingFlagsNote'
 
 export interface CompileResult {
   updatedConfig: ServiceDraftConfig
@@ -21,6 +22,30 @@ export interface CompileResult {
   ambiguities: string[]
   /** T-201: what did not fit in one service (ten price lines, ten questions), by name. Absent when all fitted. */
   leftOut?: LeftOut
+  /** T-204: what the code tied after the AI's answer (a line to its question, "each additional" to the answer minus 1) */
+  linked?: LinkRepair[]
+  /** T-204: what is still loose. Shown here and on "Test & Publish"; it never blocks applying or saving. */
+  flags?: PricingFlag[]
+}
+
+/**
+ * T-204: what is shown while the compile runs. It is one request that takes about half a minute, so
+ * the steps follow the clock: the first two are the AI's work, the last is the code that checks its
+ * answer. Each stays until the next is due; the last stays until the answer is in.
+ */
+export const COMPILE_STEPS: ReadonlyArray<{ after: number; label: string }> = [
+  { after: 0, label: 'Reading your prices…' },
+  { after: 9, label: 'Making questions…' },
+  { after: 22, label: 'Checking…' },
+]
+
+/** The step to show after `seconds` of compiling */
+export function compileStepAt(seconds: number): number {
+  let index = 0
+  COMPILE_STEPS.forEach((step, i) => {
+    if (seconds >= step.after) index = i
+  })
+  return index
 }
 
 interface PricingComposerProps {
@@ -48,6 +73,16 @@ export function PricingComposer({
   const [compiling, setCompiling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<CompileResult | null>(null)
+  const [step, setStep] = useState(0)
+
+  // T-204: the steps shown while it works
+  useEffect(() => {
+    if (!compiling) return
+    const started = Date.now()
+    setStep(0)
+    const timer = setInterval(() => setStep(compileStepAt((Date.now() - started) / 1000)), 500)
+    return () => clearInterval(timer)
+  }, [compiling])
 
   const handleCompile = async () => {
     if (!description.trim() || compiling) return
@@ -166,10 +201,26 @@ export function PricingComposer({
         >
           {compiling ? 'Compiling…' : 'Compile Pricing'}
         </button>
-        {compiling && (
-          <span className="text-sm text-text-muted">Turning your words into pricing rules…</span>
-        )}
       </div>
+
+      {compiling && (
+        <ol className="mt-3 space-y-1.5" aria-live="polite" data-testid="compile-steps">
+          {COMPILE_STEPS.map((item, index) => (
+            <li
+              key={item.label}
+              data-state={index < step ? 'done' : index === step ? 'now' : 'next'}
+              className={`flex items-center gap-2 text-sm ${index === step ? 'font-semibold text-text-primary' : index < step ? 'text-secondary' : 'text-text-muted'}`}
+            >
+              <span
+                aria-hidden="true"
+                className={`inline-block h-2 w-2 shrink-0 rounded-full ${index < step ? 'bg-secondary' : index === step ? 'bg-primary' : 'border border-field'}`}
+              />
+              {item.label}
+            </li>
+          ))}
+          <li className="pt-1 text-xs text-text-muted">This usually takes about half a minute.</li>
+        </ol>
+      )}
 
       {error && (
         <div className="mt-3 rounded-lg border border-danger-line bg-danger-light p-3 text-sm text-danger">
@@ -212,6 +263,14 @@ export function PricingComposer({
 
           {/* T-201: what did not fit in one service, by name, before anything is applied */}
           <LeftOutNote leftOut={result.leftOut} />
+
+          {/* T-204: what is still loose. It stays visible here and on "Test & Publish"; applying is allowed. */}
+          <PricingFlagsNote
+            flags={result.flags}
+            testId="compile-flags"
+            title="Worth a look before you apply"
+            hint={'Say in your description what each one depends on and compile again, or apply and link them on "Pricing Setup".'}
+          />
 
           {/* Questions the AI needs answered instead of guessing */}
           {result.ambiguities.length > 0 && (

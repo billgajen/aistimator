@@ -4,8 +4,8 @@
  * HTML email templates for quote notifications.
  * Uses inline styles for maximum email client compatibility.
  */
-import { APPROVAL_COPY, EMAIL_COLOR, EMAIL_FONT, brandColourForEmail, businessLogoBlock, emailHeadStyle, poweredByRow, productLogoRow, textColourOnCardForEmail, textOnColourForEmail } from '@qolumns/shared'
-import type { ApprovalDetail, CustomerEmailBrand } from '@qolumns/shared'
+import { APPROVAL_COPY, EMAIL_COLOR, brandColourForEmail, businessLogoBlock, customerPricePanel, emailShell, poweredByRow, productLogoRow, textColourOnCardForEmail, textOnColourForEmail } from '@qolumns/shared'
+import type { ApprovalDetail, CustomerEmailBrand, CustomerQuoteState } from '@qolumns/shared'
 
 export interface CustomerEmailData {
   customerName: string
@@ -19,6 +19,12 @@ export interface CustomerEmailData {
   primaryColor?: string
   /** T-147: an estimate shown before the business approved it; the business will confirm */
   awaitingConfirmation?: boolean
+  /**
+   * T-204: where the quote stands, said beside the price. Left out, it follows `awaitingConfirmation`:
+   * waiting for the business, or (a quote the worker sent automatically) an estimate nobody reviewed.
+   * The worker never sends a reviewed quote: approving is the web app's.
+   */
+  state?: CustomerQuoteState
   /** T-201: the business's logo and whether "Powered by" shows (customer-email-brand.ts) */
   brand?: CustomerEmailBrand
 }
@@ -53,34 +59,8 @@ function emailWrapper(content: string, _primaryColor?: string, options: { fromPr
   // business's emails to its customers. T-201: there it follows the plan, by the estimate page's own
   // rule (`brand.showPoweredBy`, customer-email-brand.ts; the HTML is @qolumns/shared's).
   const footer = options.fromProduct || options.toBusiness ? '' : poweredByRow(options.brand?.showPoweredBy)
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quote notification</title>
-${emailHeadStyle()}
-</head>
-<body style="margin: 0; padding: 0; font-family: ${EMAIL_FONT.body}; background-color: #FAF9F6;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td style="padding: 40px 20px;">
-        ${productHeader}
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <tr>
-            <td style="padding: 40px;">
-              ${content}
-            </td>
-          </tr>
-        </table>
-        ${footer}
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `.trim()
+  // T-204: the page itself is the one every email uses (fixed 600 px card, phone padding): emailShell
+  return emailShell({ title: 'Quote notification', content, above: productHeader, below: footer })
 }
 
 /**
@@ -95,6 +75,9 @@ export function customerQuoteEmail(data: CustomerEmailData): string {
     : data.validUntil
     ? `<p style="margin: 0 0 24px; color: #626C66; font-size: 14px;">This quote is valid until <strong>${data.validUntil}</strong>.</p>`
     : ''
+
+  // T-204: said beside the price (see `state` above)
+  const state: CustomerQuoteState = data.state ?? (estimate ? 'waiting' : 'estimate')
 
   const scopeSection = data.scopeSummary
     ? `
@@ -123,12 +106,7 @@ export function customerQuoteEmail(data: CustomerEmailData): string {
         : "Thank you for your enquiry. We've prepared a quote for you:"}
     </p>
 
-    <div style="margin: 24px 0; padding: 24px; background-color: #EAEFF5; border-radius: 8px; text-align: center;">
-      <p style="margin: 0 0 4px; color: #626C66; font-size: 14px;">${estimate ? 'Estimate' : 'Quoted total'}</p>
-      <p style="margin: 0; font-size: 36px; font-weight: 700; font-family: ${EMAIL_FONT.figure}; font-variant-numeric: tabular-nums; color: ${textColourOnCardForEmail(primaryColor)};">
-        ${escapeHtml(data.total)}
-      </p>
-    </div>
+    ${customerPricePanel({ label: estimate ? 'Estimate' : 'Quoted total', total: data.total, colour: textColourOnCardForEmail(primaryColor), state, businessName: data.businessName })}
 
     ${scopeSection}
     ${validitySection}
@@ -527,12 +505,7 @@ export function revisedQuoteEmail(data: RevisedQuoteEmailData): string {
       Your quote has been updated. Please review the latest version:
     </p>
 
-    <div style="margin: 24px 0; padding: 24px; background-color: #EAEFF5; border-radius: 8px; text-align: center;">
-      <p style="margin: 0 0 4px; color: #626C66; font-size: 14px;">Updated total</p>
-      <p style="margin: 0; font-size: 36px; font-weight: 700; font-family: ${EMAIL_FONT.figure}; font-variant-numeric: tabular-nums; color: ${textColourOnCardForEmail(primaryColor)};">
-        ${escapeHtml(data.total)}
-      </p>
-    </div>
+    ${customerPricePanel({ label: 'Updated total', total: data.total, colour: textColourOnCardForEmail(primaryColor), state: 'confirmed', businessName: data.businessName })}
 
     <table role="presentation" style="width: 100%; margin: 32px 0;">
       <tr>

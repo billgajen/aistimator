@@ -38,7 +38,7 @@ Under "Service Area" you can list the ZIP codes or postcodes you cover, or the s
 3. Press "Save Service Area".
 
 - A customer's code passes when it starts with one of yours. So the first part of a code covers every code that starts with it.
-- A customer outside your list sees "Location is outside service area" when they send the form. Their request is not sent and no estimate is made.
+- A customer outside your list is told so when they send the form. They are taken back to the ZIP code or postcode box, with a line under it saying your business doesn't cover that code. Everything else they entered is kept, so a customer who mistyped the code can correct it and send again. No request is sent and no estimate is made for a code you don't cover.
 - The check uses the code the customer types. A customer who leaves the code empty is not checked.
 - "No restrictions" takes requests from anywhere.
 To limit by state instead, choose "County/State":
@@ -47,7 +47,7 @@ To limit by state instead, choose "County/State":
 2. To name a county, write it with its state after a comma, like "Harris County, TX".
 3. Press "Save Service Area".
 
-- The customer's ZIP code says which state the job is in. A customer in a state that is not on your list sees "Location is outside service area", and their request is not sent.
+- The customer's ZIP code says which state the job is in. A customer in a state that is not on your list is taken back to the ZIP code box and told your business doesn't cover that code, and their request is not sent.
 - A ZIP code tells us the state, not the county. So "Harris County, TX" lets in every customer in Texas and turns away customers in other states.
 - A county written with no state cannot be checked from a ZIP code, so nobody is turned away because of it. Write the state after it.
 - A customer who gives no ZIP code is not checked. A customer is turned away only when it is certain they are outside your list.
@@ -150,7 +150,7 @@ They are on the "Branding" tab. Press "Save Changes" at the bottom when you are 
 5. Under "Quote Template", tick "Allow customers to accept quotes directly" to put an accept button on the quote page. Untick it to leave the button off.
 6. Press "Save Changes".
 
-"Preview" on the right shows a sample quote with your changes before you save.
+"Preview" on the right shows a sketch of your quote with your changes before you save. It uses your own details: your currency, your tax name and rate from "Settings" (or no tax line if you charge none), and lines from one of your own services at sample sizes. It shows "Prepared with {{product}}" only if your estimates carry that line today. Until one of your services has prices, the sketch uses plain stand-in lines.
 
 ## Can I remove "Prepared with {{product}}" from my quotes?
 <!-- id: account-badge; page: /app/settings/branding -->

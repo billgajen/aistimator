@@ -123,12 +123,15 @@ describe('unfinished requests: seen and handled', () => {
       'apps/web/src/app/(dashboard)/app/page.tsx',
     ]) {
       const source = read(path)
-      expect(source, path).toContain('unfinishedFilter(')
+      // T-204: the list reads the rows through the rule; the three counts go through `countUnfinished`,
+      // which reads them through the same rule and counts one per person per service
+      expect(source, path).toMatch(/unfinishedFilter\(|countUnfinished(Entries)?\(/)
       // no reader filters the table by hand
       expect(source, path).not.toMatch(/from\('request_leads'\)[\s\S]{0,200}\.is\('completed_at', null\)/)
     }
+    expect(read('apps/web/src/lib/unfinished-leads.ts')).toMatch(/export async function countUnfinished[\s\S]{0,400}unfinishedFilter\(/)
     expect(read('apps/web/src/app/api/leads/new-count/route.ts')).toContain('newOnly: true')
-    expect(read('apps/web/src/app/(dashboard)/app/page.tsx')).toMatch(/unfinishedFilter\([\s\S]{0,200}newOnly: true/)
+    expect(read('apps/web/src/app/(dashboard)/app/page.tsx')).toMatch(/countUnfinished\([\s\S]{0,200}newOnly: true/)
     // the list and its tab count show everyone, seen or not
     expect(read('apps/web/src/app/api/leads/route.ts')).not.toContain('newOnly')
     expect(read('apps/web/src/app/api/quotes/route.ts')).not.toContain('newOnly')
@@ -148,8 +151,11 @@ describe('unfinished requests: seen and handled', () => {
     const done = read('apps/web/src/app/api/leads/[leadId]/done/route.ts')
     expect(done).toContain('requireTenant()')
     expect(done.indexOf('requireTenant()')).toBeLessThan(done.indexOf('createAdminClient()'))
-    // looked up and written by id AND tenant, both times
-    expect(done.match(/\.eq\('id', leadId\)\s*\n\s*\.eq\('tenant_id', auth\.tenantId\)/g)).toHaveLength(2)
+    // looked up by id AND tenant; T-204: written to every row of that one entry (the same person and
+    // service), each write by its ids AND the tenant
+    expect(done.match(/\.eq\('id', leadId\)\s*\n\s*\.eq\('tenant_id', auth\.tenantId\)/g)).toHaveLength(1)
+    expect(done.match(/\.in\('id', ids\)\s*\.eq\('tenant_id', auth\.tenantId\)/g)).toHaveLength(2)
+    expect(done).toMatch(/unfinishedFilter\(admin\.from\('request_leads'\)\.select\(LEAD_ROW_COLUMNS\), auth\.tenantId\)/)
     expect(done).toContain('LEAD_ID.test(leadId)')
     // no customer details in logs
     for (const source of [seen, done]) expect(source).not.toMatch(/console\.\w+\([^)]*(customer|email|phone)/i)
@@ -410,7 +416,8 @@ describe('Home', () => {
     const queries = home.match(/\.from\('(quotes|quote_feedback|services|tenants)'\)[\s\S]*?(?=\n\s*supabase\b|\n\s*\]\)|\n\s*checkPlanLimit)/g) ?? []
     expect(queries.length).toBeGreaterThanOrEqual(7)
     for (const q of queries) expect(q, q.slice(0, 80)).toMatch(/\.eq\('(tenant_id|id)', profile\.tenant_id\)/)
-    expect(home).toMatch(/unfinishedFilter\([\s\S]{0,160}profile\.tenant_id/)
+    // T-204: the count goes through the shared rule, one per person per service, for this tenant
+    expect(home).toMatch(/countUnfinished\(supabase, profile\.tenant_id/)
   })
 
   it('a fixed number of queries: nothing is fetched per quote', () => {

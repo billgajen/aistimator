@@ -55,14 +55,25 @@ export const EMAIL_FONT_FILES = [
   { family: 'Bricolage Grotesque', weight: 700, file: 'BricolageGrotesque-700.ttf' },
 ] as const
 
-/** For an email's <head>: the faces from our domain, and headings in the display face */
+/** T-204: under this width an email is on a phone, and its padding is `EMAIL_PHONE_PADDING` (40px 20px and 40px otherwise) */
+export const EMAIL_PHONE_MAX_WIDTH = 480
+export const EMAIL_PHONE_PADDING = { outer: '16px 8px', card: '24px 16px' } as const
+
+/** For an email's <head>: the faces from our domain, headings in the display face, and the phone's padding */
 export function emailHeadStyle(): string {
   const faces = EMAIL_FONT_FILES.map(
     (f) => `@font-face { font-family: '${f.family}'; font-weight: ${f.weight}; font-style: normal; src: url('https://${APP_DOMAIN}/brand/fonts/${f.file}') format('truetype'); }`
   ).join('\n    ')
+  // T-204: the emails are a light document (email-shell.ts says why), and on a phone the space
+  // around the card and inside it is reduced so the content uses the screen's width
   return `<style>
     ${faces}
+    :root { color-scheme: light only; }
     h1, h2 { font-family: ${EMAIL_FONT.display}; letter-spacing: -0.01em; }
+    @media only screen and (max-width: ${EMAIL_PHONE_MAX_WIDTH}px) {
+      .email-outer { padding: ${EMAIL_PHONE_PADDING.outer} !important; }
+      .email-card { padding: ${EMAIL_PHONE_PADDING.card} !important; }
+    }
   </style>`
 }
 

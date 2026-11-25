@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RequiredMark, StepTitle } from '../StepTitle'
 
 /**
@@ -12,6 +12,7 @@ export function JobDetailsStep({
   postalCodeLabel,
   postalCodeExample,
   postcode,
+  postcodeError,
   description,
   descriptionRequired,
   onPostcodeChange,
@@ -22,6 +23,8 @@ export function JobDetailsStep({
   postalCodeLabel: string
   postalCodeExample: string
   postcode: string
+  /** T-204: the business does not cover this ZIP or postcode. Shown under the field, which takes the focus. */
+  postcodeError?: string | null
   description: string
   descriptionRequired: boolean
   onPostcodeChange: (value: string) => void
@@ -30,6 +33,13 @@ export function JobDetailsStep({
   onSubmit: () => void
 }) {
   const [touched, setTouched] = useState(false)
+  // T-204: back from a refused ZIP or postcode, the customer lands in that field, ready to correct it
+  const postcodeField = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (!postcodeError) return
+    postcodeField.current?.focus()
+    postcodeField.current?.select()
+  }, [postcodeError])
   const missingDescription = descriptionRequired && !description.trim()
   const input = 'w-full px-4 py-3 text-[15px] border rounded-xl placeholder:text-text-muted focus:outline-none focus:ring-2 transition border-field bg-white focus:border-primary'
 
@@ -37,9 +47,27 @@ export function JobDetailsStep({
     <div className="p-4 sm:p-6">
       <StepTitle>Last step</StepTitle>
       <div className="space-y-4">
-        <div className="max-w-[220px]">
+        <div>
           <label htmlFor="job-postcode" className="block text-[13px] font-semibold text-text-primary mb-1.5">{postalCodeLabel}</label>
-          <input id="job-postcode" type="text" autoComplete="postal-code" value={postcode} onChange={(e) => onPostcodeChange(e.target.value)} placeholder={postalCodeExample} className={input} />
+          <div className="max-w-[220px]">
+            <input
+              ref={postcodeField}
+              id="job-postcode"
+              type="text"
+              autoComplete="postal-code"
+              value={postcode}
+              onChange={(e) => onPostcodeChange(e.target.value)}
+              placeholder={postalCodeExample}
+              aria-invalid={postcodeError ? true : undefined}
+              aria-describedby={postcodeError ? 'job-postcode-error' : undefined}
+              className={postcodeError ? input.replace('border-field', 'border-danger') : input}
+            />
+          </div>
+          {postcodeError && (
+            <p id="job-postcode-error" role="alert" className="mt-1.5 text-sm text-danger" data-testid="outside-area">
+              {postcodeError}
+            </p>
+          )}
         </div>
         <div>
           <label htmlFor="job-description" className="block text-[13px] font-semibold text-text-primary mb-1.5">

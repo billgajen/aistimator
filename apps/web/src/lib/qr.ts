@@ -39,3 +39,52 @@ export function qrToRgba(matrix: boolean[][], scale = 10, margin = 4): { data: U
   )
   return { data, size }
 }
+
+/** The ink a QR code is drawn in (the same in the picture and the vector) */
+export const QR_INK = '#1B2823'
+
+/**
+ * T-204: the same code as a vector (SVG), sharp at any size: a van's side, a
+ * banner, a printer's file. One unit per module, the same quiet zone as the
+ * PNG, a white ground, and each row's dark runs as one path, so the file is
+ * small and no hairlines show between modules. `size` is the width and height
+ * it opens at; it scales without loss.
+ */
+export function qrToSvg(matrix: boolean[][], margin = 4, size = 1024): string {
+  const modules = matrix.length + margin * 2
+  let path = ''
+  matrix.forEach((row, r) => {
+    let c = 0
+    while (c < row.length) {
+      if (!row[c]) {
+        c++
+        continue
+      }
+      let run = 1
+      while (c + run < row.length && row[c + run]) run++
+      path += `M${c + margin} ${r + margin}h${run}v1h-${run}z`
+      c += run
+    }
+  })
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${modules} ${modules}" shape-rendering="crispEdges">` +
+    `<rect width="${modules}" height="${modules}" fill="#FFFFFF"/>` +
+    `<path d="${path}" fill="${QR_INK}"/>` +
+    `</svg>\n`
+  )
+}
+
+/** The dark modules a vector made by `qrToSvg` draws, read back from its path (for the checks) */
+export function svgToMatrix(svg: string, margin = 4): boolean[][] {
+  const modules = Number(/viewBox="0 0 (\d+) /.exec(svg)?.[1] ?? 0)
+  const n = modules - margin * 2
+  const matrix = Array.from({ length: Math.max(0, n) }, () => Array.from({ length: Math.max(0, n) }, () => false))
+  for (const [, x, y, run] of svg.matchAll(/M(\d+) (\d+)h(\d+)v1h-\d+z/g)) {
+    for (let i = 0; i < Number(run); i++) {
+      const row = matrix[Number(y) - margin]
+      if (row) row[Number(x) - margin + i] = true
+    }
+  }
+  return matrix
+}

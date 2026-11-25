@@ -7,17 +7,31 @@
  * The suggestedAction strings are written to be pasted straight into the
  * plain-language pricing composer (AD-021/AD-024).
  */
+import { isSetupTest, quoteWasAccepted, quoteWasSent } from './quote-outcomes'
 
 export interface CalibrationQuoteInput {
   serviceId: string
   status: string
   total: number
+  /** T-204: a setup test is in no figure */
+  isTest?: boolean | null
+  /** T-204: when it reached the customer (an older row has none and is read by its status) */
+  sentAt?: string | null
 }
 
 export interface CalibrationAmendmentInput {
   serviceId: string
   beforeTotal: number
   afterTotal: number
+  /**
+   * T-204: the quote the edit was made to, and when. A quote edited more than
+   * once is one quote: its change is from its price before the first edit to
+   * its price after the last. An edit with no quote id stands alone.
+   */
+  quoteId?: string
+  createdAt?: string
+  /** T-204: an edit to a setup test is in no figure */
+  isTest?: boolean | null
 }
 
 export interface CalibrationSuggestion {
@@ -54,16 +68,25 @@ export const LOW_ACCEPTANCE_PCT = 30
 /** Share of quotes stuck in review that suggests a confidence problem */
 export const HIGH_REVIEW_SHARE = 0.5
 
-const SENT_STATUSES = new Set(['sent', 'viewed', 'accepted', 'paid', 'revised'])
-const ACCEPTED_STATUSES = new Set(['accepted', 'paid'])
-const PROCESSED_STATUSES = new Set([
-  'sent',
-  'viewed',
-  'accepted',
-  'paid',
-  'revised',
-  'pending_review',
-])
+/**
+ * T-204: one change per quote. Edits to the same quote become one: from its
+ * price before the first of them to its price after the last. Edits to setup
+ * tests are dropped.
+ */
+export function editsPerQuote(amendments: readonly CalibrationAmendmentInput[]): CalibrationAmendmentInput[] {
+  const single: CalibrationAmendmentInput[] = []
+  const byQuote = new Map<string, CalibrationAmendmentInput[]>()
+  for (const edit of amendments) {
+    if (edit.isTest === true) continue
+    if (!edit.quoteId) single.push(edit)
+    else byQuote.set(edit.quoteId, [...(byQuote.get(edit.quoteId) ?? []), edit])
+  }
+  for (const edits of byQuote.values()) {
+    const inOrder = [...edits].sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''))
+    single.push({ ...inOrder[0]!, afterTotal: inOrder[inOrder.length - 1]!.afterTotal })
+  }
+  return single
+}
 
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b)
@@ -83,15 +106,16 @@ export function calibrateService(
   quotes: CalibrationQuoteInput[],
   amendments: CalibrationAmendmentInput[]
 ): ServiceCalibration {
-  const serviceQuotes = quotes.filter((q) => q.serviceId === serviceId)
-  const serviceAmendments = amendments.filter(
-    (a) => a.serviceId === serviceId && a.beforeTotal > 0
-  )
+  // T-204: setup tests are in no figure, and "sent" is the one definition every Analytics figure
+  // uses (quote-outcomes.ts): a declined, expired or questioned quote was sent too.
+  const serviceQuotes = quotes.filter((q) => q.serviceId === serviceId && !isSetupTest({ is_test: q.isTest }))
+  const serviceAmendments = editsPerQuote(amendments.filter((a) => a.serviceId === serviceId)).filter((a) => a.beforeTotal > 0)
 
-  const sent = serviceQuotes.filter((q) => SENT_STATUSES.has(q.status))
-  const accepted = serviceQuotes.filter((q) => ACCEPTED_STATUSES.has(q.status))
-  const processed = serviceQuotes.filter((q) => PROCESSED_STATUSES.has(q.status))
+  const reached = (q: CalibrationQuoteInput) => quoteWasSent({ status: q.status, sent_at: q.sentAt })
+  const sent = serviceQuotes.filter(reached)
+  const accepted = serviceQuotes.filter((q) => quoteWasAccepted(q))
   const inReview = serviceQuotes.filter((q) => q.status === 'pending_review')
+  const processed = serviceQuotes.filter((q) => reached(q) || q.status === 'pending_review')
 
   const acceptanceRatePct =
     sent.length >= MIN_QUOTES_FOR_RATE

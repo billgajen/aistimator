@@ -1,30 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
-import { getRegion, canDownloadQuotePdf, customerRoomScanView, resolveRegionContext, roomScanOfAnswers } from '@qolumns/shared'
+import { canDownloadQuotePdf } from '@qolumns/shared'
 import { NextResponse } from 'next/server'
-import { generatePdf, isDocRaptorConfigured } from '@/lib/docraptor'
-import { generateQuotePdfHtml, type QuotePdfData } from '@/lib/pdf-template'
-import { customerTerms } from '@/lib/quote-terms'
-import { uploadToR2, generateDownloadUrl, isR2Configured } from '@/lib/r2'
-import type {
-  QuotePricing,
-  QuoteContent,
-  TenantBranding,
-  TenantTemplate,
-} from '@qolumns/shared'
+import { generateDownloadUrl, isR2Configured } from '@/lib/r2'
+import { makeQuotePdf } from '@/lib/quote-pdf'
 
 /**
  * POST /api/quotes/:quoteId/pdf
- * Generate a PDF for a quote (dashboard use, requires auth)
+ * Generate a PDF for a quote (dashboard use, requires auth).
+ * T-204: the making itself is lib/quote-pdf.ts, shared with the customer's own download.
  */
-/** T-193: the scan stored with the quote's request, as the customer sees it */
-function pdfRoomScan(quote: { quote_requests?: unknown; content_json?: unknown }, tenant: { region?: string | null; unit_system?: string | null }): Pick<QuotePdfData, 'roomScan'> {
-  const request = ((r: unknown) => (Array.isArray(r) ? r[0] : r))(quote.quote_requests) as { job_answers?: unknown } | null
-  const scan = roomScanOfAnswers(request?.job_answers)
-  if (!scan) return {}
-  const region = resolveRegionContext(tenant)
-  return { roomScan: customerRoomScanView(scan, region.unitSystem, region.locale, { takeoff: (quote.content_json as { takeoff?: unknown } | null)?.takeoff ?? [] }) }
-}
-
 export async function POST(
   _request: Request,
   { params }: { params: { quoteId: string } }
@@ -60,23 +44,9 @@ export async function POST(
       )
     }
 
-    // Fetch quote with tenant data
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
-      .select(`
-        *,
-        tenants!tenant_id (
-          id,
-          name,
-          region,
-          unit_system,
-          branding_json,
-          template_json,
-          default_terms_text
-        ),
-        services!service_id ( name ),
-        quote_requests!quote_request_id ( job_answers )
-      `)
+      .select('id, status, pdf_asset_id')
       .eq('id', quoteId)
       .eq('tenant_id', profile.tenant_id)
       .single()
@@ -116,156 +86,17 @@ export async function POST(
       }
     }
 
-    // Check DocRaptor configuration
-    if (!isDocRaptorConfigured()) {
-      return NextResponse.json(
-        { error: { code: 'PDF_NOT_CONFIGURED', message: 'PDF generation is not configured' } },
-        { status: 503 }
-      )
-    }
-
-    // Extract data
-    const tenant = quote.tenants as {
-      id: string
-      name: string
-      region?: string | null
-      unit_system?: string | null
-      branding_json: TenantBranding | null
-      template_json: TenantTemplate | null
-      default_terms_text?: string | null
-    }
-
-    const branding: TenantBranding = {
-      logoAssetId: null,
-      primaryColor: '#2563eb',
-      footerNotes: null,
-      ...(tenant.branding_json || {}),
-    }
-
-    const template: TenantTemplate = {
-      showLineItems: true,
-      includeAssumptions: true,
-      includeExclusions: true,
-      validityDays: 30,
-      ...(tenant.template_json || {}),
-    }
-
-    const pricing = quote.pricing_json as QuotePricing
-    const content = quote.content_json as QuoteContent
-    const customer = quote.customer_json as { name: string; email: string; phone?: string }
-
-    // Calculate valid until date
-    let validUntil: string | undefined
-    if (template.validityDays && quote.created_at) {
-      const createdDate = new Date(quote.created_at)
-      createdDate.setDate(createdDate.getDate() + template.validityDays)
-      validUntil = createdDate.toISOString()
-    }
-
-    // TODO: Get logo URL if logoAssetId exists
-    let logoUrl: string | undefined
-    if (branding.logoAssetId && isR2Configured()) {
-      const { data: logoAsset } = await supabase
-        .from('assets')
-        .select('r2_key')
-        .eq('id', branding.logoAssetId)
-        .single()
-
-      if (logoAsset) {
-        logoUrl = await generateDownloadUrl(logoAsset.r2_key)
-      }
-    }
-
-    // Prepare PDF data
-    const pdfData: QuotePdfData = {
-      quoteId: quote.id,
-      businessName: tenant.name,
-      logoUrl,
-      branding,
-      template,
-      customer,
-      pricing,
-      content,
-      createdAt: quote.created_at,
-      validUntil,
-      locale: getRegion(tenant.region).locale, // T-133
-      // T-179: the first section's heading on a combined quote
-      serviceName: (quote.services as { name?: string } | null)?.name,
-      // T-193: the room scan's sizes and floor plans, in the business's units
-      ...pdfRoomScan(quote, tenant),
-      // T-201: the business's "Default Terms & Conditions", when it has any
-      terms: customerTerms(tenant.default_terms_text),
-    }
-
-    // Generate HTML
-    const html = generateQuotePdfHtml(pdfData)
-
-    // Generate PDF via DocRaptor
-    const result = await generatePdf({
-      name: `Quote-${quoteId}`,
-      html,
-    })
-
-    if (!result.success || !result.pdf) {
-      console.error('PDF generation failed:', result.error)
-      return NextResponse.json(
-        { error: { code: 'PDF_GENERATION_FAILED', message: result.error || 'Failed to generate PDF' } },
-        { status: 500 }
-      )
-    }
-
-    // Store PDF in R2 and create asset record
-    const timestamp = Date.now()
-    const r2Key = `${profile.tenant_id}/pdfs/${quoteId}-${timestamp}.pdf`
-    const fileName = `Quote-${quoteId}.pdf`
-
-    let pdfAssetId: string | null = null
-    let downloadUrl: string | null = null
-
-    if (isR2Configured()) {
-      // Upload to R2
-      await uploadToR2(r2Key, result.pdf, 'application/pdf')
-
-      // Create asset record
-      const { data: asset, error: assetError } = await supabase
-        .from('assets')
-        .insert({
-          tenant_id: profile.tenant_id,
-          type: 'pdf',
-          file_name: fileName,
-          content_type: 'application/pdf',
-          size_bytes: result.pdf.length,
-          r2_key: r2Key,
-        })
-        .select()
-        .single()
-
-      if (assetError) {
-        console.error('Failed to create PDF asset record:', assetError)
-      } else {
-        pdfAssetId = asset.id
-
-        // Update quote with PDF asset ID
-        await supabase
-          .from('quotes')
-          .update({ pdf_asset_id: pdfAssetId })
-          .eq('id', quoteId)
-          .eq('tenant_id', profile.tenant_id)
-
-        // Generate download URL
-        downloadUrl = await generateDownloadUrl(r2Key)
-      }
-    } else {
-      // Development fallback: return PDF as base64
-      console.warn('[PDF] R2 not configured, returning PDF as base64')
+    const made = await makeQuotePdf(supabase, quoteId, profile.tenant_id)
+    if (!made.ok) {
+      return NextResponse.json({ error: { code: made.code, message: made.message } }, { status: made.status })
     }
 
     return NextResponse.json({
       quoteId,
-      pdfAssetId,
-      downloadUrl,
+      pdfAssetId: made.assetId,
+      downloadUrl: made.r2Key ? await generateDownloadUrl(made.r2Key) : null,
       // Include base64 for development without R2
-      ...(!isR2Configured() && { pdfBase64: result.pdf.toString('base64') }),
+      ...(!isR2Configured() && { pdfBase64: made.pdf.toString('base64') }),
       message: 'PDF generated successfully',
     })
   } catch (error) {

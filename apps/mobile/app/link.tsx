@@ -3,13 +3,21 @@
  * customer on site (T-149). They point their camera at it and get the
  * business's request page. The link is shown in words too, and can be sent
  * or copied.
+ *
+ * T-204: the code is drawn at once from the link the phone already holds
+ * (lib/link-memory.ts): the Account tab this screen is opened from has just
+ * read it, and it is saved on the phone for the next time. The server is
+ * still asked, quietly; the code is drawn again only if the link has changed.
+ * With nothing held (the first open on a new phone) it waits for the server,
+ * as it used to.
  */
 import { useEffect, useState } from 'react'
 import { Dimensions, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
-import type { AppAccountResponse } from '@qolumns/shared'
 import { useApi } from '../src/lib/api-context'
 import { shortLink } from '../src/lib/account'
+import { linkInMemory, loadSavedLink, rememberLink, type SavedLink } from '../src/lib/link-memory'
+import { currentUserId } from '../src/lib/supabase'
 import { plainError } from '../src/lib/errors'
 import { done } from '../src/lib/feel'
 import { Qr } from '../src/components/Qr'
@@ -18,15 +26,36 @@ import { colors, fonts, radius, scale, space, type } from '../src/theme'
 
 export default function QuoteLink() {
   const api = useApi()
-  const [account, setAccount] = useState<AppAccountResponse | null>(null)
+  // What the phone holds is there in the first frame: no grey square, no wait
+  const [account, setAccount] = useState<Pick<SavedLink, 'businessName' | 'quoteLink'> | null>(() => linkInMemory(currentUserId()))
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     let alive = true
+    let shown = linkInMemory(currentUserId()) !== null
+    const userId = currentUserId()
+    // 1. saved on the phone from an earlier run (a few milliseconds, no network)
+    if (!shown) {
+      void loadSavedLink(userId).then((saved) => {
+        if (alive && saved && !shown) {
+          shown = true
+          setError(null)
+          setAccount(saved)
+        }
+      })
+    }
+    // 2. the server, quietly: it corrects a link that has changed, and fills a phone that holds none
     api.account().then(
-      (a) => alive && setAccount(a),
-      (e) => alive && setError(plainError(e, 'Your quote link could not be loaded. Try again.'))
+      (a) => {
+        void rememberLink(userId, a)
+        if (!alive) return
+        shown = true
+        setError(null)
+        setAccount((now) => (now && now.quoteLink === a.quoteLink && now.businessName === a.businessName ? now : a))
+      },
+      // with a code already on screen a failed read says nothing: the code still works
+      (e) => alive && !shown && setError(plainError(e, 'Your quote link could not be loaded. Try again.'))
     )
     return () => {
       alive = false

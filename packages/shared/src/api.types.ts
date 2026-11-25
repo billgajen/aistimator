@@ -540,6 +540,12 @@ export interface UpdateQuoteRequest {
   sendToCustomer?: boolean
   /** If responding to feedback, link this feedback ID */
   feedbackId?: string
+  /**
+   * T-204: the business's answer to the customer's pending question (plain text, optional).
+   * Used only with `sendToCustomer` and only while a question is pending: the email to the
+   * customer then shows it above the price, and it is kept on the amendment's record.
+   */
+  answerToCustomer?: string
 }
 
 export interface UpdateQuoteResponse {
@@ -623,6 +629,8 @@ export interface QuoteDetailResponse {
       submittedAt: string
     } | null
   }
+  /** T-204: the quote's price before the business first edited it (null when never edited). Only with ?trace=1. */
+  firstPricing?: unknown
   service: {
     id: string
     name: string

@@ -26,7 +26,8 @@
  * no address nothing is claimed and nothing is sent.
  */
 import { PRODUCT_NAME } from './brand'
-import { EMAIL_FONT, emailHeadStyle } from './email-style'
+import { emailShell } from './email-shell'
+import { productLogoRow } from './product-logo'
 
 export type OpsAlertKind = 'quote_failed' | 'worker_error' | 'queue_backed_up' | 'support_high' | 'ai_busy'
 
@@ -107,20 +108,18 @@ export function opsAlertEmail(alert: OpsAlert, opts: OpsAlertEmailOptions = {}):
   const admin = opts.appUrl ? `${opts.appUrl.replace(/\/$/, '')}${words.adminPath ?? '/admin/quotes'}` : ''
   const off = 'These alerts go to the ALERT_EMAIL address, at most one of each kind an hour. To turn them off, remove that setting.'
   const lines = [words.what, ...facts, held, words.look, admin, off].filter(Boolean)
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${escape(words.subject)}</title>${emailHeadStyle()}
-</head>
-<body style="margin:0;padding:24px;font-family:${EMAIL_FONT.body};color:#1B2823;background-color:#FFFFFF;">
-  <h1 style="margin:0;font-size:20px;font-weight:700;">${escape(words.subject)}</h1>
-  <p style="margin:12px 0 0;font-size:15px;" data-role="what">${escape(words.what)}</p>
+  // T-204: the page is the one every email uses (fixed 600 px card, phone padding): emailShell
+  const html = emailShell({
+    title: words.subject,
+    above: productLogoRow(),
+    content: `<h1 style="margin:0;font-size:20px;font-weight:700;color:#1B2823;">${escape(words.subject)}</h1>
+  <p style="margin:12px 0 0;font-size:15px;color:#1B2823;" data-role="what">${escape(words.what)}</p>
   ${facts.length ? `<ul style="margin:12px 0 0;padding-left:20px;font-size:14px;color:#4F5D57;" data-role="facts">${facts.map((f) => `<li>${escape(f)}</li>`).join('')}</ul>` : ''}
   ${held ? `<p style="margin:12px 0 0;font-size:14px;color:#4F5D57;" data-role="held-back">${escape(held)}</p>` : ''}
-  <p style="margin:12px 0 0;font-size:15px;">${escape(words.look)}</p>
-  ${admin ? `<p style="margin:12px 0 0;font-size:15px;"><a href="${escape(admin)}" data-role="admin">Open the admin area</a></p>` : ''}
-  <p style="margin:24px 0 0;font-size:13px;color:#626C66;" data-role="turn-off">${escape(off)}</p>
-</body>
-</html>`
+  <p style="margin:12px 0 0;font-size:15px;color:#1B2823;">${escape(words.look)}</p>
+  ${admin ? `<p style="margin:12px 0 0;font-size:15px;"><a href="${escape(admin)}" data-role="admin" style="color:#205E56;">Open the admin area</a></p>` : ''}
+  <p style="margin:24px 0 0;font-size:13px;color:#626C66;" data-role="turn-off">${escape(off)}</p>`,
+  })
   return { subject, html, text: lines.join('\n\n') }
 }
 

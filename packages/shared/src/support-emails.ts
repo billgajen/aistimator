@@ -11,7 +11,7 @@
  * The same branded page as the billing emails: the logo over a white card.
  */
 import { PRODUCT_NAME } from './brand'
-import { EMAIL_FONT, emailHeadStyle } from './email-style'
+import { emailFootnote, emailShell } from './email-shell'
 import { productLogoRow } from './product-logo'
 import { SUPPORT_COPY, type SupportAiKind, type SupportSeverity } from './support'
 
@@ -41,24 +41,17 @@ interface PageInput {
 }
 
 function page(input: PageInput): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${escape(input.title)}</title>${emailHeadStyle()}
-</head>
-<body style="margin:0;padding:0;font-family:${EMAIL_FONT.body};background-color:#FAF9F6;">
-  <table role="presentation" style="width:100%;border-collapse:collapse;"><tr><td style="padding:40px 20px;">
-    ${productLogoRow()}
-    <table role="presentation" style="max-width:600px;margin:0 auto;background-color:#FFFFFF;border-radius:8px;"><tr><td style="padding:40px;">
-      <p style="margin:0;font-size:14px;color:#626C66;">${escape(input.label)}</p>
+  // T-204: the page is the one every email uses (fixed 600 px card, phone padding): emailShell
+  return emailShell({
+    title: input.title,
+    above: productLogoRow(),
+    below: emailFootnote(PRODUCT_NAME),
+    content: `<p style="margin:0;font-size:14px;color:#626C66;">${escape(input.label)}</p>
       <h1 style="margin:8px 0 0;font-size:24px;font-weight:700;color:#1B2823;" data-role="heading">${escape(input.heading)}</h1>
       ${input.body}
       <table role="presentation" style="width:100%;margin:24px 0 4px;"><tr><td style="text-align:center;"><a href="${escape(input.buttonHref)}" data-role="${input.buttonRole}" style="display:inline-block;padding:14px 28px;background-color:#205E56;color:#FFFFFF;text-decoration:none;font-weight:600;font-size:15px;border-radius:8px;">${escape(input.buttonLabel)}</a></td></tr></table>
-      ${input.note ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#626C66;" data-role="note">${escape(input.note)}</p>` : ''}
-    </td></tr></table>
-    <table role="presentation" style="max-width:600px;margin:20px auto 0;"><tr><td style="text-align:center;color:#626C66;font-size:12px;">${escape(PRODUCT_NAME)}</td></tr></table>
-  </td></tr></table>
-</body>
-</html>`
+      ${input.note ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#626C66;" data-role="note">${escape(input.note)}</p>` : ''}`,
+  })
 }
 
 const REPLY_IN_DASHBOARD = 'To reply, open it in your dashboard. Replies to this email are not read.'

@@ -8,6 +8,8 @@ export * from './api.types'
 
 // Re-export outcome calibration (T-110)
 export * from './calibration'
+// T-204: one definition of sent / opened / accepted for every Analytics figure
+export * from './quote-outcomes'
 
 // Re-export rate benchmarks (T-115)
 export * from './benchmarks'
@@ -29,6 +31,12 @@ export * from './accuracy'
 
 // Re-export deterministic quantity formulas (T-125)
 export * from './formula'
+// T-204: how an answer is compared with a line's condition (the engine's own code)
+export * from './answer-compare'
+// T-204: the links between a service's questions and its price lines
+export * from './pricing-links'
+// T-204: a quote whose photos could not be read is held, and says why
+export * from './photos-unread'
 
 // Re-export region layer, units and locale formatting (T-133, AD-025)
 export * from './regions'
@@ -49,6 +57,8 @@ export * from './brand'
 export * from './product-logo'
 export * from './colour-contrast'
 export * from './email-style'
+// T-204: the one page every email is put in (fixed width, phone padding, light on purpose)
+export * from './email-shell'
 // T-201: the business's logo and the "Powered by" line in emails to a customer
 export * from './customer-email'
 export * from './review-account'
@@ -67,6 +77,7 @@ export * from './business-email'
 export * from './email-from'
 export * from './minimum-charge'
 export * from './failed-request'
+export * from './waiting-poll'
 export * from './ops-alerts'
 export * from './service-suggestion'
 // T-179: one request, several services

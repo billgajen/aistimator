@@ -110,3 +110,32 @@ export function serviceAreaVerdict(input: ServiceAreaInput): ServiceAreaVerdict 
 export function withinServiceArea(input: ServiceAreaInput): boolean {
   return serviceAreaVerdict(input) !== 'outside'
 }
+
+/** The code the form's server answers with when a request is certainly outside the area (lib/quote-intake.ts) */
+export const OUTSIDE_SERVICE_AREA_CODE = 'OUTSIDE_SERVICE_AREA'
+
+/** "ZIP code" stays "ZIP code"; "Postcode" reads "postcode" inside a sentence */
+function inSentence(label: string): string {
+  const text = clean(label) || 'postcode'
+  return /^[A-Z][a-z]/.test(text) ? text.charAt(0).toLowerCase() + text.slice(1) : text
+}
+
+/**
+ * T-204: what the customer reads, beside the ZIP or postcode field, when the
+ * business does not cover the place they gave. The form goes straight back to
+ * that field with everything else they entered still there, so the line says
+ * what to do next and never suggests starting again.
+ */
+export function outsideAreaLine(input: { businessName?: string | null; postalCodeLabel?: string | null; postcode?: string | null }): string {
+  const business = clean(input.businessName) || 'This business'
+  const label = inSentence(input.postalCodeLabel ?? '')
+  const place = clean(input.postcode)
+  return `${business} doesn’t cover ${place || `that ${label}`}. If the ${label} isn’t right, change it and send again. Everything else you entered is still here.`
+}
+
+/** The same, said in the chat form: there is no field to go back to, so the customer types the right one */
+export function outsideAreaChatLine(input: { businessName?: string | null; postalCodeLabel?: string | null }): string {
+  const business = clean(input.businessName) || 'This business'
+  const label = inSentence(input.postalCodeLabel ?? '')
+  return `Sorry, ${business} doesn’t cover that ${label}. If it isn’t right, tell me the correct one and I’ll send your request again. Everything else you told me is kept.`
+}

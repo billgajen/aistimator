@@ -135,7 +135,7 @@ describe('T-202 item 4: "Clear" asks first, and says exactly what it empties', (
   })
 
   const page = read('apps/web/src/app/(dashboard)/app/services/page.tsx')
-  const handler = page.slice(page.indexOf('const clearAIDraft = () => {'), page.indexOf('const sampleService'))
+  const handler = page.slice(page.indexOf('const clearAIDraft = () => {'), page.indexOf('const serviceBody = () => {'))
 
   it('what the list says is what the handler empties, and nothing else', () => {
     const emptied = [...handler.matchAll(/^\s{6}(\w+): /gm)].map((m) => m[1])
