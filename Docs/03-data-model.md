@@ -247,6 +247,26 @@ after the day that row was created are taken as the plan's.
   pressed "Share & See Benchmarks" stays off, and so do the demo business and the store reviewers' accounts,
   which their scripts set to false.
 
+### tenants: the day's test estimates (T-202, migration 51)
+- `test_estimate_times` (timestamptz[], not null, default `{}`): when each test estimate of the last 24 hours was
+  started ("Try it yourself"). A business may make 5 in 24 hours. The count is kept on the business, not worked
+  out from `quotes.is_test` rows, because a business can delete a test (`DELETE /api/quotes/:id`): a deleted test
+  still counts. Starts empty for every business (a test made before migration 51 is not counted again).
+  - Written only by the service role: the trigger `tenants_test_estimate_guard` (the pattern of `signup_source`,
+    migration 45) refuses a business changing it on its own row.
+  - `claim_test_estimate(p_tenant_id, p_limit)` → `(claimed, claimed_at, used, available_at)`: drops entries older
+    than 24 hours, and adds now if fewer than `p_limit` are left, holding the business's row meanwhile (two
+    requests at once cannot both take the last place). `available_at` is the oldest of the newest `p_limit` plus
+    24 hours, null while there is room. `release_test_estimate(p_tenant_id, p_claimed_at)` removes that one
+    moment (a test that was not saved). Both are for the service role only (revoked from `PUBLIC`, `anon`,
+    `authenticated`).
+- `quotes.is_test` (migration 33) is unchanged: it is what marks a test. T-202 changes who can set it: the
+  server, when the request body says `ownTest: true` and the request carries the signed-in session of that
+  business (before: a signed code in the quote page's address).
+- `quote_link_first_visit_at` (migration 35) is **no longer written** (T-202): a visit to the quote link is not
+  recorded. It is still read: a business ticked by a visit before T-202 keeps "Share your quote link" ticked.
+  `quote_link_copied_at` is set by Copy and, since T-202, by Share (dashboard or phone app).
+
 ### tenants: the reminder to the customer (T-201, migration 50)
 - `customer_reminder_enabled` (boolean, not null, default **true**): the one automatic reminder a customer gets
   when an estimate has waited three days with no answer. Settings → "Reminder to the customer" writes it

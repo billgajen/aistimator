@@ -16,6 +16,7 @@ interface Quote {
   id: string
   status: string
   is_demo: boolean
+  is_test: boolean
   reminder_sent_at: string | null
   accepted_at: string | null
   declined_at: string | null
@@ -87,6 +88,7 @@ const waiting = (id: string, tenant: { id: string; customer_reminder_enabled: bo
   id,
   status: 'sent',
   is_demo: false,
+  is_test: false,
   reminder_sent_at: null,
   accepted_at: null,
   declined_at: null,
@@ -137,6 +139,8 @@ describe('T-201: the reminder to the customer, on or off', () => {
         waiting('asked_a_question', ON, { status: 'feedback_received' }),
         waiting('expired_link', ON, { token_expires_at: new Date(now - DAY).toISOString() }),
         waiting('demo', ON, { is_demo: true }),
+        // T-202: a test estimate the business made itself is never reminded
+        waiting('own_test', ON, { is_test: true }),
         waiting('never_sent', ON, { sent_at: null }),
       ])
     ).toEqual(['opened'])

@@ -86,6 +86,42 @@ export function usedForAllowance(
 }
 
 /**
+ * T-202: what a business falls back on when its plan ends (a payment that was
+ * never taken, a cancellation): its region's allowance without a plan, with
+ * the numbers of this business. Read by the payment-failed email, so it says
+ * what will really happen and not "new requests are then saved".
+ *   per 'total'  the free quotes that never reset: `left` are still unused
+ *                (a quote priced on the plan was never one of them, T-201)
+ *   per 'month'  the old monthly allowance (pre-US businesses): `limit` a month
+ * Pure. The same rule as `checkPlanLimit` below applies once there is no plan.
+ */
+export interface AfterPlanEnds {
+  per: 'month' | 'total'
+  limit: number
+  left: number
+}
+
+export function allowanceAfterPlan(region: string | null | undefined, rows: UsageRow[] | null | undefined, period: string): AfterPlanEnds {
+  const allowance = freeAllowance(region)
+  const used = usedForAllowance(rows, allowance.per, period)
+  return { per: allowance.per, limit: allowance.quotes, left: Math.max(0, allowance.quotes - used) }
+}
+
+/** Reads it for one business. Null when it cannot be read: the email then states the rule without numbers. */
+export async function readAllowanceAfterPlan(supabase: SupabaseClient, tenantId: string): Promise<AfterPlanEnds | null> {
+  try {
+    const [{ data: tenant, error: tenantError }, { data: rows, error: usageError }] = await Promise.all([
+      supabase.from('tenants').select('region').eq('id', tenantId).single(),
+      supabase.from('usage_counters').select('period_yyyymm, estimates_created, plan_estimates_created').eq('tenant_id', tenantId),
+    ])
+    if (tenantError || usageError || !tenant) return null
+    return allowanceAfterPlan((tenant as { region?: string | null }).region, rows as UsageRow[] | null, getCurrentPeriod())
+  } catch {
+    return null
+  }
+}
+
+/**
  * Check whether the tenant may create another estimate this period.
  * Limit comes from the subscription's plan; tenants without a subscription
  * get the trial default. Fails open on read errors — a billing lookup

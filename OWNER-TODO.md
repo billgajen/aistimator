@@ -3210,8 +3210,10 @@ Built and installed on your iPhone 20 November 2026. Nothing to deploy. No code 
 
 ### Rebuild when the 7 days run out
 
-A free (Personal Team) build stops opening after 7 days. Plug the iPhone in, unlock it, and run this one command
-from the project folder (choose your iPhone when it asks):
+A free (Personal Team) build stops opening after 7 days. The 7 days are counted from the day Apple made the
+signing profile, not from the last build: a rebuild before the profile runs out keeps the old date (seen in
+T-202). Xcode needs your Apple ID in Xcode → Settings → Accounts to get a new profile. Plug the iPhone in, unlock
+it, and run this one command from the project folder (choose your iPhone when it asks):
 
 ```
 cd apps/mobile && DEVELOPER_DIR=$HOME/Downloads/Xcode.app/Contents/Developer GEM_HOME=$HOME/.qolumns-pods-sys PATH=$HOME/.qolumns-pods-sys/bin:$PATH LANG=en_US.UTF-8 APP_VARIANT=dev npx expo run:ios --device --configuration Release
@@ -3525,7 +3527,8 @@ the item in the T-201 ticket. What is still open is at the end.
     switched off, with a note.
   - [x] Switching every service off sent Home back to setup. **Fixed (13).**
   - [x] There was no change-password in Settings. **Fixed (14).**
-  - [ ] There is no test estimate after setup. **Still so** (not in T-201).
+  - [x] There was no test estimate after setup. **Fixed in T-202 (3):** "Try it yourself", from setup and from
+    Home.
 - **Quote link and estimates**
   - [x] "Preview on a demo page" opened a developer page. **Removed (15).**
   - [x] The Advanced tip said "Go to Pricing Rules", which is not a page. **Fixed (16).**
@@ -3559,9 +3562,9 @@ the item in the T-201 ticket. What is still open is at the end.
 - **Home**
   - [x] "Accepted this month" and the panel's Accepted step counted different things. **Fixed (35).**
 
-**Still open after T-201** (the T-201 section at the end of this file has the detail): no test estimate after
-setup; "Clear" on "Scope & Photos" does not ask; marking a job won or lost, a date range on Analytics and
-changing the account email are in the backlog.
+**After T-202:** the test estimate, "Clear" asking first, the share tick and the payment-failed email are
+fixed (the T-202 section at the end of this file). "Pricing trace" stays under "More", as you decided. Marking
+a job won or lost, a date range on Analytics and changing the account email are in the backlog.
 
 ### The app on your iPhone
 
@@ -3964,11 +3967,91 @@ code that is live today.
 
 ### Left from the T-198 list
 
-- "Clear" on "Scope & Photos" still empties without asking (only "Regenerate" was in the ticket).
-- There is still no test estimate after setup.
-- "Pricing trace" is still under "More" only, after sending (as the ticket asked).
-- A business typing its own Pro address into a browser still ticks "Share your quote link" (no sign-in reaches
-  that address).
-- The payment-failed email's line "new requests are then saved" is slightly off when free quotes remain.
+- ~~"Clear" on "Scope & Photos" still empties without asking.~~ **Fixed in T-202 (4).**
+- ~~There is still no test estimate after setup.~~ **Fixed in T-202 (3).**
+- "Pricing trace" is still under "More" only, after sending (as you decided).
+- ~~A business typing its own Pro address into a browser still ticks "Share your quote link".~~ **Fixed in
+  T-202 (5):** a visit ticks nothing now.
+- ~~The payment-failed email's line "new requests are then saved" is slightly off when free quotes remain.~~
+  **Fixed in T-202 (6).**
 - Not built, in the product backlog at the top of this file (items 14 to 16): marking a job won or lost, a date
   range on Analytics, changing the account email.
+
+## T-202 — "Try again" in the app, new icons, the test estimate, and the last T-198 fixes
+
+**Built, not deployed.** To put it live: **migration 51 first** (`bash scripts/deploy-migration-51.sh`), then the
+**web**. The worker is not touched. The migration is safe under the code that is live today. T-201 has to be
+live first (migration 50, worker, web), or go out together with this.
+
+### The icons (item 2): waiting for your OK
+
+- **Look at `.checks/t202/icons.png`:** old on the left, new on the right, for the iPhone icon, Android's round
+  and rounded-square masks, the themed icon, the status-bar mark, the Play listing icon, and the site's icons.
+- Every icon is now made from `brand/qolumns-letter.png` by one command, `python3 scripts/make-icons.py`. If
+  you change the drawing again: save it over that file, run the command, and the apps need building again.
+- On Android the mark has the same room inside the round mask as before. Say if you want it larger or smaller
+  (one number in the script).
+- **Not changed:** anything that shows the wordmark (splash, sign-in, emails, the social image, the Play
+  feature graphic). No email shows the letter, and the site has no manifest file.
+- [ ] **Play Console:** upload `Docs/store/google-play/icon-512.png` as the listing icon when you upload the
+  new bundle (the listing icon is set in the console, not by the bundle).
+- [ ] App Store Connect takes its icon from the build; nothing to upload by hand.
+
+### The builds (item 7)
+
+Built 25 November 2026, after your OK on the icons.
+
+- **Android bundle:** `apps/mobile/build/qolumns-android-3.aab` (git-ignored). Version 0.1.0, **version code 3**,
+  same Expo project and upload key as bundle 2. Read out of the file: the new launcher icon on `#192822`, the
+  new themed icon, the new notification icon, and the new app code ("Try again", the share report).
+  **Not uploaded**; `eas submit` was not run.
+  - [ ] Upload it by hand to Play's internal testing, and set the listing icon (above).
+- **iPhone dev build ("Qolumns Dev"):** built with the new icon and installed on your iPhone. It did not open by
+  itself because the phone had locked by the end of the build; open it from the home screen.
+  - [ ] **It stops opening after 26 November, 23:40 UK time, not 29 November.** A free build lives as long as
+    Apple's signing profile, and the profile on this Mac was made on 19 November. A rebuild reuses that profile
+    until it runs out, so today's rebuild did not move the date.
+  - [ ] **Sign in to Xcode before the next rebuild:** Xcode → Settings → Accounts → "+" → Apple Account. The
+    list is empty today, and without an account Xcode cannot ask Apple for a new profile (the build stops with
+    "No Accounts"). After 26 November: sign in, plug in and unlock the phone, run the rebuild command (T-192
+    section). That gives seven new days.
+
+### The test estimate (item 3)
+
+- **Setup's last step is now "Try it yourself"** ("See what your customers see"), and the same button is on Home
+  until your first real customer request. It opens your own form inside the dashboard.
+- **No test link exists any more.** A request is a test only when it is sent from your signed-in dashboard.
+  Nothing in a web address can make one, so a customer cannot.
+- **5 a day.** At the limit the page says when the next one frees up, in your own time.
+- **"Delete this test"** is on a test's page, and asks first. A deleted test still counts toward the day's five.
+- **Decided by you, 25 Nov:**
+  - Test emails keep going out, marked "[Test]": seeing the email is part of the test. The estimate email goes
+    to the address typed as the customer.
+  - The 3-day reminder stays stopped for a test.
+  - The tabs on Quotes keep counting tests (the list shows them with the "Test" tag).
+- A paused account can still make tests (as before).
+
+### The rest
+
+- **"Try again" in the app (1):** same button, same five tries, same sentences as the dashboard. "Contact" is
+  still there beside it.
+- **"Clear" (4):** asks first and lists what goes and what stays.
+- **"Share your quote link" (5):** ticked by Copy or Share (dashboard or app, "Send on WhatsApp" included), by
+  "Download PNG" on the QR code (your decision of 25 Nov), or by your first real request. Opening the link ticks
+  nothing. Showing the QR code on the phone app's screen does not tick it (there is no download there).
+- **Payment-failed email (6):** it now says how many free quotes are left and what happens after them. The
+  billing page had the same wrong line after a plan ended; that is fixed too.
+
+### What you must do
+
+- [ ] Say OK (or not) to the icons.
+- [ ] Deploy when ready: migration 51, then web (after or together with T-201).
+- [ ] Upload the new Android bundle and the Play listing icon.
+
+### Not proven here
+
+- Nothing ran on a phone: "Try again", the share tick from the app, the "Test" label and the new icons are
+  proven by unit tests and by calling the server the way the app does.
+- No email was sent from this Mac: the payment-failed sentence is checked from real rows, and through Stripe's
+  sandbox in the full run.
+

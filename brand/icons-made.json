@@ -1,0 +1,14 @@
+{
+  "source": "brand/qolumns-letter.png",
+  "sourceSha256": "2f6a44f6b3222ce932d7b6f47f67b088491fe6ecd901fbc4c215301246a72f6a",
+  "files": {
+    "apps/web/src/app/icon.png": "e8badb81227e44476c9931720112bb45eb88d7eb35aa8bf46fe2b8faf1b9f3fa",
+    "apps/web/src/app/apple-icon.png": "c7f8cd70d31adfe28b408422d06174d600ec97d71d11e681a32a76f0a6209dc2",
+    "apps/web/src/app/favicon.ico": "2b972242d1728a2c7e6801f41653c331267821ca19df6d99488f24a36176a7bb",
+    "apps/mobile/assets/icon.png": "9917d0abec0fc40c77a5c29afc018f9085e9ad24763f0daee8f0df9286c3a0bf",
+    "Docs/store/google-play/icon-512.png": "50ae2cff0e8c8ca7aaab365c6fce3836af6e540ff6ffdebab959b0bcac94f991",
+    "apps/mobile/assets/adaptive-icon.png": "598614a3a934faeaa28c6e3e78a9379c7d15af47ef350aaaf9a7ce3d42cacfe8",
+    "apps/mobile/assets/adaptive-icon-monochrome.png": "295a6f09a3fb3666cf27d48a321dd1d30af3b2d763be3efa279bb0389cd65841",
+    "apps/mobile/assets/notification-icon.png": "bbc0829fa60a42829d4e5c66aae9232447f4a35ec3dde3afc64ce2b5297d7849"
+  }
+}

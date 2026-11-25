@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { ADDRESS_COPY } from '@qolumns/shared'
 import { slugify } from '@/lib/tenant-slug'
-import { ownVisitUrl } from '@/lib/quote-link-url'
 import { PlanTag } from '@/components/dashboard/PlanTag'
 import { useCopy } from './useCopy'
 import { CleanLinkOffer } from './CleanLinkOffer'
@@ -124,8 +123,7 @@ export function QuoteLinkCard({
             {copiedId === 'link' ? 'Copied' : 'Copy'}
           </button>
           <a
-            // T-201: marked as the business's own visit, so opening it does not tick "Share your quote link"
-            href={ownVisitUrl(main)}
+            href={main}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-semibold text-text-primary hover:bg-surface"

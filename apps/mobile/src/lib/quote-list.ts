@@ -83,13 +83,15 @@ export function rowWords(item: QuoteListItem, opts: QuoteTurnOptions = {}): RowW
   // ago, not opened yet"); a phone row shows the state, a reason when there is one, and one time.
   const when = agoWords(lastChanged(item), opts)
   const detail = REASON_ACTIONS.has(turn.action ?? '') && turn.detail ? turn.detail : null
+  // T-202: a test estimate the business made itself ("Try it yourself" in the dashboard) says so on its row
+  const service = item.isTest === true ? `${item.serviceName} · Test` : item.serviceName
   return {
     customer,
-    service: item.serviceName,
+    service,
     total,
     state: turn.label,
     detail,
     when,
-    spoken: [customer, item.serviceName, total, turn.label, detail, when].filter(Boolean).join(', '),
+    spoken: [customer, service, total, turn.label, detail, when].filter(Boolean).join(', '),
   }
 }

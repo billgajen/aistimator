@@ -23,7 +23,7 @@ Each step counts what happened this calendar month, from the 1st until now. The 
 - "Opened": estimates a customer opened for the first time this month.
 - "Accepted": every estimate accepted this month. It is the same number as "Accepted" under "Where your quotes stand".
 
-Under each step after the first, a small line gives its share of the step before, such as a percentage "of requests", "of sent" or "of opened". Each thing is counted in the month it happened, so an estimate sent last month and accepted this month counts under "Accepted" this month. Test requests from setup never count.
+Under each step after the first, a small line gives its share of the step before, such as a percentage "of requests", "of sent" or "of opened". Each thing is counted in the month it happened, so an estimate sent last month and accepted this month counts under "Accepted" this month. Test estimates (made with "Try it yourself") never count.
 
 {{#soon app}}Every number here comes from requests your customers sent. Estimates you make yourself on site need the phone app, which is {{soon}}.{{/soon}}
 {{#live app}}Estimates you made yourself on site, in the phone app, are not in "Requests", "Estimates sent", "Opened" or the main figure. One that was accepted this month is counted in "Accepted", and the step then says how many, such as "includes 1 made on site", in place of its share. It also has its own line under the steps that ends "you made on site." So "Accepted" is the jobs in "Won this month:" plus the estimates in that line.{{/live}}
@@ -49,7 +49,7 @@ They count your quotes by whose turn it is. Press one to open that tab of "Quote
 - "Waiting for customer": quotes that are with the customer right now. They were sent or opened and not answered yet, or the customer was asked for more details.
 - "Accepted", marked "this month": every estimate accepted since the 1st of this month. The "Accepted" step in "Won through {{product}}" shows the same number.
 
-Test requests from setup are left out. A business with no quotes yet sees one line instead: "No quotes yet. When a customer sends a request, you will see here whose turn it is."
+Test estimates are left out. A business with no quotes yet sees one line instead: "No quotes yet. When a customer sends a request, you will see here whose turn it is."
 
 ## What do the numbers on the Analytics page mean?
 <!-- id: analytics-page-numbers; page: /app/analytics -->
@@ -61,7 +61,7 @@ The four figures at the top count all your quotes since you started, not one mon
 - "Quotes Accepted": quotes the customer accepted.
 - "Conversion Rate": "Quotes Accepted" as a share of every quote that was sent to a customer. Declined and expired quotes count as sent.
 
-The test request from setup is left out of all four.
+A test estimate is left out of all four, even one you approved and accepted yourself.
 
 Lower down:
 

@@ -8,12 +8,12 @@ type Answers = Array<{ fieldId: string; value: string | number | boolean | strin
 /**
  * T-151: save the request as soon as the customer has given their contact
  * details, then record how far they got. Best-effort: a failure here never
- * stops the customer (only invalid contact details are reported back). Test
- * requests from setup never create one.
+ * stops the customer (only invalid contact details are reported back). The
+ * business's own test (T-202, from inside its dashboard) never creates one.
  */
-export function useUnfinishedLead(opts: { tenantKey: string; testToken?: string; honeypot: string; getTurnstileToken: () => Promise<string | null> }) {
+export function useUnfinishedLead(opts: { tenantKey: string; ownTest?: boolean; honeypot: string; getTurnstileToken: () => Promise<string | null> }) {
   const lead = useRef<{ leadId: string; leadToken: string } | null>(null)
-  const { tenantKey, testToken, honeypot, getTurnstileToken } = opts
+  const { tenantKey, ownTest, honeypot, getTurnstileToken } = opts
 
   const start = useCallback(
     async (serviceId: string, customer: { name: string; email: string; phone: string }): Promise<{ fieldErrors?: Record<string, string>; message?: string }> => {
@@ -29,7 +29,7 @@ export function useUnfinishedLead(opts: { tenantKey: string; testToken?: string;
             customer: { name: customer.name, email: customer.email || null, phone: customer.phone || null },
             turnstileToken: turnstileToken || undefined,
             website: honeypot || undefined,
-            ...(testToken && { testToken }),
+            ...(ownTest && { ownTest: true }),
             source: { type: 'widget' },
           }),
         })
@@ -41,7 +41,7 @@ export function useUnfinishedLead(opts: { tenantKey: string; testToken?: string;
       }
       return {}
     },
-    [tenantKey, testToken, honeypot, getTurnstileToken]
+    [tenantKey, ownTest, honeypot, getTurnstileToken]
   )
 
   const update = useCallback(

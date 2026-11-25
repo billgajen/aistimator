@@ -217,6 +217,19 @@ what `pnpm check:failed` reads. The exit code is 0 only when everything passed.
   rewrites in `package.json`. `npx expo export --platform android` proves the JavaScript bundles for Android.
 - **A fixture that needs three plan cards no longer exists:** since T-200 two plans are offered.
 
+## T-202: one script, two sections; the icons
+
+- **`verify-t202` (quick, no model, a browser):** `scripts/hardcore-test/verify-t202.mts` runs the sections in
+  `scripts/hardcore-test/t202/` with T-201's harness: `tryit` (the test estimate from the signed-in session, the
+  limit of five and its time, deleting a test, what a test never counts in, the share tick) and `fixes` ("Try
+  again" as the phone app calls it through five tries, "Clear" asking first, the payment-failed sentence from
+  real rows). One alone: `npx tsx scripts/hardcore-test/verify-t202.mts tryit`.
+- **A test request in any script** is now made the way the dashboard makes it: `ownTest: true` in the body of
+  `POST /api/public/quotes`, with the business's session cookie. There is no test link any more.
+- **Icons:** `python3 scripts/make-icons.py` writes them from `brand/qolumns-letter.png` and records what it
+  wrote in `brand/icons-made.json`; `apps/mobile/src/__tests__/icons-t202.test.ts` fails when the drawing and
+  the record disagree. To look at old against new: `python3 scripts/make-icons.py --compare out.png <revision>`.
+
 ## T-201: one script, five sections
 
 - **`verify-t201` (quick, no model, a browser for one section):** `scripts/hardcore-test/verify-t201.mts` runs the

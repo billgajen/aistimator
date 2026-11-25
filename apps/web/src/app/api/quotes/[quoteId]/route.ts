@@ -1,4 +1,7 @@
-import { createClient, bearerToken } from '@/lib/supabase/server'
+import { createAdminClient, createClient, bearerToken } from '@/lib/supabase/server'
+import { deleteTestEstimate } from '@/lib/test-estimate-delete'
+import { deleteFromR2, isR2Configured } from '@/lib/r2'
+import { TRY_IT_COPY } from '@/lib/try-it-copy'
 import {
   formatMoney,
   resolveRegionContext,
@@ -768,5 +771,32 @@ async function triggerLearningAnalysisIfNeeded(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ serviceId }),
     }).catch((e: unknown) => console.error('[Learning] Failed to trigger analysis:', e))
+  }
+}
+
+/**
+ * DELETE /api/quotes/[quoteId]
+ * T-202: a business deletes one of its own TEST estimates (made with "Try it
+ * yourself"). Anything else is refused: a real quote is never deleted here
+ * (409 NOT_A_TEST), and another business's quote is not found (404). The
+ * rules and what is removed: lib/test-estimate-delete.ts.
+ */
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ quoteId: string }> }) {
+  try {
+    const { quoteId } = await params
+    const supabase = await createClient()
+    const auth = await getAuthContext(supabase)
+    if ('error' in auth) return auth.error
+
+    const result = await deleteTestEstimate(createAdminClient(), auth.tenantId, quoteId, isR2Configured() ? deleteFromR2 : null)
+    if (result.kind === 'deleted') return NextResponse.json({ deleted: true })
+    if (result.kind === 'not_found') return NextResponse.json({ error: { code: 'NOT_FOUND', message: 'Quote not found' } }, { status: 404 })
+    if (result.kind === 'not_a_test') {
+      return NextResponse.json({ error: { code: 'NOT_A_TEST', message: TRY_IT_COPY.delete.notATest } }, { status: 409 })
+    }
+    return NextResponse.json({ error: { code: 'DELETE_FAILED', message: TRY_IT_COPY.delete.failed } }, { status: 500 })
+  } catch (error) {
+    console.error('[Quotes] Delete test error:', error instanceof Error ? error.message : 'unknown')
+    return NextResponse.json({ error: { code: 'INTERNAL_ERROR', message: TRY_IT_COPY.delete.failed } }, { status: 500 })
   }
 }

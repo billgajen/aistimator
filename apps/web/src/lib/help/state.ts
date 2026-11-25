@@ -16,7 +16,7 @@ import { EMPTY_HELP_STATE, getRegion, type HelpState } from '@qolumns/shared'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { checkPlanLimit } from '@/lib/plan-limits'
 import { loadAccess } from '@/lib/access'
-import { hasCustomBranding } from '@/lib/setup-checklist'
+import { hasCustomBranding, quoteLinkShared } from '@/lib/setup-checklist'
 import { planName } from '@/lib/support'
 
 type Db = SupabaseClient
@@ -75,7 +75,17 @@ export async function loadHelpState(
     state.currency = row.currency ?? null
     state.brandingSet = hasCustomBranding(row.branding_json)
     state.pricesChecked = Boolean(row.prices_checked_at)
-    state.linkShared = Boolean(row.quote_link_copied_at || row.quote_link_first_visit_at)
+  }
+  // T-202: the same rule as Home's checklist (Copy or Share, a tick from before T-202, or a first real request)
+  const hasRequest = request && !request.error ? (request.data?.length ?? 0) > 0 : null
+  if (row) {
+    state.linkShared = quoteLinkShared({
+      quoteLinkCopiedAt: row.quote_link_copied_at,
+      quoteLinkFirstVisitAt: row.quote_link_first_visit_at,
+      hasRealRequest: hasRequest === true,
+    })
+  } else if (hasRequest === true) {
+    state.linkShared = true
   }
   if (services && !services.error) {
     state.services = ((services.data ?? []) as Array<{ name?: string | null; active?: boolean | null }>).map((s) => ({ name: s.name ?? '', active: s.active === true }))
@@ -89,7 +99,7 @@ export async function loadHelpState(
   // T-199: on the free start the business works like another plan while free quotes are left (the one rule)
   const access = await attempt(() => loadAccess(supabase, tenantId))
   if (access?.basis === 'free_start' && access.plan && access.freeLeft !== null) state.freeStart = { plan: access.plan.name, left: access.freeLeft }
-  if (request && !request.error) state.hasRequest = (request.data?.length ?? 0) > 0
+  if (hasRequest !== null) state.hasRequest = hasRequest
   if (typeof whatsapp === 'boolean') state.whatsappConnected = whatsapp
   return state
 }

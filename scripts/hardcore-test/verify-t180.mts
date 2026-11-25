@@ -758,6 +758,9 @@ try {
   await dash.context().close()
   const failMail = (await waitForMail(retry.b.email, 'payment-failed'))[0]
   check('one email: "Your payment didn\'t go through", with the line and a button to the billing page', mailTo(retry.b.email, 'payment-failed').length === 1 && failMail?.Subject === "Your payment didn't go through" && (failMail.HtmlBody ?? '').includes('Update your card to keep your quotes running.') && (failMail.HtmlBody ?? '').includes('/app/settings/billing'), failMail?.Subject)
+  // T-202: it says what happens to new requests if the payment is never taken, with this business's own free quotes
+  const afterPlanLine = ((failMail?.HtmlBody ?? '').match(/<span data-role="after-plan">([^<]*)<\/span>/)?.[1] ?? '')
+  check('…and says what its new requests fall back on if the plan ends: its free quotes left, or that they are used', /^If it still cannot be taken, your plan ends\. (You still have \d+ of your \d+ free quotes, so the next (\d+ new requests are|new request is) still priced\.|Your \d+ free quotes are used, so new requests are then saved)/.test(afterPlanLine) && (failMail?.HtmlBody ?? '').includes('New requests are still priced meanwhile.'), afterPlanLine)
   const duringRetry = await submit(retry.b)
   const retryBilling = await billing(retry.b)
   check('everything keeps working while Stripe retries: the plan is still Pro, a request is priced, WhatsApp stays on', (retryBilling.subscription.plan as Row | null)?.id === 'plan_us_pro' && retryBilling.subscription.paymentFailed === true && duringRetry.ok && !held(duringRetry) && (await whatsappAccess(retry.b)).allowed === true, { plan: (retryBilling.subscription.plan as Row | null)?.id, held: held(duringRetry) })

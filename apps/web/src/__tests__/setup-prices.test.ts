@@ -10,8 +10,7 @@ import type { MultiplierConfig } from '@qolumns/shared'
 import { listPacks } from '@/lib/vertical-packs'
 import { toPriceList, applyPriceList, type PricedService } from '@/lib/price-list'
 import { servicePayload, applyCompile, type DraftService } from '@/lib/onboarding-service'
-import { issueTestToken, verifyTestToken, TEST_TOKEN_TTL_MS } from '@/lib/test-quote-token'
-import { publicSource } from '@/lib/test-quotes'
+import { publicSource } from '@/lib/test-estimates'
 import { offeredPlanId } from '@/lib/signup-choices'
 import { CheckPricesStep } from '@/components/onboarding/CheckPricesStep'
 
@@ -155,28 +154,9 @@ describe('T-150: "Check your prices" screen', () => {
   })
 })
 
-describe('T-150: the test flag is server-issued', () => {
-  const key = 'test-secret'
-  const now = 1_800_000_000_000
-
-  it('a token issued for a tenant verifies for that tenant', () => {
-    const { token, expiresAt } = issueTestToken('tnt_a', now, key)
-    expect(verifyTestToken(token, 'tnt_a', now + 1000, key)).toEqual({ ok: true, tenantId: 'tnt_a' })
-    expect(Date.parse(expiresAt)).toBe(now + TEST_TOKEN_TTL_MS)
-  })
-
-  it('refuses another tenant, an expired token, a changed body, a changed signature and junk', () => {
-    const { token } = issueTestToken('tnt_a', now, key)
-    const [body, sig] = token.split('.') as [string, string]
-    const forgedBody = Buffer.from(JSON.stringify({ t: 'tnt_b', e: now + 9e9, n: 'x' })).toString('base64url')
-    expect(verifyTestToken(token, 'tnt_b', now, key)).toEqual({ ok: false, reason: 'wrong_tenant' })
-    expect(verifyTestToken(token, 'tnt_a', now + TEST_TOKEN_TTL_MS + 1, key)).toEqual({ ok: false, reason: 'expired' })
-    expect(verifyTestToken(`${forgedBody}.${sig}`, 'tnt_b', now, key).ok).toBe(false)
-    expect(verifyTestToken(`${body}.${sig.slice(0, -2)}xx`, 'tnt_a', now, key).ok).toBe(false)
-    expect(verifyTestToken(token, 'tnt_a', now, 'another-secret').ok).toBe(false)
-    for (const junk of ['', 'abc', 'a.b.c', 'true', '1']) expect(verifyTestToken(junk, 'tnt_a', now, key).ok).toBe(false)
-  })
-
+describe('T-150: the test flag is set by the server', () => {
+  // T-202: the signed code in the web address (T-150's test link) is gone: a test is marked from the
+  // business's own signed-in session (tryit-t202.test.ts). What a client sends in `source` is still ignored.
   it('a client can’t mark its own request as a test through `source`', () => {
     expect(publicSource({ type: 'widget', test: true, isTest: true, is_test: true, pageUrl: 'x' })).toEqual({ type: 'widget', pageUrl: 'x' })
     expect(publicSource(undefined)).toEqual({ type: 'widget' })

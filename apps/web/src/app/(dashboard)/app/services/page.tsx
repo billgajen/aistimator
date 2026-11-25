@@ -14,7 +14,7 @@ import { PricingComposer } from '@/components/services/PricingComposer'
 import { draftAddonsToConfig } from '@/lib/draft-addons'
 import { measuredLines, sampleNote, samplePrice, type SampleResult } from '@/lib/sample-price'
 import { AmountSymbol, amountBoxPadding } from '@/components/services/AmountSymbol'
-import { REGENERATE_KEEPS, draftToSave, handMadeDraft, isAiDraft, isHandMade, lineNeedsQuestion, linesNeverCharged, looseReferences, regenerateReplaces, syncQuestions } from '@/lib/service-questions'
+import { CLEARED_MEDIA, CLEAR_KEEPS, REGENERATE_KEEPS, clearEmpties, clearLoosens, draftToSave, handMadeDraft, isAiDraft, isHandMade, lineNeedsQuestion, linesNeverCharged, looseReferences, regenerateReplaces, syncQuestions } from '@/lib/service-questions'
 import type {
   Service,
   ServiceMediaConfig,
@@ -189,6 +189,8 @@ export default function ServicesPage() {
   const [draftError, setDraftError] = useState<string | null>(null)
   // T-201: "Regenerate" asks first, and says what it will replace
   const [confirmRegenerate, setConfirmRegenerate] = useState(false)
+  // T-202: "Clear" asks first too, and says what it will empty
+  const [confirmClear, setConfirmClear] = useState(false)
   // T-201: the keys of the questions the open service was saved with. They never change (lib/service-questions).
   const savedFieldIds = useRef<Set<string>>(new Set())
   // T-201: a service just added from a template. It is switched off until its example prices are checked.
@@ -249,6 +251,7 @@ export default function ServicesPage() {
     setAiDraft(null)
     setDraftError(null)
     setConfirmRegenerate(false)
+    setConfirmClear(false)
     savedFieldIds.current = new Set()
     setShowModal(true)
   }
@@ -284,6 +287,7 @@ export default function ServicesPage() {
     setAiDraft(isAiDraft(service.draft_config) ? service.draft_config : null)
     setDraftError(null)
     setConfirmRegenerate(false)
+    setConfirmClear(false)
     savedFieldIds.current = new Set((service.draft_config?.suggestedFields || []).map((f) => f.fieldId).filter(Boolean))
     setShowModal(true)
   }
@@ -297,6 +301,7 @@ export default function ServicesPage() {
     setAiDraft(null)
     setDraftError(null)
     setConfirmRegenerate(false)
+    setConfirmClear(false)
   }
 
   /**
@@ -395,17 +400,15 @@ export default function ServicesPage() {
    * Clear AI draft and reset to defaults
    */
   const clearAIDraft = () => {
+    setConfirmClear(false)
     setAiDraft(null)
     setFormData((prev) => ({
       ...prev,
       scopeIncludes: [],
       scopeExcludes: [],
       defaultAssumptions: [],
-      mediaConfig: {
-        minPhotos: 1,
-        maxPhotos: 8,
-        photoGuidance: null,
-      },
+      // T-202: what it empties is listed to the business first by clearEmpties (lib/service-questions.ts)
+      mediaConfig: { ...CLEARED_MEDIA },
       workSteps: [],
       expectedSignals: [],
       suggestedFields: [],
@@ -1047,7 +1050,10 @@ export default function ServicesPage() {
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => setConfirmRegenerate(true)}
+                            onClick={() => {
+                              setConfirmClear(false)
+                              setConfirmRegenerate(true)
+                            }}
                             disabled={generatingDraft || confirmRegenerate}
                             className="text-sm text-tertiary hover:text-text-primary"
                             data-testid="regenerate"
@@ -1056,8 +1062,13 @@ export default function ServicesPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={clearAIDraft}
+                            onClick={() => {
+                              setConfirmRegenerate(false)
+                              setConfirmClear(true)
+                            }}
+                            disabled={generatingDraft || confirmClear}
                             className="text-sm text-text-secondary hover:text-text-primary"
+                            data-testid="clear-draft"
                           >
                             Clear
                           </button>
@@ -1093,6 +1104,38 @@ export default function ServicesPage() {
                             onClick={() => setConfirmRegenerate(false)}
                             className="inline-flex min-h-[44px] items-center rounded-lg border border-field bg-background px-4 text-sm font-semibold text-text-primary transition-colors hover:bg-surface"
                             data-testid="regenerate-cancel"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {/* T-202: "Clear" asks first and names what it empties, the same way. "Cancel" changes nothing. */}
+                    {aiDraft && confirmClear && (
+                      <div className="rounded-lg border border-border-strong bg-background p-4" role="alertdialog" aria-labelledby="clear-title" data-testid="clear-confirm">
+                        <h3 id="clear-title" className="text-sm font-bold text-text-primary">Empty this service&apos;s setup?</h3>
+                        <p className="mt-1 text-sm text-text-secondary">Nothing is written in its place. It empties:</p>
+                        <ul className="mt-2 list-inside list-disc space-y-0.5 text-sm text-text-primary">
+                          {clearEmpties(formData).map((line) => (
+                            <li key={line}>{line}</li>
+                          ))}
+                        </ul>
+                        {clearLoosens(formData) && <p className="mt-2 text-sm text-text-primary" data-testid="clear-loosens">{clearLoosens(formData)}</p>}
+                        <p className="mt-2 text-sm text-text-secondary">{CLEAR_KEEPS} Nothing is saved until you press &quot;{editingService ? 'Save Changes' : 'Create Service'}&quot;.</p>
+                        <div className="mt-3 flex flex-wrap gap-3">
+                          <button
+                            type="button"
+                            onClick={clearAIDraft}
+                            className="inline-flex min-h-[44px] items-center rounded-lg bg-primary px-4 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+                            data-testid="clear-yes"
+                          >
+                            Empty the setup
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmClear(false)}
+                            className="inline-flex min-h-[44px] items-center rounded-lg border border-field bg-background px-4 text-sm font-semibold text-text-primary transition-colors hover:bg-surface"
+                            data-testid="clear-cancel"
                           >
                             Cancel
                           </button>

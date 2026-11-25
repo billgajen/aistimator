@@ -17,7 +17,6 @@ export interface QuoteLinkTenant {
   id: string
   name: string
   slug: string
-  quoteLinkFirstVisitAt: string | null
 }
 
 export interface QuoteLinkStore {
@@ -61,13 +60,11 @@ interface TenantRow {
   id: string
   name: string
   slug: string
-  quote_link_first_visit_at: string | null
 }
-const toTenant = (row: TenantRow | null): QuoteLinkTenant | null =>
-  row ? { id: row.id, name: row.name, slug: row.slug, quoteLinkFirstVisitAt: row.quote_link_first_visit_at } : null
+const toTenant = (row: TenantRow | null): QuoteLinkTenant | null => (row ? { id: row.id, name: row.name, slug: row.slug } : null)
 
 export function supabaseQuoteLinkStore(supabase: Admin): QuoteLinkStore {
-  const tenantCols = 'id, name, slug, quote_link_first_visit_at'
+  const tenantCols = 'id, name, slug'
   return {
     async tenantBySlug(slug) {
       const { data } = await supabase.from('tenants').select(tenantCols).eq('slug', slug).maybeSingle()
@@ -94,31 +91,11 @@ export function supabaseQuoteLinkStore(supabase: Admin): QuoteLinkStore {
   }
 }
 
-/**
- * T-201: does this visit tick "Share your quote link" on Home? Only a visit
- * that is not the business's own: not its setup test, not opened from the
- * dashboard, and not by someone signed in to this business. (Before T-201 the
- * business opening its own link ticked the step.) Pure.
- */
-export function countsAsFirstVisit(visit: {
-  alreadyVisited: boolean
-  isSetupTest: boolean
-  ownMark: boolean
-  /** the business the visitor is signed in to, if any */
-  signedInTenantId: string | null
-  tenantId: string
-}): boolean {
-  if (visit.alreadyVisited || visit.isSetupTest || visit.ownMark) return false
-  return visit.signedInTenantId !== visit.tenantId
-}
+// T-202: a visit to the page is not recorded any more. Opening the link used to
+// tick "Share your quote link" (tenants.quote_link_first_visit_at), but a visit
+// cannot tell the owner from a customer (on a business's own address no sign-in
+// reaches the page). The step is ticked by Copy or Share, or by the first real
+// request (lib/setup-checklist.ts). The column is still read there, so a
+// business ticked by a visit before T-202 stays ticked; nothing writes it.
 
-/** Record the first visit to a tenant's quote page (once; later visits are no-ops). */
-export async function markFirstVisit(supabase: Admin, tenantId: string): Promise<void> {
-  await supabase
-    .from('tenants')
-    .update({ quote_link_first_visit_at: new Date().toISOString() })
-    .eq('id', tenantId)
-    .is('quote_link_first_visit_at', null)
-}
-
-export { quoteLinkUrl, ownVisitUrl, OWN_VISIT_PARAM } from '@/lib/quote-link-url'
+export { quoteLinkUrl } from '@/lib/quote-link-url'

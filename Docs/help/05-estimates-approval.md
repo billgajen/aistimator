@@ -214,17 +214,29 @@ The page then shows what you invoiced against the quote, and the difference as a
 ## What is a "Test" estimate, and how do I make one?
 <!-- id: estimates-test; page: /app/quotes -->
 
-A test estimate is one you made yourself during setup, to see what your customers see. It has a "Test" tag beside the name in Quotes and on its own page. It does not count toward your plan.
+A test estimate is one you made yourself, to see what your customers see. It has a "Test" tag beside the name in Quotes and on its own page. It does not count toward your plan, and it is left out of "Analytics", of "Won through {{product}}" and of the counts on "Home".
 
-You make one on the last step of setup, "Now try it as your customer":
+You make one with "Try it yourself". The button is on the last step of setup, and on "Home" until your first real customer request arrives:
 
-1. Press "Try it as your customer". Your request page opens in a new tab, with a "Test mode" line at the top.
+1. Press "Try it yourself". Your request form opens in a new tab, with a "Test mode" line at the top.
 2. Fill in the form as a customer would and press "Get my estimate".
-3. Go back to the setup tab. The estimate appears there. If it is waiting for your approval, you can press "Approve & send" to see how approving works.
+3. You land on the estimate page your customer would get. The estimate is also in Quotes, with the "Test" tag. If it is waiting for your approval, you can approve it to see how approving works.
 
-There is a limit on how many test requests you can make in a day.
+You can make 5 test estimates in 24 hours. After the fifth, the button says when you can make another.
 
-A request you send from your ordinary quote link, without the "Test mode" line, is a real request and counts like any other.
+A request you send from your ordinary quote link, without the "Test mode" line, is a real request and counts like any other. Only you can make a test: it needs you to be signed in to your dashboard.
+
+## How do I delete a test estimate?
+<!-- id: estimates-test-delete; page: /app/quotes/[quoteId] -->
+
+Open the test estimate from Quotes and press "Delete this test". Only an estimate with the "Test" tag has this button. A real quote cannot be deleted.
+
+1. Open "Quotes" and open the estimate with the "Test" tag.
+2. Press "Delete this test".
+3. Read the box that opens. It asks "Delete this test estimate?" and says what goes: the test request, its estimate, its photos and its page. The link you were given stops working.
+4. Press "Delete the test". "Cancel" leaves everything as it was.
+
+Deleting cannot be undone. A deleted test still counts as one of your 5 test estimates for the day.
 
 ## How was this price worked out?
 <!-- id: estimates-how-priced; page: /app/quotes/[quoteId]/trace -->
@@ -245,7 +257,7 @@ The page shows:
 For a shorter view, the quote's own page shows each line under "Pricing" and what was read under "What {{product}} understood".
 
 ## What does "Could not be priced" mean, and can I try again?
-<!-- id: estimates-failed; page: /app/quotes/[quoteId] -->
+<!-- id: estimates-failed; page: /app/quotes/[quoteId]; flags: app -->
 
 It means no price could be worked out for that request, so no estimate was sent. You can try again, or quote this one yourself.
 
@@ -259,7 +271,10 @@ To try again:
 2. Under "Next step", press "Try again". The price is worked out again from the same answers and photos, and the page updates when it is done.
 3. If it works, the estimate carries on as any other does. If it still cannot be priced, the page says so again.
 
-Trying again does not use another quote from your plan. The request was counted once, when it arrived. You can try one request up to five times.
+Trying again does not use another quote from your plan. The request was counted once, when it arrived. You can try one request up to five times. After the fifth, the button is gone and the page says to contact the customer and quote it yourself.
+
+{{#soon app}}The phone app is {{soon}}. It will have the same "Try again" button.{{/soon}}
+{{#live app}}The phone app has the same button: open the request in the app and press "Try again" at the bottom of the screen. The five tries are counted together, on the website and in the app.{{/live}}
 
 To quote it yourself:
 

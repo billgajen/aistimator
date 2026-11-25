@@ -51,11 +51,13 @@ export async function run(h: Harness): Promise<void> {
   const link = `${h.app}/quote/${slug}`
   h.check('the step starts unticked', !(await tenant()).quote_link_first_visit_at && !(await tenant()).quote_link_copied_at, await tenant())
   const own = await h.http('GET', `${link}?own=1`)
-  h.check('opened from the dashboard’s "Open" button (the link with its mark): the page opens, the step stays unticked', own.status === 200 && !(await tenant()).quote_link_first_visit_at, { status: own.status, row: await tenant() })
+  h.check('opened with the old "?own=1" mark: the page opens, the step stays unticked', own.status === 200 && !(await tenant()).quote_link_first_visit_at, { status: own.status, row: await tenant() })
   const signedIn = await h.http('GET', link, { headers: biz.cookie })
   h.check('opened by the business while signed in: the step stays unticked', signedIn.status === 200 && !(await tenant()).quote_link_first_visit_at, { status: signedIn.status, row: await tenant() })
   const customer = await h.http('GET', link)
-  h.check('opened by a customer: the step is ticked', customer.status === 200 && Boolean((await tenant()).quote_link_first_visit_at), { status: customer.status, row: await tenant() })
+  // T-202: a visit ticks nothing any more, a customer's included (it cannot tell the owner from a customer);
+  // Copy, Share or the first real request tick it (verify-t202, section "tryit", part G)
+  h.check('opened by a customer: the step stays unticked too (T-202)', customer.status === 200 && !(await tenant()).quote_link_first_visit_at && !(await tenant()).quote_link_copied_at, { status: customer.status, row: await tenant() })
 
   // -------------------------------------------------------------------------
   h.section('Items 15 and 16. The Quote link page')

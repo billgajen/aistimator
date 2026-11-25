@@ -83,9 +83,9 @@ describe('T-149: slug rules', () => {
 
 describe('T-149: resolving /quote/{slug}', () => {
   const tenants: QuoteLinkTenant[] = [
-    { id: 'tnt_a', name: 'Alpha Painting', slug: 'alpha-painting', quoteLinkFirstVisitAt: null },
-    { id: 'tnt_b', name: 'Bravo Roofing', slug: 'bravo-roofing-new', quoteLinkFirstVisitAt: null },
-    { id: 'tnt_c', name: 'Charlie Doors', slug: 'charlie-doors', quoteLinkFirstVisitAt: null },
+    { id: 'tnt_a', name: 'Alpha Painting', slug: 'alpha-painting' },
+    { id: 'tnt_b', name: 'Bravo Roofing', slug: 'bravo-roofing-new' },
+    { id: 'tnt_c', name: 'Charlie Doors', slug: 'charlie-doors' },
   ]
   const sites: Record<string, string | null> = { tnt_a: 'tkey_alpha', tnt_b: 'tkey_bravo', tnt_c: null }
   const history: Record<string, string> = { 'bravo-roofing': 'tnt_b' }

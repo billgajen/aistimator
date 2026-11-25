@@ -5,6 +5,7 @@ import { formatMoney, getPlan } from '@qolumns/shared'
 import { COMING_SOON, PLUS_TAX, planLines } from '@/lib/marketing/plan-claims'
 import type { BillingResponse, PlanInfo } from '@qolumns/shared'
 import { pendingChangeLine, type PendingPlanChange } from '@/lib/billing-pending'
+import { planEndedNote } from '@/lib/plan-ended'
 
 export default function BillingPage() {
   return (
@@ -287,7 +288,8 @@ function BillingPageContent() {
         )}
         {!currentPlan && subscription?.endedPlanName && (
           <p className="mt-4 rounded-xl bg-mist p-3 text-sm text-text-secondary" data-testid="ended-note">
-            Your {subscription.endedPlanName} plan has ended. New requests are saved for you but not priced until you pick a plan.
+            {/* T-202: free quotes never used are still there after a plan, so it says what really happens to a new request */}
+            {planEndedNote(subscription.endedPlanName, { used: data?.usage.estimatesCreated ?? 0, limit: data?.usage.planLimit ?? 0, per: freeTotal ? 'total' : 'month' })}
           </p>
         )}
         {data?.suspended && (

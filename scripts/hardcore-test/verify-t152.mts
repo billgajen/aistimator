@@ -130,9 +130,10 @@ h = await home(a)
 check('confirming prices and copying the link tick their steps', done(h, 'prices') && done(h, 'share'))
 
 // a setup test is not a real request
-const link = expectOk('test-link', await http('POST', `${cfg.appUrl}/api/onboarding/test-link`, { headers: a.cookie }))
-const testToken = new URL(link.url).searchParams.get('test')!
-const testQuote = expectOk('test submit', await submit(a, doorId, { name: 'Owner Test', email: 'owner.test@example.com' }, { testToken }))
+// T-202: a test is the body saying so together with the business's own session (no code, no link)
+const submitTest = (customer: Record<string, unknown>) =>
+  http('POST', `${cfg.appUrl}/api/public/quotes`, { headers: a.cookie, body: { tenantKey: a.tenantKey, serviceId: doorId, customer, job: { postcodeOrZip: '63021', answers: doorAnswers }, source: { type: 'widget' }, ownTest: true } })
+const testQuote = expectOk('test submit', await submitTest({ name: 'Owner Test', email: 'owner.test@example.com' }))
 await pollQuote(cfg, testQuote.quoteId, tokenOf(testQuote))
 check('a setup test does not tick "First real request received"', !done(await home(a), 'first_request'))
 
@@ -156,7 +157,7 @@ const eleventh = await submit(a, doorId, { name: 'Eleven Held', email: 'eleven@e
 const heldRow = (await sb.select('quotes', `tenant_id=eq.${a.tenantId}&customer_json->>email=eq.eleven@example.com&select=id,status,content_json,pricing_json`))[0]
 check('the 11th is held as a lead (unpriced), even though it is a new month', eleventh.ok && heldRow?.status === 'pending_review' && heldRow?.content_json?.limitHold === true, { status: heldRow?.status, limitHold: heldRow?.content_json?.limitHold })
 check('…and does not count', (await totalUsed(a.tenantId)) === 10)
-const atLimitTest = expectOk('test at limit', await submit(a, doorId, { name: 'Owner Test 2', email: 'owner.test2@example.com' }, { testToken }))
+const atLimitTest = expectOk('test at limit', await submitTest({ name: 'Owner Test 2', email: 'owner.test2@example.com' }))
 const atLimitTestQuote = await pollQuote(cfg, atLimitTest.quoteId, tokenOf(atLimitTest))
 check('a setup test is still priced at the limit and not counted', atLimitTestQuote.pricing?.total === 1400 && (await totalUsed(a.tenantId)) === 10)
 const billing = expectOk('billing', await http('GET', `${cfg.appUrl}/api/billing`, { headers: a.cookie }))

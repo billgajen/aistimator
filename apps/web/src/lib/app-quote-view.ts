@@ -29,6 +29,7 @@ import {
   mainSubtotal,
   sectionSubtotal,
   splitMinimum,
+  tryAgainView,
   type AppAlsoAsked,
   type AppQuoteLine,
   type AppQuoteSection,
@@ -122,6 +123,7 @@ export function appQuoteView(input: {
 
   const total = money(pricing.total)
   const taxAmount = money(pricing.taxAmount)
+  const tryAgain = tryAgainView({ status, content_json: quote.content_json })
 
   // T-186: how sure the price is, in the one sentence the dashboard shows. A quote priced before the
   // reasons were stored cannot say "measured from the photos" when none of its lines was.
@@ -174,5 +176,7 @@ export function appQuoteView(input: {
     photos: input.photos,
     ...(input.photoCount !== undefined && { photoCount: input.photoCount }),
     ...(alsoAsked.length > 0 && { alsoAsked }),
+    // T-202: a request that could not be priced says how many tries are left, by the dashboard's rule
+    ...(tryAgain && { tryAgain }),
   }
 }

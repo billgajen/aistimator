@@ -302,7 +302,8 @@ describe('T-201 item 7: "Regenerate" asks first', () => {
     const page = code('app/(dashboard)/app/services/page.tsx')
     // the link itself no longer generates
     const link = page.slice(page.indexOf('data-testid="regenerate"') - 400, page.indexOf('data-testid="regenerate"'))
-    expect(link).toContain('onClick={() => setConfirmRegenerate(true)}')
+    // T-202: it also closes the "Clear" question, so one is asked at a time
+    expect(link).toMatch(/onClick=\{\(\) => \{\s*setConfirmClear\(false\)\s*setConfirmRegenerate\(true\)\s*\}\}/)
     expect(link).not.toContain('generateAIDraft')
     const yes = page.slice(page.indexOf('data-testid="regenerate-yes"') - 500, page.indexOf('data-testid="regenerate-yes"'))
     expect(yes).toContain('void generateAIDraft()')

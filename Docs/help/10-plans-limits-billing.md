@@ -19,7 +19,7 @@ While any are left, and you have never had a plan, your business works like {{fr
 
 These do not use up a free quote:
 
-- a test request you send yourself during setup;
+- a test estimate you make yourself with "Try it yourself" (at the end of setup or on "Home");
 - a request a customer started but did not finish;
 - a request that was saved without a price because you had none left;
 - a quote priced while you were on a plan. So if your plan ends, the free quotes you never used are still there.
@@ -65,7 +65,7 @@ Each customer request that gets a price counts as one quote. It is counted when 
 
 - A request with several services still counts once.
 - Pricing the same request again, after an edit or an answer, does not count again.
-- Test requests from setup, unfinished requests and requests saved without a price do not count.
+- Test estimates, unfinished requests and requests saved without a price do not count.
 - A saved request counts when it is priced: by itself when you pick a plan, or when you press "Price this request".
 
 On a plan, the count is for the calendar month. It starts again on the first day of each month, not on the day your plan renews. The "Billing" tab shows it under "Quotes this month".
@@ -146,7 +146,7 @@ The button is there only once you have bought a plan.
 Your plan keeps working while the payment is tried again over the next days. New requests are still priced.
 
 - Every page of the dashboard shows "Your payment didn't go through. Update your card to keep your quotes running."
-- You get one email about it.
+- You get one email about it. It also says what will happen to new requests if the payment is never taken, with your own numbers: how many of your free quotes you still have, or that they are used.
 - The "Billing" tab shows "Payment problem".
 - Your plan keeps everything it includes while the payment is tried again, the estimate without the "Prepared with {{product}}" line too.
 
@@ -155,7 +155,12 @@ To fix it:
 1. Press "Update your card" in the notice at the top of the page, or open "Settings", "Billing", "Manage billing".
 2. Change your card on Stripe's page.
 
-If the payment still cannot be taken, your plan ends. New requests then use any free quotes you never used. After that they are saved for you but not priced until you pick a plan again.
+If the payment still cannot be taken, your plan ends. What happens to a new request then depends on your free quotes:
+
+- You still have free quotes you never used: new requests are still priced, one free quote each. When those are used, new requests are saved for you but not priced until you pick a plan again.
+- Your free quotes are all used: new requests are saved for you but not priced until you pick a plan again.
+
+The "Billing" tab then says "Your … plan has ended", followed by which of the two applies to you.
 
 ## How do I cancel my plan?
 <!-- id: billing-cancel; page: /app/settings/billing -->
@@ -170,7 +175,7 @@ After you cancel, the "Billing" tab says your plan "ends on" a date and "works a
 
 When the plan has ended:
 
-- The tab shows "No plan".
+- The tab shows "No plan", and a line that starts "Your … plan has ended". The line says how many of your free quotes you still have, or that they are used and new requests are saved without a price.
 - Free quotes you never used are still yours. Only the quotes you priced before you had a plan count against your {{free.quotes}}; quotes priced on the plan do not. If you had used them all, new requests are saved without a price.
 - The other features you had while you were new and on free quotes do not come back: they were for a business that had never had a plan.
 - Your services, prices, settings and quotes stay. Quotes you have sent still open for your customers.

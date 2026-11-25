@@ -41,8 +41,8 @@ Each step is ticked only by one particular action. If a step stays open, that ac
 
 - "Add a service": you need at least one service that is switched on. On "Services", press "Enable" beside a disabled service, or add one. A service added with "Add from a template" starts switched off: check its prices, then press "Enable".
 - "Check your prices": a service added with "Add from a template" does not tick it until you save. On "Services", press "Edit", go to "Test & Publish" with "Next", and press "Save Changes".
-- "Share your quote link": copying the website code does not tick it, and your own test in setup does not either. Press "Copy" under "Your quote link" on "Home".
-- "First real request received": only a request a customer sends in ticks it. Tests from setup and unfinished requests do not.
+- "Share your quote link": opening the link does not tick it, whoever opens it. Copying the website code does not, and your own test estimate does not either. Press "Copy" under "Your quote link" on "Home". It is also ticked when your first real customer request arrives.
+- "First real request received": only a request a customer sends in ticks it. Test estimates and unfinished requests do not.
 
 ## Why did an estimate come out at zero, or much lower than it should?
 <!-- id: problems-price-zero; page: /app/services -->
@@ -183,7 +183,7 @@ Usually because of what they count. Check these before you worry:
 - "Won through {{product}}" and "Accepted" count this calendar month only, from the 1st. They start again at zero each month. "Last month:" shows the month before.
 - A quote counts as accepted only when the customer presses the accept button on their quote page. A job agreed by phone or in person is not counted, and there is no button to mark a quote as accepted yourself.
 - "Requests" counts requests your customers sent themselves. Someone who started the form and stopped is not a request: they are under "Unfinished requests".
-- Test requests from setup never count on Home.
+- Test estimates (made with "Try it yourself") never count on Home.
 - A quote the customer has not accepted adds nothing to "Won this month:", whatever its price.
 
 For every quote since you started, open "See all numbers". The Analytics page counts all of them, with no monthly reset.
@@ -225,7 +225,7 @@ Open "Settings", then the "Billing" tab, and read what it says under "Current Pl
 
 - "Free quotes used": you have used your {{free.quotes}} free quotes. They do not start again each month. Pick a plan. The features of {{freeStart.plan}} that you had while free quotes were left have stopped too, until you pick a plan that includes them.
 - "Limit reached": you have used this month's quotes on your plan. Move to a bigger plan, or wait for the first day of next month.
-- "Your … plan has ended": the plan was cancelled, or a failed payment could not be taken, and any free quotes you had never used are now used too. Pick a plan again.
+- "Your … plan has ended", then "Your … free quotes are used": the plan was cancelled, or a failed payment could not be taken, and any free quotes you had never used are now used too. Pick a plan again. (If the line says you still have free quotes, new requests are still being priced from those.)
 - "Your account is paused": press "Email us" in the notice at the top of the page.
 
 When you pick a plan, or a bigger one, requests saved in the last 30 days are priced for you, oldest first, as far as the plan's quotes for the month go. Nothing is priced by itself when a new month starts, or when a paused account is restored. For a saved request that is left:
@@ -242,7 +242,7 @@ Change your card. Your plan keeps working while the payment is tried again over 
 1. Press "Update your card" in the notice at the top of any dashboard page. If that does not open, go to "Settings", "Billing", and press "Manage billing".
 2. Change your card on Stripe's page.
 
-The notice goes away once the payment has gone through. If the payment still cannot be taken, your plan ends. New requests then use any free quotes you never used, and after that they are saved without a price until you pick a plan again.
+The notice goes away once the payment has gone through. If the payment still cannot be taken, your plan ends. New requests then use any free quotes you never used, and after that they are saved without a price until you pick a plan again. The email about the failed payment says how many free quotes you still have.
 
 ## My logo does not show. Why?
 <!-- id: problems-logo-missing; page: /app/settings/branding -->

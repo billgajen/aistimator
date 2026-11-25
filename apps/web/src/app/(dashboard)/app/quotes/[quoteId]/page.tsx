@@ -19,6 +19,7 @@ import { UnderstoodPanel } from '@/components/quotes/UnderstoodPanel'
 import { Money } from '@/components/quote/document-parts'
 import { RoomScanCard } from '@/components/room-scan/RoomScanCard'
 import { EstimateReport } from '@/components/help/EstimateReport'
+import { DeleteTestEstimate } from '@/components/try-it/DeleteTestEstimate'
 import type {
   QuoteDetailResponse,
   QuotePricing,
@@ -371,7 +372,7 @@ export default function QuoteDetailPage({
             <h1 className="font-display text-2xl font-extrabold text-text-primary">
               Quote for {customer.name}
               {(quote as { is_test?: boolean }).is_test && (
-                <span className="ml-2 inline-flex items-center rounded-full bg-butter px-2 py-0.5 align-middle text-xs font-semibold uppercase tracking-wide text-tertiary" title="A test request from setup. It doesn't count toward your plan.">
+                <span className="ml-2 inline-flex items-center rounded-full bg-butter px-2 py-0.5 align-middle text-xs font-semibold uppercase tracking-wide text-tertiary" title="A test estimate you made yourself. It does not count toward your plan." data-testid="test-tag">
                   Test
                 </span>
               )}
@@ -426,6 +427,9 @@ export default function QuoteDetailPage({
           {actionNote.text}
         </p>
       )}
+
+      {/* T-202: a test estimate (made with "Try it yourself") can be deleted; it asks first */}
+      {(quote as { is_test?: boolean }).is_test === true && <DeleteTestEstimate quoteId={quote.id} />}
 
       {/* 1. T-158: whose turn it is, in one sentence, with the one main button */}
       <NextStepBox

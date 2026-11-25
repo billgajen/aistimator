@@ -199,7 +199,7 @@ describe('T-162: internal names', () => {
   })
 
   it('the signing labels carry the new name', () => {
-    expect(read('apps/web/src/lib/test-quote-token.ts')).toContain("'qolumns:test-quote-token:v1'")
+    // T-202: the test link's signed code is gone (lib/test-quote-token.ts was removed with it)
     expect(read('apps/web/src/lib/demo/demo-guard.ts')).toContain('`qolumns:demo-ip:v1:${ip}`')
   })
 })

@@ -148,6 +148,8 @@ export const SCRIPTS = [
   { id: 't200', server: 'standard', model: 'none' },
   // T-201: the reminder switch, the service editor (a browser for Regenerate), estimates, Home and Settings, billing
   { id: 't201', server: 'standard', model: 'none', browser: true, minutes: 20 },
+  // T-202: two sections sharing T-201's harness (the test estimate and the share tick; the small fixes)
+  { id: 't202', server: 'standard', model: 'none', browser: true, minutes: 20 },
 ]
 
 /** Lint, typecheck and unit tests: every level runs these first */

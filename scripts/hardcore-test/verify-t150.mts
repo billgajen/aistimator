@@ -85,19 +85,21 @@ check('the edited prices are what the service stores', stored.workSteps.find((w:
 
 // ---------- 4. the guided test ----------
 const before = await usage(a.tenantId)
-const link = expectOk('test-link', await http('POST', `${cfg.appUrl}/api/onboarding/test-link`, { headers: a.cookie }))
-const testToken = new URL(link.url).searchParams.get('test')!
-check('the test link is the business’s own quote page in test mode', new URL(link.url).pathname === `/quote/${(await tenantRow(a.tenantId)).slug}` && Boolean(testToken))
-const testPage = await page(null, new URL(link.url).pathname + new URL(link.url).search)
-check('the quote page shows it is a test', testPage.status === 200 && testPage.html.includes('Test mode'))
+// T-202: the test starts on a page inside the dashboard (no code in any address); the request is
+// marked as a test from the business's own session. `link.now` is the server's time, to look from.
+const link = expectOk('test start', await http('GET', `${cfg.appUrl}/api/test-estimates`, { headers: a.cookie }))
+check('the test starts on a page inside the dashboard, with nothing in its address', link.canStart === true && link.url === '/app/try-it')
+const testPage = await page(a, link.url)
+check('that page shows it is a test', testPage.status === 200 && testPage.html.includes('Test mode'))
 const site = (await sb.select('tenant_sites', `tenant_id=eq.${a.tenantId}&select=tenant_key`))[0]
 const answers = [{ fieldId: '_project_description', value: 'New garage door please, single steel one' }, { fieldId: 'door_size', value: 'Single (8 or 9 ft wide, 7 ft tall)' }, { fieldId: 'door_style', value: 'Steel, non-insulated' }]
-async function submit(extra: Record<string, unknown>) {
+async function submit(extra: Record<string, unknown>, headers: Record<string, string> = {}) {
   return http('POST', `${cfg.appUrl}/api/public/quotes`, {
+    headers,
     body: { tenantKey: site.tenant_key, serviceId, customer: { name: 'Owner Test', email: 'owner-test@example.com' }, job: { postcodeOrZip: '63021', answers }, ...extra },
   })
 }
-const testSubmit = expectOk('test submit', await submit({ testToken, source: { type: 'widget' } }))
+const testSubmit = expectOk('test submit', await submit({ ownTest: true, source: { type: 'widget' } }, a.cookie))
 const testQuote = await pollQuote(cfg, testSubmit.quoteId, new URL(testSubmit.quoteViewUrl).searchParams.get('token')!)
 const testRow = await quoteRow(testSubmit.quoteId)
 check('the test request is flagged as a test', testRow.is_test === true)
@@ -105,26 +107,25 @@ check('it charges the edited prices, penny-exact ($175.50 + $1,333.33 = $1,508.8
 check('it is shown to the "customer" as an estimate', testQuote.status === 'pending_review' && testQuote.pricing?.total === 1508.83, testQuote.status)
 const after = await usage(a.tenantId)
 check('it does not count toward the plan (created and sent unchanged)', after.created === before.created && after.sent === before.sent, { before, after })
-const inline = expectOk('test-quote', await http('GET', `${cfg.appUrl}/api/onboarding/test-quote?since=${encodeURIComponent(link.issuedAt)}`, { headers: a.cookie }))
+const inline = expectOk('test-quote', await http('GET', `${cfg.appUrl}/api/onboarding/test-quote?since=${encodeURIComponent(link.now)}`, { headers: a.cookie }))
 check('setup gets the estimate to show inline', inline.quote?.id === testSubmit.quoteId && inline.quote?.total === 1508.83 && inline.quote?.lines?.length >= 2, inline.quote?.lines)
 const approve = await http('POST', `${cfg.appUrl}/api/quotes/${testSubmit.quoteId}/approve`, { headers: a.cookie })
 check('Approve & send works on the test estimate', approve.ok && approve.json.status === 'sent', approve.json)
 const list2 = expectOk('quotes list', await http('GET', `${cfg.appUrl}/api/quotes`, { headers: a.cookie }))
 check('the quotes list marks it as a test', list2.items.find((q: { quoteId: string }) => q.quoteId === testSubmit.quoteId)?.isTest === true)
-check('the other business can’t read it', expectOk('rival test-quote', await http('GET', `${cfg.appUrl}/api/onboarding/test-quote?since=${encodeURIComponent(link.issuedAt)}`, { headers: madeUp.cookie })).quote === null)
+check('the other business can’t read it', expectOk('rival test-quote', await http('GET', `${cfg.appUrl}/api/onboarding/test-quote?since=${encodeURIComponent(link.now)}`, { headers: madeUp.cookie })).quote === null)
 
 // ---------- 5. the flag can't be forged ----------
 const forgedSource = expectOk('forged source', await submit({ source: { type: 'widget', test: true, is_test: true } }))
 await pollQuote(cfg, forgedSource.quoteId, new URL(forgedSource.quoteViewUrl).searchParams.get('token')!)
 check('a public visitor sending test: true in source gets a normal (counted) quote', (await quoteRow(forgedSource.quoteId)).is_test === false && (await usage(a.tenantId)).created === after.created + 1)
-const tampered = `${testToken.split('.')[0]}.AAAA${testToken.split('.')[1]!.slice(4)}`
-check('a tampered test token is refused (403)', (await submit({ testToken: tampered })).status === 403)
-check('a made-up test token is refused (403)', (await submit({ testToken: 'true' })).status === 403)
-const rivalLink = expectOk('rival link', await http('POST', `${cfg.appUrl}/api/onboarding/test-link`, { headers: madeUp.cookie }))
-check('another business’s test token is refused here (403)', (await submit({ testToken: new URL(rivalLink.url).searchParams.get('test') })).status === 403)
-check('a test link needs a login', (await http('POST', `${cfg.appUrl}/api/onboarding/test-link`)).status === 401)
+// T-202: a test needs the body saying so AND the business's own session; the old link's code is refused
+check('a request that says "test" with no sign-in is refused (403)', (await submit({ ownTest: true })).status === 403)
+check('a code from the old test link is refused (403)', (await submit({ testToken: 'true' }, a.cookie)).status === 403)
+check('another business, signed in, cannot make a test here (403)', (await submit({ ownTest: true }, madeUp.cookie)).status === 403)
+check('starting a test needs a login', (await http('GET', `${cfg.appUrl}/api/test-estimates`)).status === 401)
 const forgedPage = await page(null, `/quote/${(await tenantRow(a.tenantId)).slug}?test=true`)
-check('the quote page ignores a bad test token (no test banner)', forgedPage.status === 200 && !forgedPage.html.includes('Test mode'))
+check('the quote page has no test mode, whatever its address says (no test banner)', forgedPage.status === 200 && !forgedPage.html.includes('Test mode'))
 
 // ---------- 6. skipping, and a business with services ----------
 const homeWithService = await page(a, '/app')

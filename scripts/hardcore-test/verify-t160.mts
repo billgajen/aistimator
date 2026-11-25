@@ -395,8 +395,8 @@ if (!process.env.PLAYWRIGHT_DIR) {
   const clip = await p.evaluate(() => navigator.clipboard.readText()).catch(() => '')
   check('Home: Copy puts the quote link on the clipboard and says "Copied"', linkOnHome === `${origin}/quote/${a.slug}` && (clip === linkOnHome || clip === ''), { linkOnHome, clip })
   check('Home: Open and "QR code and website form" go to the public page and the Quote link page',
-    // T-201: "Open" marks the visit as the business's own (?own=1), so it does not tick "Share your quote link"
-    (await p.getByTestId('home-quote-link').getByRole('link', { name: 'Open', exact: true }).getAttribute('href')) === `${linkOnHome}?own=1` &&
+    // T-202: "Open" opens the plain link again (a visit ticks nothing any more, so T-201's "?own=1" mark is gone)
+    (await p.getByTestId('home-quote-link').getByRole('link', { name: 'Open', exact: true }).getAttribute('href')) === linkOnHome &&
       (await p.getByTestId('home-quote-link').getByRole('link', { name: 'QR code and website form' }).getAttribute('href')) === '/app/quote-link')
 
   // ---- the banner and the badge clear, and come back ----

@@ -1,6 +1,7 @@
 import { checkContact, contactRequirementOf } from '@/lib/contact-rules'
 import { completeLeads } from '@/lib/request-leads'
-import { decideTestRequest, publicSource } from '@/lib/test-quotes'
+import { decideTestRequest, publicSource, releaseTestClaim } from '@/lib/test-estimates'
+import { currentTenant } from '@/lib/current-tenant'
 import { createAdminClient } from '@/lib/supabase/server'
 import { createQuoteSubmission } from '@/lib/quote-intake'
 import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
@@ -42,7 +43,12 @@ interface CreateQuoteRequest {
   turnstileToken?: string
   /** Honeypot — hidden field no human sees; any value means a bot */
   website?: string
-  /** T-150: server-issued test token from setup (owner's test request) */
+  /**
+   * T-202: "this is my own test", sent by the form shown inside the dashboard (/app/try-it). It makes a test
+   * only together with the signed-in session of that business (lib/test-estimates.ts); without it: refused.
+   */
+  ownTest?: boolean
+  /** T-150's code from the old test link. Nothing sends it any more; a tab left open is told to start again. */
   testToken?: string
   /** T-151: the unfinished request this submission completes */
   leadId?: string
@@ -160,11 +166,25 @@ export async function POST(request: Request) {
       demoIp = demo.ipHash
     }
 
-    // T-150: only a valid server-issued token for this tenant makes a test request
-    // (the demo business has no owner, so no test links)
-    const test = isDemo ? ({ kind: 'normal' } as const) : await decideTestRequest(supabase, tenantId, body.testToken)
+    // T-202: a test is the business's own, sent from inside its dashboard: the body says so AND the
+    // request carries that business's signed-in session. Nothing in a web address makes one, and a
+    // request that says "test" without the session is refused, never counted as a real one.
+    // (The demo business has no owner, so no tests.)
+    const test = isDemo
+      ? ({ kind: 'normal' } as const)
+      : await decideTestRequest(supabase, tenantId, {
+          ownTest: body.ownTest,
+          oldToken: body.testToken,
+          signedInTenantId: async () => {
+            const auth = await currentTenant()
+            return auth.ok ? auth.tenantId : null
+          },
+        })
     if (test.kind === 'refused') {
-      return NextResponse.json({ error: { code: test.code, message: test.message } }, { status: test.status })
+      return NextResponse.json(
+        { error: { code: test.code, message: test.message, ...(test.availableAt && { availableAt: test.availableAt }) } },
+        { status: test.status }
+      )
     }
 
     const result = await createQuoteSubmission(supabase, {
@@ -182,7 +202,12 @@ export async function POST(request: Request) {
       isDemo,
       // T-151: a service with no questions of its own still needs a description
       requireDescriptionWithoutQuestions: true,
+    }).catch(async (error: unknown) => {
+      if (test.kind === 'test') await releaseTestClaim(supabase, tenantId, test.claimedAt)
+      throw error
     })
+    // T-202: a test that was not saved (an answer missing, a photo refused) gives its place in the day's five back
+    if (test.kind === 'test' && result.status !== 200) await releaseTestClaim(supabase, tenantId, test.claimedAt)
 
     // T-151: the request is now a quote — close the unfinished lead it came from
     const quoteId = (result.json as { quoteId?: string }).quoteId

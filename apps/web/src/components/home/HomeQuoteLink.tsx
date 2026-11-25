@@ -3,13 +3,12 @@
 import Link from 'next/link'
 import { QUOTE_TURN_COPY } from '@qolumns/shared'
 import { useCopy } from '@/components/share/useCopy'
-import { ownVisitUrl } from '@/lib/quote-link-url'
 
 /**
  * T-160: "Your quote link" on Home — the link with Copy and Open, and a way
  * to the Quote link page for the QR code and the website form. Copy is the
  * same action as on that page (it also ticks "Share your quote link"). Open
- * does not tick it (T-201).
+ * does not tick it (T-202: opening the link, by anyone, ticks nothing).
  */
 export function HomeQuoteLink({ link }: { link: string }) {
   const Q = QUOTE_TURN_COPY.home.quoteLink
@@ -29,8 +28,7 @@ export function HomeQuoteLink({ link }: { link: string }) {
           {copiedId === 'home-link' ? Q.copied : Q.copy}
         </button>
         <a
-          // T-201: marked as the business's own visit, so opening it does not tick "Share your quote link"
-          href={ownVisitUrl(link)}
+          href={link}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-text-primary hover:bg-surface"

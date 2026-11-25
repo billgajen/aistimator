@@ -422,6 +422,55 @@ are `{ "error": { "code", "message" } }`; the message is written for the person 
   message, address, phone or email. A failed send is logged with the quote id and counts, and never changes any
   route's answer. Settings: `EXPO_ACCESS_TOKEN` (optional, web and worker).
 
+## T-202: the test estimate ("Try it yourself") and the "Share your quote link" tick
+
+**A test request is marked from the business's own session, never from a web address.** T-150's test link
+(`/quote/<slug>?test=<token>`, `POST /api/onboarding/test-link`, `testToken`) is gone.
+
+- `GET /api/test-estimates` (signed in) →
+  `{ "canStart": true, "reason": null, "limit": 5, "used": 1, "availableAt": null, "url": "/app/try-it", "now": "<ISO>" }`.
+  May this business start a test now? `reason` is `"no_service"` (no service switched on) or `"limit"` (5 made in
+  the last 24 hours; `availableAt` is when the next one frees up: the oldest of the five plus 24 hours). It
+  changes nothing and gives out no code. `now` is the server's clock, for `GET /api/onboarding/test-quote?since=`.
+  401 without a sign-in.
+- Page `GET /app/try-it` (under `/app`, so the sign-in guard covers it; outside the dashboard's frame): the
+  signed-in business's own request form, full screen, in test mode. Its address carries nothing. At the limit, or
+  with no service switched on, it says so instead of showing the form.
+- `POST /api/public/quotes` takes **`ownTest: true`** (sent only by the form on `/app/try-it`). The request is a
+  test (`quotes.is_test = true`, outside the plan as before) **only if the request also carries the signed-in
+  session of a user of the business the `tenantKey` belongs to** (the dashboard's cookie; a bearer sign-in counts
+  too). Otherwise:
+  - `ownTest` with no session, with another business's session, or with any value but `true` →
+    **403** `TEST_NOT_SIGNED_IN` ("A test request can only be sent from your own dashboard. Sign in, then start it
+    again from Home."). Nothing is saved: it is never taken as a real, counted request.
+  - `testToken` (a tab left open on the old test link) → **403** `TEST_LINK_INVALID` ("This test link no longer
+    works. Start a new test from your dashboard."), whatever else is sent.
+  - the sixth test in 24 hours → **429** `TEST_LIMIT_REACHED` with `error.availableAt` (ISO). The page writes the
+    time in the reader's own time zone.
+  - the count could not be read → **503** `TEST_NOT_STARTED`.
+  - A session without `ownTest` changes nothing: a signed-in business sending an ordinary request makes a real,
+    counted one. `source.ownTest`, `source.test`, `source.isTest` and `source.is_test` are stripped, as before.
+  - The day's count is taken in one step in the database (`claim_test_estimate`, migration 51) and given back
+    (`release_test_estimate`) when the request is not saved (any answer but 200).
+- `POST /api/public/leads` takes `ownTest` under the same rule: with the session → `{ "skipped": true }` (a test
+  is never an unfinished request, and nothing is counted); without → 403; `testToken` → 403.
+- `DELETE /api/quotes/:quoteId` (signed in) → `{ "deleted": true }`. **Only the business's own test.** A real
+  quote → **409** `NOT_A_TEST`; another business's quote or an unknown id → 404; 401 without a sign-in. Removes
+  the stored files (photos, their small copies, the PDF), their `assets` rows, the quote (logs, amendments,
+  approval links and the push log cascade) and its `quote_requests` row. `tenants.test_estimate_times` is not
+  touched: a deleted test still counts as one of the day's five.
+- `GET /api/onboarding/test-quote?since=` is unchanged (setup's last step reads the test it is waiting for).
+- `GET /quote/:slug` reads nothing from its address and records nothing: `?test=` and `?own=1` are ignored, and
+  **`tenants.quote_link_first_visit_at` is no longer written**.
+- `POST /api/tenant/share-event` takes `{ "event": "copied" | "shared" | "qr" }` (400 `INVALID_EVENT` otherwise;
+  signed in only, cookie or the app's bearer). Each sets `tenants.quote_link_copied_at` once. The phone app calls
+  it from "Copy link" and "Send the link" on its quote link screen; the dashboard sends `qr` when the QR code is
+  downloaded.
+- **"Share your quote link" is done** when `quote_link_copied_at` is set, or `quote_link_first_visit_at` is set
+  (a business ticked by a visit before T-202 stays ticked), or the business has a real customer request (not a
+  test, not a quote made in the app): `quoteLinkShared` in `apps/web/src/lib/setup-checklist.ts`, read by Home and
+  by the help assistant's state.
+
 ## T-201: change password, Analytics, the benchmarks switch, the WhatsApp page
 - `GET /api/tenant` returns `tenant.customerReminder` (boolean; true unless the business switched the reminder to
   its customers off). `PUT /api/tenant` accepts `customerReminder`: only `true` or `false` (**400**
@@ -787,7 +836,10 @@ T-151 customer flow:
 	•	`GET /api/public/quotes/:quoteId` returns `customer.phone` (the link holder's own number, to confirm on accept). `GET /api/quotes/:quoteId` now also returns `review_hold`, `is_test` and `acceptance_json`.
 	•	`quote_requests.customer_email` is nullable (phone-only requests). Customer emails (worker estimate/quote emails, approve, edit-and-send, reminders) are skipped when there is no address; `POST /api/quotes/:id/resend` → 400 `NO_EMAIL` (T-157: "This customer gave no email address. Copy the link and send it to them another way.", checked before anything is written).
 
-T-150 setup and test requests (dashboard cookie or app Bearer; tenant from the signed-in user):
+T-150 setup and test requests (dashboard cookie or app Bearer; tenant from the signed-in user).
+**T-202 replaced the test link and `testToken` below: there is no `POST /api/onboarding/test-link` any more, and a
+test is marked from the business's own session. See "T-202: the test estimate" above; the two lines are kept as
+history.**
 	•	`PUT /api/tenant` also accepts `trade` (a vertical pack id, `"other"`, or null) and `tradeOther` (≤ 200 chars, kept only when `trade` is `"other"`). An unknown trade → 400 `INVALID_INPUT`.
 	•	`POST /api/onboarding/test-link` → `{ "url": "<origin>/quote/<slug>?test=<token>", "issuedAt", "expiresAt" }`. The token is an HMAC over the tenant id and a 2-hour expiry (key: `TEST_QUOTE_SECRET`, else derived from the service-role key). 401 when logged out.
 	•	`GET /api/onboarding/test-quote?since=<ISO>` → `{ "quote": null }` or `{ "quote": { id, status, serviceName, currency, subtotal, taxAmount, taxLabel, total, lines[{label, amount}], scopeSummary } }`: the tenant's latest test request since the link was issued.
@@ -799,9 +851,9 @@ T-150 setup and test requests (dashboard cookie or app Bearer; tenant from the s
 T-149 quote link (dashboard cookie or app Bearer; tenant from the signed-in user):
 	•	`GET /api/tenant/slug[?check=<slug>]` → `{ "slug", "changeable", "random", "options?": string[], "check?": { "slug", "available", "reason?", "message?" } }`. T-174: `random` is true while the link still ends in the four generated characters and has never been replaced (decided on the server: generated ending, `slug_changed_at` empty, nothing in `tenant_slug_history`). `options` (only when `random`, and not on a `?check` call) is up to three clean links built from the business's own stored details (service area, trade, website name, region), each already checked free; it can be empty. `reason`: `too_short` | `too_long` | `invalid_characters` | `reserved` | `taken` (another business's current or former slug).
 	•	`PUT /api/tenant/slug` `{ "slug" }` → `{ "slug", "changeable", "free" }`. Allowed once (`changeable: false`, `free: false`). T-174: replacing a `random` link is free and leaves the one change (`changeable: true`, `free: true`); the server decides that from the tenant's record, never from the request, and it happens once. The same format, reserved-word and never-reuse checks run either way. 400 `INVALID_SLUG`, 409 `SLUG_TAKEN`, 409 `ALREADY_CHANGED`. The old slug goes to `tenant_slug_history`: it keeps redirecting and can never be taken by anyone else. Writing `tenants.slug` directly is refused by a DB trigger (only the service role may change it).
-	•	`POST /api/tenant/share-event` `{ "event": "copied" }` → `{ "ok": true }`. Sets `tenants.quote_link_copied_at` once (home checklist).
+	•	`POST /api/tenant/share-event` `{ "event": "copied" }` (T-202: or `"shared"`, or `"qr"`) → `{ "ok": true }`. Sets `tenants.quote_link_copied_at` once (home checklist).
 
-Public page `GET /quote/:slug` (T-149): the business's hosted quote page, rendering the same widget as `/embed/:tenantKey` (AD-024), so submissions go through `POST /api/public/quotes` with that tenant's key under the same rate limits, Turnstile and honeypot. 200 for a current slug with an active site; 308 to `/quote/<current>` for a former slug; 404 for unknown, malformed or inactive. Rate limit scope `quote_page` (60/min/IP). The first view sets `tenants.quote_link_first_visit_at`. `/embed/:tenantKey`, `widget.js` and `iframe-loader.js` are unchanged.
+Public page `GET /quote/:slug` (T-149): the business's hosted quote page, rendering the same widget as `/embed/:tenantKey` (AD-024), so submissions go through `POST /api/public/quotes` with that tenant's key under the same rate limits, Turnstile and honeypot. 200 for a current slug with an active site; 308 to `/quote/<current>` for a former slug; 404 for unknown, malformed or inactive. Rate limit scope `quote_page` (60/min/IP). The first view set `tenants.quote_link_first_visit_at` until T-202; a visit is no longer recorded. `/embed/:tenantKey`, `widget.js` and `iframe-loader.js` are unchanged.
 
 CRUD /api/services
 
@@ -1125,4 +1177,4 @@ T-201 (the quote link and estimates):
 - `GET /api/public/quotes/:id/pdf`: **404** `PDF_NOT_FOUND` while the price is withheld (`pending_review` not shown early, or `awaiting_clarification`), whether or not a PDF exists.
 - `POST /api/quotes/:id/pdf` (dashboard): the PDF prints the business's terms after the price and the notes, under "Terms and conditions", when it has any.
 - `POST /api/quotes/:id/process` also prices again a request that could not be priced (`status: "failed"`): 200 `{ "queued": true, "retried": true }`. **Nothing is claimed on the plan** (the request was counted when it arrived, and that count is not given back when pricing fails). **429** `RETRY_LIMIT` after five tries of one request by the business (`content_json.businessRetries`), **403** `ACCOUNT_PAUSED` for a suspended business, **502** `QUEUE_FAILED` when the worker cannot be reached (the quote stays failed). A quote that is neither failed nor held by the plan limit is still 400 `NOT_HELD`. The admin's `/api/admin/quotes/:id/retry` is unchanged and has no limit.
-- `GET /quote/:slug`: the first view sets `tenants.quote_link_first_visit_at` only when it is not the business's own: not with `?own=1` (the mark the dashboard's "Open" buttons add; the page removes it from the address bar), and not by a visitor signed in to that business. `?test=` (the setup test) never counted. A business's own address forwards the query, so the mark works there too.
+- (Replaced by T-202: a visit is no longer recorded at all, and `?own=1` is gone.) `GET /quote/:slug`: the first view sets `tenants.quote_link_first_visit_at` only when it is not the business's own: not with `?own=1` (the mark the dashboard's "Open" buttons add; the page removes it from the address bar), and not by a visitor signed in to that business. `?test=` (the setup test) never counted. A business's own address forwards the query, so the mark works there too.

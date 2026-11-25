@@ -193,9 +193,9 @@ The email also gives them your quote link, in case adding code is not possible o
 
 Press "Open" beside your quote link, on "Quote link" or on "Home". This is your real request page, as your customers see it.
 
-It shows your real form. A request you send from it is a real request, and it shows in Quotes like any other.
+It shows your real form. A request you send from it is a real request, and it shows in Quotes like any other. To send a request that does not count, use "Try it yourself" on "Home" or at the end of setup: it opens the same form in test mode.
 
-Opening your own link this way does not tick "Share your quote link" on "Home".
+Opening the link does not tick "Share your quote link" on "Home".
 
 ## How do I get a QR code for my quote link?
 <!-- id: link-qr-code; page: /app/quote-link -->
@@ -207,6 +207,8 @@ The "QR code" section shows a QR code for your quote link. Customers point their
 3. Print it, or send the file to your printer or sign maker. It works on a van, flyers, business cards or invoices.
 
 There is no print button on the page. You print the downloaded picture yourself.
+
+Pressing "Download PNG" ticks "Share your quote link" on "Home". Looking at the QR code does not.
 
 If you change your link, the page shows a code for the new link. A code you already printed still works, because the old link sends people to the new one.
 
@@ -256,11 +258,18 @@ The question then shows on the form's "About the job" step.
 A question added here is asked and its answer is kept with the request, but it does not change a price. To raise or lower a price by an answer, ask the question on the service itself: open "Services", press "Edit" beside the service, add the question on "Customer Questions", then use it under "Adjustments" on "Pricing Setup".
 
 ## What counts as "Share your quote link" on Home?
-<!-- id: link-shared-step; page: /app -->
+<!-- id: link-shared-step; page: /app; flags: app -->
 
-The setup step "Share your quote link" on Home is ticked the first time either of these happens:
+The setup step "Share your quote link" on Home is ticked the first time any of these happens:
 
-- You copy your link. That means "Copy" beside your quote link (on Home or on the Quote link page), or "Copy" on any of the ready-made texts on the Quote link page.
-- A customer opens your request page for the first time.
+- You copy your link. That means "Copy" beside your quote link (on Home, on the Quote link page or at the end of setup), or "Copy" on any of the ready-made texts on the Quote link page.
+- You send your link with the send button on the Quote link page.
+- You press "Download PNG" on the QR code on the Quote link page.
+- Your first real customer request arrives.
 
-Opening your own link does not tick it: not with the "Open" button beside your link, and not while you are signed in. Copying the website code with "Copy code" does not tick it. A test request you make during setup does not tick it either.
+{{#soon app}}The phone app is {{soon}}. Its "Your quote link" screen will tick the step too, with "Copy link" or "Send the link".{{/soon}}
+{{#live app}}In the phone app, "Copy link" and "Send the link" on the "Your quote link" screen tick it too.{{/live}}
+
+Opening the link does not tick it, whoever opens it: a visit cannot tell you from a customer. Copying the website code with "Copy code" does not tick it. A test estimate you make with "Try it yourself" does not tick it either.
+
+If the step was already ticked, it stays ticked.

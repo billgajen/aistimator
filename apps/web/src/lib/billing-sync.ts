@@ -22,6 +22,7 @@ import { businessAccess, canUse, planForStripePrice, storedSubscriptionStatus, s
 import type { PlanInterval, StoredSubscriptionStatus } from '@qolumns/shared'
 import { sendEmail, isPostmarkConfigured } from './postmark'
 import { paymentFailedEmail } from './billing-emails'
+import { readAllowanceAfterPlan } from './plan-limits'
 import { businessEmailFor } from './business-email'
 import { offerAddressAgain } from './own-address'
 
@@ -238,7 +239,9 @@ export async function notifyPaymentFailedOnce(admin: SupabaseClient, tenantId: s
     if (!to) return
     const { data: tenant } = await admin.from('tenants').select('name').eq('id', tenantId).single()
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
-    const email = paymentFailedEmail({ businessName: (tenant as { name?: string } | null)?.name || 'Your business', billingUrl: `${appUrl}/app/settings/billing` })
+    // T-202: what its new requests fall back on if the plan ends, with this business's own numbers
+    const afterPlan = await readAllowanceAfterPlan(admin, tenantId)
+    const email = paymentFailedEmail({ businessName: (tenant as { name?: string } | null)?.name || 'Your business', billingUrl: `${appUrl}/app/settings/billing`, afterPlan })
     await sendEmail({ from: { kind: 'business' }, to, subject: email.subject, htmlBody: email.html, tag: 'payment-failed' })
     console.log('[Billing] Payment-failed notice sent')
   } catch (error) {

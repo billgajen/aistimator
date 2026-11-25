@@ -83,6 +83,8 @@ export interface Tenant {
   default_terms_text: string | null
   /** T-201: the one automatic reminder to a customer (migration 50); absent or true = on */
   customer_reminder_enabled?: boolean
+  /** T-202: when each test estimate of the last 24 hours was started (migration 51); written by the server only */
+  test_estimate_times?: string[]
   /** T-149: public quote page address /quote/{slug} (migration 32) */
   slug: string
   /** T-149: set when the business changed its slug (allowed once) */

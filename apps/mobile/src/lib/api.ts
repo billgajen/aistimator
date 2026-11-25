@@ -188,6 +188,10 @@ export function createApi(opts: {
     /** T-184: the Account tab (the business's name and logo, its plan's name and usage, its quote link) */
     account: () => request<AppAccountResponse>('/api/app/account'),
 
+    /** T-202: the business pressed Copy or Send on its own quote link; ticks "Share your quote link" on Home (the dashboard's route) */
+    quoteLinkShared: (event: 'copied' | 'shared') =>
+      request<{ ok: boolean }>('/api/tenant/share-event', { method: 'POST', body: JSON.stringify({ event }) }),
+
     getQuote: (quoteId: string) => request<AppQuoteView>(`/api/app/quotes/${encodeURIComponent(quoteId)}`),
 
     createQuote: (body: AppCreateQuoteRequest) =>
@@ -214,6 +218,12 @@ export function createApi(opts: {
 
     /** T-134: price a request that was saved when the plan limit was reached (402 while the limit still stands) */
     priceHeldRequest: (quoteId: string) => request<{ queued: boolean }>(`${quotePath(quoteId)}/process`, { method: 'POST' }),
+
+    /**
+     * T-202: price again a request that could not be priced (the dashboard's "Try again", the same route).
+     * Five tries a request (429 RETRY_LIMIT after that); it is never counted against the plan again.
+     */
+    tryAgain: (quoteId: string) => request<{ queued: boolean; retried?: boolean }>(`${quotePath(quoteId)}/process`, { method: 'POST' }),
 
     /** T-180: the account line (a paused account, a failed payment), or null */
     async accountNotice(): Promise<AccountNotice | null> {

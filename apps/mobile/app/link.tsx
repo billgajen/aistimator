@@ -36,11 +36,22 @@ export default function QuoteLink() {
   const link = account?.quoteLink ?? null
   const side = Math.min(Dimensions.get('window').width - space.xl * 2, 340)
 
+  // T-202: pressing Copy or Send ticks "Share your quote link" on Home. Best-effort: with no
+  // signal the link is still copied or sent, and the tick comes with the next press.
+  const noteShared = (event: 'copied' | 'shared') => void api.quoteLinkShared(event).catch(() => undefined)
+
   async function copy() {
     if (!link) return
+    noteShared('copied')
     await Clipboard.setStringAsync(link).catch(() => undefined)
     done()
     setCopied(true)
+  }
+
+  function send() {
+    if (!link) return
+    noteShared('shared')
+    void Share.share({ message: link }).catch(() => undefined)
   }
 
   return (
@@ -73,7 +84,7 @@ export default function QuoteLink() {
       </ScrollView>
       {link ? (
         <BottomBar>
-          <Button title="Send the link" icon="share-outline" onPress={() => void Share.share({ message: link }).catch(() => undefined)} />
+          <Button title="Send the link" icon="share-outline" onPress={send} />
           <Button title="Copy link" icon="copy-outline" variant="secondary" onPress={() => void copy()} />
         </BottomBar>
       ) : null}

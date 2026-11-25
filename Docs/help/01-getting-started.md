@@ -28,7 +28,7 @@ Setup takes you from your trade to your first services in a few short screens. U
 3. "Check your prices" shows every number your estimates will charge. Change any number to match what you charge, then press "These are my prices".
 4. "Last step — the basics": choose your "Currency", tick the box to add tax to estimates if you charge it (then fill in "Tax name" and "Rate (%)"), and fill in "Service area" and "Your logo" if you want to. Both are optional. Leave "Service area" blank to take requests from anywhere.
 5. Press the button that starts "Create" and ends "& finish". Your services are created.
-6. "Now try it as your customer" lets you send a test request, copy your quote link, and press "Go to dashboard".
+6. "Try it yourself" lets you see what your customers see with a test request, copy your quote link, and press "Go to dashboard".
 
 You can change everything afterwards, on "Services" and in "Settings".
 
@@ -48,17 +48,21 @@ If you would rather build your services by hand, press "Skip — set up manually
 ## How do I see what a customer sees?
 <!-- id: start-test-estimate; page: /app/onboarding -->
 
-The last screen of setup, "Now try it as your customer", lets you send a test request through your own quote page. Test requests do not count toward your plan or your free quotes.
+Press "Try it yourself". Your own request form opens in a new tab, in test mode, and what you send from it is a test estimate. A test estimate does not count toward your plan or your free quotes.
 
-1. Press "Try it as your customer". Your quote page opens in a new tab, with a line at the top that starts "Test mode".
-2. Fill in the form as a customer would and send it.
-3. Go back to the setup tab. It says "Waiting for your test request…", then "Got it. Pricing your test request…".
-4. Under "Here's the estimate your customer got" you see each line and the "Total". If your quote page asked a question first, answer it in the other tab and the estimate appears.
+The button is on the last screen of setup, "Try it yourself", under "See what your customers see". It is also on "Home", in the "Try it yourself" box, until your first real customer request arrives. It needs at least one service switched on.
+
+1. Press "Try it yourself". Your request form opens in a new tab, with a line at the top that starts "Test mode".
+2. Fill in the form as a customer would and send it. You land on the estimate page your customer would get.
+3. In setup, go back to the setup tab. It says "Waiting for your test request…", then "Got it. Pricing your test request…".
+4. Under "Here's the estimate your customer got" you see each line and the "Total". If your form asked a question first, answer it in the other tab and the estimate appears.
 5. If the estimate is waiting for your approval, press "Approve & send" to see what approving does. The page then says "Sent. Your customer now has your confirmed quote and can accept it."
 
-A test link works for two hours; "Open it again" gives you a fresh one. There is a daily limit on test requests, and the page tells you when you reach it. A test shows in "Quotes" with a "Test" tag and is left out of the counts on "Home".
+Started from "Home", the test estimate is in "Quotes" once you have sent it.
 
-This test is only offered in setup. After setup, if you open your quote link yourself and send a request, it is treated as a real request and it counts.
+You can make 5 test estimates in 24 hours. After that the button tells you when you can make another, for example: "You have made 5 test estimates in the last 24 hours. You can make another after 3:40 PM tomorrow." A test shows in "Quotes" with a "Test" tag and is left out of the counts on "Home" and in "Analytics". You can delete a test on its own page with "Delete this test".
+
+Only this button makes a test. It works only while you are signed in to your dashboard, so a customer cannot make one. If you open your quote link yourself and send a request, it is treated as a real request and it counts.
 
 ## What is on the Home page?
 <!-- id: start-home-page; page: /app; flags: ownAddress -->
@@ -84,7 +88,7 @@ Then, from top to bottom:
 8. "Your quote link": the link you give customers, with "Copy", "Open" and "QR code and website form".
 9. "Last 30 days": "Requests", "Estimates sent", "Accepted" and "Value accepted", each compared with the 30 days before. "See all numbers" opens "Analytics". These four numbers are hidden once "Won through {{product}}" shows.
 
-Test requests from setup are left out of every count on this page.
+Test estimates, the ones you make with "Try it yourself", are left out of every count on this page. While you have had no real customer request, "Home" also shows a "Try it yourself" box.
 
 ## What is the "Get set up" list, and what ticks each step?
 <!-- id: start-get-set-up; page: /app -->
@@ -93,8 +97,8 @@ Test requests from setup are left out of every count on this page.
 
 1. "Add a service" is ticked when you have at least one service, switched on or off. Pressing it opens "Services".
 2. "Check your prices" is ticked when you finish setup after pressing "These are my prices", or when you save a service on "Services" with "Create Service" or "Save Changes". Pressing it opens "Services".
-3. "Share your quote link" is ticked the first time you press "Copy" on your quote link (on "Home", on the "Quote link" page or at the end of setup), or copy one of the ready-made texts under "Where to put it", or the first time a customer opens your quote page. Opening your own link does not count: not with the "Open" button, and not while you are signed in. Your own test from setup does not count. Copying the website code does not tick it either. Pressing it opens "Quote link".
-4. "First real request received" is ticked when a customer sends you a request. A test from setup does not count, and an unfinished request does not count. Pressing it opens "Quotes".
+3. "Share your quote link" is ticked the first time you press "Copy" on your quote link (on "Home", on the "Quote link" page or at the end of setup), copy one of the ready-made texts on the "Quote link" page, send your link with the send button there, or press "Download PNG" on the QR code there. It is also ticked when your first real customer request arrives. Opening the link does not tick it, whoever opens it. Your own test estimate does not tick it, and copying the website code does not. Pressing it opens "Quote link".
+4. "First real request received" is ticked when a customer sends you a request. A test estimate does not count, and an unfinished request does not count. Pressing it opens "Quotes".
 
 Nothing is switched off while a step is unticked. The list is only a guide.
 
@@ -107,7 +111,7 @@ It shows three counts, by whose turn it is. Pressing a count opens that tab in "
 2. "Waiting for customer": quotes where the next move is the customer's, such as a quote you sent that has not been accepted yet.
 3. "Accepted", marked "this month": every estimate accepted since the 1st of this month. The "Accepted" step in "Won through {{product}}" shows the same number.
 
-Before your first quote it says "No quotes yet. When a customer sends a request, you will see here whose turn it is." Test requests are not counted.
+Before your first quote it says "No quotes yet. When a customer sends a request, you will see here whose turn it is." Test estimates are not counted.
 
 ## What is each item in the menu for?
 <!-- id: start-menu; page: /app; flags: whatsapp -->
@@ -133,7 +137,7 @@ You get {{free.quotes}} free quotes, and no card is needed. They are counted in 
 While you have never had a plan and still have free quotes left, your business works like {{freeStart.plan}}: you can use every feature that plan includes. "Home" says so in one line under your business name, with how many free quotes are left. The "Billing" tab lists what each plan includes.
 
 - Each request a customer sends in counts as one, however many services it asks for.
-- Test requests from setup do not count.
+- Test estimates (made with "Try it yourself") do not count.
 - Unfinished requests (someone started and did not finish) do not count.
 
 When you have only a few left, "Home" shows a notice with a "Pick a plan" button, and we email you once. After they are used up, you are on no plan. New requests are still saved, but they are not priced: the customer is told you will send their estimate shortly. Pick a plan to price them. The features of {{freeStart.plan}} stop as well, until you pick a plan that includes them. Nothing you made is lost.

@@ -138,13 +138,11 @@ const lost = expectOk('lost lead', await startLead(a, doorId, { name: 'Reload Ra
 expectOk('ray submits', await submit(a, doorId, { name: 'Reload Ray', email: 'ray@example.com' }, doorAnswers))
 check('a lead whose token was lost is still closed by the same customer finishing', !(await openLeads(a)).some((l) => l.leadId === lost.leadId))
 
-// Test mode never creates a lead
-const link = expectOk('test link', await http('POST', `${cfg.appUrl}/api/onboarding/test-link`, { headers: a.cookie }))
-const testToken = new URL(link.url).searchParams.get('test')
+// Test mode never creates a lead. T-202: a test is the body saying so together with the business's own session.
 const leadsBefore = await count('request_leads', `tenant_id=eq.${a.tenantId}`)
-const testLead = await startLead(a, doorId, { name: 'Owner Test', email: 'owner-test@example.com' }, { testToken })
+const testLead = await http('POST', `${cfg.appUrl}/api/public/leads`, { headers: a.cookie, body: { tenantKey: a.tenantKey, serviceId: doorId, customer: { name: 'Owner Test', email: 'owner-test@example.com' }, ownTest: true } })
 check('a test request from setup never creates an unfinished lead', testLead.ok && testLead.json.skipped === true && (await count('request_leads', `tenant_id=eq.${a.tenantId}`)) === leadsBefore)
-check('…and a forged test token is refused', (await startLead(a, doorId, { name: 'Faker', email: 'fake@example.com' }, { testToken: 'forged.token' })).status === 403)
+check('…and "test" without the business’s session, or the old link’s code, is refused', (await startLead(a, doorId, { name: 'Faker', email: 'fake@example.com' }, { ownTest: true })).status === 403 && (await startLead(a, doorId, { name: 'Faker', email: 'fake@example.com' }, { testToken: 'forged.token' })).status === 403)
 
 // ---------- 4. accept asks for the next step ----------
 const toAccept = expectOk('to accept', await submit(a, doorId, { name: 'Acey Accept', email: 'acey@example.com', phone: '(555) 201-1212' }, doorAnswers))

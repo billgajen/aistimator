@@ -480,10 +480,10 @@ function QuotesList() {
   )
 }
 
-/** T-150: the owner's test request from setup */
+/** T-150: the owner's own test request (T-202: made with "Try it yourself"; it can be deleted on its own page) */
 function TestBadge() {
   return (
-    <span className="ml-2 inline-flex items-center rounded-full bg-butter px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-tertiary" title="A test request from setup. It doesn't count toward your plan.">
+    <span className="ml-2 inline-flex items-center rounded-full bg-butter px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-tertiary" title="A test estimate you made yourself. It does not count toward your plan." data-testid="test-tag">
       Test
     </span>
   )

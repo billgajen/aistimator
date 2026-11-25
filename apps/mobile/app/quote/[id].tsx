@@ -38,6 +38,7 @@ import { pricingStages } from '../../src/lib/pricing-stages'
 import { loadQuoteToken, saveQuoteToken } from '../../src/lib/quote-tokens'
 import { evidenceWords, shareMessage } from '../../src/lib/share'
 import { storyOfQuote, TONE_STYLE } from '../../src/lib/status'
+import { TRY_AGAIN_BUTTON, TRY_AGAIN_STARTED, TRY_AGAIN_USED, tryAgainError, tryAgainState } from '../../src/lib/try-again'
 import { PricingStages } from '../../src/components/PricingStages'
 import { EstimateReport } from '../../src/components/EstimateReport'
 import { RoomScanCard, RoomScanSummary, SCAN_TIP } from '../../src/components/RoomScanSummary'
@@ -71,6 +72,8 @@ export default function QuoteDetail() {
   const [error, setError] = useState<string | null>(null)
   const [offline, setOffline] = useState(false)
   const [note, setNote] = useState<string | null>(null)
+  // T-202: "Try again" was pressed on this screen; said while the price is worked out again
+  const [triedAgain, setTriedAgain] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const alive = useRef(true)
   // T-194: an area just scanned again (`index`) or added, named before it is sent
@@ -124,6 +127,12 @@ export default function QuoteDetail() {
       if (timer.current) clearTimeout(timer.current)
     }
   }, [load])
+
+  // T-202: once the try has ended with a price, "Pricing started" is not said for a later pricing (a new scan, an answer)
+  const status = quote?.status
+  useEffect(() => {
+    if (status && status !== 'failed' && !isPricing(status)) setTriedAgain(false)
+  }, [status])
 
   /** Run one action: one at a time, with its failure said in plain words */
   async function run(action: () => Promise<void>) {
@@ -260,6 +269,30 @@ export default function QuoteDetail() {
       await load()
     })
 
+  // T-202: a request that could not be priced is priced again: the dashboard's "Try again", the same
+  // route, five tries a request, never counted against the plan again. The screen then follows the
+  // quote as it does any quote being priced (`load` asks again until there is a price or it failed).
+  // A refusal is said in the server's own sentence, and the quote is read again, so the button goes
+  // when the tries are used.
+  const tryAgain = async () => {
+    if (!quote || busy) return
+    setBusy(true)
+    setError(null)
+    setNote(null)
+    try {
+      await api.tryAgain(quote.id)
+      if (alive.current) setTriedAgain(true)
+    } catch (e) {
+      // the tries are used: the quote read below says so in its own place, once
+      if (alive.current && toApiError(e).code !== 'RETRY_LIMIT') setError(tryAgainError(e))
+    }
+    try {
+      await load()
+    } finally {
+      if (alive.current) setBusy(false)
+    }
+  }
+
   const saveInvoice = () =>
     run(async () => {
       const amount = parseMoneyInput(invoice)
@@ -310,6 +343,8 @@ export default function QuoteDetail() {
   const turn = story.turn
   const steps = story.steps
   const action = mainAction(quote)
+  // T-202: a request that could not be priced: "Try again" while a try is left, then the sentence that says what to do
+  const tryState = tryAgainState(quote)
   // how sure the price is: the server's one sentence (the dashboard's); a server from before T-186 sends none
   const certainty = quote.pricing.certainty !== undefined ? quote.pricing.certainty : certaintySentence(quote.pricing.estimate)
   const figure = headlinePrice(quote)
@@ -351,7 +386,10 @@ export default function QuoteDetail() {
 
           {pricing ? (
             // the stages, in the same place the price will be
-            <PricingStages stages={pricingStages({ photosTotal: photoCount, photosDone: photoCount, sent: true, status: quote.status, waitingForSignal: offline })} />
+            <>
+              <PricingStages stages={pricingStages({ photosTotal: photoCount, photosDone: photoCount, sent: true, status: quote.status, waitingForSignal: offline })} />
+              {triedAgain ? <Muted>{TRY_AGAIN_STARTED}</Muted> : null}
+            </>
           ) : (
             <>
               <View style={{ marginTop: space.md }}>
@@ -366,6 +404,7 @@ export default function QuoteDetail() {
                   dashboard (shared grading.ts). No grade letter, and none of the words the customer-language rules ban. */}
               {figure && certainty ? <Muted>{certainty}</Muted> : null}
               <Body style={{ marginTop: space.md }}>{turn.sentence}</Body>
+              {tryState === 'used' ? <Muted>{TRY_AGAIN_USED}</Muted> : null}
               {action === 'add_price' ? <Muted>The price is added on the web, in your dashboard.</Muted> : null}
               {action === 'send' && customer.email ? <Muted>{first ?? 'The customer'} is also emailed the link when you approve.</Muted> : null}
             </>
@@ -648,6 +687,11 @@ export default function QuoteDetail() {
       ) : action === 'price_request' ? (
         <BottomBar>
           <Button title={QUOTE_TURN_COPY.pageButtons.priceRequest} onPress={priceRequest} busy={busy} />
+        </BottomBar>
+      ) : tryState === 'offer' ? (
+        // T-202: the dashboard's button, its words and its server action; reaching the customer stays above
+        <BottomBar>
+          <Button title={TRY_AGAIN_BUTTON.title} icon="refresh" onPress={() => void tryAgain()} busy={busy} {...(busy && { label: TRY_AGAIN_BUTTON.busy })} />
         </BottomBar>
       ) : null}
       </KeyboardSpace>

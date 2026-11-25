@@ -611,6 +611,15 @@ names `widget.js` and `iframe-loader.js` are unchanged.
   the page; the row reads "Inactive" either way). Services made in setup are created on, as before: setup has
   its own "Check your prices" step.
 
+## T-202: "Try it yourself" and the share tick
+
+- **`/app/try-it`** (`app/(try)/app/try-it/page.tsx`: under `/app` for the sign-in guard, in its own route group so it has no dashboard frame): the signed-in business's own request form, full screen, with `ownTest` on `EstimateWidget` (a line above the form: "Test mode: this is what your customers see…", and "Back to your dashboard"). At the day's limit or with no service switched on it shows a short page saying so (`LimitLine` writes the time in the reader's zone). `EstimateWidget`'s `testToken` prop is gone; `/quote/:slug` and `/embed` never set `ownTest`.
+- **`TryItButton`** (`components/try-it`): asks `GET /api/test-estimates`, then opens `/app/try-it` in a new tab, or says the limit / the missing service under the button. Used by setup's last step (`TestQuoteStep`, now headed "Try it yourself" / "See what your customers see") and by **`HomeTryIt`**, the box Home shows until the first real request while a service is switched on (`showTryItOnHome`).
+- **Quote page** (`/app/quotes/:id`): a test has "Delete this test" (`DeleteTestEstimate`): it asks first (what goes; that the day's count stays), "Cancel" changes nothing, and after deleting the business is on Quotes.
+- **Home, Quote link page:** the "Open" buttons open the plain link again. T-201's `?own=1` mark (`ownVisitUrl`, `OwnVisitMark`) is removed: a visit ticks nothing now. "Send on WhatsApp" reports `shared`; every Copy of the link reports `copied` as before.
+- **QR code:** "Download PNG" (`components/share/QrCode.tsx`, `qr-download`) reports `qr` to `POST /api/tenant/share-event` after the picture is saved, which ticks "Share your quote link".
+- **Phone app:** "Copy link" and "Send the link" on `app/link.tsx` report to `POST /api/tenant/share-event`; a test estimate's row reads "<service> · Test" (`rowWords`).
+
 ## T-201: the quote link and estimates
 
 - **Quote link page** (`/app/quote-link`): "Preview on a demo page" is gone (the developer page `/demo?tenantKey=` still opens by its address; nothing links to it). The "Open" buttons there and on Home open the link with `?own=1` (`ownVisitUrl`, `lib/quote-link-url.ts`), so the business's own visit does not tick "Share your quote link"; `components/share/OwnVisitMark` takes the mark off the address bar. The Advanced tip now reads "To change a price by an answer" and points at Services → "Customer Questions" → "Adjustments" on "Pricing Setup".

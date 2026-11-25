@@ -31,7 +31,7 @@ export function UseItOnWhatsApp(props: { businessName: string; link: string; reg
             fetch('/api/tenant/share-event', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ event: 'copied' }),
+              body: JSON.stringify({ event: 'shared' }),
             }).catch(() => undefined)
           }}
           className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-hover"

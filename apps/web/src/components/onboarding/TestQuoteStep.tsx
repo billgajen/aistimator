@@ -6,6 +6,8 @@ import { formatMoney } from '@qolumns/shared'
 import { MinimumNote } from '@/components/quote/MinimumNote'
 import { useCopy } from '@/components/share/useCopy'
 import { CleanLinkOffer } from '@/components/share/CleanLinkOffer'
+import { TryItButton } from '@/components/try-it/TryItButton'
+import { TRY_IT_COPY } from '@/lib/try-it-copy'
 
 interface TestQuote {
   id: string
@@ -24,9 +26,13 @@ interface TestQuote {
 const WORKING = new Set(['queued', 'generating'])
 
 /**
- * T-150: setup's last step. The owner tries their own quote page as a
+ * T-150: setup's last step. The owner tries their own request form as a
  * customer (test mode: not counted), sees the estimate it produced right here,
  * approves it as the business, then gets the link to share.
+ * T-202: headed "Try it yourself"; the form opens inside the dashboard
+ * (/app/try-it) and the request is marked as a test from the owner's own
+ * session, not from a code in the address. Five a day; the button says when
+ * the next one can be made.
  */
 export function TestQuoteStep({
   createdCount,
@@ -40,7 +46,6 @@ export function TestQuoteStep({
   fallbackCurrency: string
 }) {
   const [since, setSince] = useState<string | null>(null)
-  const [opening, setOpening] = useState(false)
   const [quote, setQuote] = useState<TestQuote | null>(null)
   const [approving, setApproving] = useState(false)
   const [approved, setApproved] = useState(false)
@@ -49,26 +54,12 @@ export function TestQuoteStep({
   // T-174: the link shown here follows a replacement made on this step
   const [link, setLink] = useState(quoteLink)
 
-  async function openTest() {
-    setOpening(true)
+  // T-202: the test page was opened in another tab (TryItButton); from that moment, look for the test request
+  function testStarted(sinceIso: string) {
     setError(null)
-    // Open the tab first (in the click) so pop-up blockers allow it
-    const tab = window.open('about:blank', '_blank')
-    try {
-      const res = await fetch('/api/onboarding/test-link', { method: 'POST' })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error?.message || 'Could not start the test')
-      setSince(json.issuedAt)
-      setQuote(null)
-      setApproved(false)
-      if (tab) tab.location.href = json.url
-      else window.location.assign(json.url)
-    } catch (e) {
-      tab?.close()
-      setError(e instanceof Error ? e.message : 'Could not start the test')
-    } finally {
-      setOpening(false)
-    }
+    setSince(sinceIso)
+    setQuote(null)
+    setApproved(false)
   }
 
   // Wait for the test request to arrive and be priced
@@ -112,22 +103,17 @@ export function TestQuoteStep({
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-extrabold tracking-tight text-text-primary">Now try it as your customer</h1>
+      <h1 className="font-display text-3xl font-extrabold tracking-tight text-text-primary">{TRY_IT_COPY.title}</h1>
       <p className="mt-2 text-text-secondary">
-        {createdCount} service{createdCount === 1 ? '' : 's'} ready. Open your quote page, ask for a job as if you were a
-        customer, and watch the estimate arrive here. Test requests don&apos;t count toward your plan.
+        {createdCount} service{createdCount === 1 ? '' : 's'} ready. {TRY_IT_COPY.line}: open your own request form, ask for a
+        job as if you were a customer, and watch the estimate arrive here. A test estimate does not count toward your plan.
       </p>
 
       <div className="mt-6 rounded-xl border border-border bg-surface p-5">
-        <h2 className="font-semibold text-text-primary">1. Try it as your customer</h2>
-        <button
-          type="button"
-          onClick={openTest}
-          disabled={opening}
-          className="mt-3 inline-flex items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
-          {opening ? 'Opening…' : since ? 'Open it again' : 'Try it as your customer'}
-        </button>
+        <h2 className="font-semibold text-text-primary">1. {TRY_IT_COPY.line}</h2>
+        <div className="mt-3">
+          <TryItButton label={since ? TRY_IT_COPY.again : TRY_IT_COPY.button} onStarted={testStarted} />
+        </div>
         {since && !quote && (
           <p className="mt-3 text-sm text-text-secondary" role="status" aria-live="polite">
             Waiting for your test request… fill in the form in the other tab.

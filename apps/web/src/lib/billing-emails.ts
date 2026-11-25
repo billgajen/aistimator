@@ -53,8 +53,34 @@ export function freeQuotesLeftEmail(input: { businessName: string; used: number;
   }
 }
 
-/** A card payment failed and is being retried. */
-export function paymentFailedEmail(input: { businessName: string; billingUrl: string }): { subject: string; html: string } {
+/**
+ * T-202: what happens to new requests if the payment is never taken and the
+ * plan ends, for this business. Until T-202 the email said "new requests are
+ * then saved for you but not priced", which is wrong for a business that still
+ * has free quotes: since T-201 a quote priced on a plan is not one of the free
+ * ones, so they are still there when the plan ends.
+ *   - free quotes left: the next ones are still priced, then requests are saved
+ *   - none left: requests are saved, not priced, until a plan is active
+ *   - the old monthly allowance (a business from before the US launch)
+ *   - `null` (the numbers could not be read): the rule, with no number
+ * Plain text; the caller escapes nothing in it because it holds only numbers.
+ */
+export function afterPlanEndsLine(after: { per: 'month' | 'total'; limit: number; left: number } | null | undefined): string {
+  const saved = 'saved for you but not priced until a plan is active again'
+  if (!after) return `If it still cannot be taken, your plan ends. New requests are then priced only while you have free quotes left; after that they are ${saved}.`
+  if (after.per === 'month') {
+    return `If it still cannot be taken, your plan ends. Without a plan, up to ${after.limit} new requests a month are still priced; past that, they are ${saved}.`
+  }
+  if (after.left > 0) {
+    const next = after.left === 1 ? 'the next new request is still priced' : `the next ${after.left} new requests are still priced`
+    const those = after.left === 1 ? 'After that one' : 'After those'
+    return `If it still cannot be taken, your plan ends. You still have ${after.left} of your ${after.limit} free quotes, so ${next}. ${those}, new requests are ${saved}.`
+  }
+  return `If it still cannot be taken, your plan ends. Your ${after.limit} free quotes are used, so new requests are then ${saved}.`
+}
+
+/** A card payment failed and is being retried. `afterPlan`: this business's allowance once it has no plan (T-202). */
+export function paymentFailedEmail(input: { businessName: string; billingUrl: string; afterPlan?: { per: 'month' | 'total'; limit: number; left: number } | null }): { subject: string; html: string } {
   return {
     subject: "Your payment didn't go through",
     html: page({
@@ -63,7 +89,8 @@ export function paymentFailedEmail(input: { businessName: string; billingUrl: st
       heading: "Your payment didn't go through.",
       paragraphs: [
         `<span data-role="line">${escape(PAYMENT_FAILED_LINE)}</span>`,
-        `Everything keeps working for now, and the payment will be tried again over the next days. If it still cannot be taken, your plan ends: new requests are then saved for you but not priced until a plan is active again.`,
+        `Everything keeps working for now, and the payment will be tried again over the next days. New requests are still priced meanwhile.`,
+        `<span data-role="after-plan">${escape(afterPlanEndsLine(input.afterPlan))}</span>`,
       ],
       buttonHref: input.billingUrl,
       buttonLabel: 'Update your card',

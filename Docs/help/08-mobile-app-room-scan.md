@@ -45,6 +45,18 @@ It prices a job while you are standing in it. Starting a quote is part of {{onsi
 The "Quotes" tab lists your quotes, with the ones that need you first. With no signal, the quote is saved on the phone and sends by itself when the signal is back. The app does not edit a quote's lines or your prices: "Edit in the dashboard" opens the quote on the web.
 {{/live}}
 
+## A request could not be priced. Can I try again in the phone app?
+<!-- id: app-try-again; page: /app/quotes/[quoteId]; flags: app -->
+
+{{#soon app}}The phone app is {{soon}}. It will have the same "Try again" button as the quote's page on the website, which you can use today.{{/soon}}
+{{#live app}}Yes. A request that says "Could not be priced" has a "Try again" button at the bottom of its screen in the app. It does the same as "Try again" on the website.
+
+1. Open the "Quotes" tab and open the request.
+2. Press "Try again". The screen shows the price being worked out again, from the same answers and photos, and then the price.
+3. If it still cannot be priced, the screen says so again and you can press "Try again" once more.
+
+Trying again does not use another quote from your plan. You can try one request up to five times, counting the tries made on the website. After that the button is gone and the screen says "This request has been tried 5 times and still has no price. Contact the customer and quote it yourself, or tell us with Help." The customer's email and phone number stay on the screen so you can reach them.{{/live}}
+
 ## How will I sign in to the phone app?
 <!-- id: app-sign-in; page: /app; flags: app -->
 

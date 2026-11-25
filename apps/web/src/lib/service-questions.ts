@@ -393,6 +393,43 @@ export function regenerateReplaces(form: Pick<ServiceForm, 'suggestedFields' | '
 export const REGENERATE_KEEPS = 'Your service name, description, base fee, minimum charge and adjustments stay as they are.'
 
 /**
+ * T-202: what "Clear" on "Scope & Photos" empties, with how much of each there
+ * is now. It lists what `clearAIDraft` on the services page does, line for
+ * line: the three scope lists, the photo settings (back to the defaults, the
+ * guidance and any required photos gone), the questions, the price lines and
+ * with them what each line measures from the photos.
+ */
+export function clearEmpties(form: Pick<ServiceForm, 'scopeIncludes' | 'scopeExcludes' | 'defaultAssumptions' | 'mediaConfig' | 'suggestedFields' | 'workSteps'>): string[] {
+  const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+  const required = form.mediaConfig.requiredAngles?.length ?? 0
+  const photoParts = [
+    `${form.mediaConfig.minPhotos} to ${form.mediaConfig.maxPhotos} photos now`,
+    ...(form.mediaConfig.photoGuidance?.trim() ? ['your photo guidance'] : []),
+    ...(required > 0 ? [count(required, 'required photo', 'required photos')] : []),
+  ]
+  return [
+    `What’s included (${count(form.scopeIncludes.length, 'item', 'items')} now), what’s excluded (${form.scopeExcludes.length}) and your assumptions (${form.defaultAssumptions.length})`,
+    `The photo settings, back to ${CLEARED_MEDIA.minPhotos} to ${CLEARED_MEDIA.maxPhotos} photos with no guidance (${photoParts.join(', ')})`,
+    `Your questions (${count(form.suggestedFields.length, 'question', 'questions')} now)`,
+    `Your price lines, and what each one measures from the photos (${count(form.workSteps.length, 'line', 'lines')} now)`,
+  ]
+}
+
+/** The photo settings "Clear" leaves behind (the same as a new, empty service) */
+export const CLEARED_MEDIA = { minPhotos: 1, maxPhotos: 8, photoGuidance: null } as const
+
+/** What "Clear" leaves alone */
+export const CLEAR_KEEPS = 'Your service name, description, base fee, minimum charge, add-ons and adjustments stay as they are.'
+
+/** Said only when an adjustment or an add-on leans on a question that is about to go */
+export function clearLoosens(form: Pick<ServiceForm, 'multipliers' | 'suggestedFields'>): string | null {
+  const fieldIds = new Set(form.suggestedFields.map((f) => f.fieldId))
+  const using = form.multipliers.filter((m) => m.when?.subject !== 'subtotal' && m.when?.fieldId && fieldIds.has(m.when.fieldId)).length
+  if (using === 0) return null
+  return `${using === 1 ? 'One adjustment uses' : `${using} adjustments use`} a question that will be removed, so ${using === 1 ? 'it stops' : 'they stop'} applying until you choose a question for ${using === 1 ? 'it' : 'them'} again.`
+}
+
+/**
  * Adjustments and conditions that point at a question or fact the service no
  * longer has (it was removed, or the service was saved before T-201 with a
  * renamed question). Each is a line for "Test & Publish": the engine skips

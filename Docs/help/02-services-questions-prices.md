@@ -180,7 +180,8 @@ They are on the "Scope & Photos" step. They tell the customer what the job cover
 On a service marked "AI Draft" this step also has two links.
 
 - "Regenerate" writes a new draft from the service name and description. It asks first: it lists what it will replace (the scope lists, the photo settings, your questions, your price lines and your add-ons, with how many of each you have) and you press "Replace with a new draft" or "Cancel". "Cancel" leaves everything as it was. Your base fee, minimum charge and adjustments are not replaced.
-- "Clear" empties the scope, the photo settings, the questions and the price lines at once, without asking. If you press it by mistake, close the window with the X without saving.
+- "Clear" empties the setup and writes nothing in its place. It asks first: it lists what it will empty (what's included, what's excluded and your assumptions; the photo settings, which go back to 1 to 8 photos with no guidance; your questions; and your price lines with what each one measures from the photos, with how many of each you have) and you press "Empty the setup" or "Cancel". "Cancel" leaves everything as it was. Your service name, description, base fee, minimum charge, add-ons and adjustments are not emptied. If an adjustment uses a question that will be removed, the list says so: that adjustment stops applying until you choose a question for it again.
+- Neither button saves anything. After "Replace with a new draft" or "Empty the setup", the service changes only when you press "Save Changes" (or "Create Service"); closing the window with the X keeps the service as it was.
 
 ## How do I test a service's prices?
 <!-- id: services-test; page: /app/services -->

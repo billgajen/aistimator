@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { checkPublicRateLimit, getClientIp, rateLimitedResponse } from '@/lib/rate-limit'
 import { verifyTurnstileToken, HUMAN_CHECK_FAILED_MESSAGE } from '@/lib/turnstile'
-import { verifyTestToken } from '@/lib/test-quote-token'
 import { checkContact, contactRequirementOf } from '@/lib/contact-rules'
 import { hashLeadToken, newLeadToken } from '@/lib/request-leads'
-import { publicSource } from '@/lib/test-quotes'
+import { decideTestRequest, publicSource } from '@/lib/test-estimates'
+import { currentTenant } from '@/lib/current-tenant'
 
 interface CreateLeadBody {
   tenantKey?: string
@@ -13,6 +13,9 @@ interface CreateLeadBody {
   customer?: { name?: string; email?: string | null; phone?: string | null }
   turnstileToken?: string
   website?: string
+  /** T-202: the business's own test, from the form inside its dashboard (needs its signed-in session) */
+  ownTest?: boolean
+  /** T-150's code from the old test link: refused */
   testToken?: string
   source?: Record<string, unknown>
 }
@@ -43,13 +46,23 @@ export async function POST(request: Request) {
   if (!site?.is_active) return fail(400, 'INVALID_TENANT_KEY', 'Invalid or unknown tenant key')
   const tenantId = site.tenant_id as string
 
-  // T-150: the owner's test from setup is never an unfinished lead
-  if (body.testToken) {
-    if (!verifyTestToken(String(body.testToken), tenantId).ok) {
-      return fail(403, 'TEST_LINK_INVALID', 'This test link has expired or is not valid. Start a new test from setup.')
-    }
-    return NextResponse.json({ skipped: true })
-  }
+  // T-202: the business's own test is never an unfinished lead. The same rule as on submission
+  // (the body says "test" AND the session is that business's); nothing is counted here.
+  const test = await decideTestRequest(
+    supabase,
+    tenantId,
+    {
+      ownTest: body.ownTest,
+      oldToken: body.testToken,
+      signedInTenantId: async () => {
+        const auth = await currentTenant()
+        return auth.ok ? auth.tenantId : null
+      },
+    },
+    { claim: false }
+  )
+  if (test.kind === 'refused') return fail(test.status, test.code, test.message)
+  if (test.kind === 'test') return NextResponse.json({ skipped: true })
 
   const [{ data: service }, { data: tenant }] = await Promise.all([
     supabase.from('services').select('id').eq('id', body.serviceId).eq('tenant_id', tenantId).eq('active', true).maybeSingle(),

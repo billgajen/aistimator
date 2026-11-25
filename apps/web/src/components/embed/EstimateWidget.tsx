@@ -10,6 +10,7 @@ import { brandStyleVars } from '@/lib/color'
 import { useTurnstile } from '@/components/embed/useTurnstile'
 import { checkContact, contactRequirementOf, descriptionRequired, usableContact } from '@/lib/contact-rules'
 import { useUnfinishedLead } from '@/components/embed/useUnfinishedLead'
+import { TRY_IT_COPY, limitLine } from '@/lib/try-it-copy'
 import { ContactStep } from '@/components/embed/steps/ContactStep'
 import { QuestionsStep } from '@/components/embed/steps/QuestionsStep'
 import { JobDetailsStep } from '@/components/embed/steps/JobDetailsStep'
@@ -48,8 +49,12 @@ interface EstimateWidgetProps {
   demo?: WidgetDemoOptions
   /** T-149: the hosted quote page — fills the screen instead of sizing to a frame */
   hosted?: boolean
-  /** T-150: server-verified test token from setup; the request is marked as a test */
-  testToken?: string
+  /**
+   * T-202: the business trying its own form from inside its dashboard (/app/try-it). The form says so
+   * when it sends the request; the server makes it a test only if the request also carries that
+   * business's signed-in session (lib/test-estimates.ts). Never set from a web address.
+   */
+  ownTest?: boolean
 }
 
 export interface ServiceMediaConfig {
@@ -166,14 +171,14 @@ function ConversationalChat({
   tenantKey,
   widgetData,
   serviceId,
-  testToken,
+  ownTest,
   onComplete,
 }: {
   tenantKey: string
   widgetData: WidgetData
   serviceId?: string | null
-  /** T-150: server-verified test token (the owner's test from setup) */
-  testToken?: string
+  /** T-202: the business's own test, from inside its dashboard */
+  ownTest?: boolean
   onComplete: (result: QuoteResponse) => void
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -187,7 +192,7 @@ function ConversationalChat({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { containerRef: turnstileRef, getToken: getTurnstileToken } = useTurnstile(TURNSTILE_SITE_KEY)
   // T-151: save the request as soon as the chat has the service and contact details
-  const lead = useUnfinishedLead({ tenantKey, testToken, honeypot: '', getTurnstileToken })
+  const lead = useUnfinishedLead({ tenantKey, ownTest, honeypot: '', getTurnstileToken })
   const contactRule = contactRequirementOf(widgetData.contactRequirement)
 
   // Track which service the conversation has resolved to
@@ -360,7 +365,7 @@ function ConversationalChat({
           body: JSON.stringify({
             ...data.formData,
             ...lead.submitFields(),
-            ...(testToken && { testToken }),
+            ...(ownTest && { ownTest: true }),
             assetIds: completedAssetIds,
             tenantKey,
             turnstileToken: turnstileToken || undefined,
@@ -494,7 +499,7 @@ function ConversationalChat({
 // MAIN EMBED PAGE
 // ============================================================================
 
-export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: EstimateWidgetProps) {
+export function EstimateWidget({ tenantKey, hosted = false, ownTest = false, demo }: EstimateWidgetProps) {
   const searchParams = useSearchParams()
   const serviceId = searchParams.get('serviceId')
   const displayMode = searchParams.get('mode')
@@ -519,7 +524,7 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
   // T-173: a submission that was held back (too many tries, the human check, a server fault) can be sent again as it is
   const [canResend, setCanResend] = useState(false)
   // T-151: the request is saved as soon as the contact step is done
-  const lead = useUnfinishedLead({ tenantKey, testToken, honeypot, getTurnstileToken })
+  const lead = useUnfinishedLead({ tenantKey, ownTest, honeypot, getTurnstileToken })
   const [savingContact, setSavingContact] = useState(false)
   const [contactErrors, setContactErrors] = useState<Partial<Record<'name' | 'email' | 'phone', string>>>({})
 
@@ -617,7 +622,7 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
           tenantKey,
           turnstileToken: turnstileToken || undefined,
           website: honeypot || undefined,
-          ...(testToken && { testToken }),
+          ...(ownTest && { ownTest: true }),
           serviceId: selectedService,
           customer: {
             name: customerName,
@@ -658,9 +663,13 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
           demo.onBusy()
           return
         }
-        setError(data.error?.message || 'Failed to submit')
+        // T-202: the day's test estimates are used up: say when the next one can be made, in this reader's own time
+        const testLimit = data.error?.code === 'TEST_LIMIT_REACHED'
+        setError(testLimit ? limitLine(data.error?.availableAt) : data.error?.message || 'Failed to submit')
         // T-173: held back, not refused for what was typed: every answer is still here and can be sent again
         setCanResend(response.status === 429 || response.status >= 500 || data.error?.code === 'VERIFICATION_FAILED')
+        // (sending the same test again would be refused again until the time given)
+        if (testLimit) setCanResend(false)
 
         // T-178: there is no "switch to another service" any more. The server
         // no longer refuses a request for its description; it keeps it on the
@@ -755,9 +764,12 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
       style={brandStyleVars(widgetData?.branding?.primaryColor)}
       data-testid="request-form"
     >
-      {testToken && (
-        <p className="mx-3 mt-3 max-w-xl rounded-xl border bg-butter px-4 py-2.5 text-center text-sm text-text-primary sm:mx-auto sm:mb-3 sm:mt-0" role="note">
-          Test mode: this is how your customers see your quote page. This request won&apos;t count toward your plan.
+      {ownTest && (
+        <p className="mx-3 mt-3 max-w-xl rounded-xl border bg-butter px-4 py-2.5 text-center text-sm text-text-primary sm:mx-auto sm:mb-3 sm:mt-0" role="note" data-testid="test-mode-note">
+          {TRY_IT_COPY.banner}{' '}
+          <a href="/app" className="font-semibold underline underline-offset-2">
+            {TRY_IT_COPY.back}
+          </a>
         </p>
       )}
       <div className="bg-white pb-2 sm:mx-auto sm:max-w-xl sm:overflow-hidden sm:rounded-3xl sm:border sm:border-border sm:shadow-warm-lg" data-testid="form-card">
@@ -802,7 +814,7 @@ export function EstimateWidget({ tenantKey, hosted = false, testToken, demo }: E
           tenantKey={tenantKey}
           widgetData={widgetData}
           serviceId={serviceId}
-          testToken={testToken}
+          ownTest={ownTest}
           onComplete={(result) => {
             setQuoteResult(result)
             setStep('success')

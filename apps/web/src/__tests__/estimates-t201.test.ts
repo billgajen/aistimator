@@ -16,7 +16,6 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { QUOTE_TURN_COPY, customerEstimateNote, customerRangeAllowed, customerSeesNoFigure, findConfidenceLanguage, isShownEarly } from '@qolumns/shared'
 import type { QuoteContent, QuotePricing, TenantBranding, TenantTemplate } from '@qolumns/shared'
-import { OWN_VISIT_PARAM, countsAsFirstVisit, ownVisitUrl } from '@/lib/quote-link'
 import { BUSINESS_RETRY_LIMIT, RETRY_COPY, businessRetriesOf, canBusinessRetry } from '@/lib/quote-retry-rules'
 import { TRACE_UNDERSTOOD_COPY, fromWords, keyWords, understoodTrace, understoodTraceEmpty, valueWords } from '@/lib/trace-understood'
 import { TERMS_HEADING, TERMS_MAX_CHARS, customerTerms, termsParagraphs } from '@/lib/quote-terms'
@@ -27,48 +26,21 @@ const read = (path: string) => readFileSync(join(__dirname, '..', '..', '..', '.
 
 // ---------------------------------------------------------------------------
 describe('T-201 item 11: the business opening its own quote link is not a share', () => {
-  const visit = { alreadyVisited: false, isSetupTest: false, ownMark: false, signedInTenantId: null as string | null, tenantId: 'tnt_a' }
-
-  it('a customer (signed in to nothing) ticks the step', () => {
-    expect(countsAsFirstVisit(visit)).toBe(true)
-  })
-
-  it('the business, signed in, does not', () => {
-    expect(countsAsFirstVisit({ ...visit, signedInTenantId: 'tnt_a' })).toBe(false)
-  })
-
-  it('someone signed in to ANOTHER business is a customer here', () => {
-    expect(countsAsFirstVisit({ ...visit, signedInTenantId: 'tnt_b' })).toBe(true)
-  })
-
-  it('the dashboard’s "Open" button does not, signed in or not (an own address carries no sign-in)', () => {
-    expect(countsAsFirstVisit({ ...visit, ownMark: true })).toBe(false)
-  })
-
-  it('the setup test and a second visit do not', () => {
-    expect(countsAsFirstVisit({ ...visit, isSetupTest: true })).toBe(false)
-    expect(countsAsFirstVisit({ ...visit, alreadyVisited: true })).toBe(false)
-  })
-
-  it('the mark is one query value, added to a plain link or to one that already has a query', () => {
-    expect(ownVisitUrl('https://qolumns.com/quote/harlow')).toBe(`https://qolumns.com/quote/harlow?${OWN_VISIT_PARAM}=1`)
-    expect(ownVisitUrl('https://harlow.qolumns.com/?x=1')).toBe(`https://harlow.qolumns.com/?x=1&${OWN_VISIT_PARAM}=1`)
-  })
-
-  it('both "Open" buttons carry the mark, and Copy copies the plain link', () => {
+  // T-202 went further: opening the link ticks nothing for anyone (a visit cannot tell the owner from a
+  // customer), so the "own visit" mark and the first-visit rule of T-201 are gone. share-t202.test.ts
+  // holds the rule as it is now. What is left of item 11:
+  it('both "Open" buttons open the plain link, and Copy copies it', () => {
     for (const file of ['apps/web/src/components/home/HomeQuoteLink.tsx', 'apps/web/src/components/share/QuoteLinkCard.tsx']) {
       const source = read(file)
-      expect(source, file).toMatch(/href=\{ownVisitUrl\((link|main)\)\}/)
+      expect(source, file).toMatch(/href=\{(link|main)\}/)
+      expect(source, file).not.toContain('ownVisitUrl')
       expect(source, file).toMatch(/copy\('(home-link|link)', (link|main)\)/)
     }
   })
 
-  it('the page reads the mark, asks who is signed in only while the step is unticked, and takes the mark off the address bar', () => {
+  it('the page records no visit', () => {
     const page = read('apps/web/src/app/quote/[slug]/page.tsx')
-    expect(page).toContain('countsAsFirstVisit(')
-    expect(page).toMatch(/const signedInTenantId = unticked \? await signedInBusiness\(\) : null/)
-    expect(page).toContain('{ownMark && <OwnVisitMark />}')
-    expect(read('apps/web/src/components/share/OwnVisitMark.tsx')).toContain('searchParams.delete(OWN_VISIT_PARAM)')
+    expect(page).not.toMatch(/markFirstVisit|countsAsFirstVisit|OwnVisitMark|searchParams/)
   })
 })
 

@@ -93,7 +93,8 @@ const hosted = await page(`/quote/${aRow.slug}`)
 check('/quote/{slug} loads', hosted.status === 200, hosted.status)
 check('…with the business name in the title', hosted.html.includes(`<title>${aRow.name}: request an estimate</title>`))
 check('…rendering this tenant’s own widget', hosted.html.includes(site.tenant_key))
-check('the first visit is recorded', Boolean((await tenantRow(a.tenantId)).quote_link_first_visit_at))
+// T-202: a visit is no longer recorded (it cannot tell the owner from a customer); Copy, Share or the first real request tick the step
+check('a visit is not recorded (T-202)', !(await tenantRow(a.tenantId)).quote_link_first_visit_at)
 const viaLink = await submit(site.tenant_key, serviceId)
 check('a request from the quote page produces a quote, as the embed does', ['sent', 'viewed'].includes(viaLink.status) && viaLink.pricing?.total === 1400, { status: viaLink.status, total: viaLink.pricing?.total })
 

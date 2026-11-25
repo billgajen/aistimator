@@ -3,7 +3,11 @@
 import { useEffect, useRef } from 'react'
 import { qrMatrix, qrToRgba } from '@/lib/qr'
 
-/** T-149: QR code for the quote link, drawn in the browser, with a PNG download. */
+/**
+ * T-149: QR code for the quote link, drawn in the browser, with a PNG download.
+ * T-202: downloading it ticks "Share your quote link" on Home (best-effort,
+ * like Copy: the download never waits for it).
+ */
 export function QrCode({ value, fileName }: { value: string; fileName: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -29,6 +33,11 @@ export function QrCode({ value, fileName }: { value: string; fileName: string })
       a.download = fileName
       a.click()
       URL.revokeObjectURL(url)
+      fetch('/api/tenant/share-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: 'qr' }),
+      }).catch(() => undefined)
     }, 'image/png')
   }
 
@@ -47,6 +56,7 @@ export function QrCode({ value, fileName }: { value: string; fileName: string })
         </p>
         <button
           type="button"
+          data-testid="qr-download"
           onClick={download}
           className="mt-3 inline-flex min-h-[44px] items-center rounded-lg border border-border bg-background px-3.5 py-2 text-sm font-semibold text-text-primary hover:bg-surface"
         >

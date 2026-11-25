@@ -15,6 +15,174 @@
 
 ## Issues & Resolutions
 
+### 2026-11-24: T-202 — "Try again" in the app, new icons, the test estimate, and the last T-198 fixes (AD-093, AD-094)
+
+**Built, not deployed.** Needs **migration 51** (`bash scripts/deploy-migration-51.sh`, first), then the **web**.
+No worker change. The phone app needs a new build for items 1, 2 and 5.
+
+#### 1. "Try again" in the phone app
+- The rules and the words moved to `packages/shared/src/quote-retry.ts` (`BUSINESS_RETRY_LIMIT`, `RETRY_COPY`,
+  `businessRetriesOf`, `canBusinessRetry`); `apps/web/src/lib/quote-retry-rules.ts` only passes them on. The
+  dashboard and the app read the same sentences.
+- The app's quote view (`/api/app/quotes/:id`) carries `tryAgain: { left }` for a request that could not be
+  priced, worked out on the server by the shared rule. The app shows "Try again" in the bottom bar while tries
+  remain and calls the route the dashboard calls (`POST /api/quotes/:id/process`): five tries a request, never
+  counted against the plan. Nothing in pricing or counting changed.
+- After pressing, the screen follows the quote as it does one being priced. At five tries the button is gone and
+  the limit sentence shows. A refusal shows the server's own sentence. "Contact" stays as it was. One code path
+  for both phones. An older server that sends no `tryAgain` leaves the screen as it was.
+
+#### 2. Icons from the owner's new drawing
+- **`scripts/make-icons.py`** (Python with Pillow) makes every icon from `brand/qolumns-letter.png`: the site's
+  `icon.png` (512), `apple-icon.png` (180) and `favicon.ico` (16, 32, 48); the iPhone icon (the drawing at 840
+  inside 1024, no transparency); the Play listing icon (512, no transparency); Android's adaptive foreground,
+  its one-colour version and the white status-bar mark. Before this the icons were made by hand in T-190 and
+  T-200 and nothing recorded how.
+- **Android's round mask.** The mark is sized so that all of its ink stays inside 87% of the circle Android
+  promises to show (66 of 108): the drawing at 602 px in the 1024 foreground, the room the icon had before. The
+  background stays `#192822`, the drawing's own green.
+- **`brand/icons-made.json`** records the drawing's fingerprint and each icon's; a unit test
+  (`icons-t202.test.ts`) fails if the drawing changes without the script being run, or an icon is changed by hand.
+- **`brand/qolumns-letter.png` is committed now** (T-201 left it out because nothing read it; the script does).
+- **Not icons of the letter, so not remade:** the wordmark files (splash, sign-in, emails, the social image, the
+  Play feature graphic). The site has no manifest file, and no email carries the letter.
+- The old icons are overwritten (git keeps them); the comparison picture is `.checks/t202/icons.png`
+  (`python3 scripts/make-icons.py --compare <file> <git revision of the old icons>`).
+
+#### 3. The test estimate: "Try it yourself" (AD-093)
+- **What was there:** T-150's last setup step marked a test by a signed code in the web address
+  (`/quote/<slug>?test=<token>`, good for two hours, 10 a day). Anyone holding that address could make
+  uncounted requests until it ran out, and after setup there was no way to make a test at all.
+- **Now:** a page inside the dashboard, `/app/try-it` (its own route group, so it shows the form as a customer
+  sees it, with no dashboard frame; the `/app` sign-in guard covers it). The form sends `ownTest: true` in the
+  body, and the server marks `is_test` only when the request also carries the signed-in session of a user of
+  that business. `ownTest` with no session, with another business's session, or the old `testToken`: 403,
+  nothing saved. Nothing in any web address makes a test; the public quote page reads nothing from its address.
+- **Limit: 5 in 24 hours a business**, told before the form opens (`GET /api/test-estimates`: `canStart`,
+  `reason`, `used`, `availableAt`) and enforced on submit (429 `TEST_LIMIT_REACHED` with `availableAt`). The
+  page shows that time in the reader's own time zone.
+- **The count is its own** (migration 51): `tenants.test_estimate_times`, the moments of the last 24 hours,
+  taken by `claim_test_estimate` (the business's row is held, so two at once cannot both take the last place)
+  and given back by `release_test_estimate` only when the request was refused before it was saved. A trigger
+  stops a business writing the list through its own row. It is not worked out from the quotes because:
+- **A test can be deleted:** `DELETE /api/quotes/:id` removes the business's own test with its rows and stored
+  files; a real quote answers 409 `NOT_A_TEST`. "Delete this test" on the quote page asks first. A deleted test
+  still counts toward the day's five.
+- **Where it is offered:** setup's last step, headed "Try it yourself" / "See what your customers see", and a box
+  on Home until the first real customer request, while a service is switched on (so also after a skipped setup).
+- **A test counts nowhere:** the plan, billing, Analytics, "Won through Qolumns", Home's figures and "first real
+  request", the share tick, phone notifications (all through `is_test`; each has a check). **Added by me:** the
+  3-day reminder to the customer no longer goes out for a test (`dueReminders` leaves out `is_test`).
+- **Kept as it was (T-150's decision):** the business's own emails about a test, marked "[Test]", and the
+  estimate email to the address typed as the customer. The Quotes tabs' counts include tests, because the list
+  shows those rows (with the "Test" tag). The app's list now reads "<service> · Test".
+- Removed: `lib/test-quote-token.ts`, `lib/test-quotes.ts`, `POST /api/onboarding/test-link`, the form's
+  `testToken`.
+
+#### 4. "Clear" on "Scope & Photos" asks first
+- Same pattern as T-201's "Regenerate". It lists what the handler really empties, with counts (the three scope
+  lists; the photo settings, back to 1 to 8 photos with no guidance; the questions; the price lines and what
+  they measure from photos), what stays (name, description, base fee, minimum charge, add-ons, adjustments),
+  warns when an adjustment uses a question about to go, and says nothing is saved until "Save Changes". Cancel
+  leaves everything. Only one of the two questions is open at a time.
+
+#### 5. "Share your quote link" is ticked by sharing, not by a visit (AD-094)
+- **Root cause of the wrong ticks:** the step was ticked when anyone opened the link, and a visit cannot tell
+  the owner from a customer (T-201's `?own=1` mark covered only the dashboard's "Open" button, not the own
+  address typed into a browser).
+- Nothing records a visit any more (`markFirstVisit`, `countsAsFirstVisit`, `ownVisitUrl`, `OwnVisitMark`
+  removed; "Open" opens the plain link). The step is ticked by `quoteLinkShared` (`lib/setup-checklist.ts`):
+  Copy or Share pressed on the business's quote link in the dashboard or the app (`POST /api/tenant/share-event`,
+  now `copied`, `shared` or `qr`; "Send on WhatsApp" counts as shared), a QR code download, or a first real
+  customer request. Home and the help assistant's state use the same function.
+- **Already ticked stays ticked:** `quote_link_first_visit_at` is still read and never written. No migration for
+  this item.
+- **QR code (owner, 25 Nov 2026):** "Download PNG" on the Quote link page ticks the step too
+  (`components/share/QrCode.tsx` reports `qr` after the picture is saved; best-effort, like Copy). Looking at
+  the code does not. The phone app only shows the code on its screen (no download), so nothing changed there.
+
+#### 6. The payment-failed email says what will really happen
+- **Root cause:** the sentence predates T-201 item 33. Since then a business whose plan ends still has the free
+  quotes it never used, so "new requests are then saved for you but not priced" was wrong for it.
+- `afterPlanEndsLine` (`lib/billing-emails.ts`) with that business's own numbers (`readAllowanceAfterPlan`,
+  `lib/plan-limits.ts`): free quotes left ("You still have N of your M free quotes, so the next N new requests
+  are still priced. After those…saved"), none left, the old monthly allowance of legacy UK accounts, and a
+  sentence with no numbers if the rows cannot be read.
+- **The same wrong claim was on the billing page** ("Your X plan has ended. New requests are saved…" even with
+  free quotes left): now `planEndedNote` (`lib/plan-ended.ts`). Home's limit banners and the app's payment line
+  were right (each speaks only once the limit is reached) and are unchanged.
+
+#### AD-093: only the business's own signed-in session makes a test request
+A request is a test when, and only when, its body asks for one and it arrives with the session of a user of the
+business the form belongs to. No address, token or client-set field can make one. The day's count lives on the
+business's row, written only by the server, so deleting a test cannot hand a place back.
+**Do not** bring back a test link, and do not count tests from the `quotes` table.
+
+#### AD-094: a visit never ticks a setup step
+A page being opened says nothing about who opened it. "Share your quote link" is ticked by something the
+business does while signed in (Copy, Share) or by a real customer's request arriving.
+
+#### Constraints
+- `brand/qolumns-letter.png` is the source of every letter icon: change the drawing, run
+  `python3 scripts/make-icons.py`, build the apps again. Never edit an icon file by hand (a test fails).
+- `tenants.test_estimate_times` is written only by `claim_test_estimate` / `release_test_estimate`.
+- `quote_link_first_visit_at` is history: read, never written.
+- The retry rules and sentences live in the shared package; neither the web nor the app keeps its own copy.
+
+#### 7. The builds (25 Nov 2026, after the owner's OK on the icons)
+- **Android:** EAS build `c0d0551b`, version code 3 (Expo's counter went 2 → 3), saved as
+  `apps/mobile/build/qolumns-android-3.aab` (git-ignored, not uploaded, `eas submit` not run). Built from the
+  first T-202 commit; the QR change made after it touches the web only, so the app's files are the same. Read
+  out of the file: version code 3, package `com.qolumns.app`, the same signing certificate as bundle 2, the
+  launcher foreground and themed icon equal to the new assets (and different from bundle 2's), background
+  `0xFF192822`, the notification icon's shape equal to the new asset, and "Try again" and `share-event` in the
+  app's code.
+- **iPhone dev build:** the `ios` folder was made again (`expo prebuild -p ios`) so the icon catalogue holds the
+  new icon, then the usual command built and installed "Qolumns Dev" on the owner's phone. Opening it failed
+  ("the device is locked"); the install is on the phone (`devicectl` lists it).
+- **Finding: a rebuild does not move the expiry.** The app carries Apple's signing profile, made 19 Nov, ending
+  26 Nov 23:40 UTC. Xcode reuses a profile that is still valid. With the profile set aside, the build failed:
+  Xcode has no Apple ID in Accounts ("No Accounts"), so it cannot ask for a new one; the profile was put back.
+  Expo passes `-allowProvisioningUpdates` only on the first build after a prebuild (when it writes the team into
+  the project). The owner has to sign in to Xcode before the next rebuild.
+- **Trap:** `CI=1 npx expo prebuild` clears the `ios` folder (pods and all) and rewrites the `ios` / `android`
+  scripts in `package.json`; the package.json change was undone.
+
+#### Checks
+- **After the owner's decisions of 25 Nov (QR download ticks the share step):** unit web 1,936; lint and
+  typecheck clean; `pnpm check:quick --only t202`: 116 of 116 in 1 min 16 s (three new checks, in a browser:
+  looking at the QR code ticks nothing, "Download PNG" saves the picture and reports `qr`, the step is ticked).
+  The quick and full runs below were made before this change and were not repeated: it adds one accepted value
+  to a signed-in route and one request after a download.
+- Unit: web 1,935, worker 808, app 222, all passing; typecheck and lint clean.
+- **`pnpm check:quick`, once: 31 of 31 (23 scripts, 2,013 checks) in 4 min 56 s.** `verify-t202` 113 of 113
+  (`tryit` 72, `fixes` 41). `verify-t157` failed beside the others and passed alone, 96 of 96: the local
+  database gateway answered one request "An invalid response was received from the upstream server"; the
+  product was not involved.
+- Older checks corrected for the new rules: `verify-t149`, `t150`, `t151`, `t152` (the test link became
+  `ownTest` with the session), `t160` (no `?own=1`), `t201/estimates.mts` (a visit ticks nothing), `verify-t180`
+  (one check added for the email's sentence), and unit tests `estimates-t201`, `quote-link`, `setup-prices`,
+  `rename-qolumns`, `services-t201`, `reminder-t201`.
+- **`pnpm check:full`, once, alone: 46 of 46 (38 scripts, 3,298 checks) in 33 min 12 s**, every script on its
+  first try. Run because item 6 is a billing email and item 3 changes the route that takes in requests.
+  `verify-t180` 112 of 112 in Stripe's sandbox, with the new check of the payment-failed sentence; `verify-t202`
+  113 of 113 with the real model's servers.
+- The migration's deploy script was run against a copy of the local database put back to migration 50, then a
+  second time: the Before check worked at 50, the After check matched what the script says to expect, and the
+  second run changed nothing.
+- **Not seen:** anything on a phone ("Try again", the share tick, the "Test" label and the icons are unit tests,
+  source reads and a read of the built files; nobody has looked at the two builds on a device yet); a real email.
+
+**Files:** `packages/shared/src/{quote-retry,api.types,database.types,index}.ts`;
+`apps/mobile/{app/quote/[id].tsx,app/link.tsx,src/lib/{try-again,api,quote-list}.ts,assets/*}`;
+`apps/web/src/app/{(try)/*,api/test-estimates/*,api/quotes/[quoteId]/route.ts,api/public/{quotes,leads}/route.ts,api/tenant/share-event/route.ts,quote/[slug]/page.tsx,icon.png,apple-icon.png,favicon.ico}`,
+`app/(dashboard)/app/{page,quotes/page,quotes/[quoteId]/page,services/page,settings/billing/page}.tsx`,
+`components/{try-it/*,home/HomeTryIt.tsx,home/HomeQuoteLink.tsx,onboarding/TestQuoteStep.tsx,embed/*,share/*}`,
+`lib/{test-estimates,test-estimate-delete,try-it,try-it-copy,plan-ended,plan-limits,billing-emails,billing-sync,setup-checklist,quote-link,quote-reminders,service-questions,app-quote-view,help/state}.ts`;
+`supabase/migrations/00000000000051_t202.sql`; `scripts/{make-icons.py,deploy-migration-51.sh}`;
+`scripts/hardcore-test/{verify-t202.mts,t202/*}`; `brand/{qolumns-letter.png,icons-made.json}`;
+`Docs/store/google-play/icon-512.png`; Docs/help 01, 02, 04, 05, 08, 09, 10, 14.
+
 ### 2026-11-24: T-201 — Android fixes, the reminder switch, and the oddities found in T-198 (AD-089 to AD-092)
 
 **Built, not deployed.** Needs **migration 50** (`bash scripts/deploy-migration-50.sh`, first), then the **web**

@@ -28,6 +28,8 @@ import { NeedsYouDot } from '@/components/quotes/NeedsYouDot'
 import { NEEDS_YOU_MARK } from '@/lib/status-tone'
 import { LatestActivity, type ActivityLine } from '@/components/home/LatestActivity'
 import { HomeQuoteLink } from '@/components/home/HomeQuoteLink'
+import { HomeTryIt } from '@/components/home/HomeTryIt'
+import { showTryItOnHome } from '@/lib/test-estimates'
 import { WonPanel } from '@/components/home/WonPanel'
 import { HomeAddressCard } from '@/components/home/HomeAddressCard'
 import { addressAndAccess } from '@/lib/own-address'
@@ -254,13 +256,16 @@ export default async function DashboardPage() {
     }
   })
 
+  const hasRealRequest = (realRequestResult.data?.length ?? 0) > 0
   const checklist = buildChecklist({
     hasService,
     pricesCheckedAt: tenantRow?.prices_checked_at,
     quoteLinkCopiedAt: tenantRow?.quote_link_copied_at,
     quoteLinkFirstVisitAt: tenantRow?.quote_link_first_visit_at,
-    hasRealRequest: (realRequestResult.data?.length ?? 0) > 0,
+    hasRealRequest,
   })
+  // T-202: "Try it yourself" stays on Home until the first real request, while a service is switched on
+  const offerTryIt = showTryItOnHome({ hasRealRequest, hasActiveService: services.any && !services.allOff })
 
   const recentRows = (
     (recentResult.data ?? []) as unknown as Array<
@@ -453,6 +458,9 @@ export default async function DashboardPage() {
           </div>
         </section>
       )}
+
+      {/* T-202: the test estimate from setup's last step, for a business that skipped setup or passed the step over */}
+      {offerTryIt && <HomeTryIt />}
 
       {!tenantRow?.time_zone && <RememberTimeZone />}
 

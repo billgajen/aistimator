@@ -56,6 +56,8 @@ export async function dueReminders(
     .eq('tenants.customer_reminder_enabled', true)
     // T-153: a demo quote is never reminded
     .eq('is_demo', false)
+    // T-202: nor is a test estimate the business made itself (the "customer" is the business)
+    .eq('is_test', false)
     .is('reminder_sent_at', null)
     .is('accepted_at', null)
     .is('declined_at', null)

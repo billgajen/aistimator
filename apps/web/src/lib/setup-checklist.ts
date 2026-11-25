@@ -7,8 +7,12 @@
  *                           in a notice and never goes back to setup)
  * 2. Check your prices    — the business confirmed them (setup's "These are my
  *                           prices", or saving a service on Services)
- * 3. Share your quote link — the link was copied or the page had its first visit
- * 4. First real request    — a customer request arrived (not a setup test,
+ * 3. Share your quote link — the business pressed Copy or Share on its link
+ *                           (dashboard or phone app), downloaded its QR code,
+ *                           or its first real request arrived. T-202: opening the link ticks nothing (a
+ *                           visit cannot tell the owner from a customer); a
+ *                           business ticked by a visit before T-202 stays ticked.
+ * 4. First real request    — a customer request arrived (not a test,
  *                           not a quote the business made in its own app)
  *
  * Branding is not a step any more; `hasCustomBranding` drives the tick on the
@@ -20,8 +24,17 @@ export interface ChecklistInput {
   hasService: boolean
   pricesCheckedAt: string | null | undefined
   quoteLinkCopiedAt: string | null | undefined
+  /** Set by a visit to the link before T-202. Nothing writes it any more; read so those businesses stay ticked. */
   quoteLinkFirstVisitAt: string | null | undefined
   hasRealRequest: boolean
+}
+
+/**
+ * T-202: is "Share your quote link" done? The one rule, read by Home's
+ * checklist and by the help assistant's state (lib/help/state.ts).
+ */
+export function quoteLinkShared(input: Pick<ChecklistInput, 'quoteLinkCopiedAt' | 'quoteLinkFirstVisitAt' | 'hasRealRequest'>): boolean {
+  return Boolean(input.quoteLinkCopiedAt || input.quoteLinkFirstVisitAt) || input.hasRealRequest === true
 }
 
 export interface ChecklistStep {
@@ -55,7 +68,7 @@ export function buildChecklist(input: ChecklistInput): { steps: ChecklistStep[];
     {
       id: 'share',
       label: 'Share your quote link',
-      completed: Boolean(input.quoteLinkCopiedAt || input.quoteLinkFirstVisitAt),
+      completed: quoteLinkShared(input),
       href: '/app/quote-link',
     },
     { id: 'first_request', label: 'First real request received', completed: input.hasRealRequest, href: '/app/quotes' },

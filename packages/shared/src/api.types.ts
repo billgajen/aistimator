@@ -886,6 +886,11 @@ export interface AppQuoteView {
   customer?: { name: string; email: string | null; phone: string | null }
   /** Saved but not priced: the plan limit was reached, or the account is paused */
   held?: boolean
+  /**
+   * T-202: only on a request that could not be priced: how many times the business can still press
+   * "Try again" (quote-retry.ts). 0 means the tries are used. A server from before T-202 sends none.
+   */
+  tryAgain?: { left: number }
   /** For the status wording (packages/shared/src/quote-turn.ts) */
   dates?: {
     sentAt: string | null
