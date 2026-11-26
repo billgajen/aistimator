@@ -10,7 +10,9 @@
     "export:ios": "expo export --platform ios",
     "lint": "eslint app src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:room-scan": "node scripts/check-room-scan.mjs",
+    "eas-build-post-install": "node scripts/check-room-scan.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/bricolage-grotesque": "^0.4.1",

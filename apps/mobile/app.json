@@ -57,6 +57,7 @@
     "plugins": [
       "expo-router",
       "./plugins/with-optional-hardware",
+      "./plugins/with-room-scan-linked",
       [
         "expo-secure-store",
         {

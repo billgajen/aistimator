@@ -4261,3 +4261,66 @@ Built 25 November 2026. **Not deployed.** Web only; no worker, no migration.
 
 - **iPhone Duo support, before April 2027.** Build with the iOS 27.1 SDK, test the app in the Duo simulator
   (both screens, folded and open), then make the Duo screenshots for the listing. Not started.
+
+## T-206 — The App Store build had no room scanner; the review account could not start a quote
+
+Built 26 November 2026. **Not deployed.** Web only; no worker, no migration. One new iPhone build.
+
+### Why the scanner was missing
+
+The scanner's two native files (`RoomScanModule.swift` and `RoomScan.podspec`, in
+`apps/mobile/modules/room-scan/ios`) were never in git. A line in `apps/mobile/.gitignore`, `ios/`, was meant
+for the generated project folder and also matched the scanner's folder. EAS is sent what git has, so the build
+service never had the scanner, and Expo linked everything else without a word. A build made on this Mac reads
+the files from disk, which is why it always worked on your phone. Both files are committed now, and the ignore
+line is `/ios/`.
+
+### What you must do, in this order
+
+- [ ] **Repair the review accounts on production** (each run checks the account and makes its missing site row;
+  the password is not changed and not printed):
+  - App Store reviewer: `npx tsx scripts/create-review-account.mts --prod`
+  - Google Play reviewer: `npx tsx scripts/create-review-account.mts --prod --email-name=review`
+  - Each should end with "Its site row: made." (or "already there"). An account that does not exist yet is made
+    whole, with its password shown once, as before.
+- [ ] **Deploy the web** (`npx vercel deploy --prod` from the repo root), after T-204's worker and web and
+  T-205's web if those are not out yet. From then on the app's first call makes a missing site row by itself.
+- [ ] **Make the iPhone build again**, from `apps/mobile`:
+
+  ```
+  cd apps/mobile && npx eas-cli@latest build -p ios --profile production
+  ```
+
+  It is 1.0.0 with the next build number (3), set by EAS. Nothing needs pushing first: EAS takes the files from
+  this folder as they are committed.
+- [ ] **In that build's log, look for two lines.** If either check fails, the build fails and says "ROOM SCANNER
+  MISSING" with the reason.
+  - In the step that runs the `eas-build-post-install` hook:
+    `Room scanner check: RoomScan is installed and RoomScanModule is in Expo's list of modules.`
+  - In the Xcode log (the build page's "Xcode logs" download; the short log may not show it):
+    `Room scanner check: RoomScanModule is linked into Qolumns`
+- [ ] Install it from TestFlight on your iPhone with LiDAR: New quote, a service with a room-sized question,
+  on step 3 the "Room scan" card no longer says "Room scan needs the full app", and "Scan an area" opens the
+  scanner.
+- [ ] Sign in to the app as the reviewer and press New quote: the services are listed.
+
+Android needs no new build for this ticket.
+
+### What changed
+
+- **The store build carries the room scanner**, and a build without it now fails instead of shipping.
+- **The review account script** makes the business's site row, and repairs an account made before.
+- **The app never says "Set up your website widget first"**: the server makes what was missing.
+- **On an iPad** the Quotes screen says "On this iPad" above a quote you started and have not sent.
+
+### Not proven here
+
+- **The EAS build itself.** I did not send a build to EAS. I made the same build on this Mac from a copy of
+  exactly what EAS would be sent (EAS's own tool made the copy): Release, for a real iPhone, the store
+  identity, unsigned. It built, the scanner is in the binary, and both checks ran. Signing and the upload are
+  EAS's part.
+- **The scan on a phone from that build**: your TestFlight check above.
+- **Whether a failed hook stops an EAS build** is not written in Expo's documentation; I expect it does. The
+  Xcode step does not depend on it: a failed step fails any Xcode build.
+- Other lines in the app still say "this phone" on an iPad (the sign-out alert, "Saved on this phone" while a
+  price is worked out, a lost-signal notice on New quote). Only the Quotes screen was asked for.

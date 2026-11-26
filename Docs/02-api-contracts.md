@@ -1142,7 +1142,7 @@ The app uses the widget's public `GET /api/public/widget/config?tenantKey=` and 
 GET /api/app/bootstrap
 200: `{ "tenantName": "…", "tenantKey": "tkey_…", "currency": "USD", "region": { "code": "US", "locale": "en-US", "postalCodeLabel": "ZIP code" } }`
 (T-196: also `won`, and the optional `?tz=`; see "T-196" above.)
-409 `NO_SITE` when the tenant has no active widget site (the app uses the widget's form).
+T-206: a business with no site row gets one on this call (the dashboard's own `getOrCreateTenantKey`), so `tenantKey` is always answered. The old 409 `NO_SITE` ("Set up your website widget first") is gone. 503 `TRY_AGAIN` only when the row could be neither read nor made.
 
 GET /api/app/account (T-184)
 The app's Account tab: a small read of what the dashboard already shows.

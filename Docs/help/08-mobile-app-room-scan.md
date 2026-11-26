@@ -67,7 +67,7 @@ Trying again does not use another quote from your plan. You can try one request 
 <!-- id: app-ipad; page: /app; flags: app -->
 
 {{#soon app}}The app is {{soon}}. When it is live it will run on an iPad as well as an iPhone, with the same screens.{{/soon}}
-{{#live app}}Yes. The same app runs on an iPad. Its screens are the same as on an iPhone, kept to one column in the middle of the wider screen. Taking photos works with the iPad's camera.{{/live}}
+{{#live app}}Yes. The same app runs on an iPad. Its screens are the same as on an iPhone, kept to one column in the middle of the wider screen. Taking photos works with the iPad's camera. A quote you started and have not sent yet is listed on the Quotes screen under "On this iPad".{{/live}}
 
 ## Will my phone tell me when a customer sends a request?
 <!-- id: app-notifications; page: /app/settings/notifications; flags: app -->

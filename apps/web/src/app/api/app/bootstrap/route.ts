@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
-import { canUse, getRegion, onsiteNotInPlan, resolveRegionContext, type AppBootstrapResponse } from '@qolumns/shared'
+import { ID_PREFIXES, canUse, getRegion, onsiteNotInPlan, resolveRegionContext, type AppBootstrapResponse } from '@qolumns/shared'
 import { requireTenant } from '@/lib/auth-tenant'
 import { loadAccess } from '@/lib/access'
 import { loadWonLines, rememberTimeZone } from '@/lib/won'
+import { getOrCreateTenantKey } from '@/lib/tenant-site'
 import { createAdminClient } from '@/lib/supabase/server'
 
 /**
@@ -18,6 +19,12 @@ import { createAdminClient } from '@/lib/supabase/server'
  * T-199: any business can use the app, on any plan or none. `onsiteQuotes`
  * says whether it can start a quote in it; the route that makes the quote
  * decides again (POST /api/app/quotes).
+ *
+ * T-206: a business with no site row gets one here, on first need, as the
+ * dashboard's own pages make it (getOrCreateTenantKey). It used to be
+ * answered 409 NO_SITE, "Set up your website widget first": a business made
+ * outside sign-up's pages (the store reviewer's account) could not start a
+ * quote in the app, and nothing in the app could put that right.
  */
 export async function GET(request: Request) {
   const auth = await requireTenant()
@@ -40,11 +47,10 @@ export async function GET(request: Request) {
   if (!tenant) {
     return NextResponse.json({ error: { code: 'TENANT_NOT_FOUND', message: 'Tenant not found' } }, { status: 404 })
   }
-  if (!site?.tenant_key) {
-    return NextResponse.json(
-      { error: { code: 'NO_SITE', message: 'Set up your website widget first (Dashboard → Embed) — the app uses the same form.' } },
-      { status: 409 }
-    )
+  const tenantKey = (site?.tenant_key as string | undefined) ?? (await getOrCreateTenantKey(supabase, tenantId))
+  if (!tenantKey.startsWith(ID_PREFIXES.tenantKey)) {
+    // The helper answers a word that is not a key when the row could not be made (the database did not answer)
+    return NextResponse.json({ error: { code: 'TRY_AGAIN', message: 'Your account could not be loaded. Try again in a moment.' } }, { status: 503 })
   }
   const region = getRegion(tenant.region as string | null)
   const zone = (tenant as { time_zone?: string | null }).time_zone ?? null
@@ -53,7 +59,7 @@ export async function GET(request: Request) {
   const won = await loadWonLines(supabase, tenantId, { time_zone: kept ? reported : zone, region: tenant.region as string | null, currency: tenant.currency as string | null })
   const body: AppBootstrapResponse = {
     tenantName: tenant.name as string,
-    tenantKey: site.tenant_key as string,
+    tenantKey,
     currency: (tenant.currency as string) || 'USD',
     region: {
       code: region.code,

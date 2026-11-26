@@ -1,5 +1,8 @@
 .expo/
 dist/
-ios/
-android/
+# The two generated native projects, at this folder's top only (T-206). Written without the leading slash,
+# these lines also matched modules/room-scan/ios: the scanner's Swift source and podspec were never in git,
+# so the build service never received them and the store build had no room scan.
+/ios/
+/android/
 .env

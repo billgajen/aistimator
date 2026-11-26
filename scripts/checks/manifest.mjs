@@ -158,6 +158,8 @@ export const SCRIPTS = [
   { id: 't204', server: 'standard', model: 'none', browser: true, minutes: 30 },
   // T-205: the support page and the business's answer on the customer's page (T-201's harness, a browser)
   { id: 't205', server: 'standard', model: 'none', browser: true },
+  // T-206: the app's first call makes the business's site row; the review account script makes and repairs it
+  { id: 't206', server: 'standard', model: 'none' },
 ]
 
 /** Lint, typecheck and unit tests: every level runs these first */

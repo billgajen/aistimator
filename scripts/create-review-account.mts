@@ -4,6 +4,8 @@
 //   Local:       npx tsx scripts/create-review-account.mts
 //   Production:  npx tsx scripts/create-review-account.mts --prod
 //   New password for the account that exists:   add --new-password
+//   Run again for an account that exists: it is checked and repaired (T-206: its site row is made when it has
+//   none, and turned back on when it is off). Nothing else is changed, and the password stays as it is.
 //   A second reviewer's account (T-199, Google Play):   add --email-name=review --one-service
 //     --email-name=<name>   the sign-in is <name>@<APP_DOMAIN> instead of the App Store one
 //     --one-service         the first service only, and the two sample quotes that are for it
@@ -13,6 +15,9 @@
 //     sign-up does (the handle_new_user trigger);
 //   - the business: invented name, US, set up (no setup wizard), no notification email, so nothing is ever
 //     emailed for it;
+//   - its site row (tenant_sites), which holds the key the app reads the business's form with. The dashboard
+//     makes that row the first time one of its pages needs it; a business nobody has opened the dashboard for
+//     has none (T-206: the app's New quote answered "Set up your website widget first" for the reviewer);
 //   - two services from the US trade packs, exactly as setup builds them (servicePayload);
 //   - a FREE TEST PLAN (a subscriptions row with no Stripe customer, as scripts/set-test-plan.sh makes): never
 //     billed, never counted as revenue;
@@ -33,6 +38,7 @@ import { samplePrice } from '../apps/web/src/lib/sample-price'
 import { paintingPackUS } from '../apps/web/src/lib/vertical-packs/painting-us'
 import { garageDoorsPackUS } from '../apps/web/src/lib/vertical-packs/garage-doors-us'
 import { APP_DOMAIN } from '../packages/shared/src/brand'
+import { ID_PREFIXES } from '../packages/shared/src/index'
 import { reviewAccountQuotes, REVIEW_ACCOUNT, reviewLabel } from '../packages/shared/src/review-account'
 
 const PROJECT_REF = 'ygsuzeveesgrafgpkrev'
@@ -72,8 +78,13 @@ console.log(`App Store review account on ${t.label}`)
 const users = (await call('GET', `/auth/v1/admin/users?per_page=1000`)) as { users?: Array<{ id: string; email?: string }> }
 const existing = users.users?.find((u) => u.email?.toLowerCase() === email)
 if (existing) {
+  // T-206: an account made before the script made its site row is repaired here
+  const itsTenant = (await rest('GET', `user_profiles?id=eq.${existing.id}&select=tenant_id`))?.[0]?.tenant_id as string | undefined
+  if (!itsTenant) throw new Error(`The account exists (${email}) but has no business: it cannot be repaired here`)
+  const site = await ensureSite(itsTenant)
+  console.log(`  It exists already (${email}). Its site row: ${site}.`)
   if (!newPassword) {
-    console.log(`  It exists already (${email}). Nothing changed. To give it a new password, run again with --new-password.`)
+    console.log('  Nothing else changed. To give it a new password, run again with --new-password.')
     process.exit(0)
   }
   await call('PUT', `/auth/v1/admin/users/${existing.id}`, { password })
@@ -104,6 +115,9 @@ await rest('PATCH', `tenants?id=eq.${tenantId}`, {
   prices_checked_at: now,
   onboarding_skipped_at: now,
 })
+
+// 2b. Its site row: the key the app reads the business's form with (T-206)
+console.log(`  site row ${await ensureSite(tenantId)}`)
 
 // 3. Two services from the packs, as setup builds them
 const picks = [
@@ -171,6 +185,19 @@ for (const sample of reviewAccountQuotes(new Date()).filter((q) => q.service < m
 
 await checkSignIn()
 printOnce(email, password)
+
+// T-206: the business's site row, as the dashboard makes it on first need (lib/tenant-site.ts): one row, turned
+// on. Says what it found: "made", "turned back on" or "already there".
+async function ensureSite(tenant: string): Promise<'made' | 'turned back on' | 'already there'> {
+  const sites = (await rest('GET', `tenant_sites?tenant_id=eq.${tenant}&select=id,is_active&order=created_at.asc`)) ?? []
+  if (sites.some((site) => site.is_active === true)) return 'already there'
+  if (sites[0]) {
+    await rest('PATCH', `tenant_sites?id=eq.${sites[0].id as string}`, { is_active: true })
+    return 'turned back on'
+  }
+  await rest('POST', 'tenant_sites', { tenant_id: tenant, domain: 'localhost', tenant_key: `${ID_PREFIXES.tenantKey}${randomBytes(12).toString('hex')}`, is_active: true })
+  return 'made'
+}
 
 // The reviewer's first step: the email and the new password sign in
 async function checkSignIn() {

@@ -15,6 +15,90 @@
 
 ## Issues & Resolutions
 
+### 2026-11-26: T-206 — The App Store build had no room scanner; the review account could not start a quote
+
+**Built, not deployed.** Web only (`npx vercel deploy --prod`). No worker, no migration, no pricing change. The
+iPhone app needs one new production build (1.0.0, the next build number). Android needs none.
+
+- **1. The room scanner was never sent to the build service.**
+  - **What broke:** the EAS production iOS build 1.0.0 (2), from TestFlight on an iPhone with LiDAR, said "Room
+    scan needs the full app" on New quote. That line is `roomScanAvailability()` finding no native `RoomScan`
+    module in the binary.
+  - **Root cause:** `apps/mobile/.gitignore` had the line `ios/`, meant for the generated native project
+    `apps/mobile/ios`. Without a leading slash it matches a folder of that name at any depth, so it also
+    matched `apps/mobile/modules/room-scan/ios`: `RoomScanModule.swift` and `RoomScan.podspec` were never in
+    git (`git log` has no commit for either, back to T-138). EAS uploads what git has, less what `.gitignore`
+    leaves out, so the build service got the module's `index.ts` and `expo-module.config.json` and no native
+    source. Expo's autolinking looks for a podspec, found none, and linked every module except ours **without
+    an error or a warning**. A build made on this Mac (T-192 to T-202) reads the files from disk, which is why
+    the scanner always worked on the owner's phone.
+  - **Not the cause** (each looked at): autolinking of a local module (it finds `modules/room-scan` when the
+    podspec is there), `.easignore` (there is none), a config plugin (the module needs none), entitlements
+    (RoomPlan needs none), `Info.plist` (the camera line is there and names the scan).
+  - **Resolution:** the two ignore lines are `/ios/` and `/android/`, and the Swift file and the podspec are
+    committed (the podspec's old product name is corrected in passing). Until this commit they existed on the
+    owner's Mac only.
+  - **So it cannot happen silently again**, two checks, both part of the build:
+    - `apps/mobile/scripts/check-room-scan.mjs`, run by the build service as the `eas-build-post-install` hook
+      (after `npm install`, `expo prebuild` and `pod install`, before anything is compiled). It stops the build
+      when the native source is not in the folder, when CocoaPods did not install the `RoomScan` pod, or when
+      Expo's `ExpoModulesProvider.swift` does not name `RoomScanModule`. Nothing to do on Android.
+    - `apps/mobile/plugins/with-room-scan-linked.js` adds a last step to the Xcode build of the app, "Check the
+      room scanner is linked": for a Release build for a real iPhone it reads the linked binary and fails the
+      build when `RoomScanModule` is not in it. This one does not depend on how the build service treats a
+      hook.
+  - **Proof** (26 Nov, on this Mac, no build was sent to EAS):
+    - `eas build:inspect --stage archive` (EAS's own tool; it copies what would be uploaded and starts no
+      build) with the old ignore file: `modules/room-scan` holds 2 files, no `ios` folder. With the new one: 4
+      files, the podspec and the Swift among them.
+    - In that copy, as the build service does it: `pnpm install`, `expo prebuild` for the store variant
+      (`com.qolumns.app`, no `APP_VARIANT`), `pod install` ("Installing RoomScan (0.1.0)"), the hook (passes),
+      then `xcodebuild archive`, Release, for a real iPhone, unsigned. "ARCHIVE SUCCEEDED", and the new Xcode
+      step printed "RoomScanModule is linked into Qolumns" after the link.
+    - The archived `Qolumns.app/Qolumns` (arm64, stripped): its strings hold `_TtC8RoomScan14RoomScanModule`
+      and `RoomScan.RoomScanViewController`, and it links `RoomPlan.framework` (weak). Version 1.0.0, minimum
+      iOS 16.4, the camera line in place.
+    - Taking the native source out of the copy again: Expo's autolinking finds 0 modules named
+      `RoomScanModule` (1 with it), and the hook exits 1 with "ROOM SCANNER MISSING".
+- **2. The review account had no site row.** `scripts/create-review-account.mts` made the user, the business,
+  its services, plan and quotes, but not its `tenant_sites` row: the dashboard makes that row the first time
+  one of its pages needs it, and nobody opens the dashboard for this account. The script now makes it
+  (`ensureSite`), and a run for an account that exists repairs it before it stops: made when there is none,
+  turned back on when it is off, left alone otherwise. The password is not touched unless `--new-password` is
+  given. Not run on production.
+- **3. `GET /api/app/bootstrap` makes the site row on first need** with the dashboard's own
+  `getOrCreateTenantKey`, instead of answering 409 `NO_SITE` ("Set up your website widget first"). Nothing in
+  the app could put that right, so the app must never be told it. 503 `TRY_AGAIN` only when the row could be
+  neither read nor made.
+- **4. "On this iPad".** On an iPad the Quotes screen's heading above quotes kept on the device, the unfinished
+  quote's line and a waiting quote's line say "iPad" (`src/lib/device.ts`). A phone is unchanged. Other
+  screens' lines that say "this phone" (an alert, the pricing wait) are as they were.
+
+#### Constraints
+- **An ignore line for a generated folder starts with a slash.** `ios/` and `android/` match at any depth; a
+  local Expo module keeps its native source in a folder of exactly that name.
+- A native module of our own is not in a store build until its native source is in git. `release-t206` (app
+  unit tests) holds that for the scanner; the two build checks hold it at build time.
+- The app is never answered `NO_SITE`: a route the app starts with makes what it needs.
+
+#### Relation
+- Extends T-138 (the scanner), T-184 (the line "Room scan needs the full app", written for Expo Go) and T-191
+  (the review account). T-205 noted "On this phone" on an iPad and left it; item 4 is that.
+
+#### Checks
+- Unit: web 2,150 (3 new, in `review-account-t191`), app 263 (21 in the new `release-t206`), worker unchanged.
+  Lint and typecheck clean.
+- `verify-t206` (new, in the manifest, no model): 21 of 21. The app's first call for a business with no site
+  row, as the app signs in and as the dashboard does; the key reads the form and a quote is started and priced
+  with it; the review account script on the local database: makes the row, makes it again when it is gone,
+  turns it on when it is off, changes nothing otherwise, never prints the password on a repair.
+- **`pnpm check:quick`, once: 34 of 35** (27 scripts, 2,266 checks) in 4 min 39 s. The one failure was the new
+  `verify-t206` itself: it read the word after "password" in the line "the email and the password work" as
+  the password. The product's checks in it had passed. Pattern corrected; **`pnpm check:failed`: 3 of 3** in
+  46 s (`t206` 21 of 21). No `check:full` (the ticket says none: no pricing, worker or migration change).
+- The Release archive from the clean copy took about 10 minutes and is described under item 1. No build was
+  sent to EAS, nothing was deployed, production was not touched.
+
 ### 2026-11-25: T-205 — App Store release prep: version 1.0.0, the support page, store pictures, and one T-204 leftover
 
 **Built, not deployed.** Web only (`npx vercel deploy --prod`). No worker, no migration, no pricing change. The

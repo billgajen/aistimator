@@ -13,7 +13,10 @@ Built in T-137 (the app), T-138 (LiDAR room scan), T-182 (the on-site path, and 
 - Expo modules: secure-store (the sign-in, in the keychain), image-picker (camera and library),
   image-manipulator (photos are made smaller before upload), file-system (drafts and photos kept on the
   phone, uploads with progress), constants, linking, status-bar, font, haptics, clipboard, splash-screen.
-- One native module of our own: `modules/room-scan` (Swift, Apple RoomPlan, LiDAR).
+- One native module of our own: `modules/room-scan` (Swift, Apple RoomPlan, LiDAR). Its native source
+  (`modules/room-scan/ios`) must be in git, or the build service never receives it and the store build has no
+  scanner (T-206). Two checks stop such a build: `scripts/check-room-scan.mjs` (the `eas-build-post-install`
+  hook) and the Xcode step added by `plugins/with-room-scan-linked.js`.
 - No UI kit. Colours, sizes and faces are in `src/theme.ts`; `Docs/design/system.md` decides them. The three
   brand faces come from `@expo-google-fonts/*`; the one icon set is Ionicons (`@expo/vector-icons`), always
   through the `Icon` component in `src/components/ui.tsx`. The QR code is drawn from plain views

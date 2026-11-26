@@ -10,12 +10,13 @@
  */
 import { accountNoticeLine } from '../../src/lib/onsite-gate'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, RefreshControl, SectionList, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Platform, Pressable, RefreshControl, SectionList, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
 import type { AppWonLines, QuoteListItem } from '@qolumns/shared'
 import { useApi } from '../../src/lib/api-context'
 import { toApiError, type AccountNotice } from '../../src/lib/api'
 import { plainError } from '../../src/lib/errors'
+import { deviceWord, forDevice } from '../../src/lib/device'
 import { useOutbox, useOutboxState } from '../../src/lib/outbox-context'
 import { usePush } from '../../src/lib/push-context'
 import { draftProgress, draftTitle, OUTBOX_COPY, type Draft } from '../../src/lib/outbox'
@@ -23,6 +24,9 @@ import { groupQuotes, matchesSearch, rowWords, type ListGroup } from '../../src/
 import { TONE_STYLE, turnOfListItem } from '../../src/lib/status'
 import { Button, EmptyState, ErrorText, Icon, Muted, Notice, Pill, ProgressBar, Screen, Skeleton, TopBar } from '../../src/components/ui'
 import { colors, fonts, icon, radius, scale, space, tabular, touch, type } from '../../src/theme'
+
+/** T-206: what the quotes kept here are said to be on: an iPad on an iPad, a phone everywhere else */
+const DEVICE = deviceWord(Platform.OS, Platform.OS === 'ios' && Platform.isPad)
 
 export default function Quotes() {
   const api = useApi()
@@ -141,14 +145,14 @@ export default function Quotes() {
             ) : null}
             {notice ? <Notice tone={notice.kind === 'suspended' ? 'danger' : 'notice'}>{accountNoticeLine(notice)}</Notice> : null}
             {error ? <ErrorText>{error}</ErrorText> : null}
-            {waiting.length > 0 || unfinished ? <GroupHeader title="On this phone" count={waiting.length + (unfinished ? 1 : 0)} /> : null}
+            {waiting.length > 0 || unfinished ? <GroupHeader title={`On this ${DEVICE}`} count={waiting.length + (unfinished ? 1 : 0)} /> : null}
             {waiting.map((draft) => (
               <WaitingRow key={draft.id} draft={draft} onPress={() => router.navigate(`/new?draft=${draft.id}`)} />
             ))}
             {unfinished ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Unfinished quote, ${draftTitle(unfinished)}. Saved on this phone. Carry on`}
+                accessibilityLabel={`Unfinished quote, ${draftTitle(unfinished)}. Saved on this ${DEVICE}. Carry on`}
                 onPress={() => router.navigate('/new')}
                 style={({ pressed }) => [styles.draftRow, pressed && { backgroundColor: colors.mint }]}
               >
@@ -156,7 +160,9 @@ export default function Quotes() {
                   <Text style={styles.name} maxFontSizeMultiplier={scale.text}>
                     Unfinished quote
                   </Text>
-                  <Muted>{draftTitle(unfinished)} · saved on this phone. Tap to carry on.</Muted>
+                  <Muted>
+                    {draftTitle(unfinished)} · saved on this {DEVICE}. Tap to carry on.
+                  </Muted>
                 </View>
                 <Icon name="chevron-forward" size={icon.small} color={colors.muted} />
               </Pressable>
@@ -255,7 +261,7 @@ function QuoteRow({ item, onPress }: { item: QuoteListItem; onPress: () => void 
 /** A quote that has not reached the server yet: it is on this phone and sends by itself */
 function WaitingRow({ draft, onPress }: { draft: Draft; onPress: () => void }) {
   const progress = draftProgress(draft)
-  const line = draft.problem ? draft.problem.message : draft.send === 'sending' ? 'Sending the job' : progress.line || OUTBOX_COPY.offline
+  const line = forDevice(draft.problem ? draft.problem.message : draft.send === 'sending' ? 'Sending the job' : progress.line || OUTBOX_COPY.offline, DEVICE)
   return (
     <Pressable
       accessibilityRole="button"
