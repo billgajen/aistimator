@@ -17,8 +17,14 @@
 
 ### 2026-11-27: T-208 — The home page's videos open in a window over the page; a transcript is no longer shown
 
-**Deploy: web only** (`npx vercel deploy --prod --yes` from the repo root, after pushing). No worker, no
-migration, no app build. DEPLOY-RECORD-T208
+**Deployed 27 Nov 2026, web only** (commit e06f750, `npx vercel deploy --prod --yes` from the repo root, Vercel
+`estimator-infevzse4`). No worker, no migration, no app build.
+**On the live site afterwards** (page views and presses only): the home page's HTML has the three video buttons,
+no `<video>`, no hero player and no "Read the transcript"; `/support` has its six links and no transcript. In
+Chrome (which can decode the videos) at 1,440 and 390 px each of the three buttons opened the window and its
+video played with sound on the press (time advancing, not muted): the hero wide at 1,440 (1,392 by 783 px on a
+900 px high screen) and upright at 390 (374 by 665 px on an 844 px high screen), the two guides wide. The page
+behind did not scroll, and Escape closed the window, removed the video and returned the focus to the button.
 
 Web only. No pricing, worker, billing or database code changed; no migration; no new dependency.
 
