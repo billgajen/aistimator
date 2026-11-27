@@ -5,7 +5,7 @@
  * quote-turn.ts): "Needs you" first with its count, then "Waiting for
  * customer", "Accepted", then the rest. A request that could not be priced,
  * or one saved at the plan limit, is in "Needs you" with its reason. Quotes
- * still on this phone (unfinished, or waiting for a signal) sit above them
+ * still on this device (unfinished, or waiting for a signal) sit above them
  * all. Search by customer name; pull down to refresh.
  */
 import { accountNoticeLine } from '../../src/lib/onsite-gate'
@@ -258,7 +258,7 @@ function QuoteRow({ item, onPress }: { item: QuoteListItem; onPress: () => void 
   )
 }
 
-/** A quote that has not reached the server yet: it is on this phone and sends by itself */
+/** A quote that has not reached the server yet: it is on this device and sends by itself */
 function WaitingRow({ draft, onPress }: { draft: Draft; onPress: () => void }) {
   const progress = draftProgress(draft)
   const line = forDevice(draft.problem ? draft.problem.message : draft.send === 'sending' ? 'Sending the job' : progress.line || OUTBOX_COPY.offline, DEVICE)

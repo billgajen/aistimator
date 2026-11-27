@@ -23,7 +23,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
     if (!this.state.failed) return this.props.children
     return (
       <View style={{ flex: 1, justifyContent: 'center', backgroundColor: colors.paper }}>
-        <EmptyState icon="refresh" title="Something went wrong" text="Nothing was lost. A quote you were writing is saved on this phone.">
+        <EmptyState icon="refresh" title="Something went wrong" text="Nothing was lost. A quote you were writing is saved on this device.">
           <Button title="Try again" onPress={() => this.setState({ failed: false })} />
         </EmptyState>
       </View>

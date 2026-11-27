@@ -17,6 +17,7 @@ import type { ExpectedSignalConfig, SuggestedField, WorkStepConfig } from '@qolu
 import { measuredLines, sampleNote } from '@/lib/sample-price'
 import { photoDetails, photoKey, type PreviewPrice, type PreviewValues } from '@/lib/pricing-preview'
 import type { ServiceCreateBody } from '@/lib/service-rows'
+import { GuideLink } from '@/components/guide/GuideLink'
 
 interface PricingTestProps {
   /** The service as the editor would save it */
@@ -101,7 +102,11 @@ export function PricingTest({ service, serviceId, currencySymbol, onTested }: Pr
   return (
     <div className="space-y-6" data-testid="pricing-test">
       <div>
-        <h3 className="text-base font-medium text-text-primary">Test Your Pricing</h3>
+        {/* T-207: the guide for this step, beside its heading */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4">
+          <h3 className="text-base font-medium text-text-primary">Test Your Pricing</h3>
+          <GuideLink id="test-pricing" />
+        </div>
         <p className="mb-3 text-sm text-text-muted">
           Enter a customer&apos;s answers to see the price they would get. It is worked out the same way as a real request.
         </p>

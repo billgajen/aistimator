@@ -12,6 +12,7 @@ import { WhereToPutIt } from './WhereToPutIt'
 import { UseItOnWhatsApp } from './UseItOnWhatsApp'
 import { EmbedCodeCard } from './EmbedCodeCard'
 import { FormFieldsBuilder } from './FormFieldsBuilder'
+import { GuideLink } from '@/components/guide/GuideLink'
 
 /** T-149: the Quote link page (was "Share" until T-160), in the order a small trade needs it. */
 export function SharePageClient(props: {
@@ -39,7 +40,8 @@ export function SharePageClient(props: {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Quote link" description="Give customers this link, or put the form on your website." />
+      {/* T-207: the guide for this page, under its title */}
+      <PageHeader title="Quote link" description="Give customers this link, or put the form on your website." below={<GuideLink id="quote-link" />} />
 
       {address?.canChoose && <OwnAddressCard view={address} place="quote-link" onChosen={setAddress} />}
 

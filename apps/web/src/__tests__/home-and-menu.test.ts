@@ -477,8 +477,9 @@ describe('the menu, in sections', () => {
 
   it('"Services" and "Quote link" replace "Prices" and "Share" as page names', async () => {
     expect(read('apps/web/src/app/(dashboard)/app/services/page.tsx')).toContain('title="Services"')
+    // T-207: the header also carries the page's guide link, under the title
     expect(read('apps/web/src/components/share/SharePageClient.tsx')).toContain(
-      '<PageHeader title="Quote link" description="Give customers this link, or put the form on your website." />'
+      '<PageHeader title="Quote link" description="Give customers this link, or put the form on your website." below={<GuideLink id="quote-link" />} />'
     )
     const config = (await import(join(WEB, 'next.config.js'))).default as { redirects: () => Promise<Array<{ source: string; destination: string }>> }
     const redirects = Object.fromEntries((await config.redirects()).map((r) => [r.source, r.destination]))

@@ -580,3 +580,15 @@ dialog.photo-viewer {
 dialog.photo-viewer::backdrop {
   background: rgb(27 40 35 / 0.6);
 }
+
+/* T-207: a guide's video window. The browser's own modal dialog, as the photo viewer above: the page behind
+   is dimmed with ink, and nothing here moves. */
+dialog.guide-dialog {
+  margin: auto;
+  max-height: calc(100dvh - 1.5rem);
+  overflow: auto;
+  color: var(--color-text-primary);
+}
+dialog.guide-dialog::backdrop {
+  background: rgb(27 40 35 / 0.6);
+}

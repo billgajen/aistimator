@@ -113,7 +113,7 @@ describe('T-196: the Notifications section', () => {
   it('refused on the phone: the switches show off and say where to change it', () => {
     expect(pushSection({ available: true, permission: 'denied', prefs: DEFAULT_PUSH_PREFS })).toEqual({
       kind: 'refused',
-      line: "Turned off in your phone's settings",
+      line: "Turned off in your device's settings",
       prefs: { newRequest: false, accepted: false, question: false },
     })
   })

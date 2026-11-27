@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, type KeyboardEvent } from 're
 import { currencySymbol as sharedCurrencySymbol, getRegion, reviewModeOf, pricingChecks } from '@qolumns/shared'
 import type { ReviewMode } from '@qolumns/shared'
 import { PageHeader } from '@/components/dashboard/EmptyState'
+import { GuideLink } from '@/components/guide/GuideLink'
 import { AIDraftBadge } from '@/components/AIDraftBadge'
 import { WorkStepEditor } from '@/components/WorkStepEditor'
 import { SuggestedFieldEditor } from '@/components/SuggestedFieldEditor'
@@ -663,6 +664,8 @@ export default function ServicesPage() {
               </svg>
               Add Service
             </button>
+            {/* T-207: the guide for this page, beside the button it is about */}
+            <GuideLink id="add-service" />
           </div>
         }
       />
@@ -1273,6 +1276,7 @@ export default function ServicesPage() {
 
                     {/* Plain-language pricing composer (T-104) — the default way to set pricing */}
                     <PricingComposer
+                      aside={<GuideLink id="set-prices" />}
                       serviceName={formData.name}
                       serviceDescription={formData.description}
                       currencySymbol={currencySymbol}

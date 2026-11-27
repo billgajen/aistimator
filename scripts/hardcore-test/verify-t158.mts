@@ -495,7 +495,8 @@ if (!process.env.PLAYWRIGHT_DIR) {
   const boxOf = async (p: Page) => ({
     sentence: await p.getByTestId('next-step-sentence').innerText(),
     action: await p.getByTestId('next-step').getAttribute('data-action'),
-    buttons: await p.locator('[data-testid="next-step"] button, [data-testid="next-step"] a').allInnerTexts(),
+    // T-207: the card's quiet guide link ("Watch how") is help, not one of the step's buttons
+    buttons: await p.locator('[data-testid="next-step"] button:not([data-testid^="guide-"]), [data-testid="next-step"] a').allInnerTexts(),
     label: await p.getByTestId('turn-label').first().innerText(),
   })
   const trackerOf = (p: Page) => p.getByTestId('tracker-step').evaluateAll((els) => els.map((el) => ({

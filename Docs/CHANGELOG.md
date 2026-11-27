@@ -15,6 +15,151 @@
 
 ## Issues & Resolutions
 
+### 2026-11-27: T-207 — The guide videos in the dashboard, on the site and on /support; two leftovers
+
+**Built 27 Nov 2026. Web only** (`npx vercel deploy --prod --yes` from the repo root). No worker, no migration, no
+app build: the app's wording ships with its next build.
+
+Help content on existing screens. No pricing, worker, billing or database code changed; no migration; no new
+dependency.
+
+- **What was added.** Eight finished videos were already in `apps/web/public/guides` (the hero, wide and
+  upright, and six how-to guides; each with a `.jpg` poster frame, a voiceover, and captions that are part of
+  the picture). They are shown as they are: nothing was re-encoded, renamed or generated.
+- **One list: `apps/web/src/lib/guides.ts`.** For each guide: its id (`hero`, `add-service`, `set-prices`,
+  `test-pricing`, `quote-link`, `approve`, `on-site`), title, file, poster, length in seconds, the picture's
+  size, and the voiceover as lines of text. The hero has two sources, wide and upright (`tall`).
+  - **The rule: `lib/guides.ts` is the only file that names a guide file.** Every screen asks for a guide by
+    its id (`<GuideLink id="add-service" />`). A unit test holds both halves: every file the list names is in
+    the folder (and every file in the folder is named, once), and no other file under `apps/web/src` contains
+    the folder's path. That is also why the components live in `components/guide` (singular): an import from a
+    folder named like the public one would spell the forbidden path.
+  - **The videos are re-made by hand, outside the repo, when a screen changes.** Nothing here builds one.
+    Replace the `.mp4` and its `.jpg` under the same names, and correct `seconds` and `transcript` in the list
+    if the new video differs. A new guide is a new entry in the list (and in `SETUP_GUIDES` if it belongs in
+    the numbered six).
+  - The product's name in a transcript comes from `PRODUCT_NAME` and the address from `APP_DOMAIN`; the text
+    reads exactly as the voiceover.
+- **The player (`components/guide`).**
+  - `GuideLink` takes the guide's id and nothing else. It is a quiet link, "Watch how · 32 s", with a play mark
+    and the length from the list.
+  - Pressing it opens the browser's own modal dialog (`showModal`, as the customer photo viewer does, T-169):
+    the browser keeps the focus inside it, closes it on Escape, and reports every way of closing (Escape,
+    "Close", a click on the dimmed page) with one `close` event. On that event the video stops, the guide is
+    remembered, and the focus goes back to the link. No focus-trap code of our own, and no new dependency.
+  - **The video is only in the page while the window is open** (`<video controls playsInline preload="none"
+    poster=…>`), so a page with six links loads no video and no poster until one is pressed.
+  - **It starts inside the press itself, with sound.** The press handler puts the video in the page at once
+    (`flushSync`) and calls `play()` before it returns, which is what lets a browser play sound. Nothing in the
+    dashboard plays by itself: there is no `autoPlay` anywhere, and no effect that starts a video.
+  - Under the video, "Read the transcript": a closed `<details>` with the voiceover's lines.
+  - **Remembered in `localStorage`**, one key per guide (`qolumns.guide.watched.<id>`), once four fifths of
+    the video have played or its window was closed. The link then carries a small tick and nothing else
+    changes. Every read and write is inside a `try`: a browser that refuses storage remembers for the page
+    only. Links to the same guide on one page update together.
+- **Where each guide shows.**
+
+  | Guide | Where | File |
+  |---|---|---|
+  | `add-service` | Services, in the page header beside "Add Service" | `app/(dashboard)/app/services/page.tsx` |
+  | `set-prices` | the service editor, step "Pricing Setup", beside the step's heading "Describe your pricing" | `services/page.tsx` (passes it to `components/services/PricingComposer.tsx`, new `aside`) |
+  | `test-pricing` | the service editor, step "Test & Publish", beside "Test Your Pricing" | `components/services/PricingTest.tsx` |
+  | `quote-link` | Quote link, under the page title | `components/share/SharePageClient.tsx` (`PageHeader`, new `below`) |
+  | `approve` | a quote's page, in the "Next step" card, only while its action is "approve" | `components/quotes/NextStepBox.tsx` |
+  | all six, 1 to 6 | Home, the "Getting started" card | `app/(dashboard)/app/page.tsx`, `components/guide/GettingStarted.tsx` |
+  | all six, 1 to 6 | `/support`, the section "Video guides" | `app/support/page.tsx`, `components/guide/GuideList.tsx` |
+  | `hero` | the marketing home page, in the hero under the headline's block, above the three frames | `app/page.tsx`, `components/guide/HeroVideo.tsx` |
+
+  - "Pricing Setup" has no heading of its own (the step's name is in the row of step numbers), so the link sits
+    beside the first heading of the step. Setup's "check your prices" step uses the same composer and gets no
+    link.
+  - With the link in it, the Services header's buttons take a row of their own under the title at widths
+    under about 1,300 px (they sat beside the title before).
+- **Home's "Getting started" card.** Shown while the business has sent fewer than three quotes
+  (`GETTING_STARTED_UNTIL`; one more read on Home, of at most three rows: this business's quotes that are not
+  tests and have a `sent_at`). It sits after "Get set up", so below "Waiting for you" and never above it.
+  "Hide" is remembered per business in `localStorage` (`qolumns.guide.getting-started-hidden.<tenant id>`).
+  - **A hidden card is not shown for a moment on the next visit.** The page comes from the server, which
+    cannot read the browser's storage, so the card is in the HTML. One line of script inside the card hides it
+    before it is first painted; React then removes it when it reads the same key. `verify-t207` reads the page
+    as its HTML arrives and finds the card already hidden.
+- **The marketing hero video.** A poster with an 80 px play button (white with an ink edge: the screen keeps its
+  one yellow button). It plays with sound when pressed and never by itself. Two of it: the wide video from
+  640 px, the upright one under that, and CSS decides which shows. **Only the one on screen loads anything**:
+  each poster is a lazy `<img>` (the hidden one is never laid out, so never fetched) and a `<video>` is not in
+  the page until its button is pressed. One that is no longer shown (a phone turned on its side) is paused.
+  The transcript is under it, closed, on its own white ground (it can sit over the hero photograph).
+- **Content-Security-Policy: none is set anywhere**, so nothing blocks media from our own address and nothing
+  was added (a unit test fails if one appears without `media-src`).
+- **Found on the way: the middleware ran on every video request.** Its matcher left images alone
+  (`svg|png|jpg|jpeg|gif|webp`) but not `.mp4`, so each piece of a video a signed-in business asked for would
+  first have made the sign-in check's round trip to Supabase. `mp4` is added to that list. The pages still go
+  through the middleware (a unit test runs the pattern against both).
+- **Leftover 1: the app says "this device", not "this phone".** It runs on an iPad too. Changed in the files
+  the ticket named (`app/(tabs)/account.tsx`, `new.tsx`, `quote/[id].tsx`, `src/lib/outbox.ts`,
+  `src/components/ErrorBoundary.tsx`, and comments in `(tabs)/index.tsx`, `feel.ts`, `notifications.ts`,
+  `modules/room-scan/index.ts`). The room scan's two lines about the device now say "iPhone or iPad".
+  - **The Quotes screen keeps T-206's own word** ("On this iPad" / "On this phone"): `forDevice` now also turns
+    a neutral line ("Saved on this device.") into the device's own, so that screen does not say two things.
+    `release-t206.test.ts` is unchanged and passes.
+  - **Three lines outside the ticket's list had the same fault and were changed too:** "This photo is no longer
+    on this device" (`device-files.ts`), and "Turned off in your device's settings" / "Open your device's
+    settings" (`packages/shared/src/push.ts`, used by the app only).
+  - **Left as it is:** "Point your phone's camera at the code" on the app's QR screen (that is the customer's
+    phone), and the scan's source label `iPhone (LiDAR)`, which is stored with a scan and shown on the web.
+  - No app build in this ticket: the wording ships with the next one.
+- **Leftover 2: `OWNER-TODO.md`.** "Switching the addresses on", steps 1 to 7, and "One thing to look at in
+  Cloudflare first" are ticked, dated 27 Nov 2026, with what the owner did. "To test with one business" is
+  left unticked.
+- **Docs.** `Docs/help/01-getting-started.md` has a new entry ("Are there videos that show me how to do
+  things?") and "Getting started" in Home's list; the support-page entry names "Video guides".
+  `Docs/design/system.md` (Layout) says what a guide link and the hero player look like.
+
+**Constraints**
+
+- Only `lib/guides.ts` names a guide file (above). Do not import from a folder called `guides` under `src`.
+- No video plays by itself. A new place for a guide uses `GuideLink`; it is a button followed by a closed
+  dialog, so it goes in a row or a block, never inside a `<p>`.
+- The window must stay the browser's own modal dialog opened with `showModal()`. A hand-made overlay would need
+  its own focus trap and Escape handling, and would sit under the service editor instead of over it.
+- **The checks' browser cannot decode the videos** (Playwright's Chromium has no H.264). `verify-t207` proves
+  "it plays" as: `play()` was called once, inside the press, with the sound on, and the file was asked for. That
+  the videos really play with sound was seen by hand in Chrome (below).
+
+**Checks**
+
+- **Quick level (`pnpm check:quick`), run once: 23 min 58 s.** Lint, typecheck, the unit suites (worker 926,
+  web 2,184 of which 34 are new in `guides-t207.test.ts`, app 269 of which 6 are new in
+  `wording-t207.test.ts`), both builds and 28 verify scripts. **33 of 36 steps passed; three verify scripts
+  failed, each on a deliberate change of this ticket**, and were updated:
+  - `t152` forbade the words "Start free" anywhere on the home page. The hero video's voiceover ends "Start
+    free at qolumns.com" and its transcript is on the page. The check now takes the transcript out before
+    looking: no button, link or line of the page's own says it.
+  - `t158` expected the "Next step" card of a quote awaiting approval to hold one button. It now also holds the
+    guide link; the check counts the step's buttons and leaves the guide link out.
+  - `t170` waited for every image on the home page to load, and was stopped after ten minutes: the hero
+    poster for the other screen width is a lazy image in a hidden box, which is never fetched (as meant). Its
+    helper now waits only for images that are laid out.
+  - `pnpm check:failed` then passed: 3 scripts, 599 checks, 2 min 36 s (`t170` 417 of 417, among them the
+    contrast of every line over the hero photograph and the three frames still half on it).
+  - `t160` passed on its second try, alone (the order of "Latest activity" when its events fall in the same
+    second beside other scripts). Not this ticket's.
+- **`verify-t207` (new, in the manifest): 136 checks**, in a browser at 390 and 1,280 px (the hero also at 639
+  and 640): the files are served, a video in pieces; the player on `/support`; the hero; each dashboard
+  placement; "Getting started" below "Waiting for you", hidden by "Hide" and at three sent quotes.
+- **By hand, in Chrome** (which can decode the videos): the wide hero, the upright hero and guide 1 each played
+  with sound on the press (time advancing, not muted); only the poster on screen had been fetched before it;
+  Escape closed the window, removed the video and returned the focus.
+- No full level: nothing in pricing, the worker, billing, emails or a migration changed.
+
+**Not proven**
+
+- **Safari and a real iPhone or iPad.** Everything was run in Chrome and in the checks' Chromium. The videos
+  are H.264 with AAC, and the pieces are served with `206`, which is what Safari asks for, but no Apple browser
+  was used here.
+- The videos' content was not checked against the transcripts by ear, except the hero's and guide 1's first
+  seconds: the transcripts are the ticket's text.
+
 ### 2026-11-26: T-206 — The App Store build had no room scanner; the review account could not start a quote
 
 **Built, not deployed.** Web only (`npx vercel deploy --prod`). No worker, no migration, no pricing change. The

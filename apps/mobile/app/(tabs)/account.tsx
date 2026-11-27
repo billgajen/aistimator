@@ -69,7 +69,7 @@ export default function Account() {
       ])
       return
     }
-    Alert.alert('Sign out?', 'A quote on this phone has not been sent yet. It stays saved and is sent when you sign in again.', [
+    Alert.alert('Sign out?', 'A quote on this device has not been sent yet. It stays saved and is sent when you sign in again.', [
       { text: 'Stay signed in', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: () => void push.signOut() },
     ])

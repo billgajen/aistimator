@@ -2,6 +2,7 @@
 
 import { QUOTE_TURN_COPY } from '@qolumns/shared'
 import type { QuoteTurn } from '@qolumns/shared'
+import { GuideLink } from '@/components/guide/GuideLink'
 
 // T-169: 44 px tall on a phone (system.md, Layout)
 const PRIMARY =
@@ -69,9 +70,13 @@ export function NextStepBox({
       {turn.action && (
         <div className="mt-4 flex flex-wrap items-center gap-3">
           {turn.action === 'approve' && (
-            <button type="button" onClick={onApprove} disabled={approving} className={PRIMARY}>
-              {approving ? B.approving : B.approve}
-            </button>
+            <>
+              <button type="button" onClick={onApprove} disabled={approving} className={PRIMARY}>
+                {approving ? B.approving : B.approve}
+              </button>
+              {/* T-207: how checking and approving works, only while this quote waits for it */}
+              <GuideLink id="approve" />
+            </>
           )}
           {turn.action === 'add_price' && (
             <button type="button" onClick={onEdit} className={PRIMARY}>

@@ -14,7 +14,7 @@ export function tap(): void {
   try {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined)
   } catch {
-    // no haptics on this phone
+    // no haptics on this device
   }
 }
 
@@ -23,7 +23,7 @@ export function done(): void {
   try {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined)
   } catch {
-    // no haptics on this phone
+    // no haptics on this device
   }
 }
 

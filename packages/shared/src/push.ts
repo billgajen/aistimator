@@ -72,8 +72,8 @@ export const PUSH_COPY = {
   askYes: 'Turn on',
   askNo: 'Not now',
   /** The switches when the phone itself refuses notifications for the app */
-  refused: "Turned off in your phone's settings",
-  openSettings: "Open your phone's settings",
+  refused: "Turned off in your device's settings",
+  openSettings: "Open your device's settings",
   /** A build that cannot receive notifications (one installed from a Mac for testing) */
   unavailable: 'Available in the App Store version',
   /** T-200: the same on Android, where no other shop is ever named (Google Play's rule) */

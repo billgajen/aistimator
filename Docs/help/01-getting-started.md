@@ -94,12 +94,34 @@ Then, from top to bottom:
 3. A notice about your plan or your free quotes, when you are close to the limit or have reached it.
 4. "Won through {{product}}": what you won this calendar month. It appears once a customer has accepted an estimate.
 5. "Get set up": four steps, shown until all four are done.
-6. "Where your quotes stand": three counts by whose turn it is.
-7. "Latest activity": the newest things that happened to your quotes. Each line opens its quote.
-8. "Your quote link": the link you give customers, with "Copy", "Open" and "QR code and website form".
-9. "Last 30 days": "Requests", "Estimates sent", "Accepted" and "Value accepted", each compared with the 30 days before. "See all numbers" opens "Analytics". These four numbers are hidden once "Won through {{product}}" shows.
+6. "Getting started": six short videos, one for each step of using {{product}}. It is shown until you have sent three quotes, or until you press "Hide".
+7. "Where your quotes stand": three counts by whose turn it is.
+8. "Latest activity": the newest things that happened to your quotes. Each line opens its quote.
+9. "Your quote link": the link you give customers, with "Copy", "Open" and "QR code and website form".
+10. "Last 30 days": "Requests", "Estimates sent", "Accepted" and "Value accepted", each compared with the 30 days before. "See all numbers" opens "Analytics". These four numbers are hidden once "Won through {{product}}" shows.
 
 Test estimates, the ones you make with "Try it yourself", are left out of every count on this page. While you have had no real customer request, "Home" also shows a "Try it yourself" box.
+
+## Are there videos that show me how to do things?
+<!-- id: start-video-guides; page: /app -->
+
+Yes. There are six short videos, each under a minute: "Add a service", "Set your prices", "Test your pricing", "Share your quote link", "Check and approve" and "Quote on site". They play with sound, the words are shown on the picture, and each has its words written out under "Read the transcript".
+
+You find them in three places:
+
+1. On "Home", in the "Getting started" card, in order from 1 to 6. The card is shown until you have sent three quotes, or until you press "Hide".
+2. Beside the step each one is about, as a link that says "Watch how" and how long the video is. It is on "Services" beside "Add Service", in a service's editor on the "Pricing Setup" step and on the "Test & Publish" step, on "Quote link" under the page's title, and on a quote that is waiting for your approval, in its "Next step" card.
+3. On the Support page of the {{product}} website, under "Video guides". That page needs no sign-in.
+
+To watch one:
+
+1. Press "Watch how". The video opens over the page and starts playing. Nothing plays until you press it.
+2. Press "Read the transcript" under the video if you would rather read it.
+3. Press "Close", or the Escape key, to go back to where you were.
+
+A video you have watched, or opened and closed, gets a small tick beside its link. The tick is remembered by the browser you are using, so another browser or another device starts without ticks. It changes nothing else: you can watch a video again as often as you like.
+
+"Hide" on the "Getting started" card puts the card away in the browser you are using. The videos stay beside each step and on the Support page.
 
 ## Do I need to refresh the page to see a new request?
 <!-- id: start-updates-itself; page: /app -->

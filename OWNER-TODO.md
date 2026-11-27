@@ -3623,7 +3623,8 @@ free start, the app's rule, the new wording) is live with the web deploy.
 
 ### One thing to look at in Cloudflare first
 
-- [ ] Open **Cloudflare → qolumns.com → DNS → Records** and read the names of every record. I could not read
+- [x] **Looked at on 27 Nov 2026: the only subdomains were `www` and `pm-bounces`, both already reserved.**
+  Open **Cloudflare → qolumns.com → DNS → Records** and read the names of every record. I could not read
   this list (the read was refused here). From public DNS I found two subdomains, `www` and `pm-bounces`, and
   both are reserved. **If you see any other subdomain there, tell me its name before switching the addresses
   on**, so I can reserve it: otherwise a business could choose it as its address.
@@ -3636,8 +3637,20 @@ page is about 11, so roughly 9,000 page views a day across every business's addr
 
 Do these in order. Each step is safe to stop after.
 
-- [ ] **1. Make a key** and keep it for steps 2 and 3: `openssl rand -hex 32`
-- [ ] **2. Deploy the addresses Worker and give it the key:**
+**Steps 1 to 7 done by the owner on 27 Nov 2026 (ticked in T-207). The addresses are on.** What was done:
+
+- the wildcard record `AAAA` `*` → `100::`, proxied, was added;
+- the `qolumns-addresses` Worker was deployed, with its key;
+- the same key was set on Vercel;
+- the bucket's CORS list includes `https://*.qolumns.com`;
+- `NEXT_PUBLIC_OWN_ADDRESS_HOST=qolumns.com` was set and the web redeployed;
+- the checks passed: a made-up address forwards to `qolumns.com` keeping the path, and `www` and `qolumns.com`
+  are unchanged.
+
+"To test with one business" below is still to do.
+
+- [x] **1. Make a key** and keep it for steps 2 and 3: `openssl rand -hex 32` (done 27 Nov 2026)
+- [x] **2. Deploy the addresses Worker and give it the key:** (done 27 Nov 2026: `qolumns-addresses` deployed, with its key)
 
 ```
 cd apps/worker && pnpm deploy:addresses
@@ -3646,9 +3659,10 @@ npx wrangler secret put ADDRESS_PROXY_KEY -c wrangler.addresses.toml --env produ
 
   The first command creates a Worker named `qolumns-addresses` with the route `*.qolumns.com/*`. It is separate
   from the job worker (`estimator-worker`) and touches nothing of it. The second asks for the key: paste it.
-- [ ] **3. Vercel → estimator-web → Settings → Environment Variables (Production):** add `ADDRESS_PROXY_KEY` with
-  the same key. Do not redeploy yet.
-- [ ] **4. Add the DNS record** (Cloudflare → qolumns.com → DNS → Records → Add record):
+- [x] **3. Vercel → estimator-web → Settings → Environment Variables (Production):** add `ADDRESS_PROXY_KEY` with
+  the same key. Do not redeploy yet. (Done 27 Nov 2026: the key is set on Vercel.)
+- [x] **4. Add the DNS record** (Cloudflare → qolumns.com → DNS → Records → Add record). Done 27 Nov 2026: wildcard
+  `AAAA` `*` → `100::`, proxied.
 
   | Field | Value |
   |---|---|
@@ -3662,7 +3676,8 @@ npx wrangler secret put ADDRESS_PROXY_KEY -c wrangler.addresses.toml --env produ
   must be proxied: a grey cloud would make every address fail. `www` and `pm-bounces` keep their own records,
   which win over the wildcard. If `www` is itself proxied (orange cloud), the Worker answers it with a redirect
   to the same page on `qolumns.com`, which is where `www` goes today.
-- [ ] **5. Let the storage bucket take photos from the addresses:**
+- [x] **5. Let the storage bucket take photos from the addresses:** (done 27 Nov 2026: the bucket's CORS list
+  includes `https://*.qolumns.com`)
 
 ```
 bash scripts/deploy-t174-settings.sh cors
@@ -3672,13 +3687,15 @@ bash scripts/deploy-t174-settings.sh cors
   knows. This adds `https://*.qolumns.com` to the list (it prints the list when done; the four addresses it had
   stay). **Without this step a customer on an address cannot add a photo.** `--dry-run` first shows what it
   would send.
-- [ ] **6. Check before any business sees it:**
+- [x] **6. Check before any business sees it:** (done 27 Nov 2026: a made-up address forwards to `qolumns.com`
+  keeping the path; `www` and `qolumns.com` are unchanged)
   - `https://nobody-here.qolumns.com` lands on `https://qolumns.com`.
   - `https://nobody-here.qolumns.com/login` lands on `https://qolumns.com/login`.
   - `https://www.qolumns.com` and `https://qolumns.com` open the main site as before, and an email still sends
     (pm-bounces is Postmark's).
-- [ ] **7. Switch it on:** in Vercel add `NEXT_PUBLIC_OWN_ADDRESS_HOST` = `qolumns.com` (Production), then
-  redeploy the web (this value is built into the pages, so it needs a deploy, not only a save).
+- [x] **7. Switch it on:** in Vercel add `NEXT_PUBLIC_OWN_ADDRESS_HOST` = `qolumns.com` (Production), then
+  redeploy the web (this value is built into the pages, so it needs a deploy, not only a save). (Done 27 Nov
+  2026: set, and the web redeployed.)
 
 ### To test with one business (Bluum, on Pro), after step 7
 

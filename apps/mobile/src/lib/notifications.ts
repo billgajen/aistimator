@@ -84,7 +84,7 @@ export async function preparePush(): Promise<void> {
 
 let lastToken: string | null = null
 
-/** This phone's Expo push token, or null when it has none (no permission, a simulator, no signal) */
+/** This device's Expo push token, or null when it has none (no permission, a simulator, no signal) */
 export async function pushToken(): Promise<string | null> {
   if (!pushBuild) return null
   try {

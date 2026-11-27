@@ -55,6 +55,8 @@ interface PricingComposerProps {
   current: DescribablePricing & { currentConfig?: Partial<ServiceDraftConfig> }
   currencySymbol?: string
   onApply: (result: CompileResult) => void
+  /** T-207: something small beside the heading (the service editor's guide link) */
+  aside?: React.ReactNode
 }
 
 /** The example in the box, in the business's own currency (T-201: it was typed in pounds for everyone) */
@@ -68,6 +70,7 @@ export function PricingComposer({
   current,
   currencySymbol = '$',
   onApply,
+  aside,
 }: PricingComposerProps) {
   const [description, setDescription] = useState('')
   const [compiling, setCompiling] = useState(false)
@@ -145,9 +148,13 @@ export function PricingComposer({
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
       <div className="mb-3">
-        <h3 className="font-display text-base font-bold text-text-primary">
-          Describe your pricing
-        </h3>
+        {/* T-207: the service editor puts its guide beside this heading */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4">
+          <h3 className="font-display text-base font-bold text-text-primary">
+            Describe your pricing
+          </h3>
+          {aside}
+        </div>
         <p className="text-sm text-text-secondary">
           Write it the way you&apos;d explain it to a customer — we&apos;ll turn it into pricing
           rules you can review below. No forms, no formulas.

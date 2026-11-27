@@ -130,7 +130,7 @@ For anything about your account, your plan or your data, write from the email ad
 
 Yes. On the {{product}} website, press "Support" at the bottom of any page. It needs no sign-in.
 
-It says how to reach us ({{support.email}}, and "Ask {{product}}" in this Help panel), and it links to the Privacy Policy, the Terms of Service and the page for deleting your account.
+It says how to reach us ({{support.email}}, and "Ask {{product}}" in this Help panel), it has the six "Video guides" that show each step, and it links to the Privacy Policy, the Terms of Service and the page for deleting your account.
 
 {{#soon app}}The phone app is {{soon}}. When it is live, its "Account" screen will have a "Support page" row that opens the same page.{{/soon}}
 {{#live app}}In the phone app, open "Account" and press "Support page". "Help" on the same screen writes us an email.{{/live}}

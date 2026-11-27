@@ -167,7 +167,7 @@ export function createApi(opts: {
     /** T-196: the user's three notification switches */
     pushPrefs: () => request<AppPushPrefsResponse>('/api/app/push-token'),
 
-    /** T-196: register this phone for notifications, or refresh it (sign-in, and every launch) */
+    /** T-196: register this device for notifications, or refresh it (sign-in, and every launch) */
     registerPush: (token: string, platform: 'ios' | 'android') =>
       request<AppPushPrefsResponse>('/api/app/push-token', { method: 'PUT', body: JSON.stringify({ token, platform }) }),
 
@@ -175,7 +175,7 @@ export function createApi(opts: {
     setPushPrefs: (prefs: Partial<AppPushPrefsResponse['prefs']>) =>
       request<AppPushPrefsResponse>('/api/app/push-token', { method: 'PATCH', body: JSON.stringify(prefs) }),
 
-    /** T-196: forget this phone (sign-out) */
+    /** T-196: forget this device (sign-out) */
     forgetPush: (token: string) => request<{ ok: boolean }>('/api/app/push-token', { method: 'DELETE', body: JSON.stringify({ token }) }),
 
     widgetConfig: (tenantKey: string) =>

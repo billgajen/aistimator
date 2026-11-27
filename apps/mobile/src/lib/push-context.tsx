@@ -35,7 +35,7 @@ interface PushContextValue {
   turnOn: () => Promise<void>
   /** Set one switch. False when it could not be saved (the switch goes back). */
   setPref: (key: keyof PushPrefs, value: boolean) => Promise<boolean>
-  /** Forget this phone, then sign out */
+  /** Forget this device, then sign out */
   signOut: () => Promise<void>
 }
 
@@ -54,7 +54,7 @@ export function PushProvider({ userId, children }: { userId: string | null; chil
   const waitingPath = useRef<string | null>(null)
   const asking = useRef(false)
 
-  /** Register this phone, or refresh it. The server answers the user's switches. */
+  /** Register this device, or refresh it. The server answers the user's switches. */
   const register = useCallback(async () => {
     const token = await pushToken()
     if (!token || !signedIn.current) return

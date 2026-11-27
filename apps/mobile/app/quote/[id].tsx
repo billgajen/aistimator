@@ -225,7 +225,7 @@ export default function QuoteDetail() {
     })
   const confirm = () => (quote ? sendAnswers(quote.questions) : undefined)
 
-  /** The customer's link: the one this phone kept, or a new one (every earlier link keeps working) */
+  /** The customer's link: the one this device kept, or a new one (every earlier link keeps working) */
   async function linkFor(q: AppQuoteView): Promise<string> {
     const stored = q.status === 'expired' ? null : await loadQuoteToken(q.id)
     if (stored) return stored.viewUrl
@@ -319,7 +319,7 @@ export default function QuoteDetail() {
   }
 
   const open = (url: string) =>
-    void Linking.openURL(url).catch(() => setError('That could not be opened on this phone.'))
+    void Linking.openURL(url).catch(() => setError('That could not be opened on this device.'))
 
   // ---- Not loaded yet. A job that was just sent shows its stages at once, with no blank moment. ----
   if (!quote) {

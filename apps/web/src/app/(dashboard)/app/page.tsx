@@ -31,6 +31,8 @@ import { HomeQuoteLink } from '@/components/home/HomeQuoteLink'
 import { HomeTryIt } from '@/components/home/HomeTryIt'
 import { showTryItOnHome } from '@/lib/test-estimates'
 import { WonPanel } from '@/components/home/WonPanel'
+import { GettingStarted } from '@/components/guide/GettingStarted'
+import { GETTING_STARTED_UNTIL } from '@/lib/guides'
 import { HomeAddressCard } from '@/components/home/HomeAddressCard'
 import { addressAndAccess } from '@/lib/own-address'
 import { RememberTimeZone } from '@/components/home/RememberTimeZone'
@@ -52,6 +54,7 @@ export const dynamic = 'force-dynamic'
  * w. T-196: "Won through Qolumns", this calendar month, once an estimate has been accepted
  *    (T-198: above the checklist)
  * c. the setup checklist until it is done
+ * c2. T-207: "Getting started", the six guide videos, until three quotes have been sent or it is hidden
  * d. Where your quotes stand: three counts by whose turn it is
  * e. Latest activity   f. Your quote link
  * g. four numbers for the last 30 days, each against the 30 days before
@@ -129,7 +132,7 @@ export default async function DashboardPage() {
   const forCustomer = groupFilter('waiting', businessAsked)
 
   // Every query below is scoped to this tenant (RLS + explicit filter)
-  const [servicesResult, waitingResult, recentResult, realRequestResult, waitingCountResult, anyQuoteResult, questionsResult, everWon] = await Promise.all([
+  const [servicesResult, waitingResult, recentResult, realRequestResult, waitingCountResult, anyQuoteResult, questionsResult, everWon, sentResult] = await Promise.all([
     // T-201: every service, on or off. Setup is over once one exists; switched off is not "none".
     supabase.from('services').select('id, active').eq('tenant_id', profile.tenant_id),
     // a. waiting for the owner, newest first (T-158: also customer questions
@@ -192,6 +195,14 @@ export default async function DashboardPage() {
       .limit(20),
     // w. T-196: has an estimate ever been accepted (any kind, and from a customer's own request)
     everAccepted(supabase, profile.tenant_id),
+    // c2. T-207: has this business sent three quotes yet (no more than three rows are read)
+    supabase
+      .from('quotes')
+      .select('id')
+      .eq('tenant_id', profile.tenant_id)
+      .eq('is_test', false)
+      .not('sent_at', 'is', null)
+      .limit(GETTING_STARTED_UNTIL),
   ])
 
   // T-201: a business that switched every service off still has services: it stays on Home, with a notice
@@ -458,6 +469,10 @@ export default async function DashboardPage() {
           </div>
         </section>
       )}
+
+      {/* c2. T-207: the six guide videos, for a business that has sent fewer than three quotes. It hides
+          itself (and remembers "Hide"); it sits below "Waiting for you", never above it. */}
+      <GettingStarted tenantId={profile.tenant_id} sentQuotes={sentResult.data?.length ?? 0} />
 
       {/* T-202: the test estimate from setup's last step, for a business that skipped setup or passed the step over */}
       {offerTryIt && <HomeTryIt />}

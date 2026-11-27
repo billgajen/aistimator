@@ -251,7 +251,7 @@ function NewQuote() {
         <View style={styles.centre}>
           {loadError ? (
             <ErrorText>
-              {loadError === OFFLINE ? 'No signal, and this phone has not loaded your services yet. Find a signal and open this again.' : loadError}
+              {loadError === OFFLINE ? 'No signal, and this device has not loaded your services yet. Find a signal and open this again.' : loadError}
             </ErrorText>
           ) : (
             <>
@@ -329,7 +329,7 @@ function NewQuote() {
         // only the first of several can answer a guided angle; the rest are extras
         outbox.addPhoto(draft!.id, await keepPhoto(asset, index === 0 ? angleId : null))
       } catch {
-        setStepError('That photo could not be saved on this phone. Try again.')
+        setStepError('That photo could not be saved on this device. Try again.')
       }
     }
   }
@@ -451,7 +451,7 @@ function NewQuote() {
   }
 
   function discard() {
-    Alert.alert('Delete this quote?', 'The photos and answers on this phone are removed. Nothing has been sent.', [
+    Alert.alert('Delete this quote?', 'The photos and answers on this device are removed. Nothing has been sent.', [
       { text: 'Keep it', style: 'cancel' },
       {
         text: 'Delete',
@@ -482,7 +482,7 @@ function NewQuote() {
         <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xl }} keyboardShouldPersistTaps="handled">
           {draft.problem?.kind === 'refused' ? <Notice tone="danger">{draft.problem.message}</Notice> : null}
           {loadError && position === 0 ? (
-            <Notice>{loadError === OFFLINE ? 'No signal. Using your services as this phone last saw them.' : loadError}</Notice>
+            <Notice>{loadError === OFFLINE ? 'No signal. Using your services as this device last saw them.' : loadError}</Notice>
           ) : null}
 
           {step === 'service' ? (
@@ -808,7 +808,7 @@ function Sending({ draft }: { draft: Draft }) {
     <Screen>
       <TopBar title={draft.customer.name.trim() || draft.serviceName || 'New quote'} note={draft.serviceName} />
       <ScrollView contentContainerStyle={{ padding: space.lg }}>
-        <Title>{stuck ? 'Saved on this phone' : 'Pricing this job'}</Title>
+        <Title>{stuck ? 'Saved on this device' : 'Pricing this job'}</Title>
         <PricingStages stages={stages} />
         <Muted style={{ marginTop: space.md }}>
           {stuck

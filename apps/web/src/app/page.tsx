@@ -9,6 +9,7 @@ import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { FounderNote } from '@/components/marketing/FounderNote'
 import { HeroDemo } from '@/components/marketing/home/HeroDemo'
+import { HeroVideo } from '@/components/guide/HeroVideo'
 import { SetupSteps } from '@/components/marketing/home/SetupSteps'
 import { WhatItNotices } from '@/components/marketing/home/WhatItNotices'
 import { HeroPhoto } from '@/components/marketing/home/HeroPhoto'
@@ -38,7 +39,8 @@ const WRAP = 'mx-auto max-w-container px-4 sm:px-6'
  *
  * One idea per section, and no two neighbours share a layout or a background
  * (T-167 order):
- *   1 hero (paper): the words over the hero photograph, the one yellow button, and the product demo (three frames of one height, T-168)
+ *   1 hero (paper): the words over the hero photograph, the one yellow button, the hero video (a poster and a
+ *     play button, T-207: it plays when pressed, never by itself) and the product demo (three frames of one height, T-168)
  *   2 what homeowners want (grey): three large figures in three columns (T-168), one column on a phone
  *   3 what it notices (paper): the message line and four examples, each with its real screen
  *   4 your prices (mint): a sentence that turns into price lines (the one moment)
@@ -95,6 +97,10 @@ export default function HomePage() {
           </Link>
         </div>
         <p className="hero-small-line mt-3 text-xs text-text-muted">{HERO.smallLine}</p>
+      </div>
+      {/* T-207: the product in 33 seconds. A poster and a play button: it plays with sound when pressed, never by itself. */}
+      <div className="mt-8 lg:mt-10">
+        <HeroVideo />
       </div>
       <div className="mt-10 lg:mt-12">
         <HeroDemo

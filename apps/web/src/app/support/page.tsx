@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
+import { GuideList } from '@/components/guide/GuideList'
+import { GUIDE_COPY } from '@/lib/guides'
 import { DATA_DELETION_PATH, PRODUCT_NAME, SUPPORT_EMAIL } from '@qolumns/shared'
 
 /**
@@ -55,6 +57,15 @@ export default function SupportPage() {
                 Open Help in your dashboard
               </Link>
             </p>
+          </section>
+
+          {/* T-207: the six guide videos, the same list and the same player as the dashboard's */}
+          <section data-testid="support-guides">
+            <h2 className="font-display text-lg font-bold text-text-primary">{GUIDE_COPY.videoGuides}</h2>
+            <p className="mt-2 leading-relaxed text-text-secondary">{GUIDE_COPY.videoGuidesLine}</p>
+            <div className="mt-3 border-b border-border">
+              <GuideList />
+            </div>
           </section>
 
           <section data-testid="support-app">

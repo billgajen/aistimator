@@ -194,9 +194,9 @@ export interface OutboxDeps {
     /** Delete a photo's copy, or a room model, from the phone (never throws) */
     remove(uri: string): Promise<void>
   }
-  /** Keep the customer's link for a quote this phone made */
+  /** Keep the customer's link for a quote this device made */
   saveQuoteLink(quoteId: string, viewUrl: string): Promise<void>
-  /** Who is signed in on this phone (null when nobody is) */
+  /** Who is signed in on this device (null when nobody is) */
   owner(): string | null
   now(): number
   newId(): string
@@ -214,9 +214,9 @@ export function retryDelayMs(attempts: number, retryAfterSeconds?: number): numb
 const MAX_STORAGE_REFUSALS = 3
 
 export const OUTBOX_COPY = {
-  offline: 'No signal. Saved on this phone. It sends by itself when you are back online.',
+  offline: 'No signal. Saved on this device. It sends by itself when you are back online.',
   busy: 'The server is busy. Trying again shortly.',
-  signin: 'Sign in again to send this quote. It is saved on this phone.',
+  signin: 'Sign in again to send this quote. It is saved on this device.',
   photoRefused: 'A photo could not be uploaded. Take it again.',
 } as const
 

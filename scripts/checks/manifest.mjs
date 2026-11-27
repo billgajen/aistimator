@@ -160,6 +160,8 @@ export const SCRIPTS = [
   { id: 't205', server: 'standard', model: 'none', browser: true },
   // T-206: the app's first call makes the business's site row; the review account script makes and repairs it
   { id: 't206', server: 'standard', model: 'none' },
+  // T-207: the guide videos: the player, the marketing hero and each dashboard placement (T-201's harness, a browser)
+  { id: 't207', server: 'standard', model: 'none', browser: true },
 ]
 
 /** Lint, typecheck and unit tests: every level runs these first */

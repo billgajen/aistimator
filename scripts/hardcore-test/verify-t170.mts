@@ -107,7 +107,9 @@ if (!process.env.PLAYWRIGHT_DIR) {
         window.scrollTo(0, y)
         await new Promise((r) => setTimeout(r, 60))
       }
-      await Promise.all([...document.images].map((img) => (img.complete ? null : img.decode().catch(() => null))))
+      // T-207: an image that is not laid out is never fetched (the hero video's poster for the other screen
+      // width is a lazy image inside a hidden box), so waiting for it would wait for ever
+      await Promise.all([...document.images].filter((img) => img.getClientRects().length > 0).map((img) => (img.complete ? null : img.decode().catch(() => null))))
       window.scrollTo(0, 0)
     })
     await p.waitForTimeout(200)

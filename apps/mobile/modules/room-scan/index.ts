@@ -28,10 +28,10 @@ interface RoomScanNative {
 const native = requireOptionalNativeModule<RoomScanNative>('RoomScan')
 
 /**
- *   ready           this phone can scan now
- *   needs_full_app  an iPhone running the app without the scanner in it (Expo Go)
- *   no_lidar        the full app on an iPhone that has no LiDAR sensor
- *   not_ios         not an iPhone
+ *   ready           this device can scan now
+ *   needs_full_app  an iPhone or iPad running the app without the scanner in it (Expo Go)
+ *   no_lidar        the full app on an iPhone or iPad that has no LiDAR sensor
+ *   not_ios         not an iPhone or iPad
  */
 export type RoomScanAvailability = 'ready' | 'needs_full_app' | 'no_lidar' | 'not_ios'
 
@@ -49,8 +49,8 @@ export function roomScanAvailability(): RoomScanAvailability {
 export function roomScanBlockedLine(availability: RoomScanAvailability): string | null {
   if (availability === 'ready') return null
   if (availability === 'needs_full_app') return 'Room scan needs the full app'
-  if (availability === 'no_lidar') return 'This iPhone has no LiDAR sensor (it is on Pro models)'
-  return 'Room scan needs an iPhone with LiDAR'
+  if (availability === 'no_lidar') return 'Your iPhone or iPad has no LiDAR sensor (it is on Pro models)'
+  return 'Room scan needs an iPhone or iPad with LiDAR'
 }
 
 export function isRoomScanSupported(): boolean {
@@ -73,7 +73,7 @@ export async function openPage(url: string): Promise<void> {
 }
 
 /**
- * T-201: whether this phone can open the 3D viewer. An iPhone always can (Safari's in-app browser, or
+ * T-201: whether this device can open the 3D viewer. An iPhone always can (Safari's in-app browser, or
  * Safari itself). Android has no in-app browser here, so the viewer opens in the phone's own browser, and
  * the phone is asked whether anything on it opens a web address: where nothing does, "View in 3D" is not
  * shown at all.

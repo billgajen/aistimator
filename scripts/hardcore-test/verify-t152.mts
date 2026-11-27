@@ -9,6 +9,7 @@ import path from 'node:path'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { ROOT, loadEnv, makeSupabase, sessionCookieHeader, http, expectOk, pollQuote, shortId, saveJson, runStamp, OLD_PRODUCT_NAMES } from './lib.mjs'
 import { garageDoorsPackUS } from '../../apps/web/src/lib/vertical-packs/garage-doors-us'
+import { GUIDES } from '../../apps/web/src/lib/guides'
 
 const cfg = loadEnv()
 const sb = makeSupabase(cfg)
@@ -217,8 +218,11 @@ check('the Branding page gets the region for its placeholders', brandingApi.regi
 const pricing = text((await page(`${cfg.appUrl}/pricing`)).html)
 check('pricing page: "Try every Pro feature free: 10 quotes, no card"', pricing.includes('Try every Pro feature free: 10 quotes, no card'))
 check('pricing FAQ: 10 in total, not reset monthly', pricing.includes('Can I try it for free?') && pricing.includes('don’t reset each month'))
-const landing = text((await page(`${cfg.appUrl}/`)).html)
-check('home page: no "Start free"; the offer instead', !/Start free/.test(landing) && landing.includes('Try every Pro feature free: 10 quotes, no card'))
+// T-207: the hero video's voiceover ends "Start free at qolumns.com", and its transcript is on the page as it is
+// spoken. No button, link or line of the page's own says it: the transcript is taken out before looking.
+const landingWhole = text((await page(`${cfg.appUrl}/`)).html)
+const landing = GUIDES.hero.transcript.reduce((html, line) => html.split(line).join(''), landingWhole)
+check('home page: no "Start free" (the hero video’s transcript aside); the offer instead', landing.length < landingWhole.length && !/Start free/.test(landing) && landing.includes('Try every Pro feature free: 10 quotes, no card'))
 const login = text((await page(`${cfg.appUrl}/login`)).html)
 check('the login page shows the product name', login.includes('Qolumns') && !OLD_PRODUCT_NAMES.some((old) => login.includes(old)))
 
