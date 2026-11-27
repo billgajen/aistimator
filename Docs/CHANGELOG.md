@@ -17,6 +17,15 @@
 
 ### 2026-11-27: T-209 — A new, longer hero video; a guide of a minute or more says its length in minutes
 
+**Deployed 27 Nov 2026, web only** (commit 14741de, `npx vercel deploy --prod --yes` from the repo root, Vercel
+`estimator-drfk7lgav`). No worker, no migration, no app build.
+**On the live site afterwards** (page views, file downloads and presses only): the six replaced files are served
+byte for byte as committed; both hero files are 60.0 s by their own header (guide 2 25.47 s, guide 6 38.93 s).
+In real Chrome at 1,440 and 390 px the hero's button reads "See how it works · 1 min" ("1 minute" to a screen
+reader), the other two read "· 32 s" and "· 39 s", and the window is titled "How Qolumns works", plays the wide
+file (the upright one at 390 px) with sound, reports 60 s, and holds the eleven lines as hidden text. Escape
+closes it and the focus returns to the button.
+
 Web only. No pricing, worker, billing or database code changed; no migration; no new dependency.
 
 **Why.** The first hero video (33 s, "Photo in, quote out") showed one moment: a photo goes in, a quote comes
