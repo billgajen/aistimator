@@ -17,8 +17,14 @@
 
 ### 2026-11-27: T-207 — The guide videos in the dashboard, on the site and on /support; two leftovers
 
-**Built 27 Nov 2026. Web only** (`npx vercel deploy --prod --yes` from the repo root). No worker, no migration, no
-app build: the app's wording ships with its next build.
+**Deployed 27 Nov 2026, web only** (commit 2fa0351, `npx vercel deploy --prod --yes` from the repo root, Vercel
+`estimator-mkv621mtc`). No worker, no migration, no app build: the app's wording ships with its next build.
+**On the live site afterwards** (read only): all eight videos answer in pieces (`206`, `video/mp4`) and their
+posters `200`; `/support` has "Video guides" with six links and no video in its HTML; the home page has the hero
+video's two play buttons and no video in its HTML; in Chrome at 390 and 1,280 px the hero (upright, then wide)
+and guide 6 played with sound on the press, and Escape closed the window, removed the video and returned the
+focus. The dashboard placements were not opened on production (that needs a business's sign-in); they are the
+same build `verify-t207` walked locally.
 
 Help content on existing screens. No pricing, worker, billing or database code changed; no migration; no new
 dependency.
