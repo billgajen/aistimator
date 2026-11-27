@@ -581,14 +581,30 @@ dialog.photo-viewer::backdrop {
   background: rgb(27 40 35 / 0.6);
 }
 
-/* T-207: a guide's video window. The browser's own modal dialog, as the photo viewer above: the page behind
-   is dimmed with ink, and nothing here moves. */
+/* T-207, T-208: a guide's video window. The browser's own modal dialog, as the photo viewer above, and nothing
+   here moves. Since T-208 the page behind goes dark (ink, nine tenths) and the video is as large as fits. */
 dialog.guide-dialog {
-  margin: auto;
-  max-height: calc(100dvh - 1.5rem);
-  overflow: auto;
-  color: var(--color-text-primary);
+  /* T-208: the window is the whole screen, and see-through: the dark is its backdrop, and the video sits in the middle */
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: transparent;
+  color: #fff;
+  /* on the dark, the focus ring is white */
+  --color-focus: #fff;
 }
 dialog.guide-dialog::backdrop {
-  background: rgb(27 40 35 / 0.6);
+  background: rgb(var(--color-ink-rgb, 27 40 35) / 0.9);
+}
+/* the page behind an open guide does not scroll (the gutter stays, so nothing moves sideways) */
+html:has(dialog.guide-dialog[open]) {
+  overflow: hidden;
+  scrollbar-gutter: stable;
 }

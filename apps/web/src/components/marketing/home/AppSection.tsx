@@ -3,6 +3,8 @@ import { Picture } from '@/components/marketing/screens/ProductScreens'
 import { AppListScreen, AppPhone, AppQuoteScreen, RoomScanCard, type AppListRow } from '@/components/marketing/screens/AppScreens'
 import { storeLinks } from '@/lib/marketing/app-stores'
 import { UPCOMING, appAvailability } from '@/lib/marketing/plan-claims'
+import { WATCH } from '@/lib/marketing/home-copy'
+import { WatchButton } from '@/components/guide/WatchButton'
 
 /**
  * T-187: the on-site app, on Home: "Price a job while you are standing in
@@ -41,7 +43,11 @@ export function AppSection({
             </li>
           ))}
         </ul>
-        <p className="mt-6 font-display text-lg font-bold text-text-primary" data-testid="app-availability">
+        {/* T-208: the app pricing a job in a room, in the same window as the hero's video */}
+        <div className="mt-3 flex justify-start">
+          <WatchButton id="on-site" words={WATCH.onSite} />
+        </div>
+        <p className="mt-3 font-display text-lg font-bold text-text-primary" data-testid="app-availability">
           {appAvailability()}
         </p>
         {stores.length > 0 ? (

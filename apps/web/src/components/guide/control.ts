@@ -4,8 +4,8 @@
  *
  * The window is the browser's own modal dialog (`showModal`): the browser
  * keeps the focus inside it, closes it on Escape, and tells us with one
- * `close` event however it was closed (Escape, the Close button, a click on
- * the dimmed page).
+ * `close` event however it was closed (Escape, the ✕, a press on the dark
+ * page around the video).
  */
 export interface DialogLike {
   open: boolean
@@ -39,9 +39,22 @@ export function openGuide(dialog: DialogLike | null, video: VideoLike | null): v
   }
 }
 
-/** The window has closed: the video stops, the guide is remembered, and the focus goes back to the link. */
-export function guideClosed(video: VideoLike | null, opener: FocusLike | null, remember: () => void): void {
+/**
+ * The window has closed: the video stops, the guide is remembered (where the button that opened it remembers:
+ * the dashboard's link does, a marketing page's button does not), and the focus goes back to the button.
+ */
+export function guideClosed(video: VideoLike | null, opener: FocusLike | null, remember?: () => void): void {
   video?.pause()
-  remember()
+  remember?.()
   opener?.focus()
+}
+
+/**
+ * T-208: the window fills the screen and only the video is not "the dark part", so a press anywhere else closes
+ * it. A press counts only when it both began and ended off the video: dragging the video's own slider and
+ * letting go below it is not a press on the dark part. (The ✕ closes by its own handler, also from the keyboard.)
+ */
+export function pressClosesWindow(began: { tagName: string } | null, ended: { tagName: string } | null): boolean {
+  const onVideo = (el: { tagName: string } | null) => el?.tagName === 'VIDEO'
+  return began !== null && ended !== null && !onVideo(began) && !onVideo(ended)
 }

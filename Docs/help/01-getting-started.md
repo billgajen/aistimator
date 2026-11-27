@@ -105,19 +105,18 @@ Test estimates, the ones you make with "Try it yourself", are left out of every 
 ## Are there videos that show me how to do things?
 <!-- id: start-video-guides; page: /app -->
 
-Yes. There are six short videos, each under a minute: "Add a service", "Set your prices", "Test your pricing", "Share your quote link", "Check and approve" and "Quote on site". They play with sound, the words are shown on the picture, and each has its words written out under "Read the transcript".
+Yes. There are six short videos, each under a minute: "Add a service", "Set your prices", "Test your pricing", "Share your quote link", "Check and approve" and "Quote on site". They play with sound, and the words are shown on the picture as they are spoken.
 
 You find them in three places:
 
 1. On "Home", in the "Getting started" card, in order from 1 to 6. The card is shown until you have sent three quotes, or until you press "Hide".
-2. Beside the step each one is about, as a link that says "Watch how" and how long the video is. It is on "Services" beside "Add Service", in a service's editor on the "Pricing Setup" step and on the "Test & Publish" step, on "Quote link" under the page's title, and on a quote that is waiting for your approval, in its "Next step" card.
+2. Beside the step each one is about, as a link that says "Watch how" and how long the video is. It is on "Services" under the page's title, in a service's editor on the "Pricing Setup" step and on the "Test & Publish" step, on "Quote link" under the page's title, and on a quote that is waiting for your approval, in its "Next step" card.
 3. On the Support page of the {{product}} website, under "Video guides". That page needs no sign-in.
 
 To watch one:
 
-1. Press "Watch how". The video opens over the page and starts playing. Nothing plays until you press it.
-2. Press "Read the transcript" under the video if you would rather read it.
-3. Press "Close", or the Escape key, to go back to where you were.
+1. Press "Watch how". The page goes dark and the video opens over it, as large as fits your screen, and starts playing. Nothing plays until you press it.
+2. Press the "✕" above the video, the dark page around it, or the Escape key, to go back to where you were.
 
 A video you have watched, or opened and closed, gets a small tick beside its link. The tick is remembered by the browser you are using, so another browser or another device starts without ticks. It changes nothing else: you can watch a video again as often as you like.
 

@@ -632,11 +632,15 @@ export default function ServicesPage() {
       <PageHeader
         title="Services"
         description="Your services and what you charge for each"
+        // T-208: the page's guide sits under its line, and the three buttons keep the title's row down to
+        // tablet width (they are a little narrower between 1,024 and 1,280 px, where the menu takes its room)
+        below={<GuideLink id="add-service" />}
+        actionsBeside
         actions={
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 md:flex-nowrap lg:gap-2 xl:gap-3">
             <button
               onClick={() => setShowBulkUpload(true)}
-              className="inline-flex min-h-[44px] items-center rounded-lg border border-field bg-background px-4 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary"
+              className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-lg border border-field bg-background px-4 py-2.5 text-sm lg:px-3 xl:px-4 font-semibold text-text-secondary transition-colors hover:text-text-primary"
             >
               <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -646,13 +650,13 @@ export default function ServicesPage() {
             <button
               onClick={() => setShowTemplates(true)}
               data-testid="add-from-template"
-              className="inline-flex min-h-[44px] items-center rounded-lg border border-field bg-background px-4 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary"
+              className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-lg border border-field bg-background px-4 py-2.5 text-sm lg:px-3 xl:px-4 font-semibold text-text-secondary transition-colors hover:text-text-primary"
             >
               Add from a template
             </button>
             <button
               onClick={openCreateModal}
-              className="inline-flex min-h-[44px] items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+              className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-lg bg-primary px-5 py-2.5 text-sm lg:px-3.5 xl:px-5 font-semibold text-white transition-colors hover:bg-primary-hover"
             >
               <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path
@@ -664,8 +668,6 @@ export default function ServicesPage() {
               </svg>
               Add Service
             </button>
-            {/* T-207: the guide for this page, beside the button it is about */}
-            <GuideLink id="add-service" />
           </div>
         }
       />

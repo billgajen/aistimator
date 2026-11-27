@@ -8,10 +8,9 @@
 //      nothing plays until a link is pressed; the press opens a window and starts the video inside
 //      the press; the focus stays in the window; Escape, "Close" and a click outside close it; the
 //      video is then gone and the focus is back on the link; the guide is remembered (a tick),
-//      also once four fifths have played; the transcript is closed until asked for
-//   C  the marketing home page: a poster with a play button under the headline; the wide video from
-//      640 px and the upright one under it, and only the one on screen loads; it never plays by
-//      itself; the transcript under it
+//      also once four fifths have played; no transcript is shown (T-208)
+//   C  the marketing home page: since T-208 the hero has no player of its own (its video opens from
+//      a button, in the same window: verify-t208 walks that); nothing of a guide loads or plays
 //   D  the dashboard: where each guide sits (Services, the two editor steps, Quote link, the quote
 //      page's "Next step" only while it waits for approval), and Home's "Getting started": below
 //      "Waiting for you", hidden by "Hide" for this business in this browser (and not shown for a
@@ -142,12 +141,15 @@ try {
     const reached = await p.evaluate(() => !!document.activeElement)
     check(`${width}: Tab, twelve times, never reaches the page behind the window`, reached && inside.every(Boolean), inside)
 
-    // the transcript
-    const transcript = openDialog(p).locator('[data-testid=guide-transcript]')
-    check(`${width}: "${GUIDE_COPY.transcript}" is closed until asked for`, (await transcript.locator('summary').innerText()).trim() === GUIDE_COPY.transcript && !(await transcript.evaluate((d: HTMLDetailsElement) => d.open)))
-    await transcript.locator('summary').click()
-    const lines = await transcript.locator('p').allInnerTexts()
-    check(`${width}: opened, it is the voiceover, line for line`, JSON.stringify(lines) === JSON.stringify(g.transcript), lines)
+    // T-208: no transcript is shown; the voiceover's words are in the window for a screen reader only
+    const words = openDialog(p).locator('[data-testid=guide-words]')
+    const wordsBox = await words.boundingBox()
+    check(`${width}: nothing in the window offers a transcript to read`, (await openDialog(p).locator('details, summary').count()) === 0 && !/transcript/i.test(await openDialog(p).innerText()))
+    check(
+      `${width}: the voiceover is there for a screen reader, line for line, and takes no room on the screen`,
+      JSON.stringify(await words.locator('p').allTextContents()) === JSON.stringify(g.transcript) && !!wordsBox && wordsBox.width <= 1 && wordsBox.height <= 1 && (await openDialog(p).getAttribute('aria-describedby')) === (await words.getAttribute('id')),
+      wordsBox
+    )
     check(`${width}: nothing scrolls sideways with the window open`, !(await sideways(p)))
 
     // Escape
@@ -159,17 +161,17 @@ try {
     check(`${width}: the other guides carry none`, (await p.locator('[data-testid=guide-watched]').count()) === 1 && (await stored(p, watchedKey('set-prices'))) === null)
     await shot(p, `support-${width}-watched`)
 
-    // "Close", and a click on the dimmed page
+    // the ✕ ("Close" to a screen reader), and a click on the dark page
     await link(p, 'quote-link').click()
     await openDialog(p).waitFor({ timeout: 10_000 })
     await p.locator('[data-testid=guide-close]').click()
     await closed(p)
-    check(`${width}: "Close" closes it and gives the focus back`, (await openDialog(p).count()) === 0 && (await focusOn(p)) === 'guide-link-quote-link' && (await watched(p, 'quote-link')) === 'true')
+    check(`${width}: the ✕ closes it and gives the focus back`, (await openDialog(p).count()) === 0 && (await focusOn(p)) === 'guide-link-quote-link' && (await watched(p, 'quote-link')) === 'true')
     await link(p, 'approve').click()
     await openDialog(p).waitFor({ timeout: 10_000 })
     await p.mouse.click(3, 3)
     await closed(p)
-    check(`${width}: a click on the dimmed page closes it too`, (await openDialog(p).count()) === 0 && (await focusOn(p)) === 'guide-link-approve')
+    check(`${width}: a click on the dark page closes it too`, (await openDialog(p).count()) === 0 && (await focusOn(p)) === 'guide-link-approve')
 
     // four fifths played, with the window still open
     await link(p, 'set-prices').click()
@@ -196,46 +198,14 @@ try {
 
   // -------------------------------------------------------------------------
   section('C. The marketing home page')
-  const hero = GUIDES.hero
-  for (const width of [390, 639, 640, 1280]) {
+  for (const width of [390, 1280]) {
     const { ctx, p, asked } = await open(width)
     await p.goto(`${app}/`, { waitUntil: 'networkidle' })
-    const wide = width >= 640
-    const shown = p.locator(`[data-testid=hero-video-${wide ? 'wide' : 'tall'}]`)
-    const other = p.locator(`[data-testid=hero-video-${wide ? 'tall' : 'wide'}]`)
-    const want = wide ? hero : hero.tall!
-    const not = wide ? hero.tall! : hero
-    check(`${width}: the ${wide ? 'wide' : 'upright'} video is the one shown`, (await shown.isVisible()) && !(await other.isVisible()))
-    const h1 = await p.locator('[data-testid=hero] h1').boundingBox()
-    const box = await shown.boundingBox()
-    const demo = await p.locator('[data-testid=hero] [data-testid=hero-demo-frames]').boundingBox()
-    check(`${width}: it sits in the hero, under the headline and above the three frames`, !!h1 && !!box && !!demo && box.y >= h1.y + h1.height && box.y + box.height <= demo.y, { h1, box, demo })
-    await shown.scrollIntoViewIfNeeded()
-    await p.waitForLoadState('networkidle')
     await p.waitForTimeout(500)
-    check(`${width}: the poster on screen is the only guide file asked for (no video, not the other poster)`, JSON.stringify([...new Set(asked)]) === JSON.stringify([base(want.poster)]), asked)
-    check(`${width}: nothing has played, and there is no video on the page`, (await plays(p)).length === 0 && (await p.locator('video').count()) === 0)
-    const button = shown.locator('[data-testid=hero-video-play]')
-    const size = await button.locator('span span').first().boundingBox()
-    check(`${width}: the play button is large (at least 64 px) and says what it plays`, !!size && size.width >= 64 && size.height >= 64 && (await button.getAttribute('aria-label')) === GUIDE_COPY.play(hero), size)
-    await shot(p, `home-${width}`)
-
-    await button.click()
-    const video = shown.locator('video')
-    await video.waitFor({ timeout: 10_000 })
-    const attrs = await video.evaluate((v: HTMLVideoElement) => ({ controls: v.controls, inline: v.playsInline, preload: v.getAttribute('preload'), poster: v.getAttribute('poster'), src: v.getAttribute('src'), autoplay: v.autoplay }))
-    const started = await plays(p)
-    check(`${width}: pressed, it starts once, inside the press, with the sound on`, started.length === 1 && started[0]!.inPress && !started[0]!.muted, started)
-    check(`${width}: it is the ${wide ? 'wide' : 'upright'} file, with controls, in the page, nothing loaded ahead`, attrs.controls && attrs.inline && attrs.preload === 'none' && attrs.src === want.src && attrs.poster === want.poster && !attrs.autoplay, attrs)
-    await p.waitForTimeout(400)
-    check(`${width}: the other video and its poster were never asked for`, !asked.includes(base(not.src)) && !asked.includes(base(not.poster)) && asked.includes(base(want.src)), asked)
-    const transcript = p.locator('[data-testid=hero-video] [data-testid=guide-transcript]')
-    const underVideo = await transcript.boundingBox()
-    const videoBox = await shown.boundingBox()
-    check(`${width}: "${GUIDE_COPY.transcript}" is under the video, closed`, !!underVideo && !!videoBox && underVideo.y >= videoBox.y + videoBox.height && !(await transcript.evaluate((d: HTMLDetailsElement) => d.open)))
-    await transcript.locator('summary').click()
-    check(`${width}: opened, it is the hero's voiceover`, JSON.stringify(await transcript.locator('p').allInnerTexts()) === JSON.stringify(hero.transcript))
+    check(`${width}: the hero has no player of its own: no video, no poster, no play button (T-208)`, (await p.locator('[data-testid=hero] video, [data-testid=hero-video], [data-testid=hero-video-play]').count()) === 0)
+    check(`${width}: nothing of a guide was asked for, and nothing played`, asked.length === 0 && (await plays(p)).length === 0 && (await p.locator('video').count()) === 0, asked)
     check(`${width}: nothing scrolls sideways`, !(await sideways(p)))
+    await shot(p, `home-${width}`)
     await ctx.close()
   }
 
@@ -302,14 +272,19 @@ try {
     }
     check(`${width}: Home does not scroll sideways`, !(await sideways(p)))
 
-    // Services: beside "Add Service"
+    // Services: under the page's line (T-208: it was beside "Add Service", and pushed the buttons off the title's row)
     await p.goto(`${app}/app/services`, { waitUntil: 'networkidle' })
     const add = p.getByRole('button', { name: 'Add Service', exact: true })
     await add.waitFor({ timeout: 20_000 })
     const addBox = await add.boundingBox()
     const addLink = await link(p, 'add-service').boundingBox()
-    const sameParent = await link(p, 'add-service').evaluate((el) => [...(el.parentElement?.querySelectorAll('button') ?? [])].some((b) => b.textContent?.trim() === 'Add Service'))
-    check(`${width}: Services has the "Add a service" guide in its header, beside "Add Service"`, sameParent && !!addBox && !!addLink && (await link(p, 'add-service').innerText()).replace(/\s+/g, ' ').trim() === `${GUIDE_COPY.watch} · ${guide('add-service').seconds} s`, { addBox, addLink })
+    const servicesRule = await p.locator('div:has(> div h1) > .tape-rule').boundingBox()
+    const servicesLine = await p.locator('h1 + p', { hasText: 'Your services and what you charge for each' }).boundingBox()
+    check(
+      `${width}: Services has the "Add a service" guide in its header, under the page's line`,
+      !!addBox && !!addLink && !!servicesRule && !!servicesLine && addLink.y >= servicesLine.y + servicesLine.height - 1 && addLink.y + addLink.height <= servicesRule.y + 1 && (await link(p, 'add-service').innerText()).replace(/\s+/g, ' ').trim() === `${GUIDE_COPY.watch} · ${guide('add-service').seconds} s`,
+      { addBox, addLink, servicesLine, servicesRule }
+    )
     check(`${width}: Services does not scroll sideways`, !(await sideways(p)))
     await shot(p, `dash-services-${width}`)
 

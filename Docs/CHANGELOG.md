@@ -15,6 +15,130 @@
 
 ## Issues & Resolutions
 
+### 2026-11-27: T-208 — The home page's videos open in a window over the page; a transcript is no longer shown
+
+**Deploy: web only** (`npx vercel deploy --prod --yes` from the repo root, after pushing). No worker, no
+migration, no app build. DEPLOY-RECORD-T208
+
+Web only. No pricing, worker, billing or database code changed; no migration; no new dependency.
+
+**Why.** T-207 stood a video player in the marketing hero, between the buttons and the three frames, with a
+"Read the transcript" under it. The hero is the page's first screen and should stay clean: headline, text, the
+buttons, the small line, the three frames. And the videos' captions are part of the picture, so a written-out
+transcript repeats on the screen what is already on the screen: it is for a screen reader only.
+
+- **The hero is as it was before T-207.** `components/guide/HeroVideo.tsx` is deleted and `app/page.tsx` no
+  longer draws a video, a poster or a play button. No page has a player standing in it any more.
+- **A third action in the hero's row: "See how it works · 33 s"** (`components/guide/WatchButton.tsx`, new), after
+  "Try it as a customer". Words and a small juniper play mark, no ground and no edge (`WATCH_BUTTON` in
+  `lib/marketing/cta.ts`), so it is quieter than the two buttons; 48 px high like them. In the row from 640 px
+  (the row may wrap); under the two buttons on a phone, centred. The play mark is drawn, not the "▶" character
+  (a phone can show that character as a coloured emoji).
+- **Two more of the same button, each under its section's intro text:** "See setup · 32 s" (guide `add-service`)
+  under "Set up in minutes", in `app/page.tsx`; "Watch it on site · 39 s" (guide `on-site`) in the on-site
+  app's section, under its three lines, in `components/marketing/home/AppSection.tsx`. The words are `WATCH`
+  in `lib/marketing/home-copy.ts`; the seconds are the list's (`lib/guides.ts`), typed nowhere else.
+- **One window for every guide** (`components/guide/GuideDialog.tsx`; item 3 asked for one dialog, not two). The
+  marketing buttons and the dashboard's "Watch how" links open the same component, so **the dashboard's and the
+  support page's guide window changed its look too**: it was a white card with the title, "Close", the video
+  and the transcript.
+  - It is still the browser's own modal dialog (`showModal`): the focus stays inside, Escape closes it, one
+    `close` event for every way of closing. It now fills the screen and is see-through; its backdrop is ink at
+    nine tenths (`globals.css`).
+  - The video is in the middle and as large as fits: as wide as the screen allows, or as wide as its height
+    allows, and never larger than the video's own pixels. Margins: 8 px on a phone, 24 px from 640 px.
+  - Over the video: the guide's title in white, and a round white ✕ (44 px, "Close" to a screen reader).
+  - **It closes on the ✕, on Escape, and on a press anywhere that is not the video.** A press counts only when
+    it began and ended off the video (`pressClosesWindow` in `control.ts`): dragging the video's own slider
+    and letting go under the video does not close the window.
+  - **The page behind does not scroll** while it is open: `html:has(dialog.guide-dialog[open]) { overflow:
+    hidden; scrollbar-gutter: stable }`. CSS only; the gutter stays, so the page does not move sideways when a
+    desktop scrollbar goes.
+  - **The hero plays upright (9:16) under 640 px and wide (16:9) from 640 px.** The video is chosen at the press
+    (`sourceFor`, `UPRIGHT_QUERY` in `lib/guides.ts`), so only one of the two is ever asked for. The six how-to
+    guides have one video each and play that.
+  - As before: the video is only in the page while the window is open, `preload="none"`, started inside the
+    press with its sound, never by itself; on closing it is paused and the focus goes back to the button.
+- **`useGuide` (new) holds what every opener shares**: the window, opening it inside the press, closing it.
+  `GuideLink` (dashboard: remembers a watched guide, shows a tick) and `WatchButton` (marketing) are each a
+  button plus that. **A marketing button remembers nothing**: it writes nothing to a visitor's browser.
+- **No transcript is shown anywhere.** "Read the transcript" and the `GuideTranscript` component are gone from
+  the home page, the dashboard's windows and `/support`. The words stay in `lib/guides.ts` and are in the open
+  window as screen-reader-only text (`sr-only`), which the dialog names with `aria-describedby`. A closed window
+  holds none of it, so no page carries a transcript in its HTML (which is why `verify-t152` reads the home page
+  whole again: T-207 had to take the hero's transcript out before looking for "Start free").
+- **The Services header.** "Watch how · 32 s" moved out of the row of buttons to under the page's line
+  (`PageHeader`'s `below`). T-207's report said the link had pushed the buttons off the title's row under about
+  1,300 px; **measured now, the three buttons alone did not fit beside the title at 1,024 px either** (648 px of
+  room beside the menu, 500 px of buttons, 275 px of title line). So, for this page:
+  - `PageHeader` has a new `actionsBeside`: from 768 px the actions keep the title's row and are never wrapped;
+    the title's block gives way instead. Only Services asks for it; every other page's header is unchanged.
+  - Between 1,024 and 1,280 px the three buttons are a little narrower (12 px of side padding for 16, 8 px
+    between them for 12). At 1,024 px the page's line ("Your services and what you charge for each") wraps to
+    two lines beside them. Under 768 px the buttons wrap under the title, as on every page.
+- **Docs.** `Docs/help/01-getting-started.md` ("Are there videos…"): no transcript, the ✕ and the dark page,
+  and Services' link "under the page's title". `Docs/design/system.md` (Layout): the one window, the marketing
+  video button, no player on a page, no transcript shown.
+
+**Constraints**
+
+- One window: a new place for a guide uses `GuideLink` (dashboard) or `WatchButton` (marketing), both through
+  `useGuide`. Do not write a second dialog or stand a `<video>` in a page.
+- Do not show a transcript. If the words are needed on screen again, that is a decision for the owner: the
+  captions are in the picture.
+- A guide link does not go in a page header's row of buttons.
+- T-207's constraints stand: only `lib/guides.ts` names a guide file; no video plays by itself; the window is
+  the browser's own modal dialog.
+
+**Checks**
+
+- **Quick level (`pnpm check:quick`), run once: 4 min 29 s. 37 of 37 steps passed** (29 verify scripts, 2,623
+  checks): lint, typecheck, the unit suites (worker 926, web 2,199, app 269), both builds, and the verify
+  scripts with the AI stand-in. `check:failed` was not needed. No full level: nothing in pricing, the worker,
+  billing, emails or a migration changed.
+- **Unit tests: `guides-t208.test.ts`, 17 new.** The hero holds no video and reads headline, text, buttons,
+  small line, frames; the three buttons' words and seconds (from the list); each opens the one window on its
+  own guide and nothing of a video is on the page before a press; which video a screen gets; what counts as a
+  press on the dark page; no file says "Read the transcript" and only the window uses a transcript, as hidden
+  text the dialog is described by; the Services header's row holds three buttons and no guide link.
+  `guides-t207.test.ts` (32, was 34) says the same things as they now are: three tests of the hero's own player
+  became one that says it is gone.
+- **`verify-t208` (new, in the manifest): 238 checks**, in a browser at 1,440, 1,024, 640, 639 and 390 px (the
+  dashboard at 1,024, 768, 1,280 and 390):
+  - the hero: no video, nothing of a guide asked for on load, the order of its parts, the third action in the
+    row on a desktop and under the buttons on a phone, with no ground and no edge;
+  - the window: modal, on the right guide; the wide video from 640 px and the upright one under it, and only
+    that one asked for; started once inside the press with the sound on; dark backdrop; in the middle; as
+    large as fits; near the whole screen on a phone; the page behind does not scroll (wheel, Page Down) and
+    is where it was afterwards; Tab stays inside;
+  - closing: Escape, the ✕ (pointer and keyboard), a press on the dark page (a corner, under the video); each
+    stops the video and returns the focus to the button; a press on the video does not close it, nor does a
+    drag that begins on the video and ends off it; nothing is written to the visitor's browser;
+  - the two section buttons: under their intro text, the right guide, the same window;
+  - no transcript offered on the home page, `/support` or the dashboard, with a window open or closed; the
+    voiceover is in the open window as one clipped pixel of text, line for line;
+  - Services: the three buttons on one row beside the title at 1,024 (also 768 and 1,280), the guide link
+    under the page's line.
+- **`verify-t207` updated (98 checks, was 136)** where it expected the hero's own player or a visible
+  transcript: its home page section now holds that the hero has no player and nothing loads; its player
+  section holds the hidden words instead of the opened transcript; Services' link is looked for under the
+  page's line. **`verify-t152`** reads the home page whole again (above).
+- **The checks' browser cannot decode the videos** (as in T-207): "it plays" is `play()` called once inside
+  the press, not muted, and the right file asked for. Real playback in the new window was seen in Chrome on
+  the live site (the deploy note, above).
+
+**Not proven**
+
+- **Safari and a real iPhone or iPad**, as in T-207: Chrome and the checks' Chromium only. Two things here lean
+  on newer CSS: the scroll lock uses `:has()` (Safari 15.4, Chrome 105, Firefox 121 and later; an older
+  browser shows the window the same but the page behind can still be scrolled), and the window's size uses
+  `dvh` (the same versions).
+- **A screen reader was not run.** The transcript is in the window as hidden text named by `aria-describedby`,
+  as the ticket asked; how each screen reader reads a description of that length while the video's own sound
+  plays was not heard.
+- The dashboard's windows were not opened on production (that needs a business's sign-in); they are the same
+  component the home page and `/support` open, and `verify-t208` opened one on Services locally.
+
 ### 2026-11-27: T-207 — The guide videos in the dashboard, on the site and on /support; two leftovers
 
 **Deployed 27 Nov 2026, web only** (commit 2fa0351, `npx vercel deploy --prod --yes` from the repo root, Vercel

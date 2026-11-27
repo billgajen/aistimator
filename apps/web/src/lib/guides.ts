@@ -30,7 +30,10 @@ export interface Guide extends GuideSource {
   title: string
   /** The video's length, as the link says it ("Watch how · 32 s") */
   seconds: number
-  /** The voiceover, one line to a sentence or two, as it is spoken */
+  /**
+   * The voiceover, one line to a sentence or two, as it is spoken. The captions are part of the picture, so
+   * this is not shown (T-208): it is in the guide's window for a screen reader only.
+   */
   transcript: readonly string[]
   /** The hero only: the same video upright, for a phone. `src` and `poster` are the wide one. */
   tall?: GuideSource
@@ -142,6 +145,15 @@ export function guide(id: GuideId): Guide {
   return GUIDES[id]
 }
 
+/** Under this width a guide that has an upright video plays that one (T-208): a phone held upright */
+export const UPRIGHT_UNDER = 640
+export const UPRIGHT_QUERY = `(max-width: ${UPRIGHT_UNDER - 1}px)`
+
+/** The video a guide's window plays on this screen: the upright one on a narrow screen, when the guide has one */
+export function sourceFor(g: Guide, narrow: boolean): GuideSource {
+  return narrow && g.tall ? g.tall : g
+}
+
 /** The six how-to guides, in the order a new business needs them (Home's "Getting started", the support page) */
 export const SETUP_GUIDES: readonly GuideId[] = ['add-service', 'set-prices', 'test-pricing', 'quote-link', 'approve', 'on-site']
 
@@ -149,15 +161,14 @@ export const SETUP_GUIDES: readonly GuideId[] = ['add-service', 'set-prices', 't
 export const GUIDE_COPY = {
   watch: 'Watch how',
   watched: 'Watched',
-  transcript: 'Read the transcript',
   close: 'Close',
   gettingStarted: 'Getting started',
   gettingStartedLine: 'Six short videos, each under a minute. They play with sound.',
   hide: 'Hide',
   videoGuides: 'Video guides',
-  videoGuidesLine: 'Six short videos that show each step, each under a minute. They play with sound, and each has its words written out under it.',
-  /** The hero's play button, as a screen reader says it */
-  play: (g: Guide) => `Play the video: ${g.title} (${g.seconds} seconds, with sound)`,
+  videoGuidesLine: 'Six short videos that show each step, each under a minute. They play with sound, and the words are shown on the picture.',
+  /** A marketing page's video button ("See how it works · 33 s"), as a screen reader says it */
+  buttonLabel: (words: string, g: Guide) => `${words} (video, ${g.seconds} seconds, with sound)`,
   /** A guide link, as a screen reader says it */
   linkLabel: (g: Guide, watched: boolean) => `Watch how: ${g.title} (${g.seconds} seconds)${watched ? ', watched' : ''}`,
 } as const

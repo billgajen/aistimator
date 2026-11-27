@@ -1,6 +1,11 @@
 /**
  * T-207: the guide videos: the one list, the player, and where each guide is shown.
  *
+ * T-208 changed three things held here, and this file says them as they now are: the window and its
+ * opening moved into `useGuide` (shared with the marketing pages' buttons), the transcript is no longer
+ * shown, and the Services link sits under the page's line. The hero's own player is gone: what replaced it
+ * is in guides-t208.test.ts.
+ *
  * What a browser does with them (the focus staying inside the window, Escape, the video
  * starting inside the press, only the visible hero loading) is proved in a real browser by
  * scripts/hardcore-test/verify-t207.mts. Here: the list against the files, the rule that only
@@ -30,7 +35,6 @@ import { guideClosed, openGuide } from '@/components/guide/control'
 import { GuideLink } from '@/components/guide/GuideLink'
 import { GuideList } from '@/components/guide/GuideList'
 import { GettingStarted } from '@/components/guide/GettingStarted'
-import { HeroVideo } from '@/components/guide/HeroVideo'
 
 const ROOT = join(__dirname, '../../../..')
 const WEB = join(ROOT, 'apps/web')
@@ -164,30 +168,32 @@ describe('T-207 part B: the player', () => {
   it('the window is the browser’s own modal dialog, with a video that has controls and loads nothing ahead', () => {
     const dialog = code('apps/web/src/components/guide/GuideDialog.tsx')
     expect(dialog).toMatch(/<dialog\s+ref=\{dialogRef\}/)
-    expect(dialog).toMatch(/<video\s+ref=\{videoRef\}\s+controls\s+playsInline\s+preload="none"\s+poster=\{guide\.poster\}\s+src=\{guide\.src\}/)
+    expect(dialog).toMatch(/<video\s+ref=\{videoRef\}\s+controls\s+playsInline\s+preload="none"\s+poster=\{source\.poster\}\s+src=\{source\.src\}/)
     expect(dialog).toContain('onClose={onClosed}')
     // Escape is the browser's: nothing here stops the dialog's own "cancel"
     expect(dialog).not.toMatch(/onCancel|preventDefault|onKeyDown/)
     // opened with showModal (the focus stays inside it), never the non-modal show()
     expect(code('apps/web/src/components/guide/control.ts')).toContain('dialog.showModal()')
     expect(code('apps/web/src/components/guide/control.ts')).not.toMatch(/\.show\(\)/)
-    // the transcript is closed until asked for
-    expect(dialog).toMatch(/<details className=/)
-    expect(dialog).not.toMatch(/<details[^>]*\sopen/)
-    expect(dialog).toContain('{GUIDE_COPY.transcript}')
-    expect(GUIDE_COPY.transcript).toBe('Read the transcript')
+    // T-208: no transcript to open (guides-t208.test.ts holds where the words went)
+    expect(dialog).not.toMatch(/<details/)
   })
 
   it('nothing plays by itself, anywhere: no autoplay attribute, and play() only inside a press', () => {
-    for (const file of ['GuideLink.tsx', 'GuideDialog.tsx', 'HeroVideo.tsx', 'GuideList.tsx', 'GettingStarted.tsx', 'control.ts', 'memory.ts']) {
+    for (const file of ['GuideLink.tsx', 'GuideDialog.tsx', 'WatchButton.tsx', 'useGuide.tsx', 'GuideList.tsx', 'GettingStarted.tsx', 'control.ts', 'memory.ts']) {
       expect(code(`apps/web/src/components/guide/${file}`), file).not.toMatch(/autoplay/i)
     }
-    const guideLink = code('apps/web/src/components/guide/GuideLink.tsx')
-    // the one caller of openGuide is the button's own onClick
-    expect(guideLink).toMatch(/const show = \(\) => \{\s*flushSync\(\(\) => setOpen\(true\)\)\s*openGuide\(dialog\.current, video\.current\)\s*\}/)
-    expect(guideLink).toContain('onClick={show}')
-    expect(guideLink.match(/openGuide\(/g)).toHaveLength(1)
-    expect(guideLink).not.toMatch(/useEffect/)
+    // the one caller of openGuide is `show`, and `show` is only ever a button's own onClick
+    const opener = code('apps/web/src/components/guide/useGuide.tsx')
+    expect(opener).toMatch(/const show = \(\) => \{\s*const playing = sourceFor\(guide, window\.matchMedia\(UPRIGHT_QUERY\)\.matches\)\s*flushSync\(\(\) => setSource\(playing\)\)\s*openGuide\(dialog\.current, video\.current\)\s*\}/)
+    expect(opener.match(/openGuide\(/g)).toHaveLength(1)
+    for (const file of ['GuideLink.tsx', 'WatchButton.tsx']) {
+      const button = code(`apps/web/src/components/guide/${file}`)
+      expect(button, file).toContain('onClick={show}')
+      expect(button.match(/\bshow\b/g), file).toHaveLength(2)
+      expect(button, file).not.toMatch(/useEffect|openGuide|\.play\(/)
+    }
+    expect(opener).not.toMatch(/useEffect/)
   })
 
   /** A stand-in for the browser's dialog: Escape cancels it, which closes it, which tells whoever listens */
@@ -259,8 +265,8 @@ describe('T-207 part B: the player', () => {
     expect(events.slice(-3)).toEqual(['close', 'pause', 'focus link'])
     expect(remembered).toEqual(['add-service'])
     // and the real one is wired that way: every way of closing ends in the dialog's one "close" event
-    const guideLink = code('apps/web/src/components/guide/GuideLink.tsx')
-    expect(guideLink).toMatch(/onClosed=\{\(\) => \{\s*guideClosed\(video\.current, opener\.current, \(\) => remember\(key\)\)\s*setOpen\(false\)\s*\}\}/)
+    expect(code('apps/web/src/components/guide/useGuide.tsx')).toMatch(/onClosed=\{\(\) => \{\s*guideClosed\(video\.current, opener\.current, on\.closed\)\s*setSource\(null\)\s*\}\}/)
+    expect(code('apps/web/src/components/guide/GuideLink.tsx')).toContain('closed: () => remember(key),')
     expect(code('apps/web/src/components/guide/GuideDialog.tsx')).toContain('onClick={() => dialogRef.current?.close()}')
   })
 
@@ -348,8 +354,10 @@ describe('T-207: what the browser remembers', () => {
 describe('T-207 part C: where the guides are shown', () => {
   const services = code('apps/web/src/app/(dashboard)/app/services/page.tsx')
 
-  it('5. Services: in the page header, beside "Add Service"', () => {
-    expect(services).toMatch(/Add Service\s*<\/button>\s*<GuideLink id="add-service" \/>\s*<\/div>\s*\}\s*\/>/)
+  it('5. Services: in the page header (since T-208 under the page’s line, not in the row of buttons)', () => {
+    expect(services).toMatch(/<PageHeader\s+title="Services"\s+description="Your services and what you charge for each"\s+below=\{<GuideLink id="add-service" \/>\}/)
+    expect(services.match(/<GuideLink id="add-service" \/>/g)).toHaveLength(1)
+    expect(services).toMatch(/Add Service\s*<\/button>\s*<\/div>\s*\}\s*\/>/)
   })
 
   it('6. the "Pricing Setup" step: beside the step’s heading', () => {
@@ -440,47 +448,9 @@ describe('T-207 part C: where the guides are shown', () => {
     expect(code('apps/web/src/components/guide/GuideList.tsx')).toContain('<GuideLink id={id} />')
   })
 
-  it('12. the marketing home page: the hero video under the headline, above the three frames', () => {
-    const page = code('apps/web/src/app/page.tsx')
-    const headline = page.indexOf('{HERO.headline}</h1>')
-    const video = page.indexOf('<HeroVideo />')
-    expect(headline).toBeGreaterThan(0)
-    expect(video).toBeGreaterThan(headline)
-    expect(video).toBeLessThan(page.indexOf('<HeroDemo'))
-    expect(page.match(/<HeroVideo \/>/g)).toHaveLength(1)
-  })
-
-  it('12. a poster and a large play button; two of it, and CSS decides which is shown', () => {
-    const html = renderToStaticMarkup(createElement(HeroVideo)).replace(/<!-- -->/g, '')
-    const hero = GUIDES.hero
-    // under 640 px the upright one, from 640 px the wide one
-    expect(html).toMatch(/<div class="[^"]*\bsm:hidden\b[^"]*" data-testid="hero-video-tall">/)
-    expect(html).toMatch(/<div class="hidden [^"]*\bsm:block\b[^"]*" data-testid="hero-video-wide">/)
-    expect(html.indexOf(hero.tall!.poster)).toBeGreaterThan(0)
-    expect(html.indexOf(hero.poster)).toBeGreaterThan(0)
-    // each poster is a lazy image with its size, so the one that is not shown is never fetched and nothing moves
-    expect(html.match(/<img [^>]*loading="lazy"[^>]*>/g)).toHaveLength(2)
-    expect(html).toContain(`<img src="${hero.poster}" alt="" width="1920" height="1080" loading="lazy"`)
-    expect(html).toContain(`<img src="${hero.tall!.poster}" alt="" width="1080" height="1920" loading="lazy"`)
-    // no video is on the page, and nothing names a video file, until a button is pressed
-    expect(html).not.toContain('<video')
-    expect(html).not.toContain('.mp4')
-    expect(html.match(/aria-label="Play the video: Photo in, quote out \(33 seconds, with sound\)"/g)).toHaveLength(2)
-    // the play button is 80 px, and is not the page's yellow button
-    expect(html).toMatch(/<span class="[^"]*\bh-20 w-20\b[^"]*rounded-full[^"]*">/)
-    expect(html).not.toMatch(/bg-accent/)
-    // the transcript, closed
-    expect(html).toContain('Read the transcript')
-    expect(html).not.toMatch(/<details[^>]*\sopen/)
-    for (const line of hero.transcript) expect(html).toContain(line.replace(/'/g, '&#x27;'))
-  })
-
-  it('12. pressed, it is a video with controls that loads nothing ahead; one no longer shown stops', () => {
-    const player = code('apps/web/src/components/guide/HeroVideo.tsx')
-    expect(player).toMatch(/<video\s+ref=\{video\}\s+controls\s+playsInline\s+preload="none"\s+poster=\{source\.poster\}\s+src=\{source\.src\}/)
-    expect(player).toMatch(/const play = \(\) => \{\s*flushSync\(\(\) => setStarted\(true\)\)/)
-    expect(player).toContain("const WIDE_FROM = '(min-width: 640px)'")
-    expect(player).toMatch(/query\.addEventListener\('change', stop\)/)
+  it('12. the marketing home page: no player in the hero any more (T-208 opens the video from a button)', () => {
+    expect(existsSync(join(WEB, 'src/components/guide/HeroVideo.tsx'))).toBe(false)
+    expect(code('apps/web/src/app/page.tsx')).not.toMatch(/HeroVideo|<video/)
   })
 })
 

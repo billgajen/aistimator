@@ -256,15 +256,21 @@ prompt, what was kept and what was rejected).
   buttons (white, `field` edge: a page to open, or one of the panel's own forms), then "Did this answer it?"
   with Yes and No. Nothing in it is yellow: an answer is not something that needs the business. No typing
   animation and no avatar; while an answer is on its way the block says "Looking that up…".
-- **A guide video is a quiet link, not a player on the page** (T-207). "Watch how · 32 s": a small play mark, the
-  words, the length in the figure face, in juniper; a small green tick once watched. It opens the video in a modal
-  dialog (the browser's own, as the photo viewer: white, `rounded-2xl`, `shadow-warm-lg`, the page dimmed with
-  ink, no animation) with the guide's title, "Close", the video and a closed "Read the transcript". It sits beside
-  the heading or the button it is about, in a row or a block, never inside a paragraph. **No video plays by
-  itself, anywhere**: a press starts it, with its sound. Every guide comes from the one list, `lib/guides.ts`.
-  The marketing hero's video is the one player on a page: a poster with an 80 px white play button with an ink
-  edge (never yellow: the screen has its one yellow button), the wide video from 640 px and the upright one
-  under that, with the transcript closed under it on its own white ground.
+- **A guide video is a quiet link, not a player on the page** (T-207, T-208). In the dashboard, "Watch how · 32 s":
+  a small play mark, the words, the length in the figure face, in juniper; a small green tick once watched. It
+  sits beside the heading it is about or under a page's line, in a row or a block, never inside a paragraph, and
+  never in a page header's row of buttons (it pushed them off the title's row). On a marketing page, a video
+  button: a small juniper play mark and ink words ("See how it works · 33 s"), with no ground and no edge, so it
+  is quieter than any button beside it; the words underline under the pointer. Never yellow.
+  - **One window for every guide** (T-208): the browser's own modal dialog, filling the screen. The page behind
+    goes dark (ink at nine tenths) and does not scroll. The video is in the middle, as large as fits, with
+    `rounded-xl` corners; over it the guide's title in white and a white round ✕ (44 px). It closes on the ✕, on
+    Escape, and on a press anywhere on the dark. No animation. The hero's video is upright (9:16) under 640 px
+    and wide from 640 px.
+  - **No video plays by itself, anywhere**: a press starts it, with its sound. No page has a player standing in
+    it. Every guide comes from the one list, `lib/guides.ts`.
+  - **No transcript is shown**: the captions are part of the picture. The voiceover's words are in the open
+    window for a screen reader only.
 - **The dashboard quote page reads in one order** (T-169): the next step, what the AI understood (with the
   customer's photos), the price, then the rest in one card divided by rules. The total is the mono figure at
   `text-4xl`. A new block on that page goes into one of those four, not into a box of its own.

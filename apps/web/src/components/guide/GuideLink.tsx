@@ -1,17 +1,16 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { flushSync } from 'react-dom'
-import { GUIDE_COPY, guide as guideOf, watchedEnough, watchedKey, type GuideId } from '@/lib/guides'
-import { guideClosed, openGuide } from './control'
-import { GuideDialog } from './GuideDialog'
+import { GUIDE_COPY, watchedEnough, watchedKey, type GuideId } from '@/lib/guides'
 import { remember, useRemembered } from './memory'
+import { useGuide } from './useGuide'
 
 /**
  * T-207: "Watch how · 32 s", the quiet link that opens a guide's video.
  *
- * It takes the guide's id and nothing else: the title, the length, the file
- * and the transcript come from the one list (lib/guides.ts).
+ * It takes the guide's id and nothing else: the title, the length and the
+ * file come from the one list (lib/guides.ts). The window, and opening and
+ * closing it, are `useGuide`'s (T-208), shared with the marketing pages'
+ * video buttons.
  *
  * - Pressing it opens the window and starts the video, with sound: the press
  *   is the person's own action, which is what lets a browser play sound.
@@ -25,19 +24,14 @@ import { remember, useRemembered } from './memory'
  * block, never inside a paragraph.
  */
 export function GuideLink({ id }: { id: GuideId }) {
-  const guide = guideOf(id)
   const key = watchedKey(id)
   const watched = useRemembered(key)
-  const [open, setOpen] = useState(false)
-  const opener = useRef<HTMLButtonElement>(null)
-  const dialog = useRef<HTMLDialogElement>(null)
-  const video = useRef<HTMLVideoElement>(null)
-
-  const show = () => {
-    // the video is put in the page now, inside the press, so it can be started inside the press too
-    flushSync(() => setOpen(true))
-    openGuide(dialog.current, video.current)
-  }
+  const { guide, opener, show, dialog } = useGuide(id, {
+    progress: (currentTime, duration) => {
+      if (watchedEnough(currentTime, duration)) remember(key)
+    },
+    closed: () => remember(key),
+  })
 
   return (
     <>
@@ -69,19 +63,7 @@ export function GuideLink({ id }: { id: GuideId }) {
           </svg>
         )}
       </button>
-      <GuideDialog
-        guide={guide}
-        open={open}
-        dialogRef={dialog}
-        videoRef={video}
-        onProgress={(currentTime, duration) => {
-          if (watchedEnough(currentTime, duration)) remember(key)
-        }}
-        onClosed={() => {
-          guideClosed(video.current, opener.current, () => remember(key))
-          setOpen(false)
-        }}
-      />
+      {dialog}
     </>
   )
 }

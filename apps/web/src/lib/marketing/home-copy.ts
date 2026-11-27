@@ -18,6 +18,19 @@ export const MESSAGE_LINE = says(['photo-notes', 'pricing-engine'], 'The AI work
 
 const FREE = FREE_ALLOWANCE.US!.quotes
 
+/**
+ * T-208: the words of the page's three video buttons. Each opens a guide video in a window over the page; its
+ * length is added from the one list of guides (lib/guides.ts), as "· 33 s".
+ */
+export const WATCH = {
+  /** In the hero's row of buttons: the product in half a minute */
+  hero: 'See how it works',
+  /** Under "Set up in minutes": the first setup guide */
+  setup: 'See setup',
+  /** In the on-site app's section: the app pricing a job in a room */
+  onSite: 'Watch it on site',
+} as const
+
 export const HERO = {
   /** T-173 (the owner's words): "for your customers" replaces "on your website"; a business needs no website to use it */
   headline: 'Instant quotes for your customers, in your prices.',

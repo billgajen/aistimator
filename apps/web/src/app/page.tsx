@@ -9,7 +9,7 @@ import { SiteNav } from '@/components/marketing/SiteNav'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { FounderNote } from '@/components/marketing/FounderNote'
 import { HeroDemo } from '@/components/marketing/home/HeroDemo'
-import { HeroVideo } from '@/components/guide/HeroVideo'
+import { WatchButton } from '@/components/guide/WatchButton'
 import { SetupSteps } from '@/components/marketing/home/SetupSteps'
 import { WhatItNotices } from '@/components/marketing/home/WhatItNotices'
 import { HeroPhoto } from '@/components/marketing/home/HeroPhoto'
@@ -21,7 +21,7 @@ import { listPacks } from '@/lib/vertical-packs'
 import { templateTrades, tradeHref } from '@/lib/marketing/trades'
 import { appQuoteLines, marketingExample } from '@/lib/marketing/examples'
 import { MAIN_CTA, QUIET_BUTTON, QUIET_LINK } from '@/lib/marketing/cta'
-import { HERO, HERO_DEMO, HERO_DEMO_FRAMES, MESSAGE_LINE, NOTICES, OTHER_TRADES, SETUP, CONTROL, STATISTICS, ADD_IT, PRICING_HEADING, PLANS_SECTION, FAQ, HOME_FAQ_UPCOMING_AFTER, FINAL_CTA, FINAL_QUIET_LINK, PAGE_META } from '@/lib/marketing/home-copy'
+import { HERO, HERO_DEMO, HERO_DEMO_FRAMES, MESSAGE_LINE, NOTICES, OTHER_TRADES, SETUP, CONTROL, STATISTICS, ADD_IT, PRICING_HEADING, PLANS_SECTION, FAQ, HOME_FAQ_UPCOMING_AFTER, FINAL_CTA, FINAL_QUIET_LINK, PAGE_META, WATCH } from '@/lib/marketing/home-copy'
 
 export const metadata: Metadata = {
   title: PAGE_META.title,
@@ -39,8 +39,7 @@ const WRAP = 'mx-auto max-w-container px-4 sm:px-6'
  *
  * One idea per section, and no two neighbours share a layout or a background
  * (T-167 order):
- *   1 hero (paper): the words over the hero photograph, the one yellow button, the hero video (a poster and a
- *     play button, T-207: it plays when pressed, never by itself) and the product demo (three frames of one height, T-168)
+ *   1 hero (paper): the words over the hero photograph, the one yellow button, and the product demo (three frames of one height, T-168)
  *   2 what homeowners want (grey): three large figures in three columns (T-168), one column on a phone
  *   3 what it notices (paper): the message line and four examples, each with its real screen
  *   4 your prices (mint): a sentence that turns into price lines (the one moment)
@@ -88,19 +87,17 @@ export default function HomePage() {
       <div className="max-w-3xl">
         <h1 className="font-display text-display-sm font-extrabold text-text-primary sm:text-display-md lg:text-display-lg">{HERO.headline}</h1>
         <p className="mt-4 max-w-2xl text-base text-text-secondary sm:text-lg">{HERO.subline}</p>
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center" data-testid="hero-actions">
           <Link href="/signup" className={MAIN_CTA} data-testid="hero-signup" data-cta="main">
             {freeOfferLabel()}
           </Link>
           <Link href="/demo" className={QUIET_BUTTON} data-testid="hero-demo">
             Try it as a customer
           </Link>
+          {/* T-208: the product in 33 seconds, in a window over the page: words only, quieter than the two buttons */}
+          <WatchButton id="hero" words={WATCH.hero} className="sm:px-2" />
         </div>
         <p className="hero-small-line mt-3 text-xs text-text-muted">{HERO.smallLine}</p>
-      </div>
-      {/* T-207: the product in 33 seconds. A poster and a play button: it plays with sound when pressed, never by itself. */}
-      <div className="mt-8 lg:mt-10">
-        <HeroVideo />
       </div>
       <div className="mt-10 lg:mt-12">
         <HeroDemo
@@ -201,6 +198,10 @@ export default function HomePage() {
       <section className={`${WRAP} py-16 sm:py-20`} data-testid="setup">
         <h2 className={H2}>{SETUP.heading}</h2>
         <p className="mt-3 max-w-2xl text-text-secondary">{SETUP.lead}</p>
+        {/* T-208: the first setup guide, in the same window as the hero's video */}
+        <div className="mt-1 flex justify-start">
+          <WatchButton id="add-service" words={WATCH.setup} />
+        </div>
         <SetupSteps
           steps={SETUP.steps}
           screenLabels={SETUP.screens}
