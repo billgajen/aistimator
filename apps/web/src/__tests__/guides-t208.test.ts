@@ -12,7 +12,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { GUIDES, GUIDE_COPY, SETUP_GUIDES, UPRIGHT_QUERY, UPRIGHT_UNDER, guide, sourceFor, type GuideId } from '@/lib/guides'
+import { GUIDES, GUIDE_COPY, SETUP_GUIDES, UPRIGHT_QUERY, UPRIGHT_UNDER, guide, guideLength, sourceFor, type GuideId } from '@/lib/guides'
 import { WATCH } from '@/lib/marketing/home-copy'
 import { MAIN_CTA, QUIET_BUTTON, WATCH_BUTTON } from '@/lib/marketing/cta'
 import { guideClosed, pressClosesWindow } from '@/components/guide/control'
@@ -66,22 +66,23 @@ describe('T-208 items 2 to 4: three video buttons, one window', () => {
     expect(page).toContain('<div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center" data-testid="hero-actions">')
   })
 
-  it('"See how it works · 33 s", "See setup · 32 s", "Watch it on site · 39 s": the seconds are the list’s', () => {
+  it('"See how it works · 1 min" (T-209: it was "· 33 s"), "See setup · 32 s", "Watch it on site · 39 s": the lengths are the list’s', () => {
     expect(WATCH).toEqual({ hero: 'See how it works', setup: 'See setup', onSite: 'Watch it on site' })
-    expect(text(button('hero', WATCH.hero))).toBe(`See how it works · ${GUIDES.hero.seconds} s`)
+    expect(text(button('hero', WATCH.hero))).toBe(`See how it works · ${guideLength(GUIDES.hero.seconds).text}`)
+    expect(text(button('hero', WATCH.hero))).toBe('See how it works · 1 min')
     expect(text(button('add-service', WATCH.setup))).toBe(`See setup · ${guide('add-service').seconds} s`)
     expect(text(button('on-site', WATCH.onSite))).toBe(`Watch it on site · ${guide('on-site').seconds} s`)
-    expect([GUIDES.hero.seconds, guide('add-service').seconds, guide('on-site').seconds]).toEqual([33, 32, 39])
+    expect([GUIDES.hero.seconds, guide('add-service').seconds, guide('on-site').seconds]).toEqual([60, 32, 39])
     // no length is typed on the page or in the button
     for (const file of ['apps/web/src/app/page.tsx', 'apps/web/src/components/marketing/home/AppSection.tsx', 'apps/web/src/components/guide/WatchButton.tsx', 'apps/web/src/lib/marketing/home-copy.ts']) {
-      expect(code(file), file).not.toMatch(/\b3[239] s\b/)
+      expect(code(file), file).not.toMatch(/\b3[239] s\b|\b\d+ min\b/)
     }
-    expect(code('apps/web/src/components/guide/WatchButton.tsx')).toContain('<span className="figure">{guide.seconds}</span> s')
+    expect(code('apps/web/src/components/guide/WatchButton.tsx')).toContain('<span className="figure">{length.figure}</span> {length.unit}')
   })
 
   it('each is a button with a play mark, its words, and what a screen reader needs', () => {
     const html = button('hero', WATCH.hero)
-    expect(html).toMatch(/^<button type="button" aria-label="See how it works \(video, 33 seconds, with sound\)" aria-haspopup="dialog"/)
+    expect(html).toMatch(/^<button type="button" aria-label="See how it works \(video, 1 minute, with sound\)" aria-haspopup="dialog"/)
     expect(html).toContain('data-testid="watch-hero"')
     expect(html).toMatch(/<svg[^>]*aria-hidden="true"/)
     expect(GUIDE_COPY.buttonLabel(WATCH.onSite, guide('on-site'))).toBe('Watch it on site (video, 39 seconds, with sound)')
@@ -155,7 +156,7 @@ describe('T-208 item 3: the window', () => {
 
   it('open, it holds the guide’s title, a ✕ and the video, sized to fit the screen at the video’s own shape', () => {
     const wide = open('hero')
-    expect(wide).toContain('>Photo in, quote out</h2>')
+    expect(wide).toContain('>How Qolumns works</h2>')
     expect(wide).toMatch(/<button type="button" aria-label="Close"[^>]*data-testid="guide-close"><svg/)
     expect(wide).toContain(`poster="${GUIDES.hero.poster}" src="${GUIDES.hero.src}" width="1920" height="1080"`)
     expect(wide).toContain('style="width:min(100%, calc((100dvh - var(--guide-chrome)) * 1920 / 1080), 1920px)"')

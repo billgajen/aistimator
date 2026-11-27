@@ -1,4 +1,4 @@
-import { APP_DOMAIN, PRODUCT_NAME } from '@qolumns/shared'
+import { PRODUCT_NAME } from '@qolumns/shared'
 
 /**
  * T-207: the guide videos, in one list.
@@ -28,7 +28,7 @@ export interface GuideSource {
 export interface Guide extends GuideSource {
   id: GuideId
   title: string
-  /** The video's length, as the link says it ("Watch how · 32 s") */
+  /** The video's length in seconds. A screen says it through `guideLength` ("Watch how · 32 s", "· 1 min") */
   seconds: number
   /**
    * The voiceover, one line to a sentence or two, as it is spoken. The captions are part of the picture, so
@@ -51,17 +51,22 @@ const files = (name: string, size: { width: number; height: number }): GuideSour
 export const GUIDES: Record<GuideId, Guide> = {
   hero: {
     id: 'hero',
-    title: 'Photo in, quote out',
-    seconds: 33,
+    title: `How ${PRODUCT_NAME} works`,
+    seconds: 60,
     ...files('hero-16x9', WIDE),
     tall: files('hero-9x16', TALL),
     transcript: [
-      "Your customers want a price before they'll book a visit.",
-      `With ${PRODUCT_NAME}, they snap a few photos and answer a few questions, right on your website.`,
-      `${PRODUCT_NAME} reads the photos, and prices the job from your own price list.`,
-      'You check it, and tap approve.',
-      'Your customer gets a professional quote, every line explained, with a button to accept.',
-      `${PRODUCT_NAME}. Photo estimates for trades. Start free at ${APP_DOMAIN}.`,
+      'Most homeowners look for a price online before they call. Very few find one.',
+      'And the first business to give them a price often wins the job.',
+      `With ${PRODUCT_NAME}, they snap a few photos and answer a few questions, on your website, or from your quote link.`,
+      'Usually within a minute, they see an estimate in your prices. Even at ten at night, when no one else is answering.',
+      'You get a notification on your phone, and an email.',
+      'The AI works out the job. Your prices work out the cost, line by line.',
+      'Change anything you like, then approve and send.',
+      'Your customer gets the quote by email, every line explained, and accepts with one tap.',
+      'And you know the moment they say yes.',
+      `Out on a job? Use the ${PRODUCT_NAME} app. Take the photos, scan the room, and give your customer a quote before you leave.`,
+      `${PRODUCT_NAME}. Answer first, in your prices. Try it free: ten quotes, no card needed.`,
     ],
   },
   'add-service': {
@@ -145,6 +150,20 @@ export function guide(id: GuideId): Guide {
   return GUIDES[id]
 }
 
+/** From this many seconds a guide's length is said in minutes (T-209) */
+export const MINUTE = 60
+
+/**
+ * T-209: a guide's length as a screen says it, in one place. Under a minute it is seconds ("33 s"); from a
+ * minute it is whole minutes, to the nearest ("1 min"). `figure` and `unit` are the two halves, for a screen
+ * that sets the figure in the figure face; `text` is both; `spoken` is how a screen reader is told.
+ */
+export function guideLength(seconds: number): { figure: string; unit: 's' | 'min'; text: string; spoken: string } {
+  if (seconds < MINUTE) return { figure: String(seconds), unit: 's', text: `${seconds} s`, spoken: `${seconds} seconds` }
+  const minutes = Math.round(seconds / MINUTE)
+  return { figure: String(minutes), unit: 'min', text: `${minutes} min`, spoken: minutes === 1 ? '1 minute' : `${minutes} minutes` }
+}
+
 /** Under this width a guide that has an upright video plays that one (T-208): a phone held upright */
 export const UPRIGHT_UNDER = 640
 export const UPRIGHT_QUERY = `(max-width: ${UPRIGHT_UNDER - 1}px)`
@@ -167,10 +186,10 @@ export const GUIDE_COPY = {
   hide: 'Hide',
   videoGuides: 'Video guides',
   videoGuidesLine: 'Six short videos that show each step, each under a minute. They play with sound, and the words are shown on the picture.',
-  /** A marketing page's video button ("See how it works · 33 s"), as a screen reader says it */
-  buttonLabel: (words: string, g: Guide) => `${words} (video, ${g.seconds} seconds, with sound)`,
+  /** A marketing page's video button ("See how it works · 1 min"), as a screen reader says it */
+  buttonLabel: (words: string, g: Guide) => `${words} (video, ${guideLength(g.seconds).spoken}, with sound)`,
   /** A guide link, as a screen reader says it */
-  linkLabel: (g: Guide, watched: boolean) => `Watch how: ${g.title} (${g.seconds} seconds)${watched ? ', watched' : ''}`,
+  linkLabel: (g: Guide, watched: boolean) => `Watch how: ${g.title} (${guideLength(g.seconds).spoken})${watched ? ', watched' : ''}`,
 } as const
 
 /** A guide counts as watched once this share of it has played (or its window was closed) */

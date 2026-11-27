@@ -1,6 +1,6 @@
 'use client'
 
-import { GUIDE_COPY, watchedEnough, watchedKey, type GuideId } from '@/lib/guides'
+import { GUIDE_COPY, guideLength, watchedEnough, watchedKey, type GuideId } from '@/lib/guides'
 import { remember, useRemembered } from './memory'
 import { useGuide } from './useGuide'
 
@@ -32,6 +32,7 @@ export function GuideLink({ id }: { id: GuideId }) {
     },
     closed: () => remember(key),
   })
+  const length = guideLength(guide.seconds)
 
   return (
     <>
@@ -51,7 +52,7 @@ export function GuideLink({ id }: { id: GuideId }) {
         <span>{GUIDE_COPY.watch}</span>
         <span aria-hidden="true">·</span>
         <span>
-          <span className="figure">{guide.seconds}</span> s
+          <span className="figure">{length.figure}</span> {length.unit}
         </span>
         {watched && (
           <svg className="h-4 w-4 shrink-0 text-secondary" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-testid="guide-watched">

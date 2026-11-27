@@ -260,7 +260,7 @@ prompt, what was kept and what was rejected).
   a small play mark, the words, the length in the figure face, in juniper; a small green tick once watched. It
   sits beside the heading it is about or under a page's line, in a row or a block, never inside a paragraph, and
   never in a page header's row of buttons (it pushed them off the title's row). On a marketing page, a video
-  button: a small juniper play mark and ink words ("See how it works · 33 s"), with no ground and no edge, so it
+  button: a small juniper play mark and ink words ("See how it works · 1 min"), with no ground and no edge, so it
   is quieter than any button beside it; the words underline under the pointer. Never yellow.
   - **One window for every guide** (T-208): the browser's own modal dialog, filling the screen. The page behind
     goes dark (ink at nine tenths) and does not scroll. The video is in the middle, as large as fits, with

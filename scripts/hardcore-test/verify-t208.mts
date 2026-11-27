@@ -3,7 +3,7 @@
 //
 // What it proves, in a real browser
 //   A  the marketing home page: the hero has no video of its own (headline, text, the buttons, the
-//      small line, then the three frames); a third, quieter action "See how it works · 33 s" after
+//      small line, then the three frames); a third, quieter action "See how it works · 1 min" after
 //      "Try it as a customer", in the row on a desktop and under the buttons on a phone
 //   B  the window it opens: the page goes dark, the video is in the middle and as large as fits
 //      (wide from 640 px, upright under it, near the whole screen on a phone); it starts inside the
@@ -24,7 +24,7 @@
 import path from 'node:path'
 import { mkdirSync } from 'node:fs'
 import { h, finish } from './t201/harness.mts'
-import { GUIDES, GUIDE_COPY, guide, sourceFor, watchedKey, type GuideId } from '../../apps/web/src/lib/guides'
+import { GUIDES, GUIDE_COPY, guide, guideLength, sourceFor, watchedKey, type GuideId } from '../../apps/web/src/lib/guides'
 import { WATCH } from '../../apps/web/src/lib/marketing/home-copy'
 
 const { app, check, section } = h
@@ -124,7 +124,7 @@ try {
     check(`${width}: headline, text, the buttons, the small line, then the three frames, in that order`, down.every((b, i) => i === 0 || b.y >= down[i - 1]!.y + down[i - 1]!.height - 1), down)
     const actions = (await hero.locator('[data-testid=hero-actions]').boundingBox())!
     check(`${width}: the small line follows the buttons directly, and the frames follow it (nothing else in between)`, small.y - (actions.y + actions.height) <= 16 && frames.y - (small.y + small.height) <= 120, { actions, small, frames })
-    check(`${width}: the third action reads "${WATCH.hero} · ${GUIDES.hero.seconds} s"`, words(await watch.innerText()) === `${WATCH.hero} · ${GUIDES.hero.seconds} s`, await watch.innerText())
+    check(`${width}: the third action reads "${WATCH.hero} · ${guideLength(GUIDES.hero.seconds).text}"`, words(await watch.innerText()) === `${WATCH.hero} · ${guideLength(GUIDES.hero.seconds).text}`, await watch.innerText())
     if (width >= 1024) {
       check(`${width}: it is in the buttons' row, after "Try it as a customer"`, Math.abs(midY(watchBox) - midY(demo)) <= 2 && Math.abs(midY(signup) - midY(demo)) <= 2 && watchBox.x >= demo.x + demo.width && demo.x >= signup.x + signup.width, { signup, demo, watchBox })
     } else if (width < 640) {

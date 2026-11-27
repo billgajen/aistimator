@@ -15,6 +15,94 @@
 
 ## Issues & Resolutions
 
+### 2026-11-27: T-209 — A new, longer hero video; a guide of a minute or more says its length in minutes
+
+Web only. No pricing, worker, billing or database code changed; no migration; no new dependency.
+
+**Why.** The first hero video (33 s, "Photo in, quote out") showed one moment: a photo goes in, a quote comes
+out. The new one tells the whole flow, which is why it is a minute long: a homeowner looks for a price and
+rarely finds one; with the product they send photos and answers and usually see an estimate in the business's
+prices within a minute, day or night; the business is told on its phone and by email; the AI works out the job
+and the business's prices work out the cost; the business changes what it likes, approves and sends; the
+customer accepts with one tap and the business knows at once; and the on-site app is a chapter of its own
+(photos, room scan, a quote before leaving) rather than a line at the end.
+
+- **The hero in the list** (`lib/guides.ts`): `seconds: 60`, title "How Qolumns works" (from `PRODUCT_NAME`),
+  and the new voiceover as its transcript, eleven lines. The two files keep their names (`hero-16x9`,
+  `hero-9x16`, each with its poster), so nothing else names them.
+- **`guideLength(seconds)` (new, `lib/guides.ts`): the one place a length becomes words.** Under 60 it is
+  seconds as before ("33 s"); from 60 it is whole minutes, to the nearest ("1 min", so the hero's button reads
+  "See how it works · 1 min"). It gives the figure and the unit apart (the figure is set in the figure face),
+  both together, and the spoken form ("1 minute", "32 seconds"). `WatchButton`, `GuideLink` and the two
+  screen-reader labels in `GUIDE_COPY` all use it; a unit test holds that no other file writes a guide's
+  seconds out. The six how-to guides are each under a minute, so every "Watch how · N s" reads as it did.
+- **Guides 2 and 6 are a change of file only**: guide 2's voice says the name correctly, and guide 6 was cut
+  again to leave out a private area of the home (and the Quotes list). No title, length or transcript changed.
+- **How the voice is made to say the name.** The voiceover script writes the name as "Kollums", so the voice
+  says it like the word "columns"; written as it is spelled, the voice gets it wrong often enough to matter.
+  Each recorded line that has the name in it is listened to before it is used. That spelling is for the voice
+  only: the transcript, the captions and every screen say the name from `PRODUCT_NAME`.
+
+**What went wrong on the way: the web copies were one build behind their masters**
+
+The ticket said the six files were already replaced and to commit them as they are. Measured before committing,
+they were not the finished ones, so nothing was committed or deployed until the owner had replaced them:
+
+| File in `apps/web/public/guides` | As first found (18:08) | As committed (18:34) |
+|---|---|---|
+| `hero-16x9.mp4`, `hero-9x16.mp4` | 67.6 s, with the captions of an earlier script ("…while others are still booking a visit", "On site? Scan the room with the app, and quote before you leave.") | 60.0 s; the owner checked the captions against the transcript |
+| `guide-2-set-your-prices.mp4` | byte for byte the file already live (25.11 s) | 25.47 s |
+| `guide-6-quote-on-site.mp4` | byte for byte the file already live | 38.93 s, a different file; the owner checked the frames: the private area is not shown |
+
+Each first web copy had been written a few seconds before its master in `apps/mobile/build/video` (18:08:16–20
+against 18:08:22–24; 17:31:46 against 17:31:48), which is what an encode-then-copy in the wrong order looks
+like: the web copy is made from the previous master. Deploying those would have put an earlier cut of the hero
+on the home page under a transcript that did not match it, left guide 2's voice as it was, and left the guide 6
+that shows a private area of the home live while this entry said it was gone. The ticket said not to re-encode,
+so the web copies were not made here: the owner made them again, and `verify-t209` (below) now holds every
+file to its length.
+
+**Constraints**
+
+- A length is said through `guideLength`. Do not write `{guide.seconds} s` on a screen or in a label.
+- **A guide's `seconds` is its file's length to the nearest second, and `verify-t209` holds every file to it**
+  (read from the MP4's own header, `scripts/hardcore-test/t209/mp4-length.mts`; no video tool is needed). A
+  re-made video that is not really in the folder, or is another cut, fails there. When a video is re-made:
+  replace the file, change `seconds` (and the transcript) in the list, run `pnpm check:quick --only t209`.
+- The check cannot see a picture or hear a voice. Two cuts of the same length pass it: what a re-cut removed
+  from the picture is checked by eye.
+- T-207's and T-208's constraints stand: only `lib/guides.ts` names a guide file; one window; no transcript shown.
+
+**Checks**
+
+- **Quick level (`pnpm check:quick`), run once, with the first files: 4 min 22 s. 37 of 38 steps passed** (30
+  verify scripts, 2,655 checks): lint, typecheck, the unit suites, both builds, and every verify script but the
+  new one. **`verify-t209` failed, as it should have: 34 of 36**, the two failures being the hero's two files at
+  67.6 s where the list says 60. (Its very first run was 32 of 36: two checks of the hidden transcript were
+  written wrongly and were corrected; it was then run alone, `pnpm check:quick --only t209`.)
+- **`pnpm check:failed`, with the finished files: 45 s. `verify-t209` 36 of 36**, against a fresh build of the
+  web app. No code changed between the two runs: only the six files. No full level.
+- **Unit tests: `guides-t209.test.ts`, 12 new** (web 2,211, was 2,199): the formatter under, at and over a
+  minute, and never "0 min" or "60 s"; the hero's button, the figure face and the screen-reader label; the six
+  shorter guides unchanged; one formatter and no other writer; the hero's seconds, title and transcript word
+  for word; the open window's title and hidden words; guides 2 and 6 unchanged in the list.
+  `guides-t207.test.ts` and `guides-t208.test.ts` were changed only where they named the hero's seconds, title
+  or transcript.
+- **`verify-t209` (new, in the manifest): 36 checks.** A: each of the eight video files, as the web app serves
+  it, is as long as the list says. B to D, in a browser at 1,440 and 390 px: the hero's button reads "See how it
+  works · 1 min" and says "1 minute" to a screen reader; the other two keep "· 32 s" and "· 39 s"; the window
+  is titled "How Qolumns works", plays the wide or the upright file, and holds the eleven lines for a screen
+  reader only; the support page's six links still read "Watch how · N s".
+- `verify-t208` was changed in one check (the hero's button text now comes through `guideLength`); `verify-t207`
+  needed no change (it names neither the hero's seconds nor its title).
+
+**Not proven**
+
+- **What is in the picture and what the voice says is the owner's check, not this repo's.** The owner looked at
+  the finished files' frames (the hero's captions against the transcript; guide 6 without the private area) and
+  listens to each line that has the name in it. No check here can see a picture or hear a voice.
+- Safari and a real iPhone or iPad, as in T-207 and T-208.
+
 ### 2026-11-27: T-208 — The home page's videos open in a window over the page; a transcript is no longer shown
 
 **Deployed 27 Nov 2026, web only** (commit e06f750, `npx vercel deploy --prod --yes` from the repo root, Vercel

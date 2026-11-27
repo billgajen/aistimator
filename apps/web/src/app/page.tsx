@@ -94,7 +94,7 @@ export default function HomePage() {
           <Link href="/demo" className={QUIET_BUTTON} data-testid="hero-demo">
             Try it as a customer
           </Link>
-          {/* T-208: the product in 33 seconds, in a window over the page: words only, quieter than the two buttons */}
+          {/* T-208: the product in a minute, in a window over the page: words only, quieter than the two buttons */}
           <WatchButton id="hero" words={WATCH.hero} className="sm:px-2" />
         </div>
         <p className="hero-small-line mt-3 text-xs text-text-muted">{HERO.smallLine}</p>

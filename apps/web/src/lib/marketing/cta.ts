@@ -20,7 +20,7 @@ export const JUNIPER_BUTTON = `${BASE} bg-primary text-white hover:bg-primary-ho
 export const QUIET_LINK = 'inline-flex min-h-[44px] items-center text-sm font-semibold underline underline-offset-4'
 
 /**
- * T-208: a video button ("See how it works · 33 s"): words and a play mark, no ground and no edge, so it is
+ * T-208: a video button ("See how it works · 1 min"): words and a play mark, no ground and no edge, so it is
  * quieter than any button beside it. The words underline under the pointer (components/guide/WatchButton).
  */
 export const WATCH_BUTTON = 'group motion-press inline-flex min-h-[48px] items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold text-text-primary'

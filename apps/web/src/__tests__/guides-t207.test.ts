@@ -17,7 +17,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { APP_DOMAIN, PRODUCT_NAME } from '@qolumns/shared'
+import { PRODUCT_NAME } from '@qolumns/shared'
 import {
   GETTING_STARTED_UNTIL,
   GUIDES,
@@ -56,7 +56,7 @@ describe('T-207 part A: one list of guides', () => {
       expect(g.transcript.length, id).toBeGreaterThan(0)
       expect(guide(id as GuideId)).toBe(g)
     }
-    expect(Object.fromEntries(Object.values(GUIDES).map((g) => [g.id, g.seconds]))).toEqual({ hero: 33, 'add-service': 32, 'set-prices': 25, 'test-pricing': 23, 'quote-link': 29, approve: 26, 'on-site': 39 })
+    expect(Object.fromEntries(Object.values(GUIDES).map((g) => [g.id, g.seconds]))).toEqual({ hero: 60, 'add-service': 32, 'set-prices': 25, 'test-pricing': 23, 'quote-link': 29, approve: 26, 'on-site': 39 })
     expect(SETUP_GUIDES.map((id) => guide(id).title)).toEqual(['Add a service', 'Set your prices', 'Test your pricing', 'Share your quote link', 'Check and approve', 'Quote on site'])
   })
 
@@ -106,16 +106,10 @@ describe('T-207 part A: one list of guides', () => {
   })
 
   it('the transcripts are the voiceover, with the product named from the one constant', () => {
-    expect(GUIDES.hero.transcript).toEqual([
-      "Your customers want a price before they'll book a visit.",
-      `With ${PRODUCT_NAME}, they snap a few photos and answer a few questions, right on your website.`,
-      `${PRODUCT_NAME} reads the photos, and prices the job from your own price list.`,
-      'You check it, and tap approve.',
-      'Your customer gets a professional quote, every line explained, with a button to accept.',
-      `${PRODUCT_NAME}. Photo estimates for trades. Start free at ${APP_DOMAIN}.`,
-    ])
-    expect(APP_DOMAIN).toBe('qolumns.com')
-    expect(Object.fromEntries(Object.values(GUIDES).map((g) => [g.id, g.transcript.length]))).toEqual({ hero: 6, 'add-service': 5, 'set-prices': 4, 'test-pricing': 4, 'quote-link': 4, approve: 4, 'on-site': 6 })
+    // T-209: the hero is a new, longer video; guides-t209.test.ts holds its lines word for word
+    expect(GUIDES.hero.transcript[0]).toBe('Most homeowners look for a price online before they call. Very few find one.')
+    expect(GUIDES.hero.transcript.at(-1)).toBe(`${PRODUCT_NAME}. Answer first, in your prices. Try it free: ten quotes, no card needed.`)
+    expect(Object.fromEntries(Object.values(GUIDES).map((g) => [g.id, g.transcript.length]))).toEqual({ hero: 11, 'add-service': 5, 'set-prices': 4, 'test-pricing': 4, 'quote-link': 4, approve: 4, 'on-site': 6 })
     const first = Object.fromEntries(Object.values(GUIDES).map((g) => [g.id, g.transcript[0]]))
     const last = Object.fromEntries(Object.values(GUIDES).map((g) => [g.id, g.transcript.at(-1)]))
     expect(first).toMatchObject({

@@ -20,10 +20,10 @@ const FREE = FREE_ALLOWANCE.US!.quotes
 
 /**
  * T-208: the words of the page's three video buttons. Each opens a guide video in a window over the page; its
- * length is added from the one list of guides (lib/guides.ts), as "· 33 s".
+ * length is added from the one list of guides (lib/guides.ts), as "· 1 min" or "· 32 s".
  */
 export const WATCH = {
-  /** In the hero's row of buttons: the product in half a minute */
+  /** In the hero's row of buttons: the product in a minute */
   hero: 'See how it works',
   /** Under "Set up in minutes": the first setup guide */
   setup: 'See setup',

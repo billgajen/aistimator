@@ -164,6 +164,8 @@ export const SCRIPTS = [
   { id: 't207', server: 'standard', model: 'none', browser: true },
   // T-208: the home page's video buttons and the one window they open; no transcript shown; the Services header (a browser)
   { id: 't208', server: 'standard', model: 'none', browser: true },
+  // T-209: each guide's video file is as long as the list says; the hero's "1 min" button and its new window (a browser)
+  { id: 't209', server: 'standard', model: 'none', browser: true },
 ]
 
 /** Lint, typecheck and unit tests: every level runs these first */
