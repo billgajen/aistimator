@@ -17,7 +17,13 @@
 
 ### 2026-11-27: T-210 — Oumn test call: a private page to test a voice assistant before building her
 
-**Not deployed yet, and off wherever it is deployed** until `VOICE_TEST_ENABLED=true` is set (OWNER-TODO, T-210).
+**Deployed 28 Nov 2026, web only** (commit 1349a19, `npx vercel deploy --prod --yes` from the repo root, Vercel
+`estimator-42lyv79tm`). No worker, no migration, no app build. **The page is off**: `VOICE_TEST_ENABLED` is not
+set in Vercel, and the owner sets it for the test and removes it afterwards (OWNER-TODO, T-210).
+**On the live site afterwards** (page views and two empty posts only): signed out, `/admin/voice-test` sends
+you to sign in, and both routes answer 404 "Not found"; the home page loads as before. As an admin on
+production it was not opened (that needs the owner's sign-in); with the switch off it answers 404 there too,
+as it did locally.
 Web only. No pricing, worker, billing or database code changed; no migration; no new dependency. The shared
 package gained a task in the model registry and one field per region, neither of which the worker reads.
 
@@ -185,7 +191,8 @@ answer. Neither left a row.
 - **Echo.** With a loudspeaker and no headphones the browser's echo cancelling has to stop her hearing herself.
   Not tried.
 - **The cost and delay figures**: one short call, mostly silent. The test is what measures them.
-- **Production**: not deployed by this ticket's checks; the token and the call were made with the local key.
+- **Production with the switch on**: the token and both calls were made on the local stack with the local key.
+  The first call on production is the owner's.
 
 ### 2026-11-27: T-209 — A new, longer hero video; a guide of a minute or more says its length in minutes
 

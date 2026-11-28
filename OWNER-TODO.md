@@ -4346,7 +4346,8 @@ Android needs no new build for this ticket.
 
 ## T-210 — Oumn test call (a private voice test page)
 
-Built 27 November 2026. Web only; no worker, no migration. **The page is off until you switch it on.**
+Built 27 November 2026, deployed 28 November (web only; no worker, no migration). **The page is off until you
+switch it on.**
 
 ### Switch it on (Vercel)
 
