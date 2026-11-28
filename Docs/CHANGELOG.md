@@ -17,6 +17,14 @@
 
 ### 2026-11-28: T-211 — Oumn test call, round two: fixes from the first live calls
 
+**Deployed 28 Nov 2026, web only** (commit 849d6e1, `npx vercel deploy --prod --yes` from the repo root, Vercel
+`estimator-7dhid32vz`). No worker, no migration, no app build. `VOICE_TEST_ENABLED` was already on in production,
+so the page is live for a platform admin; `OPENAI_API_KEY` was found already set there too, so the engine picker
+shows, with an engine that has not been run once (see F).
+**On the live site afterwards** (a page view and three empty posts only): signed out, `/admin/voice-test` sends
+you to sign in and the three routes answer 404; the home page loads as before. As an admin on production it was
+not opened (that needs the owner's sign-in): the first call there, on either engine, is the owner's.
+
 Web only. No pricing, worker, billing or database code changed; no migration; no new dependency. Still the private
 test page: admin only, behind `VOICE_TEST_ENABLED`; nothing is stored as a quote, a lead or a booking and no email
 is sent. The shared package gained registry entries and one field per region; the worker reads none of them.

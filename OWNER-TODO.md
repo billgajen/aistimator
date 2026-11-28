@@ -4415,11 +4415,12 @@ The page can run the same call on OpenAI's GPT-Live. It appears as an **Engine**
 **This engine was built from OpenAI's documentation and has not been run once** (there was no key to run it
 with): your first call on it is its first test. If it does not connect, send me the "Problems" list.
 
-- [ ] Vercel → the web project → Settings → Environment Variables → add **`OPENAI_API_KEY`** for Production
-  (or `npx vercel env add OPENAI_API_KEY production`). The key needs access to the Live sessions API.
-- [ ] Deploy again: `npx vercel deploy --prod --yes`
-- [ ] Open the page: an **Engine** picker is now above the voices. Pick "OpenAI GPT-Live" and make the same
-  calls. Its cost is shown by the minute plus its backend model's tokens.
+- [x] **`OPENAI_API_KEY` is already set in Vercel for Production** (found at the deploy, 28 November), so nothing
+  needs adding. If it is ever removed: Vercel → the web project → Settings → Environment Variables → add
+  `OPENAI_API_KEY` for Production (or `npx vercel env add OPENAI_API_KEY production`), then
+  `npx vercel deploy --prod --yes`. The key needs access to the Live sessions API.
+- [ ] Open the page: an **Engine** picker is above the voices. Pick "OpenAI GPT-Live" and make the same calls.
+  Its cost is shown by the minute plus its backend model's tokens.
 
 ### After testing: switch both off
 
