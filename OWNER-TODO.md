@@ -4389,3 +4389,56 @@ dollars at most. Starting a call is limited to 20 an hour.
   here. If the first call does not connect or you cannot hear her, the "Problems" list in the results says
   what the page saw; send me that.
 
+---
+
+## T-211 — Oumn test call, round two
+
+Built and deployed 28 November 2026 (web only; no worker, no migration). `VOICE_TEST_ENABLED` is already on in
+production, so the new page is live for you at https://qolumns.com/admin/voice-test.
+
+### Before your next calls
+
+- [ ] Fill in **Your details** on the page (name, and an email or phone as the business asks). She is given
+  them and should never ask for them. The bot check runs when you press Start call; if it shows a challenge,
+  answer it.
+- [ ] Leave **Based in** empty for one call and put a town in it for another: Harbor Lane Painting has no
+  service area set, so this box decides what she says about where the business works.
+- [ ] The page now counts calls: **3 a day for a device and 20 a day for a business**. When you reach one,
+  press **Clear my block (test only)**: it forgets your strikes, any block, and today's counts for your device
+  and the chosen business.
+- [ ] Work through the new "Things to try". Going off topic or being rude twice in a day will block you for two
+  days: that is the test working. Clear it with the same button.
+
+### To compare a second engine (optional)
+
+The page can run the same call on OpenAI's GPT-Live. It appears as an **Engine** picker only while the key is set.
+**This engine was built from OpenAI's documentation and has not been run once** (there was no key to run it
+with): your first call on it is its first test. If it does not connect, send me the "Problems" list.
+
+- [ ] Vercel → the web project → Settings → Environment Variables → add **`OPENAI_API_KEY`** for Production
+  (or `npx vercel env add OPENAI_API_KEY production`). The key needs access to the Live sessions API.
+- [ ] Deploy again: `npx vercel deploy --prod --yes`
+- [ ] Open the page: an **Engine** picker is now above the voices. Pick "OpenAI GPT-Live" and make the same
+  calls. Its cost is shown by the minute plus its backend model's tokens.
+
+### After testing: switch both off
+
+- [ ] Vercel → Environment Variables → delete **`OPENAI_API_KEY`** and **`VOICE_TEST_ENABLED`**
+  (`npx vercel env rm OPENAI_API_KEY production` and `npx vercel env rm VOICE_TEST_ENABLED production`).
+- [ ] Deploy again: `npx vercel deploy --prod --yes`
+- [ ] Open https://qolumns.com/admin/voice-test: it should say the page is not found.
+
+### What to bring back
+
+The copied results of each call (engine, delays, cost, the price check, what she recorded), and how she sounded.
+
+### Not proven here
+
+- **The OpenAI engine**, at all (see above).
+- **Strikes and blocks against the real store.** The rules are tested with a store in memory; the first real
+  strike on production is yours. If the panel says "Nothing is being counted", Upstash did not answer.
+- **The bot check on this page.** It is the site's own check; this machine has no keys for it, so the page was
+  tested without it. If Start call says it could not confirm you are a person, try again; if it keeps
+  happening, tell me.
+- How she sounds, a real microphone, iPhone Safari, echo without headphones: as before.
+

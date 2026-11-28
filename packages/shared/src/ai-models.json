@@ -1,5 +1,5 @@
 {
-  "_comment": "T-135 model registry: the ONLY place model names live. Override any task at runtime with AI_MODEL_<TASK> (e.g. AI_MODEL_ADJUDICATION=anthropic:claude-opus-5-5). Prices are USD per 1M tokens, copied from the providers' published pages on the asOf date; update them here, never in code. `thinkingLevel` on a task is sent only to models whose capabilities list it (override with AI_THINKING_<TASK>=low|medium|high|default). `models` holds per-model request capabilities; a model not listed keeps the legacy request shape (response schema, system prompt as a primed turn, temperature). T-203: `overflow` on a task is the second provider a busy call is sent to after the in-place retries (apps/worker/src/ai/busy.ts): \"none\", or { provider, model }. Override per deployment with AI_OVERFLOW_<TASK> (\"none\", \"model\" or \"provider:model\"). A task's overflow is switched on only after scripts/load-test/overflow-proof.mts passes for it; `overflowCandidate` is the model that proof runs for a task still set to \"none\". T-210: `voice_call` is a Live API model (speech in, speech out, over a WebSocket); it has no entry in `prices` because the Live API is priced per modality. `live` holds that: per model, USD per 1M tokens for text in, audio in, text out and audio out (thinking tokens are charged as text out), copied from the model's page on the asOf date, and the Live API's prebuilt voices with the default.",
+  "_comment": "T-135 model registry: the ONLY place model names live. Override any task at runtime with AI_MODEL_<TASK> (e.g. AI_MODEL_ADJUDICATION=anthropic:claude-opus-5-5). Prices are USD per 1M tokens, copied from the providers' published pages on the asOf date; update them here, never in code. `thinkingLevel` on a task is sent only to models whose capabilities list it (override with AI_THINKING_<TASK>=low|medium|high|default). `models` holds per-model request capabilities; a model not listed keeps the legacy request shape (response schema, system prompt as a primed turn, temperature). T-203: `overflow` on a task is the second provider a busy call is sent to after the in-place retries (apps/worker/src/ai/busy.ts): \"none\", or { provider, model }. Override per deployment with AI_OVERFLOW_<TASK> (\"none\", \"model\" or \"provider:model\"). A task's overflow is switched on only after scripts/load-test/overflow-proof.mts passes for it; `overflowCandidate` is the model that proof runs for a task still set to \"none\". T-210: `voice_call` is a Live API model (speech in, speech out, over a WebSocket); it has no entry in `prices` because the Live API is priced per modality. `live` holds that: per model, USD per 1M tokens for text in, audio in, text out and audio out (thinking tokens are charged as text out), copied from the model's page on the asOf date, and the Live API's prebuilt voices with the default. T-211: `comparison` holds models that are NOT part of the product: the private voice test page can run the same call on a second engine to compare it. They are kept out of `tasks` on purpose (every product task runs on the product's providers). Override with AI_MODEL_<NAME> (e.g. AI_MODEL_VOICE_CALL_OPENAI). `live.minutePrices` is for a voice model billed by the minute of session: active and standby USD per minute, and the seconds billed when a session starts (credited against the session's own time).",
   "tasks": {
     "extraction_pass": {
       "provider": "gemini",
@@ -247,6 +247,13 @@
       "outputPerMTok": 5,
       "asOf": "2026-09-25",
       "source": "Anthropic API pricing (claude-api skill model table)"
+    },
+    "gpt-6-luna": {
+      "inputPerMTok": 0.1,
+      "outputPerMTok": 0.5,
+      "cachedInputPerMTok": 0.01,
+      "asOf": "2026-11-28",
+      "source": "developers.openai.com/api/docs/pricing (standard, short context). T-211: the backend of the voice test's comparison engine only"
     }
   },
   "live": {
@@ -294,6 +301,48 @@
       "Sulafat"
     ],
     "voicesAsOf": "2026-11-27",
-    "voicesSource": "aistudio.google.com/docs/speech-generation (the Live API's native-audio models take the same voices)"
+    "voicesSource": "aistudio.google.com/docs/speech-generation (the Live API's native-audio models take the same voices)",
+    "minutePrices": {
+      "gpt-live-1.1": {
+        "activePerMinute": 0.05,
+        "standbyPerMinute": 0.02,
+        "startSeconds": 15,
+        "asOf": "2026-11-28",
+        "source": "developers.openai.com/api/docs/pricing and /api/docs/models/gpt-live-1.1 (billed per second; a WebRTC session bills 15 s while it starts, credited against its own time: /api/docs/guides/voice-latency-cost?api=live). The backend model's tokens are billed apart."
+      }
+    },
+    "comparisonVoices": {
+      "gpt-live-1.1": {
+        "default": "marin",
+        "voices": [
+          "marin",
+          "cedar",
+          "pearl",
+          "quartz",
+          "ripple",
+          "halo",
+          "vesper",
+          "willow",
+          "stone",
+          "gleam",
+          "meridian",
+          "beacon",
+          "delta",
+          "cinder"
+        ],
+        "asOf": "2026-11-28",
+        "source": "developers.openai.com/api/docs/guides/live-conversations (voice options) and the Live sessions reference"
+      }
+    }
+  },
+  "comparison": {
+    "voice_call_openai": {
+      "provider": "openai",
+      "model": "gpt-live-1.1"
+    },
+    "voice_call_openai_backend": {
+      "provider": "openai",
+      "model": "gpt-6-luna"
+    }
   }
 }

@@ -16,8 +16,17 @@ export const ASSISTANT_NAME = 'Oumn'
 export const CALL_LIMIT_SECONDS = 8 * 60
 /** At this many seconds she is told that time is short */
 export const WRAP_UP_SECONDS = 6 * 60
-/** What she is told then. Her instructions say what to do when she hears it. */
-export const WRAP_UP_NOTE = 'Time is short: about two minutes are left on this call. Finish what you are saying, sum up in one sentence, and say goodbye.'
+/** What she is told then (as a system note). Her instructions say what to do when she hears it. */
+export const WRAP_UP_NOTE = 'time is short: about two minutes are left on this call.'
+/** What she is told as the call connects, and when the caller has made no sound */
+export const CONNECTED_NOTE = 'the call has connected.'
+export const SILENT_NOTE = 'the caller has been silent for a while.'
+export const STILL_SILENT_NOTE = 'the caller is still silent.'
+
+/** The two voice engines of the test page. The second is offered only when its key is set (AD-102). */
+export const ENGINES = ['gemini', 'openai'] as const
+export type Engine = (typeof ENGINES)[number]
+export const ENGINE_NAMES: Record<Engine, string> = { gemini: 'Gemini Live', openai: 'OpenAI GPT-Live' }
 
 /** A minted token must open its one session within this many seconds */
 export const TOKEN_START_SECONDS = 60
@@ -50,14 +59,23 @@ export function voiceTestEnabled(env: Record<string, string | undefined> = proce
   return env.VOICE_TEST_ENABLED === 'true'
 }
 
-/** The page's "things to try" */
+/** The page's "things to try" (T-211: round two) */
 export const THINGS_TO_TRY: readonly string[] = [
-  'Ask for a price.',
-  'Ask for something the business does not offer.',
-  'Ask about an area outside its service area.',
-  'Ask something it has not answered anywhere (a guarantee, parking).',
-  'Ask "are you a real person?"',
-  'Ask for a person.',
-  'Give an urgent problem.',
-  'Book a visit.',
+  'Ask what a service costs before giving any details.',
+  'Ask for two services together.',
+  'Ask for something that is not listed.',
+  'Ask about a town nearby, one far away, and another country.',
+  'Go off topic.',
+  'Be rude.',
+  'Stay silent.',
+  'Say goodbye.',
+  'Trail off in the middle of a sentence.',
+  'Correct your email address.',
 ]
+
+/** What is said under the Start call button, and will be on the real page */
+export const callNotice = (businessName: string) => `${ASSISTANT_NAME} is ${businessName}'s AI assistant. Calls are transcribed so ${businessName} can follow up.`
+
+/** The device id the page keeps (localStorage and a cookie): who is counted for strikes and daily limits */
+export const DEVICE_KEY = 'qolumns.voice.device'
+export const DEVICE_COOKIE = 'qv_device'

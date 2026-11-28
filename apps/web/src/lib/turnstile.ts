@@ -68,7 +68,9 @@ let warnedOff = false
 
 export async function verifyTurnstileToken(
   token: string | undefined,
-  remoteIp: string
+  remoteIp: string,
+  /** T-211: how long Cloudflare is given. A caller that must have a real answer (a voice call) waits longer than a form does. */
+  timeoutMs: number = SITEVERIFY_TIMEOUT_MS
 ): Promise<TurnstileVerification> {
   const secret = process.env.TURNSTILE_SECRET_KEY
   if (!secret || !process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || turnstileSwitchedOff()) {
@@ -99,7 +101,7 @@ export async function verifyTurnstileToken(
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString(),
-      signal: AbortSignal.timeout(SITEVERIFY_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     })
 
     if (!response.ok) {
@@ -123,7 +125,7 @@ export async function verifyTurnstileToken(
     return { ok: true, unchecked: 'not-the-visitor' }
   } catch (error) {
     // The name only (TimeoutError, TypeError): a message can carry an address
-    console.error(`[Turnstile] FAILING OPEN: siteverify did not answer within ${SITEVERIFY_TIMEOUT_MS} ms or could not be reached; the request went ahead unchecked: ${error instanceof Error ? error.name : 'unknown error'}`)
+    console.error(`[Turnstile] FAILING OPEN: siteverify did not answer within ${timeoutMs} ms or could not be reached; the request went ahead unchecked: ${error instanceof Error ? error.name : 'unknown error'}`)
     return { ok: true, unchecked: 'no-answer' }
   }
 }

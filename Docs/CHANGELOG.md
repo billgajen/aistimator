@@ -15,6 +15,244 @@
 
 ## Issues & Resolutions
 
+### 2026-11-28: T-211 — Oumn test call, round two: fixes from the first live calls
+
+Web only. No pricing, worker, billing or database code changed; no migration; no new dependency. Still the private
+test page: admin only, behind `VOICE_TEST_ENABLED`; nothing is stored as a quote, a lead or a booking and no email
+is sent. The shared package gained registry entries and one field per region; the worker reads none of them.
+
+**Why.** Three live calls on 28 November showed that the prices she spoke were the engine's, that a minute cost 3.9
+to 6.7 cents and more as a call went on, that she took 1.2 to 2.4 seconds to answer and up to 5.5 around a tool,
+and that her voice and manner were robotic: she called the business by its name in the third person, repeated
+stock sentences, said the business covered a town it had set no area for, said it "does not offer" things it had
+simply not listed, and could neither send an estimate nor end a call. This ticket fixes what those calls found.
+
+**A. Before the call**
+- **A details form** (name, email, phone) on the page, held to the business's own contact rules
+  (`lib/contact-rules.ts`, on the page and again on the server) and to the site's bot check (`lib/turnstile.ts`,
+  `useTurnstile`). **A call does not start without a passed check** (`lib/voice/human-check.ts`): a request form
+  lets a request through when the check could not run (AD-060), because a lost request costs a business a
+  customer; a call costs money from its first second, so here "not run" and "no answer" are a refusal. Where the
+  check is not set up at all (this machine, the checks) there is none to pass. The check is given 3 seconds to
+  answer for a call (the forms keep their half second).
+- **Under the button:** "Oumn is {business}'s AI assistant. Calls are transcribed so {business} can follow up."
+- **She is given the caller's name** and told which details are on file; she greets by first name and never asks
+  for, says or spells a name, an email or a phone number. Her instructions hold the name only: the address and
+  the number stay in the signed call session, where `book_time` and `send_estimate` read them.
+  `update_contact` corrects one when the caller says it is wrong; the page shows the new value.
+- **"Based in"** (test only, empty by default) and **"General advice"** (on by default) are on the page.
+
+**B. Protection** (`lib/voice/guard-config.ts` holds every number; `guard.ts` the rules; `guard-store.ts` Upstash)
+- **`end_call(reason)`**: finished, off_topic, abusive, silent. After it the page lets her last sentence finish
+  and disconnects; nothing she says once it is answered is played (in the first run she read the tool's answer
+  out).
+- **Silence** is the page's to notice (she cannot hear the absence of a caller): 20 s with no sound from the
+  caller and she is told so; 10 s more and she is told again; if she does not end the call then, the page does,
+  as `silent`. Silence is never a strike.
+- **Strikes and blocks**, for a device id (a random id the page keeps in localStorage and a cookie) and a salted
+  hash of the address. **The raw address is never stored or logged**: it is hashed where it is read. An
+  off_topic or abusive ending is one strike; two within 24 hours block for 2 days; a strike within 30 days of a
+  block ending blocks for 7; a block on either the device or the address stops the call, and a block on one is
+  put on the other. In Upstash, each key with an expiry. **If Upstash is not set up, slow or failing, the call
+  goes ahead and nothing is counted.**
+- **Limits:** 3 calls a device a day and 20 a business a day; the 8-minute cap stays.
+- **The test page shows** strikes, the block and today's counts, with "Clear my block (test only)" (it also
+  clears today's counts for the device and the business, or a day of testing would stop at three calls).
+
+**C. How she talks** (`lib/voice/instructions.ts`)
+- She is staff: "we", "our", contractions, one or two short sentences; "We don't offer that", never "{business}
+  does not offer". She still opens as the business's AI assistant and says so when asked.
+- Never the same sentence twice; money in words (`lib/voice/money-words.ts`: her tools give every amount as
+  figures and as the words to say, so "825 USD" is never in front of her); a short line before a tool that takes
+  a moment; English, with the caller's speech transcribed as the business's language and a stray foreign word
+  ignored; silence while a caller trails off.
+
+**D. What she knows and says**
+- **Not included, not on my list, included.** "That's not included" only for a service's own not-included list.
+  Anything she cannot find is "not on my list" and the team will confirm. **It is recorded from the call
+  itself, not by a tool** (`results.ts` `forTheTeam`): each time she says so, what the caller had just asked is
+  listed. A tool for it was built first and removed: it cost a second billed turn and a second, redundant
+  sentence every time.
+- **A typical price up front** (`lib/voice/typical.ts`, tool `get_typical_price`): the same `/preview` path as an
+  estimate, with required number questions at their minimum (a measurement's own lower bound when it has one,
+  else 1) and each required choice at the option the ENGINE prices lowest. Every candidate is priced by the
+  engine; nothing is worked out in the web app. None for a service the engine cannot size without photos.
+- **Service area** (`areaRule`): a set area is the answer; with none, "Based in" decides between "we're based in
+  X, nearby is normally fine, the team will confirm further out, where is the job?" and "where is the job? the
+  team will confirm"; another country is always no; she is never told to say that an unset area is covered.
+- **Several services: the second case applies.** The pricing path that writes nothing (`/preview`) prices one
+  service a call; one total for several services exists only on a saved quote (T-179's sections). So she gets
+  each engine price separately, says each, and says the written estimate will show the total. Nothing adds them.
+- **General advice**, short and basic, ending "the team will confirm when they see it"; never step-by-step for
+  work that could injure or damage; off with the page's checkbox.
+- **`send_estimate`** shows "would email the estimate to {email}" and she says "I've emailed that to you".
+  `book_time` takes the slot only and uses the form's details.
+
+**E. Speed and cost**
+- **The business's information is in her instructions from the start**; `get_business_info` is gone (it made the
+  first turn 3 seconds long, was called twice and was once cancelled).
+- **Thinking cannot be set on this model.** Google's docs say to leave it out, and the Live API closes the
+  connection if it is sent ("Thinking level is not supported for this model", probed 28 Nov). Nothing is sent.
+- **End of speech: `silenceDurationMs` 500** (the Live API's own is about 800; Google advises 500 to 800), with
+  120 ms kept from before speech so a first word is not clipped.
+- **A sliding window on the call's memory** (`contextWindowCompression`): once the conversation passes 3,000
+  tokens beyond her instructions it is trimmed to 1,500 (about the last minute). Her instructions always stay.
+  **What her tools have answered survives the trim** two ways: every tool answer carries the call's notes so
+  far (`callSoFar`: the estimates and typical prices given, a visit, a sent estimate, corrected details), and
+  the page puts those notes back in her memory once a minute as a turn that asks for no answer (probed: it adds
+  no billed turn). The caller's details are in the signed session, not in her memory at all.
+
+**Before and after, on the same recorded caller** (local stack, real Chrome, Gemini Live, voice Aoede; the
+caller is a recording, so its timing is the same in every run; 28 Nov 2026)
+
+| | 1-minute call, before | 1-minute call, after | 5-minute call, before | 5-minute call, after |
+|---|---|---|---|---|
+| Cost a minute | 2.3 cents | 3.9 cents | 3.8 cents | 4.0 cents |
+| Median delay | 1.32 s | 0.97 s | 1.25 s | 1.12 s |
+| Worst delay to her first words | 1.38 s | 1.02 s | 2.33 s | 1.92 s |
+| A turn with one tool, to the answer | (none in the first minute) | 2.0 to 2.2 s | 2.0 to 2.3 s | median 2.04 s |
+| A turn with two tools, to the answer | | | 2.2 s (one tool) | 3.2 s |
+| Tool calls in the call | 1 | 2 | 4 | 7 |
+
+- **Against the targets.** Median delay under 1.2 s: met (0.97 and 1.12 s). A tool turn under 2.5 s: met for one
+  tool (about 2.0 s, and she speaks a line within about a second of the caller stopping); **not met when she
+  runs two tools in one turn** (free times, then the booking: 3.2 s). Cost under 5 cents a minute on a 5-minute
+  talking call: **4.0 cents on this recorded caller, which talks less than a person does**; the owner's live
+  calls cost 3.9 to 6.7 cents on round one's build, on which this caller cost 3.8. So expect live calls of this
+  length at about the same as before, not below 5 cents for certain. The live test is what answers it.
+- **A 5-minute call no longer costs more a minute than a 1-minute one** (4.0 against 3.9; before, 3.8 against
+  2.3). The context read at each turn stays between about 4,000 and 6,500 tokens instead of climbing.
+- **A short call costs more than it did.** The business's information is in her instructions from the first
+  word (2,800 tokens read at every turn, against about 900), and she now uses a tool in the first minute
+  (the typical price). That is the price of the faster first turn and of the typical price.
+- **A first attempt cost 5.6 cents a minute** (memory window twice as large, longer instructions, and a tool
+  call every time something was "not on my list"). The numbers above are after the window, the instructions
+  and that tool were cut.
+- **Four behaviour calls on the final build**, each a recording: off topic (steered once, then "I'm unable to
+  discuss sports topics. Have a great day!" and `end_call(off_topic)` on the next off-topic line, 17 s after
+  the steer, not 30); abusive (a reply to the first insult, then "That's enough of that language. Goodbye."
+  and `end_call(abusive)`; her first reply was not a warning, so the instruction now says to warn that she will
+  end the call); silent ("Are you still there, Dana?" at 27 s, a goodbye and `end_call(silent)` at 40 s); the
+  area with "Based in" Springfield ("We're based in Springfield. Nearby is normally fine, and the team will
+  confirm anything further out", and "Sorry, we don't cover that" for a job in France).
+- **OpenAI: no numbers.** It could not be run (no key).
+
+**F. A second voice engine, for comparison only**
+
+#### AD-102: OpenAI is used on the voice test page only, to compare. It is not part of the product stack.
+The page can run the same call on OpenAI's GPT-Live when `OPENAI_API_KEY` is set (the picker is hidden without
+it). No product task runs on it: its two models are in the registry under `comparison`, apart from `tasks`
+(two existing tests hold that every product task runs on the product's providers), with
+`AI_MODEL_VOICE_CALL_OPENAI` and `AI_MODEL_VOICE_CALL_OPENAI_BACKEND` to override. A later decision would be
+needed to use it for customers. No SDK: plain fetch and WebRTC.
+- **There is no client secret to mint.** OpenAI's Live sessions take the browser's WebRTC offer through OUR
+  server, which creates the session with the key (`POST /v1/live/sessions`, `lib/voice/openai-live.ts`) and
+  hands back the answer. The key never reaches the browser; the audio then flows browser to OpenAI directly.
+- **What is locked.** The model, her instructions and her voice are fixed at startup (OpenAI rejects a change
+  with `immutable_field_update`). Her tools live with the backend ("delegation") model, whose instructions and
+  tools a browser COULD change with `session.update`; so the session is created with the list of events the
+  browser may send (`client.data_channel.allowed_client_events`), and `session.update` and
+  `session.instructions.append` are not on it. On paper that is as locked as the Gemini token.
+- Her tools run on our server on this engine too: the backend model's function calls reach the page on the data
+  channel and go to the same tool route, with the business pinned by the same signed session.
+- **Cost** is shown the same way: the voice at its per-minute rate (a session is billed 15 seconds as it starts,
+  credited against its own time, so the charge is for whichever is more), plus the backend model's tokens.
+- **IT HAS NOT BEEN RUN.** There was no OpenAI key on the machine it was built on. It is written from OpenAI's
+  documentation, unit-tested against that documentation's shapes, and unproven against OpenAI: the owner's
+  first call on it is its first test. It stays admin-test only.
+
+**G. Results panel**: the engine and voice, the end reason, strikes and the block; delay split into turns with and
+without a tool (a tool turn is timed to her first words and to the answer itself); the context read at each turn;
+**every amount of money she said, each valid only if it is an engine total, an engine line or a typical price
+returned earlier in the call** (an amount said before the engine gave it is a mismatch); sentences she said more
+than once; what is for the team to confirm; corrected details. "Things to try" is the ticket's new list.
+
+**What the APIs did, and did not do, as expected**
+- Gemini: no thinking setting on `gemini-3.8-live`; no fillers by the model itself on this model (she says the
+  line because she is told to, and once in a 5-minute call she said it and then did not call the tool); a turn
+  with a tool is billed as two readings of the whole context; `clientContent` with `turnComplete: false` adds to
+  her memory without a turn; a tool answered with `scheduling: "SILENT"` did not save a billed turn.
+- OpenAI (from the docs): no browser client secret for Live sessions; no turn-detection, language or
+  transcription setting; transcripts come as deltas with no end-of-turn event, so the page marks her turns from
+  the sound of her voice; no documented maximum session length.
+
+**Constraints**
+- Every number of the protection is in `guard-config.ts`. Do not write a duration or a count elsewhere.
+- The raw address is hashed where it is read (`ipHashOf`) and goes no further: not to the store, not to a log,
+  not into the session.
+- Protection fails open. A change that makes a call depend on Upstash answering is a regression.
+- A call does not start without a passed bot check where the check is set up. This is the one place the site
+  refuses on "not run"; do not copy it to a request form (AD-060).
+- A tool never takes the business or the caller's details as arguments; both are the signed session's.
+- No price is added, rounded or worked out in the web app, for a typical price either: the engine prices every
+  candidate.
+- OpenAI stays out of `tasks` and off every customer path (AD-102).
+- T-210's constraints stand (the page is off by default and unlinked; a tool never writes; the made-up slots
+  are test data).
+
+**Checks**
+
+- **Quick level (`pnpm check:quick`), run once: 5 min 10 s. 40 of 40 steps passed** (32 verify scripts, 2,766
+  checks): lint, typecheck, the unit suites (worker 926, web 2,312, app 269), both builds, and the verify
+  scripts with the AI stand-in. `check:failed` was not needed. No full level: nothing in pricing, the worker,
+  billing, emails or a migration changed.
+- **Unit tests: `voice-t211.test.ts`, 77 new.** Strikes and blocks (one, two in a day, two a day apart, a strike
+  after a block ended, both subjects blocked together, a record's lifetime); **Upstash not set up, failing or
+  hanging = allowed**, and a store that fails half way; the limits (3 a device, 20 a business, a new day, a
+  refused call not counted); the device id; the address's hash, and that nothing the store is ever handed holds
+  the address; the bot check's rule and the route's order; her eight tools and that none takes a business or
+  the caller's details; the session (changed business, changed contact, an invented price: refused); the
+  typical price's answers, the engine choosing each option, the basis text, no price from photos; money in
+  words and that the page reads every such amount back to the same figure; which spoken amounts are valid,
+  including one said before the engine gave it; what is for the team; `end_call`'s reasons; the service-area
+  wording for each case; her instructions line by line, and no trade word in them or in the code (T-210's test,
+  kept); the token's new settings; the second engine's session, lock, registry entries and cost.
+  `voice-t210.test.ts` keeps what did not change (24 tests: the slots, the cost, the reading of spoken amounts,
+  the registry, the worklets, "get_estimate writes nothing"); its tests of the old tools and instructions were
+  replaced by the above. A shared fixture is `voice-fixture.ts`.
+- **`verify-t211` (new, in the manifest): 62 checks.** A: the contact rules at the start of a call (for a
+  business that asks for an email and for one that asks for a phone), no second engine without its key, the
+  protection with no store. B, through the real route and the real pricing worker: the typical price equals
+  "Test your pricing" for the same smallest answers; two services are two engine prices and no sum; a corrected
+  detail is used by the tools that follow; `end_call`; and **after four typical prices, two services'
+  estimates, a correction, a booking and five endings, the counts of quotes, requests, leads and assets are 0,
+  `usage_counters` is empty, and the business's tenant, service, rule and form rows are byte for byte as they
+  were**. C, the page in a browser against a stand-in engine: the form, the line under the button, the device
+  id in localStorage and a cookie, a tool turn timed to her first words and to the answer, valid and mismatched
+  amounts (the mismatch in red), "not on my list" recorded with the caller's question, a corrected email shown
+  and used, and after `end_call` her last sentence heard out before the page disconnects. D: the silence notes
+  at 20 and 30 s and the page ending the call as silent. E: the 6-minute note, the 8-minute stop, a blocked
+  visitor's message.
+- **`verify-t210`: 45 checks** (was 69): it keeps who can reach the page, the session, "get_estimate writes
+  nothing" and the pretend tools, on the new tools; its browser part moved to `verify-t211` with the new page.
+- **By hand, on the local stack:** the probes of the Live API's settings; ten real calls on Gemini from real
+  Chrome with a recorded caller (the two before, the six after above, and two on the first attempt).
+
+**Not proven**
+
+- **The OpenAI engine: not run at all.** No key was available. Everything about it is from OpenAI's docs: the
+  session request, the events on the data channel, the usage it reports, the lock. Its voices are a subset
+  taken from the docs' table; one may not exist for this model.
+- **Strikes, blocks and limits against the real store.** The rules are tested with a store in memory. Upstash's
+  own answers (a value read back as a string or as an object, the expiry) are handled both ways but were not
+  run. The first real strike is on production.
+- **The bot check before a call.** Not set up on this machine, so the page was only run without it. On
+  production it is live and strict: if Cloudflare does not say yes within 3 seconds, the call does not start.
+- **How she sounds.** Every call here was read as a transcript, not heard. Whether the manner is less robotic
+  to the ear, and whether "Aoede" is the right voice, is the owner's test.
+- **Off topic "at about 30 seconds".** She has no clock. She is told the number and ended on the caller's next
+  off-topic line, 17 s on.
+- **A caller who trails off.** She is told to wait, and the end-of-speech wait is now shorter (500 ms), which
+  works against it. Not tried: the recorded caller does not trail off.
+- **She can say "one moment" and then not call the tool.** It happened once in a 5-minute run (asked to move a
+  visit to the afternoon). The instruction now forbids stopping there; it did not recur in the final runs, and
+  one run is not proof.
+- **Her memory over a long call.** The window keeps about a minute. An answer the caller gave two minutes ago
+  and that no tool has used yet can be lost; she would ask again. Not seen in the 5-minute runs.
+- **Cost on a talking call**, and delay on a real network and a phone: the recorded caller is quieter than a
+  person and the machine is on a fast line.
+- A real microphone, iPhone Safari, echo without headphones: as in T-210.
+
 ### 2026-11-27: T-210 — Oumn test call: a private page to test a voice assistant before building her
 
 **Deployed 28 Nov 2026, web only** (commit 1349a19, `npx vercel deploy --prod --yes` from the repo root, Vercel

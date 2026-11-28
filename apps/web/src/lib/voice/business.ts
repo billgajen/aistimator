@@ -12,6 +12,7 @@
 import { getRegion, readAreaEntry } from '@qolumns/shared'
 import type { ExpectedSignalConfig, RegionCode, WidgetField, WorkStepConfig } from '@qolumns/shared'
 import type { createAdminClient } from '@/lib/supabase/server'
+import { contactRequirementOf, type ContactRequirement } from '../contact-rules'
 import { knownTimeZone } from './slots'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -54,6 +55,12 @@ export interface VoiceBusiness {
   locale: string
   languageVariant: string
   emergencyNumber: string
+  /** The language a call is held in, as a BCP 47 tag ("en-US") */
+  speechLanguage: string
+  /** The country the business works in ("United States"): a job in another country is never covered */
+  country: string
+  /** Which contact details a customer must give (the request form's own rule) */
+  contactRequirement: ContactRequirement
   timeZone: string
   currency: string
   serviceArea: { everywhere: boolean; areas: string[]; postalCodeLabel: string }
@@ -87,12 +94,12 @@ export const questionsOf = (fields: readonly WidgetField[]): VoiceQuestion[] =>
 /** One business with its active services, or null when there is no such business */
 export async function loadVoiceBusiness(admin: Admin, tenantId: string): Promise<VoiceBusiness | null> {
   const [{ data: tenant }, { data: services }, { data: rules }, { data: configs }] = await Promise.all([
-    admin.from('tenants').select('id, name, region, currency, time_zone, service_area_mode, service_area_values, default_terms_text').eq('id', tenantId).maybeSingle(),
+    admin.from('tenants').select('id, name, region, currency, time_zone, service_area_mode, service_area_values, default_terms_text, contact_requirement').eq('id', tenantId).maybeSingle(),
     admin.from('services').select(SERVICE_COLUMNS).eq('tenant_id', tenantId).eq('active', true).order('name'),
     admin.from('service_pricing_rules').select('service_id, rules_json').eq('tenant_id', tenantId),
     admin.from('widget_configs').select('service_id, config_json').eq('tenant_id', tenantId),
   ])
-  const t = tenant as { id: string; name: string; region?: string | null; currency?: string | null; time_zone?: string | null; service_area_mode?: string | null; service_area_values?: unknown[] | null; default_terms_text?: string | null } | null
+  const t = tenant as { id: string; name: string; region?: string | null; currency?: string | null; time_zone?: string | null; service_area_mode?: string | null; service_area_values?: unknown[] | null; default_terms_text?: string | null; contact_requirement?: string | null } | null
   if (!t) return null
   const region = getRegion(t.region)
   const fieldsFor = (serviceId: string): WidgetField[] => {
@@ -109,6 +116,9 @@ export async function loadVoiceBusiness(admin: Admin, tenantId: string): Promise
     locale: region.locale,
     languageVariant: region.copy.languageVariant,
     emergencyNumber: region.emergencyNumber,
+    speechLanguage: region.speechLanguage,
+    country: region.name,
+    contactRequirement: contactRequirementOf(t.contact_requirement),
     timeZone: knownTimeZone(t.time_zone) ? t.time_zone : region.timeZone,
     currency: t.currency || region.currency,
     serviceArea: {

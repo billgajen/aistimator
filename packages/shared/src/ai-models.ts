@@ -58,6 +58,8 @@ const THINKING_LEVELS: ThinkingLevel[] = ['low', 'medium', 'high']
 export interface ModelPrice {
   inputPerMTok: number
   outputPerMTok: number
+  /** Input read from the provider's cache, when the provider prices it apart */
+  cachedInputPerMTok?: number
   asOf: string
   source: string
 }
@@ -225,6 +227,40 @@ const LIVE = (registry as unknown as { live: { prices: Record<string, LiveModelP
 /** The Live API prices for a model; null when the registry has none (the cost is then not worked out) */
 export function getLivePrice(model: string): LiveModelPrice | null {
   return LIVE.prices[model] ?? null
+}
+
+/** T-211: a voice model billed by the minute of session, not by the token */
+export interface LiveMinutePrice {
+  activePerMinute: number
+  standbyPerMinute: number
+  /** Seconds billed when a session starts; the session's own time is credited against them */
+  startSeconds: number
+  asOf: string
+  source: string
+}
+
+/**
+ * T-211: models that are NOT part of the product. The private voice test page can run the same
+ * call on a second engine, to compare. They are kept out of the task list on purpose.
+ */
+export type ComparisonModel = 'voice_call_openai' | 'voice_call_openai_backend'
+
+const COMPARISON = (registry as unknown as { comparison: Record<ComparisonModel, { provider: string; model: string }> }).comparison
+const LIVE_EXTRA = (registry as unknown as { live: { minutePrices: Record<string, LiveMinutePrice>; comparisonVoices: Record<string, { default: string; voices: string[] }> } }).live
+
+/** The model a comparison runs on, after its env override (AI_MODEL_<NAME>) */
+export function resolveComparisonModel(name: ComparisonModel, env: EnvLike = {}): { provider: string; model: string } {
+  const override = env[`AI_MODEL_${name.toUpperCase()}`]?.trim()
+  return { provider: COMPARISON[name].provider, model: override || COMPARISON[name].model }
+}
+
+export function getLiveMinutePrice(model: string): LiveMinutePrice | null {
+  return LIVE_EXTRA.minutePrices[model] ?? null
+}
+
+/** The voices of a comparison voice model; null when the registry lists none for it */
+export function comparisonVoices(model: string): { default: string; voices: readonly string[] } | null {
+  return LIVE_EXTRA.comparisonVoices[model] ?? null
 }
 
 /** The Live API's prebuilt voices, and the one a call uses when none is picked */

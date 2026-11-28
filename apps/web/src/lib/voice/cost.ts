@@ -105,6 +105,42 @@ export function callCost(tokens: CallTokens, price: LiveModelPrice | null, secon
   return { textInUsd, audioInUsd, textOutUsd, audioOutUsd, thoughtsUsd, totalUsd, perMinuteUsd: seconds >= 1 ? totalUsd / (seconds / 60) : null, unpricedTokens: tokens.otherIn }
 }
 
+/** T-211: what a call on an engine billed by the minute used: the session's seconds, and its backend model's tokens */
+export interface MinuteUsage {
+  /** Seconds of session, as the engine reports them (the page's own clock until it does) */
+  seconds: number
+  backendIn: number
+  /** Of `backendIn`, how many were read from the provider's cache */
+  backendCachedIn: number
+  backendOut: number
+}
+
+export const NO_MINUTES: MinuteUsage = { seconds: 0, backendIn: 0, backendCachedIn: 0, backendOut: 0 }
+
+export interface MinuteCost {
+  voiceUsd: number
+  /** The seconds the voice is charged for: the session's own, and never less than the seconds billed at its start */
+  billedSeconds: number
+  backendUsd: number
+  totalUsd: number
+  perMinuteUsd: number | null
+}
+
+/**
+ * The cost of a call on an engine billed by the minute: the voice at its active rate (a session is
+ * billed some seconds as it starts, and its own time is credited against them, so the charge is
+ * for whichever is more), plus the backend model's tokens at that model's prices.
+ */
+export function minuteCost(usage: MinuteUsage, voice: { activePerMinute: number; startSeconds: number } | null, backend: { inputPerMTok: number; outputPerMTok: number; cachedInputPerMTok?: number } | null): MinuteCost | null {
+  if (!voice) return null
+  const billedSeconds = Math.max(usage.seconds, voice.startSeconds)
+  const voiceUsd = (billedSeconds / 60) * voice.activePerMinute
+  const fresh = Math.max(0, usage.backendIn - usage.backendCachedIn)
+  const backendUsd = backend ? usd(fresh, backend.inputPerMTok) + usd(usage.backendCachedIn, backend.cachedInputPerMTok ?? backend.inputPerMTok) + usd(usage.backendOut, backend.outputPerMTok) : 0
+  const totalUsd = voiceUsd + backendUsd
+  return { voiceUsd, billedSeconds, backendUsd, totalUsd, perMinuteUsd: usage.seconds >= 1 ? totalUsd / (usage.seconds / 60) : null }
+}
+
 /** Dollars to four places: a call costs cents, and a cent is too coarse to compare two calls */
 export const usdText = (amount: number) => `$${amount.toFixed(4)}`
 

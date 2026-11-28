@@ -124,7 +124,8 @@ Working style unchanged: one ticket at a time, plan → implement → checks →
 
 ## 7. Oumn: a voice assistant for each business (planned; T-210 is step 0)
 
-Added 27 November 2026 (T-210). Outside the v1 scope. Nothing below is built except the step 0 test.
+Added 27 November 2026 (T-210), revised 28 November (T-211). Outside the v1 scope. Nothing below is built
+except the step 0 test.
 
 **What she is.** Oumn is an AI voice assistant that answers for a business. A customer talks to her and she
 answers questions from the business's own information, gives an estimate in the business's prices, and offers
@@ -142,7 +143,7 @@ does not exist yet. When it is built it is one calendar, used by Oumn and by the
 alike, so a time offered by voice and a time picked on the page can never clash. Until then she can only take
 a request for a visit.
 
-**Step 0: the test call (T-210, done).** A private admin page (`/admin/voice-test`) where the owner talks to
+**Step 0: the test call (T-210, done; round two T-211).** A private admin page (`/admin/voice-test`) where the owner talks to
 her as a customer of any business. It answers five questions before the full build is committed to:
 1. the cost of a minute of call;
 2. the delay before she answers;
@@ -152,6 +153,44 @@ her as a customer of any business. It answers five questions before the full bui
 
 The test stores nothing and changes nothing a customer or a business sees. Its free times are made up, and
 booking and passing to a person only show what would have happened.
+
+**What round one found (three live calls, 28 November 2026).** The prices she spoke were the engine's. A minute
+cost 3.9 to 6.7 cents and rose with the length of the call. She answered in 1.2 to 2.4 seconds, and in up to 5.5
+around a tool. Her voice and manner were robotic: she spoke of the business in the third person, repeated stock
+sentences, said things the business had never said (an area it covers, a service it does not offer), and could
+not send an estimate or end a call.
+
+**The rules round two set (T-211).** These are the rules for the real build too.
+- **Before a call:** the caller gives a name and an email or phone number, by the business's own contact rules,
+  and passes the site's bot check. Under the button: "Oumn is {business}'s AI assistant. Calls are transcribed
+  so {business} can follow up." She is given the details, greets by first name, and never asks for or says back
+  a name, an email or a phone number; a detail the caller says is wrong is corrected in the call.
+- **She is staff.** "We" and "our", contractions, one or two short sentences. She says she is an AI assistant
+  when she opens and whenever asked. She never says the same sentence twice, says money in words in the
+  business's currency, says a short line before a tool that takes a moment, answers in English unless the
+  caller speaks a whole sentence in another language, and waits when a caller trails off.
+- **What she knows.** The business's information is in her instructions from the first word. "Not included"
+  is only for what a service lists as not included. Anything she cannot find is "not on my list, I'll get the
+  team to confirm", and is recorded for the business. A vague answer is confirmed as a number before pricing.
+- **Prices.** A typical price up front ("it depends on …, but we normally charge about … for …"), from the
+  same pricing path as an estimate with the smallest valid answers; none for a service priced from photos.
+  Several services are priced one at a time and she never adds them: the written estimate shows the total.
+  She can send the estimate.
+- **Where the business works.** A set area is the answer. With none set she says where the business is based
+  (when that is known), that nearby is normally fine and the team will confirm, and asks where the job is.
+  Another country is always no. She never promises an area that is not set.
+- **General advice** about the kind of work, short and basic, ending "the team will confirm when they see it";
+  never step-by-step instructions for work that could injure or damage. The business can switch it off.
+- **Protection.** She ends a call herself: after a goodbye, after steering an off-topic caller once, after one
+  warning to an abusive one, and when nobody is there. An off-topic or abusive ending is a strike; two in a
+  day block the device and the address for two days, and a strike within thirty days of a block ending blocks
+  for seven. Three calls a device a day, twenty a business, eight minutes a call. If the store that counts
+  them is down, the call goes ahead. A blocked visitor is shown the request form instead.
+- **Cost and speed.** Her memory of a call is a sliding window, so a long call does not cost more a minute than
+  a short one; what her tools have answered is put back in her memory as it slides.
+
+**A second engine, for comparison only.** The test page can run the same call on OpenAI's GPT-Live when its key
+is set. It is not part of the product (AD-102).
 
 **What follows, if the test passes** (each its own ticket, in this order):
 - a relay of our own between the browser and the model, if the direct connection is not fast or safe enough

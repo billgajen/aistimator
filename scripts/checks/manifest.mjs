@@ -168,9 +168,12 @@ export const SCRIPTS = [
   { id: 't208', server: 'standard', model: 'none', browser: true },
   // T-209: each guide's video file is as long as the list says; the hero's "1 min" button and its new window (a browser)
   { id: 't209', server: 'standard', model: 'none', browser: true },
-  // T-210: the private voice test: who can reach it, her tools through the real route (the business is the
-  // session's; an estimate writes nothing), and the page against a stand-in for the Live API (a browser)
-  { id: 't210', server: 'standard', model: 'none', browser: true },
+  // T-210: the private voice test: who can reach it, and her tools through the real route (the business is the
+  // session's; an estimate writes nothing). Its browser part moved to t211 with the round-two page.
+  { id: 't210', server: 'standard', model: 'none' },
+  // T-211: the voice test, round two: a typical price and several services write nothing; the details form, the
+  // price check, end_call, silence and the six- and eight-minute marks against a stand-in engine (a browser)
+  { id: 't211', server: 'standard', model: 'none', browser: true },
 ]
 
 /** Lint, typecheck and unit tests: every level runs these first */

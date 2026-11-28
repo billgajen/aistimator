@@ -18,6 +18,8 @@ const SCALES: Record<string, number> = { hundred: 100, thousand: 1000, grand: 10
 const MONEY_WORDS: Record<string, string> = { dollar: 'USD', dollars: 'USD', bucks: 'USD', usd: 'USD', pound: 'GBP', pounds: 'GBP', quid: 'GBP', gbp: 'GBP', euro: 'EUR', euros: 'EUR', eur: 'EUR' }
 const MONEY_SIGNS: Record<string, string> = { $: 'USD', '£': 'GBP', '€': 'EUR' }
 const SMALL_WORDS = new Set(['cent', 'cents', 'pence', 'penny', 'pennies', 'p'])
+/** The currency a small unit names by itself. A cent is several currencies', so it names none. */
+const SMALL_CURRENCY: Record<string, string> = { pence: 'GBP', penny: 'GBP', pennies: 'GBP' }
 
 export interface SpokenAmount {
   amount: number
@@ -141,6 +143,12 @@ export function spokenAmounts(speech: string): SpokenAmount[] {
     let money = sign !== null
     let currency = sign
     const word = tokens[end + 1]?.text
+    if (sign === null && word !== undefined && SMALL_WORDS.has(word) && word !== 'p' && value < 100) {
+      // under one unit, said in the small unit alone: "ninety-nine cents", "50 pence"
+      found.push({ amount: Math.round(value) / 100, text: speech.slice(first.start, tokens[end + 1]!.end), money: true, currency: SMALL_CURRENCY[word] ?? null })
+      i = end + 2
+      continue
+    }
     if (word !== undefined && word in MONEY_WORDS) {
       money = true
       currency = currency ?? MONEY_WORDS[word]!

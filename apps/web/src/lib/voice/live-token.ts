@@ -1,5 +1,5 @@
 /**
- * T-210: the short-lived token a test call's browser opens the Live API with.
+ * T-210, T-211: the short-lived token a test call's browser opens the Gemini Live API with.
  *
  * The page talks to Google directly (no relay of ours carries the audio), so it needs a
  * credential. It is never the API key. The server mints an ephemeral token for one call, and the
@@ -10,14 +10,51 @@
  * connection with the same token was refused; the plain (unconstrained) service refused it.
  *
  * One use, to be opened within a minute, dead a minute after the call limit.
+ *
+ * T-211, for speed and cost (the numbers are `LIVE_TUNING`):
+ * - the wait for the end of speech is set, shorter than the Live API's own (about 800 ms);
+ * - the call's memory slides: once the conversation passes `historyTriggerTokens` the oldest
+ *   turns are dropped down to `historyKeepTokens`, so a long call stops costing more a minute
+ *   than a short one (each turn is billed for everything still in the context). Her
+ *   instructions always stay, and what her tools have answered comes back to her with every
+ *   tool answer (tools.ts `callSoFar`), so a price given early is not lost with the old turns;
+ * - the caller's speech is transcribed as the business's language, so a mis-heard word does not
+ *   come back as another language.
+ * This model takes no thinking setting (Google's docs say to leave it out), so none is sent.
  */
 import { LIVE_TOKEN_URL, TOKEN_LIFE_SECONDS, TOKEN_START_SECONDS } from './config'
+
+/** Every number of the Live API session that this ticket chose */
+export const LIVE_TUNING = {
+  /** How long a silence ends the caller's turn. Google's default is about 800 ms and its advice is 500 to 800. */
+  silenceDurationMs: 500,
+  /** Sound kept from before speech is detected, so the first word is not clipped */
+  prefixPaddingMs: 120,
+  /** How much conversation, beyond her instructions and tools, starts a trim… */
+  historyTriggerTokens: 3_000,
+  /** …and how much conversation is kept after it (about the last minute of a call) */
+  historyKeepTokens: 1_500,
+  /** Her instructions and tools are text: about this many characters to a token */
+  charsPerToken: 4,
+} as const
+
+/**
+ * The sliding window for one call. The Live API counts the whole context, instructions and all,
+ * and always keeps the instructions; so the two numbers are her instructions' own size plus the
+ * conversation to allow and to keep.
+ */
+export function slidingWindow(setup: Pick<LiveSetup, 'instruction' | 'tools'>): { triggerTokens: number; slidingWindow: { targetTokens: number } } {
+  const fixed = Math.ceil((setup.instruction.length + JSON.stringify(setup.tools).length) / LIVE_TUNING.charsPerToken)
+  return { triggerTokens: fixed + LIVE_TUNING.historyTriggerTokens, slidingWindow: { targetTokens: fixed + LIVE_TUNING.historyKeepTokens } }
+}
 
 export interface LiveSetup {
   model: string
   voice: string
   instruction: string
   tools: unknown[]
+  /** The language the caller is expected to speak, as a BCP 47 tag */
+  language: string
 }
 
 /** The session setup the token carries: everything about the call that the browser must not choose */
@@ -27,8 +64,10 @@ export function lockedSetup(setup: LiveSetup) {
     generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: setup.voice } } } },
     systemInstruction: { parts: [{ text: setup.instruction }] },
     tools: [{ functionDeclarations: setup.tools }],
+    realtimeInputConfig: { automaticActivityDetection: { silenceDurationMs: LIVE_TUNING.silenceDurationMs, prefixPaddingMs: LIVE_TUNING.prefixPaddingMs } },
+    contextWindowCompression: slidingWindow(setup),
     // Both sides of the call as text, for the page's transcript and its price check
-    inputAudioTranscription: {},
+    inputAudioTranscription: { languageCodes: [setup.language] },
     outputAudioTranscription: {},
   }
 }
