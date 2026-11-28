@@ -217,12 +217,13 @@ describe('T-208 item 5: the transcript is for a screen reader only', () => {
     expect(read('Docs/help/01-getting-started.md')).not.toMatch(/transcript/i)
     expect(GUIDE_COPY.videoGuidesLine).not.toMatch(/written out|transcript/i)
     // the only user of a guide's transcript is the window
+    // (T-210: the private voice test keeps the transcript of a test call, which is another thing; its two folders are left out)
     const users: string[] = []
     const find = (dir: string) => {
       for (const name of readdirSync(dir)) {
         const full = join(dir, name)
         if (statSync(full).isDirectory()) {
-          if (name !== '__tests__') find(full)
+          if (name !== '__tests__' && name !== 'voice' && name !== 'voice-test') find(full)
         } else if (/\.tsx?$/.test(name) && /\.transcript\b/.test(readFileSync(full, 'utf8'))) users.push(relative(WEB, full))
       }
     }

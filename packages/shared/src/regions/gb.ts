@@ -11,6 +11,7 @@ export const GB_REGION: RegionDefinition = {
   currency: 'GBP',
   locale: 'en-GB',
   timeZone: 'Europe/London',
+  emergencyNumber: '999',
   unitSystem: 'metric',
   postalCodePattern: '^[A-Z]{1,2}[0-9][0-9A-Z]?\\s?[0-9][A-Z]{2}$',
   callingCode: '44',

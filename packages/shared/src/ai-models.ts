@@ -26,6 +26,8 @@ export type AiTask =
   | 'support_reply'
   /** T-198: answer a business's question about using the product, from the help guide only. Reads and answers; changes nothing. */
   | 'help_answer'
+  /** T-210: a spoken call with a business's assistant (the Live API: speech in, speech out). A private test for now. */
+  | 'voice_call'
 
 export const AI_TASKS: AiTask[] = [
   'extraction_pass',
@@ -40,6 +42,7 @@ export const AI_TASKS: AiTask[] = [
   'feature_match',
   'support_reply',
   'help_answer',
+  'voice_call',
 ]
 
 export interface ModelRoute {
@@ -206,6 +209,27 @@ export function harnessModel(name: keyof typeof registry.harness): ModelRoute {
 export function getModelPrice(model: string): ModelPrice | null {
   return PRICES[model] ?? null
 }
+
+/** T-210: a Live API model's prices, USD per 1M tokens, one per modality and direction */
+export interface LiveModelPrice {
+  textInPerMTok: number
+  audioInPerMTok: number
+  textOutPerMTok: number
+  audioOutPerMTok: number
+  asOf: string
+  source: string
+}
+
+const LIVE = (registry as unknown as { live: { prices: Record<string, LiveModelPrice>; defaultVoice: string; voices: string[] } }).live
+
+/** The Live API prices for a model; null when the registry has none (the cost is then not worked out) */
+export function getLivePrice(model: string): LiveModelPrice | null {
+  return LIVE.prices[model] ?? null
+}
+
+/** The Live API's prebuilt voices, and the one a call uses when none is picked */
+export const LIVE_VOICES: readonly string[] = LIVE.voices
+export const DEFAULT_LIVE_VOICE: string = LIVE.defaultVoice
 
 /** Estimated USD for a call; null when the model has no configured price. */
 export function estimateCostUsd(model: string, inputTokens: number, outputTokens: number): number | null {

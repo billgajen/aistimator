@@ -15,6 +15,178 @@
 
 ## Issues & Resolutions
 
+### 2026-11-27: T-210 — Oumn test call: a private page to test a voice assistant before building her
+
+**Not deployed yet, and off wherever it is deployed** until `VOICE_TEST_ENABLED=true` is set (OWNER-TODO, T-210).
+Web only. No pricing, worker, billing or database code changed; no migration; no new dependency. The shared
+package gained a task in the model registry and one field per region, neither of which the worker reads.
+
+**Why.** Oumn is a planned voice assistant for each business (`Docs/06-v2-strategy.md`, section 7): a customer
+talks to her through the browser and she answers questions, gives estimates in the business's prices and offers
+times. Before that is built, a one-day test has to answer five things: what a minute of call costs, how long
+she takes to answer, how natural she sounds, whether the prices she SAYS are the pricing engine's, and whether
+she keeps to the business's information. This ticket is that test and nothing more. Nothing a customer or a
+business sees changes; no quote, lead, booking or email is made by it.
+
+- **The page, `/admin/voice-test`** (`app/admin/voice-test/page.tsx`, `components/voice-test/VoiceTest.tsx`).
+  A business picker (it opens on the owner's test business when that exists) and a voice picker (the registry's
+  Live voices, Aoede first), Start call and End call, a live transcript of both sides, a "things to try" list,
+  and a results panel that fills in as the call runs: the delay of every turn with the median and the worst;
+  tokens by kind, the cost of the call and the cost per minute; every tool call with its arguments and result;
+  and the price check. "Copy results" puts the whole panel on the clipboard as plain text.
+  A call is ended by the page at 8 minutes; at 6 she is told that time is short.
+- **It is private twice over** (`lib/voice/access.ts`): it exists only while `VOICE_TEST_ENABLED` is exactly
+  `true`, and only for a platform admin (the admin area's own check). Otherwise the page and both routes answer
+  404. Nothing links to it.
+- **Her instructions are built from the business** (`lib/voice/instructions.ts`): its name, its region's
+  language and emergency number, its currency, and the words the customer language guard bans about a price.
+  She opens as "Oumn, the AI assistant for <business>" and says truthfully that she is an AI when asked. A
+  price comes only from `get_estimate`, is "an estimate that <business> will confirm", and is never worked out
+  by her. What the business's information does not answer gets "I'll get them to confirm that." No trade is
+  named in the instructions or the code (a unit test holds it).
+- **Her five tools run on our server** (`lib/voice/tools.ts`, `POST /api/admin/voice-test/tool`).
+  - `get_business_info`: name, time zone, currency, service area, standard terms, and each active service with
+    its description, what is and is not included, its assumptions and the questions its request form asks.
+  - `get_estimate(serviceId, answers)`: the pricing worker's `/preview`, the path "Test your pricing" uses
+    (T-204): the real rules engine, no AI, no photos.
+  - `get_free_times(fromDate)`: **made-up test slots** (`lib/voice/slots.ts`: two-hour windows on weekdays, from
+    tomorrow, in the business's time zone). No calendar exists.
+  - `book_time` and `request_person` **do nothing**: they answer with what would have happened, and the page
+    shows "would book …" / "would pass to a person …".
+- **The price check** (`lib/voice/spoken.ts`, `results.ts`). For every estimate she got, the page shows the
+  engine's total beside the amounts of money she then said, read out of her transcript ("four hundred and fifty
+  dollars", "$450", "450 pounds", "four fifty"). An amount of money she said that the engine did not give (not
+  the total, the subtotal, the tax or a line), or the wrong currency, is a mismatch, in red.
+- **The registry** (`packages/shared/src/ai-models.json`): task `voice_call` → the Live model (override
+  `AI_MODEL_VOICE_CALL`); a new `live` section with that model's four prices (text in, audio in, text out,
+  audio out, per 1M tokens, with the date and the page they were read from) and the Live voices with the
+  default. The cost on the page is worked out from those and from the Live API's own usage reports
+  (`lib/voice/cost.ts`). No model name, voice or price is written in code.
+- **Regions** gained `emergencyNumber` (911 for the US, 999 for the UK): what she tells a caller who may be in
+  danger.
+
+#### AD-101: the voice test talks to the Live API directly, with a token that locks the call
+The browser opens the model's WebSocket itself. No relay of ours carries the audio: whether a direct connection
+is fast and safe enough for customers is one of the things the test measures, and a relay (a Cloudflare
+Durable Object between the two) is the next ticket only if it is not.
+- **The key never reaches the browser.** `POST /api/admin/voice-test/session` mints a Live API ephemeral token
+  for one call (`lib/voice/live-token.ts`): one use, to be opened within 60 seconds, dead 9 minutes after it was
+  made.
+- **The token locks the whole setup**: the model, her instructions, her voice, her tools and the transcription
+  of both sides are in the token, with no field mask, so the Live API takes the setup from the token and
+  ignores what the browser sends. Probed against Google on 27 Nov 2026: a browser setup that named another
+  model, other instructions, another voice and no tools changed nothing; a second connection with the same
+  token was refused ("Token has been used too many times"); the plain service refused the token ("Permission
+  denied"). So a tampered page can talk to her, but cannot make her someone else or give her other tools.
+- **The business is pinned by a signed call session** (`lib/voice/session.ts`), made when the call starts and
+  sent back with every tool call. The tool route takes the business from it and from nothing else; a tool takes
+  no business argument and refuses one. The session is signed with a server-only secret, belongs to the admin
+  who started the call, and runs out with the token.
+- **Nothing is stored.** No table, no row, no log line of what was said. The results live in the page until it
+  is left.
+- Both routes are rate limited per admin (`voice_test_start`, `voice_test_tool` in `rate-limit-config.ts`).
+
+#### How "get_estimate writes nothing" was checked
+1. **The code path.** The tool's only way out is `previewPriceNow` → the worker's `/preview` →
+   `previewPrice` → `processQuote(..., { preview })`, which is section mode over data handed in: it returns
+   straight after the rules engine. `preview-pricing.ts` holds no insert, update, upsert, delete or rpc
+   (T-204's own unit test, and this ticket's). `lib/voice/*`, both routes and the page hold none either, and
+   the loader makes four `select`s.
+2. **The database, before and after** (`verify-t210`, section C): for a new business, seven estimates and three
+   refused ones through the real route and the real worker left the counts of quotes, quote requests, request
+   leads and assets at 0, `usage_counters` empty, and the business's own tenant, service, pricing-rule and form
+   rows byte for byte as they were (including `updated_at` and `test_estimate_times`). No admin activity row.
+3. **The same answer as Test your pricing**: the same service and answers through
+   `POST /api/services/preview-price` gave the same total and lines.
+
+#### What the Live API did, and did not do, as expected
+- **The current model is `gemini-3.8-live`** (Google's Live docs and its model page; the key's model list has
+  it). Ephemeral tokens are on `v1beta` now, not `v1alpha`.
+- **Token locking works, but the docs and the API reference disagree on the field's name**: the guide's examples
+  say `liveConnectConstraints`, the reference says `bidiGenerateContentSetup` with `fieldMask`. The reference's
+  spelling is what the REST endpoint took.
+- **The full WebSocket address for a token is not written in the docs.** It is the `…BidiGenerateContentConstrained`
+  service with the token as `access_token` (found by probing; the plain service refuses a token).
+- **No British English setting.** The native-audio model picks the language and accent itself; a language code
+  cannot be set. She is told the region's language variant in her instructions, which is the only lever. How
+  she sounds to a British listener is the owner's to hear.
+- **Function calls are non-blocking by default on this model.** The tools are declared `BLOCKING` so that she
+  waits for the engine before she says a price.
+- **She does not speak first.** The Live API waits to be spoken to, so the page tells her "The call has
+  connected." and she opens.
+- **Usage is reported per turn**, and each turn counts everything said so far (the whole context is read
+  again), so a long call costs more per minute than a short one. Thinking tokens are reported apart and are
+  charged as text out.
+- A session without context compression is limited to 15 minutes by Google; the test stops at 8.
+
+#### Two real calls (local stack, real Chrome, a recorded caller; 27 Nov 2026)
+- 80 seconds: she opened, read the business, priced 400 sq ft and 20 ft at the engine's 7,347.00 and said
+  "$7,347.00" (match), said she is an AI, and said the business does not offer a service it does not list.
+  Delays 1.8 s (with the estimate inside it) and 1.1 s. $0.024 for the call, about $0.018 a minute.
+- 95 seconds: asked about a guarantee and parking she said "I'll get them to confirm that" and offered to pass
+  the questions on; asked to book the first time, with a name and a phone number, she called `get_free_times`
+  and `book_time` and said back what the tool gave her ("would book: Monday, November 30, 8 am to 10 am … for
+  Dana Reyes"). Delays 1.1 s and 2.6 s (two tools inside it). $0.030, about $0.019 a minute.
+Both calls were mostly silence, so a talking call will cost more a minute, and two calls are not the test's
+answer. Neither left a row.
+
+**Constraints**
+
+- The voice test must stay switched off by default and must never be linked from a page a business sees.
+- A tool never takes a business: the business is the session's. A new tool goes through `runTool` and checks
+  every argument.
+- A tool never writes. The day she makes a real request it goes through the same intake as the form, in its
+  own ticket.
+- No price, model name or voice in code: the registry's `voice_call` and `live`.
+- The made-up slots are test data. Do not offer them to a customer.
+
+**Checks**
+
+- **Quick level (`pnpm check:quick`), run once: 4 min 27 s. 38 of 39 steps passed** (31 verify scripts, 2,727
+  checks): lint, typecheck, the unit suites (worker 926, web 2,266, app 269), both builds, and every verify
+  script but the new one, which was at 68 of 69. Its one failure was real and small: with no Gemini key on the
+  server (the checks' server has none) starting a call for a business that does not exist answered "not set
+  up" (503) before "no such business" (404). The route now looks the business up first.
+- **`pnpm check:failed`, twice.** The first run failed on the script itself (it read the price check the
+  moment the estimate was listed, before her words about it had arrived; it now waits for them). The second:
+  **`verify-t210` 69 of 69**, 45 s, against a fresh build. No full level: nothing in pricing, the worker,
+  billing, emails or a migration changed.
+- **Unit tests: `voice-t210.test.ts`, 55 new** (web 2,266, was 2,211). The session (changed, re-signed, run
+  out, another admin's: refused); no tool takes a business and each refuses one; an estimate is priced for the
+  session's business and only for its own services; every bad argument; answers sent as the form sends them;
+  no price when the engine gives none; the tools and the routes cannot write; the made-up slots (weekdays,
+  from the business's tomorrow, two hours, only a slot on offer can be booked); the cost by modality at the
+  registry's prices; the spoken amounts ("four hundred and fifty dollars", "$450", "450 pounds", "four fifty",
+  cents, a wrong currency, a rounded total); her instructions (name, AI, estimate, the banned words, 911 or
+  999, no trade); the token's lock and that the key goes only to Google; the registry; the switch; and both
+  audio worklets run as an audio thread runs them (16 kHz up from 48, 44.1 and 16 kHz devices; 24 kHz down).
+  `guides-t208.test.ts` changed in one line: its scan for users of a guide's transcript leaves out the voice
+  test's two folders (a call's transcript is another thing).
+- **`verify-t210` (new, in the manifest): 69 checks.** A: signed out and as a business's owner the page and
+  both routes are not there. B: her tools through the real route (the business is the session's; six kinds of
+  bad session refused). C: the estimate equals "Test your pricing" and nothing is written (the before and
+  after above). D: the made-up times and the two tools that pretend. E: the page in a browser with a stand-in
+  for the Live API on its socket: the pickers, the microphone going up as 16 kHz PCM in 40 ms pieces, her tool
+  call passed to the real route and answered with the engine's 7,347.00, a delay measured to within 350 ms of
+  the script's own clock, the cost from two usage reports, a match, then a rounded amount flagged as a
+  mismatch in red, "Copy results", End call. F: the wrap-up note at 6:00 and the stop at 8:00, with the page's
+  clock moved forward. The checks' web app has `VOICE_TEST_ENABLED=true` (manifest).
+- **By hand, on the local stack:** with the switch off, a platform admin gets 404 from the page and from both
+  routes (another admin page: 200). The token probe (above). Two real calls from real Chrome.
+
+**Not proven**
+
+- **How she sounds**, on Mac Chrome, on iPhone Safari, and to a British listener: the owner's test.
+- **A real microphone.** On this machine an automated browser cannot open one (a real one or Chrome's fake one
+  never opens), so the checks and the one real call hand the page a made-up microphone stream. Everything after
+  that point is the page's own code. The owner's first call is the first with a real microphone.
+- **iPhone Safari at all**: not run. The page uses an audio worklet and a 48 kHz device rate there; both are
+  handled in code and neither was tried on a phone.
+- **Echo.** With a loudspeaker and no headphones the browser's echo cancelling has to stop her hearing herself.
+  Not tried.
+- **The cost and delay figures**: one short call, mostly silent. The test is what measures them.
+- **Production**: not deployed by this ticket's checks; the token and the call were made with the local key.
+
 ### 2026-11-27: T-209 — A new, longer hero video; a guide of a minute or more says its length in minutes
 
 **Deployed 27 Nov 2026, web only** (commit 14741de, `npx vercel deploy --prod --yes` from the repo root, Vercel

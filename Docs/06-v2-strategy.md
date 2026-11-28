@@ -119,3 +119,47 @@ Working style unchanged: one ticket at a time, plan → implement → checks →
 - Multi-language output, multi-seat roles, deep compliance tooling (unchanged from v1 backlog)
 - Aerial/satellite measurement (roofing-era problem; revisit at that expansion)
 - Hardcoding painting-specific logic in the engine — the pack is configuration only
+
+---
+
+## 7. Oumn: a voice assistant for each business (planned; T-210 is step 0)
+
+Added 27 November 2026 (T-210). Outside the v1 scope. Nothing below is built except the step 0 test.
+
+**What she is.** Oumn is an AI voice assistant that answers for a business. A customer talks to her and she
+answers questions from the business's own information, gives an estimate in the business's prices, and offers
+times for a visit. She says she is an AI assistant when asked. She is the same promise as the rest of the
+product, spoken: the price is always the business's own (AD-001). She asks the pricing engine for every price
+and never works one out, and when the business's information does not answer a question she says she will get
+it confirmed.
+
+**Web call first.** The first channel is a call through the browser: a button on the business's quote link and
+website form, the customer's microphone, her voice back. No phone number, no telephony provider, no app. A
+phone line is a later step, and only if web calls show the demand.
+
+**A calendar shared with the estimate page.** Offering a time needs the business's free times. That calendar
+does not exist yet. When it is built it is one calendar, used by Oumn and by the estimate page's "book a visit"
+alike, so a time offered by voice and a time picked on the page can never clash. Until then she can only take
+a request for a visit.
+
+**Step 0: the test call (T-210, done).** A private admin page (`/admin/voice-test`) where the owner talks to
+her as a customer of any business. It answers five questions before the full build is committed to:
+1. the cost of a minute of call;
+2. the delay before she answers;
+3. how natural she sounds (Mac Chrome, iPhone Safari, a British listener);
+4. whether the prices she says are the pricing engine's, to the cent;
+5. whether she keeps to the business's information and says so when she does not know.
+
+The test stores nothing and changes nothing a customer or a business sees. Its free times are made up, and
+booking and passing to a person only show what would have happened.
+
+**What follows, if the test passes** (each its own ticket, in this order):
+- a relay of our own between the browser and the model, if the direct connection is not fast or safe enough
+  for customers (the test reports on this);
+- the calendar;
+- the customer-facing call on the quote link, with a real request made at the end of a call (through the same
+  intake as the form, so the business's review rules, plan count and notifications apply);
+- passing to a person and urgent alerts, through the business's existing notifications.
+
+**Not doing:** a price she works out herself, in any form; a voice that claims to be a person; recording calls
+without the customer being told.

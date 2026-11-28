@@ -18,6 +18,8 @@ const STANDARD_WEB = {
   WHATSAPP_APP_SECRET: 'local-app-secret-t175',
   WHATSAPP_VERIFY_TOKEN: 'local-verify-t175',
   WHATSAPP_ENCRYPTION_KEY: 'local-encryption-key-t175',
+  // T-210: the private voice test page exists on the checks' web app (it is off everywhere unless this is set)
+  VOICE_TEST_ENABLED: 'true',
 }
 
 const DEMO_AND_CRON = { CRON_SECRET: 'local-cron-t153', DEMO_DAILY_CAP: '8', DEMO_IP_LIMIT_PER_HOUR: '3' }
@@ -166,6 +168,9 @@ export const SCRIPTS = [
   { id: 't208', server: 'standard', model: 'none', browser: true },
   // T-209: each guide's video file is as long as the list says; the hero's "1 min" button and its new window (a browser)
   { id: 't209', server: 'standard', model: 'none', browser: true },
+  // T-210: the private voice test: who can reach it, her tools through the real route (the business is the
+  // session's; an estimate writes nothing), and the page against a stand-in for the Live API (a browser)
+  { id: 't210', server: 'standard', model: 'none', browser: true },
 ]
 
 /** Lint, typecheck and unit tests: every level runs these first */

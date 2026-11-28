@@ -4341,3 +4341,50 @@ Android needs no new build for this ticket.
   Xcode step does not depend on it: a failed step fails any Xcode build.
 - Other lines in the app still say "this phone" on an iPad (the sign-out alert, "Saved on this phone" while a
   price is worked out, a lost-signal notice on New quote). Only the Quotes screen was asked for.
+
+---
+
+## T-210 — Oumn test call (a private voice test page)
+
+Built 27 November 2026. Web only; no worker, no migration. **The page is off until you switch it on.**
+
+### Switch it on (Vercel)
+
+- [ ] Vercel → the web project → Settings → Environment Variables → add **`VOICE_TEST_ENABLED`** with the value
+  `true`, for Production. (`GEMINI_API_KEY` is already there: the chat form uses it.)
+  Or from the repo root: `npx vercel env add VOICE_TEST_ENABLED production`, and type `true` when asked.
+- [ ] Deploy again, so the setting takes effect: `npx vercel deploy --prod --yes`
+- [ ] Sign in with your admin account and open **https://qolumns.com/admin/voice-test**. If it says the page
+  is not found, the setting is not `true` or the deploy has not finished.
+
+### Run the test
+
+- [ ] On your Mac, in Chrome: the business is Harbor Lane Painting and the voice is Aoede already. Press
+  **Start call** and allow the microphone. She speaks first.
+- [ ] Work through "Things to try" on the page. One call ends by itself at 8 minutes; start another for the rest.
+- [ ] When a call ends, press **Copy results** and paste them somewhere before you start the next call: a new
+  call replaces the results, and nothing is saved.
+- [ ] Do the same on your iPhone in Safari (the same address, the same sign-in).
+- [ ] Ask a British listener to make one call, or play one back to them, and write down what they say.
+- [ ] Try a second voice or two from the picker for comparison.
+
+What to bring back: the copied results of each call, and a sentence on how she sounded on each device.
+
+### Switch it off again
+
+- [ ] Vercel → Settings → Environment Variables → delete `VOICE_TEST_ENABLED`
+  (or `npx vercel env rm VOICE_TEST_ENABLED production`), then `npx vercel deploy --prod --yes`.
+- [ ] Open https://qolumns.com/admin/voice-test again: it should say the page is not found.
+
+### What it costs
+
+Each call is charged to the Gemini key by the minute. One short local call came to about 2 cents a minute; a
+call with more talking will be more. The page shows each call's cost. A whole day of testing should be a few
+dollars at most. Starting a call is limited to 20 an hour.
+
+### Not proven here
+
+- How she sounds, a real microphone, iPhone Safari, and echo without headphones: none could be tried from
+  here. If the first call does not connect or you cannot hear her, the "Problems" list in the results says
+  what the page saw; send me that.
+

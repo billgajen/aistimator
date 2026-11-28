@@ -76,6 +76,15 @@ export const RATE_LIMITS = {
   ],
   // T-199: the live check as a business types its own address (signed in; the key is the business)
   address_check: [{ seconds: MINUTE, perIp: 120, perKey: 120 }],
+  // T-210: the private voice test (platform admins only; the key is the admin). Starting a call mints a
+  // token for a call that costs money by the minute, so a handful an hour is already a full day of testing.
+  voice_test_start: [
+    { seconds: MINUTE, perIp: 6, perKey: 3 },
+    { seconds: HOUR, perIp: 40, perKey: 20 },
+    { seconds: DAY, perIp: 120, perKey: 60 },
+  ],
+  // T-210: one of her tool calls during a test call (each reads the business; an estimate asks the pricing worker)
+  voice_test_tool: [{ seconds: MINUTE, perIp: 120, perKey: 60 }],
   // The sign-up relay to Meta: a person signs up once
   marketing: [{ seconds: MINUTE, perIp: 5, perKey: 1000 }],
   // Sign-up: the key is the email address (so one address cannot be sent email after email)

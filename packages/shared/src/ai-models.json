@@ -1,5 +1,5 @@
 {
-  "_comment": "T-135 model registry: the ONLY place model names live. Override any task at runtime with AI_MODEL_<TASK> (e.g. AI_MODEL_ADJUDICATION=anthropic:claude-opus-5-5). Prices are USD per 1M tokens, copied from the providers' published pages on the asOf date; update them here, never in code. `thinkingLevel` on a task is sent only to models whose capabilities list it (override with AI_THINKING_<TASK>=low|medium|high|default). `models` holds per-model request capabilities; a model not listed keeps the legacy request shape (response schema, system prompt as a primed turn, temperature). T-203: `overflow` on a task is the second provider a busy call is sent to after the in-place retries (apps/worker/src/ai/busy.ts): \"none\", or { provider, model }. Override per deployment with AI_OVERFLOW_<TASK> (\"none\", \"model\" or \"provider:model\"). A task's overflow is switched on only after scripts/load-test/overflow-proof.mts passes for it; `overflowCandidate` is the model that proof runs for a task still set to \"none\".",
+  "_comment": "T-135 model registry: the ONLY place model names live. Override any task at runtime with AI_MODEL_<TASK> (e.g. AI_MODEL_ADJUDICATION=anthropic:claude-opus-5-5). Prices are USD per 1M tokens, copied from the providers' published pages on the asOf date; update them here, never in code. `thinkingLevel` on a task is sent only to models whose capabilities list it (override with AI_THINKING_<TASK>=low|medium|high|default). `models` holds per-model request capabilities; a model not listed keeps the legacy request shape (response schema, system prompt as a primed turn, temperature). T-203: `overflow` on a task is the second provider a busy call is sent to after the in-place retries (apps/worker/src/ai/busy.ts): \"none\", or { provider, model }. Override per deployment with AI_OVERFLOW_<TASK> (\"none\", \"model\" or \"provider:model\"). A task's overflow is switched on only after scripts/load-test/overflow-proof.mts passes for it; `overflowCandidate` is the model that proof runs for a task still set to \"none\". T-210: `voice_call` is a Live API model (speech in, speech out, over a WebSocket); it has no entry in `prices` because the Live API is priced per modality. `live` holds that: per model, USD per 1M tokens for text in, audio in, text out and audio out (thinking tokens are charged as text out), copied from the model's page on the asOf date, and the Live API's prebuilt voices with the default.",
   "tasks": {
     "extraction_pass": {
       "provider": "gemini",
@@ -73,6 +73,11 @@
       "provider": "gemini",
       "model": "gemini-3.8-flash",
       "thinkingLevel": "low",
+      "overflow": "none"
+    },
+    "voice_call": {
+      "provider": "gemini",
+      "model": "gemini-3.8-live",
       "overflow": "none"
     }
   },
@@ -243,5 +248,52 @@
       "asOf": "2026-09-25",
       "source": "Anthropic API pricing (claude-api skill model table)"
     }
+  },
+  "live": {
+    "prices": {
+      "gemini-3.8-live": {
+        "textInPerMTok": 0.75,
+        "audioInPerMTok": 3,
+        "textOutPerMTok": 4.5,
+        "audioOutPerMTok": 12,
+        "asOf": "2026-11-27",
+        "source": "aistudio.google.com/docs/models/gemini-3.8-live (paid tier; the page also gives audio in as $0.005/min and audio out as $0.018/min)"
+      }
+    },
+    "defaultVoice": "Aoede",
+    "voices": [
+      "Zephyr",
+      "Puck",
+      "Charon",
+      "Kore",
+      "Fenrir",
+      "Leda",
+      "Orus",
+      "Aoede",
+      "Callirrhoe",
+      "Autonoe",
+      "Enceladus",
+      "Iapetus",
+      "Umbriel",
+      "Algieba",
+      "Despina",
+      "Erinome",
+      "Algenib",
+      "Rasalgethi",
+      "Laomedeia",
+      "Achernar",
+      "Alnilam",
+      "Schedar",
+      "Gacrux",
+      "Pulcherrima",
+      "Achird",
+      "Zubenelgenubi",
+      "Vindemiatrix",
+      "Sadachbia",
+      "Sadaltager",
+      "Sulafat"
+    ],
+    "voicesAsOf": "2026-11-27",
+    "voicesSource": "aistudio.google.com/docs/speech-generation (the Live API's native-audio models take the same voices)"
   }
 }

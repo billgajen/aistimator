@@ -69,6 +69,8 @@ export interface RegionDefinition {
   locale: string
   /** T-196: the time zone a month is counted in until the business's own is known (tenants.time_zone) */
   timeZone: string
+  /** T-210: the number to call when someone may be in danger */
+  emergencyNumber: string
   /** Default unit system (tenants can override) */
   unitSystem: UnitSystem
   /** Regex source that validates a postal code (case-insensitive) */

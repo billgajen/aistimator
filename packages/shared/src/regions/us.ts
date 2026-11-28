@@ -11,6 +11,7 @@ export const US_REGION: RegionDefinition = {
   currency: 'USD',
   locale: 'en-US',
   timeZone: 'America/New_York',
+  emergencyNumber: '911',
   unitSystem: 'imperial',
   postalCodePattern: '^\\d{5}(-\\d{4})?$',
   callingCode: '1',
